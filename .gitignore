@@ -1,0 +1,15 @@
+# 后端
+__pycache__/
+*.pyc
+.env
+.venv/
+*.egg-info/
+
+# 前端
+node_modules/
+dist/
+.vite/
+
+# 通用
+.DS_Store
+*.log
