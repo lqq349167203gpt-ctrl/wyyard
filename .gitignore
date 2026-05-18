@@ -5,6 +5,13 @@ __pycache__/
 .venv/
 *.egg-info/
 
+# 数据文件（不从 git 管理）
+backend/data/*.json
+backend/data/wyyard.db
+backend/data/chroma/
+backend/data/uploads/
+backend/uploads/
+
 # 前端
 node_modules/
 dist/
