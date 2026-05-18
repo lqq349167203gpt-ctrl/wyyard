@@ -8,10 +8,17 @@ dependencies = [
     "langgraph>=0.4.0",
     "langchain>=0.3.0",
     "langchain-anthropic>=0.3.0",
+    "langchain-openai>=1.0.0",
+    "langchain-chroma>=1.0.0",
+    "langchain-text-splitters>=1.0.0",
+    "chromadb>=1.0.0",
+    "lark-oapi>=1.5.0",
+    "pypdf2>=3.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "httpx>=0.28.0",
     "python-dotenv>=1.0.0",
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]

@@ -5,9 +5,13 @@ class Settings(BaseSettings):
     app_name: str = "wyyard-backend"
     debug: bool = False
 
-    # Anthropic
+    # LLM（默认智谱 GLM-5）
+    llm_api_key: str = ""
+    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    llm_model: str = "glm-5"
+
+    # Anthropic（备用）
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-6"
 
     # 飞书
     feishu_app_id: str = ""

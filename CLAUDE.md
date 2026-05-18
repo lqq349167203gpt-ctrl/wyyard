@@ -1,12 +1,12 @@
 # wyyard_project — AI 综合管理平台
 
 ## 项目定位
-企业级 AI 综合管理端：Agent 编排、知识库管理、业务数据管理，三合一。
+企业级 AI 综合管理平台 — 用户管理、活动日历、付费项目、账号权限、系统日志，一站式业务管理。
 
 ## 技术栈
 - **前端**：React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS
-- **后端**：Python 3.11+ + LangGraph + FastAPI
-- **数据源**：飞书多维表格（通过 lark-cli / 飞书 OpenAPI）
+- **后端**：Python 3.11+ + FastAPI
+- **数据持久化**：JSON 文件（`backend/data/`）
 - **模型**：Claude API（Anthropic SDK）
 
 ## 目录结构
@@ -18,22 +18,43 @@ wyyard_project/
 │   │   ├── components/       # 通用组件
 │   │   ├── pages/            # 页面
 │   │   ├── hooks/            # 自定义 hooks
-│   │   ├── lib/              # 工具函数、API 调用
+│   │   ├── lib/              # 工具函数、API 调用（api.ts）
 │   │   └── types/            # TypeScript 类型定义
 │   ├── public/
 │   └── package.json
-├── backend/                  # LangGraph 后端
+├── backend/                  # FastAPI 后端
 │   ├── app/
-│   │   ├── agents/           # LangGraph Agent 定义
-│   │   ├── graphs/           # LangGraph 工作流图
-│   │   ├── api/              # FastAPI 路由
+│   │   ├── api/              # API 路由（每个资源一个文件）
 │   │   ├── services/         # 业务逻辑
-│   │   ├── models/           # 数据模型
-│   │   └── config/           # 配置
+│   │   ├── models/           # 数据模型（Pydantic）
+│   │   ├── middleware/       # 中间件（操作日志自动记录）
+│   │   └── config/           # 配置（pydantic-settings）
+│   ├── data/                 # JSON 数据文件
 │   ├── requirements.txt
 │   └── pyproject.toml
-└── docs/                     # 项目文档
 ```
+
+## 页面清单
+| 分组 | 页面 | 路由 |
+|------|------|------|
+| 业务 | 用户管理 | /customers |
+| 业务 | 疗愈记录 | /healing-records |
+| 疗愈活动 | 人员到场 | /courses/class-records |
+| 疗愈活动 | 活动安排 | /courses/daily-activities |
+| 付费项目 | 付费项目 | /payment |
+| 信息配置 | 沙龙类型 | /positions/courses |
+| 信息配置 | 会员身份 | /config/member-identities |
+| 信息配置 | 疗愈身份 | /healing-identities |
+| 信息配置 | 疗愈空间 | /courses/spaces |
+| 账号管理 | 账号管理 | /accounts |
+| 账号管理 | 角色管理 | /positions/management |
+| 账号管理 | 修改密码 | /change-password |
+| 系统配置 | 工作台 | / |
+| 系统配置 | AI 配置 | /agents |
+| 系统配置 | 知识库 | /knowledge |
+| 系统配置 | 业务数据 | /business |
+| 系统配置 | 操作日志 | /operation-logs |
+| 系统配置 | 系统日志 | /system-logs |
 
 ## 开发规范
 
@@ -42,6 +63,7 @@ wyyard_project/
 - 变量/函数命名用英文，语义清晰，不用拼音
 - 密钥、token、密码不进代码、不进 commit、不进日志，统一用 .env 管理
 - 改完主动跑验证，不要只改不验
+- 所有数据必须有持久化机制（数据库、JSON 文件等），确保服务重启后数据不丢失，除非用户明确要求删除
 
 ### 前端
 - 组件拆分粒度：一个组件只做一件事
@@ -52,7 +74,7 @@ wyyard_project/
 
 ### 后端
 - Agent 定义和 Graph 定义分离：`agents/` 放 Agent 配置，`graphs/` 放工作流编排
-- API 路由按资源分组：`api/agents.py`、`api/knowledge.py`、`api/business.py`
+- API 路由按资源分组，每个资源一个文件，放在 `backend/app/api/`
 - 飞书 API 调用封装在 `services/feishu.py`，不散落在各处
 - 错误处理用 FastAPI 的 HTTPException，返回结构化的中文错误信息
 - 环境变量通过 `config/settings.py` 统一管理，用 pydantic-settings

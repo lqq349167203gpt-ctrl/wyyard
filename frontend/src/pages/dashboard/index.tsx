@@ -15,48 +15,48 @@ export default function DashboardPage() {
   const totalMessages = agents.reduce((sum, a) => sum + a.message_count, 0)
 
   const stats = [
-    { title: "Agent 数量", value: agents.length, icon: Bot, color: "text-blue-600" },
-    { title: "运行中", value: running, icon: Play, color: "text-green-600" },
-    { title: "业务数据表", value: 5, icon: Database, color: "text-purple-600" },
-    { title: "消息总量", value: totalMessages, icon: MessageSquare, color: "text-orange-600" },
+    { title: "Agent 数量", value: agents.length, icon: Bot, color: "text-primary" },
+    { title: "运行中", value: running, icon: Play, color: "text-emerald-500" },
+    { title: "业务数据表", value: 5, icon: Database, color: "text-muted-foreground" },
+    { title: "消息总量", value: totalMessages, icon: MessageSquare, color: "text-muted-foreground" },
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="px-6 pt-12 pb-6 space-y-3">
       <div>
-        <h1 className="text-2xl font-semibold">工作台</h1>
-        <p className="text-sm text-muted-foreground mt-1">系统运行概览</p>
+        <h1 className="text-lg font-semibold">工作台</h1>
+        <p className="text-xs text-muted-foreground mt-1.5">系统运行概览</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-4">
         {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+          <Card key={stat.title} className="shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 px-5 pt-4">
+              <CardTitle className="text-xs font-normal text-muted-foreground">
                 {stat.title}
               </CardTitle>
               <stat.icon className={`h-4 w-4 ${stat.color}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+            <CardContent className="px-5 pb-4">
+              <div className="text-2xl font-semibold">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Agent 运行状态</CardTitle>
+      <Card className="shadow-none">
+        <CardHeader className="px-5 pt-4 pb-3">
+          <CardTitle className="text-sm font-semibold">Agent 运行状态</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-5 pb-4">
           {agents.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">暂无 Agent，点击左侧「Agent 管理」创建</p>
+            <p className="text-sm text-muted-foreground py-6 text-center">暂无 Agent，点击左侧「AI 配置」创建</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {agents.map((agent) => (
                 <div
                   key={agent.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className="flex items-center justify-between rounded bg-muted/50 px-4 py-3"
                 >
                   <div className="flex items-center gap-3">
                     <Bot className="h-4 w-4 text-muted-foreground" />
@@ -69,7 +69,7 @@ export default function DashboardPage() {
                     <span className="text-xs text-muted-foreground">
                       {agent.message_count} 条消息
                     </span>
-                    <Badge variant={agent.status === "running" ? "default" : "secondary"}>
+                    <Badge variant={agent.status === "running" ? "default" : "secondary"} className="text-xs">
                       {agent.status === "running" ? "运行中" : "已停止"}
                     </Badge>
                   </div>

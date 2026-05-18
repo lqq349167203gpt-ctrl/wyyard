@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 
 class SyncStatus(str, Enum):
@@ -16,7 +17,9 @@ class FeishuTable(BaseModel):
     table_id: str
     record_count: int = 0
     sync_status: SyncStatus = SyncStatus.PENDING
-    last_synced_at: datetime | None = None
+    last_synced_at: Optional[datetime] = None
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
 
 
 class FeishuTableCreate(BaseModel):

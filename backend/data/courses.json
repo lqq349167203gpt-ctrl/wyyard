@@ -1,0 +1,62 @@
+{
+  "6b1fa222": {
+    "type": "读书会",
+    "name": "《当下的力量》读书会",
+    "teachers": [
+      "1be876a9",
+      "7de22dd9"
+    ],
+    "class_count": 0,
+    "id": "6b1fa222",
+    "created_at": "2026-04-25T06:50:03.421202Z",
+    "updated_at": "2026-04-25T10:34:55.529394Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "3257b30d": {
+    "type": "呼吸冥想",
+    "name": "呼吸冥想—链接身体",
+    "teachers": [],
+    "class_count": 0,
+    "id": "3257b30d",
+    "created_at": "2026-04-25T06:50:15.540222Z",
+    "updated_at": "2026-04-25T07:08:54.778738Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "79d8a7b2": {
+    "type": "觉醒游戏",
+    "name": "觉醒游戏-丽娜",
+    "teachers": [],
+    "class_count": 0,
+    "id": "79d8a7b2",
+    "created_at": "2026-04-25T06:50:25.193196Z",
+    "updated_at": "2026-04-25T07:09:17.862883Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "5b6bd8d5": {
+    "type": "颂钵",
+    "name": "颂钵",
+    "teachers": [],
+    "class_count": 0,
+    "id": "5b6bd8d5",
+    "created_at": "2026-04-25T06:50:33.259193Z",
+    "updated_at": "2026-04-25T07:09:21.878044Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "ef11f067": {
+    "type": "未分类",
+    "name": "课程测试",
+    "teachers": [
+      "1be876a9"
+    ],
+    "class_count": 0,
+    "id": "ef11f067",
+    "created_at": "2026-05-09T12:10:19.110658Z",
+    "updated_at": "2026-05-09T12:10:19.110658Z",
+    "is_deleted": false,
+    "deleted_at": null
+  }
+}

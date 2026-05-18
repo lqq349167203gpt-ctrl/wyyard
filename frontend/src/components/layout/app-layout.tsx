@@ -1,19 +1,68 @@
-import { Outlet } from "react-router-dom"
+import { Outlet, useNavigate, useLocation } from "react-router-dom"
+import { useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
+import { LogOut } from "lucide-react"
+
+const PAGE_TITLES: Record<string, string> = {
+  "/": "无忧 - 首页",
+  "/customers": "无忧 - 用户管理",
+  "/visits": "无忧 - 到场人员",
+  "/healing-records": "无忧 - 客户信息",
+  "/courses/class-records": "无忧 - 人员到场",
+  "/courses/daily-activities": "无忧 - 活动安排",
+  "/payment/membership-cards": "无忧 - 会员活动",
+  "/payment/group-cases": "无忧 - 觉醒游戏",
+  "/payment/emotional-releases": "无忧 - 情绪释放",
+  "/payment/energy-knots": "无忧 - 能量结",
+  "/payment/internal-courses": "无忧 - 内部课程",
+  "/courses/group-case-sessions": "无忧 - 觉醒游戏场次",
+  "/courses/emotional-release-sessions": "无忧 - 情绪释放场次",
+  "/courses/energy-knot-sessions": "无忧 - 能量结场次",
+  "/courses/internal-course-sessions": "无忧 - 内部课程场次",
+  "/agents": "无忧 - AI配置",
+  "/knowledge": "无忧 - 知识库",
+  "/business": "无忧 - 业务数据",
+
+
+  "/system-logs": "无忧 - 系统日志",
+  "/accounts": "无忧 - 账号管理",
+  "/positions/management": "无忧 - 角色管理",
+  "/positions/courses": "无忧 - 沙龙类型",
+  "/config/member-identities": "无忧 - 会员身份",
+  "/courses/spaces": "无忧 - 疗愈空间",
+  "/healing-identities": "无忧 - 疗愈身份",
+  "/operation-logs": "无忧 - 操作日志",
+}
 
 export function AppLayout() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    const title = PAGE_TITLES[location.pathname] || "无忧小院"
+    document.title = title
+  }, [location.pathname])
+
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn")
+    localStorage.removeItem("currentUser")
+    localStorage.removeItem("userPermissions")
+    navigate("/login")
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-14 items-center gap-3 border-b px-6">
+        <header className="flex h-11 items-center justify-between bg-white px-5 border-b-[4px] border-[#f7f8fa]">
           <SidebarTrigger />
-          <Separator orientation="vertical" className="h-5" />
-          <span className="text-sm text-muted-foreground">AI 综合管理平台</span>
+          <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e]" onClick={handleLogout}>
+            <LogOut className="h-3.5 w-3.5 mr-1.5" /> 退出登录
+          </Button>
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 min-w-0 overflow-auto bg-white">
           <Outlet />
         </main>
       </SidebarInset>

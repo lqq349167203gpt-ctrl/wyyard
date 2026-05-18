@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
 from datetime import datetime
+from typing import Optional
 
 
 class AgentStatus(str, Enum):
@@ -12,10 +13,11 @@ class AgentStatus(str, Enum):
 class AgentBase(BaseModel):
     name: str
     description: str = ""
-    model: str = "claude-sonnet-4-6"
+    model: str = "glm-5"
     system_prompt: str = ""
     temperature: float = 0.7
     max_tokens: int = 4096
+    ai_config_id: Optional[str] = None
 
 
 class AgentCreate(AgentBase):
@@ -23,13 +25,14 @@ class AgentCreate(AgentBase):
 
 
 class AgentUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    model: str | None = None
-    system_prompt: str | None = None
-    temperature: float | None = None
-    max_tokens: int | None = None
-    status: AgentStatus | None = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    model: Optional[str] = None
+    system_prompt: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    ai_config_id: Optional[str] = None
+    status: Optional[AgentStatus] = None
 
 
 class Agent(AgentBase):
@@ -38,6 +41,8 @@ class Agent(AgentBase):
     created_at: datetime
     updated_at: datetime
     message_count: int = 0
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
 
 
 class AgentMessage(BaseModel):

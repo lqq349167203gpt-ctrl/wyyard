@@ -1,0 +1,58 @@
+{
+  "b1949e94": {
+    "customer_id": "7de22dd9",
+    "customer_name": "白羊",
+    "date": "2026-04-29",
+    "title": "信心提升",
+    "growth_record": "12342134",
+    "teacher": "余老师",
+    "materials": [],
+    "id": "b1949e94",
+    "created_at": "2026-04-29T16:44:55.548644Z",
+    "updated_at": "2026-04-29T16:44:55.548644Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "8c25d28e": {
+    "customer_id": "7de22dd9",
+    "customer_name": "白羊",
+    "date": "2026-04-22",
+    "title": "1234",
+    "growth_record": "亲密关系探索局中看见不敢回应现男友  底层是上一段婚姻中和前夫 也看见相同模式 在对方抛弃我之前 我先离开 这样我就不是被抛弃了 回避型依恋           （下一步推进动作——种个案种子 ",
+    "teacher": "",
+    "materials": [],
+    "id": "8c25d28e",
+    "created_at": "2026-04-30T05:01:34.590546Z",
+    "updated_at": "2026-04-30T05:01:34.590546Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "67c20220": {
+    "customer_id": "3afb97f2",
+    "customer_name": "薇",
+    "date": "2026-04-27",
+    "title": "到场记录",
+    "growth_record": "123315314",
+    "teacher": "",
+    "materials": [],
+    "id": "67c20220",
+    "created_at": "2026-05-11T12:08:48.246380Z",
+    "updated_at": "2026-05-11T12:08:48.246380Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "f35db57c": {
+    "customer_id": "3afb97f2",
+    "customer_name": "薇",
+    "date": "2026-05-09",
+    "title": "到场记录",
+    "growth_record": "123",
+    "teacher": "",
+    "materials": [],
+    "id": "f35db57c",
+    "created_at": "2026-05-12T10:04:43.241069Z",
+    "updated_at": "2026-05-12T10:04:43.241069Z",
+    "is_deleted": false,
+    "deleted_at": null
+  }
+}

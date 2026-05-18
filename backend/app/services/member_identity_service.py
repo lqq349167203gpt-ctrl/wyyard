@@ -1,0 +1,182 @@
+import uuid
+from datetime import datetime, timezone
+from typing import List, Optional, Dict
+
+from app.models.member_identity import MemberIdentity, MemberIdentityCreate, MemberIdentityUpdate, IdentityCondition
+from app.models.customer import CustomerUpdate
+from app.services.storage import load_data, save_data
+from app.services import customer_service
+
+FILENAME = "member_identities.json"
+_identities: Dict[str, MemberIdentity] = {}
+
+
+def _load():
+    global _identities
+    data = load_data(FILENAME)
+    _identities = {k: MemberIdentity(**v) for k, v in data.items()}
+
+
+def _save():
+    data = {k: v.model_dump(mode="json") for k, v in _identities.items()}
+    save_data(FILENAME, data)
+
+
+_load()
+
+
+def list_identities() -> List[MemberIdentity]:
+    return sorted([v for v in _identities.values() if not v.is_deleted], key=lambda x: x.sort_order)
+
+
+def get_identity(identity_id: str) -> Optional[MemberIdentity]:
+    identity = _identities.get(identity_id)
+    if identity and identity.is_deleted:
+        return None
+    return identity
+
+
+def create_identity(data: MemberIdentityCreate) -> MemberIdentity:
+    now = datetime.now(timezone.utc)
+    max_order = max((i.sort_order for i in _identities.values()), default=-1)
+    identity_data = data.model_dump()
+    identity_data["sort_order"] = max_order + 1
+    identity = MemberIdentity(
+        id=str(uuid.uuid4())[:8],
+        created_at=now,
+        updated_at=now,
+        **identity_data,
+    )
+    _identities[identity.id] = identity
+    _save()
+    return identity
+
+
+def update_identity(identity_id: str, data: MemberIdentityUpdate) -> Optional[MemberIdentity]:
+    identity = _identities.get(identity_id)
+    if not identity:
+        return None
+    for key, value in data.model_dump(exclude_unset=True).items():
+        if hasattr(identity, key) and key not in ("id", "created_at"):
+            setattr(identity, key, value)
+    identity.updated_at = datetime.now(timezone.utc)
+    _identities[identity_id] = identity
+    _save()
+    return identity
+
+
+def reorder(ids: list) -> list:
+    """按传入的 ID 顺序更新 sort_order，返回变更描述列表"""
+    active = sorted([v for v in _identities.values() if not v.is_deleted], key=lambda x: x.sort_order)
+    before_order = {v.id: i for i, v in enumerate(active)}
+
+    changes = []
+    for i, identity_id in enumerate(ids):
+        identity = _identities.get(identity_id)
+        if identity:
+            old_pos = before_order.get(identity_id, -1)
+            if old_pos != i:
+                changes.append(f"{identity.name}（{old_pos + 1}→{i + 1}）")
+            identity.sort_order = i
+            identity.updated_at = datetime.now(timezone.utc)
+    _save()
+    return changes
+
+
+def delete_identity(identity_id: str) -> bool:
+    identity = _identities.get(identity_id)
+    if not identity:
+        return False
+    identity.is_deleted = True
+    identity.deleted_at = datetime.now(timezone.utc)
+    _save()
+    return True
+
+
+def _compare_count(actual: int, op: str, target: int) -> bool:
+    if op == ">":
+        return actual > target
+    elif op == "=":
+        return actual == target
+    elif op == "<":
+        return actual < target
+    return False
+
+
+def _check_condition(condition: IdentityCondition, customer_id: str,
+                     arrival_count: int, activity_count: int,
+                     customer_cards, customer_courses, today_str: str) -> bool:
+    t = condition.type
+    if t == "arrival":
+        return _compare_count(arrival_count, condition.count_op, condition.count_value)
+    elif t == "activity":
+        return _compare_count(activity_count, condition.count_op, condition.count_value)
+    elif t == "card":
+        item_set = set(condition.items) if condition.items else set()
+        for c in customer_cards:
+            if item_set and c.card_type not in item_set:
+                continue
+            if condition.validity == "active" and c.expiry_date and c.expiry_date < today_str:
+                continue
+            return True
+        return False
+    elif t == "course":
+        item_set = set(condition.items) if condition.items else set()
+        for c in customer_courses:
+            if item_set and c.course_type not in item_set:
+                continue
+            if condition.validity == "active" and c.expiry_date and c.expiry_date < today_str:
+                continue
+            return True
+        return False
+    return False
+
+
+def refresh_member_type(customer_id: str):
+    """根据配置的会员身份规则自动刷新用户的 member_type"""
+    customer = customer_service.get_customer(customer_id)
+    if not customer:
+        return
+
+    identities = list_identities()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # 预计算用户数据
+    from app.services import membership_card_service, visit_service, internal_course_service
+    all_cards = membership_card_service.list_cards()
+    customer_cards = [c for c in all_cards if c.customer_id == customer_id]
+
+    all_courses = internal_course_service.list_courses()
+    customer_courses = [c for c in all_courses if c.customer_id == customer_id]
+
+    all_visits = visit_service.list_visits()
+    customer_visits = [v for v in all_visits if v.customer_id == customer_id]
+    arrival_count = sum(1 for v in customer_visits if v.arrived)
+    activity_count = sum(1 for v in customer_visits if v.activity_id)
+
+    # 按 sort_order 顺序匹配，第一条命中即为身份
+    member_type = ""
+    for identity in identities:
+        if not identity.conditions:
+            member_type = identity.name
+            break
+        results = [_check_condition(cond, customer_id, arrival_count, activity_count,
+                                    customer_cards, customer_courses, today_str)
+                   for cond in identity.conditions]
+        if identity.operator == "any":
+            matched = any(results)
+        else:
+            matched = all(results)
+        if matched:
+            member_type = identity.name
+            break
+
+    if customer.member_type != member_type:
+        customer_service.update_customer(customer_id, CustomerUpdate(member_type=member_type))
+
+
+def refresh_all():
+    """批量刷新所有用户的 member_type"""
+    customers = customer_service.list_customers()
+    for c in customers:
+        refresh_member_type(c.id)

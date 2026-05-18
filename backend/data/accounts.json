@@ -1,0 +1,38 @@
+{
+  "admin001": {
+    "owner": "不闹",
+    "role": "超级管理员",
+    "username": "admin_wyxy",
+    "password": "wyxy_123456",
+    "enabled": true,
+    "id": "admin001",
+    "created_at": "2026-05-06T00:00:00Z",
+    "is_system": true,
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "be03aa61": {
+    "owner": "白羊",
+    "role": "信息管理员",
+    "username": "baiyang",
+    "password": "123456",
+    "enabled": true,
+    "id": "be03aa61",
+    "created_at": "2026-05-06T06:07:28.223947Z",
+    "is_system": false,
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "8dd780df": {
+    "owner": "薇",
+    "role": "超级管理员",
+    "username": "qwert",
+    "password": "123456",
+    "enabled": true,
+    "id": "8dd780df",
+    "created_at": "2026-05-06T17:14:10.525911Z",
+    "is_system": false,
+    "is_deleted": true,
+    "deleted_at": "2026-05-06T17:14:23.949117Z"
+  }
+}

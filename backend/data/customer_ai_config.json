@@ -1,0 +1,13 @@
+{
+  "id": "default",
+  "name": "客户信息提取",
+  "provider": "xiaomi",
+  "model": "mimo-v2.5-pro",
+  "api_key": "tp-cqgunfmcu1maxv4kdmq3a1v6rl8mdir8f0ngxl9g5gqkndgf",
+  "base_url": "https://api.xiaomi.com/v1/",
+  "system_prompt": "",
+  "temperature": 0.0,
+  "max_tokens": 2048,
+  "created_at": "2026-04-25T16:10:47.384010Z",
+  "updated_at": "2026-04-25T16:12:21.322020Z"
+}

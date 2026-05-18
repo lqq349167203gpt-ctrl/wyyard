@@ -1,0 +1,474 @@
+{
+  "56c0364f": {
+    "date": "2026-04-25",
+    "start_time": null,
+    "end_time": null,
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "",
+    "teacher_ids": [],
+    "participant_ids": [],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 2",
+        "member_ids": [],
+        "leader_id": "",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "56c0364f",
+    "created_at": "2026-04-25T10:24:25.392849Z",
+    "updated_at": "2026-04-26T14:19:34.303418Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "a870ba9d": {
+    "date": "2026-04-25",
+    "start_time": null,
+    "end_time": null,
+    "course_id": "3257b30d",
+    "course_name": "呼吸冥想—链接身体",
+    "course_description": "",
+    "teacher_ids": [
+      "7de22dd9"
+    ],
+    "participant_ids": [
+      "59cfbdd2",
+      "7de22dd9",
+      "3afb97f2"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [
+          "3afb97f2"
+        ],
+        "leader_id": "7de22dd9",
+        "deputy_id": "59cfbdd2"
+      },
+      {
+        "name": "小组 2",
+        "member_ids": [],
+        "leader_id": "",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "a870ba9d",
+    "created_at": "2026-04-25T10:25:12.175236Z",
+    "updated_at": "2026-04-30T02:40:43.420330Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "1f0ef510": {
+    "date": "2026-04-25",
+    "start_time": "00:04",
+    "end_time": "23:03",
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "",
+    "teacher_ids": [
+      "1be876a9"
+    ],
+    "participant_ids": [],
+    "materials": [],
+    "groups": [],
+    "is_public_welfare": false,
+    "id": "1f0ef510",
+    "created_at": "2026-04-25T13:04:06.080822Z",
+    "updated_at": "2026-04-25T13:04:23.212540Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "9cdac4ce": {
+    "date": "2026-04-26",
+    "start_time": "10:47",
+    "end_time": "02:47",
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "本次课程核心：\n深度走进内在小孩，学习看见、接纳与温柔抱持，完整拆解内在小孩疗愈核心逻辑、底层原理与实操方法，助力大家打通疗愈思维，掌握专业技能。\n\n沉浸式线下实战演练，手把手带你修炼，一步步成长为专业且优秀的内在小孩疗愈师。\n\n想要现场参与线下实战训练、沉浸式进修的伙伴，请回复↩️一颗❤️这个读书会是\n明天19:30觉醒游戏训练 招募主持人 提问君\n\n1. 潘冬雯 提问君\n2. 海霞 成就君\n3. 潼潼 提问君\n4. 彭彭 提问君\n5. 安心觉醒君\n6. 秀芹 主持人",
+    "teacher_ids": [
+      "1be876a9"
+    ],
+    "participant_ids": [
+      "3afb97f2",
+      "bd9a20ec",
+      "00ad4ddb",
+      "32980b37",
+      "03a38e46",
+      "7de22dd9",
+      "38b06aa4",
+      "167b1708",
+      "629e16ab",
+      "8f7f8931",
+      "ccead5b9",
+      "59cfbdd2"
+    ],
+    "materials": [
+      {
+        "id": "7347c766",
+        "name": "p524782986.jpg",
+        "url": "/api/uploads/materials/7347c766.jpg",
+        "size": 38503
+      }
+    ],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [
+          "3afb97f2",
+          "ccead5b9",
+          "167b1708",
+          "38b06aa4",
+          "00ad4ddb",
+          "8f7f8931",
+          "03a38e46",
+          "32980b37",
+          "bd9a20ec",
+          "629e16ab"
+        ],
+        "leader_id": "7de22dd9",
+        "deputy_id": "59cfbdd2"
+      },
+      {
+        "name": "小组 2",
+        "member_ids": [],
+        "leader_id": "",
+        "deputy_id": ""
+      },
+      {
+        "name": "小组 3",
+        "member_ids": [],
+        "leader_id": "",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "9cdac4ce",
+    "created_at": "2026-04-26T14:45:14.708904Z",
+    "updated_at": "2026-04-26T16:50:27.946180Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "f9f989a9": {
+    "date": "2026-04-26",
+    "start_time": "00:19",
+    "end_time": "23:18",
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "对方而非",
+    "teacher_ids": [
+      "7de22dd9"
+    ],
+    "participant_ids": [],
+    "materials": [],
+    "groups": [],
+    "is_public_welfare": true,
+    "id": "f9f989a9",
+    "created_at": "2026-04-26T15:18:53.812248Z",
+    "updated_at": "2026-05-07T17:07:57.956901Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "9b49b93c": {
+    "date": "2026-04-27",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "次课程核心： 深度走进内在小孩，学习看见、接纳与温柔抱持，完整拆解内在小孩疗愈核心逻辑、底层原理与实操方法",
+    "teacher_ids": [
+      "1be876a9"
+    ],
+    "participant_ids": [
+      "bd9a20ec",
+      "7de22dd9",
+      "3afb97f2"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [
+          "bd9a20ec"
+        ],
+        "leader_id": "7de22dd9",
+        "deputy_id": ""
+      },
+      {
+        "name": "小组 2",
+        "member_ids": [
+          "3afb97f2"
+        ],
+        "leader_id": "",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "9b49b93c",
+    "created_at": "2026-04-27T01:04:35.650721Z",
+    "updated_at": "2026-05-11T08:03:34.974987Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "badc7d4c": {
+    "date": "2026-04-28",
+    "start_time": "09:00",
+    "end_time": "11:00",
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "",
+    "teacher_ids": [
+      "7de22dd9"
+    ],
+    "participant_ids": [
+      "ccead5b9"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [],
+        "leader_id": "ccead5b9",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "badc7d4c",
+    "created_at": "2026-04-30T03:29:13.069614Z",
+    "updated_at": "2026-05-04T07:52:45.132756Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "c567bf52": {
+    "date": "2026-04-27",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "3257b30d",
+    "course_name": "呼吸冥想—链接身体",
+    "course_description": "",
+    "teacher_ids": [
+      "7de22dd9"
+    ],
+    "participant_ids": [
+      "3afb97f2",
+      "7de22dd9"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [],
+        "leader_id": "3afb97f2",
+        "deputy_id": ""
+      },
+      {
+        "name": "小组 2",
+        "member_ids": [],
+        "leader_id": "7de22dd9",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": true,
+    "id": "c567bf52",
+    "created_at": "2026-05-03T23:33:12.376685Z",
+    "updated_at": "2026-05-16T07:33:45.232752Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "152d0dc5": {
+    "date": "2026-05-12",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "",
+    "teacher_ids": [
+      "1be876a9"
+    ],
+    "participant_ids": [],
+    "materials": [],
+    "groups": [],
+    "is_public_welfare": false,
+    "id": "152d0dc5",
+    "created_at": "2026-05-12T16:48:11.284146Z",
+    "updated_at": "2026-05-12T16:48:11.284146Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "a53ba497": {
+    "date": "2026-05-12",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "3257b30d",
+    "course_name": "呼吸冥想—链接身体",
+    "course_description": "",
+    "teacher_ids": [
+      "7de22dd9"
+    ],
+    "participant_ids": [],
+    "materials": [],
+    "groups": [],
+    "is_public_welfare": false,
+    "id": "a53ba497",
+    "created_at": "2026-05-12T16:48:20.050637Z",
+    "updated_at": "2026-05-12T16:48:20.050637Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "70cf08f6": {
+    "date": "2026-05-15",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "6b1fa222",
+    "course_name": "《当下的力量》读书会",
+    "course_description": "",
+    "teacher_ids": [
+      "3afb97f2"
+    ],
+    "participant_ids": [
+      "ccead5b9"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [],
+        "leader_id": "ccead5b9",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "70cf08f6",
+    "created_at": "2026-05-15T04:30:35.432345Z",
+    "updated_at": "2026-05-15T06:54:28.208015Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "4f2df128": {
+    "date": "2026-05-15",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "3257b30d",
+    "course_name": "呼吸冥想—链接身体",
+    "course_description": "呼吸冥想",
+    "teacher_ids": [
+      "3afb97f2"
+    ],
+    "participant_ids": [
+      "ccead5b9"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [],
+        "leader_id": "ccead5b9",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "4f2df128",
+    "created_at": "2026-05-15T06:54:02.270499Z",
+    "updated_at": "2026-05-15T06:54:26.306258Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "3f7899f8": {
+    "date": "2026-05-15",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "5b6bd8d5",
+    "course_name": "颂钵",
+    "course_description": "",
+    "teacher_ids": [
+      "3afb97f2"
+    ],
+    "participant_ids": [
+      "ccead5b9"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [],
+        "leader_id": "ccead5b9",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "3f7899f8",
+    "created_at": "2026-05-15T06:54:22.070948Z",
+    "updated_at": "2026-05-15T06:54:24.010504Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "8f9946fc": {
+    "date": "2026-05-15",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "3257b30d",
+    "course_name": "呼吸冥想—链接身体",
+    "course_description": "",
+    "teacher_ids": [
+      "3afb97f2"
+    ],
+    "participant_ids": [
+      "ccead5b9"
+    ],
+    "materials": [],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [],
+        "leader_id": "ccead5b9",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "8f9946fc",
+    "created_at": "2026-05-15T06:54:53.569991Z",
+    "updated_at": "2026-05-16T08:22:04.938688Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "f65ad0e5": {
+    "date": "2026-05-15",
+    "start_time": "09:00",
+    "end_time": "10:00",
+    "course_id": "3257b30d",
+    "course_name": "呼吸冥想—链接身体",
+    "course_description": "",
+    "teacher_ids": [
+      "3afb97f2"
+    ],
+    "participant_ids": [
+      "ccead5b9"
+    ],
+    "materials": [
+      {
+        "id": "4dce898e",
+        "name": "p524782986.jpg",
+        "url": "/api/uploads/materials/4dce898e.jpg",
+        "size": 38503
+      }
+    ],
+    "groups": [
+      {
+        "name": "小组 1",
+        "member_ids": [],
+        "leader_id": "ccead5b9",
+        "deputy_id": ""
+      }
+    ],
+    "is_public_welfare": false,
+    "id": "f65ad0e5",
+    "created_at": "2026-05-15T06:54:53.952787Z",
+    "updated_at": "2026-05-18T03:46:44.061341Z",
+    "is_deleted": false,
+    "deleted_at": null
+  }
+}

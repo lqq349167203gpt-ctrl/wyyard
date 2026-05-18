@@ -1,18 +1,37 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Optional, List, Dict
 
 from app.models.agent import Agent, AgentCreate, AgentUpdate, AgentStatus
+from app.services.storage import load_data, save_data
 
-# 内存存储，后续替换为数据库
-_agents: dict[str, Agent] = {}
-
-
-def list_agents() -> list[Agent]:
-    return list(_agents.values())
+FILENAME = "agents.json"
+_agents: Dict[str, Agent] = {}
 
 
-def get_agent(agent_id: str) -> Agent | None:
-    return _agents.get(agent_id)
+def _load():
+    global _agents
+    data = load_data(FILENAME)
+    _agents = {k: Agent(**v) for k, v in data.items()}
+
+
+def _save():
+    data = {k: v.model_dump(mode="json") for k, v in _agents.items()}
+    save_data(FILENAME, data)
+
+
+_load()
+
+
+def list_agents() -> List[Agent]:
+    return [v for v in _agents.values() if not v.is_deleted]
+
+
+def get_agent(agent_id: str) -> Optional[Agent]:
+    agent = _agents.get(agent_id)
+    if agent and agent.is_deleted:
+        return None
+    return agent
 
 
 def create_agent(data: AgentCreate) -> Agent:
@@ -26,10 +45,11 @@ def create_agent(data: AgentCreate) -> Agent:
         **data.model_dump(),
     )
     _agents[agent.id] = agent
+    _save()
     return agent
 
 
-def update_agent(agent_id: str, data: AgentUpdate) -> Agent | None:
+def update_agent(agent_id: str, data: AgentUpdate) -> Optional[Agent]:
     agent = _agents.get(agent_id)
     if not agent:
         return None
@@ -37,8 +57,15 @@ def update_agent(agent_id: str, data: AgentUpdate) -> Agent | None:
     for key, value in update_data.items():
         setattr(agent, key, value)
     agent.updated_at = datetime.now(timezone.utc)
+    _save()
     return agent
 
 
 def delete_agent(agent_id: str) -> bool:
-    return _agents.pop(agent_id, None) is not None
+    agent = _agents.get(agent_id)
+    if not agent:
+        return False
+    agent.is_deleted = True
+    agent.deleted_at = datetime.now(timezone.utc)
+    _save()
+    return True

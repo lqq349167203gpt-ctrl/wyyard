@@ -1,0 +1,47 @@
+{
+  "4c178f40": {
+    "name": "临平分院",
+    "id": "4c178f40",
+    "rooms": [
+      {
+        "name": "1楼",
+        "id": "d8d52742",
+        "space_id": "4c178f40"
+      },
+      {
+        "name": "2楼",
+        "id": "03d34244",
+        "space_id": "4c178f40"
+      },
+      {
+        "name": "3楼",
+        "id": "644ac99e",
+        "space_id": "4c178f40"
+      }
+    ],
+    "created_at": "2026-04-25T06:48:44.008099Z",
+    "updated_at": "2026-04-25T06:48:53.943463Z",
+    "is_deleted": false,
+    "deleted_at": null
+  },
+  "dcad91d1": {
+    "name": "桃源时代5幢",
+    "id": "dcad91d1",
+    "rooms": [
+      {
+        "name": "房间1",
+        "id": "fd0a5ad2",
+        "space_id": "dcad91d1"
+      },
+      {
+        "name": "房间2",
+        "id": "23878479",
+        "space_id": "dcad91d1"
+      }
+    ],
+    "created_at": "2026-05-15T04:31:10.170108Z",
+    "updated_at": "2026-05-15T04:31:19.533231Z",
+    "is_deleted": false,
+    "deleted_at": null
+  }
+}

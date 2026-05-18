@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Annotated
 from langgraph.graph.message import add_messages
-from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 from app.config.settings import settings
 
@@ -14,10 +14,10 @@ class ChatState(TypedDict):
 
 
 def chat_node(state: ChatState) -> ChatState:
-    model_name = state.get("model", settings.anthropic_model)
-    llm = ChatAnthropic(
-        model=model_name,
-        api_key=settings.anthropic_api_key,
+    llm = ChatOpenAI(
+        model=state.get("model", settings.llm_model),
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
         temperature=0.7,
         max_tokens=4096,
     )
