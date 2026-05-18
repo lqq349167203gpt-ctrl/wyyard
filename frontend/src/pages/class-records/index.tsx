@@ -1,0 +1,4210 @@
+import { useEffect, useState, useRef, useMemo, useCallback } from "react"
+import { Plus, Trash2, Edit, X, Users, BookOpen, ChevronRight, ChevronLeft, FileUp, Download, File, LayoutList, LayoutGrid, Loader2, ChevronDown, Search } from "lucide-react"
+import VisitsDetailView from "@/components/visits/detail-view"
+import VisitsListView from "@/components/visits/list-view"
+import GroupingView from "@/components/grouping-view"
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { classRecordApi, groupCaseSessionApi, groupCaseApi, emotionalReleaseSessionApi, emotionalReleaseApi, energyKnotSessionApi, energyKnotApi, internalCourseSessionApi, courseApi, customerApi, uploadApi, visitApi, dailyGroupingApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type Course, type Customer, type CustomerSearchResult, type GroupCaseCustomerSearchResult, type EmotionalReleaseCustomerSearchResult, type EnergyKnotCustomerSearchResult, type InternalCourseSessionCustomerSearchResult, type VisitRecord } from "@/lib/api"
+import ArrivalConfirmationView from "./arrival-confirmation"
+import { usePagination } from "@/hooks/use-pagination"
+import { PaginationBar } from "@/components/pagination-bar"
+
+const today = new Date().toISOString().split("T")[0]
+
+function formatDate(d: Date): string {
+  return d.toISOString().split("T")[0]
+}
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d); r.setDate(r.getDate() + n); return r
+}
+function getWeekday(d: string): string {
+  return ["日", "一", "二", "三", "四", "五", "六"][new Date(d).getDay()]
+}
+function formatDateChinese(d: string): string {
+  const date = new Date(d)
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const weekday = ["日", "一", "二", "三", "四", "五", "六"][date.getDay()]
+  return `${year}年${month}月${day}日 星期${weekday}`
+}
+
+export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "activities" }) {
+  const [records, setRecords] = useState<ClassRecord[]>([])
+  const [groupCaseSessions, setGroupCaseSessions] = useState<GroupCaseSession[]>([])
+  const [emotionalReleaseSessions, setEmotionalReleaseSessions] = useState<EmotionalReleaseSession[]>([])
+  const [courses, setCourses] = useState<Course[]>([])
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([])
+  const [teachers, setTeachers] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<"list" | "detail">("detail")
+
+  // 活动列表筛选 - 输入框状态
+  const [inputActType, setInputActType] = useState("all")
+  const [inputActName, setInputActName] = useState("")
+  const [inputActStartDate, setInputActStartDate] = useState("")
+  const [inputActEndDate, setInputActEndDate] = useState("")
+  // 已提交的筛选条件
+  const [appliedActFilters, setAppliedActFilters] = useState({ type: "all", name: "", startDate: "", endDate: "" })
+  const [hasActSearched, setHasActSearched] = useState(false)
+  const [detailDate, setDetailDate] = useState(today)
+  const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
+  const [detailTab, setDetailTab] = useState<"visitors" | "activities" | "arrival_confirmation" | "grouping">(() => {
+    try {
+      const perms: string[] = JSON.parse(localStorage.getItem("userPermissions") || "[]")
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      const isSA = currentUser?.role === "超级管理员"
+      const has = (k: string) => isSA || perms.includes(k) || perms.includes("class-records")
+      if (has("class-records-visitors")) return "visitors"
+      if (has("class-records-activities")) return "activities"
+      if (has("class-records-arrival")) return "arrival_confirmation"
+    } catch {}
+    return "visitors"
+  })
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false)
+  const [calendarPickerMonth, setCalendarPickerMonth] = useState(() => today.substring(0, 7))
+
+  // 新增/编辑弹窗
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<ClassRecord | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [formDate, setFormDate] = useState(today)
+  const [formStartTime, setFormStartTime] = useState("09:00")
+  const [formEndTime, setFormEndTime] = useState("10:00")
+  const [formCourseId, setFormCourseId] = useState("")
+  const [formTeacherId, setFormTeacherId] = useState("")
+  const [formDescription, setFormDescription] = useState("")
+  const [formIsPublicWelfare, setFormIsPublicWelfare] = useState(false)
+  const [showCourseDropdown, setShowCourseDropdown] = useState(false)
+  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false)
+
+  // 资料弹窗
+  const [materialsDialogOpen, setMaterialsDialogOpen] = useState(false)
+  const [materialsRecord, setMaterialsRecord] = useState<ClassRecord | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  // 删除确认
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  // 小组人员面板
+  const [groupsRecord, setGroupsRecord] = useState<ClassRecord | null>(null)
+  const [groupsPanelOpen, setGroupsPanelOpen] = useState(false)
+  const [groupSearchKeyword, setGroupSearchKeyword] = useState("")
+  const [groupSearchResults, setGroupSearchResults] = useState<CustomerSearchResult[]>([])
+  const [groupSearchTarget, setGroupSearchTarget] = useState<{ groupIndex: number; role: "leader" | "deputy" | "member" } | null>(null)
+  const groupSearchTimeoutRef = useRef<number | null>(null)
+  const groupBlurTimeoutRef = useRef<number | null>(null)
+  const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
+  const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
+  const [fullVisits, setFullVisits] = useState<VisitRecord[]>([])
+  const [arrivalDialogOpen, setArrivalDialogOpen] = useState(false)
+  const [arrivalVisit, setArrivalVisit] = useState<VisitRecord | null>(null)
+  const [arrivalTime, setArrivalTime] = useState("09:00")
+  const [arrivalSaving, setArrivalSaving] = useState(false)
+  const [draggingVisitorId, setDraggingVisitorId] = useState<string | null>(null)
+  const [dropTargetGroup, setDropTargetGroup] = useState<number | null>(null)
+
+  // 人员分组
+  const [groups, setGroups] = useState<{ name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]>([])
+  const calendarPickerRef = useRef<HTMLDivElement>(null)
+
+  // 新增/编辑弹窗（觉醒游戏）
+  const [gcsDialogOpen, setGcsDialogOpen] = useState(false)
+  const [gcsEditingRecord, setGcsEditingRecord] = useState<GroupCaseSession | null>(null)
+  const [gcsSaving, setGcsSaving] = useState(false)
+  const [gcsFormDate, setGcsFormDate] = useState(today)
+  const [gcsFormStartTime, setGcsFormStartTime] = useState("09:00")
+  const [gcsFormEndTime, setGcsFormEndTime] = useState("10:00")
+  const [gcsFormOwnerId, setGcsFormOwnerId] = useState("")
+  const [gcsFormOwnerName, setGcsFormOwnerName] = useState("")
+  const [gcsFormAchieverId, setGcsFormAchieverId] = useState("")
+  const [gcsFormAchieverName, setGcsFormAchieverName] = useState("")
+  const [gcsFormHostId, setGcsFormHostId] = useState("")
+  const [gcsFormHostName, setGcsFormHostName] = useState("")
+  const [gcsFormDescription, setGcsFormDescription] = useState("")
+  const [gcsSearchField, setGcsSearchField] = useState<"owner" | "achiever" | "host" | null>(null)
+  const [gcsSearchKeyword, setGcsSearchKeyword] = useState("")
+  const [gcsSearchResults, setGcsSearchResults] = useState<GroupCaseCustomerSearchResult[]>([])
+  const [gcsSearching, setGcsSearching] = useState(false)
+  const [gcsShowDropdown, setGcsShowDropdown] = useState(false)
+  const gcsSearchTimeoutRef = useRef<number | null>(null)
+  const gcsDropdownRef = useRef<HTMLDivElement>(null)
+  const gcsBlurTimeoutRef = useRef<number | null>(null)
+
+  // 资料弹窗
+  const [gcsMaterialsDialogOpen, setGcsMaterialsDialogOpen] = useState(false)
+  const [gcsMaterialsRecord, setGcsMaterialsRecord] = useState<GroupCaseSession | null>(null)
+
+  // 删除确认
+  const [gcsDeleteId, setGcsDeleteId] = useState<string | null>(null)
+
+  // 觉醒游戏成员配置弹窗
+  const [gcsMembersDialogOpen, setGcsMembersDialogOpen] = useState(false)
+  const [gcsMembersRecord, setGcsMembersRecord] = useState<GroupCaseSession | null>(null)
+  const [gcsMemberSearchKeyword, setGcsMemberSearchKeyword] = useState("")
+  const [gcsMemberSearchResults, setGcsMemberSearchResults] = useState<GroupCaseCustomerSearchResult[]>([])
+  const [gcsMemberSearching, setGcsMemberSearching] = useState(false)
+  const [gcsMemberShowDropdown, setGcsMemberShowDropdown] = useState(false)
+  const gcsMemberSearchTimeoutRef = useRef<number | null>(null)
+  const gcsMemberDropdownRef = useRef<HTMLDivElement>(null)
+
+  // 觉醒游戏成员弹窗中的主持人搜索
+  const [gcsMemberHostSearchKeyword, setGcsMemberHostSearchKeyword] = useState("")
+  const [gcsMemberHostSearchResults, setGcsMemberHostSearchResults] = useState<GroupCaseCustomerSearchResult[]>([])
+  const [gcsMemberHostSearching, setGcsMemberHostSearching] = useState(false)
+  const [gcsMemberHostShowDropdown, setGcsMemberHostShowDropdown] = useState(false)
+  const gcsMemberHostSearchTimeoutRef = useRef<number | null>(null)
+  const gcsMemberHostDropdownRef = useRef<HTMLDivElement>(null)
+
+  // 觉醒游戏购买弹窗
+  const [gcsPurchaseDialogOpen, setGcsPurchaseDialogOpen] = useState(false)
+  const [gcsPendingOwner, setGcsPendingOwner] = useState<GroupCaseCustomerSearchResult | null>(null)
+  const [gcsPurchaseCount, setGcsPurchaseCount] = useState("")
+  const [gcsPurchaseAmount, setGcsPurchaseAmount] = useState("")
+  const [gcsPurchaseSaving, setGcsPurchaseSaving] = useState(false)
+
+  // 新增/编辑弹窗（情绪释放）
+  const [ersDialogOpen, setErsDialogOpen] = useState(false)
+  const [ersEditingRecord, setErsEditingRecord] = useState<EmotionalReleaseSession | null>(null)
+  const [ersSaving, setErsSaving] = useState(false)
+  const [ersFormDate, setErsFormDate] = useState(today)
+  const [ersFormStartTime, setErsFormStartTime] = useState("09:00")
+  const [ersFormEndTime, setErsFormEndTime] = useState("10:00")
+  const [ersFormOwnerId, setErsFormOwnerId] = useState("")
+  const [ersFormOwnerName, setErsFormOwnerName] = useState("")
+  const [ersFormAchieverId, setErsFormAchieverId] = useState("")
+  const [ersFormAchieverName, setErsFormAchieverName] = useState("")
+  const [ersFormHostId, setErsFormHostId] = useState("")
+  const [ersFormHostName, setErsFormHostName] = useState("")
+  const [ersFormDescription, setErsFormDescription] = useState("")
+  const [ersSearchField, setErsSearchField] = useState<"owner" | "achiever" | "host" | null>(null)
+  const [ersSearchKeyword, setErsSearchKeyword] = useState("")
+  const [ersSearchResults, setErsSearchResults] = useState<EmotionalReleaseCustomerSearchResult[]>([])
+  const [ersSearching, setErsSearching] = useState(false)
+  const [ersShowDropdown, setErsShowDropdown] = useState(false)
+  const ersSearchTimeoutRef = useRef<number | null>(null)
+  const ersDropdownRef = useRef<HTMLDivElement>(null)
+  const ersBlurTimeoutRef = useRef<number | null>(null)
+
+  // 情绪释放资料弹窗
+  const [ersMaterialsDialogOpen, setErsMaterialsDialogOpen] = useState(false)
+  const [ersMaterialsRecord, setErsMaterialsRecord] = useState<EmotionalReleaseSession | null>(null)
+
+  // 情绪释放删除确认
+  const [ersDeleteId, setErsDeleteId] = useState<string | null>(null)
+
+  // 情绪释放成员配置弹窗
+  const [ersMembersDialogOpen, setErsMembersDialogOpen] = useState(false)
+  const [ersMembersRecord, setErsMembersRecord] = useState<EmotionalReleaseSession | null>(null)
+  const [ersMemberSearchKeyword, setErsMemberSearchKeyword] = useState("")
+  const [ersMemberSearchResults, setErsMemberSearchResults] = useState<EmotionalReleaseCustomerSearchResult[]>([])
+  const [ersMemberSearching, setErsMemberSearching] = useState(false)
+  const [ersMemberShowDropdown, setErsMemberShowDropdown] = useState(false)
+  const ersMemberSearchTimeoutRef = useRef<number | null>(null)
+  const ersMemberDropdownRef = useRef<HTMLDivElement>(null)
+
+  // 情绪释放成员弹窗中的主持人搜索
+  const [ersMemberHostSearchKeyword, setErsMemberHostSearchKeyword] = useState("")
+  const [ersMemberHostSearchResults, setErsMemberHostSearchResults] = useState<EmotionalReleaseCustomerSearchResult[]>([])
+  const [ersMemberHostSearching, setErsMemberHostSearching] = useState(false)
+  const [ersMemberHostShowDropdown, setErsMemberHostShowDropdown] = useState(false)
+  const ersMemberHostSearchTimeoutRef = useRef<number | null>(null)
+  const ersMemberHostDropdownRef = useRef<HTMLDivElement>(null)
+
+  // 情绪释放购买弹窗
+  const [ersPurchaseDialogOpen, setErsPurchaseDialogOpen] = useState(false)
+  const [ersPendingOwner, setErsPendingOwner] = useState<EmotionalReleaseCustomerSearchResult | null>(null)
+  const [ersPurchaseCount, setErsPurchaseCount] = useState("")
+  const [ersPurchaseAmount, setErsPurchaseAmount] = useState("")
+  const [ersPurchaseSaving, setErsPurchaseSaving] = useState(false)
+
+  // ===== 能量结 =====
+  const [energyKnotSessions, setEnergyKnotSessions] = useState<EnergyKnotSession[]>([])
+  const [eksDialogOpen, setEksDialogOpen] = useState(false)
+  const [eksEditingRecord, setEksEditingRecord] = useState<EnergyKnotSession | null>(null)
+  const [eksSaving, setEksSaving] = useState(false)
+  const [eksFormDate, setEksFormDate] = useState(today)
+  const [eksFormStartTime, setEksFormStartTime] = useState("09:00")
+  const [eksFormEndTime, setEksFormEndTime] = useState("10:00")
+  const [eksFormOwnerIds, setEksFormOwnerIds] = useState<string[]>([])
+  const [eksFormOwnerNames, setEksFormOwnerNames] = useState<string[]>([])
+  const [eksFormHostIds, setEksFormHostIds] = useState<string[]>([])
+  const [eksFormHostNames, setEksFormHostNames] = useState<string[]>([])
+  const [eksFormOwnerDescriptions, setEksFormOwnerDescriptions] = useState<{id: string; name: string; description: string}[]>([])
+  const [eksSearchField, setEksSearchField] = useState<"owner" | "host" | null>(null)
+  const [eksSearchKeyword, setEksSearchKeyword] = useState("")
+  const [eksSearchResults, setEksSearchResults] = useState<EnergyKnotCustomerSearchResult[]>([])
+  const [eksSearching, setEksSearching] = useState(false)
+  const [eksShowDropdown, setEksShowDropdown] = useState(false)
+  const eksSearchTimeoutRef = useRef<number | null>(null)
+  const eksDropdownRef = useRef<HTMLDivElement>(null)
+  const [eksDeleteId, setEksDeleteId] = useState<string | null>(null)
+  // 能量结购买弹窗
+  const [eksPurchaseDialogOpen, setEksPurchaseDialogOpen] = useState(false)
+  const [eksPendingOwner, setEksPendingOwner] = useState<EnergyKnotCustomerSearchResult | null>(null)
+  const [eksPurchaseCount, setEksPurchaseCount] = useState("")
+  const [eksPurchaseAmount, setEksPurchaseAmount] = useState("")
+  const [eksPurchaseSaving, setEksPurchaseSaving] = useState(false)
+
+  // ===== 内部课程 =====
+  const [internalCourseSessions, setInternalCourseSessions] = useState<InternalCourseSession[]>([])
+  const [icsDialogOpen, setIcsDialogOpen] = useState(false)
+  const [icsEditingRecord, setIcsEditingRecord] = useState<InternalCourseSession | null>(null)
+  const [icsSaving, setIcsSaving] = useState(false)
+  const [icsFormDate, setIcsFormDate] = useState(today)
+  const [icsFormStartTime, setIcsFormStartTime] = useState("09:00")
+  const [icsFormEndTime, setIcsFormEndTime] = useState("10:00")
+  const [icsFormCourseType, setIcsFormCourseType] = useState("")
+  const [icsFormCourseName, setIcsFormCourseName] = useState("")
+  const [icsFormDescription, setIcsFormDescription] = useState("")
+  const [icsFormHostId, setIcsFormHostId] = useState("")
+  const [icsFormHostName, setIcsFormHostName] = useState("")
+  const [icsSearchField, setIcsSearchField] = useState<"host" | null>(null)
+  const [icsSearchKeyword, setIcsSearchKeyword] = useState("")
+  const [icsSearchResults, setIcsSearchResults] = useState<InternalCourseSessionCustomerSearchResult[]>([])
+  const [icsSearching, setIcsSearching] = useState(false)
+  const [icsShowDropdown, setIcsShowDropdown] = useState(false)
+  const icsSearchTimeoutRef = useRef<number | null>(null)
+  const icsDropdownRef = useRef<HTMLDivElement>(null)
+  const [icsDeleteId, setIcsDeleteId] = useState<string | null>(null)
+  // 内部课程资料弹窗
+  const [icsMaterialsDialogOpen, setIcsMaterialsDialogOpen] = useState(false)
+  const [icsMaterialsRecord, setIcsMaterialsRecord] = useState<InternalCourseSession | null>(null)
+  const [icsUploading, setIcsUploading] = useState(false)
+  // 内部课程成员弹窗
+  const [icsMembersDialogOpen, setIcsMembersDialogOpen] = useState(false)
+  const [icsMembersRecord, setIcsMembersRecord] = useState<InternalCourseSession | null>(null)
+  const [icsMemberSearchKeyword, setIcsMemberSearchKeyword] = useState("")
+  const [icsMemberSearchResults, setIcsMemberSearchResults] = useState<InternalCourseSessionCustomerSearchResult[]>([])
+  const [icsMemberSearching, setIcsMemberSearching] = useState(false)
+  const [icsMemberShowDropdown, setIcsMemberShowDropdown] = useState(false)
+  const icsMemberSearchTimeoutRef = useRef<number | null>(null)
+  const icsMemberDropdownRef = useRef<HTMLDivElement>(null)
+
+  // 会员活动余额不足警告弹窗
+  const [warningOpen, setWarningOpen] = useState(false)
+  const [warningMsg, setWarningMsg] = useState("")
+  const handleApiError = (error: any) => {
+    const msg = error?.message || ""
+    if (msg.includes("已无剩余活动次数")) {
+      setWarningMsg(msg)
+      setWarningOpen(true)
+    }
+  }
+
+  const load = () => {
+    classRecordApi.list()
+      .then(setRecords)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+    groupCaseSessionApi.list()
+      .then(setGroupCaseSessions)
+      .catch(() => {})
+    emotionalReleaseSessionApi.list()
+      .then(setEmotionalReleaseSessions)
+      .catch(() => {})
+    energyKnotSessionApi.list()
+      .then(setEnergyKnotSessions)
+      .catch(() => {})
+    internalCourseSessionApi.list()
+      .then(setInternalCourseSessions)
+      .catch(() => {})
+    courseApi.list().then(setCourses).catch(() => {})
+    customerApi.list()
+      .then((customers) => {
+        setAllCustomers(customers)
+        setTeachers(customers.filter(c => c.positions?.includes("课程老师")))
+      })
+      .catch(() => {})
+  }
+
+  const loadClassRecords = () => classRecordApi.list().then(setRecords).catch(() => {})
+  const loadGcs = () => groupCaseSessionApi.list().then(setGroupCaseSessions).catch(() => {})
+  const loadErs = () => emotionalReleaseSessionApi.list().then(setEmotionalReleaseSessions).catch(() => {})
+  const loadEks = () => energyKnotSessionApi.list().then(setEnergyKnotSessions).catch(() => {})
+  const loadIcs = () => internalCourseSessionApi.list().then(setInternalCourseSessions).catch(() => {})
+
+  useEffect(() => { load() }, [])
+
+  // 加载当天到场人员（切换日期或切换到到场确认 tab 时刷新）
+  useEffect(() => {
+    visitApi.list(detailDate).then((visits) => {
+      setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
+      setFullVisits(visits)
+    }).catch(() => { setDayVisits([]); setFullVisits([]) })
+  }, [detailDate, detailTab])
+
+  // 加载人员分组
+  useEffect(() => {
+    dailyGroupingApi.get(detailDate).then((data) => {
+      setGroups(data.groups || [])
+    }).catch(() => setGroups([]))
+  }, [detailDate])
+
+  // 加载日期范围内的到场人数
+  useEffect(() => {
+    visitApi.list().then((allVisits) => {
+      const counts: Record<string, number> = {}
+      for (const v of allVisits) {
+        counts[v.visit_date] = (counts[v.visit_date] || 0) + 1
+      }
+      setVisitCounts(counts)
+    }).catch(() => {})
+  }, [dateRangeStart])
+
+  // 点击外部关闭日历选择器
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (calendarPickerRef.current && !calendarPickerRef.current.contains(e.target as Node)) {
+        setShowCalendarPicker(false)
+      }
+    }
+    if (showCalendarPicker) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [showCalendarPicker])
+
+  // 拖拽到活动卡片的目标
+  const [dragOverActivityId, setDragOverActivityId] = useState<string | null>(null)
+
+  // 拖拽到沙龙卡片时的分组选择弹窗
+  const [dropGroupSelectOpen, setDropGroupSelectOpen] = useState(false)
+  const [dropGroupSelectRecord, setDropGroupSelectRecord] = useState<ClassRecord | null>(null)
+  const [dropGroupSelectCustomer, setDropGroupSelectCustomer] = useState<{ customer_id: string; nickname: string } | null>(null)
+
+  const handleDropToClass = async (record: ClassRecord, customer: { customer_id: string; nickname: string }) => {
+    const groups = record.groups || []
+    // 检查是否已分配到任何分组
+    const allAssigned = groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
+    if (allAssigned.includes(customer.customer_id)) return
+    if (groups.length === 0) {
+      // 无分组：创建新分组，设为组长
+      const newGroups = [{ name: "小组 1", leader_id: customer.customer_id, deputy_id: "", member_ids: [] }]
+      try {
+        await classRecordApi.updateGroups(record.id, newGroups)
+        loadClassRecords()
+      } catch (e: any) {
+        const msg = e?.response?.data?.detail || e?.message || "添加失败"
+        alert(msg)
+      }
+      return
+    }
+    setDropGroupSelectRecord(record)
+    setDropGroupSelectCustomer(customer)
+    setDropGroupSelectOpen(true)
+  }
+
+  const handleDropToClassGroup = async (groupIndex: number) => {
+    if (!dropGroupSelectRecord || !dropGroupSelectCustomer) return
+    const groups = [...(dropGroupSelectRecord.groups || [])]
+    const group = groups[groupIndex]
+    if (!group) return
+    const allAssigned = groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
+    if (allAssigned.includes(dropGroupSelectCustomer.customer_id)) {
+      setDropGroupSelectOpen(false)
+      return
+    }
+    groups[groupIndex] = { ...group, member_ids: [...group.member_ids, dropGroupSelectCustomer.customer_id] }
+    try {
+      await classRecordApi.updateGroups(dropGroupSelectRecord.id, groups)
+      loadClassRecords()
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || e?.message || "添加失败"
+      alert(msg)
+    }
+    setDropGroupSelectOpen(false)
+  }
+
+  const handleDropToGcs = async (s: GroupCaseSession, customer: { customer_id: string }) => {
+    const ids = s.participant_ids || []
+    if (ids.includes(customer.customer_id) || customer.customer_id === s.host_id || customer.customer_id === s.achiever_id) return
+    await groupCaseSessionApi.update(s.id, { participant_ids: [...ids, customer.customer_id] } as any)
+    loadGcs()
+  }
+
+  const handleDropToErs = async (s: EmotionalReleaseSession, customer: { customer_id: string }) => {
+    const ids = s.participant_ids || []
+    if (ids.includes(customer.customer_id) || customer.customer_id === s.host_id || customer.customer_id === s.achiever_id) return
+    await emotionalReleaseSessionApi.update(s.id, { participant_ids: [...ids, customer.customer_id] } as any)
+    loadErs()
+  }
+
+  const handleDropToEks = async (s: EnergyKnotSession, customer: { customer_id: string }) => {
+    const ids = s.host_ids || []
+    if (ids.includes(customer.customer_id)) return
+    await energyKnotSessionApi.update(s.id, { host_ids: [...ids, customer.customer_id] } as any)
+    loadEks()
+  }
+
+  const handleDropToIcs = async (s: InternalCourseSession, customer: { customer_id: string }) => {
+    const ids = s.participant_ids || []
+    if (ids.includes(customer.customer_id)) return
+    await internalCourseSessionApi.update(s.id, { participant_ids: [...ids, customer.customer_id] } as any)
+    loadIcs()
+  }
+
+
+  // 合并五种记录，按日期倒序排列
+  type UnifiedRecord = { type: "class"; data: ClassRecord; date: string } | { type: "gcs"; data: GroupCaseSession; date: string } | { type: "ers"; data: EmotionalReleaseSession; date: string } | { type: "eks"; data: EnergyKnotSession; date: string } | { type: "ics"; data: InternalCourseSession; date: string }
+  const allUnifiedRecords: UnifiedRecord[] = useMemo(() => [
+    ...records.map(r => ({ type: "class" as const, data: r, date: r.date })),
+    ...groupCaseSessions.map(s => ({ type: "gcs" as const, data: s, date: s.date })),
+    ...emotionalReleaseSessions.map(s => ({ type: "ers" as const, data: s, date: s.date })),
+    ...energyKnotSessions.map(s => ({ type: "eks" as const, data: s, date: s.date })),
+    ...internalCourseSessions.map(s => ({ type: "ics" as const, data: s, date: s.date })),
+  ].sort((a, b) => {
+    const dateCmp = b.date.localeCompare(a.date)
+    if (dateCmp !== 0) return dateCmp
+    const at = a.data.start_time || ""
+    const bt = b.data.start_time || ""
+    if (!at && !bt) return 0
+    if (!at) return 1
+    if (!bt) return -1
+    return bt.localeCompare(at)
+  }), [records, groupCaseSessions, emotionalReleaseSessions, energyKnotSessions, internalCourseSessions])
+
+  const getTitle = (ur: UnifiedRecord) => {
+    if (ur.type === "class") return ur.data.course_name
+    if (ur.type === "gcs") return `觉醒游戏【${ur.data.owner_name || "未分配"}】`
+    if (ur.type === "ers") return `情绪释放【${ur.data.owner_name || "未分配"}】`
+    if (ur.type === "eks") {
+      let names: string[] = []
+      try {
+        const items = JSON.parse(ur.data.description || "[]")
+        if (Array.isArray(items)) names = items.map((d: any) => d.name).filter(Boolean)
+      } catch { /* empty */ }
+      return names.length > 0 ? `能量结【${names.join("丨")}】` : `能量结【${ur.data.owner_name || "未分配"}】`
+    }
+    return ur.data.course_name
+  }
+
+  const unifiedRecords = hasActSearched
+    ? allUnifiedRecords.filter(ur => {
+        if (appliedActFilters.type !== "all" && ur.type !== appliedActFilters.type) return false
+        if (appliedActFilters.name && !getTitle(ur).toLowerCase().includes(appliedActFilters.name.toLowerCase())) return false
+        if (appliedActFilters.startDate && ur.date < appliedActFilters.startDate) return false
+        if (appliedActFilters.endDate && ur.date > appliedActFilters.endDate) return false
+        return true
+      })
+    : allUnifiedRecords
+
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(unifiedRecords)
+
+  const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
+  const detailRecords = records
+    .filter(r => r.date === detailDate)
+    .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""))
+
+  const detailGcs = groupCaseSessions.filter(s => s.date === detailDate)
+  const detailErs = emotionalReleaseSessions.filter(s => s.date === detailDate)
+  const detailEks = energyKnotSessions.filter(s => s.date === detailDate)
+  const detailIcs = internalCourseSessions.filter(s => s.date === detailDate)
+
+  // 详细视图：合并五种记录，按开始时间排序
+  const unifiedDetailRecords: UnifiedRecord[] = [
+    ...detailRecords.map(r => ({ type: "class" as const, data: r, date: r.date })),
+    ...detailGcs.map(s => ({ type: "gcs" as const, data: s, date: s.date })),
+    ...detailErs.map(s => ({ type: "ers" as const, data: s, date: s.date })),
+    ...detailEks.map(s => ({ type: "eks" as const, data: s, date: s.date })),
+    ...detailIcs.map(s => ({ type: "ics" as const, data: s, date: s.date })),
+  ].sort((a, b) => {
+    const at = a.data.start_time || ""
+    const bt = b.data.start_time || ""
+    if (!at && !bt) return 0
+    if (!at) return 1
+    if (!bt) return -1
+    return at.localeCompare(bt)
+  })
+
+  const selectedCourse = courses.find(c => c.id === formCourseId)
+
+  const getTeacherNames = (teacherIds: string[]) => {
+    return teacherIds
+      .map(id => teachers.find(t => t.id === id))
+      .filter(Boolean)
+      .map(t => t!.nickname || t!.name || "未命名")
+  }
+
+  const handleActSearch = useCallback(() => {
+    setAppliedActFilters({
+      type: inputActType,
+      name: inputActName,
+      startDate: inputActStartDate,
+      endDate: inputActEndDate,
+    })
+    setHasActSearched(true)
+  }, [inputActType, inputActName, inputActStartDate, inputActEndDate])
+
+  const handleActClear = useCallback(() => {
+    setInputActType("all")
+    setInputActName("")
+    setInputActStartDate("")
+    setInputActEndDate("")
+    setAppliedActFilters({ type: "all", name: "", startDate: "", endDate: "" })
+    setHasActSearched(false)
+  }, [])
+
+  const handleOpenCreate = (date?: string) => {
+    setEditingRecord(null)
+    setFormDate(date || today)
+    setFormStartTime("09:00")
+    setFormEndTime("10:00")
+    setFormCourseId("")
+    setFormTeacherId("")
+    setFormDescription("")
+    setFormIsPublicWelfare(false)
+    setShowCourseDropdown(false)
+    setShowTeacherDropdown(false)
+    setDialogOpen(true)
+  }
+
+  const handleOpenEdit = (record: ClassRecord) => {
+    setEditingRecord(record)
+    setFormDate(record.date)
+    setFormStartTime(record.start_time || "")
+    setFormEndTime(record.end_time || "")
+    setFormCourseId(record.course_id)
+    setFormTeacherId(record.teacher_ids[0] || "")
+    setFormDescription(record.course_description || "")
+    setFormIsPublicWelfare(record.is_public_welfare || false)
+    setShowCourseDropdown(false)
+    setShowTeacherDropdown(false)
+    setDialogOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!formCourseId) return
+    setSaving(true)
+    try {
+      const teacherIds = formTeacherId ? [formTeacherId] : []
+      if (editingRecord) {
+        const course = courses.find(c => c.id === formCourseId)
+        await classRecordApi.update(editingRecord.id, {
+          date: formDate,
+          start_time: formStartTime || null,
+          end_time: formEndTime || null,
+          course_id: formCourseId,
+          course_name: course?.name || editingRecord.course_name,
+          course_description: formDescription,
+          teacher_ids: teacherIds,
+          is_public_welfare: formIsPublicWelfare,
+        })
+      } else {
+        const course = courses.find(c => c.id === formCourseId)
+        if (!course) return
+        await classRecordApi.create({
+          date: formDate,
+          start_time: formStartTime || null,
+          end_time: formEndTime || null,
+          course_id: formCourseId,
+          course_name: course.name,
+          course_description: formDescription,
+          teacher_ids: teacherIds,
+          is_public_welfare: formIsPublicWelfare,
+        })
+      }
+      setDialogOpen(false)
+      load()
+    } catch (error) {
+      console.error("保存失败:", error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    await classRecordApi.delete(deleteId)
+    setDeleteId(null)
+    load()
+  }
+
+  // 资料上传
+  const handleOpenMaterials = (record: ClassRecord) => {
+    setMaterialsRecord(record)
+    setMaterialsDialogOpen(true)
+  }
+
+  const handleUploadMaterial = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !materialsRecord) return
+    setUploading(true)
+    try {
+      const material = await uploadApi.uploadMaterial(file)
+      const newMaterials = [...(materialsRecord.materials || []), material]
+      await classRecordApi.update(materialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...materialsRecord, materials: newMaterials }
+      setMaterialsRecord(updated)
+      load()
+    } catch { alert("上传失败，请重试") }
+    finally { setUploading(false); e.target.value = "" }
+  }
+
+  const handleDeleteMaterial = async (filename: string) => {
+    if (!materialsRecord) return
+    try {
+      await uploadApi.deleteMaterial(filename)
+      const newMaterials = (materialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      await classRecordApi.update(materialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...materialsRecord, materials: newMaterials }
+      setMaterialsRecord(updated)
+      load()
+    } catch { }
+  }
+
+  // 小组管理
+  const handleOpenGroups = (record: ClassRecord) => {
+    setGroupsRecord(record)
+    setGroupsPanelOpen(true)
+    setGroupSearchKeyword("")
+    setGroupSearchResults([])
+    setGroupSearchTarget(null)
+    // 加载当日到场人员
+    visitApi.list(record.date).then((visits) => {
+      setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
+      setFullVisits(visits)
+    }).catch(() => { setDayVisits([]); setFullVisits([]) })
+  }
+
+  const handleAddGroup = async () => {
+    if (!groupsRecord) return
+    const groups = [...(groupsRecord.groups || []), { name: `小组 ${(groupsRecord.groups || []).length + 1}`, leader_id: "", deputy_id: "", member_ids: [] }]
+    try {
+      const updated = await classRecordApi.updateGroups(groupsRecord.id, groups)
+      setGroupsRecord(updated)
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleRemoveGroup = async (index: number) => {
+    if (!groupsRecord) return
+    const groups = groupsRecord.groups
+      .filter((_, i) => i !== index)
+      .map((g, i) => ({ ...g, name: `小组 ${i + 1}` }))
+    try {
+      const updated = await classRecordApi.updateGroups(groupsRecord.id, groups)
+      setGroupsRecord(updated)
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleGroupNameChange = (index: number, name: string) => {
+    if (!groupsRecord) return
+    const groups = groupsRecord.groups.map((g, i) => i === index ? { ...g, name } : g)
+    setGroupsRecord({ ...groupsRecord, groups })
+  }
+
+  const handleSaveGroupName = async (_index: number) => {
+    if (!groupsRecord) return
+    try {
+      const updated = await classRecordApi.updateGroups(groupsRecord.id, groupsRecord.groups)
+      setGroupsRecord(updated)
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleGroupSearch = (keyword: string, groupIndex: number, role: "leader" | "deputy" | "member") => {
+    setGroupSearchKeyword(keyword)
+    setGroupSearchTarget({ groupIndex, role })
+    if (groupSearchTimeoutRef.current) clearTimeout(groupSearchTimeoutRef.current)
+    if (!keyword.trim()) { setGroupSearchResults([]); return }
+    groupSearchTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        const results = await classRecordApi.searchCustomers(keyword)
+        const allAssigned = new Set(
+          (groupsRecord?.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
+        )
+        setGroupSearchResults(results.filter(r => !allAssigned.has(r.id)))
+      } catch { setGroupSearchResults([]) }
+    }, 300)
+  }
+
+  const handleAssignGroupMember = async (customer: CustomerSearchResult) => {
+    if (!groupsRecord || !groupSearchTarget) return
+    const allAssigned = groupsRecord.groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
+    if (allAssigned.includes(customer.id)) return
+    const { groupIndex, role } = groupSearchTarget
+    const groups = [...groupsRecord.groups]
+    const group = { ...groups[groupIndex] }
+
+    if (role === "leader") {
+      group.leader_id = customer.id
+    } else if (role === "deputy") {
+      group.deputy_id = customer.id
+    } else {
+      group.member_ids = [...group.member_ids, customer.id]
+    }
+    groups[groupIndex] = group
+
+    try {
+      const updated = await classRecordApi.updateGroups(groupsRecord.id, groups)
+      setGroupsRecord(updated)
+
+      setGroupSearchKeyword("")
+      setGroupSearchResults([])
+      setGroupSearchTarget(null)
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleRemoveGroupMember = async (groupIndex: number, role: "leader" | "deputy" | "member", memberId?: string) => {
+    if (!groupsRecord) return
+    const groups = [...groupsRecord.groups]
+    const group = { ...groups[groupIndex] }
+
+    if (role === "leader") group.leader_id = ""
+    else if (role === "deputy") group.deputy_id = ""
+    else group.member_ids = group.member_ids.filter(id => id !== memberId)
+
+    groups[groupIndex] = group
+    try {
+      const updated = await classRecordApi.updateGroups(groupsRecord.id, groups)
+      setGroupsRecord(updated)
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  // 拖拽分配到场人员到小组
+  const handleDropVisitor = async (groupIndex: number, visitor: { id: string; nickname: string }) => {
+    if (!groupsRecord) return
+    const allAssigned = groupsRecord.groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
+    if (allAssigned.includes(visitor.id)) return
+    const groups = [...groupsRecord.groups]
+    const group = { ...groups[groupIndex] }
+    group.member_ids = [...group.member_ids, visitor.id]
+    groups[groupIndex] = group
+    try {
+      const updated = await classRecordApi.updateGroups(groupsRecord.id, groups)
+      setGroupsRecord(updated)
+      load()
+    } catch (e) { handleApiError(e) }
+    setDraggingVisitorId(null)
+    setDropTargetGroup(null)
+  }
+
+  // 判断到场人员是否已被分配
+  const isVisitorAssigned = (visitorId: string) => {
+    if (!groupsRecord) return false
+    return groupsRecord.groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)).includes(visitorId)
+  }
+
+  const getMemberName = (id: string) => {
+    const c = allCustomers.find(c => c.id === id)
+    return c?.nickname || c?.name || id
+  }
+
+  // ===== 觉醒游戏 handlers =====
+  const handleOpenGcsCreate = (date?: string) => {
+    setGcsEditingRecord(null)
+    setGcsFormDate(date || today)
+    setGcsFormStartTime("09:00")
+    setGcsFormEndTime("10:00")
+    setGcsFormOwnerId("")
+    setGcsFormOwnerName("")
+    setGcsFormAchieverId("")
+    setGcsFormAchieverName("")
+    setGcsFormHostId("")
+    setGcsFormHostName("")
+    setGcsFormDescription("")
+    setGcsSearchField(null)
+    setGcsSearchKeyword("")
+    setGcsSearchResults([])
+    setGcsShowDropdown(false)
+    setGcsDialogOpen(true)
+  }
+
+  const handleOpenGcsEdit = (session: GroupCaseSession) => {
+    setGcsEditingRecord(session)
+    setGcsFormDate(session.date)
+    setGcsFormStartTime(session.start_time || "09:00")
+    setGcsFormEndTime(session.end_time || "10:00")
+    setGcsFormOwnerId(session.owner_id)
+    setGcsFormOwnerName(session.owner_name || "")
+    setGcsFormAchieverId(session.achiever_id || "")
+    setGcsFormAchieverName(session.achiever_name || "")
+    setGcsFormHostId(session.host_id || "")
+    setGcsFormHostName(session.host_name || "")
+    setGcsFormDescription(session.description || "")
+    setGcsSearchField(null)
+    setGcsSearchKeyword("")
+    setGcsSearchResults([])
+    setGcsShowDropdown(false)
+    setGcsDialogOpen(true)
+  }
+
+  const handleGcsSearch = (keyword: string) => {
+    setGcsSearchKeyword(keyword)
+    if (gcsSearchTimeoutRef.current) clearTimeout(gcsSearchTimeoutRef.current)
+    if (!keyword.trim()) { setGcsSearchResults([]); setGcsShowDropdown(false); return }
+    gcsSearchTimeoutRef.current = window.setTimeout(async () => {
+      setGcsSearching(true)
+      try {
+        const results = await groupCaseSessionApi.searchCustomers(keyword)
+        setGcsSearchResults(results)
+        setGcsShowDropdown(true)
+      } catch { setGcsSearchResults([]) }
+      finally { setGcsSearching(false) }
+    }, 300)
+  }
+
+  const handleGcsSelectCustomer = (customer: GroupCaseCustomerSearchResult) => {
+    if (!gcsSearchField) return
+    if (gcsSearchField === "owner") {
+      if (customer.remaining !== -1 && customer.remaining <= 0) {
+        setGcsPendingOwner(customer)
+        setGcsPurchaseDialogOpen(true)
+        return
+      }
+      setGcsFormOwnerId(customer.id)
+      setGcsFormOwnerName(customer.nickname || customer.name)
+    } else if (gcsSearchField === "achiever") {
+      setGcsFormAchieverId(customer.id)
+      setGcsFormAchieverName(customer.nickname || customer.name)
+    } else if (gcsSearchField === "host") {
+      setGcsFormHostId(customer.id)
+      setGcsFormHostName(customer.nickname || customer.name)
+    }
+    setGcsSearchKeyword("")
+    setGcsSearchResults([])
+    setGcsShowDropdown(false)
+    setGcsSearchField(null)
+  }
+
+  const handleGcsSave = async () => {
+    if (!gcsFormOwnerId) return
+    setGcsSaving(true)
+    try {
+      const data = {
+        date: gcsFormDate,
+        start_time: gcsFormStartTime || null,
+        end_time: gcsFormEndTime || null,
+        owner_id: gcsFormOwnerId,
+        owner_name: gcsFormOwnerName,
+        description: gcsFormDescription || undefined,
+        achiever_id: gcsFormAchieverId || undefined,
+        achiever_name: gcsFormAchieverName || undefined,
+        host_id: gcsFormHostId || undefined,
+        host_name: gcsFormHostName || undefined,
+      }
+      if (gcsEditingRecord) {
+        await groupCaseSessionApi.update(gcsEditingRecord.id, data)
+  
+      } else {
+        await groupCaseSessionApi.create(data)
+      }
+      setGcsDialogOpen(false)
+      load()
+    } catch (error) {
+      handleApiError(error)
+    } finally {
+      setGcsSaving(false)
+    }
+  }
+
+  const handleGcsDelete = async () => {
+    if (!gcsDeleteId) return
+    await groupCaseSessionApi.delete(gcsDeleteId)
+    setGcsDeleteId(null)
+    load()
+  }
+
+  const handleGcsAddPurchase = async () => {
+    if (!gcsPendingOwner || !gcsPurchaseCount) return
+    setGcsPurchaseSaving(true)
+    try {
+      await groupCaseApi.create({
+        customer_id: gcsPendingOwner.id,
+        nickname: gcsPendingOwner.nickname,
+        purchase_count: parseInt(gcsPurchaseCount) || 0,
+        amount: parseFloat(gcsPurchaseAmount) || 0,
+      })
+      setGcsFormOwnerId(gcsPendingOwner.id)
+      setGcsFormOwnerName(gcsPendingOwner.nickname)
+      setGcsPurchaseDialogOpen(false)
+      setGcsPendingOwner(null)
+      load()
+    } catch (error) {
+      console.error("新增购买失败:", error)
+    } finally {
+      setGcsPurchaseSaving(false)
+    }
+  }
+
+  // 觉醒游戏资料上传
+  const handleOpenGcsMaterials = (session: GroupCaseSession) => {
+    setGcsMaterialsRecord(session)
+    setGcsMaterialsDialogOpen(true)
+  }
+
+  const handleUploadGcsMaterial = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !gcsMaterialsRecord) return
+    setUploading(true)
+    try {
+      const material = await uploadApi.uploadMaterial(file)
+      const newMaterials = [...(gcsMaterialsRecord.materials || []), material]
+      await groupCaseSessionApi.update(gcsMaterialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...gcsMaterialsRecord, materials: newMaterials }
+      setGcsMaterialsRecord(updated)
+      load()
+    } catch { alert("上传失败，请重试") }
+    finally { setUploading(false); e.target.value = "" }
+  }
+
+  const handleDeleteGcsMaterial = async (filename: string) => {
+    if (!gcsMaterialsRecord) return
+    try {
+      await uploadApi.deleteMaterial(filename)
+      const newMaterials = (gcsMaterialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      await groupCaseSessionApi.update(gcsMaterialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...gcsMaterialsRecord, materials: newMaterials }
+      setGcsMaterialsRecord(updated)
+      load()
+    } catch { }
+  }
+
+  // 觉醒游戏成员配置
+  const handleOpenGcsMembers = (session: GroupCaseSession) => {
+    setGcsMembersRecord(session)
+    setGcsMembersDialogOpen(true)
+    setGcsMemberSearchKeyword("")
+    setGcsMemberSearchResults([])
+    setGcsMemberShowDropdown(false)
+  }
+
+  const handleGcsMemberSearch = (keyword: string) => {
+    setGcsMemberSearchKeyword(keyword)
+    if (gcsMemberSearchTimeoutRef.current) clearTimeout(gcsMemberSearchTimeoutRef.current)
+    if (!keyword.trim()) { setGcsMemberSearchResults([]); setGcsMemberShowDropdown(false); return }
+    gcsMemberSearchTimeoutRef.current = window.setTimeout(async () => {
+      setGcsMemberSearching(true)
+      try {
+        const results = await groupCaseSessionApi.searchCustomers(keyword)
+        setGcsMemberSearchResults(results.filter(r => r.id !== gcsMembersRecord?.owner_id && r.id !== gcsMembersRecord?.host_id && !(gcsMembersRecord?.participant_ids || []).includes(r.id)))
+        setGcsMemberShowDropdown(true)
+      } catch { setGcsMemberSearchResults([]) }
+      finally { setGcsMemberSearching(false) }
+    }, 300)
+  }
+
+  const handleGcsAddParticipant = async (customer: GroupCaseCustomerSearchResult) => {
+    if (!gcsMembersRecord) return
+    if (customer.remaining === 0) return
+    const newIds = [...(gcsMembersRecord.participant_ids || []), customer.id]
+    try {
+      await groupCaseSessionApi.update(gcsMembersRecord.id, { participant_ids: newIds } as any)
+      setGcsMembersRecord({ ...gcsMembersRecord, participant_ids: newIds })
+
+      setGcsMemberSearchKeyword("")
+      setGcsMemberSearchResults([])
+      setGcsMemberShowDropdown(false)
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleGcsRemoveParticipant = async (id: string) => {
+    if (!gcsMembersRecord) return
+    const newIds = (gcsMembersRecord.participant_ids || []).filter(pid => pid !== id)
+    try {
+      await groupCaseSessionApi.update(gcsMembersRecord.id, { participant_ids: newIds } as any)
+      setGcsMembersRecord({ ...gcsMembersRecord, participant_ids: newIds })
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  // 觉醒游戏成员弹窗中的主持人搜索
+  const handleGcsMemberHostSearch = (keyword: string) => {
+    setGcsMemberHostSearchKeyword(keyword)
+    if (gcsMemberHostSearchTimeoutRef.current) clearTimeout(gcsMemberHostSearchTimeoutRef.current)
+    if (!keyword.trim()) { setGcsMemberHostSearchResults([]); setGcsMemberHostShowDropdown(false); return }
+    gcsMemberHostSearchTimeoutRef.current = window.setTimeout(async () => {
+      setGcsMemberHostSearching(true)
+      try {
+        const results = await groupCaseSessionApi.searchCustomers(keyword)
+        setGcsMemberHostSearchResults(results.filter(r => r.id !== gcsMembersRecord?.owner_id && !(gcsMembersRecord?.participant_ids || []).includes(r.id)))
+        setGcsMemberHostShowDropdown(true)
+      } catch { setGcsMemberHostSearchResults([]) }
+      finally { setGcsMemberHostSearching(false) }
+    }, 300)
+  }
+
+  const handleGcsMemberSetHost = async (customer: GroupCaseCustomerSearchResult) => {
+    if (!gcsMembersRecord) return
+    if (customer.remaining === 0) return
+    try {
+      await groupCaseSessionApi.update(gcsMembersRecord.id, { host_id: customer.id, host_name: customer.nickname || customer.name } as any)
+      setGcsMembersRecord({ ...gcsMembersRecord, host_id: customer.id, host_name: customer.nickname || customer.name })
+
+      setGcsMemberHostSearchKeyword("")
+      setGcsMemberHostSearchResults([])
+      setGcsMemberHostShowDropdown(false)
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleGcsMemberRemoveHost = async () => {
+    if (!gcsMembersRecord) return
+    try {
+      await groupCaseSessionApi.update(gcsMembersRecord.id, { host_id: "", host_name: "" } as any)
+      setGcsMembersRecord({ ...gcsMembersRecord, host_id: "", host_name: "" })
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  // ===== 情绪释放 handlers =====
+  const handleOpenErsCreate = (date?: string) => {
+    setErsEditingRecord(null)
+    setErsFormDate(date || today)
+    setErsFormStartTime("09:00")
+    setErsFormEndTime("10:00")
+    setErsFormOwnerId("")
+    setErsFormOwnerName("")
+    setErsFormAchieverId("")
+    setErsFormAchieverName("")
+    setErsFormHostId("")
+    setErsFormHostName("")
+    setErsFormDescription("")
+    setErsSearchField(null)
+    setErsSearchKeyword("")
+    setErsSearchResults([])
+    setErsShowDropdown(false)
+    setErsDialogOpen(true)
+  }
+
+  const handleOpenErsEdit = (session: EmotionalReleaseSession) => {
+    setErsEditingRecord(session)
+    setErsFormDate(session.date)
+    setErsFormStartTime(session.start_time || "09:00")
+    setErsFormEndTime(session.end_time || "10:00")
+    setErsFormOwnerId(session.owner_id)
+    setErsFormOwnerName(session.owner_name || "")
+    setErsFormAchieverId(session.achiever_id || "")
+    setErsFormAchieverName(session.achiever_name || "")
+    setErsFormHostId(session.host_id || "")
+    setErsFormHostName(session.host_name || "")
+    setErsFormDescription(session.description || "")
+    setErsSearchField(null)
+    setErsSearchKeyword("")
+    setErsSearchResults([])
+    setErsShowDropdown(false)
+    setErsDialogOpen(true)
+  }
+
+  const handleErsSearch = (keyword: string) => {
+    setErsSearchKeyword(keyword)
+    if (ersSearchTimeoutRef.current) clearTimeout(ersSearchTimeoutRef.current)
+    if (!keyword.trim()) { setErsSearchResults([]); setErsShowDropdown(false); return }
+    ersSearchTimeoutRef.current = window.setTimeout(async () => {
+      setErsSearching(true)
+      try {
+        const results = await emotionalReleaseSessionApi.searchCustomers(keyword)
+        setErsSearchResults(results)
+        setErsShowDropdown(true)
+      } catch { setErsSearchResults([]) }
+      finally { setErsSearching(false) }
+    }, 300)
+  }
+
+  const handleErsSelectCustomer = (customer: EmotionalReleaseCustomerSearchResult) => {
+    if (!ersSearchField) return
+    if (ersSearchField === "owner") {
+      if (customer.remaining !== -1 && customer.remaining <= 0) {
+        setErsPendingOwner(customer)
+        setErsPurchaseDialogOpen(true)
+        return
+      }
+      setErsFormOwnerId(customer.id)
+      setErsFormOwnerName(customer.nickname || customer.name)
+    } else if (ersSearchField === "achiever") {
+      setErsFormAchieverId(customer.id)
+      setErsFormAchieverName(customer.nickname || customer.name)
+    } else if (ersSearchField === "host") {
+      setErsFormHostId(customer.id)
+      setErsFormHostName(customer.nickname || customer.name)
+    }
+    setErsSearchKeyword("")
+    setErsSearchResults([])
+    setErsShowDropdown(false)
+    setErsSearchField(null)
+  }
+
+  const handleErsSave = async () => {
+    if (!ersFormOwnerId) return
+    setErsSaving(true)
+    try {
+      const data = {
+        date: ersFormDate,
+        start_time: ersFormStartTime || null,
+        end_time: ersFormEndTime || null,
+        owner_id: ersFormOwnerId,
+        owner_name: ersFormOwnerName,
+        description: ersFormDescription || undefined,
+        achiever_id: ersFormAchieverId || undefined,
+        achiever_name: ersFormAchieverName || undefined,
+        host_id: ersFormHostId || undefined,
+        host_name: ersFormHostName || undefined,
+      }
+      if (ersEditingRecord) {
+        await emotionalReleaseSessionApi.update(ersEditingRecord.id, data)
+  
+      } else {
+        await emotionalReleaseSessionApi.create(data)
+      }
+      setErsDialogOpen(false)
+      load()
+    } catch (error) {
+      handleApiError(error)
+    } finally {
+      setErsSaving(false)
+    }
+  }
+
+  const handleErsDelete = async () => {
+    if (!ersDeleteId) return
+    await emotionalReleaseSessionApi.delete(ersDeleteId)
+    setErsDeleteId(null)
+    load()
+  }
+
+  const handleErsAddPurchase = async () => {
+    if (!ersPendingOwner || !ersPurchaseCount) return
+    setErsPurchaseSaving(true)
+    try {
+      await emotionalReleaseApi.create({
+        customer_id: ersPendingOwner.id,
+        nickname: ersPendingOwner.nickname,
+        purchase_count: parseInt(ersPurchaseCount) || 0,
+        amount: parseFloat(ersPurchaseAmount) || 0,
+      })
+      setErsFormOwnerId(ersPendingOwner.id)
+      setErsFormOwnerName(ersPendingOwner.nickname)
+      setErsPurchaseDialogOpen(false)
+      setErsPendingOwner(null)
+      load()
+    } catch (error) {
+      console.error("新增购买失败:", error)
+    } finally {
+      setErsPurchaseSaving(false)
+    }
+  }
+
+  // 情绪释放资料上传
+  const handleOpenErsMaterials = (session: EmotionalReleaseSession) => {
+    setErsMaterialsRecord(session)
+    setErsMaterialsDialogOpen(true)
+  }
+
+  const handleUploadErsMaterial = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !ersMaterialsRecord) return
+    setUploading(true)
+    try {
+      const material = await uploadApi.uploadMaterial(file)
+      const newMaterials = [...(ersMaterialsRecord.materials || []), material]
+      await emotionalReleaseSessionApi.update(ersMaterialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...ersMaterialsRecord, materials: newMaterials }
+      setErsMaterialsRecord(updated)
+      load()
+    } catch { alert("上传失败，请重试") }
+    finally { setUploading(false); e.target.value = "" }
+  }
+
+  const handleDeleteErsMaterial = async (filename: string) => {
+    if (!ersMaterialsRecord) return
+    try {
+      await uploadApi.deleteMaterial(filename)
+      const newMaterials = (ersMaterialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      await emotionalReleaseSessionApi.update(ersMaterialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...ersMaterialsRecord, materials: newMaterials }
+      setErsMaterialsRecord(updated)
+      load()
+    } catch { }
+  }
+
+  // 情绪释放成员配置
+  const handleOpenErsMembers = (session: EmotionalReleaseSession) => {
+    setErsMembersRecord(session)
+    setErsMembersDialogOpen(true)
+    setErsMemberSearchKeyword("")
+    setErsMemberSearchResults([])
+    setErsMemberShowDropdown(false)
+  }
+
+  const handleErsMemberSearch = (keyword: string) => {
+    setErsMemberSearchKeyword(keyword)
+    if (ersMemberSearchTimeoutRef.current) clearTimeout(ersMemberSearchTimeoutRef.current)
+    if (!keyword.trim()) { setErsMemberSearchResults([]); setErsMemberShowDropdown(false); return }
+    ersMemberSearchTimeoutRef.current = window.setTimeout(async () => {
+      setErsMemberSearching(true)
+      try {
+        const results = await emotionalReleaseSessionApi.searchCustomers(keyword)
+        setErsMemberSearchResults(results.filter(r => r.id !== ersMembersRecord?.owner_id && r.id !== ersMembersRecord?.host_id && !(ersMembersRecord?.participant_ids || []).includes(r.id)))
+        setErsMemberShowDropdown(true)
+      } catch { setErsMemberSearchResults([]) }
+      finally { setErsMemberSearching(false) }
+    }, 300)
+  }
+
+  const handleErsAddParticipant = async (customer: EmotionalReleaseCustomerSearchResult) => {
+    if (!ersMembersRecord) return
+    if (customer.remaining === 0) return
+    const newIds = [...(ersMembersRecord.participant_ids || []), customer.id]
+    try {
+      await emotionalReleaseSessionApi.update(ersMembersRecord.id, { participant_ids: newIds } as any)
+      setErsMembersRecord({ ...ersMembersRecord, participant_ids: newIds })
+
+      setErsMemberSearchKeyword("")
+      setErsMemberSearchResults([])
+      setErsMemberShowDropdown(false)
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleErsRemoveParticipant = async (id: string) => {
+    if (!ersMembersRecord) return
+    const newIds = (ersMembersRecord.participant_ids || []).filter(pid => pid !== id)
+    try {
+      await emotionalReleaseSessionApi.update(ersMembersRecord.id, { participant_ids: newIds } as any)
+      setErsMembersRecord({ ...ersMembersRecord, participant_ids: newIds })
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  // 情绪释放成员弹窗中的主持人搜索
+  const handleErsMemberHostSearch = (keyword: string) => {
+    setErsMemberHostSearchKeyword(keyword)
+    if (ersMemberHostSearchTimeoutRef.current) clearTimeout(ersMemberHostSearchTimeoutRef.current)
+    if (!keyword.trim()) { setErsMemberHostSearchResults([]); setErsMemberHostShowDropdown(false); return }
+    ersMemberHostSearchTimeoutRef.current = window.setTimeout(async () => {
+      setErsMemberHostSearching(true)
+      try {
+        const results = await emotionalReleaseSessionApi.searchCustomers(keyword)
+        setErsMemberHostSearchResults(results.filter(r => r.id !== ersMembersRecord?.owner_id && !(ersMembersRecord?.participant_ids || []).includes(r.id)))
+        setErsMemberHostShowDropdown(true)
+      } catch { setErsMemberHostSearchResults([]) }
+      finally { setErsMemberHostSearching(false) }
+    }, 300)
+  }
+
+  const handleErsMemberSetHost = async (customer: EmotionalReleaseCustomerSearchResult) => {
+    if (!ersMembersRecord) return
+    if (customer.remaining === 0) return
+    try {
+      await emotionalReleaseSessionApi.update(ersMembersRecord.id, { host_id: customer.id, host_name: customer.nickname || customer.name } as any)
+      setErsMembersRecord({ ...ersMembersRecord, host_id: customer.id, host_name: customer.nickname || customer.name })
+
+      setErsMemberHostSearchKeyword("")
+      setErsMemberHostSearchResults([])
+      setErsMemberHostShowDropdown(false)
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleErsMemberRemoveHost = async () => {
+    if (!ersMembersRecord) return
+    try {
+      await emotionalReleaseSessionApi.update(ersMembersRecord.id, { host_id: "", host_name: "" } as any)
+      setErsMembersRecord({ ...ersMembersRecord, host_id: "", host_name: "" })
+
+      load()
+    } catch (e) { handleApiError(e) }
+  }
+
+  // ===== 能量结 handlers =====
+  const handleOpenEksCreate = (date?: string) => {
+    setEksEditingRecord(null)
+    setEksFormDate(date || today)
+    setEksFormStartTime("09:00")
+    setEksFormEndTime("10:00")
+    setEksFormOwnerIds([])
+    setEksFormOwnerNames([])
+    setEksFormHostIds([])
+    setEksFormHostNames([])
+    setEksFormOwnerDescriptions([])
+    setEksSearchField(null)
+    setEksSearchKeyword("")
+    setEksSearchResults([])
+    setEksShowDropdown(false)
+    setEksDialogOpen(true)
+  }
+
+  const handleOpenEksEdit = (session: EnergyKnotSession) => {
+    setEksEditingRecord(session)
+    setEksFormDate(session.date)
+    setEksFormStartTime(session.start_time || "09:00")
+    setEksFormEndTime(session.end_time || "10:00")
+    const names = session.owner_name ? session.owner_name.split("、").filter(Boolean) : []
+    const ids = session.owner_id ? [session.owner_id] : []
+    setEksFormOwnerIds(ids.concat(new Array(Math.max(0, names.length - ids.length)).fill("")))
+    setEksFormOwnerNames(names)
+    setEksFormHostIds(session.host_ids || [])
+    setEksFormHostNames(session.host_names || [])
+    // 解析每个案主的详情，补全 id/name
+    try {
+      const parsed = JSON.parse(session.description || "[]")
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const merged = names.map((name, i) => ({
+          id: ids[i] || parsed[i]?.id || "",
+          name,
+          description: parsed[i]?.description || "",
+        }))
+        setEksFormOwnerDescriptions(merged)
+      } else {
+        setEksFormOwnerDescriptions(names.map((name, i) => ({ id: ids[i] || "", name, description: "" })))
+      }
+    } catch {
+      setEksFormOwnerDescriptions(names.map((name, i) => ({ id: ids[i] || "", name, description: "" })))
+    }
+    setEksSearchField(null)
+    setEksSearchKeyword("")
+    setEksSearchResults([])
+    setEksShowDropdown(false)
+    setEksDialogOpen(true)
+  }
+
+  const handleEksSearch = (keyword: string) => {
+    setEksSearchKeyword(keyword)
+    if (eksSearchTimeoutRef.current) clearTimeout(eksSearchTimeoutRef.current)
+    if (!keyword.trim()) { setEksSearchResults([]); setEksShowDropdown(false); return }
+    eksSearchTimeoutRef.current = window.setTimeout(async () => {
+      setEksSearching(true)
+      try {
+        const results = await energyKnotSessionApi.searchCustomers(keyword)
+        setEksSearchResults(results.filter(r => !eksFormOwnerIds.includes(r.id) && !eksFormHostIds.includes(r.id)))
+        setEksShowDropdown(true)
+      } catch { setEksSearchResults([]) }
+      finally { setEksSearching(false) }
+    }, 300)
+  }
+
+  const handleEksSelectCustomer = (customer: EnergyKnotCustomerSearchResult) => {
+    if (!eksSearchField) return
+    if (eksSearchField === "owner") {
+      if (customer.remaining !== -1 && customer.remaining <= 0) {
+        setEksPendingOwner(customer)
+        setEksPurchaseDialogOpen(true)
+        return
+      }
+      if (!eksFormOwnerIds.includes(customer.id)) {
+        setEksFormOwnerIds([...eksFormOwnerIds, customer.id])
+        setEksFormOwnerNames([...eksFormOwnerNames, customer.nickname || customer.name])
+        setEksFormOwnerDescriptions([...eksFormOwnerDescriptions, { id: customer.id, name: customer.nickname || customer.name, description: "" }])
+      }
+    } else if (eksSearchField === "host") {
+      if (!eksFormHostIds.includes(customer.id)) {
+        setEksFormHostIds([...eksFormHostIds, customer.id])
+        setEksFormHostNames([...eksFormHostNames, customer.nickname || customer.name])
+      }
+    }
+    setEksSearchKeyword("")
+    setEksSearchResults([])
+    setEksShowDropdown(false)
+    setEksSearchField(null)
+  }
+
+  const handleEksRemoveOwner = (index: number) => {
+    setEksFormOwnerIds(eksFormOwnerIds.filter((_, i) => i !== index))
+    setEksFormOwnerNames(eksFormOwnerNames.filter((_, i) => i !== index))
+    setEksFormOwnerDescriptions(eksFormOwnerDescriptions.filter((_, i) => i !== index))
+  }
+
+  const handleEksRemoveHost = (index: number) => {
+    setEksFormHostIds(eksFormHostIds.filter((_, i) => i !== index))
+    setEksFormHostNames(eksFormHostNames.filter((_, i) => i !== index))
+  }
+
+  const handleEksSave = async () => {
+    if (eksFormOwnerIds.length === 0) return
+    setEksSaving(true)
+    try {
+      const data = {
+        date: eksFormDate,
+        start_time: eksFormStartTime || null,
+        end_time: eksFormEndTime || null,
+        owner_id: eksFormOwnerIds[0] || "",
+        owner_name: eksFormOwnerNames.join("、"),
+        host_ids: eksFormHostIds,
+        host_names: eksFormHostNames,
+        description: eksFormOwnerDescriptions.length > 0 ? JSON.stringify(eksFormOwnerDescriptions) : undefined,
+      }
+      if (eksEditingRecord) {
+        await energyKnotSessionApi.update(eksEditingRecord.id, data)
+      } else {
+        await energyKnotSessionApi.create(data)
+      }
+      setEksDialogOpen(false)
+      load()
+    } catch (error) {
+      console.error("保存失败:", error)
+    } finally {
+      setEksSaving(false)
+    }
+  }
+
+  const handleEksDelete = async () => {
+    if (!eksDeleteId) return
+    await energyKnotSessionApi.delete(eksDeleteId)
+    setEksDeleteId(null)
+    load()
+  }
+
+  const handleEksAddPurchase = async () => {
+    if (!eksPendingOwner || !eksPurchaseCount) return
+    setEksPurchaseSaving(true)
+    try {
+      await energyKnotApi.create({
+        customer_id: eksPendingOwner.id,
+        nickname: eksPendingOwner.nickname,
+        purchase_count: parseInt(eksPurchaseCount) || 0,
+        amount: parseFloat(eksPurchaseAmount) || 0,
+      })
+      if (!eksFormOwnerIds.includes(eksPendingOwner.id)) {
+        setEksFormOwnerIds([...eksFormOwnerIds, eksPendingOwner.id])
+        setEksFormOwnerNames([...eksFormOwnerNames, eksPendingOwner.nickname])
+        setEksFormOwnerDescriptions([...eksFormOwnerDescriptions, { id: eksPendingOwner.id, name: eksPendingOwner.nickname, description: "" }])
+      }
+      setEksPurchaseDialogOpen(false)
+      setEksPendingOwner(null)
+      load()
+    } catch (error) {
+      console.error("新增购买失败:", error)
+    } finally {
+      setEksPurchaseSaving(false)
+    }
+  }
+
+  // ===== 内部课程 handlers =====
+  const ICS_COURSE_TYPES = ["疗愈师课程", "商业框架陪跑", "落地赋能班"]
+
+  const handleIcsSearch = (keyword: string) => {
+    setIcsSearchKeyword(keyword)
+    if (icsSearchTimeoutRef.current) clearTimeout(icsSearchTimeoutRef.current)
+    if (!keyword.trim()) { setIcsSearchResults([]); setIcsShowDropdown(false); return }
+    icsSearchTimeoutRef.current = window.setTimeout(async () => {
+      setIcsSearching(true)
+      try {
+        const results = await internalCourseSessionApi.searchCustomers(keyword)
+        setIcsSearchResults(results.filter(r => r.id !== icsFormHostId))
+        setIcsShowDropdown(true)
+      } catch { setIcsSearchResults([]) }
+      finally { setIcsSearching(false) }
+    }, 300)
+  }
+
+  const handleIcsSelectHost = (customer: InternalCourseSessionCustomerSearchResult) => {
+    setIcsFormHostId(customer.id)
+    setIcsFormHostName(customer.nickname || customer.name)
+    setIcsSearchKeyword("")
+    setIcsSearchResults([])
+    setIcsShowDropdown(false)
+    setIcsSearchField(null)
+  }
+
+  const handleOpenIcsCreate = (date?: string) => {
+    setIcsEditingRecord(null)
+    setIcsFormDate(date || today)
+    setIcsFormStartTime("09:00")
+    setIcsFormEndTime("10:00")
+    setIcsFormCourseType("")
+    setIcsFormCourseName("")
+    setIcsFormDescription("")
+    setIcsFormHostId("")
+    setIcsFormHostName("")
+    setIcsSearchField(null)
+    setIcsSearchKeyword("")
+    setIcsSearchResults([])
+    setIcsShowDropdown(false)
+    setIcsDialogOpen(true)
+  }
+
+  const handleOpenIcsEdit = (session: InternalCourseSession) => {
+    setIcsEditingRecord(session)
+    setIcsFormDate(session.date)
+    setIcsFormStartTime(session.start_time || "09:00")
+    setIcsFormEndTime(session.end_time || "10:00")
+    setIcsFormCourseType(session.course_type || "")
+    setIcsFormCourseName(session.course_name)
+    setIcsFormDescription(session.course_description || "")
+    setIcsFormHostId(session.host_ids?.[0] || "")
+    setIcsFormHostName(session.host_names?.[0] || "")
+    setIcsSearchField(null)
+    setIcsSearchKeyword("")
+    setIcsSearchResults([])
+    setIcsShowDropdown(false)
+    setIcsDialogOpen(true)
+  }
+
+  const handleIcsSave = async () => {
+    if (!icsFormCourseName) return
+    setIcsSaving(true)
+    try {
+      const data = {
+        date: icsFormDate,
+        start_time: icsFormStartTime || null,
+        end_time: icsFormEndTime || null,
+        course_type: icsFormCourseType,
+        course_name: icsFormCourseName,
+        course_description: icsFormDescription,
+        host_ids: icsFormHostId ? [icsFormHostId] : [],
+        host_names: icsFormHostName ? [icsFormHostName] : [],
+      }
+      if (icsEditingRecord) {
+        await internalCourseSessionApi.update(icsEditingRecord.id, data)
+      } else {
+        await internalCourseSessionApi.create(data)
+      }
+      setIcsDialogOpen(false)
+      load()
+    } catch (error) {
+      console.error("保存失败:", error)
+    } finally {
+      setIcsSaving(false)
+    }
+  }
+
+  const handleIcsDelete = async () => {
+    if (!icsDeleteId) return
+    await internalCourseSessionApi.delete(icsDeleteId)
+    setIcsDeleteId(null)
+    load()
+  }
+
+  // 内部课程资料
+  const handleOpenIcsMaterials = (session: InternalCourseSession) => {
+    setIcsMaterialsRecord(session)
+    setIcsMaterialsDialogOpen(true)
+  }
+
+  const handleIcsUploadMaterial = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !icsMaterialsRecord) return
+    setIcsUploading(true)
+    try {
+      const material = await uploadApi.uploadMaterial(file)
+      const newMaterials = [...(icsMaterialsRecord.materials || []), material]
+      await internalCourseSessionApi.update(icsMaterialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...icsMaterialsRecord, materials: newMaterials }
+      setIcsMaterialsRecord(updated)
+      load()
+    } catch { alert("上传失败，请重试") }
+    finally { setIcsUploading(false); e.target.value = "" }
+  }
+
+  const handleIcsDeleteMaterial = async (filename: string) => {
+    if (!icsMaterialsRecord) return
+    try {
+      await uploadApi.deleteMaterial(filename)
+      const newMaterials = (icsMaterialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      await internalCourseSessionApi.update(icsMaterialsRecord.id, { materials: newMaterials } as any)
+      const updated = { ...icsMaterialsRecord, materials: newMaterials }
+      setIcsMaterialsRecord(updated)
+      load()
+    } catch { }
+  }
+
+  // 内部课程成员
+  const handleOpenIcsMembers = (session: InternalCourseSession) => {
+    setIcsMembersRecord(session)
+    setIcsMembersDialogOpen(true)
+    setIcsMemberSearchKeyword("")
+    setIcsMemberSearchResults([])
+    setIcsMemberShowDropdown(false)
+  }
+
+  const handleIcsMemberSearch = (keyword: string) => {
+    setIcsMemberSearchKeyword(keyword)
+    if (icsMemberSearchTimeoutRef.current) clearTimeout(icsMemberSearchTimeoutRef.current)
+    if (!keyword.trim()) { setIcsMemberSearchResults([]); setIcsMemberShowDropdown(false); return }
+    icsMemberSearchTimeoutRef.current = window.setTimeout(async () => {
+      setIcsMemberSearching(true)
+      try {
+        const results = await internalCourseSessionApi.searchCustomers(keyword)
+        setIcsMemberSearchResults(results.filter(r => !(icsMembersRecord?.participant_ids || []).includes(r.id)))
+        setIcsMemberShowDropdown(true)
+      } catch { setIcsMemberSearchResults([]) }
+      finally { setIcsMemberSearching(false) }
+    }, 300)
+  }
+
+  const handleIcsAddParticipant = async (customer: InternalCourseSessionCustomerSearchResult) => {
+    if (!icsMembersRecord) return
+    const newIds = [...(icsMembersRecord.participant_ids || []), customer.id]
+    try {
+      await internalCourseSessionApi.update(icsMembersRecord.id, { participant_ids: newIds } as any)
+      setIcsMembersRecord({ ...icsMembersRecord, participant_ids: newIds })
+      setIcsMemberSearchKeyword("")
+      setIcsMemberSearchResults([])
+      setIcsMemberShowDropdown(false)
+      load()
+    } catch { }
+  }
+
+  const handleIcsRemoveParticipant = async (id: string) => {
+    if (!icsMembersRecord) return
+    const newIds = (icsMembersRecord.participant_ids || []).filter(pid => pid !== id)
+    try {
+      await internalCourseSessionApi.update(icsMembersRecord.id, { participant_ids: newIds } as any)
+      setIcsMembersRecord({ ...icsMembersRecord, participant_ids: newIds })
+      load()
+    } catch { }
+  }
+
+  // 避免 TS 控制流缩窄：用 string 类型变量做 className 判断
+  const _vm: string = viewMode
+
+  // 独立页面模式：强制当日活动视图
+  const effectiveDetailTab = standaloneTab || detailTab
+  const effectiveViewMode = standaloneTab ? "detail" : viewMode
+
+  // TODO: ers/eks/ics UI 待添加，暂时抑制未使用变量警告
+  void gcsSearching; void gcsMemberSearching; void gcsMemberHostSearching
+  void ersSearching; void ersMemberSearching; void ersMemberHostSearching
+  void eksSearching
+  void icsSearching; void icsMemberSearching
+  void handleOpenIcsMaterials
+  void Loader2
+
+  // 权限检查
+  const userPermissions = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("userPermissions") || "[]") } catch { return [] }
+  }, [])
+  const currentUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}") } catch { return {} }
+  }, [])
+  const isSuperAdmin = currentUser?.role === "超级管理员"
+  const hasPerm = (key: string) => isSuperAdmin || userPermissions.includes(key) || userPermissions.includes("class-records")
+
+  return (
+    <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
+
+      {/* 切换按钮 + 视图模式 - 独立页面模式隐藏 */}
+      {!standaloneTab && (
+      <div className="flex items-center justify-between border-b border-[#e8e8e8] -mx-6 px-6 mb-6">
+        <div className="flex items-center gap-6">
+          {hasPerm("class-records-visitors") && (
+          <button
+            className={`relative px-1 pb-2 text-[14px] transition-colors ${
+              detailTab === "visitors" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
+            }`}
+            onClick={() => setDetailTab("visitors")}
+          >
+            到场人员
+            {detailTab === "visitors" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
+          </button>
+          )}
+          <button
+            className={`relative px-1 pb-2 text-[14px] transition-colors ${
+              detailTab === "grouping" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
+            }`}
+            onClick={() => setDetailTab("grouping")}
+          >
+            人员分组
+            {detailTab === "grouping" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
+          </button>
+          {hasPerm("class-records-activities") && (
+          <button
+            className={`relative px-1 pb-2 text-[14px] transition-colors ${
+              detailTab === "activities" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
+            }`}
+            onClick={() => setDetailTab("activities")}
+          >
+            当日活动
+            {detailTab === "activities" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
+          </button>
+          )}
+          {hasPerm("class-records-arrival") && (
+          <button
+            className={`relative px-1 pb-2 text-[14px] transition-colors ${
+              detailTab === "arrival_confirmation" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
+            }`}
+            onClick={() => setDetailTab("arrival_confirmation")}
+          >
+            到场确认
+            {detailTab === "arrival_confirmation" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
+          </button>
+          )}
+        </div>
+        <div className="flex items-center border rounded-md overflow-hidden mb-2">
+          <button
+            className={`flex items-center gap-1 px-2.5 h-7 text-[12px] transition-colors ${_vm === "detail" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}
+            onClick={() => setViewMode("detail")}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> 详细
+          </button>
+          <button
+            className={`flex items-center gap-1 px-2.5 h-7 text-[12px] transition-colors border-l ${_vm === "list" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}
+            onClick={() => setViewMode("list")}
+          >
+            <LayoutList className="h-3.5 w-3.5" /> 列表
+          </button>
+        </div>
+      </div>
+      )}
+
+      {/* 主内容区 */}
+      {effectiveViewMode === "list" && effectiveDetailTab !== "visitors" ? (
+      <div className="flex flex-1 min-h-0">
+        {/* 左侧 - 记录列表 */}
+        <div className="flex-1 bg-white rounded-lg space-y-5 flex flex-col min-w-0">
+          {/* 筛选栏 */}
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] text-[#8f959e]">活动名称</label>
+              <Input
+                placeholder="搜索活动名称"
+                value={inputActName}
+                onChange={(e) => setInputActName(e.target.value)}
+                className="h-8 text-[12px] w-40 rounded-md border border-[#e0e0e0] px-2.5 outline-none focus:border-[#3370ff]"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] text-[#8f959e]">类型</label>
+              <div className="relative">
+                <select
+                  value={inputActType}
+                  onChange={(e) => setInputActType(e.target.value)}
+                  className="h-8 w-28 appearance-none rounded-md border border-[#e0e0e0] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] cursor-pointer"
+                >
+                  <option value="all">全部</option>
+                  <option value="class">沙龙</option>
+                  <option value="gcs">觉醒游戏</option>
+                  <option value="ers">情绪释放</option>
+                  <option value="eks">能量结</option>
+                  <option value="ics">内部课程</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8f959e] pointer-events-none" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] text-[#8f959e]">开始日期</label>
+              <Input
+                type="date"
+                value={inputActStartDate}
+                onChange={(e) => setInputActStartDate(e.target.value)}
+                className={`h-8 text-[12px] w-36 rounded-md border border-[#e0e0e0] px-2.5 outline-none focus:border-[#3370ff] ${!inputActStartDate ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] text-[#8f959e]">结束日期</label>
+              <Input
+                type="date"
+                value={inputActEndDate}
+                onChange={(e) => setInputActEndDate(e.target.value)}
+                className={`h-8 text-[12px] w-36 rounded-md border border-[#e0e0e0] px-2.5 outline-none focus:border-[#3370ff] ${!inputActEndDate ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
+              />
+            </div>
+            <button
+              className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
+              onClick={handleActSearch}
+            >
+              <Search className="h-3.5 w-3.5" /> 查询
+            </button>
+            <button
+              className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
+              onClick={handleActClear}
+            >
+              <X className="h-3.5 w-3.5" /> 清空
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : unifiedRecords.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">暂无记录</p>
+                <p className="text-xs text-muted-foreground mt-1">点击上方按钮添加活动</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-4 w-20">类型</TableHead>
+                    <TableHead>日期</TableHead>
+                    <TableHead>名称</TableHead>
+                    <TableHead className="w-28">课程老师</TableHead>
+                    <TableHead className="w-28">案主</TableHead>
+                    <TableHead className="w-28">参与者</TableHead>
+                    <TableHead className="text-right pr-4">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedItems.map((ur) => {
+                    const typeLabel = ur.type === "class" ? "沙龙" : ur.type === "gcs" ? "觉醒" : ur.type === "ers" ? "情绪" : ur.type === "eks" ? "能量结" : "内部课"
+                    const typeColor = ur.type === "class" ? "bg-blue-50 text-blue-600" : ur.type === "gcs" ? "bg-purple-50 text-purple-600" : ur.type === "ers" ? "bg-orange-50 text-orange-600" : ur.type === "eks" ? "bg-yellow-50 text-yellow-600" : "bg-green-50 text-green-600"
+                    const getHost = () => {
+                      if (ur.type === "class") return getTeacherNames(ur.data.teacher_ids).join("、") || "-"
+                      if (ur.type === "gcs") return ur.data.host_name || "-"
+                      if (ur.type === "ers") return ur.data.host_name || "-"
+                      if (ur.type === "eks") return ur.data.host_names?.join("、") || "-"
+                      return ur.data.host_names?.join("、") || "-"
+                    }
+                    const getOwner = () => {
+                      if (ur.type === "class") return "-"
+                      if (ur.type === "gcs") return ur.data.owner_name || "-"
+                      if (ur.type === "ers") return ur.data.owner_name || "-"
+                      if (ur.type === "eks") return ur.data.owner_name || "-"
+                      return "-"
+                    }
+                    const handleEdit = () => {
+                      if (ur.type === "class") handleOpenEdit(ur.data)
+                      else if (ur.type === "gcs") handleOpenGcsEdit(ur.data)
+                      else if (ur.type === "ers") handleOpenErsEdit(ur.data)
+                      else if (ur.type === "eks") handleOpenEksEdit(ur.data)
+                      else if (ur.type === "ics") handleOpenIcsEdit(ur.data)
+                    }
+                    const handleDelete = () => {
+                      if (ur.type === "class") setDeleteId(ur.data.id)
+                      else if (ur.type === "gcs") setGcsDeleteId(ur.data.id)
+                      else if (ur.type === "ers") setErsDeleteId(ur.data.id)
+                      else if (ur.type === "eks") setEksDeleteId(ur.data.id)
+                      else if (ur.type === "ics") setIcsDeleteId(ur.data.id)
+                    }
+                    return (
+                      <TableRow key={`${ur.type}-${ur.data.id}`}>
+                        <TableCell className="pl-4">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${typeColor}`}>{typeLabel}</span>
+                        </TableCell>
+                        <TableCell className="text-[#2b2f36]">
+                          {ur.date}
+                          {ur.data.start_time && ur.data.end_time && (
+                            <span className="text-[12px] text-[#8f959e] ml-2">{ur.data.start_time} - {ur.data.end_time}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-[#2b2f36] font-medium">{getTitle(ur)}</TableCell>
+                        <TableCell>
+                          <span className="text-[12px] text-[#4e535a]">{getHost()}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[12px] text-[#4e535a]">{getOwner()}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[12px] text-[#4e535a]">{ur.data.participant_ids?.length || 0}</span>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <div className="flex items-center justify-end gap-1">
+                            {ur.type === "class" && (
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-[#4e535a]" onClick={(e) => { e.stopPropagation(); handleOpenMaterials(ur.data) }}>
+                                <FileUp className="h-3.5 w-3.5 mr-1" /> 资料{ur.data.materials?.length ? ` (${ur.data.materials.length})` : ""}
+                              </Button>
+                            )}
+                            {ur.type === "gcs" && (
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-[#4e535a]" onClick={(e) => { e.stopPropagation(); handleOpenGcsMaterials(ur.data) }}>
+                                <FileUp className="h-3.5 w-3.5 mr-1" /> 资料{ur.data.materials?.length ? ` (${ur.data.materials.length})` : ""}
+                              </Button>
+                            )}
+                            {ur.type === "ers" && (
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-[#4e535a]" onClick={(e) => { e.stopPropagation(); handleOpenErsMaterials(ur.data) }}>
+                                <FileUp className="h-3.5 w-3.5 mr-1" /> 资料{ur.data.materials?.length ? ` (${ur.data.materials.length})` : ""}
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); handleEdit() }}>
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); handleDelete() }}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={goToPage}
+          />
+        </div>
+      </div>
+      ) : (
+      /* ===== 详细视图 ===== */
+      <div className="flex flex-col min-h-0 flex-1 gap-2">
+      {!(effectiveDetailTab === "visitors" && effectiveViewMode === "list") && (<div>
+      {/* 选中日期显示 + 操作按钮 */}
+      <div className="flex items-center justify-between">
+        <div className="relative inline-block">
+          <button
+            className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
+            onClick={() => {
+              setCalendarPickerMonth(detailDate.substring(0, 7))
+              setShowCalendarPicker(!showCalendarPicker)
+            }}
+          >
+            <span className="text-[16px] text-[#2b2f36] font-medium whitespace-nowrap">
+              {formatDateChinese(detailDate)}
+            </span>
+            <ChevronDown className="h-4 w-4 text-[#8f959e]" />
+          </button>
+          {/* 日历选择器弹窗 */}
+          {showCalendarPicker && (
+            <div ref={calendarPickerRef} className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-50 w-[280px]">
+              {/* 年月选择 */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
+                  onClick={() => {
+                    const [y, m] = calendarPickerMonth.split("-").map(Number)
+                    setCalendarPickerMonth(`${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`)
+                  }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <span className="text-[13px] font-medium text-[#2b2f36]">
+                  {calendarPickerMonth.split("-")[0]}年{parseInt(calendarPickerMonth.split("-")[1])}月
+                </span>
+                <button
+                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
+                  onClick={() => {
+                    const [y, m] = calendarPickerMonth.split("-").map(Number)
+                    setCalendarPickerMonth(`${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}`)
+                  }}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {/* 星期标题 */}
+              <div className="grid grid-cols-7 gap-0.5 mb-1">
+                {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
+                  <div key={w} className="text-center text-[10px] text-[#8f959e] py-1">{w}</div>
+                ))}
+              </div>
+              {/* 日期网格 */}
+              <div className="grid grid-cols-7 gap-0.5">
+                {(() => {
+                  const [year, month] = calendarPickerMonth.split("-").map(Number)
+                  const firstDay = new Date(year, month - 1, 1)
+                  const lastDay = new Date(year, month, 0)
+                  const startWeekday = firstDay.getDay()
+                  const daysInMonth = lastDay.getDate()
+                  const cells: (number | null)[] = []
+                  for (let i = 0; i < startWeekday; i++) cells.push(null)
+                  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+                  return cells.map((day, i) => {
+                    if (!day) return <div key={`empty-${i}`} className="h-7" />
+                    const dateStr = `${calendarPickerMonth}-${String(day).padStart(2, "0")}`
+                    const isSelected = dateStr === detailDate
+                    const isTodayDate = dateStr === today
+                    return (
+                      <button
+                        key={dateStr}
+                        className={`h-7 flex items-center justify-center rounded text-[12px] transition-colors ${
+                          isSelected ? "bg-[#3370ff] text-white" : isTodayDate ? "bg-[#f0f5ff] text-[#3370ff]" : "hover:bg-[#f7f8fa] text-[#2b2f36]"
+                        }`}
+                        onClick={() => {
+                          setDetailDate(dateStr)
+                          setShowCalendarPicker(false)
+                        }}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {effectiveDetailTab === "activities" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Button size="sm" className="text-xs">
+                  <Plus className="mr-1 h-3.5 w-3.5" /> 新增 <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleOpenCreate(detailDate)}>沙龙活动</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleOpenGcsCreate(detailDate)}>觉醒游戏</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleOpenErsCreate(detailDate)}>情绪释放</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleOpenEksCreate(detailDate)}>能量结</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleOpenIcsCreate(detailDate)}>内部课程</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+        {/* 右侧：日期滚动条 */}
+        <div className="flex items-center gap-1 flex-1">
+          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
+            <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
+          </button>
+          <div className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto">
+            {dateRange.map((d) => {
+              const isSelected = d === detailDate
+              const isToday = d === today
+              const dayCount = records.filter(r => r.date === d).length
+                + groupCaseSessions.filter(s => s.date === d).length
+                + emotionalReleaseSessions.filter(s => s.date === d).length
+                + energyKnotSessions.filter(s => s.date === d).length
+                + internalCourseSessions.filter(s => s.date === d).length
+              const hasRecords = dayCount > 0
+              return (
+                <button
+                  key={d}
+                  className={`flex flex-col items-center px-2 py-1.5 rounded-lg transition-colors min-w-[48px] ${
+                    isSelected ? "bg-[#3370ff] text-white" : hasRecords ? "hover:bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
+                  }`}
+                  onClick={() => setDetailDate(d)}
+                >
+                  <span className={`text-[10px] ${isSelected ? "text-white/80" : isToday ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
+                    {getWeekday(d)}
+                  </span>
+                  <span className={`text-[14px] font-medium leading-tight ${isSelected ? "text-white" : isToday ? "text-[#3370ff]" : "text-[#2b2f36]"}`}>
+                    {parseInt(d.split("-")[2])}
+                  </span>
+                  {(effectiveDetailTab === "visitors" || effectiveDetailTab === "arrival_confirmation" || effectiveDetailTab === "grouping") ? (
+                    (visitCounts[d] || 0) > 0 && (
+                      <span className={`text-[10px] leading-tight ${isSelected ? "text-white/60" : "text-[#8f959e]"}`}>
+                        {visitCounts[d]}人
+                      </span>
+                    )
+                  ) : (
+                    hasRecords && (
+                      <span className={`text-[10px] leading-tight ${isSelected ? "text-white/60" : "text-[#8f959e]"}`}>
+                        {dayCount}场
+                      </span>
+                    )
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), 7)))}>
+            <ChevronRight className="h-4 w-4 text-[#4e535a]" />
+          </button>
+        </div>
+      </div>)}
+
+      {/* 内容区 */}
+      <div className="flex flex-col flex-1 min-h-0">
+      {effectiveDetailTab === "visitors" ? (
+        effectiveViewMode === "list" ? (
+        /* 到场人员 - 列表视图 */
+        <div className="flex-1 overflow-y-auto">
+          <VisitsListView />
+        </div>
+        ) : (
+        /* 到场人员 - 详细视图 */
+        <div className="flex-1 overflow-y-auto">
+          <VisitsDetailView externalDate={detailDate} onExternalDateChange={setDetailDate} hideDateBar />
+        </div>
+        )
+      ) : effectiveDetailTab === "grouping" ? (
+      /* 人员分组页面：左栏人员列表 + 右栏分组管理 */
+      <GroupingView
+        date={detailDate}
+        dayVisits={dayVisits}
+        allCustomers={allCustomers}
+        groups={groups}
+        setGroups={setGroups}
+        onSave={async (newGroups) => {
+          await dailyGroupingApi.upsert({ date: detailDate, groups: newGroups })
+          setGroups(newGroups)
+        }}
+      />
+      ) : effectiveDetailTab === "arrival_confirmation" ? (
+      /* 到场确认页面 */
+      <div className="flex-1 overflow-y-auto">
+        <ArrivalConfirmationView
+          visits={fullVisits}
+          loading={loading}
+          onMarkArrived={(visit) => {
+            setArrivalVisit(visit)
+            setArrivalTime(visit.visit_time || "09:00")
+            setArrivalDialogOpen(true)
+          }}
+          onCancelArrived={async (visit) => {
+            try {
+              await visitApi.update(visit.id, { arrived: false, arrival_time: "" } as any)
+              const visits = await visitApi.list(detailDate)
+              setFullVisits(visits)
+              setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
+            } catch (e) { handleApiError(e) }
+          }}
+        />
+      </div>
+      ) : (
+      /* 当日活动页面：左栏到场人员 + 右栏活动卡片 */
+      <div className="flex-1 flex min-h-0">
+        {/* 左栏：到场人员 — 独立页面模式隐藏 */}
+        {!standaloneTab && (
+        <div className="w-[160px] shrink-0 border-r border-[#e8e8e8] overflow-y-auto py-2 px-0">
+          <div className="text-[11px] text-[#8f959e] tracking-widest mb-2">到场人员</div>
+          {dayVisits.length > 0 ? (
+            <div className="space-y-1">
+              {dayVisits.map((v) => (
+                <div
+                  key={v.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: v.id, nickname: v.nickname }))
+                    e.dataTransfer.effectAllowed = "copy"
+                    setDraggingVisitorId(v.id)
+                  }}
+                  onDragEnd={() => setDraggingVisitorId(null)}
+                  className={`flex items-center justify-between px-2 py-1.5 rounded text-[12px] cursor-grab transition-colors ${
+                    draggingVisitorId === v.id ? "opacity-50" : "bg-white hover:bg-[#f7f8fa]"
+                  }`}
+                >
+                  <span className="text-[#2b2f36] truncate">{v.nickname}</span>
+                  {v.member_type && (
+                    <span className="text-[10px] text-[#8f959e] shrink-0 ml-1">{v.member_type}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-[#b0b5bb] py-4 text-center">暂无到场人员</div>
+          )}
+        </div>
+        )}
+        {/* 右栏：课程卡片列表 */}
+        <div className="flex-1 overflow-y-auto">
+            {unifiedDetailRecords.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">{detailDate === today ? "今天暂无记录" : `${detailDate} 暂无记录`}</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#e8e8e8] border-y border-[#e8e8e8]">
+                {unifiedDetailRecords.map((ur) => {
+                  const typeLabel = ur.type === "class" ? "沙龙" : ur.type === "gcs" ? "觉醒" : ur.type === "ers" ? "情绪" : ur.type === "eks" ? "能量结" : "内部课"
+                  const typeColor = ur.type === "class" ? "bg-blue-50 text-blue-600" : ur.type === "gcs" ? "bg-purple-50 text-purple-600" : ur.type === "ers" ? "bg-orange-50 text-orange-600" : ur.type === "eks" ? "bg-yellow-50 text-yellow-600" : "bg-green-50 text-green-600"
+
+                // ===== 活动日历卡片 =====
+                if (ur.type === "class") {
+                  const record = ur.data
+                  return (
+                    <div
+                      key={`class-${record.id}`}
+                      className={`bg-white transition-shadow ${dragOverActivityId === `class-${record.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`class-${record.id}`) }}
+                      onDragLeave={() => setDragOverActivityId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverActivityId(null)
+                        try {
+                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
+                          handleDropToClass(record, data)
+                        } catch {}
+                      }}
+                    >
+                      <div className="flex">
+                        {/* 最左侧：时间 */}
+                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
+                          {record.start_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{record.start_time}</span>
+                          )}
+                          {record.start_time && record.end_time && (
+                            <span className="text-[10px] text-[#c9cdd4]">~</span>
+                          )}
+                          {record.end_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{record.end_time}</span>
+                          )}
+                        </div>
+                        {/* 活动信息 */}
+                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${typeColor}`}>{typeLabel}</span>
+                            {record.is_public_welfare && (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#e8f5e9] text-[#4caf50]">公益</span>
+                            )}
+                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">{record.course_name}</span>
+                            {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
+                          </div>
+                          {record.course_description && (
+                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{record.course_description}</p>
+                          )}
+                        </div>
+                        {/* 中间：分组人员 */}
+                        {!standaloneTab && (
+                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
+                          {(record.groups || []).length === 0 ? (
+                            <div className="flex items-center justify-center py-4 flex-1">
+                              <span className="text-[12px] text-[#8f959e]">暂无分组</span>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 rounded p-[1px] flex-1">
+                              <div className="space-y-2 bg-white rounded px-2 py-1.5 h-full">
+                                {record.groups.map((group, gi) => {
+                                  const members: { name: string; role?: string }[] = []
+                                  const excludeIds = new Set([group.leader_id, group.deputy_id].filter(Boolean))
+                                  if (group.leader_id) members.push({ name: getMemberName(group.leader_id), role: "组长" })
+                                  if (group.deputy_id) members.push({ name: getMemberName(group.deputy_id), role: "副组长" })
+                                  members.push(...group.member_ids.filter(id => !excludeIds.has(id)).map(id => ({ name: getMemberName(id) })))
+                                  return members.length > 0 ? (
+                                    <div key={gi} className="text-[12px] text-[#4e535a]">
+                                      {members.map((m, i) => (
+                                        <span key={i}>
+                                          {i > 0 && "、"}
+                                          {m.name}
+                                          {m.role && <span className="inline-block ml-1 px-1 py-0.5 rounded text-[10px] bg-gray-50 text-[#8f959e]">{m.role}</span>}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        )}
+                        {/* 右侧：操作按钮 */}
+                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
+                          {!standaloneTab && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGroups(record)}>
+                            <Users className="h-3.5 w-3.5" />
+                          </Button>
+                          )}
+                          {standaloneTab && (
+                          <>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenMaterials(record)}>
+                            <FileUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(record)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(record.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                          </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                // ===== 觉醒游戏卡片 =====
+                if (ur.type === "gcs") {
+                  const s = ur.data
+                  return (
+                    <div
+                      key={`gcs-${s.id}`}
+                      className={`bg-white transition-shadow ${dragOverActivityId === `gcs-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`gcs-${s.id}`) }}
+                      onDragLeave={() => setDragOverActivityId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverActivityId(null)
+                        try {
+                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
+                          handleDropToGcs(s, data)
+                        } catch {}
+                      }}
+                    >
+                      <div className="flex">
+                        {/* 最左侧：时间 */}
+                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
+                          {s.start_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
+                          )}
+                          {s.start_time && s.end_time && (
+                            <span className="text-[10px] text-[#c9cdd4]">~</span>
+                          )}
+                          {s.end_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
+                          )}
+                        </div>
+                        {/* 活动信息 */}
+                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-600">觉醒</span>
+                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">觉醒游戏</span><span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[14px] font-medium text-[#2b2f36]">{s.owner_name || "未分配"}</span>
+                            {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">成就君：{s.achiever_name}</span>}
+                          </div>
+                          {s.description && (
+                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{s.description}</p>
+                          )}
+                        </div>
+                        {/* 中间：人员信息 */}
+                        {!standaloneTab && (
+                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
+                          <div className="bg-gray-50 rounded p-[1px] flex-1">
+                            <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
+                              {s.host_name && <span>{s.host_name}<span className="inline-block ml-1 px-1 py-0.5 rounded text-[10px] bg-gray-50 text-[#8f959e]">主持人</span></span>}
+                              {s.host_name && s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 && "、"}
+                              {s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 ? s.participant_ids.filter(id => id !== s.host_id && id !== s.achiever_id).map(id => getMemberName(id)).join("、") : (!s.host_name && <span className="text-[#8f959e]">暂无</span>)}
+                            </div>
+                          </div>
+                        </div>
+                        )}
+                        {/* 右侧：操作按钮 */}
+                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
+                          {!standaloneTab && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsMembers(s)}>
+                            <Users className="h-3.5 w-3.5" />
+                          </Button>
+                          )}
+                          {standaloneTab && (
+                          <>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsMaterials(s)}>
+                            <FileUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsEdit(s)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setGcsDeleteId(s.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                          </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                // ===== 情绪释放卡片 =====
+                if (ur.type === "ers") {
+                  const s = ur.data
+                  return (
+                    <div
+                      key={`ers-${s.id}`}
+                      className={`bg-white transition-shadow ${dragOverActivityId === `ers-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`ers-${s.id}`) }}
+                      onDragLeave={() => setDragOverActivityId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverActivityId(null)
+                        try {
+                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
+                          handleDropToErs(s, data)
+                        } catch {}
+                      }}
+                    >
+                      <div className="flex">
+                        {/* 最左侧：时间 */}
+                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
+                          {s.start_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
+                          )}
+                          {s.start_time && s.end_time && (
+                            <span className="text-[10px] text-[#c9cdd4]">~</span>
+                          )}
+                          {s.end_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
+                          )}
+                        </div>
+                        {/* 活动信息 */}
+                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 text-orange-600">情绪</span>
+                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">情绪释放</span><span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[14px] font-medium text-[#2b2f36]">{s.owner_name || "未分配"}</span>
+                            {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">成就君：{s.achiever_name}</span>}
+                          </div>
+                          {s.description && (
+                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{s.description}</p>
+                          )}
+                        </div>
+                        {/* 中间：人员信息 */}
+                        {!standaloneTab && (
+                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
+                          <div className="bg-gray-50 rounded p-[1px] flex-1">
+                            <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
+                              {s.host_name && <span>{s.host_name}<span className="inline-block ml-1 px-1 py-0.5 rounded text-[10px] bg-gray-50 text-[#8f959e]">主持人</span></span>}
+                              {s.host_name && s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 && "、"}
+                              {s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 ? s.participant_ids.filter(id => id !== s.host_id && id !== s.achiever_id).map(id => getMemberName(id)).join("、") : (!s.host_name && <span className="text-[#8f959e]">暂无</span>)}
+                            </div>
+                          </div>
+                        </div>
+                        )}
+                        {/* 右侧：操作按钮 */}
+                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
+                          {!standaloneTab && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsMembers(s)}>
+                            <Users className="h-3.5 w-3.5" />
+                          </Button>
+                          )}
+                          {standaloneTab && (
+                          <>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsMaterials(s)}>
+                            <FileUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsEdit(s)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setErsDeleteId(s.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                          </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                // ===== 能量结卡片 =====
+                if (ur.type === "eks") {
+                  const s = ur.data
+                  let eksNames: string[] = []
+                  let ownerDescs: {id: string; name: string; description: string}[] = []
+                  try {
+                    const items = JSON.parse(s.description || "[]")
+                    if (Array.isArray(items)) {
+                      ownerDescs = items
+                      eksNames = items.map((d: any) => d.name).filter(Boolean)
+                    }
+                  } catch { /* empty */ }
+                  const fallbackNames = (s.owner_name || "").split("、")
+                  return (
+                    <div
+                      key={`eks-${s.id}`}
+                      className={`bg-white transition-shadow ${dragOverActivityId === `eks-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`eks-${s.id}`) }}
+                      onDragLeave={() => setDragOverActivityId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverActivityId(null)
+                        try {
+                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
+                          handleDropToEks(s, data)
+                        } catch {}
+                      }}
+                    >
+                      <div className="flex">
+                        {/* 最左侧：时间 */}
+                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
+                          {s.start_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
+                          )}
+                          {s.start_time && s.end_time && (
+                            <span className="text-[10px] text-[#c9cdd4]">~</span>
+                          )}
+                          {s.end_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
+                          )}
+                        </div>
+                        {/* 活动信息 */}
+                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-600">能量</span>
+                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">能量结</span><span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[14px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
+                            {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">课程老师：{s.host_names.join("、")}</span>}
+                          </div>
+                          {ownerDescs.filter(d => d.description).length > 0 && (
+                            <div className="space-y-1">
+                              {ownerDescs.filter(d => d.description).map((d, i) => (
+                                <p key={i} className="text-[11px] text-[#8f959e] font-light leading-relaxed">
+                                  <span>{d.name || fallbackNames[i] || "未知"}：</span>{d.description}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* 中间：人员信息 */}
+                        {!standaloneTab && (
+                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
+                        </div>
+                        )}
+                        {/* 右侧：操作按钮 */}
+                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-2" : "grid-cols-1"}`}>
+                          {standaloneTab && (
+                          <>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEksEdit(s)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEksDeleteId(s.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                          </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                // ===== 内部课程卡片 =====
+                if (ur.type === "ics") {
+                  const s = ur.data
+                  return (
+                    <div
+                      key={`ics-${s.id}`}
+                      className={`bg-white transition-shadow ${dragOverActivityId === `ics-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`ics-${s.id}`) }}
+                      onDragLeave={() => setDragOverActivityId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverActivityId(null)
+                        try {
+                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
+                          handleDropToIcs(s, data)
+                        } catch {}
+                      }}
+                    >
+                      <div className="flex">
+                        {/* 最左侧：时间 */}
+                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
+                          {s.start_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
+                          )}
+                          {s.start_time && s.end_time && (
+                            <span className="text-[10px] text-[#c9cdd4]">~</span>
+                          )}
+                          {s.end_time && (
+                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
+                          )}
+                        </div>
+                        {/* 活动信息 */}
+                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-600">内部</span>
+                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">{s.course_name}</span>
+                            <span className="text-[14px] font-medium text-[#2b2f36]">丨课程老师：{s.host_names?.length > 0 ? s.host_names.join("、") : "暂无"}</span>
+                            {s.course_type && <span className="text-[12px] text-[#4e535a]">{s.course_type}</span>}
+                          </div>
+                          {s.course_description && (
+                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{s.course_description}</p>
+                          )}
+                        </div>
+                        {/* 中间：人员信息 */}
+                        {!standaloneTab && (
+                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
+                          <div className="bg-gray-50 rounded p-[1px] flex-1">
+                            <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
+                              {s.participant_ids?.length > 0 ? s.participant_ids.map(id => getMemberName(id)).join("、") : "暂无"}
+                            </div>
+                          </div>
+                        </div>
+                        )}
+                        {/* 右侧：操作按钮 */}
+                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
+                          {!standaloneTab && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsMembers(s)}>
+                            <Users className="h-3.5 w-3.5" />
+                          </Button>
+                          )}
+                          {standaloneTab && (
+                          <>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsMaterials(s)}>
+                            <FileUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsEdit(s)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setIcsDeleteId(s.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                          </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                return null
+              })}
+            </div>
+          )}
+          </div>
+        </div>
+      )}
+      </div>
+
+      {/* 新增/编辑记录弹窗 */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{editingRecord ? "编辑活动" : "新增活动"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
+              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
+              <div className="flex items-center gap-2">
+                <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <span className="text-[12px] text-[#4e535a]">至</span>
+                <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程名称</span>
+              <div className="relative">
+                <div
+                  className="min-h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] cursor-pointer flex items-center justify-between"
+                  onClick={() => setShowCourseDropdown(!showCourseDropdown)}
+                >
+                  <span className={selectedCourse ? "text-[#2b2f36]" : "text-muted-foreground"}>
+                    {selectedCourse?.name || "选择课程"}
+                  </span>
+                </div>
+                {showCourseDropdown && courses.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
+                    {courses.map((course) => (
+                      <div
+                        key={course.id}
+                        className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted ${formCourseId === course.id ? "bg-muted/50" : ""}`}
+                        onClick={() => {
+                          setFormCourseId(course.id)
+                          setShowCourseDropdown(false)
+                        }}
+                      >
+                        <div>
+                          <span className="text-[12px]">{course.name}</span>
+                          <span className="text-[12px] text-muted-foreground ml-2">{course.type}</span>
+                        </div>
+                        {formCourseId === course.id && (
+                          <span className="text-xs text-primary">已选</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
+              <div className="relative">
+                <div
+                  className="min-h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] cursor-pointer flex items-center justify-between"
+                  onClick={() => setShowTeacherDropdown(!showTeacherDropdown)}
+                >
+                  <span className={formTeacherId ? "text-[#2b2f36]" : "text-muted-foreground"}>
+                    {formTeacherId ? (() => { const c = allCustomers.find(t => t.id === formTeacherId); return c?.nickname || c?.name || formTeacherId })() : "选择课程老师"}
+                  </span>
+                </div>
+                {showTeacherDropdown && teachers.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
+                    {teachers.map((teacher) => (
+                      <div
+                        key={teacher.id}
+                        className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted ${formTeacherId === teacher.id ? "bg-muted/50" : ""}`}
+                        onClick={() => { setFormTeacherId(teacher.id); setShowTeacherDropdown(false) }}
+                      >
+                        <span className="text-[12px]">{teacher.nickname || teacher.name || "未命名"}</span>
+                        {formTeacherId === teacher.id && (
+                          <span className="text-xs text-primary">已选</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {showTeacherDropdown && teachers.length === 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-xs text-muted-foreground text-center">
+                    暂无课程老师，请先在疗愈身份中添加
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">是否公益</span>
+              <div className="relative">
+                <select
+                  value={formIsPublicWelfare ? "1" : "0"}
+                  onChange={(e) => setFormIsPublicWelfare(e.target.value === "1")}
+                  className="h-8 w-full appearance-none rounded-md border border-input bg-transparent px-2 pr-8 text-[12px] text-[#2b2f36] focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="0">否</option>
+                  <option value="1">是</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8f959e] pointer-events-none" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程介绍</span>
+              <textarea
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder="输入课程介绍..."
+                rows={4}
+                className="w-full rounded-md border border-input bg-transparent px-2 py-2 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>
+              <Button size="sm" onClick={handleSave} disabled={saving || !formCourseId}>
+                {saving ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 资料弹窗 */}
+      <Dialog open={materialsDialogOpen} onOpenChange={setMaterialsDialogOpen}>
+        <DialogContent className="max-w-md w-full p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">资料管理</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4 overflow-hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-[#4e535a] truncate">{materialsRecord?.course_name}</span>
+              <div className="shrink-0">
+                <input type="file" id="materials-upload-cr" className="hidden" onChange={handleUploadMaterial} />
+                <Button size="sm" className="h-7 text-xs" disabled={uploading} onClick={() => document.getElementById("materials-upload-cr")?.click()}>
+                  {uploading ? "上传中..." : "上传文件"}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto overflow-x-hidden">
+              {(materialsRecord?.materials || []).length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">暂无资料</div>
+              ) : (
+                (materialsRecord?.materials || []).map((m) => (
+                  <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded border gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                      <File className="h-4 w-4 text-[#8f959e] shrink-0" />
+                      <span className="text-xs text-[#2b2f36] truncate">{m.name}</span>
+                      <span className="text-[12px] text-[#8f959e] shrink-0">{(m.size / 1024).toFixed(1)}KB</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a href={`${"http://127.0.0.1:8000"}${m.url}`} download className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]">
+                        <Download className="h-3.5 w-3.5 text-[#8f959e]" />
+                      </a>
+                      <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => handleDeleteMaterial(m.url.split("/").pop()!)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认 */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除活动</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条活动吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 拖拽到沙龙：选择分组弹窗 */}
+      <Dialog open={dropGroupSelectOpen} onOpenChange={(open) => { if (!open) { setDropGroupSelectOpen(false); setDropGroupSelectRecord(null); setDropGroupSelectCustomer(null) } }}>
+        <DialogContent className="max-w-xs p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">选择分组</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-4 space-y-2">
+            <p className="text-[12px] text-[#8f959e] mb-3">
+              将 <span className="font-medium text-[#2b2f36]">{dropGroupSelectCustomer?.nickname}</span> 添加到：
+            </p>
+            {(dropGroupSelectRecord?.groups || []).map((group, gi) => (
+              <button
+                key={gi}
+                className="w-full px-3 py-2.5 rounded border text-left transition-colors border-[#e0e0e0] hover:border-[#3370ff] hover:bg-[#f0f5ff]"
+                onClick={() => handleDropToClassGroup(gi)}
+              >
+                <div className="text-[12px] font-medium text-[#2b2f36]">{group.name || `小组 ${gi + 1}`}</div>
+                <div className="text-[11px] text-[#8f959e] mt-0.5">
+                  {(group.member_ids?.length || 0)} 人
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 小组人员编辑弹窗 */}
+      {groupsPanelOpen && <Dialog open={groupsPanelOpen} onOpenChange={(open) => { setGroupsPanelOpen(open); if (!open) setGroupsRecord(null) }}>
+        <DialogContent className="max-w-3xl p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">人员配置</DialogTitle>
+          </DialogHeader>
+          {groupsRecord && (
+            <div className="flex max-h-[65vh]">
+              {/* 左侧：当日到场人员 */}
+              <div className="w-48 shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
+                <div className="px-3 py-3 border-b border-[#f0f0f0] bg-[#f7f8fa]">
+                  <span className="text-[12px] font-medium text-[#2b2f36]">当日到场</span>
+                  <span className="text-[12px] text-[#8f959e] ml-1">{dayVisits.length}人</span>
+                </div>
+                <div className="p-2 space-y-1">
+                  {dayVisits.length === 0 ? (
+                    <p className="text-[12px] text-[#b0b5bb] text-center py-4">暂无到场人员</p>
+                  ) : (
+                    dayVisits.map((v) => {
+                      const assigned = isVisitorAssigned(v.id)
+                      return (
+                        <div
+                          key={v.id}
+                          draggable={!assigned}
+                          onDragStart={() => !assigned && setDraggingVisitorId(v.id)}
+                          onDragEnd={() => { setDraggingVisitorId(null); setDropTargetGroup(null) }}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded text-[12px] select-none ${
+                            assigned
+                              ? "bg-[#f5f5f5] text-[#b0b5bb] cursor-not-allowed"
+                              : "bg-white hover:bg-[#f0f5ff] cursor-grab active:cursor-grabbing"
+                          } ${draggingVisitorId === v.id ? "opacity-50" : ""}`}
+                        >
+                          <span className="flex-1 truncate">{v.nickname}</span>
+                          {assigned && <span className="text-[10px] text-[#b0b5bb]">已分配</span>}
+                          {v.member_type && !assigned && <span className="text-[10px] text-[#8f959e]">{v.member_type}</span>}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 右侧：分组 */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <div className="text-[12px] text-[#8f959e]">{groupsRecord.course_name} · {groupsRecord.date}</div>
+
+              {(groupsRecord.groups || []).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Users className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-xs text-muted-foreground">暂无小组</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">点击下方按钮添加小组</p>
+                </div>
+              ) : (
+                groupsRecord.groups.map((group, gi) => (
+                  <div
+                    key={gi}
+                    className={`border rounded-lg bg-white transition-colors ${
+                      dropTargetGroup === gi ? "border-[#3370ff] bg-[#f0f5ff]" : "border-[#e8e8e8]"
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setDropTargetGroup(gi) }}
+                    onDragLeave={() => setDropTargetGroup(null)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const vid = draggingVisitorId
+                      const visitor = dayVisits.find(v => v.id === vid)
+                      if (visitor) handleDropVisitor(gi, visitor)
+                    }}
+                  >
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-[#f0f0f0]">
+                      <input
+                        className="text-[12px] font-medium text-[#2b2f36] bg-transparent border-none outline-none flex-1 min-w-0"
+                        value={group.name}
+                        onChange={(e) => handleGroupNameChange(gi, e.target.value)}
+                        onBlur={() => handleSaveGroupName(gi)}
+                        placeholder="小组名称"
+                      />
+                      <button
+                        className="h-5 w-5 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0"
+                        onClick={() => handleRemoveGroup(gi)}
+                      >
+                        <Trash2 className="h-3 w-3 text-[#8f959e]" />
+                      </button>
+                    </div>
+
+                    <div className="px-3 py-2.5 space-y-2.5">
+                      {/* 组长 + 副组长 */}
+                      <div className="flex gap-3">
+                        <div className="flex-[0.40] flex items-center gap-1.5 min-w-0">
+                          <span className="text-[12px] text-[#4e535a] shrink-0">组长</span>
+                          {group.leader_id ? (
+                            <div className="flex items-center gap-1 min-w-0">
+                              <Badge variant="secondary" className="text-[12px] font-normal truncate">{getMemberName(group.leader_id)}</Badge>
+                              <button className="h-4 w-4 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => handleRemoveGroupMember(gi, "leader")}>
+                                <X className="h-2.5 w-2.5 text-[#8f959e]" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex-1 relative min-w-0">
+                              <Input
+                                value={groupSearchTarget?.groupIndex === gi && groupSearchTarget?.role === "leader" ? groupSearchKeyword : ""}
+                                onChange={(e) => handleGroupSearch(e.target.value, gi, "leader")}
+                                placeholder="选择组长"
+                                className="h-7 text-[12px]"
+                                onFocus={() => { if (groupBlurTimeoutRef.current) clearTimeout(groupBlurTimeoutRef.current) }}
+                                onBlur={() => { if (groupBlurTimeoutRef.current) clearTimeout(groupBlurTimeoutRef.current); groupBlurTimeoutRef.current = window.setTimeout(() => setGroupSearchResults([]), 200) }}
+                              />
+                              {groupSearchTarget?.groupIndex === gi && groupSearchTarget?.role === "leader" && groupSearchResults.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                                  {groupSearchResults.map((c) => c.remaining === 0 ? (
+                                    <div key={c.id} className="flex items-center justify-between px-3 py-1.5 text-[12px] bg-[#f5f5f5]" onMouseDown={(e) => e.preventDefault()}>
+                                      <span>{c.nickname}</span>
+                                      <span className="text-[12px] text-[#ff4d4f]">已无剩余活动次数</span>
+                                    </div>
+                                  ) : (
+                                    <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onMouseDown={(e) => e.preventDefault()} onClick={() => handleAssignGroupMember(c)}>
+                                      <span>{c.nickname}</span>
+                                      <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-[0.45] flex items-center gap-1.5 min-w-0">
+                          <span className="text-[12px] text-[#4e535a] shrink-0">副组长</span>
+                          {group.deputy_id ? (
+                            <div className="flex items-center gap-1 min-w-0">
+                              <Badge variant="secondary" className="text-[12px] font-normal truncate">{getMemberName(group.deputy_id)}</Badge>
+                              <button className="h-4 w-4 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => handleRemoveGroupMember(gi, "deputy")}>
+                                <X className="h-2.5 w-2.5 text-[#8f959e]" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex-1 relative min-w-0">
+                              <Input
+                                value={groupSearchTarget?.groupIndex === gi && groupSearchTarget?.role === "deputy" ? groupSearchKeyword : ""}
+                                onChange={(e) => handleGroupSearch(e.target.value, gi, "deputy")}
+                                placeholder="选择副组长"
+                                className="h-7 text-[12px]"
+                                onFocus={() => { if (groupBlurTimeoutRef.current) clearTimeout(groupBlurTimeoutRef.current) }}
+                                onBlur={() => { if (groupBlurTimeoutRef.current) clearTimeout(groupBlurTimeoutRef.current); groupBlurTimeoutRef.current = window.setTimeout(() => setGroupSearchResults([]), 200) }}
+                              />
+                              {groupSearchTarget?.groupIndex === gi && groupSearchTarget?.role === "deputy" && groupSearchResults.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                                  {groupSearchResults.map((c) => c.remaining === 0 ? (
+                                    <div key={c.id} className="flex items-center justify-between px-3 py-1.5 text-[12px] bg-[#f5f5f5]" onMouseDown={(e) => e.preventDefault()}>
+                                      <span>{c.nickname}</span>
+                                      <span className="text-[12px] text-[#ff4d4f]">已无剩余活动次数</span>
+                                    </div>
+                                  ) : (
+                                    <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onMouseDown={(e) => e.preventDefault()} onClick={() => handleAssignGroupMember(c)}>
+                                      <span>{c.nickname}</span>
+                                      <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 组员 */}
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[12px] text-[#4e535a]">组员</span>
+                          </div>
+                          <div className="flex-1 relative min-w-0">
+                            <Input
+                              value={groupSearchTarget?.groupIndex === gi && groupSearchTarget?.role === "member" ? groupSearchKeyword : ""}
+                              onChange={(e) => handleGroupSearch(e.target.value, gi, "member")}
+                              placeholder="搜索添加组员"
+                              className="h-7 text-[12px]"
+                              onFocus={() => { if (groupBlurTimeoutRef.current) clearTimeout(groupBlurTimeoutRef.current) }}
+                              onBlur={() => { if (groupBlurTimeoutRef.current) clearTimeout(groupBlurTimeoutRef.current); groupBlurTimeoutRef.current = window.setTimeout(() => setGroupSearchResults([]), 200) }}
+                            />
+                            {groupSearchTarget?.groupIndex === gi && groupSearchTarget?.role === "member" && groupSearchResults.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                                {groupSearchResults.map((c) => c.remaining === 0 ? (
+                                  <div key={c.id} className="flex items-center justify-between px-3 py-1.5 text-[12px] bg-[#f5f5f5]" onMouseDown={(e) => e.preventDefault()}>
+                                    <span>{c.nickname}</span>
+                                    <span className="text-[12px] text-[#ff4d4f]">已无剩余活动次数</span>
+                                  </div>
+                                ) : (
+                                  <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onMouseDown={(e) => e.preventDefault()} onClick={() => handleAssignGroupMember(c)}>
+                                    <span>{c.nickname}</span>
+                                    <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {group.member_ids.length > 0 && (
+                          <div className="flex flex-wrap gap-1 ml-[28px]">
+                            {group.member_ids.map((mid) => (
+                              <Badge key={mid} variant="secondary" className="text-[12px] font-normal gap-1 pr-1">
+                                {getMemberName(mid)}
+                                <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0]" onClick={() => handleRemoveGroupMember(gi, "member", mid)}>
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1 h-8 text-xs border-dashed" onClick={handleAddGroup}>
+                  <Plus className="mr-1 h-3.5 w-3.5" /> 添加小组
+                </Button>
+                <Button size="sm" className="h-8 text-xs px-5" onClick={() => setGroupsPanelOpen(false)}>
+                  确定
+                </Button>
+              </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>}
+
+      {/* ===== 觉醒游戏 新增/编辑弹窗 ===== */}
+      <Dialog open={gcsDialogOpen} onOpenChange={setGcsDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{gcsEditingRecord ? "编辑觉醒游戏" : "新增觉醒游戏"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
+              <Input type="date" value={gcsFormDate} onChange={(e) => setGcsFormDate(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
+              <div className="flex items-center gap-2">
+                <Input type="time" value={gcsFormStartTime} onChange={(e) => setGcsFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <span className="text-[12px] text-[#4e535a]">至</span>
+                <Input type="time" value={gcsFormEndTime} onChange={(e) => setGcsFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">案主</span>
+              <div className="relative" ref={gcsDropdownRef}>
+                {gcsSearchField === "owner" ? (
+                  <Input
+                    value={gcsSearchKeyword}
+                    onChange={(e) => handleGcsSearch(e.target.value)}
+                    placeholder="搜索案主..."
+                    className="h-8 text-xs"
+                    autoFocus
+                    onBlur={() => { if (gcsBlurTimeoutRef.current) clearTimeout(gcsBlurTimeoutRef.current); gcsBlurTimeoutRef.current = window.setTimeout(() => { if (gcsSearchField === "owner") { setGcsSearchField(null); setGcsShowDropdown(false) } }, 200) }}
+                  />
+                ) : (
+                  <div
+                    className="min-h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] cursor-pointer flex items-center justify-between"
+                    onClick={() => { if (gcsBlurTimeoutRef.current) clearTimeout(gcsBlurTimeoutRef.current); setGcsSearchField("owner"); setGcsSearchKeyword(gcsFormOwnerName); setGcsSearchResults([]); setGcsShowDropdown(false); if (gcsFormOwnerName) handleGcsSearch(gcsFormOwnerName) }}
+                  >
+                    <span className={gcsFormOwnerId ? "text-[#2b2f36]" : "text-muted-foreground"}>
+                      {gcsFormOwnerName || "选择案主"}
+                    </span>
+                  </div>
+                )}
+                {gcsShowDropdown && gcsSearchField === "owner" && gcsSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                    {gcsSearchResults.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onMouseDown={(e) => e.preventDefault()} onClick={() => handleGcsSelectCustomer(c)}>
+                        <span>{c.nickname || c.name}</span>
+                        <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成就君</span>
+              <select
+                className="h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] text-[#2b2f36] outline-none"
+                value={gcsFormAchieverId}
+                onChange={(e) => {
+                  const id = e.target.value
+                  const c = allCustomers.find(c => c.id === id)
+                  setGcsFormAchieverId(id)
+                  setGcsFormAchieverName(c?.nickname || c?.name || "")
+                }}
+              >
+                <option value="">选择成就君</option>
+                {allCustomers.filter(c => c.positions?.includes("成就君")).map(c => (
+                  <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">个案详情</span>
+              <textarea
+                value={gcsFormDescription}
+                onChange={(e) => setGcsFormDescription(e.target.value)}
+                placeholder="输入个案详情..."
+                rows={4}
+                className="w-full rounded-md border border-input bg-transparent px-2 py-2 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setGcsDialogOpen(false)}>取消</Button>
+              <Button size="sm" onClick={handleGcsSave} disabled={gcsSaving || !gcsFormOwnerId}>
+                {gcsSaving ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== 情绪释放 新增/编辑弹窗 ===== */}
+      <Dialog open={ersDialogOpen} onOpenChange={setErsDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{ersEditingRecord ? "编辑情绪释放" : "新增情绪释放"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
+              <Input type="date" value={ersFormDate} onChange={(e) => setErsFormDate(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
+              <div className="flex items-center gap-2">
+                <Input type="time" value={ersFormStartTime} onChange={(e) => setErsFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <span className="text-[12px] text-[#4e535a]">至</span>
+                <Input type="time" value={ersFormEndTime} onChange={(e) => setErsFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">案主</span>
+              <div className="relative" ref={ersDropdownRef}>
+                {ersSearchField === "owner" ? (
+                  <Input
+                    value={ersSearchKeyword}
+                    onChange={(e) => handleErsSearch(e.target.value)}
+                    placeholder="搜索案主..."
+                    className="h-8 text-xs"
+                    autoFocus
+                    onBlur={() => { if (ersBlurTimeoutRef.current) clearTimeout(ersBlurTimeoutRef.current); ersBlurTimeoutRef.current = window.setTimeout(() => { if (ersSearchField === "owner") { setErsSearchField(null); setErsShowDropdown(false) } }, 200) }}
+                  />
+                ) : (
+                  <div
+                    className="min-h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] cursor-pointer flex items-center justify-between"
+                    onClick={() => { if (ersBlurTimeoutRef.current) clearTimeout(ersBlurTimeoutRef.current); setErsSearchField("owner"); setErsSearchKeyword(ersFormOwnerName); setErsSearchResults([]); setErsShowDropdown(false); if (ersFormOwnerName) handleErsSearch(ersFormOwnerName) }}
+                  >
+                    <span className={ersFormOwnerId ? "text-[#2b2f36]" : "text-muted-foreground"}>
+                      {ersFormOwnerName || "选择案主"}
+                    </span>
+                  </div>
+                )}
+                {ersShowDropdown && ersSearchField === "owner" && ersSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                    {ersSearchResults.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onMouseDown={(e) => e.preventDefault()} onClick={() => handleErsSelectCustomer(c)}>
+                        <span>{c.nickname || c.name}</span>
+                        <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成就君</span>
+              <select
+                className="h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] text-[#2b2f36] outline-none"
+                value={ersFormAchieverId}
+                onChange={(e) => {
+                  const id = e.target.value
+                  const c = allCustomers.find(c => c.id === id)
+                  setErsFormAchieverId(id)
+                  setErsFormAchieverName(c?.nickname || c?.name || "")
+                }}
+              >
+                <option value="">选择成就君</option>
+                {allCustomers.filter(c => c.positions?.includes("成就君")).map(c => (
+                  <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">个案详情</span>
+              <textarea
+                value={ersFormDescription}
+                onChange={(e) => setErsFormDescription(e.target.value)}
+                placeholder="输入个案详情..."
+                rows={4}
+                className="w-full rounded-md border border-input bg-transparent px-2 py-2 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setErsDialogOpen(false)}>取消</Button>
+              <Button size="sm" onClick={handleErsSave} disabled={ersSaving || !ersFormOwnerId}>
+                {ersSaving ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== 能量结 新增/编辑弹窗 ===== */}
+      <Dialog open={eksDialogOpen} onOpenChange={setEksDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{eksEditingRecord ? "编辑能量结" : "新增能量结"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
+              <Input type="date" value={eksFormDate} onChange={(e) => setEksFormDate(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
+              <div className="flex items-center gap-2">
+                <Input type="time" value={eksFormStartTime} onChange={(e) => setEksFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <span className="text-[12px] text-[#4e535a]">至</span>
+                <Input type="time" value={eksFormEndTime} onChange={(e) => setEksFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">案主</span>
+              <div className="space-y-1.5" ref={eksDropdownRef}>
+                <div className="relative">
+                  {eksSearchField === "owner" ? (
+                    <Input
+                      value={eksSearchKeyword}
+                      onChange={(e) => handleEksSearch(e.target.value)}
+                      placeholder="搜索添加案主..."
+                      className="h-8 text-xs"
+                      autoFocus
+                      onBlur={() => { setTimeout(() => { setEksSearchField(null); setEksShowDropdown(false) }, 200) }}
+                    />
+                  ) : (
+                    <div
+                      className="min-h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] cursor-pointer flex items-center text-muted-foreground"
+                      onClick={() => { setEksSearchField("owner"); setEksSearchKeyword(""); setEksSearchResults([]); setEksShowDropdown(false) }}
+                    >
+                      搜索添加案主
+                    </div>
+                  )}
+                  {eksShowDropdown && eksSearchField === "owner" && eksSearchResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                      {eksSearchResults.map((c) => (
+                        <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onClick={() => handleEksSelectCustomer(c)}>
+                          <span>{c.nickname || c.name}</span>
+                          <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {eksFormOwnerNames.length > 0 && (
+                  <div className="space-y-2">
+                    {eksFormOwnerNames.map((name, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[12px] font-medium text-[#2b2f36]">{name}</span>
+                          <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0] text-muted-foreground" onClick={() => handleEksRemoveOwner(i)}>
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                        <Input
+                          value={eksFormOwnerDescriptions[i]?.description || ""}
+                          onChange={(e) => {
+                            const updated = [...eksFormOwnerDescriptions]
+                            updated[i] = { ...updated[i], description: e.target.value }
+                            setEksFormOwnerDescriptions(updated)
+                          }}
+                          placeholder="情况介绍..."
+                          className="flex-1 h-8 text-xs"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
+              <div className="space-y-1.5">
+                <select
+                  className="h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] text-[#2b2f36] outline-none"
+                  value=""
+                  onChange={(e) => {
+                    const id = e.target.value
+                    if (!id || eksFormHostIds.includes(id)) return
+                    const c = allCustomers.find(c => c.id === id)
+                    setEksFormHostIds([...eksFormHostIds, id])
+                    setEksFormHostNames([...eksFormHostNames, c?.nickname || c?.name || ""])
+                  }}
+                >
+                  <option value="">选择课程老师</option>
+                  {allCustomers.filter(c => c.positions?.includes("能量结老师")).map(c => (
+                    <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
+                  ))}
+                </select>
+                {eksFormHostNames.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {eksFormHostNames.map((name, i) => (
+                      <Badge key={i} variant="secondary" className="text-[12px] font-normal gap-1 pr-1">
+                        {name}
+                        <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0]" onClick={() => handleEksRemoveHost(i)}>
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setEksDialogOpen(false)}>取消</Button>
+              <Button size="sm" onClick={handleEksSave} disabled={eksSaving || eksFormOwnerIds.length === 0}>
+                {eksSaving ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 能量结 购买弹窗 */}
+      <Dialog open={eksPurchaseDialogOpen} onOpenChange={setEksPurchaseDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">新增购买</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="text-[12px] text-[#8f959e]">
+              {eksPendingOwner?.nickname || eksPendingOwner?.name} 暂无剩余次数，请先录入购买信息
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">购买次数</span>
+              <Input type="number" value={eksPurchaseCount} onChange={(e) => setEksPurchaseCount(e.target.value)} placeholder="输入次数" className="h-8 text-xs" />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
+              <Input type="number" value={eksPurchaseAmount} onChange={(e) => setEksPurchaseAmount(e.target.value)} placeholder="输入金额" className="h-8 text-xs" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => { setEksPurchaseDialogOpen(false); setEksPendingOwner(null) }}>取消</Button>
+              <Button size="sm" onClick={handleEksAddPurchase} disabled={eksPurchaseSaving || !eksPurchaseCount}>
+                {eksPurchaseSaving ? "保存中..." : "确认购买"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 觉醒游戏 购买弹窗 */}
+      <Dialog open={gcsPurchaseDialogOpen} onOpenChange={setGcsPurchaseDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">新增购买</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="text-[12px] text-[#8f959e]">
+              {gcsPendingOwner?.nickname || gcsPendingOwner?.name} 暂无剩余次数，请先录入购买信息
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">购买次数</span>
+              <Input type="number" value={gcsPurchaseCount} onChange={(e) => setGcsPurchaseCount(e.target.value)} placeholder="输入次数" className="h-8 text-xs" />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
+              <Input type="number" value={gcsPurchaseAmount} onChange={(e) => setGcsPurchaseAmount(e.target.value)} placeholder="输入金额" className="h-8 text-xs" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => { setGcsPurchaseDialogOpen(false); setGcsPendingOwner(null) }}>取消</Button>
+              <Button size="sm" onClick={handleGcsAddPurchase} disabled={gcsPurchaseSaving || !gcsPurchaseCount}>
+                {gcsPurchaseSaving ? "保存中..." : "确认购买"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 情绪释放 购买弹窗 */}
+      <Dialog open={ersPurchaseDialogOpen} onOpenChange={setErsPurchaseDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">新增购买</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="text-[12px] text-[#8f959e]">
+              {ersPendingOwner?.nickname || ersPendingOwner?.name} 暂无剩余次数，请先录入购买信息
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">购买次数</span>
+              <Input type="number" value={ersPurchaseCount} onChange={(e) => setErsPurchaseCount(e.target.value)} placeholder="输入次数" className="h-8 text-xs" />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
+              <Input type="number" value={ersPurchaseAmount} onChange={(e) => setErsPurchaseAmount(e.target.value)} placeholder="输入金额" className="h-8 text-xs" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => { setErsPurchaseDialogOpen(false); setErsPendingOwner(null) }}>取消</Button>
+              <Button size="sm" onClick={handleErsAddPurchase} disabled={ersPurchaseSaving || !ersPurchaseCount}>
+                {ersPurchaseSaving ? "保存中..." : "确认购买"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 觉醒游戏 资料弹窗 */}
+      <Dialog open={gcsMaterialsDialogOpen} onOpenChange={setGcsMaterialsDialogOpen}>
+        <DialogContent className="max-w-md w-full p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">资料管理</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4 overflow-hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-[#4e535a] truncate">{gcsMaterialsRecord?.description || "觉醒游戏"}</span>
+              <div className="shrink-0">
+                <input type="file" id="gcs-materials-upload" className="hidden" onChange={handleUploadGcsMaterial} />
+                <Button size="sm" className="h-7 text-xs" disabled={uploading} onClick={() => document.getElementById("gcs-materials-upload")?.click()}>
+                  {uploading ? "上传中..." : "上传文件"}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto overflow-x-hidden">
+              {(gcsMaterialsRecord?.materials || []).length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">暂无资料</div>
+              ) : (
+                (gcsMaterialsRecord?.materials || []).map((m) => (
+                  <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded border gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                      <File className="h-4 w-4 text-[#8f959e] shrink-0" />
+                      <span className="text-xs text-[#2b2f36] truncate">{m.name}</span>
+                      <span className="text-[12px] text-[#8f959e] shrink-0">{(m.size / 1024).toFixed(1)}KB</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a href={`${"http://127.0.0.1:8000"}${m.url}`} download className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]">
+                        <Download className="h-3.5 w-3.5 text-[#8f959e]" />
+                      </a>
+                      <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => handleDeleteGcsMaterial(m.url.split("/").pop()!)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 情绪释放 资料弹窗 */}
+      <Dialog open={ersMaterialsDialogOpen} onOpenChange={setErsMaterialsDialogOpen}>
+        <DialogContent className="max-w-md w-full p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">资料管理</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4 overflow-hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-[#4e535a] truncate">情绪释放</span>
+              <div className="shrink-0">
+                <input type="file" id="ers-materials-upload" className="hidden" onChange={handleUploadErsMaterial} />
+                <Button size="sm" className="h-7 text-xs" disabled={uploading} onClick={() => document.getElementById("ers-materials-upload")?.click()}>
+                  {uploading ? "上传中..." : "上传文件"}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto overflow-x-hidden">
+              {(ersMaterialsRecord?.materials || []).length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">暂无资料</div>
+              ) : (
+                (ersMaterialsRecord?.materials || []).map((m) => (
+                  <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded border gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                      <File className="h-4 w-4 text-[#8f959e] shrink-0" />
+                      <span className="text-xs text-[#2b2f36] truncate">{m.name}</span>
+                      <span className="text-[12px] text-[#8f959e] shrink-0">{(m.size / 1024).toFixed(1)}KB</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a href={`${"http://127.0.0.1:8000"}${m.url}`} download className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]">
+                        <Download className="h-3.5 w-3.5 text-[#8f959e]" />
+                      </a>
+                      <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => handleDeleteErsMaterial(m.url.split("/").pop()!)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 觉醒游戏 成员弹窗 */}
+      {gcsMembersDialogOpen && <Dialog open={gcsMembersDialogOpen} onOpenChange={(open) => { setGcsMembersDialogOpen(open); if (!open) setGcsMembersRecord(null) }}>
+        <DialogContent className="max-w-3xl p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">成员配置</DialogTitle>
+          </DialogHeader>
+          {gcsMembersRecord && (
+            <div className="flex max-h-[65vh]">
+              {/* 左侧：当日到场人员 */}
+              <div className="w-48 shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
+                <div className="px-3 py-3 border-b border-[#f0f0f0] bg-[#f7f8fa]">
+                  <span className="text-[12px] font-medium text-[#2b2f36]">当日到场</span>
+                  <span className="text-[12px] text-[#8f959e] ml-1">{dayVisits.length}人</span>
+                </div>
+                <div className="p-2 space-y-1">
+                  {dayVisits.length === 0 ? (
+                    <p className="text-[12px] text-[#b0b5bb] text-center py-4">暂无到场人员</p>
+                  ) : (
+                    dayVisits.map((v) => {
+                      const assigned = gcsMembersRecord.participant_ids?.includes(v.id) || gcsMembersRecord.host_id === v.id || gcsMembersRecord.owner_id === v.id
+                      return (
+                        <div
+                          key={v.id}
+                          draggable={!assigned}
+                          onDragStart={() => !assigned && setDraggingVisitorId(v.id)}
+                          onDragEnd={() => setDraggingVisitorId(null)}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded text-[12px] select-none ${
+                            assigned
+                              ? "bg-[#f5f5f5] text-[#b0b5bb] cursor-not-allowed"
+                              : "bg-white hover:bg-[#f0f5ff] cursor-grab active:cursor-grabbing"
+                          } ${draggingVisitorId === v.id ? "opacity-50" : ""}`}
+                        >
+                          <span className="flex-1 truncate">{v.nickname}</span>
+                          {assigned && <span className="text-[10px] text-[#b0b5bb]">已分配</span>}
+                          {v.member_type && !assigned && <span className="text-[10px] text-[#8f959e]">{v.member_type}</span>}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 右侧：人员配置 */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const vid = draggingVisitorId
+                  if (!vid) return
+                  const visitor = dayVisits.find(v => v.id === vid)
+                  if (visitor && gcsMembersRecord) {
+                    handleGcsAddParticipant({ id: visitor.id, nickname: visitor.nickname, name: visitor.nickname, member_type: visitor.member_type, remaining: -1 })
+                  }
+                  setDraggingVisitorId(null)
+                }}
+              >
+                <div className="text-[12px] text-[#8f959e]">{gcsMembersRecord.description || "觉醒游戏"} · {gcsMembersRecord.date}</div>
+
+                <div className="border border-[#e8e8e8] rounded-lg bg-white">
+                  <div className="px-3 py-2 border-b border-[#f0f0f0]">
+                    <span className="text-[12px] font-medium text-[#2b2f36]">人员配置</span>
+                  </div>
+
+                  <div className="px-3 py-2.5 space-y-2.5">
+                    {/* 主持人 */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[12px] text-[#4e535a] shrink-0">主持人</span>
+                      {gcsMembersRecord.host_id ? (
+                        <div className="flex items-center gap-1 flex-1">
+                          <Badge variant="secondary" className="text-[12px] font-normal">{gcsMembersRecord.host_name || getMemberName(gcsMembersRecord.host_id)}</Badge>
+                          <button className="h-4 w-4 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={handleGcsMemberRemoveHost}>
+                            <X className="h-2.5 w-2.5 text-[#8f959e]" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex-1 relative" ref={gcsMemberHostDropdownRef}>
+                          <Input
+                            value={gcsMemberHostSearchKeyword}
+                            onChange={(e) => handleGcsMemberHostSearch(e.target.value)}
+                            placeholder="选择主持人"
+                            className="h-7 text-[12px]"
+                          />
+                          {gcsMemberHostShowDropdown && gcsMemberHostSearchResults.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                              {gcsMemberHostSearchResults.map((c) => c.remaining === 0 ? (
+                                <div key={c.id} className="flex items-center justify-between px-3 py-1.5 text-[12px] bg-[#f5f5f5]" onMouseDown={(e) => e.preventDefault()}>
+                                  <span>{c.nickname || c.name}</span>
+                                  <span className="text-[12px] text-[#ff4d4f]">已无剩余活动次数</span>
+                                </div>
+                              ) : (
+                                <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onClick={() => handleGcsMemberSetHost(c)}>
+                                  <span>{c.nickname || c.name}</span>
+                                  <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 参与者 */}
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-[12px] text-[#4e535a] shrink-0">参与者</span>
+                        <div className="flex-1 relative min-w-0" ref={gcsMemberDropdownRef}>
+                        <Input
+                          value={gcsMemberSearchKeyword}
+                          onChange={(e) => handleGcsMemberSearch(e.target.value)}
+                          placeholder="搜索添加组员"
+                          className="h-7 text-[12px]"
+                        />
+                        {gcsMemberShowDropdown && gcsMemberSearchResults.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                            {gcsMemberSearchResults.map((c) => c.remaining === 0 ? (
+                              <div key={c.id} className="flex items-center justify-between px-3 py-1.5 text-[12px] bg-[#f5f5f5]" onMouseDown={(e) => e.preventDefault()}>
+                                <span>{c.nickname || c.name}</span>
+                                <span className="text-[12px] text-[#ff4d4f]">已无剩余活动次数</span>
+                              </div>
+                            ) : (
+                              <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onClick={() => handleGcsAddParticipant(c)}>
+                                <span>{c.nickname || c.name}</span>
+                                <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        </div>
+                      </div>
+                      {(gcsMembersRecord.participant_ids || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 ml-[42px]">
+                          {gcsMembersRecord.participant_ids.map((id) => (
+                            <Badge key={id} variant="secondary" className="text-[12px] font-normal gap-1 pr-1">
+                              {getMemberName(id)}
+                              <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0]" onClick={() => handleGcsRemoveParticipant(id)}>
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 border-t">
+                  <Button size="sm" className="h-8 text-xs px-5" onClick={() => setGcsMembersDialogOpen(false)}>确定</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>}
+
+      {/* 情绪释放 成员弹窗 */}
+      {ersMembersDialogOpen && <Dialog open={ersMembersDialogOpen} onOpenChange={(open) => { setErsMembersDialogOpen(open); if (!open) setErsMembersRecord(null) }}>
+        <DialogContent className="max-w-3xl p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">成员配置</DialogTitle>
+          </DialogHeader>
+          {ersMembersRecord && (
+            <div className="flex max-h-[65vh]">
+              {/* 左侧：当日到场人员 */}
+              <div className="w-48 shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
+                <div className="px-3 py-3 border-b border-[#f0f0f0] bg-[#f7f8fa]">
+                  <span className="text-[12px] font-medium text-[#2b2f36]">当日到场</span>
+                  <span className="text-[12px] text-[#8f959e] ml-1">{dayVisits.length}人</span>
+                </div>
+                <div className="p-2 space-y-1">
+                  {dayVisits.length === 0 ? (
+                    <p className="text-[12px] text-[#b0b5bb] text-center py-4">暂无到场人员</p>
+                  ) : (
+                    dayVisits.map((v) => {
+                      const assigned = ersMembersRecord.participant_ids?.includes(v.id) || ersMembersRecord.host_id === v.id || ersMembersRecord.owner_id === v.id
+                      return (
+                        <div
+                          key={v.id}
+                          draggable={!assigned}
+                          onDragStart={() => !assigned && setDraggingVisitorId(v.id)}
+                          onDragEnd={() => setDraggingVisitorId(null)}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded text-[12px] select-none ${
+                            assigned
+                              ? "bg-[#f5f5f5] text-[#b0b5bb] cursor-not-allowed"
+                              : "bg-white hover:bg-[#f0f5ff] cursor-grab active:cursor-grabbing"
+                          } ${draggingVisitorId === v.id ? "opacity-50" : ""}`}
+                        >
+                          <span className="flex-1 truncate">{v.nickname}</span>
+                          {assigned && <span className="text-[10px] text-[#b0b5bb]">已分配</span>}
+                          {v.member_type && !assigned && <span className="text-[10px] text-[#8f959e]">{v.member_type}</span>}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 右侧：人员配置 */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const vid = draggingVisitorId
+                  if (!vid) return
+                  const visitor = dayVisits.find(v => v.id === vid)
+                  if (visitor && ersMembersRecord) {
+                    handleErsAddParticipant({ id: visitor.id, nickname: visitor.nickname, name: visitor.nickname, member_type: visitor.member_type, remaining: -1 })
+                  }
+                  setDraggingVisitorId(null)
+                }}
+              >
+                <div className="text-[12px] text-[#8f959e]">情绪释放 · {ersMembersRecord.date}</div>
+
+                <div className="border border-[#e8e8e8] rounded-lg bg-white">
+                  <div className="px-3 py-2 border-b border-[#f0f0f0]">
+                    <span className="text-[12px] font-medium text-[#2b2f36]">人员配置</span>
+                  </div>
+
+                  <div className="px-3 py-2.5 space-y-2.5">
+                    {/* 主持人 */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[12px] text-[#4e535a] shrink-0">主持人</span>
+                      {ersMembersRecord.host_id ? (
+                        <div className="flex items-center gap-1 flex-1">
+                          <Badge variant="secondary" className="text-[12px] font-normal">{ersMembersRecord.host_name || getMemberName(ersMembersRecord.host_id)}</Badge>
+                          <button className="h-4 w-4 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={handleErsMemberRemoveHost}>
+                            <X className="h-2.5 w-2.5 text-[#8f959e]" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex-1 relative" ref={ersMemberHostDropdownRef}>
+                          <Input
+                            value={ersMemberHostSearchKeyword}
+                            onChange={(e) => handleErsMemberHostSearch(e.target.value)}
+                            placeholder="选择主持人"
+                            className="h-7 text-[12px]"
+                          />
+                          {ersMemberHostShowDropdown && ersMemberHostSearchResults.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                              {ersMemberHostSearchResults.map((c) => c.remaining === 0 ? (
+                                <div key={c.id} className="flex items-center justify-between px-3 py-1.5 text-[12px] bg-[#f5f5f5]" onMouseDown={(e) => e.preventDefault()}>
+                                  <span>{c.nickname || c.name}</span>
+                                  <span className="text-[12px] text-[#ff4d4f]">已无剩余活动次数</span>
+                                </div>
+                              ) : (
+                                <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onClick={() => handleErsMemberSetHost(c)}>
+                                  <span>{c.nickname || c.name}</span>
+                                  <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 参与者 */}
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-[12px] text-[#4e535a] shrink-0">参与者</span>
+                        <div className="flex-1 relative min-w-0" ref={ersMemberDropdownRef}>
+                        <Input
+                          value={ersMemberSearchKeyword}
+                          onChange={(e) => handleErsMemberSearch(e.target.value)}
+                          placeholder="搜索添加组员"
+                          className="h-7 text-[12px]"
+                        />
+                        {ersMemberShowDropdown && ersMemberSearchResults.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                            {ersMemberSearchResults.map((c) => c.remaining === 0 ? (
+                              <div key={c.id} className="flex items-center justify-between px-3 py-1.5 text-[12px] bg-[#f5f5f5]" onMouseDown={(e) => e.preventDefault()}>
+                                <span>{c.nickname || c.name}</span>
+                                <span className="text-[12px] text-[#ff4d4f]">已无剩余活动次数</span>
+                              </div>
+                            ) : (
+                              <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onClick={() => handleErsAddParticipant(c)}>
+                                <span>{c.nickname || c.name}</span>
+                                <span className="text-[12px] text-muted-foreground">{c.remaining === -1 ? "不限" : `剩余 ${c.remaining} 次`}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        </div>
+                      </div>
+                      {(ersMembersRecord.participant_ids || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 ml-[42px]">
+                          {ersMembersRecord.participant_ids.map((id) => (
+                            <Badge key={id} variant="secondary" className="text-[12px] font-normal gap-1 pr-1">
+                              {getMemberName(id)}
+                              <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0]" onClick={() => handleErsRemoveParticipant(id)}>
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 border-t">
+                  <Button size="sm" className="h-8 text-xs px-5" onClick={() => setErsMembersDialogOpen(false)}>确定</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>}
+
+      {/* 觉醒游戏 删除确认 */}
+      <AlertDialog open={!!gcsDeleteId} onOpenChange={(open) => !open && setGcsDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除觉醒游戏</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条觉醒游戏吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleGcsDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 情绪释放 删除确认 */}
+      <AlertDialog open={!!ersDeleteId} onOpenChange={(open) => !open && setErsDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除情绪释放</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条情绪释放记录吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleErsDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 能量结 删除确认 */}
+      <AlertDialog open={!!eksDeleteId} onOpenChange={(open) => !open && setEksDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除能量结</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条能量结记录吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleEksDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ===== 内部课程 新增/编辑弹窗 ===== */}
+      <Dialog open={icsDialogOpen} onOpenChange={setIcsDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{icsEditingRecord ? "编辑内部课程" : "新增内部课程"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4">
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
+              <Input type="date" value={icsFormDate} onChange={(e) => setIcsFormDate(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
+              <div className="flex items-center gap-2">
+                <Input type="time" value={icsFormStartTime} onChange={(e) => setIcsFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <span className="text-[12px] text-[#4e535a]">至</span>
+                <Input type="time" value={icsFormEndTime} onChange={(e) => setIcsFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程类型</span>
+              <select
+                value={icsFormCourseType}
+                onChange={(e) => setIcsFormCourseType(e.target.value)}
+                className="h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs"
+              >
+                <option value="">选择类型</option>
+                {ICS_COURSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程名称</span>
+              <Input value={icsFormCourseName} onChange={(e) => setIcsFormCourseName(e.target.value)} placeholder="输入课程名称" className="h-8 text-xs" />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
+              <div className="relative" ref={icsDropdownRef}>
+                {icsSearchField === "host" ? (
+                  <Input
+                    value={icsSearchKeyword}
+                    onChange={(e) => handleIcsSearch(e.target.value)}
+                    placeholder="搜索课程老师..."
+                    className="h-8 text-xs"
+                    autoFocus
+                    onBlur={() => { setTimeout(() => { setIcsSearchField(null); setIcsShowDropdown(false) }, 200) }}
+                  />
+                ) : (
+                  <div
+                    className="min-h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] cursor-pointer flex items-center justify-between"
+                    onClick={() => { setIcsSearchField("host"); setIcsSearchKeyword(icsFormHostName); setIcsSearchResults([]); setIcsShowDropdown(false); if (icsFormHostName) handleIcsSearch(icsFormHostName) }}
+                  >
+                    <span className={icsFormHostId ? "text-[#2b2f36]" : "text-muted-foreground"}>
+                      {icsFormHostName || "选择课程老师"}
+                    </span>
+                  </div>
+                )}
+                {icsShowDropdown && icsSearchField === "host" && icsSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                    {icsSearchResults.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onMouseDown={(e) => e.preventDefault()} onClick={() => handleIcsSelectHost(c)}>
+                        <span>{c.nickname || c.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程介绍</span>
+              <textarea
+                value={icsFormDescription}
+                onChange={(e) => setIcsFormDescription(e.target.value)}
+                placeholder="输入课程介绍..."
+                rows={4}
+                className="w-full rounded-md border border-input bg-transparent px-2 py-2 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setIcsDialogOpen(false)}>取消</Button>
+              <Button size="sm" onClick={handleIcsSave} disabled={icsSaving || !icsFormCourseName}>
+                {icsSaving ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 内部课程 资料弹窗 */}
+      <Dialog open={icsMaterialsDialogOpen} onOpenChange={setIcsMaterialsDialogOpen}>
+        <DialogContent className="max-w-md w-full p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">资料管理</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4 overflow-hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[12px] text-[#4e535a]">已上传 {icsMaterialsRecord?.materials?.length || 0} 个文件</span>
+              <label className="cursor-pointer">
+                <input type="file" className="hidden" onChange={handleIcsUploadMaterial} />
+                <Button size="sm" variant="outline" className="h-7 text-xs" disabled={icsUploading}>
+                  {icsUploading ? "上传中..." : "上传文件"}
+                </Button>
+              </label>
+            </div>
+            {(icsMaterialsRecord?.materials || []).length === 0 ? (
+              <p className="text-[12px] text-muted-foreground text-center py-8">暂无资料</p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {icsMaterialsRecord!.materials.map((m, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 rounded border">
+                    <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[#3370ff] hover:underline truncate flex-1">{m.name || m.url.split("/").pop()}</a>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => handleIcsDeleteMaterial(m.url.split("/").pop() || "")}>
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 内部课程 成员弹窗 */}
+      <Dialog open={icsMembersDialogOpen} onOpenChange={setIcsMembersDialogOpen}>
+        <DialogContent className="max-w-3xl p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">成员管理</DialogTitle>
+          </DialogHeader>
+          {icsMembersRecord && (
+            <div className="flex max-h-[65vh]">
+              {/* 左侧：当日到场人员 */}
+              <div className="w-48 shrink-0 border-r border-[#e8e8e8] overflow-y-auto">
+                <div className="px-3 py-3 border-b border-[#f0f0f0] bg-[#f7f8fa]">
+                  <span className="text-[12px] font-medium text-[#2b2f36]">当日到场</span>
+                  <span className="text-[12px] text-[#8f959e] ml-1">{dayVisits.length}人</span>
+                </div>
+                <div className="p-2 space-y-1">
+                  {dayVisits.length === 0 ? (
+                    <p className="text-[12px] text-[#b0b5bb] text-center py-4">暂无到场人员</p>
+                  ) : (
+                    dayVisits.map((v) => {
+                      const assigned = icsMembersRecord.participant_ids?.includes(v.id) || (icsMembersRecord.host_names || []).includes(v.nickname)
+                      return (
+                        <div
+                          key={v.id}
+                          draggable={!assigned}
+                          onDragStart={() => !assigned && setDraggingVisitorId(v.id)}
+                          onDragEnd={() => setDraggingVisitorId(null)}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded text-[12px] select-none ${
+                            assigned
+                              ? "bg-[#f5f5f5] text-[#b0b5bb] cursor-not-allowed"
+                              : "bg-white hover:bg-[#f0f5ff] cursor-grab active:cursor-grabbing"
+                          } ${draggingVisitorId === v.id ? "opacity-50" : ""}`}
+                        >
+                          <span className="flex-1 truncate">{v.nickname}</span>
+                          {assigned && <span className="text-[10px] text-[#b0b5bb]">已分配</span>}
+                          {v.member_type && !assigned && <span className="text-[10px] text-[#8f959e]">{v.member_type}</span>}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 右侧：成员管理 */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const vid = draggingVisitorId
+                  if (!vid) return
+                  const visitor = dayVisits.find(v => v.id === vid)
+                  if (visitor && icsMembersRecord) {
+                    const customer = allCustomers.find(c => c.id === vid)
+                    if (customer) handleIcsAddParticipant(customer)
+                  }
+                  setDraggingVisitorId(null)
+                }}
+              >
+                {/* 课程老师 */}
+                <div>
+                  <span className="text-[12px] text-[#4e535a] mb-1.5 block">课程老师</span>
+                  {icsMembersRecord.host_names?.length ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[12px] font-medium">{icsMembersRecord.host_names[0]}</span>
+                    </div>
+                  ) : (
+                    <span className="text-[12px] text-muted-foreground">暂无</span>
+                  )}
+                </div>
+
+                {/* 参与者 */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="text-[12px] text-[#4e535a] shrink-0">参与者</span>
+                    <div className="flex-1 relative" ref={icsMemberDropdownRef}>
+                      <Input
+                        value={icsMemberSearchKeyword}
+                        onChange={(e) => handleIcsMemberSearch(e.target.value)}
+                        placeholder="搜索添加参与者"
+                        className="h-7 text-[12px]"
+                      />
+                      {icsMemberShowDropdown && icsMemberSearchResults.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-40 overflow-y-auto">
+                          {icsMemberSearchResults.map((c) => (
+                            <div key={c.id} className="flex items-center px-3 py-1.5 cursor-pointer hover:bg-muted text-[12px]" onClick={() => handleIcsAddParticipant(c)}>
+                              <span>{c.nickname || c.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {(icsMembersRecord.participant_ids || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 ml-[42px]">
+                      {icsMembersRecord.participant_ids.map((id) => (
+                        <Badge key={id} variant="secondary" className="text-[12px] font-normal gap-1 pr-1">
+                          {getMemberName(id)}
+                          <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0]" onClick={() => handleIcsRemoveParticipant(id)}>
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 内部课程 删除确认 */}
+      <AlertDialog open={!!icsDeleteId} onOpenChange={(open) => !open && setIcsDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除内部课程</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条内部课程记录吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleIcsDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 会员活动余额不足警告 */}
+      <AlertDialog open={warningOpen} onOpenChange={setWarningOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>提示</AlertDialogTitle>
+            <AlertDialogDescription>{warningMsg}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setWarningOpen(false)}>确定</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 到场确认弹窗 */}
+      <Dialog open={arrivalDialogOpen} onOpenChange={setArrivalDialogOpen}>
+        <DialogContent className="max-w-sm p-6">
+          <DialogHeader>
+            <DialogTitle>确认到场</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <label className="text-[12px] text-[#8f959e]">昵称</label>
+              <Input value={arrivalVisit?.nickname || ""} disabled className="h-8 text-[13px]" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] text-[#8f959e]">实际到场时间</label>
+              <Input
+                type="time"
+                value={arrivalTime}
+                onChange={(e) => setArrivalTime(e.target.value)}
+                className="h-8 text-[13px]"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" size="sm" className="h-8 text-[12px]" onClick={() => setArrivalDialogOpen(false)}>
+                取消
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 text-[12px]"
+                disabled={arrivalSaving}
+                onClick={async () => {
+                  if (!arrivalVisit) return
+                  setArrivalSaving(true)
+                  try {
+                    await visitApi.update(arrivalVisit.id, { arrived: true, arrival_time: arrivalTime })
+                    // 刷新数据
+                    const visits = await visitApi.list(detailDate)
+                    setFullVisits(visits)
+                    setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
+                    setArrivalDialogOpen(false)
+                  } catch (e) {
+                    handleApiError(e)
+                  } finally {
+                    setArrivalSaving(false)
+                  }
+                }}
+              >
+                {arrivalSaving ? "保存中..." : "确认到场"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      </div>
+      )}
+    </div>
+  )
+}
