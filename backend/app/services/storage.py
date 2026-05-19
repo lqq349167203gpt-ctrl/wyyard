@@ -1,24 +1,40 @@
 import json
 import os
-import sqlite3
-import threading
 from pathlib import Path
 from typing import Any, Dict
+
+import psycopg2
+import psycopg2.extras
+import psycopg2.pool
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-DB_PATH = str(DATA_DIR / "wyyard.db")
+DB_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://wyyard:wyyard123@localhost:5432/wyyard",
+)
 
-# 每个线程独立连接，避免 FastAPI 多线程冲突
-_local = threading.local()
+_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+
+
+def _get_pool():
+    global _pool
+    if _pool is None:
+        _pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=2,
+            maxconn=10,
+            dsn=DB_URL,
+        )
+    return _pool
 
 
 def _get_conn():
-    if not hasattr(_local, "conn") or _local.conn is None:
-        _local.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        _local.conn.row_factory = sqlite3.Row
-    return _local.conn
+    return _get_pool().getconn()
+
+
+def _put_conn(conn):
+    _get_pool().putconn(conn)
 
 
 def _table_name(filename: str) -> str:
@@ -27,43 +43,54 @@ def _table_name(filename: str) -> str:
 
 def _ensure_table(table: str):
     conn = _get_conn()
-    conn.execute(
-        f"CREATE TABLE IF NOT EXISTS [{table}] (id TEXT PRIMARY KEY, data TEXT NOT NULL)"
-    )
-    conn.commit()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f'CREATE TABLE IF NOT EXISTS "{table}" (id TEXT PRIMARY KEY, data TEXT NOT NULL)'
+            )
+        conn.commit()
+    finally:
+        _put_conn(conn)
 
 
 def load_data(filename: str) -> Dict[str, Any]:
     table = _table_name(filename)
     conn = _get_conn()
-    _ensure_table(table)
-    rows = conn.execute(f"SELECT id, data FROM [{table}]").fetchall()
-    result = {}
-    for row in rows:
-        result[row["id"]] = json.loads(row["data"])
+    try:
+        _ensure_table(table)
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f'SELECT id, data FROM "{table}"')
+            rows = cur.fetchall()
+        result = {}
+        for row in rows:
+            result[row["id"]] = json.loads(row["data"])
 
-    # customer_ai_config 是唯一不以 ID 为 key 的表：存储为单行，但 load 时返回平铺 dict
-    if filename == "customer_ai_config.json" and "default" in result:
-        return result["default"]
+        if filename == "customer_ai_config.json" and "default" in result:
+            return result["default"]
 
-    return result
+        return result
+    finally:
+        _put_conn(conn)
 
 
 def save_data(filename: str, data: Dict[str, Any]):
     table = _table_name(filename)
     conn = _get_conn()
-    _ensure_table(table)
+    try:
+        _ensure_table(table)
 
-    # customer_ai_config：平铺 dict 包装成 {"default": data}
-    if filename == "customer_ai_config.json" and not any(
-        isinstance(v, dict) for v in data.values()
-    ):
-        data = {"default": data}
+        if filename == "customer_ai_config.json" and not any(
+            isinstance(v, dict) for v in data.values()
+        ):
+            data = {"default": data}
 
-    with conn:
-        conn.execute(f"DELETE FROM [{table}]")
-        for key, value in data.items():
-            conn.execute(
-                f"INSERT INTO [{table}] (id, data) VALUES (?, ?)",
-                (key, json.dumps(value, ensure_ascii=False)),
-            )
+        with conn.cursor() as cur:
+            cur.execute(f'DELETE FROM "{table}"')
+            for key, value in data.items():
+                cur.execute(
+                    f'INSERT INTO "{table}" (id, data) VALUES (%s, %s)',
+                    (key, json.dumps(value, ensure_ascii=False)),
+                )
+        conn.commit()
+    finally:
+        _put_conn(conn)
