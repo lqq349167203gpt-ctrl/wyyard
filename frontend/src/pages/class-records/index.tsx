@@ -11,6 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { classRecordApi, groupCaseSessionApi, groupCaseApi, emotionalReleaseSessionApi, emotionalReleaseApi, energyKnotSessionApi, energyKnotApi, internalCourseSessionApi, courseApi, customerApi, uploadApi, visitApi, dailyGroupingApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type Course, type Customer, type CustomerSearchResult, type GroupCaseCustomerSearchResult, type EmotionalReleaseCustomerSearchResult, type EnergyKnotCustomerSearchResult, type InternalCourseSessionCustomerSearchResult, type VisitRecord } from "@/lib/api"
+import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import ArrivalConfirmationView from "./arrival-confirmation"
 import ActivityCardList from "./activity-card-list"
 
@@ -93,6 +94,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const groupBlurTimeoutRef = useRef<number | null>(null)
   const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
+  const { permissions: cp, ready: cpReady } = useCustomerPermissions("class_records")
   const [fullVisits, setFullVisits] = useState<VisitRecord[]>([])
   const [arrivalDialogOpen, setArrivalDialogOpen] = useState(false)
   const [arrivalVisit, setArrivalVisit] = useState<VisitRecord | null>(null)
@@ -338,16 +340,15 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     }).catch(() => setGroups([]))
   }, [detailDate])
 
-  // 加载日期范围内的到场人数
+  // 加载日期范围内的到场人数（与 VisitsDetailView 使用相同的 counts API + memberTypes 过滤）
   useEffect(() => {
-    visitApi.list().then((allVisits) => {
-      const counts: Record<string, number> = {}
-      for (const v of allVisits) {
-        counts[v.visit_date] = (counts[v.visit_date] || 0) + 1
-      }
-      setVisitCounts(counts)
-    }).catch(() => {})
-  }, [dateRangeStart])
+    if (!cpReady) return
+    const memberTypes = cp.join(",")
+    const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
+    visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate })
+      .then(setVisitCounts)
+      .catch(() => {})
+  }, [dateRangeStart, cpReady, cp])
 
   // 点击外部关闭日历选择器
   useEffect(() => {
@@ -364,7 +365,41 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   // 拖拽到活动卡片的目标
   const [dragOverActivityId, setDragOverActivityId] = useState<string | null>(null)
-  const [memberDropdownId, setMemberDropdownId] = useState<string | null>(null)
+  // 成员选择弹窗
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false)
+  const [memberDialogType, setMemberDialogType] = useState<string>("")
+  const [memberDialogRecord, setMemberDialogRecord] = useState<any>(null)
+  const [memberSearchFocused, setMemberSearchFocused] = useState(false)
+  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([])
+  const initialSelectedIdsRef = useRef<string[]>([])
+
+  const getCurrentParticipantIds = useCallback((type: string, record: any): string[] => {
+    if (type === "class") {
+      return (record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
+    }
+    if (type === "gcs") {
+      return [...(record.participant_ids || []), record.host_id, record.achiever_id, record.owner_id].filter(Boolean)
+    }
+    if (type === "ers") {
+      return [...(record.participant_ids || []), record.host_id, record.achiever_id].filter(Boolean)
+    }
+    if (type === "eks") {
+      return [...(record.host_ids || [])].filter(Boolean)
+    }
+    if (type === "ics") {
+      return [...(record.participant_ids || [])].filter(Boolean)
+    }
+    return []
+  }, [])
+
+  const onOpenMemberDialog = useCallback((type: string, record: any) => {
+    setMemberDialogType(type)
+    setMemberDialogRecord(record)
+    const ids = getCurrentParticipantIds(type, record)
+    setLocalSelectedIds([...ids])
+    initialSelectedIdsRef.current = [...ids]
+    setMemberDialogOpen(true)
+  }, [getCurrentParticipantIds])
 
   // 拖拽到沙龙卡片时的分组选择弹窗
   const [dropGroupSelectOpen, setDropGroupSelectOpen] = useState(false)
@@ -470,6 +505,48 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     if (!bt) return -1
     return at.localeCompare(bt)
   })
+
+  const getMemberName = useCallback((id: string) => {
+    const c = allCustomers.find(c => c.id === id)
+    return c?.nickname || c?.name || id
+  }, [allCustomers])
+
+  // 当日活动：按每日分组整理人员（用于左侧人员栏）
+  const visitorGroupSections = useMemo(() => {
+    const sections: { groupName: string; members: { id: string; nickname: string; role: string; present: boolean }[] }[] = []
+    const assignedIds = new Set<string>()
+
+    for (const group of groups) {
+      const members: { id: string; nickname: string; role: string; present: boolean }[] = []
+
+      if (group.leader_id) {
+        members.push({ id: group.leader_id, nickname: getMemberName(group.leader_id), role: "组长", present: dayVisits.some(v => v.id === group.leader_id) })
+        assignedIds.add(group.leader_id)
+      }
+      if (group.deputy_id) {
+        members.push({ id: group.deputy_id, nickname: getMemberName(group.deputy_id), role: "副组长", present: dayVisits.some(v => v.id === group.deputy_id) })
+        assignedIds.add(group.deputy_id)
+      }
+      for (const mid of (group.member_ids || [])) {
+        if (mid !== group.leader_id && mid !== group.deputy_id) {
+          members.push({ id: mid, nickname: getMemberName(mid), role: "", present: dayVisits.some(v => v.id === mid) })
+          assignedIds.add(mid)
+        }
+      }
+
+      if (members.length > 0) {
+        sections.push({ groupName: group.name, members })
+      }
+    }
+
+    // 未分组的到场人员
+    const ungrouped = dayVisits.filter(v => !assignedIds.has(v.id))
+    if (ungrouped.length > 0) {
+      sections.push({ groupName: "未分组", members: ungrouped.map(v => ({ id: v.id, nickname: v.nickname, role: "", present: true })) })
+    }
+
+    return sections
+  }, [groups, dayVisits, getMemberName])
 
   const selectedCourse = courses.find(c => c.id === formCourseId)
 
@@ -713,30 +790,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     if (!groupsRecord) return false
     return groupsRecord.groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)).includes(visitorId)
   }
-
-  const getMemberName = useCallback((id: string) => {
-    const c = allCustomers.find(c => c.id === id)
-    return c?.nickname || c?.name || id
-  }, [allCustomers])
-
-  const getCurrentParticipantIds = useCallback((type: string, record: any): string[] => {
-    if (type === "class") {
-      return (record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
-    }
-    if (type === "gcs") {
-      return [...(record.participant_ids || []), record.host_id, record.achiever_id, record.owner_id].filter(Boolean)
-    }
-    if (type === "ers") {
-      return [...(record.participant_ids || []), record.host_id, record.achiever_id].filter(Boolean)
-    }
-    if (type === "eks") {
-      return [...(record.host_ids || [])].filter(Boolean)
-    }
-    if (type === "ics") {
-      return [...(record.participant_ids || [])].filter(Boolean)
-    }
-    return []
-  }, [])
 
   const handleMemberToggle = useCallback(async (type: string, record: any, visitorId: string) => {
     const currentIds = getCurrentParticipantIds(type, record)
@@ -1736,46 +1789,38 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         </div>
       </div>
         {/* 右侧：日期滚动条 */}
-        <div className="flex items-center gap-1 flex-1">
+        <div className="flex items-center justify-between gap-1 flex-1">
           <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
             <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
           </button>
-          <div className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto">
+          <div className="flex-1 flex items-center justify-between overflow-x-auto">
             {dateRange.map((d) => {
               const isSelected = d === detailDate
               const isToday = d === today
-              const dayCount = records.filter(r => r.date === d).length
-                + groupCaseSessions.filter(s => s.date === d).length
-                + emotionalReleaseSessions.filter(s => s.date === d).length
-                + energyKnotSessions.filter(s => s.date === d).length
-                + internalCourseSessions.filter(s => s.date === d).length
-              const hasRecords = dayCount > 0
+              const isVisitorsTab = effectiveDetailTab === "visitors" || effectiveDetailTab === "arrival_confirmation" || effectiveDetailTab === "grouping"
+              const dayCount = isVisitorsTab
+                ? (visitCounts[d] || 0)
+                : records.filter(r => r.date === d).length
+                  + groupCaseSessions.filter(s => s.date === d).length
+                  + emotionalReleaseSessions.filter(s => s.date === d).length
+                  + energyKnotSessions.filter(s => s.date === d).length
+                  + internalCourseSessions.filter(s => s.date === d).length
               return (
                 <button
                   key={d}
-                  className={`flex flex-col items-center px-2 py-1.5 rounded-lg transition-colors min-w-[48px] ${
-                    isSelected ? "bg-[#3370ff] text-white" : hasRecords ? "hover:bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
+                  className={`shrink-0 flex flex-col items-center justify-center w-10 h-12 rounded-md transition-colors ${
+                    isSelected ? "bg-[#3370ff] text-white" : isToday ? "bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
                   }`}
                   onClick={() => setDetailDate(d)}
                 >
-                  <span className={`text-[10px] ${isSelected ? "text-white/80" : isToday ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
+                  <span className={`text-[10px] leading-none ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
                     {getWeekday(d)}
                   </span>
-                  <span className={`text-[14px] font-medium leading-tight ${isSelected ? "text-white" : isToday ? "text-[#3370ff]" : "text-[#2b2f36]"}`}>
-                    {parseInt(d.split("-")[2])}
-                  </span>
-                  {(effectiveDetailTab === "visitors" || effectiveDetailTab === "arrival_confirmation" || effectiveDetailTab === "grouping") ? (
-                    (visitCounts[d] || 0) > 0 && (
-                      <span className={`text-[10px] leading-tight ${isSelected ? "text-white/60" : "text-[#8f959e]"}`}>
-                        {visitCounts[d]}人
-                      </span>
-                    )
-                  ) : (
-                    hasRecords && (
-                      <span className={`text-[10px] leading-tight ${isSelected ? "text-white/60" : "text-[#8f959e]"}`}>
-                        {dayCount}场
-                      </span>
-                    )
+                  <span className="text-[14px] font-medium leading-tight">{parseInt(d.split("-")[2])}</span>
+                  {dayCount > 0 && (
+                    <span className={`text-[9px] leading-none mt-0.5 ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
+                      {isVisitorsTab ? `${dayCount}人` : `${dayCount}场`}
+                    </span>
                   )}
                 </button>
               )
@@ -1834,32 +1879,39 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         {/* 左栏：到场人员 — 独立页面模式隐藏 */}
         {!standaloneTab && (
         <div className="w-[160px] shrink-0 border-r border-[#e8e8e8] overflow-y-auto py-2 px-0">
-          <div className="text-[11px] text-[#8f959e] tracking-widest mb-2">到场人员</div>
-          {dayVisits.length > 0 ? (
-            <div className="space-y-1">
-              {dayVisits.map((v) => (
-                <div
-                  key={v.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: v.id, nickname: v.nickname }))
-                    e.dataTransfer.effectAllowed = "copy"
-                    setDraggingVisitorId(v.id)
-                  }}
-                  onDragEnd={() => setDraggingVisitorId(null)}
-                  className={`flex items-center justify-between px-2 py-1.5 rounded text-[12px] cursor-grab transition-colors ${
-                    draggingVisitorId === v.id ? "opacity-50" : "bg-white hover:bg-[#f7f8fa]"
-                  }`}
-                >
-                  <span className="text-[#2b2f36] truncate">{v.nickname}</span>
-                  {v.member_type && (
-                    <span className="text-[10px] text-[#8f959e] shrink-0 ml-1">{v.member_type}</span>
-                  )}
+          <div className="text-[11px] text-[#8f959e] tracking-widest mb-2 px-2">到场人员</div>
+          {visitorGroupSections.length > 0 ? (
+            <div className="space-y-3">
+              {visitorGroupSections.map((section, si) => (
+                <div key={si}>
+                  <div className="text-[10px] text-[#8f959e] px-2 mb-1 font-medium">{section.groupName}</div>
+                  <div className="space-y-0.5">
+                    {section.members.map((m) => (
+                      <div
+                        key={m.id}
+                        draggable={m.present}
+                        onDragStart={m.present ? (e) => {
+                          e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: m.id, nickname: m.nickname }))
+                          e.dataTransfer.effectAllowed = "copy"
+                          setDraggingVisitorId(m.id)
+                        } : undefined}
+                        onDragEnd={m.present ? () => setDraggingVisitorId(null) : undefined}
+                        className={`flex items-center justify-between px-2 py-1 rounded text-[12px] ${
+                          m.present ? `cursor-grab transition-colors ${draggingVisitorId === m.id ? "opacity-50" : "bg-white hover:bg-[#f7f8fa]"}` : "cursor-default"
+                        }`}
+                      >
+                        <span className={m.present ? "text-[#2b2f36] truncate" : "text-[#b0b5bb] truncate"}>{m.nickname}</span>
+                        {m.role && (
+                          <span className={`text-[10px] shrink-0 ml-1 ${m.present ? "text-[#8f959e]" : "text-[#c9cdd4]"}`}>{m.role}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-[#b0b5bb] py-4 text-center">暂无到场人员</div>
+            <div className="text-[11px] text-[#b0b5bb] py-4 text-center px-2">暂无到场人员</div>
           )}
         </div>
         )}
@@ -1878,8 +1930,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 dayVisits={dayVisits}
                 dragOverActivityId={dragOverActivityId}
                 setDragOverActivityId={setDragOverActivityId}
-                memberDropdownId={memberDropdownId}
-                setMemberDropdownId={setMemberDropdownId}
+                onOpenMemberDialog={onOpenMemberDialog}
                 setDeleteId={setDeleteId}
                 setGcsDeleteId={setGcsDeleteId}
                 setErsDeleteId={setErsDeleteId}
@@ -1903,10 +1954,8 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 handleOpenIcsMaterials={handleOpenIcsMaterials}
                 handleOpenIcsMembers={handleOpenIcsMembers}
                 handleDropToIcs={handleDropToIcs}
-                handleMemberToggle={handleMemberToggle}
                 getTeacherNames={getTeacherNames}
                 getMemberName={getMemberName}
-                getCurrentParticipantIds={getCurrentParticipantIds}
               />
             )}
 
@@ -2125,6 +2174,112 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 成员选择弹窗 */}
+      {memberDialogOpen && memberDialogRecord && (() => {
+        const record = memberDialogRecord
+        const activityName = memberDialogType === "class" ? record.course_name : memberDialogType === "gcs" ? "觉醒游戏" : memberDialogType === "ers" ? "情绪释放" : memberDialogType === "ics" ? record.course_name : ""
+        const selectedParticipants = localSelectedIds.map((id: string) => {
+          const c = allCustomers.find(c => c.id === id)
+          return { id, nickname: c?.nickname || c?.name || id }
+        })
+        const searchFiltered = dayVisits.filter(v => !localSelectedIds.includes(v.id)).slice(0, 8)
+
+        const handleConfirm = async () => {
+          const initialIds = initialSelectedIdsRef.current
+          const added = localSelectedIds.filter(id => !initialIds.includes(id))
+          const removed = initialIds.filter(id => !localSelectedIds.includes(id))
+          for (const id of added) {
+            await handleMemberToggle(memberDialogType, record, id)
+          }
+          for (const id of removed) {
+            await handleMemberToggle(memberDialogType, record, id)
+          }
+          setMemberDialogOpen(false)
+          setMemberDialogRecord(null)
+          setMemberDialogType("")
+        }
+
+        const handleClose = () => {
+          setMemberDialogOpen(false)
+          setMemberDialogRecord(null)
+          setMemberDialogType("")
+        }
+
+        return (
+          <Dialog open={memberDialogOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
+            <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+              <DialogHeader className="px-6 pt-5 pb-4 border-b">
+                <DialogTitle className="text-base">选择参与者 — {activityName}</DialogTitle>
+              </DialogHeader>
+              <div className="px-6 py-4 space-y-4">
+                {/* 搜索框 */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMemberSearchFocused(!memberSearchFocused)}
+                    onBlur={() => setTimeout(() => setMemberSearchFocused(false), 150)}
+                    className="w-full h-8 px-3 py-1 text-[12px] border border-[#d9d9d9] rounded bg-white text-left text-[#8f959e] hover:border-[#3370ff] focus:outline-none focus:border-[#3370ff]"
+                  >
+                    点击选择当日到场人员...
+                  </button>
+                  {memberSearchFocused && searchFiltered.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-[#e8e8e8] rounded shadow-sm max-h-48 overflow-y-auto">
+                      {searchFiltered.map(v => (
+                        <button
+                          key={v.id}
+                          className="w-full text-left px-3 py-1.5 hover:bg-[#f7f8fa] text-[12px] flex items-center justify-between"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setLocalSelectedIds(prev => [...prev, v.id])
+                            setMemberSearchFocused(false)
+                          }}
+                        >
+                          <span className="text-[#2b2f36]">{v.nickname}</span>
+                          {v.member_type && <span className="text-[10px] text-[#8f959e]">{v.member_type}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {memberSearchFocused && searchFiltered.length === 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-[#e8e8e8] rounded shadow-sm">
+                      <p className="text-[11px] text-[#8f959e] text-center py-3">无匹配结果</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 已选参与者 */}
+                <div>
+                  <div className="text-[11px] text-[#8f959e] mb-2">已选参与者（{localSelectedIds.length}）</div>
+                  {localSelectedIds.length === 0 ? (
+                    <p className="text-[11px] text-[#b0b5bb] py-2 text-center">暂无</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {selectedParticipants.map(p => (
+                        <span key={p.id} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-gray-50 text-[12px]">
+                          <span className="text-[#2b2f36]">{p.nickname}</span>
+                          <button
+                            className="text-[#c9cdd4] hover:text-[#f54a45]"
+                            onClick={() => setLocalSelectedIds(prev => prev.filter(id => id !== p.id))}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 底部按钮 */}
+              <div className="px-6 py-3 border-t border-[#e8e8e8] flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={handleClose}>取消</Button>
+                <Button size="sm" onClick={handleConfirm}>确定</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
 
       {/* 小组人员编辑弹窗 */}
       {groupsPanelOpen && <Dialog open={groupsPanelOpen} onOpenChange={(open) => { setGroupsPanelOpen(open); if (!open) setGroupsRecord(null) }}>

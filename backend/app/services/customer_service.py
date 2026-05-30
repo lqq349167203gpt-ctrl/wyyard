@@ -38,6 +38,15 @@ def get_customer(customer_id: str) -> Optional[Customer]:
 
 
 def create_customer(data: CustomerCreate) -> Customer:
+    # 检查昵称和微信号唯一性
+    for c in _customers.values():
+        if c.is_deleted:
+            continue
+        if data.nickname and c.nickname == data.nickname:
+            raise ValueError("昵称已存在")
+        if data.wechat and c.wechat == data.wechat:
+            raise ValueError("微信号已存在")
+
     now = datetime.now(timezone.utc)
     customer = Customer(
         id=str(uuid.uuid4())[:8],
@@ -57,6 +66,19 @@ def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer
     if not customer:
         return None
     update_data = data.model_dump(exclude_unset=True)
+
+    # 检查昵称和微信号唯一性（排除自身，忽略空值）
+    new_nickname = update_data.get("nickname")
+    new_wechat = update_data.get("wechat")
+    if new_nickname or new_wechat:
+        for c in _customers.values():
+            if c.is_deleted or c.id == customer_id:
+                continue
+            if new_nickname and c.nickname == new_nickname:
+                raise ValueError("昵称已存在")
+            if new_wechat and c.wechat == new_wechat:
+                raise ValueError("微信号已存在")
+
     for key, value in update_data.items():
         setattr(customer, key, value)
     customer.updated_at = datetime.now(timezone.utc)

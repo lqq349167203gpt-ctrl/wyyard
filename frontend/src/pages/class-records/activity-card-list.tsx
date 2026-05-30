@@ -30,8 +30,7 @@ interface ActivityCardListProps {
   dayVisits: DayVisit[]
   dragOverActivityId: string | null
   setDragOverActivityId: (id: string | null) => void
-  memberDropdownId: string | null
-  setMemberDropdownId: (id: string | null) => void
+  onOpenMemberDialog: (type: string, record: any) => void
   setDeleteId: (id: string | null) => void
   setGcsDeleteId: (id: string | null) => void
   setErsDeleteId: (id: string | null) => void
@@ -55,10 +54,8 @@ interface ActivityCardListProps {
   handleOpenIcsMaterials: (session: InternalCourseSession) => void
   handleOpenIcsMembers: (session: InternalCourseSession) => void
   handleDropToIcs: (session: InternalCourseSession, customer: Pick<DropCustomer, "customer_id">) => void
-  handleMemberToggle: (type: string, record: any, visitorId: string) => void
   getTeacherNames: (teacherIds: string[]) => string[]
   getMemberName: (id: string) => string
-  getCurrentParticipantIds: (type: string, record: any) => string[]
 }
 
 const ActivityCardList = memo((props: ActivityCardListProps) => {
@@ -69,8 +66,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
     dayVisits,
     dragOverActivityId,
     setDragOverActivityId,
-    memberDropdownId,
-    setMemberDropdownId,
+    onOpenMemberDialog,
     setDeleteId,
     setGcsDeleteId,
     setErsDeleteId,
@@ -94,10 +90,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
     handleOpenIcsMaterials,
     handleOpenIcsMembers,
     handleDropToIcs,
-    handleMemberToggle,
     getTeacherNames,
     getMemberName,
-    getCurrentParticipantIds,
   } = props
 
   const [visibleCount, setVisibleCount] = useState(15)
@@ -160,27 +154,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(record.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                               {isActivitiesView && (
-                                <div className="ml-auto relative">
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setMemberDropdownId(memberDropdownId === `class-${record.id}` ? null : `class-${record.id}`)}><Users className="h-3.5 w-3.5" /></Button>
-                                  {memberDropdownId === `class-${record.id}` && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border rounded shadow-sm w-44 max-h-56 overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                                      {dayVisits.length === 0 ? (
-                                        <p className="text-[11px] text-[#8f959e] text-center py-3">暂无到场人员</p>
-                                      ) : (
-                                        dayVisits.map(v => {
-                                          const checked = getCurrentParticipantIds("class", record).includes(v.id)
-                                          return (
-                                            <label key={v.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#f7f8fa] cursor-pointer text-[12px]">
-                                              <input type="checkbox" checked={checked} onChange={() => handleMemberToggle("class", record, v.id)} className="w-3.5 h-3.5 rounded border-[#d9d9d9]" />
-                                              <span className="text-[#2b2f36]">{v.nickname}</span>
-                                              {v.member_type && <span className="text-[10px] text-[#8f959e] ml-auto">{v.member_type}</span>}
-                                            </label>
-                                          )
-                                        })
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("class", record)}><Users className="h-3.5 w-3.5" /></Button>
                               )}
                             </div>
                           </div>
@@ -299,27 +273,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setGcsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                               {isActivitiesView && (
-                                <div className="ml-auto relative">
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setMemberDropdownId(memberDropdownId === `gcs-${s.id}` ? null : `gcs-${s.id}`)}><Users className="h-3.5 w-3.5" /></Button>
-                                  {memberDropdownId === `gcs-${s.id}` && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border rounded shadow-sm w-44 max-h-56 overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                                      {dayVisits.length === 0 ? (
-                                        <p className="text-[11px] text-[#8f959e] text-center py-3">暂无到场人员</p>
-                                      ) : (
-                                        dayVisits.map(v => {
-                                          const checked = getCurrentParticipantIds("gcs", s).includes(v.id)
-                                          return (
-                                            <label key={v.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#f7f8fa] cursor-pointer text-[12px]">
-                                              <input type="checkbox" checked={checked} onChange={() => handleMemberToggle("gcs", s, v.id)} className="w-3.5 h-3.5 rounded border-[#d9d9d9]" />
-                                              <span className="text-[#2b2f36]">{v.nickname}</span>
-                                              {v.member_type && <span className="text-[10px] text-[#8f959e] ml-auto">{v.member_type}</span>}
-                                            </label>
-                                          )
-                                        })
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("gcs", s)}><Users className="h-3.5 w-3.5" /></Button>
                               )}
                             </div>
                           </div>
@@ -425,27 +379,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setErsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                               {isActivitiesView && (
-                                <div className="ml-auto relative">
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setMemberDropdownId(memberDropdownId === `ers-${s.id}` ? null : `ers-${s.id}`)}><Users className="h-3.5 w-3.5" /></Button>
-                                  {memberDropdownId === `ers-${s.id}` && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border rounded shadow-sm w-44 max-h-56 overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                                      {dayVisits.length === 0 ? (
-                                        <p className="text-[11px] text-[#8f959e] text-center py-3">暂无到场人员</p>
-                                      ) : (
-                                        dayVisits.map(v => {
-                                          const checked = getCurrentParticipantIds("ers", s).includes(v.id)
-                                          return (
-                                            <label key={v.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#f7f8fa] cursor-pointer text-[12px]">
-                                              <input type="checkbox" checked={checked} onChange={() => handleMemberToggle("ers", s, v.id)} className="w-3.5 h-3.5 rounded border-[#d9d9d9]" />
-                                              <span className="text-[#2b2f36]">{v.nickname}</span>
-                                              {v.member_type && <span className="text-[10px] text-[#8f959e] ml-auto">{v.member_type}</span>}
-                                            </label>
-                                          )
-                                        })
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("ers", s)}><Users className="h-3.5 w-3.5" /></Button>
                               )}
                             </div>
                           </div>
@@ -627,27 +561,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setIcsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                               {isActivitiesView && (
-                                <div className="ml-auto relative">
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setMemberDropdownId(memberDropdownId === `ics-${s.id}` ? null : `ics-${s.id}`)}><Users className="h-3.5 w-3.5" /></Button>
-                                  {memberDropdownId === `ics-${s.id}` && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border rounded shadow-sm w-44 max-h-56 overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                                      {dayVisits.length === 0 ? (
-                                        <p className="text-[11px] text-[#8f959e] text-center py-3">暂无到场人员</p>
-                                      ) : (
-                                        dayVisits.map(v => {
-                                          const checked = getCurrentParticipantIds("ics", s).includes(v.id)
-                                          return (
-                                            <label key={v.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#f7f8fa] cursor-pointer text-[12px]">
-                                              <input type="checkbox" checked={checked} onChange={() => handleMemberToggle("ics", s, v.id)} className="w-3.5 h-3.5 rounded border-[#d9d9d9]" />
-                                              <span className="text-[#2b2f36]">{v.nickname}</span>
-                                              {v.member_type && <span className="text-[10px] text-[#8f959e] ml-auto">{v.member_type}</span>}
-                                            </label>
-                                          )
-                                        })
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("ics", s)}><Users className="h-3.5 w-3.5" /></Button>
                               )}
                             </div>
                           </div>

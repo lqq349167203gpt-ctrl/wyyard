@@ -59,7 +59,10 @@ async def list_customers(
 
 @router.post("")
 async def create_customer(data: CustomerCreate):
-    customer = customer_service.create_customer(data)
+    try:
+        customer = customer_service.create_customer(data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return _fill_visit_count(customer)
 
 
@@ -114,7 +117,10 @@ async def get_customer(customer_id: str):
 
 @router.patch("/{customer_id}")
 async def update_customer(customer_id: str, data: CustomerUpdate):
-    customer = customer_service.update_customer(customer_id, data)
+    try:
+        customer = customer_service.update_customer(customer_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
     return _fill_visit_count(customer)

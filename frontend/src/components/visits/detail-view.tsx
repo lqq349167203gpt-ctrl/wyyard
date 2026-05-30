@@ -60,6 +60,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [showConfirmNewUser, setShowConfirmNewUser] = useState(false)
   const [customerForm, setCustomerForm] = useState<Partial<CustomerCreate>>({})
   const [creatingCustomer, setCreatingCustomer] = useState(false)
+  const [customerFormError, setCustomerFormError] = useState("")
 
   const { permissions: cp, ready: permReady } = useCustomerPermissions("class_records")
   const [customerListReady, setCustomerListReady] = useState(false)
@@ -223,13 +224,14 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const handleCreateCustomer = async () => {
     if (!customerForm.nickname?.trim()) return
     setCreatingCustomer(true)
+    setCustomerFormError("")
     try {
       const created = await customerApi.create(customerForm)
       setShowAddUserDialog(false)
       setSelectedCustomer(created)
       setSearchKeyword(created.nickname)
     } catch (e) {
-      alert(e instanceof Error ? e.message : "创建失败")
+      setCustomerFormError(e instanceof Error ? e.message : "创建失败")
     } finally {
       setCreatingCustomer(false)
     }
@@ -449,7 +451,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">昵称</span>
-              <Input value={customerForm.nickname || ""} onChange={(e) => setCustomerForm({ ...customerForm, nickname: e.target.value })} placeholder="请输入" />
+              <div>
+                <Input value={customerForm.nickname || ""} onChange={(e) => { setCustomerForm({ ...customerForm, nickname: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
+                {customerFormError && customerFormError.includes("昵称") && <p className="text-[11px] text-[#f54a45] mt-1">{customerFormError}</p>}
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">姓名</span>
               <Input value={customerForm.name || ""} onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })} placeholder="请输入" />
 
@@ -463,7 +468,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <Input value={customerForm.phone || ""} onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })} placeholder="请输入" />
 
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">微信</span>
-              <Input value={customerForm.wechat || ""} onChange={(e) => setCustomerForm({ ...customerForm, wechat: e.target.value })} placeholder="请输入" />
+              <div>
+                <Input value={customerForm.wechat || ""} onChange={(e) => { setCustomerForm({ ...customerForm, wechat: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
+                {customerFormError && customerFormError.includes("微信") && <p className="text-[11px] text-[#f54a45] mt-1">{customerFormError}</p>}
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">年龄</span>
               <Input value={customerForm.age || ""} onChange={(e) => setCustomerForm({ ...customerForm, age: e.target.value })} placeholder="请输入" />
 

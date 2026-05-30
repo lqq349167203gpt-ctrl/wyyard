@@ -23,6 +23,7 @@ export default function HealingRecordsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, any>>(emptyCustomer)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; nickname: string } | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -110,6 +111,7 @@ export default function HealingRecordsPage() {
   const handleSave = async () => {
     if (!form.nickname?.trim()) return
     setSaving(true)
+    setSaveError("")
     try {
       const data = { ...form }
       const range = form.age_range
@@ -125,7 +127,7 @@ export default function HealingRecordsPage() {
       setCreateOpen(false)
       setRefreshKey(k => k + 1)
     } catch (error) {
-      alert(error instanceof Error ? error.message : "保存失败")
+      setSaveError(error instanceof Error ? error.message : "保存失败")
     } finally {
       setSaving(false)
     }
@@ -237,7 +239,10 @@ export default function HealingRecordsPage() {
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">昵称</span>
-              <Input value={form.nickname || ""} onChange={(e) => setForm({ ...form, nickname: e.target.value })} placeholder="请输入" />
+              <div>
+                <Input value={form.nickname || ""} onChange={(e) => { setForm({ ...form, nickname: e.target.value }); setSaveError("") }} placeholder="请输入" />
+                {saveError && saveError.includes("昵称") && <p className="text-[11px] text-[#f54a45] mt-1">{saveError}</p>}
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">姓名</span>
               <Input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="请输入" />
 
@@ -251,7 +256,10 @@ export default function HealingRecordsPage() {
               <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="请输入" />
 
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">微信</span>
-              <Input value={form.wechat || ""} onChange={(e) => setForm({ ...form, wechat: e.target.value })} placeholder="请输入" />
+              <div>
+                <Input value={form.wechat || ""} onChange={(e) => { setForm({ ...form, wechat: e.target.value }); setSaveError("") }} placeholder="请输入" />
+                {saveError && saveError.includes("微信") && <p className="text-[11px] text-[#f54a45] mt-1">{saveError}</p>}
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">年龄</span>
               <div className="flex gap-2">
                 <Input value={form.age || ""} onChange={(e) => { const v = e.target.value; const n = parseInt(v); let range = ""; if (n >= 60) range = "60+"; else if (n >= 51) range = "51~60"; else if (n >= 41) range = "41~50"; else if (n >= 31) range = "31~40"; else if (n >= 18) range = "18~30"; setForm({ ...form, age: v, age_range: range }); }} placeholder="具体年龄" className="flex-1" />

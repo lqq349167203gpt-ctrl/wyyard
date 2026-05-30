@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.models.visit import VisitRecordCreate
 from app.services import visit_service
+from app.services import customer_service
 from app.services.customer_service import get_customer
 from app.utils.pagination import paginate
 
