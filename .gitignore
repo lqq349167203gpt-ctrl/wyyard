@@ -20,3 +20,4 @@ dist/
 # 通用
 .DS_Store
 *.log
+backend/uploads/materials/
