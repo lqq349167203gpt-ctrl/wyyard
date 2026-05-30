@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.models.visit import VisitRecordCreate
 from app.services import visit_service
 from app.services.customer_service import get_customer
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
@@ -16,9 +17,42 @@ def _fill_member_type(record):
 
 
 @router.get("")
-async def list_visits(date: str = None, customer_id: str = None):
+async def list_visits(
+    date: str = None,
+    customer_id: str = None,
+    page: int | None = Query(None, ge=1),
+    page_size: int | None = Query(None, ge=1, le=100),
+):
     records = visit_service.list_visits(date, customer_id)
-    return [_fill_member_type(r) for r in records]
+    items = [_fill_member_type(r) for r in records]
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
+
+
+@router.get("/counts")
+async def get_visit_counts(
+    customer_ids: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    member_types: str | None = Query(None),
+):
+    """返回各日期的到场人数统计 {date: count}，不做活动计数。支持 member_types 过滤权限"""
+    ids = None
+    if member_types is not None:
+        types = [m for m in member_types.split(",") if m]
+        if types:
+            customers = customer_service.list_customers()
+            ids = [c.id for c in customers if c.member_type in types]
+            if not ids:
+                return {}
+        else:
+            ids = None  # member_types 参数为空 → 超管，不过滤
+    elif customer_ids is not None:
+        ids = [x for x in customer_ids.split(",") if x]
+        if not ids:
+            return {}
+    return visit_service.get_date_counts(ids, start_date, end_date)
 
 
 @router.get("/search-customers")

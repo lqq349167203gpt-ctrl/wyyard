@@ -26,10 +26,14 @@ def _save():
 _load()
 
 
-def list_sessions(date: Optional[str] = None) -> List[InternalCourseSession]:
+def list_sessions(date: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[InternalCourseSession]:
     sessions = [v for v in _sessions.values() if not v.is_deleted]
     if date:
         sessions = [s for s in sessions if s.date == date]
+    if start_date:
+        sessions = [s for s in sessions if s.date >= start_date]
+    if end_date:
+        sessions = [s for s in sessions if s.date <= end_date]
     sessions.sort(key=lambda s: s.created_at, reverse=True)
     return sessions
 

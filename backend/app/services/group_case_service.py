@@ -47,6 +47,8 @@ def create_case(data: GroupCaseCreate) -> GroupCase:
     )
     _cases[case.id] = case
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(case.customer_id)
     return case
 
 
@@ -60,6 +62,8 @@ def update_case(case_id: str, data: dict) -> Optional[GroupCase]:
     case.updated_at = datetime.now(timezone.utc)
     _cases[case_id] = case
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(case.customer_id)
     return case
 
 
@@ -74,6 +78,8 @@ def delete_case(case_id: str) -> tuple[bool, str]:
     case.is_deleted = True
     case.deleted_at = datetime.now(timezone.utc)
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(case.customer_id)
     return True, "删除成功"
 
 

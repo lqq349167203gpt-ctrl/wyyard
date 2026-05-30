@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from app.utils.pagination import paginate
 from app.services import membership_card_service
 from app.models.membership_card import MembershipCardCreate
 
@@ -6,8 +7,14 @@ router = APIRouter(prefix="/api/membership-cards", tags=["membership-cards"])
 
 
 @router.get("")
-def list_cards():
-    return membership_card_service.list_cards()
+def list_cards(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None)):
+    items = membership_card_service.list_cards()
+    if customer_ids:
+        allowed = set(customer_ids.split(","))
+        items = [i for i in items if i.get("customer_id") in allowed]
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

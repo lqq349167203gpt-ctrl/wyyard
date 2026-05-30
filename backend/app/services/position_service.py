@@ -45,6 +45,13 @@ def list_positions() -> List[Position]:
     return sorted([v for v in _positions.values() if not v.is_deleted], key=lambda x: x.created_at)
 
 
+def get_position(position_id: str) -> Optional[Position]:
+    p = _positions.get(position_id)
+    if p and not p.is_deleted:
+        return p
+    return None
+
+
 def create_position(data: PositionCreate) -> Position:
     now = datetime.now(timezone.utc)
     position = Position(id=str(uuid.uuid4())[:8], created_at=now, **data.model_dump())

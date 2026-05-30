@@ -14,15 +14,12 @@ class InternalCourseSessionBase(BaseModel):
     host_names: List[str] = []
     participant_ids: List[str] = []  # 参与者
     materials: List[dict] = []
+    space_id: str = ""
+    room_id: str = ""
 
 
-class InternalCourseSessionCreate(BaseModel):
-    date: str
-    course_type: str = ""
-    course_name: str
-    course_description: str = ""
-    host_ids: List[str] = []
-    host_names: List[str] = []
+class InternalCourseSessionCreate(InternalCourseSessionBase):
+    pass
 
 
 class InternalCourseSession(InternalCourseSessionBase):

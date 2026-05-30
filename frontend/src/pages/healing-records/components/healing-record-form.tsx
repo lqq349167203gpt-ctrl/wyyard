@@ -38,7 +38,7 @@ export default function HealingRecordForm({
       setGrowthRecord(record.growth_record)
       setMaterials(record.materials || [])
     } else {
-      setDate(new Date().toISOString().slice(0, 10))
+      setDate(new Date().toLocaleDateString("sv-SE"))
       setTitle("")
       setTeacher("")
       setGrowthRecord("")

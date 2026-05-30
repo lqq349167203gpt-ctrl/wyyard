@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.models.account import AccountCreate, RoleCreate
-from app.services import account_service, position_permission_service
+from app.services import account_service, position_permission_service, position_customer_permission_service
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -37,9 +37,15 @@ async def login(data: LoginRequest):
     result = account_service.login(data.username, data.password)
     if not result:
         return {"success": False, "message": "账号或密码错误"}
-    # 获取用户权限
     permissions = position_permission_service.get_permissions(result.role)
-    return {"success": True, "account": result, "permissions": permissions}
+    return {
+        "success": True,
+        "account": result,
+        "permissions": permissions,
+        "customer_permissions": position_customer_permission_service.get_customer_permissions("customers", result.role),
+        "customer_permissions_class_records": position_customer_permission_service.get_customer_permissions("class_records", result.role),
+        "customer_permissions_payment": position_customer_permission_service.get_customer_permissions("payment", result.role),
+    }
 
 
 @router.patch("/{account_id}")

@@ -1,6 +1,9 @@
-import { useState, useRef, useEffect } from "react"
-import { Plus, Trash2, GripVertical, X } from "lucide-react"
+import { useState, useRef, useEffect, useMemo } from "react"
+import { Plus, Trash2, GripVertical, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import type { Customer } from "@/lib/api"
 
 interface Visitor {
@@ -23,122 +26,40 @@ interface Props {
   groups: Group[]
   setGroups: (groups: Group[]) => void
   onSave: (groups: Group[]) => Promise<void>
+  onCustomerClick?: (customerId: string) => void
 }
 
-function RoleRow({ label, selectedId, candidates, getName, onSelect, onClear }: {
+function RoleRow({ label, selectedId, getName, onCustomerClick }: {
   label: string
   selectedId: string
-  candidates: Visitor[]
   getName: (id: string) => string
-  onSelect: (id: string) => void
-  onClear: () => void
+  onCustomerClick?: (customerId: string) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    if (open) document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
-
   return (
-    <div className="flex items-center gap-2" ref={ref}>
-      <span className="text-[12px] text-[#8f959e] w-10 shrink-0">{label}</span>
-      <div className="relative">
-        {selectedId ? (
-          <span
-            className="inline-flex items-center gap-1 bg-[#f2f3f5] text-[#2b2f36] rounded px-2 py-1 text-[12px] cursor-pointer hover:bg-[#e5e6eb]"
-            onClick={() => setOpen(!open)}
-          >
-            {getName(selectedId)}
-            <button
-              className="text-[#8f959e] hover:text-[#ff4d4f]"
-              onClick={(e) => { e.stopPropagation(); onClear() }}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ) : (
-          <button
-            className="inline-flex items-center gap-0.5 text-[12px] text-[#c0c4cc] hover:text-[#3370ff] hover:bg-[#f0f5ff] rounded px-2 py-1"
-            onClick={() => setOpen(!open)}
-          >
-            <Plus className="h-3 w-3" />
-          </button>
-        )}
-        {open && (
-          <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-[#e8e8e8] rounded-lg shadow-lg max-h-[160px] overflow-y-auto min-w-[120px]">
-            {candidates.length === 0 ? (
-              <div className="text-[11px] text-[#c0c4cc] px-3 py-2">无可用人员</div>
-            ) : (
-              candidates.map(v => (
-                <div
-                  key={v.id}
-                  className="px-3 py-1.5 text-[12px] text-[#2b2f36] hover:bg-[#f0f5ff] cursor-pointer whitespace-nowrap"
-                  onClick={() => { onSelect(v.id); setOpen(false) }}
-                >
-                  {v.nickname}
-                  {v.member_type && <span className="text-[10px] text-[#8f959e] ml-1.5">{v.member_type}</span>}
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function MemberAddBtn({ candidates, onSelect }: {
-  candidates: Visitor[]
-  onSelect: (id: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    if (open) document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
-
-  if (candidates.length === 0) return null
-
-  return (
-    <div className="relative inline-flex" ref={ref}>
-      <button
-        className="inline-flex items-center gap-0.5 text-[12px] text-[#c0c4cc] hover:text-[#3370ff] hover:bg-[#f0f5ff] rounded px-2 py-1"
-        onClick={() => setOpen(!open)}
-      >
-        <Plus className="h-3 w-3" /> 添加
-      </button>
-      {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-[#e8e8e8] rounded-lg shadow-lg max-h-[160px] overflow-y-auto min-w-[120px]">
-          {candidates.map(v => (
-            <div
-              key={v.id}
-              className="px-3 py-1.5 text-[12px] text-[#2b2f36] hover:bg-[#f0f5ff] cursor-pointer whitespace-nowrap"
-              onClick={() => { onSelect(v.id); setOpen(false) }}
-            >
-              {v.nickname}
-              {v.member_type && <span className="text-[10px] text-[#8f959e] ml-1.5">{v.member_type}</span>}
-            </div>
-          ))}
-        </div>
+    <div className="flex items-center gap-2 min-w-0">
+      <span className="text-[12px] text-[#8f959e] shrink-0 w-12">{label}</span>
+      {selectedId && (
+        <span
+          className="text-[12px] text-[#2b2f36] truncate cursor-pointer hover:text-[#3370ff]"
+          onClick={() => onCustomerClick?.(selectedId)}
+        >
+          {getName(selectedId)}
+        </span>
       )}
     </div>
   )
 }
 
-export default function GroupingView({ date, dayVisits, allCustomers, groups, setGroups, onSave }: Props) {
+export default function GroupingView({ date, dayVisits, allCustomers, groups, setGroups, onSave, onCustomerClick }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropGroupIdx, setDropGroupIdx] = useState<number | null>(null)
-  const [saved, setSaved] = useState(false)
+  const [addGroupOpen, setAddGroupOpen] = useState(false)
+  const [editGroupIdx, setEditGroupIdx] = useState<number | null>(null)
+  const [deleteGroupIdx, setDeleteGroupIdx] = useState<number | null>(null)
+  const [newGroupName, setNewGroupName] = useState("")
+  const [newGroupLeaderId, setNewGroupLeaderId] = useState("")
+  const [newGroupDeputyId, setNewGroupDeputyId] = useState("")
+  const [newGroupMemberIds, setNewGroupMemberIds] = useState<string[]>([])
 
   const prevDate = useRef(date)
   const hasUserModified = useRef(false)
@@ -155,6 +76,16 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
   // 未分组的人员（供 RoleRow 和 MemberAddBtn 使用）
   const availableVisitors = dayVisits.filter(v => !usedIds.has(v.id))
 
+  // 弹窗中需要排除的人员 ID（编辑时保留当前组的人可选）
+  const dialogExcludeIds = useMemo(() => {
+    if (editGroupIdx !== null) {
+      const currentGroup = groups[editGroupIdx]
+      const currentIds = new Set([currentGroup.leader_id, currentGroup.deputy_id, ...currentGroup.member_ids].filter(Boolean))
+      return [...usedIds].filter(id => !currentIds.has(id))
+    }
+    return [...usedIds]
+  }, [editGroupIdx, groups])
+
   // 自动保存：用户手动修改后 600ms 自动保存，日期/数据加载不触发
   useEffect(() => {
     if (prevDate.current !== date) {
@@ -169,8 +100,6 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
     saveTimer.current = setTimeout(async () => {
       try {
         await onSave(groups)
-        setSaved(true)
-        setTimeout(() => setSaved(false), 1500)
       } catch (_) {}
     }, 600)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
@@ -182,9 +111,35 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
   }
 
   const addGroup = () => {
+    setEditGroupIdx(null)
+    setNewGroupName(`小组 ${groups.length + 1}`)
+    setNewGroupLeaderId("")
+    setNewGroupDeputyId("")
+    setNewGroupMemberIds([])
+    setAddGroupOpen(true)
+  }
+
+  const openEditGroup = (idx: number) => {
+    const g = groups[idx]
+    setEditGroupIdx(idx)
+    setNewGroupName(g.name)
+    setNewGroupLeaderId(g.leader_id)
+    setNewGroupDeputyId(g.deputy_id)
+    setNewGroupMemberIds([...g.member_ids])
+    setAddGroupOpen(true)
+  }
+
+  const confirmAddGroup = () => {
     hasUserModified.current = true
-    const name = `小组 ${groups.length + 1}`
-    setGroups([...groups, { name, leader_id: "", deputy_id: "", member_ids: [] }])
+    const excludeFromMembers = new Set([newGroupLeaderId, newGroupDeputyId].filter(Boolean))
+    const cleanMemberIds = newGroupMemberIds.filter(id => !excludeFromMembers.has(id))
+    if (editGroupIdx !== null) {
+      const updated = groups.map((g, i) => i === editGroupIdx ? { name: newGroupName || g.name, leader_id: newGroupLeaderId, deputy_id: newGroupDeputyId, member_ids: cleanMemberIds } : g)
+      setGroups(updated)
+    } else {
+      setGroups([...groups, { name: newGroupName || `小组 ${groups.length + 1}`, leader_id: newGroupLeaderId, deputy_id: newGroupDeputyId, member_ids: cleanMemberIds }])
+    }
+    setAddGroupOpen(false)
   }
 
   const removeGroup = (idx: number) => {
@@ -192,29 +147,12 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
     setGroups(groups.filter((_, i) => i !== idx))
   }
 
-  const updateGroup = (idx: number, field: string, value: string) => {
-    hasUserModified.current = true
-    const updated = groups.map((g, i) => {
-      if (i !== idx) return g
-      return { ...g, [field]: value }
-    })
-    setGroups(updated)
-  }
-
   const addMemberToGroup = (groupIdx: number, visitorId: string) => {
     hasUserModified.current = true
     const updated = groups.map((g, i) => {
       if (i !== groupIdx) return g
+      if (visitorId === g.leader_id || visitorId === g.deputy_id || g.member_ids.includes(visitorId)) return g
       return { ...g, member_ids: [...g.member_ids, visitorId] }
-    })
-    setGroups(updated)
-  }
-
-  const removeMemberFromGroup = (groupIdx: number, memberId: string) => {
-    hasUserModified.current = true
-    const updated = groups.map((g, i) => {
-      if (i !== groupIdx) return g
-      return { ...g, member_ids: g.member_ids.filter(id => id !== memberId) }
     })
     setGroups(updated)
   }
@@ -251,9 +189,9 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
   }
 
   return (
-    <div className="flex-1 flex min-h-0">
+    <div className="flex-1 flex min-h-0 overflow-hidden">
       {/* 左栏：人员列表 */}
-      <div className="w-[160px] shrink-0 border-r border-[#e8e8e8] overflow-y-auto py-2 px-0">
+      <div className="w-[160px] shrink-0 border-r border-[#e8e8e8] overflow-y-auto scrollbar-hide py-2 px-0">
         <div className="text-[11px] text-[#8f959e] tracking-widest mb-2 px-2">待分组 ({availableVisitors.length})</div>
         <div className="space-y-1">
           {dayVisits.map((v) => {
@@ -274,7 +212,10 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <GripVertical className={`h-3 w-3 shrink-0 ${grouped ? "text-[#e0e0e0]" : "text-[#c0c4cc]"}`} />
-                  <span className={grouped ? "text-[#c0c4cc] truncate" : "text-[#2b2f36] truncate"}>{v.nickname}</span>
+                  <span
+                    className={`truncate ${grouped ? "text-[#c0c4cc]" : "text-[#2b2f36] cursor-pointer hover:text-[#3370ff]"}`}
+                    onClick={() => onCustomerClick?.(v.id)}
+                  >{v.nickname}</span>
                 </div>
                 {v.member_type && (
                   <span className={`text-[10px] shrink-0 ml-1 ${grouped ? "text-[#d0d0d0]" : "text-[#8f959e]"}`}>{v.member_type}</span>
@@ -286,13 +227,12 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
       </div>
 
       {/* 右栏：分组管理 */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 min-w-0 overflow-y-auto p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-medium text-[#2b2f36]">分组</span>
-            {saved && <span className="text-[11px] text-green-600">已保存</span>}
           </div>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addGroup}>
+          <Button size="sm" className="h-7 text-xs bg-[#3370ff] hover:bg-[#2860e1] text-white" onClick={addGroup}>
             <Plus className="mr-1 h-3 w-3" /> 新增
           </Button>
         </div>
@@ -305,17 +245,10 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
         ) : (
           <div className="space-y-3">
             {groups.map((group, idx) => {
-              // 候选人：本组已选的人 + 未被其他组占用的访客
-              const candidates = (id: string, excludeId: string): Visitor[] => {
-                const own = id ? dayVisits.find(v => v.id === id) : null
-                const avail = availableVisitors.filter(v => v.id !== excludeId)
-                return own ? [own, ...avail] : avail
-              }
-
               return (
               <div
                 key={idx}
-                className={`border rounded-lg transition-colors ${
+                className={`border rounded-lg transition-colors overflow-hidden ${
                   dropGroupIdx === idx ? "border-[#3370ff] bg-[#f0f5ff]" : "border-[#f0f0f0]"
                 }`}
                 onDragOver={(e) => handleDragOver(e, idx)}
@@ -326,7 +259,10 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#f0f0f0]">
                   <span className="text-[13px] font-medium text-[#2b2f36]">{group.name}</span>
                   <div className="flex items-center gap-1">
-                    <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => removeGroup(idx)}>
+                    <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => openEditGroup(idx)}>
+                      <Edit className="h-3.5 w-3.5 text-[#8f959e]" />
+                    </button>
+                    <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => setDeleteGroupIdx(idx)}>
                       <Trash2 className="h-3.5 w-3.5 text-[#8f959e]" />
                     </button>
                   </div>
@@ -337,37 +273,22 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
                   <RoleRow
                     label="组长"
                     selectedId={group.leader_id}
-                    candidates={candidates(group.leader_id, group.deputy_id)}
                     getName={getName}
-                    onSelect={(id) => updateGroup(idx, "leader_id", id)}
-                    onClear={() => updateGroup(idx, "leader_id", "")}
+                    onCustomerClick={onCustomerClick}
                   />
                   {/* 副组长 */}
                   <RoleRow
                     label="副组长"
                     selectedId={group.deputy_id}
-                    candidates={candidates(group.deputy_id, group.leader_id)}
                     getName={getName}
-                    onSelect={(id) => updateGroup(idx, "deputy_id", id)}
-                    onClear={() => updateGroup(idx, "deputy_id", "")}
+                    onCustomerClick={onCustomerClick}
                   />
                   {/* 组员 */}
-                  <div className="flex items-start gap-2">
-                    <span className="text-[12px] text-[#8f959e] w-10 shrink-0 pt-1.5">组员</span>
-                    <div className="flex-1 flex flex-wrap gap-1.5 items-center">
-                      {group.member_ids.map(mid => (
-                        <span key={mid} className="inline-flex items-center gap-1 bg-[#f2f3f5] text-[#2b2f36] rounded px-2 py-1 text-[12px]">
-                          {getName(mid)}
-                          <button className="text-[#8f959e] hover:text-[#ff4d4f]" onClick={() => removeMemberFromGroup(idx, mid)}>
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                      <MemberAddBtn
-                        candidates={availableVisitors}
-                        onSelect={(id) => addMemberToGroup(idx, id)}
-                      />
-                    </div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[12px] text-[#8f959e] shrink-0 w-12">组员</span>
+                    {[...new Set(group.member_ids)].filter(mid => mid !== group.leader_id && mid !== group.deputy_id).length > 0 && (
+                      <span className="text-[12px] text-[#2b2f36] inline-flex gap-[6px] min-w-0 flex-wrap">{[...new Set(group.member_ids)].filter(mid => mid !== group.leader_id && mid !== group.deputy_id).map(mid => <span key={mid} className="cursor-pointer hover:text-[#3370ff]" onClick={() => onCustomerClick?.(mid)}>{getName(mid)}</span>)}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -376,6 +297,93 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
           </div>
         )}
       </div>
+
+      {/* 新增分组弹窗 */}
+      <Dialog open={addGroupOpen} onOpenChange={setAddGroupOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{editGroupIdx !== null ? "编辑分组" : "新增分组"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] shrink-0 w-10">名称</span>
+              <input
+                className="flex-1 h-8 text-xs px-3 border border-[#e0e0e0] rounded focus:outline-none focus:border-[#3370ff]"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="小组名称"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] shrink-0 w-10">组长</span>
+              <div className="flex-1">
+                <CustomerSearchInput
+                  customers={allCustomers}
+                  value={newGroupLeaderId ? getName(newGroupLeaderId) : ""}
+                  onChange={() => {}}
+                  onSelectItem={(c) => setNewGroupLeaderId(c.id)}
+                  placeholder="选择组长"
+                  excludeIds={[newGroupDeputyId, ...dialogExcludeIds].filter(Boolean)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] shrink-0 w-10">副组长</span>
+              <div className="flex-1">
+                <CustomerSearchInput
+                  customers={allCustomers}
+                  value={newGroupDeputyId ? getName(newGroupDeputyId) : ""}
+                  onChange={() => {}}
+                  onSelectItem={(c) => setNewGroupDeputyId(c.id)}
+                  placeholder="选择副组长"
+                  excludeIds={[newGroupLeaderId, ...dialogExcludeIds].filter(Boolean)}
+                />
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] shrink-0 w-10 pt-1.5">组员</span>
+              <div className="flex-1">
+                <CustomerSearchInput
+                  customers={allCustomers}
+                  value={newGroupMemberIds.map(id => getName(id))}
+                  onChange={(v) => {
+                    const names = Array.isArray(v) ? v : []
+                    const newIds: string[] = []
+                    names.forEach((name: string) => {
+                      const c = allCustomers.find(c => (c.nickname || c.name) === name)
+                      if (c) newIds.push(c.id)
+                    })
+                    setNewGroupMemberIds(newIds)
+                  }}
+                  placeholder="搜索添加组员"
+                  multi
+                  excludeIds={[newGroupLeaderId, newGroupDeputyId, ...newGroupMemberIds, ...dialogExcludeIds].filter(Boolean)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" className="h-8 text-xs px-4" onClick={() => setAddGroupOpen(false)}>取消</Button>
+              <Button size="sm" className="h-8 text-xs px-4" onClick={confirmAddGroup}>确定</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认弹窗 */}
+      <AlertDialog open={deleteGroupIdx !== null} onOpenChange={(open) => { if (!open) setDeleteGroupIdx(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除"{deleteGroupIdx !== null ? groups[deleteGroupIdx]?.name : ""}"分组吗？删除后无法恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (deleteGroupIdx !== null) { removeGroup(deleteGroupIdx); setDeleteGroupIdx(null) } }}>确定</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

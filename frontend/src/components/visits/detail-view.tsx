@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react"
-import { ChevronLeft, ChevronRight, Edit, Loader2, Trash2 } from "lucide-react"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { ChevronLeft, ChevronRight, Edit, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -10,10 +10,12 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { visitApi, customerApi, type VisitRecord, type CustomerSearchResult, type CustomerCreate } from "@/lib/api"
+import { visitApi, customerApi, type VisitRecord, type CustomerLight, type CustomerCreate } from "@/lib/api"
+import { CustomerSearchInput } from "@/components/customer-search-input"
+import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0]
+  return d.toLocaleDateString("sv-SE")
 }
 function addDays(d: Date, n: number): Date {
   const r = new Date(d); r.setDate(r.getDate() + n); return r
@@ -26,9 +28,10 @@ interface DetailViewProps {
   externalDate?: string
   onExternalDateChange?: (date: string) => void
   hideDateBar?: boolean
+  onCustomerClick?: (customerId: string) => void
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick }: DetailViewProps = {}) {
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
   const selectedDate = externalDate ?? internalDate
@@ -43,10 +46,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
 
   // 新增表单状态
   const [searchKeyword, setSearchKeyword] = useState("")
-  const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null)
+  const [customerList, setCustomerList] = useState<CustomerLight[]>([])
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerLight | null>(null)
   const [visitTime, setVisitTime] = useState("09:00")
   const [needs, setNeeds] = useState("")
   const [saving, setSaving] = useState(false)
@@ -60,62 +61,107 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [customerForm, setCustomerForm] = useState<Partial<CustomerCreate>>({})
   const [creatingCustomer, setCreatingCustomer] = useState(false)
 
-  const searchTimeoutRef = useRef<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const { permissions: cp, ready: permReady } = useCustomerPermissions("class_records")
+  const [customerListReady, setCustomerListReady] = useState(false)
+
+  const visibleIds = useMemo(() => new Set(customerList.map(c => c.id)), [customerList])
+  const addedCustomerIds = useMemo(() => visits.map(v => v.customer_id), [visits])
+  const filteredVisits = useMemo(() => {
+    if (!customerListReady) return []
+    return visits.filter(v => visibleIds.has(v.customer_id))
+  }, [visits, visibleIds, customerListReady])
+
+  const [visibleCount, setVisibleCount] = useState(40)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || visibleCount >= filteredVisits.length) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount(prev => Math.min(prev + 40, filteredVisits.length))
+        }
+      },
+      { rootMargin: "200px" }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [visibleCount, filteredVisits.length])
 
   const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
 
   // 加载当日数据
+  const visitsRetryRef = useRef(0)
   useEffect(() => {
+    if (!customerListReady) return
+    let cancelled = false
     setLoading(true)
-    visitApi.list(selectedDate)
-      .then(setVisits)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [selectedDate])
-
-  // 加载日期范围内的每日人数
-  const loadDailyCounts = () => {
-    visitApi.list().then((allVisits) => {
-      const counts: Record<string, number> = {}
-      for (const v of allVisits) {
-        counts[v.visit_date] = (counts[v.visit_date] || 0) + 1
-      }
-      setDailyCounts(counts)
-    }).catch(() => {})
-  }
-  useEffect(() => { loadDailyCounts() }, [dateRangeStart])
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false)
+    const load = () => {
+      visitApi.list(selectedDate)
+        .then((data) => { if (!cancelled) setVisits(data) })
+        .catch(() => {
+          if (!cancelled && visitsRetryRef.current < 2) {
+            visitsRetryRef.current++
+            load()
+          }
+        })
+        .finally(() => { if (!cancelled) setLoading(false) })
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    load()
+    return () => { cancelled = true }
+  }, [selectedDate, customerListReady])
 
-  const handleSearch = (keyword: string) => {
-    setSearchKeyword(keyword)
-    setSelectedCustomer(null)
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    if (!keyword.trim()) { setSearchResults([]); setShowDropdown(false); return }
-    searchTimeoutRef.current = window.setTimeout(async () => {
-      setSearching(true)
-      try {
-        const results = await visitApi.searchCustomers(keyword)
-        setSearchResults(results)
-        setShowDropdown(true)
-      } catch { setSearchResults([]) }
-      finally { setSearching(false) }
-    }, 300)
+  // 加载每日到场人数，使用 member_types + 日期范围做权限过滤
+  const countsRetryRef = useRef(0)
+  const refreshCounts = () => {
+    const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
+    const memberTypes = cp.join(",")
+    const load = () => {
+      visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate })
+        .then(setDailyCounts)
+        .catch(() => {
+          if (countsRetryRef.current < 2) {
+            countsRetryRef.current++
+            load()
+          }
+        })
+    }
+    load()
   }
+  useEffect(() => { if (permReady) refreshCounts() }, [permReady, dateRangeStart, cp])
 
-  const handleSelectCustomer = (c: CustomerSearchResult) => {
-    setSelectedCustomer(c)
-    setSearchKeyword(c.nickname)
-    setSearchResults([])
-    setShowDropdown(false)
-  }
+  // 加载客户列表供搜索组件使用
+  const customerRetryRef = useRef(0)
+  useEffect(() => {
+    if (!permReady) return
+    let cancelled = false
+    const load = () => {
+      customerApi.light().then((data) => {
+        if (cancelled) return
+        let filtered = data
+        const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
+        if (cu.role !== "超级管理员") {
+          if (cp.length > 0) {
+            filtered = data.filter(c => c.member_type && cp.includes(c.member_type))
+          } else {
+            filtered = []
+          }
+        }
+        setCustomerList(filtered)
+        setCustomerListReady(true)
+      }).catch(() => {
+        if (!cancelled && customerRetryRef.current < 2) {
+          customerRetryRef.current++
+          load()
+        } else {
+          setCustomerListReady(true)
+        }
+      })
+    }
+    load()
+    return () => { cancelled = true }
+  }, [permReady, cp])
 
   const handleAdd = async () => {
     if (!selectedCustomer) {
@@ -138,7 +184,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       setVisitTime("09:00")
       const data = await visitApi.list(selectedDate)
       setVisits(data)
-      loadDailyCounts()
+      refreshCounts()
     } catch (e) {
       alert(e instanceof Error ? e.message : "添加失败")
     } finally {
@@ -148,11 +194,15 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
 
   const handleDelete = async () => {
     if (!deleteId) return
-    await visitApi.delete(deleteId)
-    setDeleteId(null)
-    const data = await visitApi.list(selectedDate)
-    setVisits(data)
-    loadDailyCounts()
+    try {
+      await visitApi.delete(deleteId)
+      setDeleteId(null)
+      const data = await visitApi.list(selectedDate)
+      setVisits(data)
+      refreshCounts()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "删除失败")
+    }
   }
 
   const handleUpdate = async () => {
@@ -176,7 +226,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     try {
       const created = await customerApi.create(customerForm)
       setShowAddUserDialog(false)
-      setSelectedCustomer({ id: created.id, nickname: created.nickname, name: created.name || "", member_type: created.member_type || "", visit_count: created.visit_count || 0 })
+      setSelectedCustomer(created)
       setSearchKeyword(created.nickname)
     } catch (e) {
       alert(e instanceof Error ? e.message : "创建失败")
@@ -232,7 +282,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         <div className="px-4 py-3 border-b border-[#f0f0f0] flex items-center gap-5 overflow-visible">
           <div className="flex items-center shrink-0">
             <span className="text-xs font-medium text-[#2b2f36]">到场人员</span>
-            <span className="text-xs text-[#2b2f36] ml-2">{visits.length} 人</span>
+            <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.length} 人</span>
           </div>
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-xs text-[#4e535a] shrink-0">预计到场时间</span>
@@ -250,25 +300,18 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           />
           <span className="text-xs text-[#4e535a] shrink-0">人员</span>
           {/* 搜索用户 */}
-          <div className="w-36 relative" ref={dropdownRef}>
-            <Input
+          <div className="w-36">
+            <CustomerSearchInput
+              customers={customerList as any[]}
               value={searchKeyword}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(v) => setSearchKeyword(v as string)}
+              onSelectItem={(customer) => {
+                setSelectedCustomer(customer)
+                setSearchKeyword(customer.nickname)
+              }}
               placeholder="昵称"
-              className="h-8 text-xs"
-              onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+              excludeIds={addedCustomerIds}
             />
-            {searching && <Loader2 className="absolute right-3 top-[34px] h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-            {showDropdown && searchResults.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-                {searchResults.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted text-xs" onClick={() => handleSelectCustomer(c)}>
-                    <span className="font-medium">{c.nickname}</span>
-                    <span className="text-muted-foreground">{c.member_type || "新人"}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           <span className="text-xs text-[#4e535a] shrink-0">需求</span>
@@ -291,45 +334,38 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         </div>
         {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : visits.length === 0 ? (
+        ) : filteredVisits.length === 0 ? (
           <p className="py-16 text-center text-xs text-[#8f959e]">当日暂无到场人员</p>
         ) : (
           <div className="p-2 space-y-0.5">
             {/* 表头 */}
-            <div className="flex items-center px-3 h-[42px] text-[13px] font-normal text-[#8f959e] bg-[#f7f8fa] rounded-t-lg">
-              <span className="w-[88px] shrink-0">昵称</span>
-              <span className="w-[400px] shrink-0">本次需求</span>
-              <span className="w-[72px] shrink-0">会员身份</span>
-              <span className="w-[96px] shrink-0">参与活动</span>
+            <div className="flex items-center px-3 h-[42px] text-[12px] font-normal text-[#8f959e] bg-[#f7f8fa] rounded-t-lg gap-3">
+              <span className="w-[80px] shrink-0">昵称</span>
+              <span className="flex-1 min-w-[200px]">本次需求</span>
+              <span className="w-[88px] shrink-0">会员身份</span>
+              <span className="w-[120px] shrink-0">参与活动</span>
               <span className="w-[72px] shrink-0">剩余次数</span>
-              <span className="w-[120px] shrink-0">预计到场时间</span>
-              <span className="w-[140px] shrink-0 text-right ml-auto">操作</span>
+              <span className="w-[100px] shrink-0">预计到场时间</span>
+              <span className="w-[64px] shrink-0">是否到店</span>
+              <span className="w-[72px] shrink-0 text-right">操作</span>
             </div>
-            {visits.map((v) => (
+            {filteredVisits.slice(0, visibleCount).map((v) => (
               <div key={v.id} className="rounded hover:bg-[#f7f8fa]">
                 {/* 主行：固定列宽 */}
-                <div className="flex items-center px-3 py-1.5">
-                  <span className="w-[88px] shrink-0 text-[12px] text-[#2b2f36] truncate">{v.nickname}</span>
-                  <span className="w-[400px] shrink-0 text-[12px] text-[#8f959e] break-words">{v.needs || "-"}</span>
-                  <span className="w-[72px] shrink-0 text-[12px] text-[#8f959e] truncate">{v.member_type || "-"}</span>
-                  <span className="w-[96px] shrink-0 text-[12px] text-[#8f959e]"><span className="text-[#2b2f36]">{v.activity_count}</span> 次{v.welfare_count > 0 && <span className="text-[#8f959e]">（公益<span className="text-[#2b2f36]">{v.welfare_count}</span>次）</span>}</span>
-                  <span className="w-[72px] shrink-0 text-[12px] text-[#8f959e]">{v.remaining_count === -1 ? "不限" : <><span className="text-[#2b2f36]">{v.remaining_count}</span> 次</>}</span>
-                  <span className="w-[120px] shrink-0 text-[12px] text-[#8f959e] whitespace-nowrap">{v.visit_time || "09:00"}</span>
-                  <div className="w-[140px] shrink-0 flex items-center justify-end gap-1 ml-auto">
-                    <button
-                      className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
-                        v.arrived
-                          ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
-                          : "bg-white border-[#e0e0e0] text-[#8f959e] hover:bg-[#f5f6f7] hover:text-[#4e535a]"
-                      }`}
-                      onClick={async () => {
-                        await visitApi.update(v.id, { arrived: !v.arrived })
-                        const data = await visitApi.list(selectedDate)
-                        setVisits(data)
-                      }}
-                    >
-                      {v.arrived ? "到店" : "未到店"}
-                    </button>
+                <div className="flex items-center px-3 py-1.5 gap-3">
+                  <span
+                    className="w-[80px] shrink-0 text-[12px] text-[#2b2f36] truncate cursor-pointer hover:text-[#3370ff]"
+                    onClick={() => onCustomerClick?.(v.customer_id)}
+                  >{v.nickname}</span>
+                  <span className="flex-1 min-w-[200px] text-[12px] text-[#8f959e] break-words">{v.needs || "-"}</span>
+                  <span className="w-[88px] shrink-0 text-[12px] text-[#8f959e] truncate">{v.member_type || "-"}</span>
+                  <span className="w-[120px] shrink-0 text-[12px] text-[#8f959e]"><span className="text-[#2b2f36]">{v.activity_count}</span> 次{v.welfare_count > 0 && <span className="text-[#8f959e]">（公益<span className="text-[#2b2f36]">{v.welfare_count}</span>次）</span>}</span>
+                  <span className="w-[72px] shrink-0 text-[12px] text-[#8f959e]">{v.remaining_count == null ? "无卡" : v.remaining_count === -1 ? "不限" : <><span className="text-[#2b2f36]">{v.remaining_count}</span> 次</>}</span>
+                  <span className="w-[100px] shrink-0 text-[12px] text-[#8f959e] whitespace-nowrap">{v.visit_time || "09:00"}</span>
+                  <span className={`w-[64px] shrink-0 text-[12px] ${v.arrived ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
+                    {v.arrived ? "到店" : "未到店"}
+                  </span>
+                  <div className="w-[72px] shrink-0 flex items-center justify-end gap-1">
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditVisit(v); setEditDate(v.visit_date); setEditNeeds(v.needs) }}>
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
@@ -340,6 +376,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 </div>
               </div>
             ))}
+            {visibleCount < filteredVisits.length && (
+              <div ref={sentinelRef} className="h-4" />
+            )}
           </div>
         )}
       </div>

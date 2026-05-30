@@ -26,10 +26,14 @@ def _save():
 _load()
 
 
-def list_records(date: Optional[str] = None) -> List[ClassRecord]:
+def list_records(date: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[ClassRecord]:
     records = [v for v in _records.values() if not v.is_deleted]
     if date:
         records = [r for r in records if r.date == date]
+    if start_date:
+        records = [r for r in records if r.date >= start_date]
+    if end_date:
+        records = [r for r in records if r.date <= end_date]
     records.sort(key=lambda r: r.created_at, reverse=True)
     return records
 

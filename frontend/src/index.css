@@ -141,3 +141,12 @@ input[type="date"].date-empty::-webkit-calendar-picker-indicator {
   border-right: none !important;
   border-left: none !important;
 }
+
+/* 隐藏滚动条但保留滚动功能 */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

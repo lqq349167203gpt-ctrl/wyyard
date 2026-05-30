@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
+from app.utils.pagination import paginate
 from app.services import group_case_session_service
 from app.models.group_case_session import GroupCaseSessionCreate
 
@@ -7,8 +8,11 @@ router = APIRouter(prefix="/api/group-case-sessions", tags=["group-case-sessions
 
 
 @router.get("")
-def list_sessions(date: Optional[str] = None):
-    return group_case_session_service.list_sessions(date)
+def list_sessions(date: Optional[str] = None, page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+    items = group_case_session_service.list_sessions(date)
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

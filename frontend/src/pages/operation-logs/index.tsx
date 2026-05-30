@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react"
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react"
-import { operationLogApi, accountApi } from "@/lib/api"
-import type { OperationLog, Account } from "@/lib/api"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { Search, X } from "lucide-react"
+import { operationLogApi, accountApi, customerApi } from "@/lib/api"
+import type { OperationLog, Account, Customer } from "@/lib/api"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useServerPagination } from "@/hooks/use-server-pagination"
+import { PaginationBar } from "@/components/pagination-bar"
 
 const PAGE_SIZE = 20
 
@@ -27,38 +29,72 @@ const METHOD_COLORS: Record<string, string> = {
   GET: "bg-gray-50 text-gray-600",
 }
 
+const FIELD_CN: Record<string, string> = {
+  nickname: "昵称", name: "名称", title: "标题", username: "用户名",
+  phone: "电话", wechat: "微信", gender: "性别", age: "年龄",
+  member_type: "会员类型", member_identity: "会员身份",
+  note: "备注", description: "描述", content: "内容",
+  status: "状态", date: "日期", start_time: "开始时间", end_time: "结束时间",
+  teacher_ids: "老师", course_name: "沙龙名称", course_type: "课程类型",
+  owner_name: "案主", host_name: "主持人", host_names: "主持人",
+  participant_ids: "参与者", achiever_name: "成就君",
+  leader_id: "组长", deputy_id: "副组长", member_ids: "成员",
+  price: "价格", amount: "金额", count: "次数",
+  sort_order: "排序", is_public_welfare: "公益",
+  arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "疗愈师回复",
+  referrer: "引流人", traffic_source: "流量来源",
+  basic_info: "基础信息", assessment: "客户评估", tags: "标签",
+  visit_count: "到店次数", paid_content: "付费内容",
+  positions: "疗愈身份", role: "角色", permissions: "权限",
+  groups: "分组", materials: "资料", images: "图片",
+  location: "地点", address: "地址",
+  start_date: "开始日期", end_date: "结束日期",
+  remaining_count: "剩余次数", card_type: "卡类型",
+  customer_id: "客户", space_id: "空间", room_id: "房间",
+  owner_id: "案主", space_name: "空间名称",
+  core_situation: "核心情况", need_tags: "需求标签",
+  follow_up_node: "跟进节点", follow_up_action: "跟进动作",
+  tracking_plan: "跟进计划", self_tags: "个人标签",
+}
+
 export default function OperationLogsPage() {
-  const [logs, setLogs] = useState<OperationLog[]>([])
-  const [page, setPage] = useState(1)
   const [operatorFilter, setOperatorFilter] = useState("")
   const [methodFilter, setMethodFilter] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [selectedLog, setSelectedLog] = useState<OperationLog | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const filtersRef = useRef({ operatorFilter, methodFilter, dateFrom, dateTo })
 
-  useEffect(() => {
-    loadLogs()
-    accountApi.list().then(setAccounts).catch(() => {})
+  const fetchLogs = useCallback(async (page: number, pageSize: number) => {
+    const f = filtersRef.current
+    return operationLogApi.listPaginated({
+      operator: f.operatorFilter || undefined,
+      method: f.methodFilter || undefined,
+      date_from: f.dateFrom || undefined,
+      date_to: f.dateTo || undefined,
+    }, page, pageSize)
   }, [])
 
-  const loadLogs = async () => {
-    try {
-      const data = await operationLogApi.list({
-        operator: operatorFilter || undefined,
-        method: methodFilter || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-      })
-      setLogs(data)
-      setPage(1)
-    } catch (error) {
-      console.error("加载操作日志失败:", error)
-    }
+  const {
+    paginatedItems: pagedLogs, currentPage, totalPages, totalItems,
+    goToPage, startIndex, endIndex, loading,
+  } = useServerPagination<OperationLog>(fetchLogs, { pageSize: PAGE_SIZE })
+
+  useEffect(() => {
+    accountApi.list().then(setAccounts).catch(() => {})
+    customerApi.list().then(setCustomers).catch(() => {})
+  }, [])
+
+  const getNameById = (id: string) => {
+    const c = customers.find(c => c.id === id)
+    return c?.nickname || c?.name || id
   }
 
   const handleSearch = () => {
-    loadLogs()
+    filtersRef.current = { operatorFilter, methodFilter, dateFrom, dateTo }
+    goToPage(1)
   }
 
   const handleClear = () => {
@@ -66,7 +102,8 @@ export default function OperationLogsPage() {
     setMethodFilter("")
     setDateFrom("")
     setDateTo("")
-    setTimeout(() => loadLogs(), 0)
+    filtersRef.current = { operatorFilter: "", methodFilter: "", dateFrom: "", dateTo: "" }
+    goToPage(1)
   }
 
   const formatDate = (dateStr: string) => {
@@ -105,20 +142,81 @@ export default function OperationLogsPage() {
     return groups
   }
 
-  const totalPages = Math.ceil(logs.length / PAGE_SIZE)
-  const pagedLogs = logs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const dayGroups = groupByDay(pagedLogs)
 
-  const renderSnapshot = (data: Record<string, unknown> | null, label: string) => {
-    if (!data) return null
+  const renderChanges = (before: Record<string, unknown> | null, after: Record<string, unknown> | null) => {
+    if (!after || !before) return null
+
+    const skipKeys = ["id", "created_at", "updated_at", "is_deleted", "deleted_at"]
+    // 跳过 _id 字段（当对应的 _name 也存在时），避免案主/主持人/成交人 等重复显示
+    const idNamePairs: Record<string, string> = {
+      owner_id: "owner_name", host_id: "host_name", closer_id: "closer_name",
+    }
+    const allKeys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
+    const changedKeys = allKeys.filter(k => {
+      if (skipKeys.includes(k)) return false
+      // Skip _id when _name also present in either before or after
+      const nameKey = idNamePairs[k]
+      if (nameKey && ((before[nameKey] !== undefined) || (after[nameKey] !== undefined))) return false
+      return JSON.stringify(before[k]) !== JSON.stringify(after[k])
+    })
+
+    if (changedKeys.length === 0) return null
+
     return (
       <div>
-        <div className="text-xs font-medium text-[#8f959e] mb-1">{label}</div>
-        <pre className="text-xs bg-[#f7f8fa] p-3 rounded-md overflow-auto max-h-60 whitespace-pre-wrap break-all">
-          {JSON.stringify(data, null, 2)}
-        </pre>
+        <div className="text-xs font-medium text-[#8f959e] mb-1.5">变更详情</div>
+        <div className="text-xs bg-[#f7f8fa] rounded-md overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#e8e8e8]">
+                <th className="text-left px-3 py-2 text-[11px] text-[#8f959e] font-medium w-20">字段</th>
+                <th className="text-left px-3 py-2 text-[11px] text-[#8f959e] font-medium">修改前</th>
+                <th className="text-left px-3 py-2 text-[11px] text-[#6385ec] font-medium">修改后</th>
+              </tr>
+            </thead>
+            <tbody>
+              {changedKeys.map((key, i) => {
+                return (
+                  <tr key={key} className={i < changedKeys.length - 1 ? "border-b border-[#f0f0f0]" : ""}>
+                    <td className="px-3 py-2 text-[#8f959e] whitespace-nowrap">{FIELD_CN[key] || key}</td>
+                    <td className="px-3 py-2 align-top">
+                      <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(before[key]) || "-"}</pre>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(after[key]) || "-"}</pre>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     )
+  }
+
+  const resolveIdsInString = (s: string): string => {
+    // Replace all 8+ char hex IDs with customer names
+    return s.replace(/[0-9a-f]{8,}(?:-[0-9a-f]{4,})*/gi, (match) => getNameById(match))
+  }
+
+  const formatCellValue = (val: unknown): string => {
+    if (val === null || val === undefined) return ""
+    if (typeof val === "boolean") return val ? "是" : "否"
+    if (Array.isArray(val)) {
+      if (val.length === 0) return "（空）"
+      return val.map(v => {
+        if (typeof v === "object" && v !== null) return resolveIdsInString(JSON.stringify(v))
+        const s = String(v)
+        if (s.length >= 8 && /^[0-9a-f-]+$/i.test(s)) return getNameById(s)
+        return s
+      }).join("、")
+    }
+    if (typeof val === "object") return resolveIdsInString(JSON.stringify(val, null, 2))
+    const s = String(val)
+    if (s.length >= 8 && /^[0-9a-f-]+$/i.test(s)) return getNameById(s)
+    return s
   }
 
   return (
@@ -191,7 +289,7 @@ export default function OperationLogsPage() {
       </div>
 
       {/* 日志列表 */}
-      {logs.length === 0 ? (
+      {!loading && totalItems === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">暂无操作记录</div>
       ) : (
         <>
@@ -218,7 +316,7 @@ export default function OperationLogsPage() {
                       <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 shrink-0">
                         {log.section}
                       </span>
-                      <span className="flex-1 text-[13px] text-[#2b2b2b] truncate">{log.content}</span>
+                      <span className="flex-1 text-[13px] text-[#2b2b2b]">{log.content}</span>
                       {log.operator && (
                         <span className="text-[11px] text-[#8f959e] shrink-0">{log.operator}</span>
                       )}
@@ -230,27 +328,14 @@ export default function OperationLogsPage() {
             ))}
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 pt-2">
-              <button
-                className="p-1.5 rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={() => setPage((p) => p - 1)}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-xs text-[#8f959e]">
-                {page} / {totalPages}
-              </span>
-              <button
-                className="p-1.5 rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={goToPage}
+          />
         </>
       )}
 
@@ -300,8 +385,9 @@ export default function OperationLogsPage() {
                 <span className="text-[#8f959e]">操作内容：</span>
                 <span className="text-[#2b2b2b]">{selectedLog.content}</span>
               </div>
-              {renderSnapshot(selectedLog.before_data, "修改前数据")}
-              {renderSnapshot(selectedLog.after_data, "修改后数据")}
+              {selectedLog.before_data || selectedLog.after_data
+                ? renderChanges(selectedLog.before_data || {}, selectedLog.after_data || {})
+                : null}
             </div>
           )}
         </DialogContent>

@@ -1,14 +1,18 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.models.course import CourseCreate
+from app.utils.pagination import paginate
 from app.services import course_service
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 
 
 @router.get("")
-async def list_courses():
-    return course_service.list_courses()
+async def list_courses(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+    items = course_service.list_courses()
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

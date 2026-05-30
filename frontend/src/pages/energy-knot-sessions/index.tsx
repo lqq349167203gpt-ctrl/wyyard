@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react"
-import { Plus, Trash2, Edit, Loader2, X, Calendar, Zap } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Plus, Trash2, Edit, Calendar, Zap } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -10,11 +10,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { energyKnotSessionApi, energyKnotApi, type EnergyKnotSession, type EnergyKnotCustomerSearchResult } from "@/lib/api"
+import { customerApi, energyKnotSessionApi, energyKnotApi, type Customer, type EnergyKnotSession } from "@/lib/api"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
-const today = new Date().toISOString().split("T")[0]
+const today = new Date().toLocaleDateString("sv-SE")
 
 export default function EnergyKnotSessionsPage() {
   const [sessions, setSessions] = useState<EnergyKnotSession[]>([])
@@ -32,18 +33,12 @@ export default function EnergyKnotSessionsPage() {
   const [formHostIds, setFormHostIds] = useState<string[]>([])
   const [formHostNames, setFormHostNames] = useState<string[]>([])
 
-  // 搜索状态
-  const [searchField, setSearchField] = useState<"owner" | "host" | null>(null)
-  const [searchKeyword, setSearchKeyword] = useState("")
-  const [searchResults, setSearchResults] = useState<EnergyKnotCustomerSearchResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const searchTimeoutRef = useRef<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  // 客户列表
+  const [customerList, setCustomerList] = useState<Customer[]>([])
 
   // 新增购买弹窗
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false)
-  const [pendingOwner, setPendingOwner] = useState<EnergyKnotCustomerSearchResult | null>(null)
+  const [pendingOwner, setPendingOwner] = useState<Customer | null>(null)
   const [purchaseCount, setPurchaseCount] = useState("")
   const [purchaseAmount, setPurchaseAmount] = useState("")
   const [purchaseSaving, setPurchaseSaving] = useState(false)
@@ -55,67 +50,13 @@ export default function EnergyKnotSessionsPage() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [])
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-        setSearchField(null)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  useEffect(() => { load(); customerApi.list().then(setCustomerList).catch(() => {}) }, [])
 
   const filteredSessions = filterDate
     ? sessions.filter(s => s.date === filterDate)
     : sessions
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredSessions)
-
-  const handleSearch = (keyword: string, field: "owner" | "host") => {
-    setSearchKeyword(keyword)
-    setSearchField(field)
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    if (!keyword.trim()) { setSearchResults([]); setShowDropdown(false); return }
-    searchTimeoutRef.current = window.setTimeout(async () => {
-      setSearching(true)
-      try {
-        const results = await energyKnotSessionApi.searchCustomers(keyword)
-        setSearchResults(results)
-        setShowDropdown(true)
-      } catch { setSearchResults([]) }
-      finally { setSearching(false) }
-    }, 300)
-  }
-
-  const handleSelectCustomer = (customer: EnergyKnotCustomerSearchResult) => {
-    if (searchField === "owner") {
-      if (customer.remaining <= 0) {
-        setPendingOwner(customer)
-        setPurchaseCount("")
-        setPurchaseAmount("")
-        setPurchaseDialogOpen(true)
-        setSearchKeyword("")
-        setSearchResults([])
-        setShowDropdown(false)
-        setSearchField(null)
-        return
-      }
-      setFormOwnerId(customer.id)
-      setFormOwnerName(customer.nickname)
-    } else if (searchField === "host") {
-      if (!formHostIds.includes(customer.id)) {
-        setFormHostIds([...formHostIds, customer.id])
-        setFormHostNames([...formHostNames, customer.nickname])
-      }
-    }
-    setSearchKeyword("")
-    setSearchResults([])
-    setShowDropdown(false)
-    setSearchField(null)
-  }
 
   const handleAddPurchase = async () => {
     if (!pendingOwner || !purchaseCount) return
@@ -146,8 +87,6 @@ export default function EnergyKnotSessionsPage() {
     setFormOwnerName("")
     setFormHostIds([])
     setFormHostNames([])
-    setSearchKeyword("")
-    setSearchField(null)
     setDialogOpen(true)
   }
 
@@ -158,8 +97,6 @@ export default function EnergyKnotSessionsPage() {
     setFormOwnerName(session.owner_name)
     setFormHostIds(session.host_ids || [])
     setFormHostNames(session.host_names || [])
-    setSearchKeyword("")
-    setSearchField(null)
     setDialogOpen(true)
   }
 
@@ -193,111 +130,6 @@ export default function EnergyKnotSessionsPage() {
     await energyKnotSessionApi.delete(deleteId)
     setDeleteId(null)
     load()
-  }
-
-  const renderOwnerSearch = () => {
-    const isActive = searchField === "owner"
-    const showClear = !isActive && !!formOwnerName
-    return (
-      <div className="grid grid-cols-[70px_1fr] items-start gap-2" ref={isActive ? dropdownRef : undefined}>
-        <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">案主</span>
-        <div className="relative">
-          <Input
-            value={isActive ? searchKeyword : formOwnerName}
-            onChange={(e) => handleSearch(e.target.value, "owner")}
-            placeholder="搜索案主..."
-            className="h-8 text-xs pr-16"
-            onFocus={() => {
-              if (!isActive) handleSearch("", "owner")
-              if (isActive && searchResults.length > 0) setShowDropdown(true)
-            }}
-          />
-          {showClear && (
-            <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              onMouseDown={(e) => { e.preventDefault(); setFormOwnerId(""); setFormOwnerName("") }}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {isActive && searching && (
-            <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          )}
-          {isActive && showDropdown && searchResults.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-              {searchResults.map((customer) => (
-                <div
-                  key={customer.id}
-                  className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                  onClick={() => handleSelectCustomer(customer)}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-medium">{customer.nickname}</span>
-                    {customer.name && customer.name !== customer.nickname && (
-                      <span className="text-[11px] text-muted-foreground">({customer.name})</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[11px] ${customer.remaining > 0 ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
-                      剩余 {customer.remaining} 次
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">{customer.member_type || "新人"}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {isActive && showDropdown && searchResults.length === 0 && searchKeyword && !searching && (
-            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-[12px] text-muted-foreground text-center">
-              未找到匹配用户
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  const renderHostSearch = () => {
-    const isActive = searchField === "host"
-    return (
-      <div className="grid grid-cols-[70px_1fr] items-start gap-2" ref={isActive ? dropdownRef : undefined}>
-        <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
-        <div className="relative">
-          <Input
-            value={isActive ? searchKeyword : ""}
-            onChange={(e) => handleSearch(e.target.value, "host")}
-            placeholder="搜索课程老师..."
-            className="h-8 text-xs"
-            onFocus={() => {
-              if (!isActive) handleSearch("", "host")
-              if (isActive && searchResults.length > 0) setShowDropdown(true)
-            }}
-          />
-          {isActive && searching && (
-            <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          )}
-          {isActive && showDropdown && searchResults.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-              {searchResults.map((customer) => (
-                <div
-                  key={customer.id}
-                  className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                  onClick={() => handleSelectCustomer(customer)}
-                >
-                  <span className="text-[12px] font-medium">{customer.nickname}</span>
-                  <span className="text-[11px] text-muted-foreground">{customer.member_type || "新人"}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {isActive && showDropdown && searchResults.length === 0 && searchKeyword && !searching && (
-            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-[12px] text-muted-foreground text-center">
-              未找到匹配用户
-            </div>
-          )}
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -384,31 +216,48 @@ export default function EnergyKnotSessionsPage() {
               <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
             </div>
 
-            {renderOwnerSearch()}
-            {renderHostSearch()}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">案主</span>
+              <CustomerSearchInput
+                customers={customerList}
+                value={formOwnerName || ""}
+                onChange={(v) => {
+                  const name = typeof v === "string" ? v : v[0] || ""
+                  if (!name) { setFormOwnerId(""); setFormOwnerName("") }
+                }}
+                onSelectItem={(c) => { setFormOwnerId(c.id); setFormOwnerName(c.nickname) }}
+                placeholder="搜索客户昵称"
+              />
+            </div>
 
-            {/* 已选课程老师 */}
-            {formHostIds.length > 0 && (
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-1.5">已选</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {formHostNames.map((name, i) => (
-                    <div key={formHostIds[i]} className="flex items-center gap-1.5 rounded border bg-muted/50 px-2.5 py-1 text-sm">
-                      <span className="font-medium text-xs">{name}</span>
-                      <button
-                        onClick={() => {
-                          setFormHostIds(formHostIds.filter((_, j) => j !== i))
-                          setFormHostNames(formHostNames.filter((_, j) => j !== i))
-                        }}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
+              <CustomerSearchInput
+                customers={customerList}
+                value={formHostNames}
+                onChange={(v) => {
+                  const names = Array.isArray(v) ? v : []
+                  // Remove hosts not in the new list
+                  const newIds: string[] = []
+                  const newNames: string[] = []
+                  names.forEach((name: string) => {
+                    const c = customerList.find(c => c.nickname === name)
+                    if (c) { newIds.push(c.id); newNames.push(c.nickname) }
+                  })
+                  setFormHostIds(newIds)
+                  setFormHostNames(newNames)
+                }}
+                onSelectItem={(c) => {
+                  if (!formHostIds.includes(c.id)) {
+                    setFormHostIds([...formHostIds, c.id])
+                    setFormHostNames([...formHostNames, c.nickname])
+                  }
+                }}
+                placeholder="搜索客户昵称"
+                multi
+                excludeIds={formOwnerId ? [formOwnerId] : []}
+              />
+            </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>

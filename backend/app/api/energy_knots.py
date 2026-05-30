@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from app.utils.pagination import paginate
 from app.services import energy_knot_service
 from app.models.energy_knot import EnergyKnotCreate
 
@@ -6,8 +7,14 @@ router = APIRouter(prefix="/api/energy-knots", tags=["energy-knots"])
 
 
 @router.get("")
-def list_knots():
-    return energy_knot_service.list_knots()
+def list_knots(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None)):
+    items = energy_knot_service.list_knots()
+    if customer_ids:
+        allowed = set(customer_ids.split(","))
+        items = [i for i in items if i.get("customer_id") in allowed]
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

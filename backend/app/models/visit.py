@@ -26,6 +26,8 @@ class VisitRecordBase(BaseModel):
     arrival_time: str = ""  # 实际到场时间 HH:MM
     activity_participation: list = []  # [{name, role, participated}]
     experience: str = ""  # 活动参与体验
+    feedback: str = ""  # 客户反馈
+    healing_notes: str = ""  # 疗愈记录
 
 
 class VisitRecordCreate(VisitRecordBase):

@@ -63,7 +63,7 @@ export default function ChangePasswordPage() {
   return (
     <div className="px-6 pt-12 pb-6">
       <div className="pb-6">
-        <h1 className="text-lg font-semibold">修改密码</h1>
+        <h1 className="text-lg font-semibold">密码修改</h1>
         <p className="text-xs text-muted-foreground mt-1.5">修改当前登录账号的密码</p>
       </div>
 

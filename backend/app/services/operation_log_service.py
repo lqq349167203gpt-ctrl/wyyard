@@ -54,13 +54,13 @@ def list_logs(
         )]
     if date_from:
         try:
-            dt = datetime.fromisoformat(date_from)
+            dt = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
             logs = [l for l in logs if l.created_at >= dt]
         except ValueError:
             pass
     if date_to:
         try:
-            dt = datetime.fromisoformat(date_to)
+            dt = datetime.fromisoformat(date_to).replace(tzinfo=timezone.utc)
             logs = [l for l in logs if l.created_at <= dt]
         except ValueError:
             pass

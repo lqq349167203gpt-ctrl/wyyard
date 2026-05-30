@@ -103,31 +103,54 @@ def _compare_count(actual: int, op: str, target: int) -> bool:
     return False
 
 
+def _get_payment_categories(condition: IdentityCondition) -> list:
+    """获取付费项目类别，兼容旧 card/course 类型"""
+    if condition.type == "card":
+        return ["会员活动"]
+    if condition.type == "course":
+        return ["内部课程"]
+    return condition.payment_categories or []
+
+
 def _check_condition(condition: IdentityCondition, customer_id: str,
                      arrival_count: int, activity_count: int,
-                     customer_cards, customer_courses, today_str: str) -> bool:
+                     customer_cards, customer_courses, customer_group_cases,
+                     customer_emotional_releases, customer_energy_knots, today_str: str) -> bool:
     t = condition.type
     if t == "arrival":
         return _compare_count(arrival_count, condition.count_op, condition.count_value)
     elif t == "activity":
         return _compare_count(activity_count, condition.count_op, condition.count_value)
-    elif t == "card":
+    elif t in ("card", "course", "payment"):
+        cats = _get_payment_categories(condition)
         item_set = set(condition.items) if condition.items else set()
-        for c in customer_cards:
-            if item_set and c.card_type not in item_set:
-                continue
-            if condition.validity == "active" and c.expiry_date and c.expiry_date < today_str:
-                continue
-            return True
-        return False
-    elif t == "course":
-        item_set = set(condition.items) if condition.items else set()
-        for c in customer_courses:
-            if item_set and c.course_type not in item_set:
-                continue
-            if condition.validity == "active" and c.expiry_date and c.expiry_date < today_str:
-                continue
-            return True
+        for cat in cats:
+            if cat == "会员活动":
+                for c in customer_cards:
+                    if item_set and c.card_type not in item_set:
+                        continue
+                    if condition.validity == "active" and c.expiry_date and c.expiry_date < today_str:
+                        continue
+                    return True
+            elif cat == "内部课程":
+                for c in customer_courses:
+                    if item_set and c.course_type not in item_set:
+                        continue
+                    if condition.validity == "active" and c.expiry_date and c.expiry_date < today_str:
+                        continue
+                    return True
+            elif cat == "觉醒游戏":
+                total = sum(c.purchase_count for c in customer_group_cases)
+                if _compare_count(total, condition.count_op, condition.count_value):
+                    return True
+            elif cat == "情绪释放":
+                total = sum(c.purchase_count for c in customer_emotional_releases)
+                if _compare_count(total, condition.count_op, condition.count_value):
+                    return True
+            elif cat == "能量结":
+                total = sum(c.purchase_count for c in customer_energy_knots)
+                if _compare_count(total, condition.count_op, condition.count_value):
+                    return True
         return False
     return False
 
@@ -143,11 +166,21 @@ def refresh_member_type(customer_id: str):
 
     # 预计算用户数据
     from app.services import membership_card_service, visit_service, internal_course_service
+    from app.services import group_case_service, emotional_release_service, energy_knot_service
     all_cards = membership_card_service.list_cards()
     customer_cards = [c for c in all_cards if c.customer_id == customer_id]
 
     all_courses = internal_course_service.list_courses()
     customer_courses = [c for c in all_courses if c.customer_id == customer_id]
+
+    all_group_cases = group_case_service.list_cases()
+    customer_group_cases = [c for c in all_group_cases if c.customer_id == customer_id]
+
+    all_emotional_releases = emotional_release_service.list_releases()
+    customer_emotional_releases = [c for c in all_emotional_releases if c.customer_id == customer_id]
+
+    all_energy_knots = energy_knot_service.list_knots()
+    customer_energy_knots = [c for c in all_energy_knots if c.customer_id == customer_id]
 
     all_visits = visit_service.list_visits()
     customer_visits = [v for v in all_visits if v.customer_id == customer_id]
@@ -161,7 +194,9 @@ def refresh_member_type(customer_id: str):
             member_type = identity.name
             break
         results = [_check_condition(cond, customer_id, arrival_count, activity_count,
-                                    customer_cards, customer_courses, today_str)
+                                    customer_cards, customer_courses,
+                                    customer_group_cases, customer_emotional_releases,
+                                    customer_energy_knots, today_str)
                    for cond in identity.conditions]
         if identity.operator == "any":
             matched = any(results)

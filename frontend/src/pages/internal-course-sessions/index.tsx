@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react"
-import { Plus, Trash2, Edit, Loader2, X, Calendar, GraduationCap, ChevronRight, ChevronDown, Users, FileUp, Download, File } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Plus, Trash2, Edit, X, Calendar, GraduationCap, ChevronRight, ChevronDown, Users, FileUp, Download, File } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -11,11 +11,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { internalCourseSessionApi, customerApi, uploadApi, type InternalCourseSession, type InternalCourseSessionCustomerSearchResult, type Customer } from "@/lib/api"
+import { internalCourseSessionApi, customerApi, uploadApi, type InternalCourseSession, type Customer } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 
-const today = new Date().toISOString().split("T")[0]
+const today = new Date().toLocaleDateString("sv-SE")
 
 const COURSE_TYPES = [
   "疗愈师课程",
@@ -47,22 +48,6 @@ export default function InternalCourseSessionsPage() {
   const [materialsRecord, setMaterialsRecord] = useState<InternalCourseSession | null>(null)
   const [uploading, setUploading] = useState(false)
 
-  // 弹窗搜索状态
-  const [searchKeyword, setSearchKeyword] = useState("")
-  const [searchResults, setSearchResults] = useState<InternalCourseSessionCustomerSearchResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const searchTimeoutRef = useRef<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  // 右侧面板参与者搜索
-  const [panelSearchKeyword, setPanelSearchKeyword] = useState("")
-  const [panelSearchResults, setPanelSearchResults] = useState<InternalCourseSessionCustomerSearchResult[]>([])
-  const [panelSearching, setPanelSearching] = useState(false)
-  const [panelShowDropdown, setPanelShowDropdown] = useState(false)
-  const panelSearchTimeoutRef = useRef<number | null>(null)
-  const panelDropdownRef = useRef<HTMLDivElement>(null)
-
   const load = () => {
     internalCourseSessionApi.list()
       .then((data) => {
@@ -79,75 +64,18 @@ export default function InternalCourseSessionsPage() {
 
   useEffect(() => { load() }, [])
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-      }
-      if (panelDropdownRef.current && !panelDropdownRef.current.contains(e.target as Node)) {
-        setPanelShowDropdown(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
   const filteredSessions = filterDate
     ? sessions.filter(s => s.date === filterDate)
     : sessions
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredSessions)
 
-  // 弹窗搜索课程老师
-  const handleSearch = (keyword: string) => {
-    setSearchKeyword(keyword)
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    if (!keyword.trim()) { setSearchResults([]); setShowDropdown(false); return }
-    searchTimeoutRef.current = window.setTimeout(async () => {
-      setSearching(true)
-      try {
-        const results = await internalCourseSessionApi.searchCustomers(keyword)
-        setSearchResults(results.filter(r => !formHostIds.includes(r.id)))
-        setShowDropdown(true)
-      } catch { setSearchResults([]) }
-      finally { setSearching(false) }
-    }, 300)
-  }
-
-  const handleSelectHost = (customer: InternalCourseSessionCustomerSearchResult) => {
-    if (!formHostIds.includes(customer.id)) {
-      setFormHostIds([...formHostIds, customer.id])
-      setFormHostNames([...formHostNames, customer.nickname])
-    }
-    setSearchKeyword("")
-    setSearchResults([])
-    setShowDropdown(false)
-  }
-
-  // 右侧面板参与者搜索
-  const handlePanelSearch = (keyword: string) => {
-    setPanelSearchKeyword(keyword)
-    if (panelSearchTimeoutRef.current) clearTimeout(panelSearchTimeoutRef.current)
-    if (!keyword.trim()) { setPanelSearchResults([]); setPanelShowDropdown(false); return }
-    panelSearchTimeoutRef.current = window.setTimeout(async () => {
-      setPanelSearching(true)
-      try {
-        const results = await internalCourseSessionApi.searchCustomers(keyword)
-        const currentIds = selectedSession?.participant_ids || []
-        setPanelSearchResults(results.filter(r => !currentIds.includes(r.id)))
-        setPanelShowDropdown(true)
-      } catch { setPanelSearchResults([]) }
-      finally { setPanelSearching(false) }
-    }, 300)
-  }
-
-  const handleAddParticipant = async (customer: InternalCourseSessionCustomerSearchResult) => {
+  const handleAddParticipant = async (customer: Customer) => {
     if (!selectedSession) return
     const newIds = [...selectedSession.participant_ids, customer.id]
     try {
       const updated = await internalCourseSessionApi.update(selectedSession.id, { participant_ids: newIds })
       setSelectedSession(updated)
-      setPanelSearchKeyword(""); setPanelSearchResults([]); setPanelShowDropdown(false)
       load()
     } catch (error) {
       console.error("添加参与者失败:", error)
@@ -209,7 +137,6 @@ export default function InternalCourseSessionsPage() {
     setFormDescription("")
     setFormHostIds([])
     setFormHostNames([])
-    setSearchKeyword("")
     setDialogOpen(true)
   }
 
@@ -221,7 +148,6 @@ export default function InternalCourseSessionsPage() {
     setFormDescription(session.course_description || "")
     setFormHostIds(session.host_ids || [])
     setFormHostNames(session.host_names || [])
-    setSearchKeyword("")
     setDialogOpen(true)
   }
 
@@ -397,40 +323,14 @@ export default function InternalCourseSessionsPage() {
                     {selectedSession.participant_ids.length} 人
                   </Badge>
                 </div>
-                <div className="relative" ref={panelDropdownRef}>
-                  <Input
-                    value={panelSearchKeyword}
-                    onChange={(e) => handlePanelSearch(e.target.value)}
-                    placeholder="搜索用户添加..."
-                    className="h-8 text-xs"
-                    onFocus={() => panelSearchResults.length > 0 && setPanelShowDropdown(true)}
-                  />
-                  {panelSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-                  {panelShowDropdown && panelSearchResults.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-48 overflow-y-auto">
-                      {panelSearchResults.map((customer) => (
-                        <div
-                          key={customer.id}
-                          className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                          onClick={() => handleAddParticipant(customer)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{customer.nickname}</span>
-                            {customer.name && customer.name !== customer.nickname && (
-                              <span className="text-xs text-muted-foreground">({customer.name})</span>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">{customer.member_type || "新人"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {panelShowDropdown && panelSearchResults.length === 0 && panelSearchKeyword && !panelSearching && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-sm text-muted-foreground text-center">
-                      未找到匹配用户
-                    </div>
-                  )}
-                </div>
+                <CustomerSearchInput
+                  customers={allCustomers}
+                  value=""
+                  onChange={() => {}}
+                  onSelectItem={(c) => handleAddParticipant(c)}
+                  placeholder="搜索用户添加..."
+                  excludeIds={selectedSession.participant_ids}
+                />
               </div>
 
               {/* 已选参与者列表 */}
@@ -508,53 +408,31 @@ export default function InternalCourseSessionsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2" ref={dropdownRef}>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
-              <div className="relative">
-                <Input
-                  value={searchKeyword}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  placeholder={formHostNames.length > 0 ? formHostNames.join("、") : "搜索课程老师..."}
-                  className="h-8 text-xs pr-16"
-                  onFocus={() => {
-                    setSearchKeyword("")
-                    if (searchResults.length > 0) setShowDropdown(true)
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => {
-                      if (!searchKeyword) setSearchKeyword("")
-                    }, 200)
-                  }}
-                />
-                {formHostIds.length > 0 && (
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onMouseDown={(e) => { e.preventDefault(); setFormHostIds([]); setFormHostNames([]) }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                {searching && <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                {showDropdown && searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-48 overflow-y-auto">
-                    {searchResults.map((customer) => (
-                      <div
-                        key={customer.id}
-                        className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                        onClick={() => handleSelectHost(customer)}
-                      >
-                        <span className="text-sm font-medium">{customer.nickname}</span>
-                        <span className="text-xs text-muted-foreground">{customer.member_type || "新人"}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {showDropdown && searchResults.length === 0 && searchKeyword && !searching && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-sm text-muted-foreground text-center">
-                    未找到匹配用户
-                  </div>
-                )}
-              </div>
+              <CustomerSearchInput
+                customers={allCustomers}
+                value={formHostNames}
+                onChange={(v) => {
+                  const names = Array.isArray(v) ? v : []
+                  const newIds: string[] = []
+                  const newNames: string[] = []
+                  names.forEach((name: string) => {
+                    const c = allCustomers.find(c => c.nickname === name)
+                    if (c) { newIds.push(c.id); newNames.push(c.nickname) }
+                  })
+                  setFormHostIds(newIds)
+                  setFormHostNames(newNames)
+                }}
+                onSelectItem={(c) => {
+                  if (!formHostIds.includes(c.id)) {
+                    setFormHostIds([...formHostIds, c.id])
+                    setFormHostNames([...formHostNames, c.nickname])
+                  }
+                }}
+                placeholder="搜索客户昵称"
+                multi
+              />
             </div>
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">

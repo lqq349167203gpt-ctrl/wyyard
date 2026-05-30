@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react"
+import { useState, useCallback, useRef } from "react"
+import { Search, X } from "lucide-react"
 import { systemLogApi } from "@/lib/api"
 import type { SystemLog } from "@/lib/api"
 import {
@@ -8,6 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useServerPagination } from "@/hooks/use-server-pagination"
+import { PaginationBar } from "@/components/pagination-bar"
 
 const PAGE_SIZE = 20
 
@@ -28,35 +30,31 @@ const METHOD_COLORS: Record<string, string> = {
 }
 
 export default function SystemLogsPage() {
-  const [logs, setLogs] = useState<SystemLog[]>([])
-  const [page, setPage] = useState(1)
   const [operatorFilter, setOperatorFilter] = useState("")
   const [methodFilter, setMethodFilter] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [selectedLog, setSelectedLog] = useState<SystemLog | null>(null)
+  const filtersRef = useRef({ operatorFilter, methodFilter, dateFrom, dateTo })
 
-  useEffect(() => {
-    loadLogs()
+  const fetchLogs = useCallback(async (page: number, pageSize: number) => {
+    const f = filtersRef.current
+    return systemLogApi.listPaginated({
+      operator: f.operatorFilter || undefined,
+      method: f.methodFilter || undefined,
+      date_from: f.dateFrom || undefined,
+      date_to: f.dateTo || undefined,
+    }, page, pageSize)
   }, [])
 
-  const loadLogs = async () => {
-    try {
-      const data = await systemLogApi.list({
-        operator: operatorFilter || undefined,
-        method: methodFilter || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-      })
-      setLogs(data)
-      setPage(1)
-    } catch (error) {
-      console.error("加载系统日志失败:", error)
-    }
-  }
+  const {
+    paginatedItems: pagedLogs, currentPage, totalPages, totalItems,
+    goToPage, startIndex, endIndex, loading,
+  } = useServerPagination<SystemLog>(fetchLogs, { pageSize: PAGE_SIZE })
 
   const handleSearch = () => {
-    loadLogs()
+    filtersRef.current = { operatorFilter, methodFilter, dateFrom, dateTo }
+    goToPage(1)
   }
 
   const handleClear = () => {
@@ -64,7 +62,8 @@ export default function SystemLogsPage() {
     setMethodFilter("")
     setDateFrom("")
     setDateTo("")
-    setTimeout(() => loadLogs(), 0)
+    filtersRef.current = { operatorFilter: "", methodFilter: "", dateFrom: "", dateTo: "" }
+    goToPage(1)
   }
 
   const formatDate = (dateStr: string) => {
@@ -103,8 +102,6 @@ export default function SystemLogsPage() {
     return groups
   }
 
-  const totalPages = Math.ceil(logs.length / PAGE_SIZE)
-  const pagedLogs = logs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const dayGroups = groupByDay(pagedLogs)
 
   const renderSnapshot = (data: Record<string, unknown> | null, label: string) => {
@@ -186,7 +183,7 @@ export default function SystemLogsPage() {
       </div>
 
       {/* 日志列表 */}
-      {logs.length === 0 ? (
+      {!loading && totalItems === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">暂无系统日志</div>
       ) : (
         <>
@@ -225,27 +222,14 @@ export default function SystemLogsPage() {
             ))}
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 pt-2">
-              <button
-                className="p-1.5 rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={() => setPage((p) => p - 1)}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-xs text-[#8f959e]">
-                {page} / {totalPages}
-              </span>
-              <button
-                className="p-1.5 rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={goToPage}
+          />
         </>
       )}
 

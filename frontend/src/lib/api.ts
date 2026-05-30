@@ -1,5 +1,13 @@
 const API_BASE = "http://127.0.0.1:8000"
 
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -76,64 +84,6 @@ export const agentApi = {
   chat: (id: string, data: ChatRequest) => request<AgentMessage>(`/api/agents/${id}/chat`, { method: "POST", body: JSON.stringify(data) }),
 }
 
-// Business
-export interface FeishuTable {
-  id: string
-  name: string
-  app_token: string
-  table_id: string
-  record_count: number
-  sync_status: "synced" | "pending" | "failed"
-  last_synced_at: string | null
-}
-
-export interface FeishuTableCreate {
-  name: string
-  app_token: string
-  table_id: string
-}
-
-export const businessApi = {
-  listTables: () => request<FeishuTable[]>("/api/business/tables"),
-  linkTable: (data: FeishuTableCreate) => request<FeishuTable>("/api/business/tables", { method: "POST", body: JSON.stringify(data) }),
-  getRecords: (tableId: string, appToken: string) => request<{ records: Record<string, unknown>[]; total: number }>(`/api/business/tables/${tableId}/records?app_token=${appToken}`),
-  syncTable: (tableId: string, appToken: string) => request<{ message: string }>(`/api/business/tables/${tableId}/sync?app_token=${appToken}`, { method: "POST" }),
-  unlinkTable: (tableId: string, appToken: string) => request<{ message: string }>(`/api/business/tables/${tableId}?app_token=${appToken}`, { method: "DELETE" }),
-}
-
-// Knowledge
-export interface KnowledgeDocument {
-  id: string
-  name: string
-  type: string
-  size: string
-  status: "indexed" | "indexing" | "failed"
-  chunk_count: number
-  created_at: string
-}
-
-export interface SearchResult {
-  content: string
-  metadata: { doc_id: string; filename: string; chunk: number }
-  score: number
-}
-
-export const knowledgeApi = {
-  listDocuments: () => request<KnowledgeDocument[]>("/api/knowledge/documents"),
-  uploadDocument: (file: File) => {
-    const formData = new FormData()
-    formData.append("file", file)
-    return fetch(`${API_BASE}/api/knowledge/documents/upload`, {
-      method: "POST",
-      body: formData,
-    }).then(async (res) => {
-      if (!res.ok) throw new Error("上传失败")
-      return res.json() as Promise<KnowledgeDocument>
-    })
-  },
-  deleteDocument: (id: string) => request<{ message: string }>(`/api/knowledge/documents/${id}`, { method: "DELETE" }),
-  search: (query: string, topK?: number) => request<SearchResult[]>(`/api/knowledge/search?query=${encodeURIComponent(query)}&top_k=${topK || 5}`),
-}
 
 // Customer
 export interface PaidContentItem {
@@ -151,6 +101,7 @@ export interface Customer {
   wechat: string
   age: string
   referrer: string
+  referrer_handler: string
   member_type: string
   paid_content: PaidContentItem[]
   visit_count: number
@@ -164,6 +115,7 @@ export interface Customer {
   assessment: string
   tags: string
   traffic_source: string
+  traffic_source_detail: string
   tracking_plan: string
   created_at: string
   updated_at: string
@@ -171,12 +123,45 @@ export interface Customer {
 
 export type CustomerCreate = Omit<Customer, "id" | "created_at" | "updated_at">
 
+export interface CustomerLight {
+  id: string
+  nickname: string
+  name: string
+  member_type: string
+  positions: string[]
+  created_at: string
+  traffic_source: string
+  traffic_source_detail: string
+}
+
+let _customerLightCache: CustomerLight[] | null = null
+
 export const customerApi = {
   list: () => request<Customer[]>("/api/customers"),
-  get: (id: string) => request<Customer>(`/api/customers/${id}`),
-  create: (data: Partial<CustomerCreate>) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<CustomerCreate>) => request<Customer>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => request<{ message: string }>(`/api/customers/${id}`, { method: "DELETE" }),
+  light: () => {
+    if (_customerLightCache) return Promise.resolve(_customerLightCache)
+    return request<CustomerLight[]>("/api/customers/light").then(data => {
+      _customerLightCache = data
+      return data
+    })
+  },
+  batch: (ids: string[]) => request<CustomerLight[]>("/api/customers/batch", { method: "POST", body: JSON.stringify({ ids }) }),
+  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; member_types?: string }) => {
+    const params = new URLSearchParams()
+    params.set("page", String(page))
+    params.set("page_size", String(pageSize))
+    if (filters?.nickname) params.set("nickname", filters.nickname)
+    if (filters?.member_type) params.set("member_type", filters.member_type)
+    if (filters?.referrer) params.set("referrer", filters.referrer)
+    if (filters?.referrer_handler) params.set("referrer_handler", filters.referrer_handler)
+    if (filters?.member_types) params.set("member_types", filters.member_types)
+    return request<PaginatedResponse<Customer>>(`/api/customers?${params.toString()}`)
+  },
+  clearLightCache: () => { _customerLightCache = null },
+	  get: (id: string) => request<Customer>(`/api/customers/${id}`),
+  create: (data: Partial<CustomerCreate>) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
+  update: (id: string, data: Partial<CustomerCreate>) => request<Customer>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
+  delete: (id: string) => request<{ message: string }>(`/api/customers/${id}`, { method: "DELETE" }).then(r => { _customerLightCache = null; return r }),
   parseChat: (chatLog: string) => request<CustomerCreate>("/api/customers/parse-chat", { method: "POST", body: JSON.stringify({ chat_log: chatLog }) }),
   parseExcel: (file: File) => {
     const formData = new FormData()
@@ -281,10 +266,12 @@ export interface VisitRecord {
   visit_count: number
   activity_count: number
   welfare_count: number
-  remaining_count: number  // 0=无卡, -1=不限次, >0=剩余次数
+  remaining_count: number | null  // 0=无卡, -1=不限次, >0=剩余次数, null=无卡/未计算
   activities: ActivityInfo[]
   activity_participation: { name: string; role: string; participated: boolean }[]
   experience: string
+  feedback: string
+  healing_notes: string
   created_at: string
   updated_at: string
 }
@@ -320,11 +307,28 @@ export const visitApi = {
     const qs = params.toString()
     return request<VisitRecord[]>(`/api/visits${qs ? `?${qs}` : ""}`)
   },
+  listPaginated: (date?: string, customerId?: string, page = 1, pageSize = 10) => {
+    const params = new URLSearchParams()
+    if (date) params.set("date", date)
+    if (customerId) params.set("customer_id", customerId)
+    params.set("page", String(page))
+    params.set("page_size", String(pageSize))
+    return request<PaginatedResponse<VisitRecord>>(`/api/visits?${params.toString()}`)
+  },
   get: (id: string) => request<VisitRecord>(`/api/visits/${id}`),
   create: (data: VisitRecordCreate) => request<VisitRecord>("/api/visits", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<VisitRecordCreate> & { activity_participation?: { name: string; role: string; participated: boolean }[]; experience?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<VisitRecordCreate> & { activity_participation?: { name: string; role: string; participated: boolean }[]; experience?: string; feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/visits/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/visits/search-customers?q=${encodeURIComponent(keyword)}`),
+  counts: (params?: { customerIds?: string; startDate?: string; endDate?: string; memberTypes?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.customerIds !== undefined) qs.set("customer_ids", params.customerIds)
+    if (params?.startDate) qs.set("start_date", params.startDate)
+    if (params?.endDate) qs.set("end_date", params.endDate)
+    if (params?.memberTypes !== undefined) qs.set("member_types", params.memberTypes)
+    const str = qs.toString()
+    return request<Record<string, number>>(`/api/visits/counts${str ? `?${str}` : ""}`)
+  },
 }
 
 // Course
@@ -347,6 +351,7 @@ export interface CourseCreate {
 
 export const courseApi = {
   list: () => request<Course[]>("/api/courses"),
+  listPaginated: (page: number, pageSize: number) => request<PaginatedResponse<Course>>(`/api/courses?page=${page}&page_size=${pageSize}`),
   create: (data: CourseCreate) => request<Course>("/api/courses", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<CourseCreate>) => request<Course>(`/api/courses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/courses/${id}`, { method: "DELETE" }),
@@ -391,6 +396,8 @@ export interface ClassRecord {
   materials: Material[]
   groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]
   is_public_welfare: boolean
+  space_id: string
+  room_id: string
   created_at: string
   updated_at: string
 }
@@ -404,16 +411,48 @@ export interface ClassRecordCreate {
   course_description?: string
   teacher_ids?: string[]
   is_public_welfare?: boolean
+  space_id?: string
+  room_id?: string
 }
 
 export const classRecordApi = {
   list: (date?: string) => request<ClassRecord[]>(`/api/class-records${date ? `?date=${date}` : ""}`),
+  listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<ClassRecord>>(`/api/class-records?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
+  listUnified: (page: number, pageSize: number, params?: { type?: string; name?: string; start_date?: string; end_date?: string; space_id?: string }) => {
+    const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params?.type) qs.set("type", params.type)
+    if (params?.name) qs.set("name", params.name)
+    if (params?.start_date) qs.set("start_date", params.start_date)
+    if (params?.end_date) qs.set("end_date", params.end_date)
+    if (params?.space_id) qs.set("space_id", params.space_id)
+    return request<PaginatedResponse<UnifiedRecord>>(`/api/class-records/unified?${qs.toString()}`)
+  },
   create: (data: ClassRecordCreate) => request<ClassRecord>("/api/class-records", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<ClassRecordCreate>) => request<ClassRecord>(`/api/class-records/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/class-records/${id}`, { method: "DELETE" }),
   updateParticipants: (id: string, participantIds: string[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/participants`, { method: "PATCH", body: JSON.stringify({ participant_ids: participantIds }) }),
   updateGroups: (id: string, groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/groups`, { method: "PATCH", body: JSON.stringify({ groups }) }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/class-records/search-customers?q=${encodeURIComponent(keyword)}`),
+  calendarCounts: () => request<Record<string, number>>("/api/class-records/calendar-counts"),
+  dashboard: (date: string) => request<DashboardData>(`/api/class-records/dashboard?date=${date}`),
+}
+
+export interface DashboardData {
+  class_records: ClassRecord[]
+  gcs_sessions: GroupCaseSession[]
+  ers_sessions: EmotionalReleaseSession[]
+  eks_sessions: EnergyKnotSession[]
+  ics_sessions: InternalCourseSession[]
+  visits: VisitRecord[]
+  visit_counts: Record<string, number>
+  calendar_counts: Record<string, number>
+  groupings: { date: string; groups: any[] }
+}
+
+export interface UnifiedRecord {
+  type: "class" | "gcs" | "ers" | "eks" | "ics"
+  data: any
+  date: string
 }
 
 // Group Cases
@@ -440,6 +479,7 @@ export interface GroupCaseCreate {
 
 export const groupCaseApi = {
   list: () => request<GroupCase[]>("/api/group-cases"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<GroupCase>>(`/api/group-cases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
   create: (data: GroupCaseCreate) => request<GroupCase>("/api/group-cases", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<GroupCaseCreate>) => request<GroupCase>(`/api/group-cases/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/group-cases/${id}`, { method: "DELETE" }),
@@ -461,6 +501,8 @@ export interface GroupCaseSession {
   host_id: string
   host_name: string
   materials: Material[]
+  space_id: string
+  room_id: string
   created_at: string
   updated_at: string
 }
@@ -477,6 +519,8 @@ export interface GroupCaseSessionCreate {
   achiever_name?: string
   host_id?: string
   host_name?: string
+  space_id?: string
+  room_id?: string
 }
 
 export interface GroupCaseCustomerSearchResult {
@@ -489,6 +533,7 @@ export interface GroupCaseCustomerSearchResult {
 
 export const groupCaseSessionApi = {
   list: (date?: string) => request<GroupCaseSession[]>(`/api/group-case-sessions${date ? `?date=${date}` : ""}`),
+  listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<GroupCaseSession>>(`/api/group-case-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
   create: (data: GroupCaseSessionCreate) => request<GroupCaseSession>("/api/group-case-sessions", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<GroupCaseSessionCreate>) => request<GroupCaseSession & { warnings?: string[] }>(`/api/group-case-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/group-case-sessions/${id}`, { method: "DELETE" }),
@@ -519,6 +564,7 @@ export interface EnergyKnotCreate {
 
 export const energyKnotApi = {
   list: () => request<EnergyKnot[]>("/api/energy-knots"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<EnergyKnot>>(`/api/energy-knots?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
   create: (data: EnergyKnotCreate) => request<EnergyKnot>("/api/energy-knots", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EnergyKnotCreate>) => request<EnergyKnot>(`/api/energy-knots/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/energy-knots/${id}`, { method: "DELETE" }),
@@ -549,6 +595,7 @@ export interface EmotionalReleaseCreate {
 
 export const emotionalReleaseApi = {
   list: () => request<EmotionalRelease[]>("/api/emotional-releases"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<EmotionalRelease>>(`/api/emotional-releases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
   create: (data: EmotionalReleaseCreate) => request<EmotionalRelease>("/api/emotional-releases", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EmotionalReleaseCreate>) => request<EmotionalRelease>(`/api/emotional-releases/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/emotional-releases/${id}`, { method: "DELETE" }),
@@ -570,6 +617,8 @@ export interface EmotionalReleaseSession {
   host_id: string
   host_name: string
   materials: Material[]
+  space_id: string
+  room_id: string
   created_at: string
   updated_at: string
 }
@@ -586,6 +635,8 @@ export interface EmotionalReleaseSessionCreate {
   achiever_name?: string
   host_id?: string
   host_name?: string
+  space_id?: string
+  room_id?: string
 }
 
 export interface EmotionalReleaseCustomerSearchResult {
@@ -598,6 +649,7 @@ export interface EmotionalReleaseCustomerSearchResult {
 
 export const emotionalReleaseSessionApi = {
   list: (date?: string) => request<EmotionalReleaseSession[]>(`/api/emotional-release-sessions${date ? `?date=${date}` : ""}`),
+  listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<EmotionalReleaseSession>>(`/api/emotional-release-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
   create: (data: EmotionalReleaseSessionCreate) => request<EmotionalReleaseSession>("/api/emotional-release-sessions", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EmotionalReleaseSessionCreate>) => request<EmotionalReleaseSession & { warnings?: string[] }>(`/api/emotional-release-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/emotional-release-sessions/${id}`, { method: "DELETE" }),
@@ -612,10 +664,12 @@ export interface EnergyKnotSession {
   end_time: string | null
   owner_id: string
   owner_name: string
-  description: string
+  description: string | null
   participant_ids: string[]
   host_ids: string[]
   host_names: string[]
+  space_id: string
+  room_id: string
   created_at: string
   updated_at: string
 }
@@ -630,6 +684,8 @@ export interface EnergyKnotSessionCreate {
   participant_ids?: string[]
   host_ids?: string[]
   host_names?: string[]
+  space_id?: string
+  room_id?: string
 }
 
 export interface EnergyKnotCustomerSearchResult {
@@ -642,6 +698,7 @@ export interface EnergyKnotCustomerSearchResult {
 
 export const energyKnotSessionApi = {
   list: (date?: string) => request<EnergyKnotSession[]>(`/api/energy-knot-sessions${date ? `?date=${date}` : ""}`),
+  listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<EnergyKnotSession>>(`/api/energy-knot-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
   create: (data: EnergyKnotSessionCreate) => request<EnergyKnotSession>("/api/energy-knot-sessions", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EnergyKnotSessionCreate>) => request<EnergyKnotSession>(`/api/energy-knot-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/energy-knot-sessions/${id}`, { method: "DELETE" }),
@@ -661,6 +718,8 @@ export interface InternalCourseSession {
   host_names: string[]
   participant_ids: string[]
   materials: Material[]
+  space_id: string
+  room_id: string
   created_at: string
   updated_at: string
 }
@@ -675,6 +734,8 @@ export interface InternalCourseSessionCreate {
   host_ids?: string[]
   host_names?: string[]
   participant_ids?: string[]
+  space_id?: string
+  room_id?: string
 }
 
 export interface InternalCourseSessionCustomerSearchResult {
@@ -686,6 +747,7 @@ export interface InternalCourseSessionCustomerSearchResult {
 
 export const internalCourseSessionApi = {
   list: (date?: string) => request<InternalCourseSession[]>(`/api/internal-course-sessions${date ? `?date=${date}` : ""}`),
+  listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<InternalCourseSession>>(`/api/internal-course-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
   create: (data: InternalCourseSessionCreate) => request<InternalCourseSession>("/api/internal-course-sessions", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<InternalCourseSessionCreate>) => request<InternalCourseSession>(`/api/internal-course-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/internal-course-sessions/${id}`, { method: "DELETE" }),
@@ -720,6 +782,7 @@ export interface InternalCourseCreate {
 
 export const internalCourseApi = {
   list: () => request<InternalCourse[]>("/api/internal-courses"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<InternalCourse>>(`/api/internal-courses?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
   create: (data: InternalCourseCreate) => request<InternalCourse>("/api/internal-courses", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<InternalCourseCreate>) => request<InternalCourse>(`/api/internal-courses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/internal-courses/${id}`, { method: "DELETE" }),
@@ -760,6 +823,7 @@ export interface MembershipCardCreate {
 
 export const membershipCardApi = {
   list: () => request<MembershipCard[]>("/api/membership-cards"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
   create: (data: MembershipCardCreate) => request<MembershipCard>("/api/membership-cards", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<MembershipCardCreate>) => request<MembershipCard>(`/api/membership-cards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/membership-cards/${id}`, { method: "DELETE" }),
@@ -792,6 +856,7 @@ export interface RoomCreate {
 
 export const spaceApi = {
   list: () => request<Space[]>("/api/spaces"),
+  listPaginated: (page: number, pageSize: number) => request<PaginatedResponse<Space>>(`/api/spaces?page=${page}&page_size=${pageSize}`),
   create: (data: SpaceCreate) => request<Space>("/api/spaces", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<SpaceCreate>) => request<Space>(`/api/spaces/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/spaces/${id}`, { method: "DELETE" }),
@@ -799,9 +864,40 @@ export const spaceApi = {
   deleteRoom: (spaceId: string, roomId: string) => request<{ message: string }>(`/api/spaces/${spaceId}/rooms/${roomId}`, { method: "DELETE" }),
 }
 
+// Reminder
+export interface ReminderCondition {
+  type: "acquaintance_date" | "visit_count" | "activity"
+  mode: "fixed_cycle" | "relative" | "participation_count" | "remaining_count"
+  operator: "gt" | "eq" | "lt" | ""
+  value: number
+  activity_type: "" | "membership" | "emotional_release" | "group_case" | "energy_knot" | "internal_course"
+}
+
+export interface Reminder {
+  id: string
+  name: string
+  account_role: string
+  account_id: string
+  condition_logic: "all" | "any"
+  conditions: ReminderCondition[]
+  trigger_mode: string
+  created_at: string
+  updated_at: string
+}
+
+export type ReminderCreate = Omit<Reminder, "id" | "created_at" | "updated_at">
+
+export const reminderApi = {
+  list: () => request<Reminder[]>("/api/reminders"),
+  create: (data: ReminderCreate) => request<Reminder>("/api/reminders", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<ReminderCreate>) => request<Reminder>(`/api/reminders/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/reminders/${id}`, { method: "DELETE" }),
+}
+
 // Member Identity
 export interface IdentityCondition {
-  type: "arrival" | "activity" | "card" | "course"
+  type: "arrival" | "activity" | "card" | "course" | "payment"
+  payment_categories: string[]
   items: string[]
   count_op: ">" | "=" | "<"
   count_value: number
@@ -870,6 +966,7 @@ export interface HealingRecordUpdate {
 
 export const healingRecordApi = {
   list: (customerId?: string) => request<HealingRecord[]>(`/api/healing-records${customerId ? `?customer_id=${customerId}` : ""}`),
+  listPaginated: (customerId?: string, page = 1, pageSize = 10) => request<PaginatedResponse<HealingRecord>>(`/api/healing-records?${customerId ? `customer_id=${customerId}&` : ""}page=${page}&page_size=${pageSize}`),
   get: (id: string) => request<HealingRecord>(`/api/healing-records/${id}`),
   create: (data: HealingRecordCreate) => request<HealingRecord>("/api/healing-records", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: HealingRecordUpdate) => request<HealingRecord>(`/api/healing-records/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -956,6 +1053,18 @@ export const systemLogApi = {
     const query = qs.toString()
     return request<SystemLog[]>(`/api/system-logs${query ? `?${query}` : ""}`)
   },
+  listPaginated: (params?: OperationLogQuery, page = 1, pageSize = 10) => {
+    const qs = new URLSearchParams()
+    if (params?.operator) qs.set("operator", params.operator)
+    if (params?.method) qs.set("method", params.method)
+    if (params?.date_from) qs.set("date_from", params.date_from)
+    if (params?.date_to) qs.set("date_to", params.date_to)
+    if (params?.entity_id) qs.set("entity_id", params.entity_id)
+    if (params?.keyword) qs.set("keyword", params.keyword)
+    qs.set("page", String(page))
+    qs.set("page_size", String(pageSize))
+    return request<PaginatedResponse<SystemLog>>(`/api/system-logs?${qs.toString()}`)
+  },
   create: (data: SystemLogCreate) => request<SystemLog>("/api/system-logs", { method: "POST", body: JSON.stringify(data) }),
 }
 
@@ -985,6 +1094,18 @@ export const operationLogApi = {
     if (params?.keyword) qs.set("keyword", params.keyword)
     const query = qs.toString()
     return request<OperationLog[]>(`/api/operation-logs${query ? `?${query}` : ""}`)
+  },
+  listPaginated: (params?: OperationLogQuery, page = 1, pageSize = 10) => {
+    const qs = new URLSearchParams()
+    if (params?.operator) qs.set("operator", params.operator)
+    if (params?.method) qs.set("method", params.method)
+    if (params?.date_from) qs.set("date_from", params.date_from)
+    if (params?.date_to) qs.set("date_to", params.date_to)
+    if (params?.entity_id) qs.set("entity_id", params.entity_id)
+    if (params?.keyword) qs.set("keyword", params.keyword)
+    qs.set("page", String(page))
+    qs.set("page_size", String(pageSize))
+    return request<PaginatedResponse<OperationLog>>(`/api/operation-logs?${qs.toString()}`)
   },
 }
 
@@ -1025,7 +1146,7 @@ export const accountApi = {
   create: (data: AccountCreate) => request<Account>("/api/accounts", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<AccountCreate>) => request<Account>(`/api/accounts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/accounts/${id}`, { method: "DELETE" }),
-  login: (username: string, password: string) => request<{ success: boolean; message?: string; account?: Account; permissions?: string[] }>("/api/accounts/login", { method: "POST", body: JSON.stringify({ username, password }) }),
+  login: (username: string, password: string) => request<{ success: boolean; message?: string; account?: Account; permissions?: string[]; customer_permissions?: string[]; customer_permissions_class_records?: string[]; customer_permissions_payment?: string[] }>("/api/accounts/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   changePassword: (id: string, oldPassword: string, newPassword: string) => request<{ message: string }>(`/api/accounts/${id}/change-password`, { method: "POST", body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }) }),
   listRoles: () => request<Role[]>("/api/accounts/roles"),
   createRole: (data: RoleCreate) => request<Role>("/api/accounts/roles", { method: "POST", body: JSON.stringify(data) }),
@@ -1040,7 +1161,27 @@ export const positionPermissionApi = {
   set: (position: string, pages: string[]) => request<{ message: string }>("/api/position-permissions", { method: "PUT", body: JSON.stringify({ position, pages }) }),
 }
 
-// Positions (角色管理)
+// Position Customer Permissions (section: customers | class_records | payment)
+export const positionCustomerPermissionApi = {
+  getAll: (section: string) => request<Record<string, string[]>>(`/api/position-customer-permissions/${section}`),
+  get: (section: string, position: string) => request<{ position: string; member_types: string[] }>(`/api/position-customer-permissions/${section}/${position}`),
+  set: (section: string, position: string, memberTypes: string[]) => request<{ message: string }>(`/api/position-customer-permissions/${section}`, { method: "PUT", body: JSON.stringify({ position, member_types: memberTypes }) }),
+  setBatch: (position: string, data: { customers: string[]; class_records: string[]; payment: string[] }) => request<{ message: string }>(`/api/position-customer-permissions/batch`, { method: "PUT", body: JSON.stringify({ position, ...data }) }),
+}
+
+// Activity Permissions (活动配置)
+export type ActivityPermissions = Record<string, Record<string, { view: boolean; participate: boolean }>>
+
+export const activityPermissionApi = {
+  getAll: () => request<ActivityPermissions>("/api/activity-permissions"),
+  saveAll: (permissions: ActivityPermissions) =>
+    request<{ message: string }>("/api/activity-permissions", {
+      method: "PUT",
+      body: JSON.stringify({ permissions }),
+    }),
+}
+
+// Positions (角色权限)
 export interface Position {
   id: string
   name: string
@@ -1080,4 +1221,34 @@ export interface DailyGrouping {
 export const dailyGroupingApi = {
   get: (date: string) => request<DailyGrouping>(`/api/daily-groupings?date=${date}`),
   upsert: (data: DailyGrouping) => request<DailyGrouping>("/api/daily-groupings", { method: "PUT", body: JSON.stringify(data) }),
+}
+
+export interface BusinessReminderItem {
+  id: string
+  customer_id: string
+  nickname: string
+  reminder_id: string
+  reminder_name: string
+  message: string
+  handled: boolean
+  description: string
+}
+
+export const businessReminderApi = {
+  list: (user_id: string, user_role: string) =>
+    request<BusinessReminderItem[]>(`/api/business-reminders?user_id=${encodeURIComponent(user_id)}&user_role=${encodeURIComponent(user_role)}`),
+  listPaginated: (user_id: string, user_role: string, handled?: boolean, page = 1, pageSize = 10) => {
+    const params = new URLSearchParams()
+    params.set("user_id", user_id)
+    params.set("user_role", user_role)
+    if (handled !== undefined) params.set("handled", String(handled))
+    params.set("page", String(page))
+    params.set("page_size", String(pageSize))
+    return request<PaginatedResponse<BusinessReminderItem>>(`/api/business-reminders?${params.toString()}`)
+  },
+  toggle: (id: string, description: string = "") =>
+    request<{ handled: boolean }>(`/api/business-reminders/${encodeURIComponent(id)}/toggle`, {
+      method: "PATCH",
+      body: JSON.stringify({ description }),
+    }),
 }

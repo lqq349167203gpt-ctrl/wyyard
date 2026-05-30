@@ -5,8 +5,7 @@ from app.config.settings import settings
 from app.middleware.operation_logging import OperationLogMiddleware
 
 from app.api.agents import router as agents_router
-from app.api.knowledge import router as knowledge_router
-from app.api.business import router as business_router
+
 from app.api.customers import router as customers_router
 from app.api.ai_configs import router as ai_configs_router
 from app.api.customer_ai_config import router as customer_ai_config_router
@@ -33,7 +32,11 @@ from app.api.operation_logs import router as operation_logs_router
 from app.api.accounts import router as accounts_router
 from app.api.position_permissions import router as position_permissions_router
 from app.api.positions import router as positions_router
+from app.api.position_customer_permissions import router as position_customer_permissions_router
 from app.api.daily_groupings import router as daily_groupings_router
+from app.api.activity_permissions import router as activity_permissions_router
+from app.api.reminders import router as reminders_router
+from app.api.business_reminders import router as business_reminders_router
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
@@ -48,8 +51,7 @@ app.add_middleware(OperationLogMiddleware)
 
 
 app.include_router(agents_router)
-app.include_router(knowledge_router)
-app.include_router(business_router)
+
 app.include_router(customers_router)
 app.include_router(ai_configs_router)
 app.include_router(customer_ai_config_router)
@@ -76,7 +78,11 @@ app.include_router(operation_logs_router)
 app.include_router(accounts_router)
 app.include_router(position_permissions_router)
 app.include_router(positions_router)
+app.include_router(position_customer_permissions_router)
 app.include_router(daily_groupings_router)
+app.include_router(activity_permissions_router)
+app.include_router(reminders_router)
+app.include_router(business_reminders_router)
 
 
 @app.get("/api/health")

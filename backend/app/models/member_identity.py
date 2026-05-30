@@ -4,7 +4,8 @@ from typing import Optional, List
 
 
 class IdentityCondition(BaseModel):
-    type: str  # "arrival" | "activity" | "card" | "course"
+    type: str  # "arrival" | "activity" | "card" | "course" | "payment"
+    payment_categories: List[str] = []  # for payment type
     items: List[str] = []  # card/course 的子项
     count_op: str = ">"  # ">" | "=" | "<"
     count_value: int = 0  # 比较值

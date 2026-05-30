@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from typing import Optional
 from app.services import operation_log_service
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/operation-logs", tags=["operation-logs"])
 
@@ -13,8 +14,10 @@ def list_logs(
     date_to: Optional[str] = None,
     entity_id: Optional[str] = None,
     keyword: Optional[str] = None,
+    page: int | None = Query(None, ge=1),
+    page_size: int | None = Query(None, ge=1, le=100),
 ):
-    return operation_log_service.list_logs(
+    items = operation_log_service.list_logs(
         operator=operator,
         method=method,
         date_from=date_from,
@@ -22,3 +25,6 @@ def list_logs(
         entity_id=entity_id,
         keyword=keyword,
     )
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items

@@ -1,11 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react"
-import { Plus, Trash2, Edit, X, Users, BookOpen, ChevronRight, ChevronLeft, FileUp, Download, File, LayoutList, LayoutGrid, Loader2, ChevronDown, Search } from "lucide-react"
+import { Plus, Trash2, X, Users, BookOpen, ChevronRight, ChevronLeft, Download, File, ChevronDown } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
-import VisitsListView from "@/components/visits/list-view"
 import GroupingView from "@/components/grouping-view"
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -14,13 +10,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { classRecordApi, groupCaseSessionApi, groupCaseApi, emotionalReleaseSessionApi, emotionalReleaseApi, energyKnotSessionApi, energyKnotApi, internalCourseSessionApi, courseApi, customerApi, uploadApi, visitApi, dailyGroupingApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type Course, type Customer, type CustomerSearchResult, type GroupCaseCustomerSearchResult, type EmotionalReleaseCustomerSearchResult, type EnergyKnotCustomerSearchResult, type InternalCourseSessionCustomerSearchResult, type VisitRecord } from "@/lib/api"
 import ArrivalConfirmationView from "./arrival-confirmation"
-import { usePagination } from "@/hooks/use-pagination"
-import { PaginationBar } from "@/components/pagination-bar"
+import ActivityCardList from "./activity-card-list"
 
 const today = new Date().toISOString().split("T")[0]
 
@@ -50,16 +42,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const [allCustomers, setAllCustomers] = useState<Customer[]>([])
   const [teachers, setTeachers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<"list" | "detail">("detail")
 
-  // 活动列表筛选 - 输入框状态
-  const [inputActType, setInputActType] = useState("all")
-  const [inputActName, setInputActName] = useState("")
-  const [inputActStartDate, setInputActStartDate] = useState("")
-  const [inputActEndDate, setInputActEndDate] = useState("")
-  // 已提交的筛选条件
-  const [appliedActFilters, setAppliedActFilters] = useState({ type: "all", name: "", startDate: "", endDate: "" })
-  const [hasActSearched, setHasActSearched] = useState(false)
   const [detailDate, setDetailDate] = useState(today)
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
   const [detailTab, setDetailTab] = useState<"visitors" | "activities" | "arrival_confirmation" | "grouping">(() => {
@@ -74,6 +57,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     } catch {}
     return "visitors"
   })
+  const isActivitiesView = standaloneTab === "activities" || detailTab === "activities"
   const [showCalendarPicker, setShowCalendarPicker] = useState(false)
   const [calendarPickerMonth, setCalendarPickerMonth] = useState(() => today.substring(0, 7))
 
@@ -308,34 +292,34 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const load = () => {
     classRecordApi.list()
       .then(setRecords)
-      .catch(() => {})
+      .catch((e) => { console.error("classRecordApi.list failed:", e) })
       .finally(() => setLoading(false))
     groupCaseSessionApi.list()
       .then(setGroupCaseSessions)
-      .catch(() => {})
+      .catch((e) => { console.error("groupCaseSessionApi.list failed:", e) })
     emotionalReleaseSessionApi.list()
       .then(setEmotionalReleaseSessions)
-      .catch(() => {})
+      .catch((e) => { console.error("emotionalReleaseSessionApi.list failed:", e) })
     energyKnotSessionApi.list()
       .then(setEnergyKnotSessions)
-      .catch(() => {})
+      .catch((e) => { console.error("energyKnotSessionApi.list failed:", e) })
     internalCourseSessionApi.list()
       .then(setInternalCourseSessions)
-      .catch(() => {})
-    courseApi.list().then(setCourses).catch(() => {})
+      .catch((e) => { console.error("internalCourseSessionApi.list failed:", e) })
+    courseApi.list().then(setCourses).catch((e) => { console.error("courseApi.list failed:", e) })
     customerApi.list()
       .then((customers) => {
         setAllCustomers(customers)
         setTeachers(customers.filter(c => c.positions?.includes("课程老师")))
       })
-      .catch(() => {})
+      .catch((e) => { console.error("customerApi.list failed:", e) })
   }
 
-  const loadClassRecords = () => classRecordApi.list().then(setRecords).catch(() => {})
-  const loadGcs = () => groupCaseSessionApi.list().then(setGroupCaseSessions).catch(() => {})
-  const loadErs = () => emotionalReleaseSessionApi.list().then(setEmotionalReleaseSessions).catch(() => {})
-  const loadEks = () => energyKnotSessionApi.list().then(setEnergyKnotSessions).catch(() => {})
-  const loadIcs = () => internalCourseSessionApi.list().then(setInternalCourseSessions).catch(() => {})
+  const loadClassRecords = () => classRecordApi.list().then(setRecords).catch((e) => { console.error("loadClassRecords failed:", e) })
+  const loadGcs = () => groupCaseSessionApi.list().then(setGroupCaseSessions).catch((e) => { console.error("loadGcs failed:", e) })
+  const loadErs = () => emotionalReleaseSessionApi.list().then(setEmotionalReleaseSessions).catch((e) => { console.error("loadErs failed:", e) })
+  const loadEks = () => energyKnotSessionApi.list().then(setEnergyKnotSessions).catch((e) => { console.error("loadEks failed:", e) })
+  const loadIcs = () => internalCourseSessionApi.list().then(setInternalCourseSessions).catch((e) => { console.error("loadIcs failed:", e) })
 
   useEffect(() => { load() }, [])
 
@@ -380,6 +364,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   // 拖拽到活动卡片的目标
   const [dragOverActivityId, setDragOverActivityId] = useState<string | null>(null)
+  const [memberDropdownId, setMemberDropdownId] = useState<string | null>(null)
 
   // 拖拽到沙龙卡片时的分组选择弹窗
   const [dropGroupSelectOpen, setDropGroupSelectOpen] = useState(false)
@@ -458,51 +443,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   }
 
 
-  // 合并五种记录，按日期倒序排列
   type UnifiedRecord = { type: "class"; data: ClassRecord; date: string } | { type: "gcs"; data: GroupCaseSession; date: string } | { type: "ers"; data: EmotionalReleaseSession; date: string } | { type: "eks"; data: EnergyKnotSession; date: string } | { type: "ics"; data: InternalCourseSession; date: string }
-  const allUnifiedRecords: UnifiedRecord[] = useMemo(() => [
-    ...records.map(r => ({ type: "class" as const, data: r, date: r.date })),
-    ...groupCaseSessions.map(s => ({ type: "gcs" as const, data: s, date: s.date })),
-    ...emotionalReleaseSessions.map(s => ({ type: "ers" as const, data: s, date: s.date })),
-    ...energyKnotSessions.map(s => ({ type: "eks" as const, data: s, date: s.date })),
-    ...internalCourseSessions.map(s => ({ type: "ics" as const, data: s, date: s.date })),
-  ].sort((a, b) => {
-    const dateCmp = b.date.localeCompare(a.date)
-    if (dateCmp !== 0) return dateCmp
-    const at = a.data.start_time || ""
-    const bt = b.data.start_time || ""
-    if (!at && !bt) return 0
-    if (!at) return 1
-    if (!bt) return -1
-    return bt.localeCompare(at)
-  }), [records, groupCaseSessions, emotionalReleaseSessions, energyKnotSessions, internalCourseSessions])
-
-  const getTitle = (ur: UnifiedRecord) => {
-    if (ur.type === "class") return ur.data.course_name
-    if (ur.type === "gcs") return `觉醒游戏【${ur.data.owner_name || "未分配"}】`
-    if (ur.type === "ers") return `情绪释放【${ur.data.owner_name || "未分配"}】`
-    if (ur.type === "eks") {
-      let names: string[] = []
-      try {
-        const items = JSON.parse(ur.data.description || "[]")
-        if (Array.isArray(items)) names = items.map((d: any) => d.name).filter(Boolean)
-      } catch { /* empty */ }
-      return names.length > 0 ? `能量结【${names.join("丨")}】` : `能量结【${ur.data.owner_name || "未分配"}】`
-    }
-    return ur.data.course_name
-  }
-
-  const unifiedRecords = hasActSearched
-    ? allUnifiedRecords.filter(ur => {
-        if (appliedActFilters.type !== "all" && ur.type !== appliedActFilters.type) return false
-        if (appliedActFilters.name && !getTitle(ur).toLowerCase().includes(appliedActFilters.name.toLowerCase())) return false
-        if (appliedActFilters.startDate && ur.date < appliedActFilters.startDate) return false
-        if (appliedActFilters.endDate && ur.date > appliedActFilters.endDate) return false
-        return true
-      })
-    : allUnifiedRecords
-
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(unifiedRecords)
 
   const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
   const detailRecords = records
@@ -532,45 +473,12 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   const selectedCourse = courses.find(c => c.id === formCourseId)
 
-  const getTeacherNames = (teacherIds: string[]) => {
+  const getTeacherNames = useCallback((teacherIds: string[]) => {
     return teacherIds
       .map(id => teachers.find(t => t.id === id))
       .filter(Boolean)
       .map(t => t!.nickname || t!.name || "未命名")
-  }
-
-  const handleActSearch = useCallback(() => {
-    setAppliedActFilters({
-      type: inputActType,
-      name: inputActName,
-      startDate: inputActStartDate,
-      endDate: inputActEndDate,
-    })
-    setHasActSearched(true)
-  }, [inputActType, inputActName, inputActStartDate, inputActEndDate])
-
-  const handleActClear = useCallback(() => {
-    setInputActType("all")
-    setInputActName("")
-    setInputActStartDate("")
-    setInputActEndDate("")
-    setAppliedActFilters({ type: "all", name: "", startDate: "", endDate: "" })
-    setHasActSearched(false)
-  }, [])
-
-  const handleOpenCreate = (date?: string) => {
-    setEditingRecord(null)
-    setFormDate(date || today)
-    setFormStartTime("09:00")
-    setFormEndTime("10:00")
-    setFormCourseId("")
-    setFormTeacherId("")
-    setFormDescription("")
-    setFormIsPublicWelfare(false)
-    setShowCourseDropdown(false)
-    setShowTeacherDropdown(false)
-    setDialogOpen(true)
-  }
+  }, [teachers])
 
   const handleOpenEdit = (record: ClassRecord) => {
     setEditingRecord(record)
@@ -806,31 +714,81 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     return groupsRecord.groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)).includes(visitorId)
   }
 
-  const getMemberName = (id: string) => {
+  const getMemberName = useCallback((id: string) => {
     const c = allCustomers.find(c => c.id === id)
     return c?.nickname || c?.name || id
-  }
+  }, [allCustomers])
+
+  const getCurrentParticipantIds = useCallback((type: string, record: any): string[] => {
+    if (type === "class") {
+      return (record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
+    }
+    if (type === "gcs") {
+      return [...(record.participant_ids || []), record.host_id, record.achiever_id, record.owner_id].filter(Boolean)
+    }
+    if (type === "ers") {
+      return [...(record.participant_ids || []), record.host_id, record.achiever_id].filter(Boolean)
+    }
+    if (type === "eks") {
+      return [...(record.host_ids || [])].filter(Boolean)
+    }
+    if (type === "ics") {
+      return [...(record.participant_ids || [])].filter(Boolean)
+    }
+    return []
+  }, [])
+
+  const handleMemberToggle = useCallback(async (type: string, record: any, visitorId: string) => {
+    const currentIds = getCurrentParticipantIds(type, record)
+    const isPresent = currentIds.includes(visitorId)
+    try {
+      if (type === "class") {
+        const groups = [...(record.groups || [])]
+        if (groups.length === 0) {
+          const newGroups = [{ name: "小组 1", leader_id: visitorId, deputy_id: "", member_ids: [] }]
+          await classRecordApi.updateGroups(record.id, newGroups)
+        } else {
+          const targetGroup = { ...groups[0] }
+          if (isPresent) {
+            if (targetGroup.leader_id === visitorId) targetGroup.leader_id = ""
+            else if (targetGroup.deputy_id === visitorId) targetGroup.deputy_id = ""
+            else targetGroup.member_ids = targetGroup.member_ids.filter((id: string) => id !== visitorId)
+          } else {
+            if (!targetGroup.leader_id) targetGroup.leader_id = visitorId
+            else targetGroup.member_ids = [...targetGroup.member_ids, visitorId]
+          }
+          groups[0] = targetGroup
+          await classRecordApi.updateGroups(record.id, groups)
+        }
+        loadClassRecords()
+      } else if (type === "gcs") {
+        const ids = record.participant_ids || []
+        const newIds = isPresent ? ids.filter((id: string) => id !== visitorId) : [...ids, visitorId]
+        await groupCaseSessionApi.update(record.id, { participant_ids: newIds } as any)
+        loadGcs()
+      } else if (type === "ers") {
+        const ids = record.participant_ids || []
+        const newIds = isPresent ? ids.filter((id: string) => id !== visitorId) : [...ids, visitorId]
+        await emotionalReleaseSessionApi.update(record.id, { participant_ids: newIds } as any)
+        loadErs()
+      } else if (type === "eks") {
+        const ids = record.host_ids || []
+        const newIds = isPresent ? ids.filter((id: string) => id !== visitorId) : [...ids, visitorId]
+        await energyKnotSessionApi.update(record.id, { host_ids: newIds } as any)
+        loadEks()
+      } else if (type === "ics") {
+        const ids = record.participant_ids || []
+        const newIds = isPresent ? ids.filter((id: string) => id !== visitorId) : [...ids, visitorId]
+        await internalCourseSessionApi.update(record.id, { participant_ids: newIds } as any)
+        loadIcs()
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || e?.message || "操作失败"
+      alert(msg)
+    }
+  }, [getCurrentParticipantIds])
 
   // ===== 觉醒游戏 handlers =====
-  const handleOpenGcsCreate = (date?: string) => {
-    setGcsEditingRecord(null)
-    setGcsFormDate(date || today)
-    setGcsFormStartTime("09:00")
-    setGcsFormEndTime("10:00")
-    setGcsFormOwnerId("")
-    setGcsFormOwnerName("")
-    setGcsFormAchieverId("")
-    setGcsFormAchieverName("")
-    setGcsFormHostId("")
-    setGcsFormHostName("")
-    setGcsFormDescription("")
-    setGcsSearchField(null)
-    setGcsSearchKeyword("")
-    setGcsSearchResults([])
-    setGcsShowDropdown(false)
-    setGcsDialogOpen(true)
-  }
-
   const handleOpenGcsEdit = (session: GroupCaseSession) => {
     setGcsEditingRecord(session)
     setGcsFormDate(session.date)
@@ -1072,25 +1030,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   }
 
   // ===== 情绪释放 handlers =====
-  const handleOpenErsCreate = (date?: string) => {
-    setErsEditingRecord(null)
-    setErsFormDate(date || today)
-    setErsFormStartTime("09:00")
-    setErsFormEndTime("10:00")
-    setErsFormOwnerId("")
-    setErsFormOwnerName("")
-    setErsFormAchieverId("")
-    setErsFormAchieverName("")
-    setErsFormHostId("")
-    setErsFormHostName("")
-    setErsFormDescription("")
-    setErsSearchField(null)
-    setErsSearchKeyword("")
-    setErsSearchResults([])
-    setErsShowDropdown(false)
-    setErsDialogOpen(true)
-  }
-
   const handleOpenErsEdit = (session: EmotionalReleaseSession) => {
     setErsEditingRecord(session)
     setErsFormDate(session.date)
@@ -1332,23 +1271,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   }
 
   // ===== 能量结 handlers =====
-  const handleOpenEksCreate = (date?: string) => {
-    setEksEditingRecord(null)
-    setEksFormDate(date || today)
-    setEksFormStartTime("09:00")
-    setEksFormEndTime("10:00")
-    setEksFormOwnerIds([])
-    setEksFormOwnerNames([])
-    setEksFormHostIds([])
-    setEksFormHostNames([])
-    setEksFormOwnerDescriptions([])
-    setEksSearchField(null)
-    setEksSearchKeyword("")
-    setEksSearchResults([])
-    setEksShowDropdown(false)
-    setEksDialogOpen(true)
-  }
-
   const handleOpenEksEdit = (session: EnergyKnotSession) => {
     setEksEditingRecord(session)
     setEksFormDate(session.date)
@@ -1521,23 +1443,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     setIcsSearchField(null)
   }
 
-  const handleOpenIcsCreate = (date?: string) => {
-    setIcsEditingRecord(null)
-    setIcsFormDate(date || today)
-    setIcsFormStartTime("09:00")
-    setIcsFormEndTime("10:00")
-    setIcsFormCourseType("")
-    setIcsFormCourseName("")
-    setIcsFormDescription("")
-    setIcsFormHostId("")
-    setIcsFormHostName("")
-    setIcsSearchField(null)
-    setIcsSearchKeyword("")
-    setIcsSearchResults([])
-    setIcsShowDropdown(false)
-    setIcsDialogOpen(true)
-  }
-
   const handleOpenIcsEdit = (session: InternalCourseSession) => {
     setIcsEditingRecord(session)
     setIcsFormDate(session.date)
@@ -1670,12 +1575,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     } catch { }
   }
 
-  // 避免 TS 控制流缩窄：用 string 类型变量做 className 判断
-  const _vm: string = viewMode
-
-  // 独立页面模式：强制当日活动视图
   const effectiveDetailTab = standaloneTab || detailTab
-  const effectiveViewMode = standaloneTab ? "detail" : viewMode
 
   // TODO: ers/eks/ics UI 待添加，暂时抑制未使用变量警告
   void gcsSearching; void gcsMemberSearching; void gcsMemberHostSearching
@@ -1683,7 +1583,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   void eksSearching
   void icsSearching; void icsMemberSearching
   void handleOpenIcsMaterials
-  void Loader2
 
   // 权限检查
   const userPermissions = useMemo(() => {
@@ -1745,209 +1644,13 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           </button>
           )}
         </div>
-        <div className="flex items-center border rounded-md overflow-hidden mb-2">
-          <button
-            className={`flex items-center gap-1 px-2.5 h-7 text-[12px] transition-colors ${_vm === "detail" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}
-            onClick={() => setViewMode("detail")}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" /> 详细
-          </button>
-          <button
-            className={`flex items-center gap-1 px-2.5 h-7 text-[12px] transition-colors border-l ${_vm === "list" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}
-            onClick={() => setViewMode("list")}
-          >
-            <LayoutList className="h-3.5 w-3.5" /> 列表
-          </button>
-        </div>
       </div>
       )}
 
       {/* 主内容区 */}
-      {effectiveViewMode === "list" && effectiveDetailTab !== "visitors" ? (
-      <div className="flex flex-1 min-h-0">
-        {/* 左侧 - 记录列表 */}
-        <div className="flex-1 bg-white rounded-lg space-y-5 flex flex-col min-w-0">
-          {/* 筛选栏 */}
-          <div className="flex items-end gap-3 flex-wrap">
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-[#8f959e]">活动名称</label>
-              <Input
-                placeholder="搜索活动名称"
-                value={inputActName}
-                onChange={(e) => setInputActName(e.target.value)}
-                className="h-8 text-[12px] w-40 rounded-md border border-[#e0e0e0] px-2.5 outline-none focus:border-[#3370ff]"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-[#8f959e]">类型</label>
-              <div className="relative">
-                <select
-                  value={inputActType}
-                  onChange={(e) => setInputActType(e.target.value)}
-                  className="h-8 w-28 appearance-none rounded-md border border-[#e0e0e0] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] cursor-pointer"
-                >
-                  <option value="all">全部</option>
-                  <option value="class">沙龙</option>
-                  <option value="gcs">觉醒游戏</option>
-                  <option value="ers">情绪释放</option>
-                  <option value="eks">能量结</option>
-                  <option value="ics">内部课程</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8f959e] pointer-events-none" />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-[#8f959e]">开始日期</label>
-              <Input
-                type="date"
-                value={inputActStartDate}
-                onChange={(e) => setInputActStartDate(e.target.value)}
-                className={`h-8 text-[12px] w-36 rounded-md border border-[#e0e0e0] px-2.5 outline-none focus:border-[#3370ff] ${!inputActStartDate ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-[#8f959e]">结束日期</label>
-              <Input
-                type="date"
-                value={inputActEndDate}
-                onChange={(e) => setInputActEndDate(e.target.value)}
-                className={`h-8 text-[12px] w-36 rounded-md border border-[#e0e0e0] px-2.5 outline-none focus:border-[#3370ff] ${!inputActEndDate ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
-              />
-            </div>
-            <button
-              className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
-              onClick={handleActSearch}
-            >
-              <Search className="h-3.5 w-3.5" /> 查询
-            </button>
-            <button
-              className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
-              onClick={handleActClear}
-            >
-              <X className="h-3.5 w-3.5" /> 清空
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-            ) : unifiedRecords.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">暂无记录</p>
-                <p className="text-xs text-muted-foreground mt-1">点击上方按钮添加活动</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-4 w-20">类型</TableHead>
-                    <TableHead>日期</TableHead>
-                    <TableHead>名称</TableHead>
-                    <TableHead className="w-28">课程老师</TableHead>
-                    <TableHead className="w-28">案主</TableHead>
-                    <TableHead className="w-28">参与者</TableHead>
-                    <TableHead className="text-right pr-4">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedItems.map((ur) => {
-                    const typeLabel = ur.type === "class" ? "沙龙" : ur.type === "gcs" ? "觉醒" : ur.type === "ers" ? "情绪" : ur.type === "eks" ? "能量结" : "内部课"
-                    const typeColor = ur.type === "class" ? "bg-blue-50 text-blue-600" : ur.type === "gcs" ? "bg-purple-50 text-purple-600" : ur.type === "ers" ? "bg-orange-50 text-orange-600" : ur.type === "eks" ? "bg-yellow-50 text-yellow-600" : "bg-green-50 text-green-600"
-                    const getHost = () => {
-                      if (ur.type === "class") return getTeacherNames(ur.data.teacher_ids).join("、") || "-"
-                      if (ur.type === "gcs") return ur.data.host_name || "-"
-                      if (ur.type === "ers") return ur.data.host_name || "-"
-                      if (ur.type === "eks") return ur.data.host_names?.join("、") || "-"
-                      return ur.data.host_names?.join("、") || "-"
-                    }
-                    const getOwner = () => {
-                      if (ur.type === "class") return "-"
-                      if (ur.type === "gcs") return ur.data.owner_name || "-"
-                      if (ur.type === "ers") return ur.data.owner_name || "-"
-                      if (ur.type === "eks") return ur.data.owner_name || "-"
-                      return "-"
-                    }
-                    const handleEdit = () => {
-                      if (ur.type === "class") handleOpenEdit(ur.data)
-                      else if (ur.type === "gcs") handleOpenGcsEdit(ur.data)
-                      else if (ur.type === "ers") handleOpenErsEdit(ur.data)
-                      else if (ur.type === "eks") handleOpenEksEdit(ur.data)
-                      else if (ur.type === "ics") handleOpenIcsEdit(ur.data)
-                    }
-                    const handleDelete = () => {
-                      if (ur.type === "class") setDeleteId(ur.data.id)
-                      else if (ur.type === "gcs") setGcsDeleteId(ur.data.id)
-                      else if (ur.type === "ers") setErsDeleteId(ur.data.id)
-                      else if (ur.type === "eks") setEksDeleteId(ur.data.id)
-                      else if (ur.type === "ics") setIcsDeleteId(ur.data.id)
-                    }
-                    return (
-                      <TableRow key={`${ur.type}-${ur.data.id}`}>
-                        <TableCell className="pl-4">
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${typeColor}`}>{typeLabel}</span>
-                        </TableCell>
-                        <TableCell className="text-[#2b2f36]">
-                          {ur.date}
-                          {ur.data.start_time && ur.data.end_time && (
-                            <span className="text-[12px] text-[#8f959e] ml-2">{ur.data.start_time} - {ur.data.end_time}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-[#2b2f36] font-medium">{getTitle(ur)}</TableCell>
-                        <TableCell>
-                          <span className="text-[12px] text-[#4e535a]">{getHost()}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[12px] text-[#4e535a]">{getOwner()}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[12px] text-[#4e535a]">{ur.data.participant_ids?.length || 0}</span>
-                        </TableCell>
-                        <TableCell className="text-right pr-4">
-                          <div className="flex items-center justify-end gap-1">
-                            {ur.type === "class" && (
-                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-[#4e535a]" onClick={(e) => { e.stopPropagation(); handleOpenMaterials(ur.data) }}>
-                                <FileUp className="h-3.5 w-3.5 mr-1" /> 资料{ur.data.materials?.length ? ` (${ur.data.materials.length})` : ""}
-                              </Button>
-                            )}
-                            {ur.type === "gcs" && (
-                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-[#4e535a]" onClick={(e) => { e.stopPropagation(); handleOpenGcsMaterials(ur.data) }}>
-                                <FileUp className="h-3.5 w-3.5 mr-1" /> 资料{ur.data.materials?.length ? ` (${ur.data.materials.length})` : ""}
-                              </Button>
-                            )}
-                            {ur.type === "ers" && (
-                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-[#4e535a]" onClick={(e) => { e.stopPropagation(); handleOpenErsMaterials(ur.data) }}>
-                                <FileUp className="h-3.5 w-3.5 mr-1" /> 资料{ur.data.materials?.length ? ` (${ur.data.materials.length})` : ""}
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); handleEdit() }}>
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); handleDelete() }}>
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-          <PaginationBar
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            startIndex={startIndex}
-            endIndex={endIndex}
-            onPageChange={goToPage}
-          />
-        </div>
-      </div>
-      ) : (
-      /* ===== 详细视图 ===== */
+            /* ===== 详细视图 ===== */
       <div className="flex flex-col min-h-0 flex-1 gap-2">
-      {!(effectiveDetailTab === "visitors" && effectiveViewMode === "list") && (<div>
+      <div>
       {/* 选中日期显示 + 操作按钮 */}
       <div className="flex items-center justify-between">
         <div className="relative inline-block">
@@ -2032,24 +1735,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {effectiveDetailTab === "activities" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button size="sm" className="text-xs">
-                  <Plus className="mr-1 h-3.5 w-3.5" /> 新增 <ChevronDown className="ml-1 h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleOpenCreate(detailDate)}>沙龙活动</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleOpenGcsCreate(detailDate)}>觉醒游戏</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleOpenErsCreate(detailDate)}>情绪释放</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleOpenEksCreate(detailDate)}>能量结</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleOpenIcsCreate(detailDate)}>内部课程</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
       </div>
         {/* 右侧：日期滚动条 */}
         <div className="flex items-center gap-1 flex-1">
@@ -2101,22 +1786,15 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             <ChevronRight className="h-4 w-4 text-[#4e535a]" />
           </button>
         </div>
-      </div>)}
+      </div>
 
       {/* 内容区 */}
       <div className="flex flex-col flex-1 min-h-0">
       {effectiveDetailTab === "visitors" ? (
-        effectiveViewMode === "list" ? (
-        /* 到场人员 - 列表视图 */
-        <div className="flex-1 overflow-y-auto">
-          <VisitsListView />
-        </div>
-        ) : (
         /* 到场人员 - 详细视图 */
         <div className="flex-1 overflow-y-auto">
           <VisitsDetailView externalDate={detailDate} onExternalDateChange={setDetailDate} hideDateBar />
         </div>
-        )
       ) : effectiveDetailTab === "grouping" ? (
       /* 人员分组页面：左栏人员列表 + 右栏分组管理 */
       <GroupingView
@@ -2194,439 +1872,45 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 <p className="text-sm text-muted-foreground">{detailDate === today ? "今天暂无记录" : `${detailDate} 暂无记录`}</p>
               </div>
             ) : (
-              <div className="divide-y divide-[#e8e8e8] border-y border-[#e8e8e8]">
-                {unifiedDetailRecords.map((ur) => {
-                  const typeLabel = ur.type === "class" ? "沙龙" : ur.type === "gcs" ? "觉醒" : ur.type === "ers" ? "情绪" : ur.type === "eks" ? "能量结" : "内部课"
-                  const typeColor = ur.type === "class" ? "bg-blue-50 text-blue-600" : ur.type === "gcs" ? "bg-purple-50 text-purple-600" : ur.type === "ers" ? "bg-orange-50 text-orange-600" : ur.type === "eks" ? "bg-yellow-50 text-yellow-600" : "bg-green-50 text-green-600"
+              <ActivityCardList
+                records={unifiedDetailRecords}
+                isActivitiesView={isActivitiesView}
+                standaloneTab={standaloneTab}
+                dayVisits={dayVisits}
+                dragOverActivityId={dragOverActivityId}
+                setDragOverActivityId={setDragOverActivityId}
+                memberDropdownId={memberDropdownId}
+                setMemberDropdownId={setMemberDropdownId}
+                setDeleteId={setDeleteId}
+                setGcsDeleteId={setGcsDeleteId}
+                setErsDeleteId={setErsDeleteId}
+                setEksDeleteId={setEksDeleteId}
+                setIcsDeleteId={setIcsDeleteId}
+                handleOpenEdit={handleOpenEdit}
+                handleOpenMaterials={handleOpenMaterials}
+                handleOpenGroups={handleOpenGroups}
+                handleDropToClass={handleDropToClass}
+                handleOpenGcsEdit={handleOpenGcsEdit}
+                handleOpenGcsMaterials={handleOpenGcsMaterials}
+                handleOpenGcsMembers={handleOpenGcsMembers}
+                handleDropToGcs={handleDropToGcs}
+                handleOpenErsEdit={handleOpenErsEdit}
+                handleOpenErsMaterials={handleOpenErsMaterials}
+                handleOpenErsMembers={handleOpenErsMembers}
+                handleDropToErs={handleDropToErs}
+                handleOpenEksEdit={handleOpenEksEdit}
+                handleDropToEks={handleDropToEks}
+                handleOpenIcsEdit={handleOpenIcsEdit}
+                handleOpenIcsMaterials={handleOpenIcsMaterials}
+                handleOpenIcsMembers={handleOpenIcsMembers}
+                handleDropToIcs={handleDropToIcs}
+                handleMemberToggle={handleMemberToggle}
+                getTeacherNames={getTeacherNames}
+                getMemberName={getMemberName}
+                getCurrentParticipantIds={getCurrentParticipantIds}
+              />
+            )}
 
-                // ===== 活动日历卡片 =====
-                if (ur.type === "class") {
-                  const record = ur.data
-                  return (
-                    <div
-                      key={`class-${record.id}`}
-                      className={`bg-white transition-shadow ${dragOverActivityId === `class-${record.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`class-${record.id}`) }}
-                      onDragLeave={() => setDragOverActivityId(null)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragOverActivityId(null)
-                        try {
-                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToClass(record, data)
-                        } catch {}
-                      }}
-                    >
-                      <div className="flex">
-                        {/* 最左侧：时间 */}
-                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-                          {record.start_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{record.start_time}</span>
-                          )}
-                          {record.start_time && record.end_time && (
-                            <span className="text-[10px] text-[#c9cdd4]">~</span>
-                          )}
-                          {record.end_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{record.end_time}</span>
-                          )}
-                        </div>
-                        {/* 活动信息 */}
-                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${typeColor}`}>{typeLabel}</span>
-                            {record.is_public_welfare && (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#e8f5e9] text-[#4caf50]">公益</span>
-                            )}
-                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">{record.course_name}</span>
-                            {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
-                          </div>
-                          {record.course_description && (
-                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{record.course_description}</p>
-                          )}
-                        </div>
-                        {/* 中间：分组人员 */}
-                        {!standaloneTab && (
-                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
-                          {(record.groups || []).length === 0 ? (
-                            <div className="flex items-center justify-center py-4 flex-1">
-                              <span className="text-[12px] text-[#8f959e]">暂无分组</span>
-                            </div>
-                          ) : (
-                            <div className="bg-gray-50 rounded p-[1px] flex-1">
-                              <div className="space-y-2 bg-white rounded px-2 py-1.5 h-full">
-                                {record.groups.map((group, gi) => {
-                                  const members: { name: string; role?: string }[] = []
-                                  const excludeIds = new Set([group.leader_id, group.deputy_id].filter(Boolean))
-                                  if (group.leader_id) members.push({ name: getMemberName(group.leader_id), role: "组长" })
-                                  if (group.deputy_id) members.push({ name: getMemberName(group.deputy_id), role: "副组长" })
-                                  members.push(...group.member_ids.filter(id => !excludeIds.has(id)).map(id => ({ name: getMemberName(id) })))
-                                  return members.length > 0 ? (
-                                    <div key={gi} className="text-[12px] text-[#4e535a]">
-                                      {members.map((m, i) => (
-                                        <span key={i}>
-                                          {i > 0 && "、"}
-                                          {m.name}
-                                          {m.role && <span className="inline-block ml-1 px-1 py-0.5 rounded text-[10px] bg-gray-50 text-[#8f959e]">{m.role}</span>}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : null
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        )}
-                        {/* 右侧：操作按钮 */}
-                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
-                          {!standaloneTab && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGroups(record)}>
-                            <Users className="h-3.5 w-3.5" />
-                          </Button>
-                          )}
-                          {standaloneTab && (
-                          <>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenMaterials(record)}>
-                            <FileUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(record)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(record.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                          </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                }
-
-                // ===== 觉醒游戏卡片 =====
-                if (ur.type === "gcs") {
-                  const s = ur.data
-                  return (
-                    <div
-                      key={`gcs-${s.id}`}
-                      className={`bg-white transition-shadow ${dragOverActivityId === `gcs-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`gcs-${s.id}`) }}
-                      onDragLeave={() => setDragOverActivityId(null)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragOverActivityId(null)
-                        try {
-                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToGcs(s, data)
-                        } catch {}
-                      }}
-                    >
-                      <div className="flex">
-                        {/* 最左侧：时间 */}
-                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-                          {s.start_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
-                          )}
-                          {s.start_time && s.end_time && (
-                            <span className="text-[10px] text-[#c9cdd4]">~</span>
-                          )}
-                          {s.end_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
-                          )}
-                        </div>
-                        {/* 活动信息 */}
-                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-600">觉醒</span>
-                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">觉醒游戏</span><span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[14px] font-medium text-[#2b2f36]">{s.owner_name || "未分配"}</span>
-                            {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">成就君：{s.achiever_name}</span>}
-                          </div>
-                          {s.description && (
-                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{s.description}</p>
-                          )}
-                        </div>
-                        {/* 中间：人员信息 */}
-                        {!standaloneTab && (
-                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
-                          <div className="bg-gray-50 rounded p-[1px] flex-1">
-                            <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
-                              {s.host_name && <span>{s.host_name}<span className="inline-block ml-1 px-1 py-0.5 rounded text-[10px] bg-gray-50 text-[#8f959e]">主持人</span></span>}
-                              {s.host_name && s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 && "、"}
-                              {s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 ? s.participant_ids.filter(id => id !== s.host_id && id !== s.achiever_id).map(id => getMemberName(id)).join("、") : (!s.host_name && <span className="text-[#8f959e]">暂无</span>)}
-                            </div>
-                          </div>
-                        </div>
-                        )}
-                        {/* 右侧：操作按钮 */}
-                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
-                          {!standaloneTab && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsMembers(s)}>
-                            <Users className="h-3.5 w-3.5" />
-                          </Button>
-                          )}
-                          {standaloneTab && (
-                          <>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsMaterials(s)}>
-                            <FileUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsEdit(s)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setGcsDeleteId(s.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                          </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                }
-
-                // ===== 情绪释放卡片 =====
-                if (ur.type === "ers") {
-                  const s = ur.data
-                  return (
-                    <div
-                      key={`ers-${s.id}`}
-                      className={`bg-white transition-shadow ${dragOverActivityId === `ers-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`ers-${s.id}`) }}
-                      onDragLeave={() => setDragOverActivityId(null)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragOverActivityId(null)
-                        try {
-                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToErs(s, data)
-                        } catch {}
-                      }}
-                    >
-                      <div className="flex">
-                        {/* 最左侧：时间 */}
-                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-                          {s.start_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
-                          )}
-                          {s.start_time && s.end_time && (
-                            <span className="text-[10px] text-[#c9cdd4]">~</span>
-                          )}
-                          {s.end_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
-                          )}
-                        </div>
-                        {/* 活动信息 */}
-                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 text-orange-600">情绪</span>
-                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">情绪释放</span><span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[14px] font-medium text-[#2b2f36]">{s.owner_name || "未分配"}</span>
-                            {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">成就君：{s.achiever_name}</span>}
-                          </div>
-                          {s.description && (
-                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{s.description}</p>
-                          )}
-                        </div>
-                        {/* 中间：人员信息 */}
-                        {!standaloneTab && (
-                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
-                          <div className="bg-gray-50 rounded p-[1px] flex-1">
-                            <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
-                              {s.host_name && <span>{s.host_name}<span className="inline-block ml-1 px-1 py-0.5 rounded text-[10px] bg-gray-50 text-[#8f959e]">主持人</span></span>}
-                              {s.host_name && s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 && "、"}
-                              {s.participant_ids?.filter(id => id !== s.host_id && id !== s.achiever_id).length > 0 ? s.participant_ids.filter(id => id !== s.host_id && id !== s.achiever_id).map(id => getMemberName(id)).join("、") : (!s.host_name && <span className="text-[#8f959e]">暂无</span>)}
-                            </div>
-                          </div>
-                        </div>
-                        )}
-                        {/* 右侧：操作按钮 */}
-                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
-                          {!standaloneTab && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsMembers(s)}>
-                            <Users className="h-3.5 w-3.5" />
-                          </Button>
-                          )}
-                          {standaloneTab && (
-                          <>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsMaterials(s)}>
-                            <FileUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsEdit(s)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setErsDeleteId(s.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                          </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                }
-
-                // ===== 能量结卡片 =====
-                if (ur.type === "eks") {
-                  const s = ur.data
-                  let eksNames: string[] = []
-                  let ownerDescs: {id: string; name: string; description: string}[] = []
-                  try {
-                    const items = JSON.parse(s.description || "[]")
-                    if (Array.isArray(items)) {
-                      ownerDescs = items
-                      eksNames = items.map((d: any) => d.name).filter(Boolean)
-                    }
-                  } catch { /* empty */ }
-                  const fallbackNames = (s.owner_name || "").split("、")
-                  return (
-                    <div
-                      key={`eks-${s.id}`}
-                      className={`bg-white transition-shadow ${dragOverActivityId === `eks-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`eks-${s.id}`) }}
-                      onDragLeave={() => setDragOverActivityId(null)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragOverActivityId(null)
-                        try {
-                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToEks(s, data)
-                        } catch {}
-                      }}
-                    >
-                      <div className="flex">
-                        {/* 最左侧：时间 */}
-                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-                          {s.start_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
-                          )}
-                          {s.start_time && s.end_time && (
-                            <span className="text-[10px] text-[#c9cdd4]">~</span>
-                          )}
-                          {s.end_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
-                          )}
-                        </div>
-                        {/* 活动信息 */}
-                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-600">能量</span>
-                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">能量结</span><span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[14px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
-                            {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">课程老师：{s.host_names.join("、")}</span>}
-                          </div>
-                          {ownerDescs.filter(d => d.description).length > 0 && (
-                            <div className="space-y-1">
-                              {ownerDescs.filter(d => d.description).map((d, i) => (
-                                <p key={i} className="text-[11px] text-[#8f959e] font-light leading-relaxed">
-                                  <span>{d.name || fallbackNames[i] || "未知"}：</span>{d.description}
-                                </p>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        {/* 中间：人员信息 */}
-                        {!standaloneTab && (
-                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
-                        </div>
-                        )}
-                        {/* 右侧：操作按钮 */}
-                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-2" : "grid-cols-1"}`}>
-                          {standaloneTab && (
-                          <>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEksEdit(s)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEksDeleteId(s.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                          </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                }
-
-                // ===== 内部课程卡片 =====
-                if (ur.type === "ics") {
-                  const s = ur.data
-                  return (
-                    <div
-                      key={`ics-${s.id}`}
-                      className={`bg-white transition-shadow ${dragOverActivityId === `ics-${s.id}` ? "ring-2 ring-[#3370ff] ring-inset" : ""}`}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverActivityId(`ics-${s.id}`) }}
-                      onDragLeave={() => setDragOverActivityId(null)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragOverActivityId(null)
-                        try {
-                          const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToIcs(s, data)
-                        } catch {}
-                      }}
-                    >
-                      <div className="flex">
-                        {/* 最左侧：时间 */}
-                        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-                          {s.start_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.start_time}</span>
-                          )}
-                          {s.start_time && s.end_time && (
-                            <span className="text-[10px] text-[#c9cdd4]">~</span>
-                          )}
-                          {s.end_time && (
-                            <span className="text-[11px] text-[#8f959e] font-light">{s.end_time}</span>
-                          )}
-                        </div>
-                        {/* 活动信息 */}
-                        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-600">内部</span>
-                            <span className="text-[14px] font-medium text-[#2b2f36] truncate">{s.course_name}</span>
-                            <span className="text-[14px] font-medium text-[#2b2f36]">丨课程老师：{s.host_names?.length > 0 ? s.host_names.join("、") : "暂无"}</span>
-                            {s.course_type && <span className="text-[12px] text-[#4e535a]">{s.course_type}</span>}
-                          </div>
-                          {s.course_description && (
-                            <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{s.course_description}</p>
-                          )}
-                        </div>
-                        {/* 中间：人员信息 */}
-                        {!standaloneTab && (
-                        <div className="w-[470px] shrink-0 px-4 flex flex-col" style={{ paddingTop: 6, paddingBottom: 6 }}>
-                          <div className="bg-gray-50 rounded p-[1px] flex-1">
-                            <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
-                              {s.participant_ids?.length > 0 ? s.participant_ids.map(id => getMemberName(id)).join("、") : "暂无"}
-                            </div>
-                          </div>
-                        </div>
-                        )}
-                        {/* 右侧：操作按钮 */}
-                        <div className={`shrink-0 grid items-center justify-items-center gap-1 px-2 py-3.5 ${standaloneTab ? "grid-cols-3" : "grid-cols-1"}`}>
-                          {!standaloneTab && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsMembers(s)}>
-                            <Users className="h-3.5 w-3.5" />
-                          </Button>
-                          )}
-                          {standaloneTab && (
-                          <>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsMaterials(s)}>
-                            <FileUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsEdit(s)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setIcsDeleteId(s.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                          </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                }
-
-                return null
-              })}
-            </div>
-          )}
           </div>
         </div>
       )}
@@ -4204,7 +3488,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       </Dialog>
 
       </div>
-      )}
     </div>
   )
 }

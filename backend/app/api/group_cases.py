@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
+from app.utils.pagination import paginate
 from app.services import group_case_service
 from app.models.group_case import GroupCaseCreate
 
@@ -7,8 +8,14 @@ router = APIRouter(prefix="/api/group-cases", tags=["group-cases"])
 
 
 @router.get("")
-def list_cases():
-    return group_case_service.list_cases()
+def list_cases(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None)):
+    items = group_case_service.list_cases()
+    if customer_ids:
+        allowed = set(customer_ids.split(","))
+        items = [i for i in items if i.get("customer_id") in allowed]
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

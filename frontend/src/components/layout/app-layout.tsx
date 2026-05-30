@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { LogOut } from "lucide-react"
 
 const PAGE_TITLES: Record<string, string> = {
-  "/": "无忧 - 首页",
-  "/customers": "无忧 - 用户管理",
+
+
+
   "/visits": "无忧 - 到场人员",
   "/healing-records": "无忧 - 客户信息",
   "/courses/class-records": "无忧 - 人员到场",
@@ -22,18 +23,17 @@ const PAGE_TITLES: Record<string, string> = {
   "/courses/energy-knot-sessions": "无忧 - 能量结场次",
   "/courses/internal-course-sessions": "无忧 - 内部课程场次",
   "/agents": "无忧 - AI配置",
-  "/knowledge": "无忧 - 知识库",
-  "/business": "无忧 - 业务数据",
+
 
 
   "/system-logs": "无忧 - 系统日志",
-  "/accounts": "无忧 - 账号管理",
-  "/positions/management": "无忧 - 角色管理",
+  "/positions/management": "无忧 - 账号管理",
   "/positions/courses": "无忧 - 沙龙类型",
   "/config/member-identities": "无忧 - 会员身份",
   "/courses/spaces": "无忧 - 疗愈空间",
   "/healing-identities": "无忧 - 疗愈身份",
   "/operation-logs": "无忧 - 操作日志",
+  "/traffic-records": "无忧 - 引流记录",
 }
 
 export function AppLayout() {
@@ -41,9 +41,12 @@ export function AppLayout() {
   const location = useLocation()
 
   useEffect(() => {
-    const title = PAGE_TITLES[location.pathname] || "无忧小院"
+    const title = PAGE_TITLES[location.pathname] || "无忧茶苑"
     document.title = title
   }, [location.pathname])
+
+  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
+  const ownerName = currentUser.owner || ""
 
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn")
@@ -58,9 +61,14 @@ export function AppLayout() {
       <SidebarInset>
         <header className="flex h-11 items-center justify-between bg-white px-5 border-b-[4px] border-[#f7f8fa]">
           <SidebarTrigger />
-          <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e]" onClick={handleLogout}>
-            <LogOut className="h-3.5 w-3.5 mr-1.5" /> 退出登录
-          </Button>
+          <div className="flex items-center gap-2">
+            {ownerName && (
+              <span className="text-xs text-[#8f959e]">{ownerName}</span>
+            )}
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e]" onClick={handleLogout}>
+              <LogOut className="h-3.5 w-3.5 mr-1.5" /> 退出登录
+            </Button>
+          </div>
         </header>
         <main className="flex-1 min-w-0 overflow-auto bg-white">
           <Outlet />

@@ -1,18 +1,18 @@
-import { useEffect, useState, useRef } from "react"
-import { Users, Zap, Plus, Trash2, Loader2, X } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Users, Zap, Plus, Trash2 } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { customerApi, visitApi, type Customer, type CustomerSearchResult } from "@/lib/api"
+import { customerApi, type Customer } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 
 const HEALING_POSITIONS = [
   { key: "成就君", label: "成就君", icon: Users, desc: "负责成就达成" },
@@ -31,14 +31,7 @@ export default function HealingIdentitiesPage() {
   const [deletingMember, setDeletingMember] = useState<Customer | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // Search state
-  const [searchKeyword, setSearchKeyword] = useState("")
-  const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [selectedCustomers, setSelectedCustomers] = useState<CustomerSearchResult[]>([])
-  const searchTimeoutRef = useRef<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [selectedNicknames, setSelectedNicknames] = useState<string[]>([])
 
   const loadCustomers = () => {
     customerApi.list()
@@ -49,60 +42,24 @@ export default function HealingIdentitiesPage() {
 
   useEffect(() => { loadCustomers() }, [])
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
   const currentConfig = HEALING_POSITIONS.find(p => p.key === activePosition)!
   const members = customers.filter(c => c.positions?.includes(activePosition))
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(members)
 
-  const handleSearch = (keyword: string) => {
-    setSearchKeyword(keyword)
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    if (!keyword.trim()) { setSearchResults([]); setShowDropdown(false); return }
-    searchTimeoutRef.current = window.setTimeout(async () => {
-      setSearching(true)
-      try {
-        const results = await visitApi.searchCustomers(keyword)
-        setSearchResults(results.filter((r) =>
-          !members.some((m) => m.id === r.id) &&
-          !selectedCustomers.some((s) => s.id === r.id)
-        ))
-        setShowDropdown(true)
-      } catch { setSearchResults([]) }
-      finally { setSearching(false) }
-    }, 300)
-  }
-
-  const handleSelectCustomer = (customer: CustomerSearchResult) => {
-    setSelectedCustomers([...selectedCustomers, customer])
-    setSearchKeyword(""); setSearchResults([]); setShowDropdown(false)
-  }
-
-  const handleRemoveCustomer = (id: string) => {
-    setSelectedCustomers(selectedCustomers.filter((c) => c.id !== id))
-  }
-
   const handleAddMembers = async () => {
-    if (selectedCustomers.length === 0) return
+    if (selectedNicknames.length === 0) return
     setSaving(true)
     try {
-      for (const customer of selectedCustomers) {
-        const fullCustomer = await customerApi.get(customer.id)
-        const existingPositions = fullCustomer.positions || []
+      for (const nickname of selectedNicknames) {
+        const customer = customers.find(c => c.nickname === nickname)
+        if (!customer) continue
+        const existingPositions = customer.positions || []
         if (!existingPositions.includes(activePosition)) {
           await customerApi.update(customer.id, { positions: [...existingPositions, activePosition] })
         }
       }
-      setSelectedCustomers([])
+      setSelectedNicknames([])
       setDialogOpen(false)
       loadCustomers()
     } catch (error) {
@@ -122,7 +79,7 @@ export default function HealingIdentitiesPage() {
   }
 
   const resetForm = () => {
-    setSearchKeyword(""); setSearchResults([]); setShowDropdown(false); setSelectedCustomers([])
+    setSelectedNicknames([])
   }
 
   return (
@@ -239,52 +196,22 @@ export default function HealingIdentitiesPage() {
             <DialogTitle className="text-base">新增{currentConfig.label}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5">
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2" ref={dropdownRef}>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">搜索用户</span>
-              <div className="relative">
-                <Input value={searchKeyword} onChange={(e) => handleSearch(e.target.value)} placeholder="输入昵称或姓名搜索..." onFocus={() => searchResults.length > 0 && setShowDropdown(true)} />
-                {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-                {showDropdown && searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-                    {searchResults.map((customer) => (
-                      <div key={customer.id} className="flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-muted" onClick={() => handleSelectCustomer(customer)}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[12px] font-medium">{customer.nickname}</span>
-                          {customer.name && customer.name !== customer.nickname && (
-                            <span className="text-[11px] text-muted-foreground">({customer.name})</span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-muted-foreground">{customer.member_type || "新人"}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {showDropdown && searchResults.length === 0 && searchKeyword && !searching && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-[12px] text-muted-foreground text-center">未找到匹配的用户</div>
-                )}
-              </div>
+              <CustomerSearchInput
+                customers={customers}
+                value={selectedNicknames}
+                onChange={(v) => setSelectedNicknames(v as string[])}
+                multi
+                excludeIds={members.map(m => m.id)}
+                placeholder="输入昵称或姓名搜索..."
+              />
             </div>
-
-            {selectedCustomers.length > 0 && (
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-1.5">已选用户</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedCustomers.map((c) => (
-                    <div key={c.id} className="flex items-center gap-1.5 rounded border bg-muted/50 px-2.5 py-1 text-sm">
-                      <span className="font-medium text-xs">{c.nickname}</span>
-                      <button onClick={() => handleRemoveCustomer(c.id)} className="text-muted-foreground hover:text-foreground">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button size="sm" onClick={handleAddMembers} disabled={saving || selectedCustomers.length === 0}>
-                {saving ? "添加中..." : `添加 (${selectedCustomers.length} 人)`}
+              <Button size="sm" onClick={handleAddMembers} disabled={saving || selectedNicknames.length === 0}>
+                {saving ? "添加中..." : `添加 (${selectedNicknames.length} 人)`}
               </Button>
             </div>
           </div>

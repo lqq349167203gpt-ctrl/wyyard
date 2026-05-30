@@ -26,10 +26,14 @@ def _save():
 _load()
 
 
-def list_sessions(date: Optional[str] = None) -> List[EnergyKnotSession]:
+def list_sessions(date: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[EnergyKnotSession]:
     sessions = [v for v in _sessions.values() if not v.is_deleted]
     if date:
         sessions = [s for s in sessions if s.date == date]
+    if start_date:
+        sessions = [s for s in sessions if s.date >= start_date]
+    if end_date:
+        sessions = [s for s in sessions if s.date <= end_date]
     sessions.sort(key=lambda s: s.created_at, reverse=True)
     return sessions
 
@@ -78,12 +82,10 @@ def delete_session(session_id: str) -> bool:
 
 
 def search_customers(keyword: str) -> list:
-    if not keyword:
-        return []
     customers = customer_service.list_customers()
     results = []
     for c in customers:
-        if keyword in c.nickname or (c.name and keyword in c.name):
+        if not keyword or keyword in c.nickname or (c.name and keyword in c.name):
             remaining = get_remaining_count(c.id)
             results.append({
                 "id": c.id,

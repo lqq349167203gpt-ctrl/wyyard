@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react"
-import { Plus, Trash2, Edit, Loader2, Zap, X } from "lucide-react"
+import { useEffect, useState, useRef, useCallback } from "react"
+import { Plus, Trash2, Edit, Zap } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -10,13 +10,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { energyKnotApi, type EnergyKnot, type CustomerSearchResult } from "@/lib/api"
-import { usePagination } from "@/hooks/use-pagination"
+import { customerApi, energyKnotApi, type Customer, type EnergyKnot } from "@/lib/api"
+import { CustomerSearchInput } from "@/components/customer-search-input"
+import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
-  const [knots, setKnots] = useState<EnergyKnot[]>([])
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingKnot, setEditingKnot] = useState<EnergyKnot | null>(null)
   const [saving, setSaving] = useState(false)
@@ -30,66 +30,51 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
   const [formCloserId, setFormCloserId] = useState("")
   const [formCloserName, setFormCloserName] = useState("")
 
-  // 搜索
-  const [searchTarget, setSearchTarget] = useState<"user" | "closer" | null>(null)
-  const [searchKeyword, setSearchKeyword] = useState("")
-  const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const searchTimeoutRef = useRef<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customersReady, setCustomersReady] = useState(false)
 
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(knots)
+  const cpRef = useRef(cp)
+  cpRef.current = cp
+  const customersRef = useRef<Customer[]>([])
+  const customersReadyRef = useRef(false)
 
-  const load = () => {
-    energyKnotApi.list()
-      .then(setKnots)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { load() }, [])
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-        setSearchTarget(null)
-      }
+  const fetchFn = useCallback(async (page: number, pageSize: number) => {
+    if (!customersReadyRef.current) {
+      return { items: [] as EnergyKnot[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    const allowed = customersRef.current
+    if (allowed.length === 0) {
+      return { items: [] as EnergyKnot[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
+    }
+    return energyKnotApi.listPaginated(page, pageSize, { customer_ids: allowed.map(c => c.id).join(",") })
   }, [])
 
-  const handleSearch = (keyword: string, target: "user" | "closer") => {
-    setSearchTarget(target)
-    setSearchKeyword(keyword)
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    if (!keyword.trim()) { setSearchResults([]); setShowDropdown(false); return }
-    searchTimeoutRef.current = window.setTimeout(async () => {
-      setSearching(true)
-      try {
-        const results = await energyKnotApi.searchCustomers(keyword)
-        setSearchResults(results)
-        setShowDropdown(true)
-      } catch { setSearchResults([]) }
-      finally { setSearching(false) }
-    }, 300)
-  }
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
 
-  const handleSelectCustomer = (customer: CustomerSearchResult) => {
-    if (searchTarget === "closer") {
-      setFormCloserId(customer.id)
-      setFormCloserName(customer.nickname)
-    } else {
-      setFormCustomerId(customer.id)
-      setFormNickname(customer.nickname)
-    }
-    setSearchKeyword("")
-    setSearchResults([])
-    setShowDropdown(false)
-    setSearchTarget(null)
-  }
+  useEffect(() => {
+    if (!permReady) return
+    customerApi.list().then((data) => {
+      let filtered = data
+      const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      if (cu.role !== "超级管理员") {
+        if (cpRef.current.length > 0) {
+          filtered = data.filter(c => c.member_type && cpRef.current.includes(c.member_type))
+        } else {
+          filtered = []
+        }
+      }
+      setCustomers(filtered)
+      customersRef.current = filtered
+      customersReadyRef.current = true
+      setCustomersReady(true)
+      refresh()
+    }).catch(() => {
+      customersReadyRef.current = true
+      setCustomersReady(true)
+      refresh()
+    })
+  }, [permReady])
 
   const handleOpenCreate = () => {
     setEditingKnot(null)
@@ -99,7 +84,6 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
     setFormAmount("")
     setFormCloserId("")
     setFormCloserName("")
-    setSearchKeyword("")
     setDialogOpen(true)
   }
 
@@ -111,7 +95,6 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
     setFormAmount(String(item.amount))
     setFormCloserId(item.closer_id || "")
     setFormCloserName(item.closer_name || "")
-    setSearchKeyword("")
     setDialogOpen(true)
   }
 
@@ -133,7 +116,7 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
         await energyKnotApi.create(data)
       }
       setDialogOpen(false)
-      load()
+      refresh()
     } catch (error) {
       console.error("保存失败:", error)
     } finally {
@@ -148,23 +131,20 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
     try {
       await energyKnotApi.delete(deleteId)
       setDeleteId(null)
-      load()
+      refresh()
     } catch (e: any) {
       setDeleteError(e?.message || "删除失败")
       setDeleteId(null)
     }
   }
 
-  const totalAmount = knots.reduce((sum, c) => sum + c.amount, 0)
-  const totalCount = knots.reduce((sum, c) => sum + c.purchase_count, 0)
-
   const content = (
     <>
       {/* 工具栏 */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground mt-[6px]">
-          {knots.length > 0 && (
-            <span>共 {knots.length} 条记录，{totalCount} 次购买，¥{totalAmount.toLocaleString()}</span>
+          {totalItems > 0 && (
+            <span>共 {totalItems} 条记录</span>
           )}
         </p>
         <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
@@ -174,9 +154,9 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
 
       {/* 表格 */}
       <div className="bg-white rounded-lg">
-        {loading ? (
+        {loading || !customersReady ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : knots.length === 0 ? (
+        ) : paginatedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Zap className="h-8 w-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground">暂无能量结记录</p>
@@ -231,56 +211,25 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
 
       {/* 新增/编辑弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm p-0 gap-0">
+        <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingKnot ? "编辑记录" : "新增"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             {/* 用户搜索 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2" ref={searchTarget === "user" ? dropdownRef : undefined}>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">用户</span>
-              <div className="relative">
-                <Input
-                  value={searchTarget === "user" ? searchKeyword : (formNickname || "")}
-                  onChange={(e) => handleSearch(e.target.value, "user")}
-                  placeholder="搜索用户..."
-                  className="h-8 text-xs pr-16"
-                  readOnly={!!editingKnot}
-                  onFocus={() => {
-                    if (!editingKnot) {
-                      setSearchTarget("user")
-                      if (formNickname) { setSearchKeyword(""); setFormNickname(""); setFormCustomerId("") }
-                      if (searchResults.length > 0) setShowDropdown(true)
-                    }
-                  }}
-                />
-                {!editingKnot && formNickname && searchTarget !== "user" && (
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onMouseDown={(e) => { e.preventDefault(); setFormNickname(""); setFormCustomerId("") }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                {searching && searchTarget === "user" && <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                {searchTarget === "user" && showDropdown && searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-                    {searchResults.map((customer) => (
-                      <div
-                        key={customer.id}
-                        className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                        onClick={() => handleSelectCustomer(customer)}
-                      >
-                        <span className="text-[12px] font-medium">{customer.nickname}</span>
-                        <span className="text-[11px] text-muted-foreground">{customer.member_type || "新人"}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {searchTarget === "user" && showDropdown && searchResults.length === 0 && searchKeyword && !searching && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-[12px] text-muted-foreground text-center">未找到匹配用户</div>
-                )}
-              </div>
+              <CustomerSearchInput
+                customers={customers}
+                value={formNickname || ""}
+                onChange={(v) => {
+                  const name = typeof v === "string" ? v : v[0] || ""
+                  if (!name) { setFormNickname(""); setFormCustomerId("") }
+                }}
+                onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
+                placeholder="搜索客户昵称"
+                disabled={!!editingKnot}
+              />
             </div>
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
@@ -294,47 +243,18 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
             </div>
 
             {/* 成交人搜索 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2" ref={searchTarget === "closer" ? dropdownRef : undefined}>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
-              <div className="relative">
-                <Input
-                  value={searchTarget === "closer" ? searchKeyword : (formCloserName || "")}
-                  onChange={(e) => handleSearch(e.target.value, "closer")}
-                  placeholder="搜索成交人..."
-                  className="h-8 text-xs pr-16"
-                  onFocus={() => {
-                    setSearchTarget("closer")
-                    if (formCloserName) { setSearchKeyword(""); setFormCloserId(""); setFormCloserName("") }
-                    if (searchResults.length > 0) setShowDropdown(true)
-                  }}
-                />
-                {formCloserName && searchTarget !== "closer" && (
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onMouseDown={(e) => { e.preventDefault(); setFormCloserName(""); setFormCloserId("") }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                {searching && searchTarget === "closer" && <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                {searchTarget === "closer" && showDropdown && searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-                    {searchResults.map((customer) => (
-                      <div
-                        key={customer.id}
-                        className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                        onClick={() => handleSelectCustomer(customer)}
-                      >
-                        <span className="text-[12px] font-medium">{customer.nickname}</span>
-                        <span className="text-[11px] text-muted-foreground">{customer.member_type || "新人"}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {searchTarget === "closer" && showDropdown && searchResults.length === 0 && searchKeyword && !searching && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-[12px] text-muted-foreground text-center">未找到匹配用户</div>
-                )}
-              </div>
+              <CustomerSearchInput
+                customers={customers}
+                value={formCloserName || ""}
+                onChange={(v) => {
+                  const name = typeof v === "string" ? v : v[0] || ""
+                  if (!name) { setFormCloserName(""); setFormCloserId("") }
+                }}
+                onSelectItem={(c) => { setFormCloserName(c.nickname); setFormCloserId(c.id) }}
+                placeholder="搜索客户昵称"
+              />
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

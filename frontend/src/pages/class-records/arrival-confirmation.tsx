@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import type { VisitRecord, HealingRecord, OperationLog } from "@/lib/api"
-import { healingRecordApi, operationLogApi } from "@/lib/api"
+import { healingRecordApi, operationLogApi, visitApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
@@ -9,6 +9,7 @@ interface ArrivalConfirmationViewProps {
   loading: boolean
   onMarkArrived: (visit: VisitRecord) => void
   onCancelArrived: (visit: VisitRecord) => void
+  onRefresh?: () => void
 }
 
 const SECTION_COLORS: Record<string, string> = {
@@ -29,6 +30,7 @@ export default function ArrivalConfirmationView({
   loading,
   onMarkArrived,
   onCancelArrived,
+  onRefresh,
 }: ArrivalConfirmationViewProps) {
   const [hrMap, setHrMap] = useState<Record<string, HealingRecord | null>>({})
   const [editVisit, setEditVisit] = useState<VisitRecord | null>(null)
@@ -37,7 +39,10 @@ export default function ArrivalConfirmationView({
   const [detailVisit, setDetailVisit] = useState<VisitRecord | null>(null)
   const [detailLogs, setDetailLogs] = useState<OperationLog[]>([])
   const [loadingLogs, setLoadingLogs] = useState(false)
-
+  const [editExpVisit, setEditExpVisit] = useState<VisitRecord | null>(null)
+  const [editExpText, setEditExpText] = useState("")
+  const [editFeedbackText, setEditFeedbackText] = useState("")
+  const [savingExp, setSavingExp] = useState(false)
   // 加载每个到访人员当日对应的疗愈记录
   useEffect(() => {
     if (visits.length === 0) return
@@ -102,6 +107,18 @@ export default function ArrivalConfirmationView({
     }
   }
 
+  const handleSaveExp = async () => {
+    if (!editExpVisit) return
+    setSavingExp(true)
+    try {
+      await visitApi.update(editExpVisit.id, { experience: editExpText, feedback: editFeedbackText })
+      setEditExpVisit(null)
+      onRefresh?.()
+    } catch {} finally {
+      setSavingExp(false)
+    }
+  }
+
   if (loading) {
     return <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
   }
@@ -111,13 +128,15 @@ export default function ArrivalConfirmationView({
   }
 
   return (
-    <div className="space-y-0.5">
+    <div>
+      <div className="space-y-0.5">
       {visits.map((v) => (
         <div
+          id={`visit-card-${v.id}`}
           key={v.id}
-          className="rounded bg-white border border-[#f0f1f2] hover:border-[#e0e1e3] p-3 transition-colors"
+          className="rounded bg-white border border-[#f0f1f2] hover:border-[#e0e1e3] p-3 transition-colors flex gap-2"
         >
-          <div className="space-y-2 -ml-1">
+          <div className="flex-1 min-w-0 space-y-2 -ml-1">
             {/* 昵称 + 到场时间 + 需求 */}
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-[#8f959e] shrink-0 w-14">昵称</span>
@@ -126,10 +145,10 @@ export default function ArrivalConfirmationView({
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f0f1f2] text-[#8f959e]">{v.member_type}</span>
               )}
               <span className="text-[12px] text-[#8f959e]">
-                {(v.arrival_time || v.visit_time || "09:00")}到场
+                {v.arrived ? `${v.arrival_time || v.visit_time || "09:00"}到场` : "--:--到场"}
               </span>
               <span className="text-[12px] text-[#8f959e] ml-3">
-                需求是<span className="text-[#2b2f36] ml-1">{v.needs || "-"}</span>
+                {v.needs || "-"}
               </span>
             </div>
 
@@ -163,52 +182,32 @@ export default function ArrivalConfirmationView({
               </div>
             </div>
 
-            {/* 是否到店 + 反馈链接 */}
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] text-[#8f959e] shrink-0 w-14">是否到店</span>
-              <div className="flex items-center gap-3">
-                {v.arrived ? (
-                  <button
-                    className="inline-flex items-center gap-1 text-[11px] px-3 py-1 rounded-lg bg-[#3370ff] text-white hover:bg-[#2860e0] transition-colors cursor-pointer"
-                    onClick={() => onCancelArrived(v)}
-                  >
-                    已到店 ✓
-                  </button>
-                ) : (
-                  <button
-                    className="text-[11px] px-3 py-1 rounded-lg border border-[#d0d5dd] text-[#8f959e] hover:bg-[#f5f6f7] transition-colors cursor-pointer"
-                    onClick={() => onMarkArrived(v)}
-                  >
-                    未到店
-                  </button>
-                )}
-                {v.arrived && (
-                  <>
-                    <a
-                      href={`/arrival-feedback/${v.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`text-[10px] underline underline-offset-2 ${
-                        v.experience ? "text-[#b0b5bb]" : "text-[#3370ff]"
-                      }`}
-                    >
-                      {v.experience ? "已填写" : "未填写"}
-                    </a>
-                    <button
-                      className="text-[10px] text-[#8f959e] hover:text-[#3370ff] cursor-pointer"
-                      onClick={() => navigator.clipboard.writeText(window.location.origin + `/arrival-feedback/${v.id}`)}
-                    >
-                      复制
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
             {/* 客户反馈 */}
             <div className="flex items-start gap-2">
-              <span className="text-[12px] text-[#8f959e] shrink-0 w-14">客户反馈</span>
-              <span className="text-[12px] text-[#2b2f36] leading-relaxed">{v.experience || <span className="text-[#b0b5bb]">-</span>}</span>
+              <span className="text-[12px] text-[#8f959e] shrink-0 w-14 mt-0.5">客户反馈</span>
+              <div className="text-[12px] text-[#2b2f36] leading-relaxed min-w-0 flex-1">
+                {v.experience ? (
+                  <>
+                    {v.experience}
+                    {v.feedback && (
+                      <span className="text-[#8f959e] ml-2">回复：{v.feedback}</span>
+                    )}
+                    <button
+                      className="text-[11px] text-[#3370ff] hover:text-[#2860e0] cursor-pointer ml-2 align-baseline"
+                      onClick={() => { setEditExpVisit(v); setEditExpText(v.experience || ""); setEditFeedbackText(v.feedback || "") }}
+                    >
+                      编辑
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="text-[11px] text-[#3370ff] hover:text-[#2860e0] cursor-pointer"
+                    onClick={() => { setEditExpVisit(v); setEditExpText(v.experience || ""); setEditFeedbackText(v.feedback || "") }}
+                  >
+                    编辑
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 疗愈记录 + 详情 */}
@@ -234,16 +233,39 @@ export default function ArrivalConfirmationView({
                   </button>
                 )}
               </div>
-              <button
-                className="text-[11px] text-[#8f959e] hover:text-[#3370ff] cursor-pointer shrink-0 self-center"
-                onClick={() => openDetail(v)}
-              >
-                详情
-              </button>
+            </div>
+
+            {/* 到店确认 */}
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-[#8f959e] shrink-0 w-14">到店确认</span>
+              <div className="flex items-center gap-3">
+                {v.arrived ? (
+                  <button
+                    className="inline-flex items-center gap-1 text-[11px] px-3 py-1 rounded-lg bg-[#3370ff] text-white hover:bg-[#2860e0] transition-colors cursor-pointer"
+                    onClick={() => onCancelArrived(v)}
+                  >
+                    已到店 ✓
+                  </button>
+                ) : (
+                  <button
+                    className="text-[11px] px-3 py-1 rounded-lg border border-[#d0d5dd] text-[#8f959e] hover:bg-[#f5f6f7] transition-colors cursor-pointer"
+                    onClick={() => onMarkArrived(v)}
+                  >
+                    未到店
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+          <button
+            className="text-[11px] text-[#8f959e] hover:text-[#3370ff] cursor-pointer shrink-0 self-end"
+            onClick={() => openDetail(v)}
+          >
+            操作记录
+          </button>
         </div>
       ))}
+      </div>
 
       {/* 疗愈记录编辑弹窗 */}
       <Dialog open={!!editVisit} onOpenChange={(open) => !open && setEditVisit(null)}>
@@ -263,6 +285,43 @@ export default function ArrivalConfirmationView({
               <Button variant="outline" size="sm" onClick={() => setEditVisit(null)}>取消</Button>
               <Button size="sm" onClick={handleSaveHR} disabled={savingHR}>
                 {savingHR ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 客户反馈编辑弹窗 */}
+      <Dialog open={!!editExpVisit} onOpenChange={(open) => !open && setEditExpVisit(null)}>
+        <DialogContent className="max-w-md p-0 gap-0">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b border-[#f0f0f0]">
+            <DialogTitle className="text-base">客户反馈 - {editExpVisit?.nickname}</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <label className="text-[12px] text-[#8f959e] mb-1.5 block">客户反馈</label>
+              <textarea
+                value={editExpText}
+                onChange={(e) => setEditExpText(e.target.value)}
+                placeholder="输入客户反馈..."
+                rows={4}
+                className="w-full rounded-xl border border-[#e8eaed] p-4 text-[15px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] text-[#8f959e] mb-1.5 block">疗愈师回复</label>
+              <textarea
+                value={editFeedbackText}
+                onChange={(e) => setEditFeedbackText(e.target.value)}
+                placeholder="输入疗愈师回复..."
+                rows={5}
+                className="w-full rounded-xl border border-[#e8eaed] p-4 text-[15px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditExpVisit(null)}>取消</Button>
+              <Button size="sm" onClick={handleSaveExp} disabled={savingExp}>
+                {savingExp ? "保存中..." : "保存"}
               </Button>
             </div>
           </div>

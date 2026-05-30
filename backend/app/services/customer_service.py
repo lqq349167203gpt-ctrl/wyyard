@@ -47,6 +47,8 @@ def create_customer(data: CustomerCreate) -> Customer:
     )
     _customers[customer.id] = customer
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(customer.id)
     return customer
 
 

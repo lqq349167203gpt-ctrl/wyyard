@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from app.utils.pagination import paginate
 from app.services import emotional_release_session_service
 from app.models.emotional_release_session import EmotionalReleaseSessionCreate
 
@@ -6,8 +7,11 @@ router = APIRouter(prefix="/api/emotional-release-sessions", tags=["emotional-re
 
 
 @router.get("")
-def list_sessions(date: str = ""):
-    return emotional_release_session_service.list_sessions(date or None)
+def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+    items = emotional_release_session_service.list_sessions(date or None)
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

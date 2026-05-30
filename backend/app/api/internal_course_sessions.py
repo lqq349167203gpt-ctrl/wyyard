@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from app.utils.pagination import paginate
 from app.services import internal_course_session_service
 from app.models.internal_course_session import InternalCourseSessionCreate
 
@@ -6,8 +7,11 @@ router = APIRouter(prefix="/api/internal-course-sessions", tags=["internal-cours
 
 
 @router.get("")
-def list_sessions(date: str = ""):
-    return internal_course_session_service.list_sessions(date or None)
+def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+    items = internal_course_session_service.list_sessions(date or None)
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

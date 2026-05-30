@@ -112,8 +112,9 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
     return activities
 
 
-def _count_customer_activities(customer_id: str) -> int:
-    """统计某客户参与的活动总次数（跨5个模块）"""
+def _build_customer_activity_counts() -> dict[str, int]:
+    """一次扫描构建所有客户的活动总次数 {customer_id: count}"""
+    from collections import defaultdict
     from app.services import (
         class_record_service,
         group_case_session_service,
@@ -121,44 +122,120 @@ def _count_customer_activities(customer_id: str) -> int:
         energy_knot_session_service,
         internal_course_session_service,
     )
-    count = 0
+    counts: dict[str, int] = defaultdict(int)
     for cr in class_record_service.list_records():
-        if customer_id in cr.participant_ids:
-            count += 1
+        for cid in cr.participant_ids:
+            counts[cid] += 1
     for s in group_case_session_service.list_sessions():
-        if customer_id in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
-            count += 1
+        for cid in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+            if cid:
+                counts[cid] += 1
     for s in emotional_release_session_service.list_sessions():
-        if customer_id in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
-            count += 1
+        for cid in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+            if cid:
+                counts[cid] += 1
     for s in energy_knot_session_service.list_sessions():
-        if customer_id in (s.participant_ids + [s.owner_id] + s.host_ids):
-            count += 1
+        for cid in (s.participant_ids + [s.owner_id] + s.host_ids):
+            if cid:
+                counts[cid] += 1
     for s in internal_course_session_service.list_sessions():
-        if customer_id in (s.participant_ids + s.host_ids):
-            count += 1
-    return count
+        for cid in (s.participant_ids + s.host_ids):
+            if cid:
+                counts[cid] += 1
+    return dict(counts)
+
+
+def _count_customer_activities(customer_id: str) -> int:
+    """统计某客户参与的活动总次数（使用批量构建的缓存）"""
+    return _build_customer_activity_counts().get(customer_id, 0)
+
+
+def _count_customer_activities_by_type(customer_id: str, activity_type: str) -> int:
+    """按活动类型统计某客户参与的活动次数"""
+    from app.services import (
+        class_record_service,
+        group_case_session_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+        internal_course_session_service,
+    )
+    if activity_type == "membership":
+        count = 0
+        for cr in class_record_service.list_records():
+            if customer_id in cr.participant_ids:
+                count += 1
+        return count
+    if activity_type == "emotional_release":
+        count = 0
+        for s in emotional_release_session_service.list_sessions():
+            if customer_id in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+                count += 1
+        return count
+    if activity_type == "group_case":
+        count = 0
+        for s in group_case_session_service.list_sessions():
+            if customer_id in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+                count += 1
+        return count
+    if activity_type == "energy_knot":
+        count = 0
+        for s in energy_knot_session_service.list_sessions():
+            if customer_id in (s.participant_ids + [s.owner_id] + s.host_ids):
+                count += 1
+        return count
+    if activity_type == "internal_course":
+        count = 0
+        for s in internal_course_session_service.list_sessions():
+            if customer_id in (s.participant_ids + s.host_ids):
+                count += 1
+        return count
+    return 0
+
+
+def _build_customer_welfare_counts() -> dict[str, int]:
+    """一次扫描构建所有客户的公益活动次数"""
+    from collections import defaultdict
+    from app.services import class_record_service
+
+    counts: dict[str, int] = defaultdict(int)
+    for cr in class_record_service.list_records():
+        if cr.is_public_welfare:
+            for cid in cr.participant_ids:
+                counts[cid] += 1
+    return dict(counts)
 
 
 def _count_customer_welfare_activities(customer_id: str) -> int:
-    """统计某客户参与的公益活动次数（仅 class_record 有公益标记）"""
-    from app.services import class_record_service
-
-    count = 0
-    for cr in class_record_service.list_records():
-        if cr.is_public_welfare and customer_id in cr.participant_ids:
-            count += 1
-    return count
+    return _build_customer_welfare_counts().get(customer_id, 0)
 
 
 def get_visit(visit_id: str) -> Optional[VisitRecord]:
     r = _visits.get(visit_id)
+    if r and r.is_deleted:
+        return None
     if r:
         r.activities = _get_customer_activities(r.customer_id, r.visit_date)
         r.activity_count = _count_customer_activities(r.customer_id)
         r.welfare_count = _count_customer_welfare_activities(r.customer_id)
         r.visit_count = count_customer_visits(r.customer_id)
     return r
+
+
+def get_date_counts(customer_ids: list[str] | None = None, start_date: str | None = None, end_date: str | None = None) -> dict[str, int]:
+    """返回各日期的到场人数统计，不做活动计数。customer_ids 用于权限过滤"""
+    allowed = set(customer_ids) if customer_ids else None
+    counts: dict[str, int] = {}
+    for v in _visits.values():
+        if v.is_deleted:
+            continue
+        if start_date and v.visit_date < start_date:
+            continue
+        if end_date and v.visit_date > end_date:
+            continue
+        if allowed is not None and v.customer_id not in allowed:
+            continue
+        counts[v.visit_date] = counts.get(v.visit_date, 0) + 1
+    return counts
 
 
 def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None) -> List[VisitRecord]:
@@ -170,19 +247,34 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None) -
     if customer_id:
         records = [r for r in records if r.customer_id == customer_id]
 
+    # 批量构建所有客户的活动计数（一次扫描，O(total_records)）
+    all_activity_counts = _build_customer_activity_counts()
+    all_welfare_counts = _build_customer_welfare_counts()
+    customer_activities_cache: dict[tuple, list] = {}
+
     for r in records:
         r.visit_count = count_customer_visits(r.customer_id)
-        r.activity_count = _count_customer_activities(r.customer_id)
-        r.welfare_count = _count_customer_welfare_activities(r.customer_id)
-        # 会员活动剩余次数：无卡=0，不限次=-1，有次数=具体数字
+        r.activity_count = all_activity_counts.get(r.customer_id, 0)
+        r.welfare_count = all_welfare_counts.get(r.customer_id, 0)
+        # 会员活动剩余次数
         cards = [c for c in membership_card_service.list_cards() if c.customer_id == r.customer_id]
         if cards:
             cards.sort(key=lambda c: c.created_at, reverse=True)
-            r.remaining_count = cards[0].remaining_count if cards[0].remaining_count is not None else -1
+            card = cards[0]
+            # 已过期的会员卡，剩余次数视为0
+            today = datetime.now().strftime("%Y-%m-%d")
+            if card.expiry_date and card.expiry_date < today:
+                r.remaining_count = 0
+            else:
+                r.remaining_count = card.remaining_count if card.remaining_count is not None else -1
         else:
             r.remaining_count = 0
         # 当日参与的活动（跨5个模块）
-        r.activities = _get_customer_activities(r.customer_id, r.visit_date)
+        # 当日参与的活动（跨5个模块），按 (customer_id, date) 缓存
+        cache_key = (r.customer_id, r.visit_date)
+        if cache_key not in customer_activities_cache:
+            customer_activities_cache[cache_key] = _get_customer_activities(r.customer_id, r.visit_date)
+        r.activities = customer_activities_cache[cache_key]
 
     return sorted(records, key=lambda r: r.created_at, reverse=True)
 
@@ -190,7 +282,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None) -
 def create_visit(data: VisitRecordCreate) -> VisitRecord:
     # 检查当天是否已到场
     for v in _visits.values():
-        if v.customer_id == data.customer_id and v.visit_date == data.visit_date:
+        if v.customer_id == data.customer_id and v.visit_date == data.visit_date and not v.is_deleted:
             raise ValueError(f"{data.nickname} 当天已经到场")
     now = datetime.now(timezone.utc)
     record = VisitRecord(

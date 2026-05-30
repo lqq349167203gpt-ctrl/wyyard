@@ -13,18 +13,28 @@ import {
 import { memberIdentityApi, type MemberIdentity, type MemberIdentityCreate, type IdentityCondition } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { ActivityConfigContent } from "@/pages/activity-config"
 
 const CARD_TYPES = ["体验会员", "常规通卡", "半年卡", "年卡"]
 const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
+const PAYMENT_CATEGORIES = ["会员活动", "觉醒游戏", "情绪释放", "能量结", "内部课程"]
 
 const TYPE_LABELS: Record<string, string> = {
   arrival: "到店情况",
   activity: "活动参与",
-  card: "会员活动",
-  course: "内部课程",
+  payment: "付费项目",
+  card: "付费项目",
+  course: "付费项目",
 }
 
 const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于" }
+const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "能量结"]
+
+function getPaymentCategories(c: IdentityCondition): string[] {
+  if (c.type === "card") return ["会员活动"]
+  if (c.type === "course") return ["内部课程"]
+  return c.payment_categories || []
+}
 
 function conditionSummary(c: IdentityCondition): string {
   if (c.type === "arrival" || c.type === "activity") {
@@ -33,20 +43,30 @@ function conditionSummary(c: IdentityCondition): string {
     if (c.count_value === 0 && c.count_op === ">") return `${label} ≥ 1 次`
     return `${label} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`
   }
-  if (c.type === "card" || c.type === "course") {
-    const prefix = c.type === "card" ? "持有" : "购买"
-    const items = c.items.length > 0 ? c.items.join("、") : "任意"
-    const validity = c.validity === "active" ? "有效" : "含过期"
-    return `${prefix}${validity}：${items}`
+  if (c.type === "card" || c.type === "course" || c.type === "payment") {
+    const categories = getPaymentCategories(c)
+    const parts: string[] = []
+    for (const cat of categories) {
+      if (cat === "会员活动" || cat === "内部课程") {
+        const prefix = cat === "会员活动" ? "持有" : "购买"
+        const subItems = c.items.length > 0 ? c.items.join("、") : "任意"
+        const validity = c.validity === "active" ? "有效" : "含过期"
+        parts.push(`${prefix}${validity}：${subItems}`)
+      } else {
+        parts.push(`${cat} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`)
+      }
+    }
+    return parts.join("，")
   }
   return ""
 }
 
 function defaultCondition(): IdentityCondition {
-  return { type: "" as any, items: [], count_op: ">", count_value: 0, validity: "active" }
+  return { type: "" as any, items: [], payment_categories: [], count_op: ">", count_value: 0, validity: "active" }
 }
 
 export default function MemberIdentitiesPage() {
+  const [activeTab, setActiveTab] = useState("identities")
   const [identities, setIdentities] = useState<MemberIdentity[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -168,19 +188,24 @@ export default function MemberIdentitiesPage() {
     setFormConditions(prev => prev.map((c, i) => {
       if (i !== index) return c
       const updated = { ...c, ...updates }
-      // 类型切换时重置子项
+      // 类型切换时重置
       if (updates.type && updates.type !== c.type) {
         updated.items = []
-        if (updates.type === "arrival" || updates.type === "activity") {
-          updated.count_op = ">"
-          updated.count_value = 0
-        } else {
-          updated.count_op = ">"
-          updated.count_value = 0
-          updated.validity = "active"
-        }
+        updated.payment_categories = []
+        updated.count_op = ">"
+        updated.count_value = 0
+        updated.validity = "active"
       }
       return updated
+    }))
+  }
+
+  const selectPaymentCategory = (condIndex: number, category: string) => {
+    setFormConditions(prev => prev.map((c, i) => {
+      if (i !== condIndex) return c
+      const current = (c.payment_categories || [])[0]
+      const next = current === category ? [] : [category]
+      return { ...c, payment_categories: next, items: [] }
     }))
   }
 
@@ -193,14 +218,34 @@ export default function MemberIdentitiesPage() {
   }
 
   return (
-    <div className="px-6 pt-12 pb-6 space-y-3">
-      <div>
-        <h1 className="text-lg font-semibold">会员身份</h1>
-        <p className="text-xs text-muted-foreground mt-1.5">
-          配置会员身份匹配规则，系统根据条件自动分配身份，按优先级从上到下匹配
-        </p>
+    <div className="px-6 pt-4 pb-6 space-y-3">
+      {/* Tab 切换 */}
+      <div className="flex items-center border-b border-[#e8e8e8] -mx-6 px-6 min-h-[39px]">
+        <div className="flex items-center gap-6">
+          {[
+            { key: "identities", label: "会员身份" },
+            { key: "activity-permissions", label: "会员权限" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              className={`relative px-1 pb-2 text-[14px] transition-colors ${
+                activeTab === tab.key
+                  ? "text-[#3370ff]"
+                  : "text-[#2b2f36] hover:text-[#4e535a]"
+              }`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+              {activeTab === tab.key && (
+                <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {activeTab === "identities" && (
+        <>
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           共 {identities.length} 个身份
@@ -316,15 +361,15 @@ export default function MemberIdentitiesPage() {
             <DialogTitle className="text-[14px]">{editingItem ? "编辑身份" : "新增身份"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-            <div className="space-y-1.5">
-              <label className="text-[12px] text-[#4e535a] font-light tracking-widest">身份名称</label>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">身份名称</span>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="输入会员身份名称" />
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[12px] text-[#4e535a] font-light tracking-widest">匹配条件</label>
-                <div className="flex items-center gap-2">
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">匹配条件</span>
+                <div className="flex items-center justify-between gap-2">
                   {formConditions.length > 1 && (
                     <select
                       value={formOperator}
@@ -342,11 +387,16 @@ export default function MemberIdentitiesPage() {
               </div>
 
               {formConditions.length === 0 ? (
-                <p className="text-[12px] text-[#8f959e] text-center py-4">无条件则直接匹配所有用户</p>
+                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+                  <span />
+                  <p className="text-[12px] text-[#8f959e] py-4">无条件则直接匹配所有用户</p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {formConditions.map((cond, ci) => (
-                    <div key={ci} className="border border-[#e5e6eb] rounded-lg p-3 space-y-3">
+                    <div key={ci} className="grid grid-cols-[70px_1fr] items-start gap-2">
+                      <span />
+                      <div className="border border-[#e5e6eb] rounded-lg p-3 space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">条件</span>
                         <select
@@ -357,8 +407,7 @@ export default function MemberIdentitiesPage() {
                           <option value="" disabled>请选择条件类型</option>
                           <option value="arrival">到店情况</option>
                           <option value="activity">活动参与</option>
-                          <option value="card">会员活动</option>
-                          <option value="course">内部课程</option>
+                          <option value="payment">付费项目</option>
                         </select>
 
                         <div className="flex-1" />
@@ -397,40 +446,108 @@ export default function MemberIdentitiesPage() {
                         </div>
                       )}
 
-                      {/* 卡/课程 → 子项选择 + 有效期 */}
-                      {cond.type && (cond.type === "card" || cond.type === "course") && (
+                      {/* 付费项目 → 项目类别 + 子项/次数 */}
+                      {cond.type && (cond.type === "payment" || cond.type === "card" || cond.type === "course") && (
                         <>
-                          <div className="flex items-start gap-2">
-                            <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right pt-1.5">项目</span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {(cond.type === "card" ? CARD_TYPES : COURSE_TYPES).map((item) => (
-                                <label
-                                  key={item}
-                                  className={`flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] cursor-pointer transition-colors ${
-                                    cond.items.includes(item)
-                                      ? "bg-[#3370ff] text-white border-[#3370ff]"
-                                      : "border-[#dee0e3] bg-white text-[#2b2f36] hover:bg-[#f7f8fa]"
-                                  }`}
-                                >
-                                  <input type="checkbox" checked={cond.items.includes(item)} onChange={() => toggleItem(ci, item)} className="hidden" />
-                                  {item}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">有效期</span>
+                            <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">项目</span>
                             <select
-                              value={cond.validity}
-                              onChange={(e) => updateCondition(ci, { validity: e.target.value as IdentityCondition["validity"] })}
+                              value={getPaymentCategories(cond)[0] || ""}
+                              onChange={(e) => selectPaymentCategory(ci, e.target.value)}
                               className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
                             >
-                              <option value="active">仅有效期内</option>
-                              <option value="all">过期依旧保留</option>
+                              <option value="" disabled>请选择项目</option>
+                              {PAYMENT_CATEGORIES.map((cat) => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
                             </select>
                           </div>
+
+                          {/* 会员活动子项 */}
+                          {getPaymentCategories(cond).includes("会员活动") && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right pt-1.5">会员活动</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {CARD_TYPES.map((item) => (
+                                  <label
+                                    key={item}
+                                    className={`flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] cursor-pointer transition-colors ${
+                                      cond.items.includes(item)
+                                        ? "bg-[#3370ff] text-white border-[#3370ff]"
+                                        : "border-[#dee0e3] bg-white text-[#2b2f36] hover:bg-[#f7f8fa]"
+                                    }`}
+                                  >
+                                    <input type="checkbox" checked={cond.items.includes(item)} onChange={() => toggleItem(ci, item)} className="hidden" />
+                                    {item}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 内部课程子项 */}
+                          {getPaymentCategories(cond).includes("内部课程") && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right pt-1.5">内部课程</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {COURSE_TYPES.map((item) => (
+                                  <label
+                                    key={item}
+                                    className={`flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] cursor-pointer transition-colors ${
+                                      cond.items.includes(item)
+                                        ? "bg-[#3370ff] text-white border-[#3370ff]"
+                                        : "border-[#dee0e3] bg-white text-[#2b2f36] hover:bg-[#f7f8fa]"
+                                    }`}
+                                  >
+                                    <input type="checkbox" checked={cond.items.includes(item)} onChange={() => toggleItem(ci, item)} className="hidden" />
+                                    {item}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 觉醒游戏/情绪释放/能量结 → 购买次数 */}
+                          {getPaymentCategories(cond).some((cat: string) => COUNT_CATEGORIES.includes(cat)) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">次数</span>
+                              <select
+                                value={cond.count_op}
+                                onChange={(e) => updateCondition(ci, { count_op: e.target.value as IdentityCondition["count_op"] })}
+                                className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
+                              >
+                                <option value=">">大于</option>
+                                <option value="=">等于</option>
+                                <option value="<">小于</option>
+                              </select>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={cond.count_value}
+                                onChange={(e) => updateCondition(ci, { count_value: parseInt(e.target.value) || 0 })}
+                                className="w-20 h-8 text-[12px]"
+                              />
+                              <span className="text-[12px] text-[#4e535a]">次</span>
+                            </div>
+                          )}
+
+                          {/* 有效期（会员活动或内部课程选中时显示） */}
+                          {getPaymentCategories(cond).some((cat: string) => cat === "会员活动" || cat === "内部课程") && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">有效期</span>
+                              <select
+                                value={cond.validity}
+                                onChange={(e) => updateCondition(ci, { validity: e.target.value as IdentityCondition["validity"] })}
+                                className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
+                              >
+                                <option value="active">仅有效期内</option>
+                                <option value="all">过期依旧保留</option>
+                              </select>
+                            </div>
+                          )}
                         </>
                       )}
+                    </div>
                     </div>
                   ))}
                 </div>
@@ -462,6 +579,10 @@ export default function MemberIdentitiesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+        </>
+      )}
+
+      {activeTab === "activity-permissions" && <ActivityConfigContent embedded />}
     </div>
   )
 }

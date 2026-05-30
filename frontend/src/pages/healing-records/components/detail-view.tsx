@@ -1,22 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { uploadApi, visitApi, type Customer, type Material, type VisitRecord } from "@/lib/api"
+import { uploadApi, customerApi, healingRecordApi, customerDetailApi, type Customer, type Material, type CustomerDetail } from "@/lib/api"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Upload, Edit, Trash2, FileText, Film } from "lucide-react"
+import { X, Upload, Copy } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
-
-interface SearchResult {
-  id: string
-  nickname: string
-  name: string
-  member_type: string
-}
 
 interface HealingRec {
   id: string
@@ -31,15 +24,6 @@ interface HealingRec {
   updated_at: string
 }
 
-interface DetailData {
-  customer: Customer
-  purchase_summary: { type: string; name: string; total_purchased: number; total_amount: number; used: number | string; remaining: number | string; effective_date: string; expiry_date: string }[]
-  activities: { type: string; date: string; name: string; role: string; host: string; is_public_welfare?: boolean }[]
-  healing_records: HealingRec[]
-  payment_records: { type: string; name: string; quantity: number; amount: number; effective_date: string; expiry_date: string; closer_name: string }[]
-}
-
-const API = "http://127.0.0.1:8000"
 
 export default function DetailView({
   selectedCustomerId,
@@ -50,105 +34,69 @@ export default function DetailView({
   onClearSelection: () => void
   hideSearch?: boolean
 }) {
-  const [keyword, setKeyword] = useState("")
-  const [results, setResults] = useState<SearchResult[]>([])
-  const [detail, setDetail] = useState<DetailData | null>(null)
+  const [customerList, setCustomerList] = useState<Customer[]>([])
+  const [searchValue, setSearchValue] = useState("")
+  const [detail, setDetail] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editingRec, setEditingRec] = useState<HealingRec | null>(null)
-  const [visits, setVisits] = useState<VisitRecord[]>([])
-  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "payment">("activities")
+  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "payment" | "purchase">("activities")
   const [activitiesPage, setActivitiesPage] = useState(1)
   const [healingPage, setHealingPage] = useState(1)
   const [paymentPage, setPaymentPage] = useState(1)
-  const skipSearchRef = useRef(false)
+  const [purchasePage, setPurchasePage] = useState(1)
+  const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
 
-  useEffect(() => { visitApi.list().then(setVisits).catch(() => {}) }, [])
+  useEffect(() => { customerApi.light().then(setCustomerList).catch(() => {}) }, [])
   // 客户到店日期集合（用于标记未参加活动）
-  const arrivedDates = new Set(visits.filter(v => v.customer_id === detail?.customer?.id && v.arrived).map(v => v.visit_date))
-
-  // 搜索防抖用 effect
-  useEffect(() => {
-    if (skipSearchRef.current) {
-      skipSearchRef.current = false
-      setResults([])
-      return
-    }
-    if (!keyword.trim()) {
-      setResults([])
-      return
-    }
-    const ctrl = new AbortController()
-    const timer = setTimeout(async () => {
-      try {
-        const r = await fetch(
-          `${API}/api/healing-records/search-customers?q=${encodeURIComponent(keyword.trim())}`,
-          { signal: ctrl.signal }
-        )
-        if (r.ok) {
-          const data = await r.json()
-          setResults(data)
-        }
-      } catch (e: any) {
-        if (e.name !== "AbortError") console.error(e)
-      }
-    }, 300)
-    return () => { clearTimeout(timer); ctrl.abort() }
-  }, [keyword])
+  const arrivedDates = new Set((detail?.visit_records || []).filter(v => v.arrived).map(v => v.visit_date))
 
   const loadDetail = useCallback(async (cid: string) => {
     setLoading(true)
+    setCopied(false)
     try {
-      const res = await fetch(`${API}/api/customer-detail/${cid}`)
-      if (!res.ok) return
-      setDetail(await res.json())
+      const data = await customerDetailApi.get(cid)
+      setDetail(data)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { if (selectedCustomerId) loadDetail(selectedCustomerId) }, [selectedCustomerId, loadDetail])
 
-  const onSelect = (r: SearchResult) => {
-    skipSearchRef.current = true
-    setKeyword(r.nickname || r.name)
-    setResults([])
-    loadDetail(r.id)
-  }
-
-  const onClear = () => { setDetail(null); setKeyword(""); setResults([]); onClearSelection() }
+  const onClear = () => { setDetail(null); setSearchValue(""); onClearSelection() }
 
   const refresh = () => { if (detail) loadDetail(detail.customer.id) }
 
   const saveRec = async (data: any) => {
-    const url = editingRec ? `${API}/api/healing-records/${editingRec.id}` : `${API}/api/healing-records`
-    const method = editingRec ? "PATCH" : "POST"
-    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
-    setFormOpen(false)
-    setEditingRec(null)
-    refresh()
-  }
-
-  const delRec = async (id: string) => {
-    if (!confirm("确认删除？")) return
-    await fetch(`${API}/api/healing-records/${id}`, { method: "DELETE" })
-    refresh()
+    if (saving) return
+    setSaving(true)
+    try {
+      if (editingRec) {
+        await healingRecordApi.update(editingRec.id, data)
+      } else {
+        await healingRecordApi.create(data)
+      }
+      setFormOpen(false)
+      setEditingRec(null)
+      refresh()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const bar = (
     <div className="flex items-center gap-4">
-      <div className="relative w-[280px]">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8f959e]" />
-        <Input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="搜索用户昵称或姓名" className="h-8 pl-8 text-[12px]" />
-        {results.length > 0 && (
-          <div className="absolute top-full left-0 right-0 bg-white border border-[#dee0e3] rounded-md shadow-lg z-50 mt-1">
-            {results.map(r => (
-              <button key={r.id} className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f7f8fa] flex items-center gap-2 border-b border-[#f0f0f0] last:border-b-0" onClick={() => onSelect(r)}>
-                <span className="text-[#2b2f36] font-medium">{r.nickname || r.name}</span>
-                {r.member_type && <span className="text-[12px] text-[#8f959e]">({r.member_type})</span>}
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="w-[280px]">
+        <CustomerSearchInput
+          customers={customerList}
+          value={searchValue}
+          onChange={(v) => setSearchValue(v as string)}
+          onSelectItem={(customer) => { loadDetail(customer.id) }}
+          placeholder="搜索用户昵称或姓名"
+        />
       </div>
       {detail && (
         <div className="flex items-center gap-2">
@@ -180,74 +128,82 @@ export default function DetailView({
   const firstVisit = c.created_at ? new Date(c.created_at).toLocaleDateString("zh-CN") : ""
 
   return (
-    <div className={hideSearch ? "p-2" : "space-y-2"}>
+    <div className={hideSearch ? "p-2 h-[75vh] flex flex-col" : "space-y-2 h-[calc(100vh-180px)] flex flex-col"}>
       {!hideSearch && bar}
 
       {/* 基本信息 */}
-      <div className="bg-white rounded-lg">
+      <div className="bg-white rounded-lg shrink-0">
         <div className="px-4 py-3 border-b"><h3 className="text-[12px] font-medium text-[#2b2f36]">基本信息</h3></div>
         <div className="p-4 grid grid-cols-3 gap-y-3 gap-x-6">
-          {[["昵称",c.nickname],["姓名",c.name],["年龄",c.age],["身份",c.member_type],["电话",c.phone],["微信",c.wechat],["初次到访",firstVisit],["到店次数",String(c.visit_count)],["引流人",c.referrer],["来源",c.traffic_source]].map(([l,v])=>(
+          {[["昵称",c.nickname],["姓名",c.name],["年龄",c.age],["会员身份",c.member_type],["电话",c.phone],["微信",c.wechat],["初次到访",firstVisit],["到店次数",String(c.visit_count)]].map(([l,v])=>(
             <div key={l} className="flex items-baseline gap-2">
               <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
               <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
             </div>
           ))}
+          <div className="flex items-baseline gap-2">
+            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈身份</span>
+            <span className="text-[12px] text-[#2b2f36]">
+              {(c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).length === 0
+                ? "-"
+                : (c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).map((p,i)=>(
+                    <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[12px] bg-[#f0f1f2] text-[#646a73] mr-1">{p}</span>
+                  ))
+              }
+            </span>
+          </div>
+        </div>
+        <div className="px-4 pb-4 grid grid-cols-3 gap-y-3 gap-x-6">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">引流人</span>
+            <span className="text-[12px] text-[#2b2f36]">{c.referrer || "-"}</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">流量来源</span>
+            <span className="text-[12px] text-[#2b2f36]">{c.traffic_source || "-"}</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">承接人</span>
+            <span className="text-[12px] text-[#2b2f36]">{c.referrer_handler || "-"}</span>
+          </div>
+          {c.traffic_source_detail && (
+          <div className="flex items-center gap-2 col-span-3">
+            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">流量链接</span>
+            <span className="text-[12px] text-[#2b2f36] truncate max-w-[200px]">{c.traffic_source_detail}</span>
+            <button
+              className="shrink-0 text-[#8f959e] hover:text-[#4e535a]"
+              onClick={() => { navigator.clipboard.writeText(c.traffic_source_detail); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+            {copied && <span className="text-[11px] text-[#8f959e]">已复制</span>}
+          </div>
+          )}
         </div>
       </div>
 
-      {/* 购买汇总 */}
-      {detail!.purchase_summary.length > 0 && (() => {
-        // 合并会员活动数据
-        const memberCards = detail!.purchase_summary.filter(s => s.type === "会员活动")
-        const otherItems = detail!.purchase_summary.filter(s => s.type !== "会员活动")
-
-        return (
-          <div className="bg-white rounded-lg">
-            <div className="px-4 pt-2.5 border-t border-[#f0f0f0]" />
-            <div className="px-4 pb-4 space-y-3">
-              {memberCards.length > 0 && (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">会员活动</span>
-                  <span className="text-[12px] text-[#2b2f36]">
-                    {memberCards.map((card, idx) => (
-                      <span key={idx} className="inline-flex items-baseline gap-2">
-                        {idx > 0 && <span className="text-[#8f959e] ml-1">丨</span>}
-                        <span>{card.name}</span>
-                        <span>{card.remaining === "不限" ? "不限次" : (typeof card.remaining === "number" && card.remaining < 0 ? <span className="text-[#c4506a]">剩余{card.remaining}次/共{card.total_purchased}次</span> : `剩余${card.remaining}次/共${card.total_purchased}次`)}</span>
-                        <span>{card.effective_date || "-"}~{card.expiry_date || "不限"}</span>
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              )}
-              {otherItems.map((s, i) => (
-                <div key={i} className="flex items-baseline gap-2">
-                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{s.type}</span>
-                  {s.type === "内部课程" && (
-                    <span className="inline-flex items-baseline gap-2">
-                      <span className="text-[12px] text-[#2b2f36]">{s.name}</span>
-                      <span className="text-[12px] text-[#2b2f36]">{s.effective_date || "-"}/{s.expiry_date || "-"}</span>
-                    </span>
-                  )}
-                  {(s.type === "觉醒游戏" || s.type === "情绪释放" || s.type === "能量结") && (
-                    <span className="text-[12px]">{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
-                  )}
-                </div>
-              ))}
+      {/* 客户信息 / 评估 / 标签 */}
+      <div className="border-t border-[#f0f0f0]" />
+      <div className="bg-white rounded-lg shrink-0">
+        <div className="p-4 space-y-3">
+          {[["客户信息",c.basic_info],["客户评估",c.assessment],["客户标签",c.tags]].map(([l,v])=>(
+            <div key={l} className="flex items-baseline gap-2">
+              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
+              <span className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v||"-"}</span>
             </div>
-          </div>
-        )
-      })()}
+          ))}
+        </div>
+      </div>
 
       {/* 记录标签页 */}
-      <div className="bg-white rounded-lg">
+      <div className="bg-white rounded-lg -mt-2.5 flex-1 min-h-0 flex flex-col">
         {/* 标签页按钮 */}
-        <div className="px-4 pt-2.5 flex gap-0 border-b border-[#f0f0f0]">
+        <div className="px-4 pt-2.5 flex gap-0 border-b border-[#f0f0f0] shrink-0">
           {[
             { key: "activities" as const, label: "活动记录" },
             { key: "healing" as const, label: "疗愈记录" },
-            { key: "payment" as const, label: "收费记录" },
+            { key: "purchase" as const, label: "项目次数" },
+            { key: "payment" as const, label: "交易记录" },
           ].map(tab => (
             <button
               key={tab.key}
@@ -256,6 +212,7 @@ export default function DetailView({
                 setActivitiesPage(1)
                 setHealingPage(1)
                 setPaymentPage(1)
+                setPurchasePage(1)
               }}
               className={`px-3 py-2 text-[12px] transition-colors border-b-2 -mb-px ${
                 activeTab === tab.key
@@ -269,13 +226,14 @@ export default function DetailView({
         </div>
 
         {/* 标签页内容 */}
-        <div className="p-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
           {/* 活动记录 */}
           {activeTab === "activities" && (() => {
+            const activities = detail!.activities || []
             const pageSize = 5
-            const totalPages = Math.ceil(detail!.activities.length / pageSize)
-            const paginatedActivities = detail!.activities.slice((activitiesPage - 1) * pageSize, activitiesPage * pageSize)
-            return detail!.activities.length===0 ? <div className="text-[12px] text-[#8f959e] text-center py-6">暂无</div> : (
+            const totalPages = Math.ceil(activities.length / pageSize)
+            const paginatedActivities = activities.slice((activitiesPage - 1) * pageSize, activitiesPage * pageSize)
+            return activities.length===0 ? <div className="text-[12px] text-[#8f959e] text-center py-6">暂无</div> : (
               <div>
                 <Table className="border-b border-[#f0f0f0]"><TableHeader><TableRow className="hover:bg-transparent">
                   <TableHead className="pl-4">日期</TableHead><TableHead>活动名称</TableHead><TableHead>角色</TableHead><TableHead>课程老师</TableHead>
@@ -286,10 +244,10 @@ export default function DetailView({
                       <TableRow key={i}>
                         <TableCell className="pl-4 text-[12px]">
                           {a.date}
-                          {notArrived && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded ml-1.5 text-[11px]">未参加</span>}
+                          {notArrived && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded ml-1.5 text-[12px]">未参加</span>}
                         </TableCell>
                         <TableCell className="text-[12px]">
-                          {a.is_public_welfare && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded mr-1.5 text-[11px]">公益</span>}
+                          {a.is_public_welfare && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded mr-1.5 text-[12px]">公益</span>}
                           {a.name || "-"}
                         </TableCell>
                         <TableCell className="text-[12px]">{a.role}</TableCell>
@@ -300,58 +258,126 @@ export default function DetailView({
                 </TableBody></Table>
                 {totalPages > 1 && (
                   <div className="px-4 py-2">
-                    <PaginationBar currentPage={activitiesPage} totalPages={totalPages} totalItems={detail!.activities.length} startIndex={(activitiesPage-1)*pageSize+1} endIndex={Math.min(activitiesPage*pageSize, detail!.activities.length)} onPageChange={setActivitiesPage} />
+                    <PaginationBar currentPage={activitiesPage} totalPages={totalPages} totalItems={activities.length} startIndex={(activitiesPage-1)*pageSize+1} endIndex={Math.min(activitiesPage*pageSize, activities.length)} onPageChange={setActivitiesPage} />
                   </div>
                 )}
               </div>
             )
           })()}
 
-          {/* 疗愈记录 */}
+          {/* 疗愈记录 — 到店记录 */}
           {activeTab === "healing" && (() => {
+            const visitRecords = (detail!.visit_records || []).sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.arrival_time || "").localeCompare(a.arrival_time || ""))
             const pageSize = 5
-            const totalPages = Math.ceil(detail!.healing_records.length / pageSize)
-            const paginatedRecords = detail!.healing_records.slice((healingPage - 1) * pageSize, healingPage * pageSize)
-            return detail!.healing_records.length===0 ? <p className="text-[12px] text-[#8f959e] text-center py-6">暂无疗愈记录</p> : (
+            const totalPages = Math.ceil(visitRecords.length / pageSize)
+            const paginatedRecords = visitRecords.slice((healingPage - 1) * pageSize, healingPage * pageSize)
+            return visitRecords.length===0 ? <p className="text-[12px] text-[#8f959e] text-center py-6">暂无到店记录</p> : (
               <div>
                 <div className="space-y-3">
-                  {paginatedRecords.map(r=>(
-                    <div key={r.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[12px] text-[#8f959e]">{r.date}</span>
-                          <span className="text-[12px] text-[#2b2f36] font-medium">{r.title}</span>
-                          {r.teacher && <span className="text-[12px] text-[#4e535a]">老师: {r.teacher}</span>}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={()=>{setEditingRec(r);setFormOpen(true)}}><Edit className="h-3.5 w-3.5"/></Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={()=>delRec(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive"/></Button>
-                        </div>
+                  {paginatedRecords.map((v) => (
+                    <div key={v.id} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] text-[#8f959e]">{v.visit_date}{v.arrival_time ? ` ${v.arrival_time}` : ""}</span>
+                        {v.arrived ? <span className="text-[12px] text-[#3370ff] bg-[#f0f4ff] px-1.5 py-0.5 rounded">已到店</span> : <span className="text-[12px] text-[#8f959e] bg-[#f0f0f0] px-1.5 py-0.5 rounded">未到店</span>}
                       </div>
-                      {r.growth_record && <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{r.growth_record}</p>}
-                      {r.materials?.length>0 && <div className="flex flex-wrap gap-2">{r.materials.map(m=>(
-                        <a key={m.id} href={m.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2 py-1 rounded bg-[#f5f6f7] text-[12px] text-[#4e535a] hover:bg-[#eff0f1]">
-                          {m.name.match(/\.(mp4|mov|avi|mkv)$/i)?<Film className="h-3 w-3"/>:<FileText className="h-3 w-3"/>}{m.name}
-                        </a>
-                      ))}</div>}
+                      {v.needs && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0">本次需求</span>
+                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.needs}</p>
+                        </div>
+                      )}
+                      {v.experience && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0">客户反馈</span>
+                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.experience}{v.feedback && <span className="text-[#8f959e] ml-2">回复：{v.feedback}</span>}</p>
+                        </div>
+                      )}
+                      {(() => {
+                        const hr = detail!.healing_records.find(r => r.date === v.visit_date)
+                        return hr?.growth_record ? (
+                          <div className="flex items-start gap-2">
+                            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0">疗愈记录</span>
+                            <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{hr.growth_record}</p>
+                          </div>
+                        ) : null
+                      })()}
+                      {!v.needs && !v.experience && !detail!.healing_records.find(r => r.date === v.visit_date)?.growth_record && (
+                        <p className="text-[12px] text-[#8f959e]">暂无记录</p>
+                      )}
                     </div>
                   ))}
                 </div>
                 {totalPages > 1 && (
                   <div className="mt-3 pt-3">
-                    <PaginationBar currentPage={healingPage} totalPages={totalPages} totalItems={detail!.healing_records.length} startIndex={(healingPage-1)*pageSize+1} endIndex={Math.min(healingPage*pageSize, detail!.healing_records.length)} onPageChange={setHealingPage} />
+                    <PaginationBar currentPage={healingPage} totalPages={totalPages} totalItems={visitRecords.length} startIndex={(healingPage-1)*pageSize+1} endIndex={Math.min(healingPage*pageSize, visitRecords.length)} onPageChange={setHealingPage} />
                   </div>
                 )}
               </div>
             )
           })()}
 
-          {/* 收费记录 */}
-          {activeTab === "payment" && (() => {
+          {/* 项目次数 */}
+          {activeTab === "purchase" && (() => {
+            const today = new Date().toLocaleDateString("sv-SE")
+            const allItems = detail!.purchase_summary || []
+            const sortedItems = [...allItems].sort((a, b) => {
+              const aExpired = a.expiry_date && a.expiry_date < today
+              const bExpired = b.expiry_date && b.expiry_date < today
+              const aNoCount = typeof a.remaining === "number" && a.remaining === 0
+              const bNoCount = typeof b.remaining === "number" && b.remaining === 0
+              const aBad = aExpired || aNoCount ? 1 : 0
+              const bBad = bExpired || bNoCount ? 1 : 0
+              return aBad - bBad
+            })
             const pageSize = 5
-            const totalPages = Math.ceil(detail!.payment_records.length / pageSize)
-            const paginatedRecords = detail!.payment_records.slice((paymentPage - 1) * pageSize, paymentPage * pageSize)
-            return detail!.payment_records.length===0 ? <div className="text-[12px] text-[#8f959e] text-center py-6">暂无</div> : (
+            const totalPages = Math.ceil(sortedItems.length / pageSize)
+            const paginatedItems = sortedItems.slice((purchasePage - 1) * pageSize, purchasePage * pageSize)
+            return sortedItems.length === 0 ? <div className="text-[12px] text-[#8f959e] text-center py-6">暂无</div> : (
+              <div>
+                <div className="divide-y divide-[#f0f0f0]">
+                  {paginatedItems.map((s, i) => {
+                    const expired = s.expiry_date && s.expiry_date < today
+                    const noCount = typeof s.remaining === "number" && s.remaining === 0
+                    return (
+                    <div key={i} className="flex items-center gap-2 py-2.5">
+                      <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{s.type}</span>
+                      <span className="text-[12px] text-[#2b2f36] flex-1 min-w-0">
+                        {s.type === "会员活动" ? (
+                          <span className="inline-flex items-baseline gap-2">
+                            <span>{s.name}</span>
+                            <span>{s.remaining === "不限" ? "不限次" : (typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`)}</span>
+                            <span>{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
+                          </span>
+                        ) : s.type === "内部课程" ? (
+                          <span className="inline-flex items-baseline gap-2">
+                            <span>{s.name}</span>
+                            <span>{s.effective_date || "-"}/{s.expiry_date || "-"}</span>
+                          </span>
+                        ) : (
+                          <span>{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
+                        )}
+                      </span>
+                      {expired && <span className="text-[12px] text-[#c4506a] bg-[#fef0f0] px-1.5 py-0.5 rounded shrink-0">已过期</span>}
+                      {noCount && !expired && <span className="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded shrink-0">无次数</span>}
+                    </div>
+                  )})}
+                </div>
+                {totalPages > 1 && (
+                  <div className="px-4 py-2">
+                    <PaginationBar currentPage={purchasePage} totalPages={totalPages} totalItems={sortedItems.length} startIndex={(purchasePage-1)*pageSize+1} endIndex={Math.min(purchasePage*pageSize, sortedItems.length)} onPageChange={setPurchasePage} />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* 交易记录 */}
+          {activeTab === "payment" && (() => {
+            const paymentRecords = detail!.payment_records || []
+            const pageSize = 5
+            const totalPages = Math.ceil(paymentRecords.length / pageSize)
+            const paginatedRecords = paymentRecords.slice((paymentPage - 1) * pageSize, paymentPage * pageSize)
+            return paymentRecords.length===0 ? <div className="text-[12px] text-[#8f959e] text-center py-6">暂无</div> : (
               <div>
                 <Table className="border-b border-[#f0f0f0]"><TableHeader><TableRow className="hover:bg-transparent">
                   <TableHead className="pl-4">类型</TableHead>
@@ -385,27 +411,15 @@ export default function DetailView({
         </div>
       </div>
 
-      {/* 基础信息 */}
-      <div className="bg-white rounded-lg">
-        <div className="px-4 py-3 border-b">
-          <h3 className="text-[12px] font-medium text-[#2b2f36]">基础信息 / 评估 / 标签</h3>
-        </div>
-        <div className="p-4 space-y-4">
-          {[["基础信息",c.basic_info],["客户评估",c.assessment],["客户标签",c.tags]].map(([l,v])=>(
-            <div key={l}><span className="text-[12px] text-[#8f959e] tracking-widest">{l}</span><p className="text-[12px] text-[#4e535a] mt-1 whitespace-pre-wrap">{v||"-"}</p></div>
-          ))}
-        </div>
-      </div>
-
       {/* 弹窗 */}
-      <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec}/>
+      <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec} customers={customerList} saving={saving}/>
     </div>
   )
 }
 
 // RecordForm 组件
 function RecordForm({
-  open, onOpenChange, rec, cid, cname, onSave,
+  open, onOpenChange, rec, cid, cname, onSave, customers, saving,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -413,6 +427,8 @@ function RecordForm({
   cid: string
   cname: string
   onSave: (data: any) => void
+  customers: Customer[]
+  saving?: boolean
 }) {
   const [date, setDate] = useState(rec?.date || "")
   const [title, setTitle] = useState(rec?.title || "")
@@ -422,38 +438,13 @@ function RecordForm({
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // 老师搜索
-  const [, setTeacherKeyword] = useState("")
-  const [teacherResults, setTeacherResults] = useState<{ id: string; nickname: string; name: string }[]>([])
-  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false)
-  const teacherTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const doSearchTeachers = useCallback(async (q: string) => {
-    try {
-      const res = await fetch(`${API}/api/customers?keyword=${encodeURIComponent(q)}`)
-      if (res.ok) {
-        const data = await res.json()
-        setTeacherResults(data.slice(0, 5))
-        setShowTeacherDropdown(true)
-      }
-    } catch {}
-  }, [])
-
-  const onTeacherInput = (val: string) => {
-    setTeacher(val)
-    setTeacherKeyword(val)
-    if (teacherTimerRef.current) clearTimeout(teacherTimerRef.current)
-    if (!val.trim()) { setTeacherResults([]); setShowTeacherDropdown(false); return }
-    teacherTimerRef.current = setTimeout(() => doSearchTeachers(val.trim()), 300)
-  }
-
-  useEffect(() => { if (rec) { setDate(rec.date); setTitle(rec.title); setTeacher(rec.teacher || ""); setGrowth(rec.growth_record || ""); setMats(rec.materials || []) } }, [rec])
-
   useEffect(() => {
-    const handleClickOutside = () => setShowTeacherDropdown(false)
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    if (rec) {
+      setDate(rec.date); setTitle(rec.title); setTeacher(rec.teacher || ""); setGrowth(rec.growth_record || ""); setMats(rec.materials || [])
+    } else {
+      setDate(""); setTitle(""); setTeacher(""); setGrowth(""); setMats([])
+    }
+  }, [rec])
 
   const handleSave = () => {
     if (!date || !title.trim()) return
@@ -472,8 +463,11 @@ function RecordForm({
     if (!files?.length) return
     setUploading(true)
     try {
-      const results = await Promise.all(Array.from(files).map(f => uploadApi.uploadMaterial(f)))
-      setMats(prev => [...prev, ...results])
+      const results = await Promise.allSettled(Array.from(files).map(f => uploadApi.uploadMaterial(f)))
+      const succeeded = results.filter((r): r is PromiseFulfilledResult<Material> => r.status === "fulfilled").map(r => r.value)
+      setMats(prev => [...prev, ...succeeded])
+      const failed = results.filter(r => r.status === "rejected")
+      if (failed.length > 0) console.error(`${failed.length} 个文件上传失败`)
     } catch (err) { console.error(err) }
     finally { setUploading(false); if (fileRef.current) fileRef.current.value = "" }
   }
@@ -493,31 +487,14 @@ function RecordForm({
             <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">标题</span>
             <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="记录标题" className="h-8 text-[12px]" />
           </div>
-          <div className="grid grid-cols-[56px_1fr] items-center gap-2 relative">
+          <div className="grid grid-cols-[56px_1fr] items-center gap-2">
             <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">老师</span>
-            <div className="relative">
-              <Input
-                value={teacher}
-                onChange={e => onTeacherInput(e.target.value)}
-                onFocus={() => { if (teacherResults.length > 0) setShowTeacherDropdown(true) }}
-                placeholder="搜索选择"
-                className="h-8 text-[12px]"
-              />
-              {showTeacherDropdown && teacherResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-[#dee0e3] rounded-md shadow-lg z-50 mt-1">
-                  {teacherResults.map(t => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f7f8fa] border-b border-[#f0f0f0] last:border-b-0"
-                      onClick={() => { setTeacher(t.nickname || t.name); setTeacherKeyword(""); setTeacherResults([]); setShowTeacherDropdown(false) }}
-                    >
-                      {t.nickname || t.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <CustomerSearchInput
+              customers={customers}
+              value={teacher}
+              onChange={(v) => setTeacher(v as string)}
+              placeholder="搜索选择"
+            />
           </div>
           <div className="grid grid-cols-[56px_1fr] items-start gap-2">
             <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2">成长记录</span>
@@ -538,7 +515,7 @@ function RecordForm({
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button size="sm" onClick={handleSave}>保存</Button>
+          <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存"}</Button>
         </div>
       </DialogContent>
     </Dialog>

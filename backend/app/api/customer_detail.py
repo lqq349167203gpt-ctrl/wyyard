@@ -40,6 +40,10 @@ def get_customer_detail(customer_id: str):
         for r in healing_record_service.list_records(customer_id)
     ]
     payment_records = _build_payment_records(customer_id)
+    visit_records = [
+        r.model_dump(mode="json")
+        for r in visit_service.list_visits(customer_id=customer_id)
+    ]
 
     return {
         "customer": basic,
@@ -47,6 +51,7 @@ def get_customer_detail(customer_id: str):
         "activities": activities,
         "healing_records": healing_records,
         "payment_records": payment_records,
+        "visit_records": visit_records,
     }
 
 

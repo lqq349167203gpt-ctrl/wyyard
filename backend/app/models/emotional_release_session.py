@@ -14,7 +14,10 @@ class EmotionalReleaseSessionBase(BaseModel):
     achiever_name: str = ""
     host_id: str = ""  # 主持人
     host_name: str = ""
+    description: str = ""
     materials: List[dict] = []
+    space_id: str = ""
+    room_id: str = ""
 
 
 class EmotionalReleaseSessionCreate(EmotionalReleaseSessionBase):

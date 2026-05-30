@@ -3,12 +3,12 @@ import { useMemo } from "react"
 import { AppLayout } from "@/components/layout/app-layout"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import LoginPage from "@/pages/login"
-import DashboardPage from "@/pages/dashboard"
-import CustomersPage from "@/pages/customers"
+
+
 import AgentsPage from "@/pages/agents"
 import ChatPage from "@/pages/chat"
-import KnowledgePage from "@/pages/knowledge"
-import BusinessPage from "@/pages/business"
+
+
 
 
 import PositionsPage from "@/pages/positions"
@@ -27,39 +27,42 @@ import HealingRecordsPage from "@/pages/healing-records"
 
 import OperationLogsPage from "@/pages/operation-logs"
 import SystemLogsPage from "@/pages/system-logs"
-import AccountsPage from "@/pages/accounts"
 import HealingIdentitiesPage from "@/pages/healing-identities"
 import ArrivalFeedbackPage from "@/pages/arrival-feedback"
 import ChangePasswordPage from "@/pages/change-password"
+import RemindersPage from "@/pages/reminders"
+import BusinessRemindersPage from "@/pages/business-reminders"
+import TrafficRecordsPage from "@/pages/traffic-records"
 
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
 
 const PATH_PERMISSIONS: Record<string, string> = {
-  "/": "dashboard",
-  "/customers": "customers",
+
+
 
   "/healing-records": "healing-records",
   "/courses/class-records": "class-records",
-  "/courses/daily-activities": "daily-activities",
+  "/courses/daily-activities": "class-records-activities",
   "/payment": "payment",
   "/courses/group-case-sessions": "group-case-sessions",
   "/courses/emotional-release-sessions": "emotional-release-sessions",
   "/courses/energy-knot-sessions": "energy-knot-sessions",
   "/courses/internal-course-sessions": "internal-course-sessions",
   "/agents": "agents",
-  "/knowledge": "knowledge",
-  "/business": "business",
+
 
 
   "/system-logs": "system-logs",
   "/operation-logs": "operation-logs",
-  "/accounts": "accounts",
   "/positions/management": "position-management",
   "/positions/courses": "courses",
   "/config/member-identities": "member-identities",
   "/courses/spaces": "spaces",
   "/healing-identities": "healing-identities",
+  "/config/reminders": "reminders",
+  "/business-reminders": "business-reminders",
+  "/traffic-records": "traffic-records",
 }
 
 function ProtectedRoute() {
@@ -82,22 +85,15 @@ function ProtectedRoute() {
     }
   }, [])
 
-  // 获取用户有权限的第一个页面
   const getFirstAllowedPath = useMemo(() => {
-    // 优先返回 dashboard
-    if (permissions.includes("dashboard")) return "/"
-    // 否则返回第一个有权限的页面
     for (const [path, permission] of Object.entries(PATH_PERMISSIONS)) {
       const hasPerm = permission === "payment"
         ? PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
         : permission === "class-records"
           ? CLASS_RECORDS_PERMISSIONS.some(p => permissions.includes(p))
           : permissions.includes(permission)
-      if (permission !== "dashboard" && hasPerm) {
-        return path
-      }
+      if (hasPerm) return path
     }
-    // 如果没有任何权限，返回登录页
     return "/login"
   }, [permissions])
 
@@ -105,22 +101,19 @@ function ProtectedRoute() {
     return <Navigate to="/login" replace />
   }
 
-  // 超级管理员跳过权限检查
+  // 首页已移除，统一重定向
+  if (location.pathname === "/") {
+    return <Navigate to={getFirstAllowedPath} replace />
+  }
+
   if (currentUser?.role !== "超级管理员") {
     const requiredPermission = PATH_PERMISSIONS[location.pathname]
-
-    // 如果访问首页但没有 dashboard 权限，重定向到有权限的页面
-    if (location.pathname === "/" && !permissions.includes("dashboard")) {
-      return <Navigate to={getFirstAllowedPath} replace />
-    }
-
-    // 如果访问其他页面但没有对应权限，重定向到有权限的页面
     const hasPermission = requiredPermission === "payment"
       ? PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
       : requiredPermission === "class-records"
         ? CLASS_RECORDS_PERMISSIONS.some(p => permissions.includes(p))
         : permissions.includes(requiredPermission)
-    if (requiredPermission && requiredPermission !== "dashboard" && !hasPermission) {
+    if (requiredPermission && !hasPermission) {
       return <Navigate to={getFirstAllowedPath} replace />
     }
   }
@@ -137,8 +130,8 @@ function App() {
           <Route path="/arrival-feedback/:visitId" element={<ArrivalFeedbackPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/customers" element={<CustomersPage />} />
+
+              <Route path="/" element={<></>} />
               <Route path="/positions/teacher" element={<PositionsPage />} />
               <Route path="/positions/management" element={<PositionManagementPage />} />
               <Route path="/positions/courses" element={<CoursesPage />} />
@@ -152,18 +145,19 @@ function App() {
               <Route path="/courses/internal-course-sessions" element={<InternalCourseSessionsPage />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id/chat" element={<ChatPage />} />
-              <Route path="/knowledge" element={<KnowledgePage />} />
-              <Route path="/business" element={<BusinessPage />} />
+
 
 
               <Route path="/config/member-identities" element={<MemberIdentitiesPage />} />
               <Route path="/healing-records" element={<HealingRecordsPage />} />
 
               <Route path="/system-logs" element={<SystemLogsPage />} />
-              <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               <Route path="/healing-identities" element={<HealingIdentitiesPage />} />
               <Route path="/operation-logs" element={<OperationLogsPage />} />
+              <Route path="/config/reminders" element={<RemindersPage />} />
+              <Route path="/business-reminders" element={<BusinessRemindersPage />} />
+              <Route path="/traffic-records" element={<TrafficRecordsPage />} />
             </Route>
           </Route>
         </Routes>

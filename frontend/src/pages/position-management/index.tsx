@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { positionApi, positionPermissionApi, accountApi } from "@/lib/api"
+import { positionApi, positionPermissionApi, positionCustomerPermissionApi, memberIdentityApi, accountApi } from "@/lib/api"
 import type { Position, Account } from "@/lib/api"
+import { AccountsContent } from "@/pages/accounts"
 
 const ALL_PAGES = [
-  { key: "dashboard", label: "工作台" },
-  { key: "customers", label: "用户管理" },
+
+
   { key: "healing-records", label: "客户信息" },
   { key: "class-records-visitors", label: "到场人员" },
   { key: "class-records-activities", label: "当日活动" },
@@ -26,33 +27,43 @@ const ALL_PAGES = [
   { key: "energy-knot-sessions", label: "能量结场次" },
   { key: "internal-course-sessions", label: "内部课程场次" },
   { key: "agents", label: "AI 配置" },
-  { key: "knowledge", label: "知识库" },
-  { key: "business", label: "业务数据" },
+
 
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
-  { key: "accounts", label: "账号管理" },
   { key: "member-identities", label: "会员身份" },
   { key: "healing-identities", label: "疗愈身份" },
-  { key: "position-management", label: "角色管理" },
+  { key: "position-management", label: "账号管理" },
   { key: "courses", label: "沙龙类型" },
   { key: "spaces", label: "疗愈空间" },
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务", keys: ["customers", "healing-records"] },
+  { label: "业务", keys: ["healing-records"] },
   { label: "人员到场", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival"] },
   { label: "付费项目", keys: ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"] },
   { label: "场次", keys: ["group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"] },
   { label: "信息配置", keys: ["courses", "member-identities", "healing-identities", "spaces"] },
-  { label: "账号管理", keys: ["accounts", "position-management"] },
-  { label: "系统配置", keys: ["dashboard", "agents", "knowledge", "business", "system-logs", "operation-logs"] },
+  { label: "账号管理", keys: ["position-management"] },
+  { label: "系统配置", keys: ["agents", "system-logs", "operation-logs"] },
+]
+
+// 需要按会员身份类型过滤客户的页面
+const CUSTOMER_FILTER_PAGES = [
+  "healing-records",
+  "class-records-visitors", "class-records-activities", "class-records-arrival",
+  "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses",
 ]
 
 export default function PositionManagementPage() {
+  const [activeTab, setActiveTab] = useState("accounts")
   const [positions, setPositions] = useState<Position[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [permissions, setPermissions] = useState<Record<string, string[]>>({})
+  const [customerPermissions, setCustomerPermissions] = useState<Record<string, string[]>>({})
+  const [customerPermissionsCR, setCustomerPermissionsCR] = useState<Record<string, string[]>>({})
+  const [customerPermissionsPay, setCustomerPermissionsPay] = useState<Record<string, string[]>>({})
+  const [memberIdentityNames, setMemberIdentityNames] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   // 弹窗状态
@@ -61,19 +72,30 @@ export default function PositionManagementPage() {
   const [formName, setFormName] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [formPermissions, setFormPermissions] = useState<string[]>([])
+  const [formCustomerPermissions, setFormCustomerPermissions] = useState<string[]>([])
+  const [formCustomerPermissionsCR, setFormCustomerPermissionsCR] = useState<string[]>([])
+  const [formCustomerPermissionsPay, setFormCustomerPermissionsPay] = useState<string[]>([])
   const [deletePosition, setDeletePosition] = useState<Position | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
 
   const loadData = async () => {
     try {
-      const [p, a, perm] = await Promise.all([
+      const [p, a, perm, cPerm, cPermCR, cPermPay, identities] = await Promise.all([
         positionApi.list(),
         accountApi.list(),
         positionPermissionApi.getAll(),
+        positionCustomerPermissionApi.getAll("customers"),
+        positionCustomerPermissionApi.getAll("class_records"),
+        positionCustomerPermissionApi.getAll("payment"),
+        memberIdentityApi.list(),
       ])
       setPositions(p)
       setAccounts(a)
       setPermissions(perm)
+      setCustomerPermissions(cPerm)
+      setCustomerPermissionsCR(cPermCR)
+      setCustomerPermissionsPay(cPermPay)
+      setMemberIdentityNames(identities.map(i => i.name))
     } catch {} finally {
       setLoading(false)
     }
@@ -90,6 +112,9 @@ export default function PositionManagementPage() {
     setFormName("")
     setFormDescription("")
     setFormPermissions(ALL_PAGES.map(p => p.key))
+    setFormCustomerPermissions([...memberIdentityNames])
+    setFormCustomerPermissionsCR([...memberIdentityNames])
+    setFormCustomerPermissionsPay([...memberIdentityNames])
     setShowDialog(true)
   }
 
@@ -98,6 +123,9 @@ export default function PositionManagementPage() {
     setFormName(position.name)
     setFormDescription(position.description || "")
     setFormPermissions(permissions[position.name] || [])
+    setFormCustomerPermissions(customerPermissions[position.name] || [])
+    setFormCustomerPermissionsCR(customerPermissionsCR[position.name] || [])
+    setFormCustomerPermissionsPay(customerPermissionsPay[position.name] || [])
     setShowDialog(true)
   }
 
@@ -113,7 +141,14 @@ export default function PositionManagementPage() {
       positionName = created.name
     }
 
-    await positionPermissionApi.set(positionName, formPermissions)
+    await Promise.all([
+      positionPermissionApi.set(positionName, formPermissions),
+      positionCustomerPermissionApi.setBatch(positionName, {
+        customers: formCustomerPermissions,
+        class_records: formCustomerPermissionsCR,
+        payment: formCustomerPermissionsPay,
+      }),
+    ])
 
     setShowDialog(false)
     setEditingPosition(null)
@@ -127,18 +162,62 @@ export default function PositionManagementPage() {
     loadData()
   }
 
+  const getSectionForPage = (pageKey: string): string | null => {
+    if (pageKey === "healing-records") return "customers"
+    if (["class-records-visitors", "class-records-activities", "class-records-arrival"].includes(pageKey)) return "class_records"
+    if (["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"].includes(pageKey)) return "payment"
+    return null
+  }
+
+  const autoFillCustomerPerms = (section: string) => {
+    if (section === "customers" && formCustomerPermissions.length === 0) setFormCustomerPermissions([...memberIdentityNames])
+    else if (section === "class_records" && formCustomerPermissionsCR.length === 0) setFormCustomerPermissionsCR([...memberIdentityNames])
+    else if (section === "payment" && formCustomerPermissionsPay.length === 0) setFormCustomerPermissionsPay([...memberIdentityNames])
+  }
+
   const handleTogglePermission = (pageKey: string) => {
-    setFormPermissions(prev =>
-      prev.includes(pageKey) ? prev.filter(k => k !== pageKey) : [...prev, pageKey]
-    )
+    setFormPermissions(prev => {
+      const next = prev.includes(pageKey) ? prev.filter(k => k !== pageKey) : [...prev, pageKey]
+      const section = getSectionForPage(pageKey)
+      if (section && next.includes(pageKey)) autoFillCustomerPerms(section)
+      return next
+    })
   }
 
   return (
-    <div className="px-6 pt-12 pb-6 space-y-3">
+    <div className="px-6 pt-4 pb-6 space-y-3">
+      {/* Tab 切换 */}
+      <div className="flex items-center border-b border-[#e8e8e8] -mx-6 px-6 min-h-[39px]">
+        <div className="flex items-center gap-6">
+          {[
+            { key: "accounts", label: "账号管理" },
+            { key: "roles", label: "角色权限" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              className={`relative px-1 pb-2 text-[14px] transition-colors ${
+                activeTab === tab.key
+                  ? "text-[#3370ff]"
+                  : "text-[#2b2f36] hover:text-[#4e535a]"
+              }`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+              {activeTab === tab.key && (
+                <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === "accounts" && <AccountsContent embedded />}
+
+      {activeTab === "roles" && (
+        <>
       <div className="flex items-center justify-between pb-2">
         <div>
-          <h1 className="text-lg font-semibold">角色管理</h1>
-          <p className="text-xs text-muted-foreground mt-1.5">管理各角色类型与页面权限配置</p>
+          <p className="text-xs text-muted-foreground">管理各角色类型与页面权限配置</p>
         </div>
         <Button size="sm" className="h-8 text-xs" onClick={openCreateDialog}>
           <Plus className="h-3.5 w-3.5 mr-1" /> 新增身份
@@ -235,6 +314,11 @@ export default function PositionManagementPage() {
                           onChange={(e) => {
                             if (e.target.checked) {
                               setFormPermissions(prev => [...new Set([...prev, ...group.keys])])
+                              // 勾选需客户过滤的页面组时，默认全选对应模块的会员身份
+                              if (group.keys.some(k => CUSTOMER_FILTER_PAGES.includes(k))) {
+                                const sec = getSectionForPage(group.keys.find(k => CUSTOMER_FILTER_PAGES.includes(k))!)
+                                if (sec) autoFillCustomerPerms(sec)
+                              }
                             } else {
                               setFormPermissions(prev => prev.filter(k => !group.keys.includes(k)))
                             }
@@ -260,6 +344,44 @@ export default function PositionManagementPage() {
                         )
                       })}
                     </div>
+                    {(() => {
+                      const section = getSectionForPage(group.keys.find(k => CUSTOMER_FILTER_PAGES.includes(k)) || "")
+                      if (!section) return null
+                      const anyChecked = group.keys.some(k => CUSTOMER_FILTER_PAGES.includes(k) && formPermissions.includes(k))
+                      if (!anyChecked) return null
+                      const perms = section === "customers" ? formCustomerPermissions
+                        : section === "class_records" ? formCustomerPermissionsCR
+                        : formCustomerPermissionsPay
+                      const setPerms = section === "customers" ? setFormCustomerPermissions
+                        : section === "class_records" ? setFormCustomerPermissionsCR
+                        : setFormCustomerPermissionsPay
+                      return (
+                        <div className="px-4 py-2.5 border-t border-[#e8e8e8] bg-[#fafbfc]">
+                          <span className="text-[11px] text-[#8f959e] block mb-2">选择该角色可见的会员身份类型</span>
+                          {memberIdentityNames.length === 0 ? (
+                            <span className="text-[12px] text-[#b0b5bb] block py-1">暂无会员身份类型，请先在"会员身份"页面创建</span>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                              {memberIdentityNames.map((name) => (
+                                <label key={name} className="flex items-center gap-2 py-0.5 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={perms.includes(name)}
+                                    onChange={() => {
+                                      setPerms(prev =>
+                                        prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+                                      )
+                                    }}
+                                    className="rounded"
+                                  />
+                                  <span className="text-[12px] text-[#2b2b2b]">{name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 ))}
               </div>
@@ -309,6 +431,8 @@ export default function PositionManagementPage() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

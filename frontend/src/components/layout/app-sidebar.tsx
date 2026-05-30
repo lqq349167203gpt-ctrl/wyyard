@@ -2,10 +2,6 @@ import { Link, useLocation } from "react-router-dom"
 import { useMemo } from "react"
 import {
   Bot,
-  BookOpen,
-  LayoutDashboard,
-  Database,
-  Users,
   ClipboardList,
   GraduationCap,
   BookText,
@@ -15,6 +11,8 @@ import {
   Heart,
   ShieldCheck,
   FileText,
+  Bell,
+  TrendingUp,
 } from "lucide-react"
 import {
   Sidebar,
@@ -29,7 +27,8 @@ import {
 } from "@/components/ui/sidebar"
 
 const businessItems = [
-  { title: "用户管理", icon: Users, path: "/customers", permission: "customers" },
+  { title: "业务提醒", icon: Bell, path: "/business-reminders", permission: "business-reminders" },
+  { title: "引流记录", icon: TrendingUp, path: "/traffic-records", permission: "traffic-records" },
   { title: "客户信息", icon: Heart, path: "/healing-records", permission: "healing-records" },
 ]
 
@@ -43,22 +42,18 @@ const configItems = [
   { title: "会员身份", icon: ShieldCheck, path: "/config/member-identities", permission: "member-identities" },
   { title: "疗愈身份", icon: Heart, path: "/healing-identities", permission: "healing-identities" },
   { title: "疗愈空间", icon: Building2, path: "/courses/spaces", permission: "spaces" },
+  { title: "提醒配置", icon: Bell, path: "/config/reminders", permission: "reminders" },
 ]
 
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"]
 
 const accountItems = [
-  { title: "账号管理", icon: Users, path: "/accounts", permission: "accounts" },
-  { title: "角色管理", icon: GraduationCap, path: "/positions/management", permission: "position-management" },
-  { title: "修改密码", icon: ShieldCheck, path: "/change-password", permission: "" },
+  { title: "账号管理", icon: GraduationCap, path: "/positions/management", permission: "position-management" },
+  { title: "密码修改", icon: ShieldCheck, path: "/change-password", permission: "" },
 ]
 
 const systemItems = [
-  { title: "工作台", icon: LayoutDashboard, path: "/", permission: "dashboard" },
   { title: "AI 配置", icon: Bot, path: "/agents", permission: "agents" },
-  { title: "知识库", icon: BookOpen, path: "/knowledge", permission: "knowledge" },
-  { title: "业务数据", icon: Database, path: "/business", permission: "business" },
-
   { title: "系统日志", icon: FileText, path: "/system-logs", permission: "system-logs" },
   { title: "操作日志", icon: ClipboardList, path: "/operation-logs", permission: "operation-logs" },
 ]

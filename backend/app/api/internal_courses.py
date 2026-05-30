@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from app.utils.pagination import paginate
 from app.services import internal_course_service
 from app.models.internal_course import InternalCourseCreate
 
@@ -6,8 +7,14 @@ router = APIRouter(prefix="/api/internal-courses", tags=["internal-courses"])
 
 
 @router.get("")
-def list_courses():
-    return internal_course_service.list_courses()
+def list_courses(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None)):
+    items = internal_course_service.list_courses()
+    if customer_ids:
+        allowed = set(customer_ids.split(","))
+        items = [i for i in items if i.get("customer_id") in allowed]
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

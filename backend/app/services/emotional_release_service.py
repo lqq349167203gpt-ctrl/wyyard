@@ -47,6 +47,8 @@ def create_release(data: EmotionalReleaseCreate) -> EmotionalRelease:
     )
     _releases[release.id] = release
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(release.customer_id)
     return release
 
 
@@ -60,6 +62,8 @@ def update_release(release_id: str, data: dict) -> Optional[EmotionalRelease]:
     release.updated_at = datetime.now(timezone.utc)
     _releases[release_id] = release
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(release.customer_id)
     return release
 
 
@@ -74,6 +78,8 @@ def delete_release(release_id: str) -> tuple[bool, str]:
     release.is_deleted = True
     release.deleted_at = datetime.now(timezone.utc)
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(release.customer_id)
     return True, "删除成功"
 
 

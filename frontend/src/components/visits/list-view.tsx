@@ -13,7 +13,7 @@ import { visitApi, type VisitRecord } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
-export default function ListView() {
+export default function ListView({ onCustomerClick }: { onCustomerClick?: (customerId: string) => void }) {
   const [visits, setVisits] = useState<VisitRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -124,7 +124,10 @@ export default function ListView() {
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-[11px] font-medium text-muted-foreground">
                       {(v.nickname || "?")[0]}
                     </div>
-                    <span className="text-[13px] text-[#2b2f36]">{v.nickname}</span>
+                    <span
+                      className="text-[13px] text-[#2b2f36] cursor-pointer hover:text-[#3370ff]"
+                      onClick={() => onCustomerClick?.(v.customer_id)}
+                    >{v.nickname}</span>
                   </div>
                 </TableCell>
                 <TableCell>

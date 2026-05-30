@@ -1,17 +1,18 @@
-import { useState } from "react"
-import { Plus } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { Plus, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import ListView from "./components/list-view"
 import DetailView from "./components/detail-view"
-import { customerApi, type CustomerCreate } from "@/lib/api"
+import { customerApi, type Customer, type CustomerCreate } from "@/lib/api"
 
-const emptyCustomer: Partial<CustomerCreate> = {
-  nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", referrer: "",
+const emptyCustomer: Record<string, any> = {
+  nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referrer_handler: "",
   member_type: "", paid_content: [], visit_count: 0,
-  basic_info: "", assessment: "", tags: "", traffic_source: "",
+  basic_info: "", assessment: "", tags: "", traffic_source: "", traffic_source_detail: "",
 }
 
 export default function HealingRecordsPage() {
@@ -19,8 +20,51 @@ export default function HealingRecordsPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState<Partial<CustomerCreate>>(emptyCustomer)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<Record<string, any>>(emptyCustomer)
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; nickname: string } | null>(null)
+  const [deleteConfirmName, setDeleteConfirmName] = useState("")
+  const [customers, setCustomers] = useState<Customer[]>([])
+
+  // 搜索状态
+  const [searchNickname, setSearchNickname] = useState("")
+  const [searchIdentity, setSearchIdentity] = useState("")
+  const [searchReferrer, setSearchReferrer] = useState("")
+  const [searchReferrerHandler, setSearchReferrerHandler] = useState("")
+  const [appliedNickname, setAppliedNickname] = useState("")
+  const [appliedIdentity, setAppliedIdentity] = useState("")
+  const [appliedReferrer, setAppliedReferrer] = useState("")
+  const [appliedReferrerHandler, setAppliedReferrerHandler] = useState("")
+  const [filterKey, setFilterKey] = useState(0)
+
+  useEffect(() => {
+    customerApi.light().then(setCustomers).catch(() => {})
+  }, [])
+
+  const identities = useMemo(() =>
+    [...new Set(customers.map(c => c.member_type).filter(Boolean))].sort()
+  , [customers])
+
+  const handleSearch = () => {
+    setAppliedNickname(searchNickname)
+    setAppliedIdentity(searchIdentity)
+    setAppliedReferrer(searchReferrer)
+    setAppliedReferrerHandler(searchReferrerHandler)
+    setFilterKey(k => k + 1)
+  }
+
+  const handleClear = () => {
+    setSearchNickname("")
+    setSearchIdentity("")
+    setSearchReferrer("")
+    setSearchReferrerHandler("")
+    setAppliedNickname("")
+    setAppliedIdentity("")
+    setAppliedReferrer("")
+    setAppliedReferrerHandler("")
+    setFilterKey(k => k + 1)
+  }
 
   const handleSelectCustomer = (customerId: string) => {
     setSelectedCustomerId(customerId)
@@ -28,12 +72,38 @@ export default function HealingRecordsPage() {
   }
 
   const handleAddNew = () => {
+    setEditingId(null)
     setForm(emptyCustomer)
     setCreateOpen(true)
   }
 
-  const handleDeleteCustomer = async (id: string) => {
-    await customerApi.delete(id)
+  const handleEditCustomer = async (id: string) => {
+    try {
+      const c = await customerApi.get(id)
+      const ageParts = (c.age || "").match(/^(\d+)(?:\s*\(([^)]+)\))?$/)
+      const isRangeOnly = /^\d+~\d+\+?$|^\d+\+$/.test(c.age || "")
+      setForm({
+        ...emptyCustomer,
+        ...c,
+        age: ageParts ? ageParts[1] || "" : isRangeOnly ? "" : c.age || "",
+        age_range: ageParts?.[2] || (isRangeOnly ? c.age : ""),
+      })
+      setEditingId(id)
+      setCreateOpen(true)
+    } catch {
+      alert("加载客户信息失败")
+    }
+  }
+
+  const handleDeleteCustomer = (id: string, nickname: string) => {
+    setDeleteTarget({ id, nickname })
+    setDeleteConfirmName("")
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    await customerApi.delete(deleteTarget.id)
+    setDeleteTarget(null)
     setRefreshKey(k => k + 1)
   }
 
@@ -41,7 +111,17 @@ export default function HealingRecordsPage() {
     if (!form.nickname?.trim()) return
     setSaving(true)
     try {
-      await customerApi.create(form as Partial<CustomerCreate>)
+      const data = { ...form }
+      const range = form.age_range
+      if (range) {
+        data.age = form.age ? `${form.age} (${range})` : range
+      }
+      delete data.age_range
+      if (editingId) {
+        await customerApi.update(editingId, data as Partial<CustomerCreate>)
+      } else {
+        await customerApi.create(data as Partial<CustomerCreate>)
+      }
       setCreateOpen(false)
       setRefreshKey(k => k + 1)
     } catch (error) {
@@ -52,25 +132,90 @@ export default function HealingRecordsPage() {
   }
 
   return (
-    <div className="px-6 pt-12 pb-6 space-y-3">
+    <div className="p-6 space-y-5">
       <div>
         <h1 className="text-lg font-semibold">客户信息</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">管理与查看全部客户资料</p>
       </div>
 
-      <div>
-        <div className="flex items-center justify-between py-2 border-b border-[#f0f0f0]">
-          <div />
-          <Button size="sm" className="h-7 text-xs" onClick={handleAddNew}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> 新建
-          </Button>
+      {/* 搜索栏 */}
+      <div className="flex items-end gap-3 flex-wrap">
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] text-[#8f959e]">昵称</label>
+          <div className="w-44">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchNickname}
+              onChange={(v) => setSearchNickname(typeof v === "string" ? v : "")}
+              placeholder="搜索客户昵称"
+            />
+          </div>
         </div>
-
-        <ListView
-          key={refreshKey}
-          onSelectCustomer={handleSelectCustomer}
-          onDeleteCustomer={handleDeleteCustomer}
-        />
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] text-[#8f959e]">身份</label>
+          <select
+            value={searchIdentity}
+            onChange={(e) => setSearchIdentity(e.target.value)}
+            className="h-8 w-36 rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
+          >
+            <option value="">全部</option>
+            {identities.map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] text-[#8f959e]">引流人</label>
+          <div className="w-44">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchReferrer}
+              onChange={(v) => setSearchReferrer(typeof v === "string" ? v : "")}
+              placeholder="搜索客户昵称"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] text-[#8f959e]">承接人</label>
+          <div className="w-44">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchReferrerHandler}
+              onChange={(v) => setSearchReferrerHandler(typeof v === "string" ? v : "")}
+              placeholder="搜索客户昵称"
+            />
+          </div>
+        </div>
+        <button
+          onClick={handleSearch}
+          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
+        >
+          <Search className="h-3.5 w-3.5" />
+          查询
+        </button>
+        <button
+          onClick={handleClear}
+          className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
+        >
+          <X className="h-3.5 w-3.5" />
+          清空
+        </button>
+        <div className="flex-1" />
+        <Button size="sm" className="h-8 text-xs" onClick={handleAddNew}>
+          <Plus className="mr-1 h-3.5 w-3.5" /> 新建
+        </Button>
       </div>
+
+      <ListView
+        key={`${refreshKey}-${filterKey}`}
+        onSelectCustomer={handleSelectCustomer}
+        onDeleteCustomer={handleDeleteCustomer}
+        onEditCustomer={handleEditCustomer}
+        filterNickname={appliedNickname}
+        filterIdentity={appliedIdentity}
+        filterReferrer={appliedReferrer}
+        filterReferrerHandler={appliedReferrerHandler}
+      />
 
       {/* 客户详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>
@@ -87,7 +232,7 @@ export default function HealingRecordsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="w-[640px] max-w-[90vw] p-0 gap-0">
           <div className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
-            <h3 className="text-[14px] font-normal">新建用户</h3>
+            <h3 className="text-[14px] font-normal">{editingId ? "编辑用户" : "新建用户"}</h3>
           </div>
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
@@ -97,7 +242,7 @@ export default function HealingRecordsPage() {
               <Input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="请输入" />
 
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">性别</span>
-              <select value={form.gender || ""} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="h-8 w-full rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat">
+              <select value={form.gender || ""} onChange={(e) => setForm({ ...form, gender: e.target.value })} className={`h-8 w-full rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat ${form.gender ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
                 <option value="">请选择</option>
                 <option value="男">男</option>
                 <option value="女">女</option>
@@ -108,12 +253,84 @@ export default function HealingRecordsPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">微信</span>
               <Input value={form.wechat || ""} onChange={(e) => setForm({ ...form, wechat: e.target.value })} placeholder="请输入" />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">年龄</span>
-              <Input value={form.age || ""} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="请输入" />
+              <div className="flex gap-2">
+                <Input value={form.age || ""} onChange={(e) => { const v = e.target.value; const n = parseInt(v); let range = ""; if (n >= 60) range = "60+"; else if (n >= 51) range = "51~60"; else if (n >= 41) range = "41~50"; else if (n >= 31) range = "31~40"; else if (n >= 18) range = "18~30"; setForm({ ...form, age: v, age_range: range }); }} placeholder="具体年龄" className="flex-1" />
+                <select value={form.age_range || ""} onChange={(e) => setForm({ ...form, age_range: e.target.value })} className={`h-8 flex-1 rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat ${form.age_range ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
+                  <option value="">年龄段</option>
+                  <option value="18~30">18~30</option>
+                  <option value="31~40">31~40</option>
+                  <option value="41~50">41~50</option>
+                  <option value="51~60">51~60</option>
+                  <option value="60+">60+</option>
+                </select>
+              </div>
 
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">引流人</span>
-              <Input value={form.referrer || ""} onChange={(e) => setForm({ ...form, referrer: e.target.value })} placeholder="请输入" />
+              <CustomerSearchInput
+                customers={customers}
+                value={form.referrer || ""}
+                onChange={(v) => setForm({ ...form, referrer: typeof v === "string" ? v : v[0] || "" })}
+                placeholder="搜索客户昵称"
+                excludeIds={form.id ? [form.id] : []}
+              />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">流量来源</span>
-              <Input value={form.traffic_source || ""} onChange={(e) => setForm({ ...form, traffic_source: e.target.value })} placeholder="请输入" />
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const hasDetail = ["小红书", "抖音", "公众号", "视频号", "好友推荐", "朋友圈"].includes(form.traffic_source)
+                  return (
+                    <>
+                      <select
+                        value={form.traffic_source || ""}
+                        onChange={(e) => setForm({ ...form, traffic_source: e.target.value, traffic_source_detail: "" })}
+                        className={`h-8 ${["好友推荐", "朋友圈"].includes(form.traffic_source) ? "flex-[6]" : hasDetail ? "flex-[7]" : "w-full"} rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat ${form.traffic_source ? "text-[#2b2f36]" : "text-[#8f959e]"}`}
+                      >
+                        <option value="">请选择</option>
+                        <option value="小红书">小红书</option>
+                        <option value="抖音">抖音</option>
+                        <option value="公众号">公众号</option>
+                        <option value="视频号">视频号</option>
+                        <option value="朋友圈">朋友圈</option>
+                        <option value="美团">美团</option>
+                        <option value="大众点评">大众点评</option>
+                        <option value="好友推荐">好友推荐</option>
+                      </select>
+                      {["小红书", "抖音", "公众号", "视频号"].includes(form.traffic_source) && (
+                        <Input value={form.traffic_source_detail || ""} onChange={(e) => setForm({ ...form, traffic_source_detail: e.target.value })} placeholder="内容链接" className="h-8 flex-[12] text-[12px]" />
+                      )}
+                      {form.traffic_source === "好友推荐" && (
+                        <div className="flex-[13]">
+                          <CustomerSearchInput
+                            customers={customers}
+                            value={form.traffic_source_detail || ""}
+                            onChange={(v) => setForm({ ...form, traffic_source_detail: typeof v === "string" ? v : v[0] || "" })}
+                            placeholder="好友昵称"
+                          />
+                        </div>
+                      )}
+                      {form.traffic_source === "朋友圈" && (
+                        <div className="flex-[13]">
+                          <CustomerSearchInput
+                            customers={customers}
+                            value={form.traffic_source_detail || ""}
+                            onChange={(v) => setForm({ ...form, traffic_source_detail: typeof v === "string" ? v : v[0] || "" })}
+                            placeholder="所属人"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">承接人</span>
+              <CustomerSearchInput
+                customers={customers}
+                value={form.referrer_handler || ""}
+                onChange={(v) => setForm({ ...form, referrer_handler: typeof v === "string" ? v : v[0] || "" })}
+                placeholder="搜索客户昵称"
+                excludeIds={form.id ? [form.id] : []}
+              />
+              <span className="col-span-2" />
             </div>
 
             <div className="border-t border-[#f0f0f0]" />
@@ -136,9 +353,43 @@ export default function HealingRecordsPage() {
             <div className="flex justify-end gap-2 pt-2 border-t border-[#f0f0f0]">
               <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>取消</Button>
               <Button size="sm" onClick={handleSave} disabled={saving}>
-                {saving ? "保存中..." : "创建"}
+                {saving ? "保存中..." : editingId ? "保存" : "创建"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认弹窗 */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => { setDeleteTarget(null); setDeleteConfirmName("") }}>
+        <DialogContent className="w-[360px] max-w-[90vw] p-0 gap-0">
+          <div className="px-5 py-3 border-b border-[#f0f0f0]">
+            <h3 className="text-[14px] font-normal">删除客户</h3>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-[12px] text-[#2b2f36]">
+              确定要删除「<span className="font-medium">{deleteTarget?.nickname}</span>」吗？删除后不可恢复。
+            </p>
+            <div>
+              <label className="text-[11px] text-[#8f959e] mb-1 block">请输入客户昵称确认删除</label>
+              <Input
+                value={deleteConfirmName}
+                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                placeholder={deleteTarget?.nickname || ""}
+                className="h-8"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">
+            <Button variant="outline" size="sm" onClick={() => { setDeleteTarget(null); setDeleteConfirmName("") }}>取消</Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleConfirmDelete}
+              disabled={deleteConfirmName !== deleteTarget?.nickname}
+            >
+              确定删除
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

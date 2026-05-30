@@ -42,6 +42,7 @@ class CustomerBase(BaseModel):
     wechat: str = ""
     age: str = ""
     referrer: str = ""
+    referrer_handler: str = ""
     member_type: str = ""
     paid_content: List[PaidContentItem] = []
     visit_count: int = 0
@@ -55,6 +56,7 @@ class CustomerBase(BaseModel):
     assessment: str = ""
     tags: str = ""
     traffic_source: str = ""
+    traffic_source_detail: str = ""
     tracking_plan: str = ""
 
 
@@ -70,6 +72,7 @@ class CustomerUpdate(BaseModel):
     wechat: Optional[str] = None
     age: Optional[str] = None
     referrer: Optional[str] = None
+    referrer_handler: Optional[str] = None
     member_type: Optional[str] = None
     paid_content: Optional[List[PaidContentItem]] = None
     visit_count: Optional[int] = None
@@ -83,6 +86,7 @@ class CustomerUpdate(BaseModel):
     assessment: Optional[str] = None
     tags: Optional[str] = None
     traffic_source: Optional[str] = None
+    traffic_source_detail: Optional[str] = None
     tracking_plan: Optional[str] = None
 
 

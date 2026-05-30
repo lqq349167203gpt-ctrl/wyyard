@@ -1,14 +1,18 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.models.space import SpaceCreate, RoomCreate
+from app.utils.pagination import paginate
 from app.services import space_service
 
 router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 
 
 @router.get("")
-async def list_spaces():
-    return space_service.list_spaces()
+async def list_spaces(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+    items = space_service.list_spaces()
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

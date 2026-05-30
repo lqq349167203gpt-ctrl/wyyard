@@ -70,6 +70,8 @@ def create_course(data: InternalCourseCreate) -> InternalCourse:
     )
     _courses[course.id] = course
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(course.customer_id)
     return course
 
 
@@ -84,6 +86,8 @@ def update_course(course_id: str, data: dict) -> Optional[InternalCourse]:
     course.updated_at = datetime.now(timezone.utc)
     _courses[course_id] = course
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(course.customer_id)
     return course
 
 
@@ -94,6 +98,8 @@ def delete_course(course_id: str) -> bool:
     course.is_deleted = True
     course.deleted_at = datetime.now(timezone.utc)
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(course.customer_id)
     return True
 
 

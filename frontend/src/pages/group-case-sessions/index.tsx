@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react"
-import { Plus, Trash2, Edit, Loader2, X, Calendar, Users, ChevronRight, FileUp, Download, File } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Plus, Trash2, Edit, X, Calendar, Users, ChevronRight, FileUp, Download, File } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -14,8 +14,9 @@ import {
 import { groupCaseSessionApi, groupCaseApi, customerApi, uploadApi, type GroupCaseSession, type GroupCaseCustomerSearchResult, type Customer } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 
-const today = new Date().toISOString().split("T")[0]
+const today = new Date().toLocaleDateString("sv-SE")
 
 export default function GroupCaseSessionsPage() {
   const [sessions, setSessions] = useState<GroupCaseSession[]>([])
@@ -36,23 +37,6 @@ export default function GroupCaseSessionsPage() {
   const [formAchieverName, setFormAchieverName] = useState("")
   const [formHostId, setFormHostId] = useState("")
   const [formHostName, setFormHostName] = useState("")
-
-  // 弹窗搜索状态
-  const [searchField, setSearchField] = useState<"owner" | "achiever" | "host" | null>(null)
-  const [searchKeyword, setSearchKeyword] = useState("")
-  const [searchResults, setSearchResults] = useState<GroupCaseCustomerSearchResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const searchTimeoutRef = useRef<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  // 右侧面板参与者搜索
-  const [panelSearchKeyword, setPanelSearchKeyword] = useState("")
-  const [panelSearchResults, setPanelSearchResults] = useState<GroupCaseCustomerSearchResult[]>([])
-  const [panelSearching, setPanelSearching] = useState(false)
-  const [panelShowDropdown, setPanelShowDropdown] = useState(false)
-  const panelSearchTimeoutRef = useRef<number | null>(null)
-  const panelDropdownRef = useRef<HTMLDivElement>(null)
 
   // 资料弹窗
   const [materialsDialogOpen, setMaterialsDialogOpen] = useState(false)
@@ -93,101 +77,19 @@ export default function GroupCaseSessionsPage() {
 
   useEffect(() => { load() }, [])
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-        setSearchField(null)
-      }
-      if (panelDropdownRef.current && !panelDropdownRef.current.contains(e.target as Node)) {
-        setPanelShowDropdown(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
   const filteredSessions = filterDate
     ? sessions.filter(s => s.date === filterDate)
     : sessions
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredSessions)
 
-  // 弹窗搜索
-  const handleSearch = (keyword: string, field: "owner" | "achiever" | "host") => {
-    setSearchKeyword(keyword)
-    setSearchField(field)
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    if (!keyword.trim()) { setSearchResults([]); setShowDropdown(false); return }
-    searchTimeoutRef.current = window.setTimeout(async () => {
-      setSearching(true)
-      try {
-        const results = await groupCaseSessionApi.searchCustomers(keyword)
-        setSearchResults(results)
-        setShowDropdown(true)
-      } catch { setSearchResults([]) }
-      finally { setSearching(false) }
-    }, 300)
-  }
-
-  const handleSelectCustomer = (customer: GroupCaseCustomerSearchResult) => {
-    if (searchField === "owner") {
-      if (customer.remaining !== -1 && customer.remaining <= 0) {
-        setPendingOwner(customer)
-        setPurchaseCount("")
-        setPurchaseAmount("")
-        setPurchaseDialogOpen(true)
-        setSearchKeyword("")
-        setSearchResults([])
-        setShowDropdown(false)
-        setSearchField(null)
-        return
-      }
-      setFormOwnerId(customer.id)
-      setFormOwnerName(customer.nickname)
-    } else if (searchField === "achiever") {
-      setFormAchieverId(customer.id)
-      setFormAchieverName(customer.nickname)
-    } else if (searchField === "host") {
-      setFormHostId(customer.id)
-      setFormHostName(customer.nickname)
-    }
-    setSearchKeyword("")
-    setSearchResults([])
-    setShowDropdown(false)
-    setSearchField(null)
-  }
-
-  // 右侧面板参与者搜索
-  const handlePanelSearch = (keyword: string) => {
-    setPanelSearchKeyword(keyword)
-    if (panelSearchTimeoutRef.current) clearTimeout(panelSearchTimeoutRef.current)
-    if (!keyword.trim()) { setPanelSearchResults([]); setPanelShowDropdown(false); return }
-    panelSearchTimeoutRef.current = window.setTimeout(async () => {
-      setPanelSearching(true)
-      try {
-        const results = await groupCaseSessionApi.searchCustomers(keyword)
-        const currentIds = [
-          selectedSession?.owner_id,
-          selectedSession?.host_id,
-          ...(selectedSession?.participant_ids || []),
-        ].filter(Boolean)
-        setPanelSearchResults(results.filter(r => !currentIds.includes(r.id)))
-        setPanelShowDropdown(true)
-      } catch { setPanelSearchResults([]) }
-      finally { setPanelSearching(false) }
-    }, 300)
-  }
-
-  const handleAddParticipant = async (customer: GroupCaseCustomerSearchResult) => {
+  const handleAddParticipant = async (customer: Customer) => {
     if (!selectedSession) return
-    if (customer.remaining === 0) return
     const newIds = [...selectedSession.participant_ids, customer.id]
     try {
       const updated = await groupCaseSessionApi.update(selectedSession.id, { participant_ids: newIds })
       setSelectedSession(updated)
 
-      setPanelSearchKeyword(""); setPanelSearchResults([]); setPanelShowDropdown(false)
       load()
     } catch (error) {
       handleApiError(error)
@@ -273,8 +175,6 @@ export default function GroupCaseSessionsPage() {
     setFormAchieverName("")
     setFormHostId("")
     setFormHostName("")
-    setSearchKeyword("")
-    setSearchField(null)
     setDialogOpen(true)
   }
 
@@ -287,8 +187,6 @@ export default function GroupCaseSessionsPage() {
     setFormAchieverName(session.achiever_name)
     setFormHostId(session.host_id)
     setFormHostName(session.host_name)
-    setSearchKeyword("")
-    setSearchField(null)
     setDialogOpen(true)
   }
 
@@ -325,80 +223,6 @@ export default function GroupCaseSessionsPage() {
     if (selectedSession?.id === deleteId) setSelectedSession(null)
     setDeleteId(null)
     load()
-  }
-
-  const renderSearchField = (
-    label: string,
-    field: "owner" | "achiever" | "host",
-    selectedName: string,
-    placeholder: string
-  ) => {
-    const isActive = searchField === field
-    const showClear = !isActive && !!selectedName
-    return (
-      <div className="grid grid-cols-[70px_1fr] items-start gap-2" ref={isActive ? dropdownRef : undefined}>
-        <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">{label}</span>
-        <div className="relative">
-          <Input
-            value={isActive ? searchKeyword : selectedName}
-            onChange={(e) => handleSearch(e.target.value, field)}
-            placeholder={placeholder}
-            className="h-8 text-xs pr-16"
-            onFocus={() => {
-              if (!isActive) handleSearch("", field)
-              if (isActive && searchResults.length > 0) setShowDropdown(true)
-            }}
-          />
-          {showClear && (
-            <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              onMouseDown={(e) => {
-                e.preventDefault()
-                if (field === "owner") { setFormOwnerId(""); setFormOwnerName("") }
-                else if (field === "achiever") { setFormAchieverId(""); setFormAchieverName("") }
-                else if (field === "host") { setFormHostId(""); setFormHostName("") }
-              }}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {isActive && searching && (
-            <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          )}
-          {isActive && showDropdown && searchResults.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-              {searchResults.map((customer) => (
-                <div
-                  key={customer.id}
-                  className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                  onClick={() => handleSelectCustomer(customer)}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-medium">{customer.nickname}</span>
-                    {customer.name && customer.name !== customer.nickname && (
-                      <span className="text-[11px] text-muted-foreground">({customer.name})</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {field === "owner" && (
-                      <span className={`text-[11px] ${customer.remaining > 0 ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
-                        {customer.remaining === -1 ? "不限" : `剩余 ${customer.remaining} 次`}
-                      </span>
-                    )}
-                    <span className="text-[11px] text-muted-foreground">{customer.member_type || "新人"}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {isActive && showDropdown && searchResults.length === 0 && searchKeyword && !searching && (
-            <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-[12px] text-muted-foreground text-center">
-              未找到匹配用户
-            </div>
-          )}
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -544,53 +368,14 @@ export default function GroupCaseSessionsPage() {
                     {selectedSession.participant_ids.length} 人
                   </Badge>
                 </div>
-                <div className="relative" ref={panelDropdownRef}>
-                  <Input
-                    value={panelSearchKeyword}
-                    onChange={(e) => handlePanelSearch(e.target.value)}
-                    placeholder="搜索用户添加..."
-                    className="h-8 text-xs"
-                    onFocus={() => panelSearchResults.length > 0 && setPanelShowDropdown(true)}
-                  />
-                  {panelSearching && <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                  {panelShowDropdown && panelSearchResults.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-48 overflow-y-auto">
-                      {panelSearchResults.map((customer) => customer.remaining === 0 ? (
-                        <div
-                          key={customer.id}
-                          className="flex items-center justify-between px-3 py-2 bg-[#f5f5f5]"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{customer.nickname}</span>
-                            {customer.name && customer.name !== customer.nickname && (
-                              <span className="text-xs text-muted-foreground">({customer.name})</span>
-                            )}
-                          </div>
-                          <span className="text-xs text-[#ff4d4f]">已无剩余活动次数</span>
-                        </div>
-                      ) : (
-                        <div
-                          key={customer.id}
-                          className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
-                          onClick={() => handleAddParticipant(customer)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{customer.nickname}</span>
-                            {customer.name && customer.name !== customer.nickname && (
-                              <span className="text-xs text-muted-foreground">({customer.name})</span>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">{customer.remaining === -1 ? "不限" : `剩余 ${customer.remaining} 次`}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {panelShowDropdown && panelSearchResults.length === 0 && panelSearchKeyword && !panelSearching && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-sm text-muted-foreground text-center">
-                      未找到匹配用户
-                    </div>
-                  )}
-                </div>
+                <CustomerSearchInput
+                  customers={allCustomers}
+                  value={""}
+                  onChange={() => {}}
+                  onSelectItem={(c) => handleAddParticipant(c)}
+                  placeholder="搜索用户添加..."
+                  excludeIds={[...(selectedSession?.owner_id ? [selectedSession.owner_id] : []), ...(selectedSession?.host_id ? [selectedSession.host_id] : []), ...(selectedSession?.participant_ids || [])]}
+                />
               </div>
 
               {/* 已选参与者列表 */}
@@ -641,28 +426,48 @@ export default function GroupCaseSessionsPage() {
               <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
             </div>
 
-            {renderSearchField("案主", "owner", formOwnerName, "搜索案主...")}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">案主</span>
+              <CustomerSearchInput
+                customers={allCustomers}
+                value={formOwnerName || ""}
+                onChange={(v) => {
+                  const name = typeof v === "string" ? v : v[0] || ""
+                  if (!name) { setFormOwnerId(""); setFormOwnerName("") }
+                }}
+                onSelectItem={(c) => { setFormOwnerId(c.id); setFormOwnerName(c.nickname) }}
+                placeholder="搜索客户昵称"
+              />
+            </div>
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成就君</span>
-              <select
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] text-[#2b2f36] outline-none"
-                value={formAchieverId}
-                onChange={(e) => {
-                  const id = e.target.value
-                  const c = allCustomers.find(c => c.id === id)
-                  setFormAchieverId(id)
-                  setFormAchieverName(c?.nickname || c?.name || "")
+              <CustomerSearchInput
+                customers={allCustomers}
+                value={formAchieverName || ""}
+                onChange={(v) => {
+                  const name = typeof v === "string" ? v : v[0] || ""
+                  if (!name) { setFormAchieverId(""); setFormAchieverName("") }
                 }}
-              >
-                <option value="">选择成就君</option>
-                {allCustomers.filter(c => c.positions?.includes("成就君")).map(c => (
-                  <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
-                ))}
-              </select>
+                onSelectItem={(c) => { setFormAchieverId(c.id); setFormAchieverName(c.nickname || c.name) }}
+                placeholder="搜索成就君"
+                positionFilter="成就君"
+              />
             </div>
 
-            {renderSearchField("主持人", "host", formHostName, "搜索主持人...")}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">主持人</span>
+              <CustomerSearchInput
+                customers={allCustomers}
+                value={formHostName || ""}
+                onChange={(v) => {
+                  const name = typeof v === "string" ? v : v[0] || ""
+                  if (!name) { setFormHostId(""); setFormHostName("") }
+                }}
+                onSelectItem={(c) => { setFormHostId(c.id); setFormHostName(c.nickname) }}
+                placeholder="搜索客户昵称"
+              />
+            </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>

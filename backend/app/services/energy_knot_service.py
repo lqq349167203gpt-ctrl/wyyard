@@ -47,6 +47,8 @@ def create_knot(data: EnergyKnotCreate) -> EnergyKnot:
     )
     _knots[knot.id] = knot
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(knot.customer_id)
     return knot
 
 
@@ -60,6 +62,8 @@ def update_knot(knot_id: str, data: dict) -> Optional[EnergyKnot]:
     knot.updated_at = datetime.now(timezone.utc)
     _knots[knot_id] = knot
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(knot.customer_id)
     return knot
 
 
@@ -75,6 +79,8 @@ def delete_knot(knot_id: str) -> tuple[bool, str]:
     knot.is_deleted = True
     knot.deleted_at = datetime.now(timezone.utc)
     _save()
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(knot.customer_id)
     return True, "删除成功"
 
 

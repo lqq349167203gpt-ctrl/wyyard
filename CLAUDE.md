@@ -46,6 +46,7 @@ wyyard_project/
 | 信息配置 | 会员身份 | /config/member-identities |
 | 信息配置 | 疗愈身份 | /healing-identities |
 | 信息配置 | 疗愈空间 | /courses/spaces |
+| 信息配置 | 提醒配置 | /config/reminders |
 | 账号管理 | 账号管理 | /accounts |
 | 账号管理 | 角色管理 | /positions/management |
 | 账号管理 | 修改密码 | /change-password |
@@ -71,6 +72,8 @@ wyyard_project/
 - 状态管理优先 React Context，复杂场景再考虑 Zustand
 - API 调用统一走 `src/lib/api.ts`，不在组件里直接 fetch
 - 页面路由放在 `src/pages/`，每个页面一个文件夹
+- **昵称搜索统一使用 `CustomerSearchInput`**（`src/components/customer-search-input.tsx`），支持单选/多选/position 过滤/排除/禁用
+- **弹窗含搜索输入框时**：DialogContent 加 `initialFocus={false}`，避免自动聚焦搜索框
 
 ### 后端
 - Agent 定义和 Graph 定义分离：`agents/` 放 Agent 配置，`graphs/` 放工作流编排

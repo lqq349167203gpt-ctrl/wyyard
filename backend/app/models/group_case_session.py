@@ -16,6 +16,8 @@ class GroupCaseSessionBase(BaseModel):
     host_id: str = ""  # 主持人
     host_name: str = ""
     materials: List[dict] = []
+    space_id: str = ""
+    room_id: str = ""
 
 
 class GroupCaseSessionCreate(GroupCaseSessionBase):

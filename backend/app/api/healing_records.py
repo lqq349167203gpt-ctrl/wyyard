@@ -2,13 +2,21 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from app.services import healing_record_service
 from app.models.healing_record import HealingRecordCreate, HealingRecordUpdate
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/healing-records", tags=["healing-records"])
 
 
 @router.get("")
-def list_records(customer_id: Optional[str] = Query(None)):
-    return healing_record_service.list_records(customer_id)
+def list_records(
+    customer_id: Optional[str] = Query(None),
+    page: int | None = Query(None, ge=1),
+    page_size: int | None = Query(None, ge=1, le=100),
+):
+    items = healing_record_service.list_records(customer_id)
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")
