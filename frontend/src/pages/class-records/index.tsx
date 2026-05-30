@@ -1597,9 +1597,9 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   return (
     <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
 
-      {/* 切换按钮 + 视图模式 - 独立页面模式隐藏 */}
+      {/* 页面切换 */}
       {!standaloneTab && (
-      <div className="flex items-center justify-between border-b border-[#e8e8e8] -mx-6 px-6 mb-6">
+      <div className="flex items-center border-b border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
         <div className="flex items-center gap-6">
           {hasPerm("class-records-visitors") && (
           <button
@@ -1648,7 +1648,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       )}
 
       {/* 主内容区 */}
-            /* ===== 详细视图 ===== */
       <div className="flex flex-col min-h-0 flex-1 gap-2">
       <div>
       {/* 选中日期显示 + 操作按钮 */}
