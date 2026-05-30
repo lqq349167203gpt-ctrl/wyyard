@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react"
-import { Plus, Trash2, X, Users, BookOpen, ChevronRight, ChevronLeft, Download, File, ChevronDown } from "lucide-react"
+import { Plus, Trash2, X, Users, BookOpen, Download, File, ChevronDown } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
 import GroupingView from "@/components/grouping-view"
 import { Button } from "@/components/ui/button"
@@ -16,24 +16,6 @@ import ActivityCardList from "./activity-card-list"
 
 const today = new Date().toISOString().split("T")[0]
 
-function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d); r.setDate(r.getDate() + n); return r
-}
-function getWeekday(d: string): string {
-  return ["日", "一", "二", "三", "四", "五", "六"][new Date(d).getDay()]
-}
-function formatDateChinese(d: string): string {
-  const date = new Date(d)
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  const weekday = ["日", "一", "二", "三", "四", "五", "六"][date.getDay()]
-  return `${year}年${month}月${day}日 星期${weekday}`
-}
-
 export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "activities" }) {
   const [records, setRecords] = useState<ClassRecord[]>([])
   const [groupCaseSessions, setGroupCaseSessions] = useState<GroupCaseSession[]>([])
@@ -44,7 +26,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const [loading, setLoading] = useState(true)
 
   const [detailDate, setDetailDate] = useState(today)
-  const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
   const [detailTab, setDetailTab] = useState<"visitors" | "activities" | "arrival_confirmation" | "grouping">(() => {
     try {
       const perms: string[] = JSON.parse(localStorage.getItem("userPermissions") || "[]")
@@ -58,8 +39,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     return "visitors"
   })
   const isActivitiesView = standaloneTab === "activities" || detailTab === "activities"
-  const [showCalendarPicker, setShowCalendarPicker] = useState(false)
-  const [calendarPickerMonth, setCalendarPickerMonth] = useState(() => today.substring(0, 7))
 
   // 新增/编辑弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -92,7 +71,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const groupSearchTimeoutRef = useRef<number | null>(null)
   const groupBlurTimeoutRef = useRef<number | null>(null)
   const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
-  const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
   const [fullVisits, setFullVisits] = useState<VisitRecord[]>([])
   const [arrivalDialogOpen, setArrivalDialogOpen] = useState(false)
   const [arrivalVisit, setArrivalVisit] = useState<VisitRecord | null>(null)
@@ -103,7 +81,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   // 人员分组
   const [groups, setGroups] = useState<{ name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]>([])
-  const calendarPickerRef = useRef<HTMLDivElement>(null)
 
   // 新增/编辑弹窗（觉醒游戏）
   const [gcsDialogOpen, setGcsDialogOpen] = useState(false)
@@ -338,30 +315,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     }).catch(() => setGroups([]))
   }, [detailDate])
 
-  // 加载日期范围内的到场人数
-  useEffect(() => {
-    visitApi.list().then((allVisits) => {
-      const counts: Record<string, number> = {}
-      for (const v of allVisits) {
-        counts[v.visit_date] = (counts[v.visit_date] || 0) + 1
-      }
-      setVisitCounts(counts)
-    }).catch(() => {})
-  }, [dateRangeStart])
-
-  // 点击外部关闭日历选择器
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (calendarPickerRef.current && !calendarPickerRef.current.contains(e.target as Node)) {
-        setShowCalendarPicker(false)
-      }
-    }
-    if (showCalendarPicker) {
-      document.addEventListener("mousedown", handleClickOutside)
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [showCalendarPicker])
-
   // 拖拽到活动卡片的目标
   const [dragOverActivityId, setDragOverActivityId] = useState<string | null>(null)
   const [memberDropdownId, setMemberDropdownId] = useState<string | null>(null)
@@ -445,7 +398,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   type UnifiedRecord = { type: "class"; data: ClassRecord; date: string } | { type: "gcs"; data: GroupCaseSession; date: string } | { type: "ers"; data: EmotionalReleaseSession; date: string } | { type: "eks"; data: EnergyKnotSession; date: string } | { type: "ics"; data: InternalCourseSession; date: string }
 
-  const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
   const detailRecords = records
     .filter(r => r.date === detailDate)
     .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""))
@@ -1597,9 +1549,9 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   return (
     <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
 
-      {/* 切换按钮 + 视图模式 - 独立页面模式隐藏 */}
+      {/* 页面切换 */}
       {!standaloneTab && (
-      <div className="flex items-center justify-between border-b border-[#e8e8e8] -mx-6 px-6 mb-6">
+      <div className="flex items-center border-b border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
         <div className="flex items-center gap-6">
           {hasPerm("class-records-visitors") && (
           <button
@@ -1646,147 +1598,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         </div>
       </div>
       )}
-
-      {/* 主内容区 */}
-            /* ===== 详细视图 ===== */
-      <div className="flex flex-col min-h-0 flex-1 gap-2">
-      <div>
-      {/* 选中日期显示 + 操作按钮 */}
-      <div className="flex items-center justify-between">
-        <div className="relative inline-block">
-          <button
-            className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
-            onClick={() => {
-              setCalendarPickerMonth(detailDate.substring(0, 7))
-              setShowCalendarPicker(!showCalendarPicker)
-            }}
-          >
-            <span className="text-[16px] text-[#2b2f36] font-medium whitespace-nowrap">
-              {formatDateChinese(detailDate)}
-            </span>
-            <ChevronDown className="h-4 w-4 text-[#8f959e]" />
-          </button>
-          {/* 日历选择器弹窗 */}
-          {showCalendarPicker && (
-            <div ref={calendarPickerRef} className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-50 w-[280px]">
-              {/* 年月选择 */}
-              <div className="flex items-center justify-between mb-3">
-                <button
-                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
-                  onClick={() => {
-                    const [y, m] = calendarPickerMonth.split("-").map(Number)
-                    setCalendarPickerMonth(`${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`)
-                  }}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <span className="text-[13px] font-medium text-[#2b2f36]">
-                  {calendarPickerMonth.split("-")[0]}年{parseInt(calendarPickerMonth.split("-")[1])}月
-                </span>
-                <button
-                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
-                  onClick={() => {
-                    const [y, m] = calendarPickerMonth.split("-").map(Number)
-                    setCalendarPickerMonth(`${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}`)
-                  }}
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {/* 星期标题 */}
-              <div className="grid grid-cols-7 gap-0.5 mb-1">
-                {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
-                  <div key={w} className="text-center text-[10px] text-[#8f959e] py-1">{w}</div>
-                ))}
-              </div>
-              {/* 日期网格 */}
-              <div className="grid grid-cols-7 gap-0.5">
-                {(() => {
-                  const [year, month] = calendarPickerMonth.split("-").map(Number)
-                  const firstDay = new Date(year, month - 1, 1)
-                  const lastDay = new Date(year, month, 0)
-                  const startWeekday = firstDay.getDay()
-                  const daysInMonth = lastDay.getDate()
-                  const cells: (number | null)[] = []
-                  for (let i = 0; i < startWeekday; i++) cells.push(null)
-                  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
-                  return cells.map((day, i) => {
-                    if (!day) return <div key={`empty-${i}`} className="h-7" />
-                    const dateStr = `${calendarPickerMonth}-${String(day).padStart(2, "0")}`
-                    const isSelected = dateStr === detailDate
-                    const isTodayDate = dateStr === today
-                    return (
-                      <button
-                        key={dateStr}
-                        className={`h-7 flex items-center justify-center rounded text-[12px] transition-colors ${
-                          isSelected ? "bg-[#3370ff] text-white" : isTodayDate ? "bg-[#f0f5ff] text-[#3370ff]" : "hover:bg-[#f7f8fa] text-[#2b2f36]"
-                        }`}
-                        onClick={() => {
-                          setDetailDate(dateStr)
-                          setShowCalendarPicker(false)
-                        }}
-                      >
-                        {day}
-                      </button>
-                    )
-                  })
-                })()}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-        {/* 右侧：日期滚动条 */}
-        <div className="flex items-center gap-1 flex-1">
-          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
-            <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
-          </button>
-          <div className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto">
-            {dateRange.map((d) => {
-              const isSelected = d === detailDate
-              const isToday = d === today
-              const dayCount = records.filter(r => r.date === d).length
-                + groupCaseSessions.filter(s => s.date === d).length
-                + emotionalReleaseSessions.filter(s => s.date === d).length
-                + energyKnotSessions.filter(s => s.date === d).length
-                + internalCourseSessions.filter(s => s.date === d).length
-              const hasRecords = dayCount > 0
-              return (
-                <button
-                  key={d}
-                  className={`flex flex-col items-center px-2 py-1.5 rounded-lg transition-colors min-w-[48px] ${
-                    isSelected ? "bg-[#3370ff] text-white" : hasRecords ? "hover:bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
-                  }`}
-                  onClick={() => setDetailDate(d)}
-                >
-                  <span className={`text-[10px] ${isSelected ? "text-white/80" : isToday ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
-                    {getWeekday(d)}
-                  </span>
-                  <span className={`text-[14px] font-medium leading-tight ${isSelected ? "text-white" : isToday ? "text-[#3370ff]" : "text-[#2b2f36]"}`}>
-                    {parseInt(d.split("-")[2])}
-                  </span>
-                  {(effectiveDetailTab === "visitors" || effectiveDetailTab === "arrival_confirmation" || effectiveDetailTab === "grouping") ? (
-                    (visitCounts[d] || 0) > 0 && (
-                      <span className={`text-[10px] leading-tight ${isSelected ? "text-white/60" : "text-[#8f959e]"}`}>
-                        {visitCounts[d]}人
-                      </span>
-                    )
-                  ) : (
-                    hasRecords && (
-                      <span className={`text-[10px] leading-tight ${isSelected ? "text-white/60" : "text-[#8f959e]"}`}>
-                        {dayCount}场
-                      </span>
-                    )
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), 7)))}>
-            <ChevronRight className="h-4 w-4 text-[#4e535a]" />
-          </button>
-        </div>
-      </div>
 
       {/* 内容区 */}
       <div className="flex flex-col flex-1 min-h-0">
@@ -3487,7 +3298,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         </DialogContent>
       </Dialog>
 
-      </div>
     </div>
   )
 }
