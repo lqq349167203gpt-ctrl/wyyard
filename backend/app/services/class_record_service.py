@@ -111,21 +111,26 @@ def delete_record(record_id: str) -> bool:
 def update_groups(record_id: str, groups: list):
     """返回 (record, []) 成功, (None, []) 未找到"""
     from app.models.class_record import GroupMember
+    from app.services import visit_service
+
     record = _records.get(record_id)
     if not record:
         return None, []
+
+    # 校验成员必须在当日到场名单中
+    visits = visit_service.list_visits(record.date)
+    visit_ids = {v.customer_id for v in visits}
 
     all_member_ids = set()
     for g in groups:
         lid = g.get("leader_id", "")
         did = g.get("deputy_id", "")
         mids = g.get("member_ids", [])
-        if lid:
-            all_member_ids.add(lid)
-        if did:
-            all_member_ids.add(did)
-        for mid in mids:
-            all_member_ids.add(mid)
+        for mid in [lid, did] + mids:
+            if mid and mid not in visit_ids:
+                raise ValueError(f"成员 {mid} 不在 {record.date} 的到场名单中")
+            if mid:
+                all_member_ids.add(mid)
 
     record.participant_ids = list(all_member_ids)
     record.groups = [GroupMember(**g) for g in groups]

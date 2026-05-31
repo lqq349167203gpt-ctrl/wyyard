@@ -2,13 +2,35 @@ from fastapi import APIRouter, HTTPException, Query
 from app.utils.pagination import paginate
 from app.services import energy_knot_session_service
 from app.models.energy_knot_session import EnergyKnotSessionCreate
+from app.services.customer_service import list_customers
 
 router = APIRouter(prefix="/api/energy-knot-sessions", tags=["energy-knot-sessions"])
+
+
+def _fill_eks_names(sessions: list) -> list:
+    customers = list_customers()
+    cmap = {c.id: c for c in customers}
+
+    def get_name(cid: str) -> str:
+        if not cid:
+            return ""
+        c = cmap.get(cid)
+        return c.nickname if c else ""
+
+    for s in sessions:
+        actual_owner = get_name(getattr(s, "owner_id", ""))
+        if getattr(s, "owner_name", "") != actual_owner:
+            setattr(s, "owner_name", actual_owner)
+        actual_hosts = [get_name(hid) for hid in (getattr(s, "host_ids", []) or [])]
+        if getattr(s, "host_names", []) != actual_hosts:
+            setattr(s, "host_names", actual_hosts)
+    return sessions
 
 
 @router.get("")
 def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
     items = energy_knot_session_service.list_sessions(date or None)
+    items = _fill_eks_names(items)
     if page is not None:
         return paginate(items, page, page_size or 10)
     return items
@@ -21,7 +43,10 @@ def create_session(data: EnergyKnotSessionCreate):
 
 @router.patch("/{session_id}")
 def update_session(session_id: str, data: dict):
-    session = energy_knot_session_service.update_session(session_id, data)
+    try:
+        session = energy_knot_session_service.update_session(session_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not session:
         raise HTTPException(status_code=404, detail="记录不存在")
     return session

@@ -4,8 +4,32 @@ from pydantic import BaseModel
 from typing import List, Optional
 from app.utils.pagination import paginate
 from app.services import class_record_service
+from app.services.customer_service import list_customers
 
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
+
+
+def _fill_names(items: list) -> list:
+    """从客户信息实时填充 owner_name / host_name / achiever_name"""
+    customers = list_customers()
+    customer_map = {c.id: c for c in customers}
+
+    def get_name(cid: str) -> str:
+        if not cid:
+            return ""
+        c = customer_map.get(cid)
+        return c.nickname if c else ""
+
+    for item in items:
+        data = item["data"]
+        for field in ("owner_name", "host_name", "achiever_name"):
+            id_field = field.replace("_name", "_id")
+            if id_field in data:
+                actual = get_name(data.get(id_field, ""))
+                if data.get(field) != actual:
+                    data[field] = actual
+
+    return items
 
 
 @router.get("")
@@ -53,6 +77,9 @@ def list_unified(
     # Internal course sessions
     for s in internal_course_session_service.list_sessions(None, start_date, end_date):
         items.append({"type": "ics", "data": s.model_dump(mode="json") if hasattr(s, "model_dump") else s, "date": s.get("date", "") if isinstance(s, dict) else getattr(s, "date", "")})
+
+    # 从客户数据实时填充名称
+    items = _fill_names(items)
 
     # Apply filters
     if type:
@@ -142,7 +169,10 @@ def update_participants(record_id: str, data: ParticipantUpdate):
 @router.patch("/{record_id}/groups")
 def update_groups(record_id: str, data: dict):
     groups = data.get("groups", [])
-    record, warnings = class_record_service.update_groups(record_id, groups)
+    try:
+        record, warnings = class_record_service.update_groups(record_id, groups)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not record:
         if warnings:
             raise HTTPException(status_code=422, detail="; ".join(warnings))

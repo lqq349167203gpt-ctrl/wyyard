@@ -60,9 +60,20 @@ def create_session(data: GroupCaseSessionCreate) -> GroupCaseSession:
 
 def update_session(session_id: str, data: dict):
     """返回 (session, []) 成功, (None, []) 未找到"""
+    from app.services import visit_service
+
     session = _sessions.get(session_id)
     if not session:
         return None, []
+
+    # 校验 participant_ids 必须在当日到场名单中
+    if "participant_ids" in data:
+        visits = visit_service.list_visits(session.date)
+        visit_ids = {v.customer_id for v in visits}
+        for pid in data["participant_ids"]:
+            if pid not in visit_ids:
+                raise ValueError(f"成员 {pid} 不在 {session.date} 的到场名单中")
+
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):
             setattr(session, key, value)

@@ -220,7 +220,7 @@ export default function MemberIdentitiesPage() {
   return (
     <div className="px-6 pt-4 pb-6 space-y-3">
       {/* Tab 切换 */}
-      <div className="flex items-center border-b border-[#e8e8e8] -mx-6 px-6 min-h-[39px]">
+      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 min-h-[39px]">
         <div className="flex items-center gap-6">
           {[
             { key: "identities", label: "会员身份" },

@@ -281,19 +281,13 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
 
       {/* 到场人员列表 */}
       <div className="bg-white rounded-lg">
-        <div className="px-4 py-3 border-b border-[#f0f0f0] flex items-center gap-5 overflow-visible">
+        <div className="px-4 py-3 flex items-center gap-5 overflow-visible">
           <div className="flex items-center shrink-0">
             <span className="text-xs font-medium text-[#2b2f36]">到场人员</span>
             <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.length} 人</span>
           </div>
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-xs text-[#4e535a] shrink-0">预计到场时间</span>
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-8 text-xs w-32 shrink-0"
-          />
           <Input
             type="time"
             value={visitTime}
@@ -341,7 +335,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         ) : (
           <div className="p-2 space-y-0.5">
             {/* 表头 */}
-            <div className="flex items-center px-3 h-[42px] text-[12px] font-normal text-[#8f959e] bg-[#f7f8fa] rounded-t-lg gap-3">
+            <div className="flex items-center px-3 h-[42px] text-[12px] font-normal text-[#8f959e] rounded-t-lg gap-3 bg-[#fafbfc]">
               <span className="w-[80px] shrink-0">昵称</span>
               <span className="flex-1 min-w-[200px]">本次需求</span>
               <span className="w-[88px] shrink-0">会员身份</span>

@@ -369,8 +369,23 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const [memberDialogOpen, setMemberDialogOpen] = useState(false)
   const [memberDialogType, setMemberDialogType] = useState<string>("")
   const [memberDialogRecord, setMemberDialogRecord] = useState<any>(null)
-  const [memberSearchFocused, setMemberSearchFocused] = useState(false)
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([])
+  const [localHostId, setLocalHostId] = useState<string>("")
+  const [showHostDropdown, setShowHostDropdown] = useState(false)
+  const [showParticipantDropdown, setShowParticipantDropdown] = useState(false)
+
+  // 点击外部关闭下拉框
+  useEffect(() => {
+    if (!memberDialogOpen) return
+    const handler = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
+      setShowHostDropdown(false)
+      setShowParticipantDropdown(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [memberDialogOpen])
+
   const initialSelectedIdsRef = useRef<string[]>([])
 
   const getCurrentParticipantIds = useCallback((type: string, record: any): string[] => {
@@ -378,7 +393,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       return (record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
     }
     if (type === "gcs") {
-      return [...(record.participant_ids || []), record.host_id, record.achiever_id, record.owner_id].filter(Boolean)
+      return [...(record.participant_ids || []), record.host_id, record.achiever_id].filter(Boolean)
     }
     if (type === "ers") {
       return [...(record.participant_ids || []), record.host_id, record.achiever_id].filter(Boolean)
@@ -396,23 +411,54 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     setMemberDialogType(type)
     setMemberDialogRecord(record)
     const ids = getCurrentParticipantIds(type, record)
-    setLocalSelectedIds([...ids])
+    const hostId = (type === "gcs" || type === "ers") ? (record.host_id || "") : ""
+    // 主持人不在参与者列表中显示
+    setLocalSelectedIds(ids.filter(id => id !== hostId))
     initialSelectedIdsRef.current = [...ids]
+    setLocalHostId(hostId)
     setMemberDialogOpen(true)
   }, [getCurrentParticipantIds])
 
-  // 拖拽到沙龙卡片时的分组选择弹窗
-  const [dropGroupSelectOpen, setDropGroupSelectOpen] = useState(false)
-  const [dropGroupSelectRecord, setDropGroupSelectRecord] = useState<ClassRecord | null>(null)
-  const [dropGroupSelectCustomer, setDropGroupSelectCustomer] = useState<{ customer_id: string; nickname: string } | null>(null)
-
   const handleDropToClass = async (record: ClassRecord, customer: { customer_id: string; nickname: string }) => {
-    const groups = record.groups || []
+    const classGroups = (record.groups || []).map(g => ({ ...g, member_ids: [...(g.member_ids || [])] }))
     // 检查是否已分配到任何分组
-    const allAssigned = groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
+    const allAssigned = classGroups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
     if (allAssigned.includes(customer.customer_id)) return
-    if (groups.length === 0) {
-      // 无分组：创建新分组，设为组长
+
+    // 查找该成员在当日分组中的角色
+    let dailyGroupName = ""
+    let dailyRole: "leader" | "deputy" | "member" | "" = ""
+    for (const dg of groups) {
+      if (dg.leader_id === customer.customer_id) { dailyGroupName = dg.name; dailyRole = "leader"; break }
+      if (dg.deputy_id === customer.customer_id) { dailyGroupName = dg.name; dailyRole = "deputy"; break }
+      if ((dg.member_ids || []).includes(customer.customer_id)) { dailyGroupName = dg.name; dailyRole = "member"; break }
+    }
+
+    if (dailyRole) {
+      // 在活动分组中查找或创建同名分组，继承当日分组角色
+      let targetIdx = classGroups.findIndex(g => g.name === dailyGroupName)
+      if (targetIdx === -1) {
+        classGroups.push({ name: dailyGroupName, leader_id: "", deputy_id: "", member_ids: [] })
+        targetIdx = classGroups.length - 1
+      }
+      const targetGroup = { ...classGroups[targetIdx], member_ids: [...classGroups[targetIdx].member_ids] }
+      if (dailyRole === "leader") {
+        targetGroup.leader_id = customer.customer_id
+      } else if (dailyRole === "deputy") {
+        targetGroup.deputy_id = customer.customer_id
+      } else {
+        targetGroup.member_ids = [...targetGroup.member_ids, customer.customer_id]
+      }
+      classGroups[targetIdx] = targetGroup
+      try {
+        await classRecordApi.updateGroups(record.id, classGroups)
+        loadClassRecords()
+      } catch (e: any) {
+        const msg = e?.response?.data?.detail || e?.message || "添加失败"
+        alert(msg)
+      }
+    } else if (classGroups.length === 0) {
+      // 无当日分组且活动无分组：新建分组并设为组长
       const newGroups = [{ name: "小组 1", leader_id: customer.customer_id, deputy_id: "", member_ids: [] }]
       try {
         await classRecordApi.updateGroups(record.id, newGroups)
@@ -421,32 +467,18 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         const msg = e?.response?.data?.detail || e?.message || "添加失败"
         alert(msg)
       }
-      return
+    } else {
+      // 无当日分组但活动已有分组：添加到第一个分组
+      classGroups[0] = { ...classGroups[0], member_ids: [...classGroups[0].member_ids, customer.customer_id] }
+      if (!classGroups[0].leader_id) classGroups[0].leader_id = customer.customer_id
+      try {
+        await classRecordApi.updateGroups(record.id, classGroups)
+        loadClassRecords()
+      } catch (e: any) {
+        const msg = e?.response?.data?.detail || e?.message || "添加失败"
+        alert(msg)
+      }
     }
-    setDropGroupSelectRecord(record)
-    setDropGroupSelectCustomer(customer)
-    setDropGroupSelectOpen(true)
-  }
-
-  const handleDropToClassGroup = async (groupIndex: number) => {
-    if (!dropGroupSelectRecord || !dropGroupSelectCustomer) return
-    const groups = [...(dropGroupSelectRecord.groups || [])]
-    const group = groups[groupIndex]
-    if (!group) return
-    const allAssigned = groups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
-    if (allAssigned.includes(dropGroupSelectCustomer.customer_id)) {
-      setDropGroupSelectOpen(false)
-      return
-    }
-    groups[groupIndex] = { ...group, member_ids: [...group.member_ids, dropGroupSelectCustomer.customer_id] }
-    try {
-      await classRecordApi.updateGroups(dropGroupSelectRecord.id, groups)
-      loadClassRecords()
-    } catch (e: any) {
-      const msg = e?.response?.data?.detail || e?.message || "添加失败"
-      alert(msg)
-    }
-    setDropGroupSelectOpen(false)
   }
 
   const handleDropToGcs = async (s: GroupCaseSession, customer: { customer_id: string }) => {
@@ -1652,7 +1684,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
       {/* 页面切换 */}
       {!standaloneTab && (
-      <div className="flex items-center border-b border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
+      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
         <div className="flex items-center gap-6">
           {hasPerm("class-records-visitors") && (
           <button
@@ -1702,10 +1734,10 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
       {/* 主内容区 */}
       <div className="flex flex-col min-h-0 flex-1 gap-2">
-      <div>
+      <div className="bg-[#f7f8fa] rounded-lg px-4 py-2 border-b-[0.5px] border-[#e8e8e8]">
       {/* 选中日期显示 + 操作按钮 */}
-      <div className="flex items-center justify-between">
-        <div className="relative inline-block">
+      <div className="flex items-center">
+        <div className="relative inline-block shrink-0">
           <button
             className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
             onClick={() => {
@@ -1788,8 +1820,8 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           )}
         </div>
       </div>
-        {/* 右侧：日期滚动条 */}
-        <div className="flex items-center justify-between gap-1 flex-1">
+        {/* 日期滚动条 */}
+        <div className="flex items-center justify-between gap-1 mt-1">
           <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
             <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
           </button>
@@ -1878,7 +1910,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       <div className="flex-1 flex min-h-0">
         {/* 左栏：到场人员 — 独立页面模式隐藏 */}
         {!standaloneTab && (
-        <div className="w-[160px] shrink-0 border-r border-[#e8e8e8] overflow-y-auto py-2 px-0">
+        <div className="w-[160px] shrink-0 border-r border-[#f5f5f5] overflow-y-auto py-2 px-0">
           <div className="text-[11px] text-[#8f959e] tracking-widest mb-2 px-2">到场人员</div>
           {visitorGroupSections.length > 0 ? (
             <div className="space-y-3">
@@ -1956,6 +1988,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 handleDropToIcs={handleDropToIcs}
                 getTeacherNames={getTeacherNames}
                 getMemberName={getMemberName}
+                dailyGroups={groups}
               />
             )}
 
@@ -2149,61 +2182,105 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 拖拽到沙龙：选择分组弹窗 */}
-      <Dialog open={dropGroupSelectOpen} onOpenChange={(open) => { if (!open) { setDropGroupSelectOpen(false); setDropGroupSelectRecord(null); setDropGroupSelectCustomer(null) } }}>
-        <DialogContent className="max-w-xs p-0 gap-0">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">选择分组</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-4 space-y-2">
-            <p className="text-[12px] text-[#8f959e] mb-3">
-              将 <span className="font-medium text-[#2b2f36]">{dropGroupSelectCustomer?.nickname}</span> 添加到：
-            </p>
-            {(dropGroupSelectRecord?.groups || []).map((group, gi) => (
-              <button
-                key={gi}
-                className="w-full px-3 py-2.5 rounded border text-left transition-colors border-[#e0e0e0] hover:border-[#3370ff] hover:bg-[#f0f5ff]"
-                onClick={() => handleDropToClassGroup(gi)}
-              >
-                <div className="text-[12px] font-medium text-[#2b2f36]">{group.name || `小组 ${gi + 1}`}</div>
-                <div className="text-[11px] text-[#8f959e] mt-0.5">
-                  {(group.member_ids?.length || 0)} 人
-                </div>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* 成员选择弹窗 */}
       {memberDialogOpen && memberDialogRecord && (() => {
         const record = memberDialogRecord
+        const isHostType = memberDialogType === "gcs" || memberDialogType === "ers"
         const activityName = memberDialogType === "class" ? record.course_name : memberDialogType === "gcs" ? "觉醒游戏" : memberDialogType === "ers" ? "情绪释放" : memberDialogType === "ics" ? record.course_name : ""
+
+        // 当日到场客户（用于筛选范围）
+        const dayVisitCustomers = allCustomers.filter(c => dayVisits.some(v => v.id === c.id))
+
         const selectedParticipants = localSelectedIds.map((id: string) => {
           const c = allCustomers.find(c => c.id === id)
-          return { id, nickname: c?.nickname || c?.name || id }
+          const groups = record.groups || []
+          let role = ""
+          for (const g of groups) {
+            if (g.leader_id === id) { role = "组长"; break }
+            if (g.deputy_id === id) { role = "副组长"; break }
+          }
+          if (!role) {
+            if (record.owner_id === id) role = "案主"
+            else if (isHostType ? localHostId === id : record.host_id === id) role = "主持人"
+            else if (record.achiever_id === id) role = "达成者"
+          }
+          return { id, nickname: c?.nickname || c?.name || id, role }
         })
-        const searchFiltered = dayVisits.filter(v => !localSelectedIds.includes(v.id)).slice(0, 8)
+
+        // 可选的参与者（排除已选 + 主持人）
+        const availableParticipants = dayVisitCustomers.filter(c => !localSelectedIds.includes(c.id) && c.id !== localHostId)
+        // 可选的主持人（排除参与者）
+        const availableHosts = dayVisitCustomers.filter(c => !localSelectedIds.includes(c.id))
 
         const handleConfirm = async () => {
-          const initialIds = initialSelectedIdsRef.current
-          const added = localSelectedIds.filter(id => !initialIds.includes(id))
-          const removed = initialIds.filter(id => !localSelectedIds.includes(id))
-          for (const id of added) {
-            await handleMemberToggle(memberDialogType, record, id)
-          }
-          for (const id of removed) {
-            await handleMemberToggle(memberDialogType, record, id)
+          const newIds = [...localSelectedIds]
+          const hostId = isHostType ? localHostId : undefined
+          try {
+            if (memberDialogType === "class") {
+              const existing = record.groups || []
+              if (existing.length === 0) {
+                if (newIds.length > 0) {
+                  await classRecordApi.updateGroups(record.id, [
+                    { name: "小组 1", leader_id: newIds[0], deputy_id: "", member_ids: newIds.slice(1) },
+                  ])
+                }
+              } else {
+                const newIdSet = new Set(newIds)
+                const updatedGroups = existing.map((g: any) => ({
+                  ...g,
+                  leader_id: g.leader_id && newIdSet.has(g.leader_id) ? g.leader_id : "",
+                  deputy_id: g.deputy_id && newIdSet.has(g.deputy_id) ? g.deputy_id : "",
+                  member_ids: (g.member_ids || []).filter((id: string) => newIdSet.has(id)),
+                }))
+                const covered = new Set<string>()
+                updatedGroups.forEach((g: any) => {
+                  if (g.leader_id) covered.add(g.leader_id)
+                  if (g.deputy_id) covered.add(g.deputy_id)
+                  ;(g.member_ids || []).forEach((id: string) => covered.add(id))
+                })
+                const leftovers = newIds.filter(id => !covered.has(id))
+                if (leftovers.length > 0) {
+                  updatedGroups[0].member_ids = [...updatedGroups[0].member_ids, ...leftovers]
+                }
+                await classRecordApi.updateGroups(record.id, updatedGroups)
+              }
+              loadClassRecords()
+            } else if (memberDialogType === "gcs") {
+              const payload: any = { participant_ids: newIds }
+              if (hostId !== undefined) payload.host_id = hostId
+              await groupCaseSessionApi.update(record.id, payload)
+              loadGcs()
+            } else if (memberDialogType === "ers") {
+              const payload: any = { participant_ids: newIds }
+              if (hostId !== undefined) payload.host_id = hostId
+              await emotionalReleaseSessionApi.update(record.id, payload)
+              loadErs()
+            } else if (memberDialogType === "eks") {
+              await energyKnotSessionApi.update(record.id, { host_ids: newIds } as any)
+              loadEks()
+            } else if (memberDialogType === "ics") {
+              await internalCourseSessionApi.update(record.id, { participant_ids: newIds } as any)
+              loadIcs()
+            }
+          } catch (e: any) {
+            const msg = e?.response?.data?.detail || e?.message || "操作失败"
+            alert(msg)
           }
           setMemberDialogOpen(false)
           setMemberDialogRecord(null)
           setMemberDialogType("")
+          setLocalHostId("")
+          setShowHostDropdown(false)
+          setShowParticipantDropdown(false)
         }
 
         const handleClose = () => {
           setMemberDialogOpen(false)
           setMemberDialogRecord(null)
           setMemberDialogType("")
+          setLocalHostId("")
+          setShowHostDropdown(false)
+          setShowParticipantDropdown(false)
         }
 
         return (
@@ -2213,51 +2290,77 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 <DialogTitle className="text-base">选择参与者 — {activityName}</DialogTitle>
               </DialogHeader>
               <div className="px-6 py-4 space-y-4">
-                {/* 搜索框 */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setMemberSearchFocused(!memberSearchFocused)}
-                    onBlur={() => setTimeout(() => setMemberSearchFocused(false), 150)}
-                    className="w-full h-8 px-3 py-1 text-[12px] border border-[#d9d9d9] rounded bg-white text-left text-[#8f959e] hover:border-[#3370ff] focus:outline-none focus:border-[#3370ff]"
-                  >
-                    点击选择当日到场人员...
-                  </button>
-                  {memberSearchFocused && searchFiltered.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-[#e8e8e8] rounded shadow-sm max-h-48 overflow-y-auto">
-                      {searchFiltered.map(v => (
-                        <button
-                          key={v.id}
-                          className="w-full text-left px-3 py-1.5 hover:bg-[#f7f8fa] text-[12px] flex items-center justify-between"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setLocalSelectedIds(prev => [...prev, v.id])
-                            setMemberSearchFocused(false)
-                          }}
-                        >
-                          <span className="text-[#2b2f36]">{v.nickname}</span>
-                          {v.member_type && <span className="text-[10px] text-[#8f959e]">{v.member_type}</span>}
-                        </button>
-                      ))}
+                {/* 主持人选择（仅 GCS / ERS） */}
+                {isHostType && (
+                  <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+                    <span className="text-[12px] text-[#8f959e] text-right">主持人</span>
+                    <div data-dropdown className="relative">
+                      <button type="button"
+                        className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={() => { setShowParticipantDropdown(false); setShowHostDropdown(!showHostDropdown) }}
+                      >
+                        <span className={localHostId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
+                          {localHostId ? (allCustomers.find(c => c.id === localHostId)?.nickname || "未命名") : "选择主持人"}
+                        </span>
+                        <ChevronDown className="h-3 w-3 text-[#8f959e]" />
+                      </button>
+                      {showHostDropdown && (
+                        <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+                          <button className="flex items-center justify-between w-full px-3 py-2 text-[12px] text-[#8f959e] hover:bg-[#f7f8fa]"
+                            onClick={() => { setLocalHostId(""); setShowHostDropdown(false) }}>
+                            <span>无</span>
+                          </button>
+                          {availableHosts.map(c => (
+                            <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
+                              onClick={() => { setLocalHostId(c.id); setLocalSelectedIds(prev => prev.filter(id => id !== c.id)); setShowHostDropdown(false) }}>
+                              <span>{c.nickname || c.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {memberSearchFocused && searchFiltered.length === 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-[#e8e8e8] rounded shadow-sm">
-                      <p className="text-[11px] text-[#8f959e] text-center py-3">无匹配结果</p>
-                    </div>
-                  )}
+                  </div>
+                )}
+
+                {/* 参与者选择 */}
+                <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#8f959e] text-right">参与者</span>
+                  <div data-dropdown className="relative">
+                    <button type="button"
+                      className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={() => { setShowHostDropdown(false); setShowParticipantDropdown(!showParticipantDropdown) }}
+                    >
+                      <span className="text-[#8f959e]">选择参与者</span>
+                      <ChevronDown className="h-3 w-3 text-[#8f959e]" />
+                    </button>
+                    {showParticipantDropdown && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+                        {availableParticipants.length === 0 ? (
+                          <span className="block w-full px-3 py-2 text-[12px] text-[#8f959e] cursor-default">无可用人员</span>
+                        ) : (
+                          availableParticipants.map(c => (
+                            <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
+                              onClick={() => { setLocalSelectedIds(prev => [...prev, c.id]); setShowParticipantDropdown(false) }}>
+                              <span>{c.nickname || c.name}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* 已选参与者 */}
                 <div>
                   <div className="text-[11px] text-[#8f959e] mb-2">已选参与者（{localSelectedIds.length}）</div>
-                  {localSelectedIds.length === 0 ? (
-                    <p className="text-[11px] text-[#b0b5bb] py-2 text-center">暂无</p>
-                  ) : (
+                  {localSelectedIds.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {selectedParticipants.map(p => (
                         <span key={p.id} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-gray-50 text-[12px]">
                           <span className="text-[#2b2f36]">{p.nickname}</span>
+                          {p.role && <span className="inline-block ml-0.5 px-1 py-0.5 rounded text-[10px] bg-gray-100 text-[#8f959e]">{p.role}</span>}
                           <button
                             className="text-[#c9cdd4] hover:text-[#f54a45]"
                             onClick={() => setLocalSelectedIds(prev => prev.filter(id => id !== p.id))}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react"
-import { Plus, Trash2, GripVertical, Edit } from "lucide-react"
+import { Plus, Trash2, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -85,6 +85,18 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
     }
     return [...usedIds]
   }, [editGroupIdx, groups])
+
+  // 弹窗可选人员：只看当日到场人员 + 编辑时保留当前组成员
+  const dialogCustomers = useMemo(() => {
+    const visitIds = new Set(dayVisits.map(v => v.id))
+    if (editGroupIdx !== null) {
+      const currentGroup = groups[editGroupIdx]
+      if (currentGroup.leader_id) visitIds.add(currentGroup.leader_id)
+      if (currentGroup.deputy_id) visitIds.add(currentGroup.deputy_id)
+      currentGroup.member_ids.forEach(id => visitIds.add(id))
+    }
+    return allCustomers.filter(c => visitIds.has(c.id))
+  }, [dayVisits, allCustomers, editGroupIdx, groups])
 
   // 自动保存：用户手动修改后 600ms 自动保存，日期/数据加载不触发
   useEffect(() => {
@@ -191,7 +203,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
       {/* 左栏：人员列表 */}
-      <div className="w-[160px] shrink-0 border-r border-[#e8e8e8] overflow-y-auto scrollbar-hide py-2 px-0">
+      <div className="w-[160px] shrink-0 border-r border-[#f5f5f5] overflow-y-auto scrollbar-hide py-2 px-0">
         <div className="text-[11px] text-[#8f959e] tracking-widest mb-2 px-2">待分组 ({availableVisitors.length})</div>
         <div className="space-y-1">
           {dayVisits.map((v) => {
@@ -211,7 +223,6 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
                 }`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <GripVertical className={`h-3 w-3 shrink-0 ${grouped ? "text-[#e0e0e0]" : "text-[#c0c4cc]"}`} />
                   <span
                     className={`truncate ${grouped ? "text-[#c0c4cc]" : "text-[#2b2f36] cursor-pointer hover:text-[#3370ff]"}`}
                     onClick={() => onCustomerClick?.(v.id)}
@@ -318,7 +329,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
               <span className="text-[12px] text-[#4e535a] shrink-0 w-10">组长</span>
               <div className="flex-1">
                 <CustomerSearchInput
-                  customers={allCustomers}
+                  customers={dialogCustomers}
                   value={newGroupLeaderId ? getName(newGroupLeaderId) : ""}
                   onChange={() => {}}
                   onSelectItem={(c) => setNewGroupLeaderId(c.id)}
@@ -331,7 +342,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
               <span className="text-[12px] text-[#4e535a] shrink-0 w-10">副组长</span>
               <div className="flex-1">
                 <CustomerSearchInput
-                  customers={allCustomers}
+                  customers={dialogCustomers}
                   value={newGroupDeputyId ? getName(newGroupDeputyId) : ""}
                   onChange={() => {}}
                   onSelectItem={(c) => setNewGroupDeputyId(c.id)}
@@ -344,7 +355,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
               <span className="text-[12px] text-[#4e535a] shrink-0 w-10 pt-1.5">组员</span>
               <div className="flex-1">
                 <CustomerSearchInput
-                  customers={allCustomers}
+                  customers={dialogCustomers}
                   value={newGroupMemberIds.map(id => getName(id))}
                   onChange={(v) => {
                     const names = Array.isArray(v) ? v : []

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { Plus, Search, X } from "lucide-react"
+import { Plus, Search, X, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -38,6 +38,24 @@ export default function HealingRecordsPage() {
   const [appliedReferrer, setAppliedReferrer] = useState("")
   const [appliedReferrerHandler, setAppliedReferrerHandler] = useState("")
   const [filterKey, setFilterKey] = useState(0)
+
+  // 自定义下拉框状态
+  const [showGenderDropdown, setShowGenderDropdown] = useState(false)
+  const [showAgeRangeDropdown, setShowAgeRangeDropdown] = useState(false)
+  const [showTrafficSourceDropdown, setShowTrafficSourceDropdown] = useState(false)
+
+  // 点击外部关闭下拉框
+  useEffect(() => {
+    if (!createOpen) return
+    const handler = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
+      setShowGenderDropdown(false)
+      setShowAgeRangeDropdown(false)
+      setShowTrafficSourceDropdown(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [createOpen])
 
   useEffect(() => {
     customerApi.light().then(setCustomers).catch(() => {})
@@ -231,7 +249,7 @@ export default function HealingRecordsPage() {
       </Dialog>
 
       {/* 新建客户弹窗 */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setShowGenderDropdown(false); setShowAgeRangeDropdown(false); setShowTrafficSourceDropdown(false) } }}>
         <DialogContent className="w-[640px] max-w-[90vw] p-0 gap-0">
           <div className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
             <h3 className="text-[14px] font-normal">{editingId ? "编辑用户" : "新建用户"}</h3>
@@ -247,11 +265,28 @@ export default function HealingRecordsPage() {
               <Input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="请输入" />
 
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">性别</span>
-              <select value={form.gender || ""} onChange={(e) => setForm({ ...form, gender: e.target.value })} className={`h-8 w-full rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat ${form.gender ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
-                <option value="">请选择</option>
-                <option value="男">男</option>
-                <option value="女">女</option>
-              </select>
+              <div data-dropdown className="relative">
+                <button type="button"
+                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => { setShowAgeRangeDropdown(false); setShowTrafficSourceDropdown(false); setShowGenderDropdown(!showGenderDropdown) }}
+                >
+                  <span className={form.gender ? "text-[#2b2f36]" : "text-[#8f959e]"}>
+                    {form.gender || "请选择"}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
+                </button>
+                {showGenderDropdown && (
+                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+                    {["男", "女"].map(v => (
+                      <button key={v} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
+                        onClick={() => { setForm({ ...form, gender: v }); setShowGenderDropdown(false) }}>
+                        <span>{v}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">电话</span>
               <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="请输入" />
 
@@ -263,14 +298,28 @@ export default function HealingRecordsPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">年龄</span>
               <div className="flex gap-2">
                 <Input value={form.age || ""} onChange={(e) => { const v = e.target.value; const n = parseInt(v); let range = ""; if (n >= 60) range = "60+"; else if (n >= 51) range = "51~60"; else if (n >= 41) range = "41~50"; else if (n >= 31) range = "31~40"; else if (n >= 18) range = "18~30"; setForm({ ...form, age: v, age_range: range }); }} placeholder="具体年龄" className="flex-1" />
-                <select value={form.age_range || ""} onChange={(e) => setForm({ ...form, age_range: e.target.value })} className={`h-8 flex-1 rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat ${form.age_range ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
-                  <option value="">年龄段</option>
-                  <option value="18~30">18~30</option>
-                  <option value="31~40">31~40</option>
-                  <option value="41~50">41~50</option>
-                  <option value="51~60">51~60</option>
-                  <option value="60+">60+</option>
-                </select>
+                <div data-dropdown className="relative flex-1">
+                  <button type="button"
+                    className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => { setShowGenderDropdown(false); setShowTrafficSourceDropdown(false); setShowAgeRangeDropdown(!showAgeRangeDropdown) }}
+                  >
+                    <span className={form.age_range ? "text-[#2b2f36]" : "text-[#8f959e]"}>
+                      {form.age_range || "年龄段"}
+                    </span>
+                    <ChevronDown className="h-3 w-3 text-[#8f959e]" />
+                  </button>
+                  {showAgeRangeDropdown && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+                      {["18~30", "31~40", "41~50", "51~60", "60+"].map(v => (
+                        <button key={v} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
+                          onClick={() => { setForm({ ...form, age_range: v }); setShowAgeRangeDropdown(false) }}>
+                          <span>{v}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">引流人</span>
@@ -287,21 +336,28 @@ export default function HealingRecordsPage() {
                   const hasDetail = ["小红书", "抖音", "公众号", "视频号", "好友推荐", "朋友圈"].includes(form.traffic_source)
                   return (
                     <>
-                      <select
-                        value={form.traffic_source || ""}
-                        onChange={(e) => setForm({ ...form, traffic_source: e.target.value, traffic_source_detail: "" })}
-                        className={`h-8 ${["好友推荐", "朋友圈"].includes(form.traffic_source) ? "flex-[6]" : hasDetail ? "flex-[7]" : "w-full"} rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat ${form.traffic_source ? "text-[#2b2f36]" : "text-[#8f959e]"}`}
-                      >
-                        <option value="">请选择</option>
-                        <option value="小红书">小红书</option>
-                        <option value="抖音">抖音</option>
-                        <option value="公众号">公众号</option>
-                        <option value="视频号">视频号</option>
-                        <option value="朋友圈">朋友圈</option>
-                        <option value="美团">美团</option>
-                        <option value="大众点评">大众点评</option>
-                        <option value="好友推荐">好友推荐</option>
-                      </select>
+                      <div data-dropdown className={`relative ${["好友推荐", "朋友圈"].includes(form.traffic_source) ? "flex-[6]" : hasDetail ? "flex-[7]" : "w-full"}`}>
+                        <button type="button"
+                          className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={() => { setShowGenderDropdown(false); setShowAgeRangeDropdown(false); setShowTrafficSourceDropdown(!showTrafficSourceDropdown) }}
+                        >
+                          <span className={form.traffic_source ? "text-[#2b2f36]" : "text-[#8f959e]"}>
+                            {form.traffic_source || "请选择"}
+                          </span>
+                          <ChevronDown className="h-3 w-3 text-[#8f959e]" />
+                        </button>
+                        {showTrafficSourceDropdown && (
+                          <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+                            {["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐"].map(v => (
+                              <button key={v} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
+                                onClick={() => { setForm({ ...form, traffic_source: v, traffic_source_detail: "" }); setShowTrafficSourceDropdown(false) }}>
+                                <span>{v}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       {["小红书", "抖音", "公众号", "视频号"].includes(form.traffic_source) && (
                         <Input value={form.traffic_source_detail || ""} onChange={(e) => setForm({ ...form, traffic_source_detail: e.target.value })} placeholder="内容链接" className="h-8 flex-[12] text-[12px]" />
                       )}

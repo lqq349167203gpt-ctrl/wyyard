@@ -1389,17 +1389,12 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
                 onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowCourseTypeDropdown(false); setShowTeacherDropdown(!showTeacherDropdown) }}
               >
                 <span className={formHostId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                  {formHostId ? formHostName : "可选"}
+                  {formHostId ? formHostName : "选择老师"}
                 </span>
                 <ChevronDown className="h-3 w-3 text-[#8f959e]" />
               </button>
               {showTeacherDropdown && (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  <button
-                    className="flex items-center justify-between w-full px-3 py-2 text-[12px] text-[#8f959e] hover:bg-[#f7f8fa]"
-                    onClick={() => { setFormHostId(""); setFormHostName(""); setShowTeacherDropdown(false) }}>
-                    <span>可选</span>
-                  </button>
                   {teachers.map(c => (
                     <button key={c.id}
                       className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
@@ -1627,10 +1622,6 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
               </button>
               {showTeacherDropdown && (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  <button className="flex items-center justify-between w-full px-3 py-2 text-[12px] text-[#8f959e] hover:bg-[#f7f8fa]"
-                    onClick={() => { setFormTeacherId(""); setShowTeacherDropdown(false) }}>
-                    <span>不选择</span>
-                  </button>
                   {teachers.map(c => (
                     <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
                       onClick={() => { setFormTeacherId(c.id); setShowTeacherDropdown(false) }}>

@@ -59,9 +59,20 @@ def create_session(data: EnergyKnotSessionCreate) -> EnergyKnotSession:
 
 
 def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
+    from app.services import visit_service
+
     session = _sessions.get(session_id)
     if not session:
         return None
+
+    # 校验 host_ids 必须在当日到场名单中
+    if "host_ids" in data:
+        visits = visit_service.list_visits(session.date)
+        visit_ids = {v.customer_id for v in visits}
+        for hid in data["host_ids"]:
+            if hid not in visit_ids:
+                raise ValueError(f"成员 {hid} 不在 {session.date} 的到场名单中")
+
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):
             setattr(session, key, value)
