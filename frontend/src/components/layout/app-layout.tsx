@@ -59,7 +59,7 @@ export function AppLayout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-11 items-center justify-between bg-white px-5 border-b-[4px] border-[#f7f8fa]">
+        <header className="flex h-11 items-center justify-between bg-white px-5 border-b-[6px] border-[#f7f8fa]">
           <SidebarTrigger />
           <div className="flex items-center gap-2">
             {ownerName && (

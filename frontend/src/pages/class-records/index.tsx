@@ -1736,14 +1736,14 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
       {/* 主内容区 */}
       <div className="flex flex-col min-h-0 flex-1 gap-2">
-      <div className="bg-[#f7f8fa] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
+      <div className="bg-[#f8faff] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
       {/* 选中日期显示 + 操作按钮 */}
       <div className="flex items-center">
         <CalendarDatePicker detailDate={detailDate} onSelectDate={setDetailDate} />
         <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
       </div>
         {/* 日期滚动条 */}
-        <div className="flex items-center justify-between gap-1 mt-1">
+        <div className="flex items-center justify-between gap-1 mt-1 h-[52px]">
           <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
             <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
           </button>
@@ -1767,15 +1767,13 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                   }`}
                   onClick={() => setDetailDate(d)}
                 >
-                  <span className={`text-[10px] leading-none ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
+                  <span className={`text-[10px] leading-none h-3 flex items-center ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
                     {getWeekday(d)}
                   </span>
-                  <span className="text-[14px] font-medium leading-tight">{parseInt(d.split("-")[2])}</span>
-                  {dayCount > 0 && (
-                    <span className={`text-[9px] leading-none mt-0.5 ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
-                      {isVisitorsTab ? `${dayCount}人` : `${dayCount}场`}
-                    </span>
-                  )}
+                  <span className="text-[14px] font-medium leading-none h-4 flex items-center">{parseInt(d.split("-")[2])}</span>
+                  <span className={`text-[9px] leading-none h-3 flex items-center mt-0.5 ${isSelected ? "text-white/80" : dayCount > 0 ? "text-[#b0b5bb]" : "text-transparent"}`}>
+                    {dayCount > 0 ? (isVisitorsTab ? `${dayCount}人` : `${dayCount}场`) : " "}
+                  </span>
                 </button>
               )
             })}

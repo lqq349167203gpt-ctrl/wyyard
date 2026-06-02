@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef, useMemo, useCallback, memo } from "react"
+import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SelectDropdown } from "@/components/select-dropdown"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -21,6 +22,8 @@ import {
   type InternalCourseSessionCustomerSearchResult,
   type GroupCaseCustomerSearchResult,
 } from "@/lib/api"
+import { SpaceDropdown } from "@/components/space-dropdown"
+import { CalendarDatePicker } from "@/components/calendar-date-picker"
 
 // ===== Date utilities =====
 const today = new Date().toISOString().split("T")[0]
@@ -40,6 +43,7 @@ function formatDateChinese(d: string): string {
 }
 
 const ICS_COURSE_TYPES = ["疗愈师课程", "商业框架陪跑", "落地赋能班"]
+const MAX_OWNER_VISIBLE = 50
 
 // ===== Pure helpers =====
 function getTeacherNames(teacherIds: string[], teachers: CustomerLight[]) {
@@ -256,9 +260,10 @@ const IcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
 ))
 
 // ===== GCS Dialog (独立组件，避免父组件 state 变化导致重渲染) =====
-const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, onClose }: {
+const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
   achieverCustomers: CustomerLight[]; session?: GroupCaseSession | null; onClose: () => void
+  onSaved: (record: GroupCaseSession) => void
 }) => {
   const [editingRecord, setEditingRecord] = useState<GroupCaseSession | null>(null)
   const [saving, setSaving] = useState(false)
@@ -271,14 +276,10 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   const [formAchieverName, setFormAchieverName] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [searchKeyword, setSearchKeyword] = useState("")
-  const [showDropdown, setShowDropdown] = useState(false)
   const [ownerRemaining, setOwnerRemaining] = useState<number | null>(null)
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
-  const [showSpaceDropdown, setShowSpaceDropdown] = useState(false)
-  const [showRoomDropdown, setShowRoomDropdown] = useState(false)
-  const [showAchieverDropdown, setShowAchieverDropdown] = useState(false)
   const remainingFetchRef = useRef(0)
 
   // Reset form when dialog opens
@@ -294,8 +295,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormDescription(session.description || "")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
-        setSearchKeyword(""); setShowDropdown(false)
-        setOwnerRemaining(null)
+        setSearchKeyword(""); setOwnerRemaining(null)
         if (session.owner_id && session.owner_name) {
           groupCaseSessionApi.searchCustomers(session.owner_name).then(results => {
             const found = results.find(r => r.id === session.owner_id)
@@ -309,8 +309,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormOwnerId(""); setFormOwnerName("")
         setFormAchieverId(""); setFormAchieverName("")
         setFormDescription("")
-        setSearchKeyword(""); setShowDropdown(false)
-        setOwnerRemaining(null)
+        setSearchKeyword(""); setOwnerRemaining(null)
         const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
         setSpaceId(ds); setRoomId(dr)
       }
@@ -319,7 +318,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
 
   // Fetch remaining counts for dropdown
   useEffect(() => {
-    if (!showDropdown && !formOwnerId) return
+    if (!searchKeyword.trim() && !formOwnerId) return
     const fetchId = ++remainingFetchRef.current
     const timer = window.setTimeout(async () => {
       try {
@@ -331,14 +330,13 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
       } catch {}
     }, 200)
     return () => clearTimeout(timer)
-  }, [searchKeyword, showDropdown, formOwnerId])
+  }, [searchKeyword, formOwnerId])
 
   // Click outside to close dropdowns
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setShowDropdown(false); setShowSpaceDropdown(false)
-      setShowRoomDropdown(false); setShowAchieverDropdown(false)
+      setSearchKeyword("")
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
@@ -359,12 +357,13 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
+      let result: GroupCaseSession
       if (editingRecord) {
-        await groupCaseSessionApi.update(editingRecord.id, data)
+        result = await groupCaseSessionApi.update(editingRecord.id, data)
       } else {
-        await groupCaseSessionApi.create(data)
+        result = await groupCaseSessionApi.create(data)
       }
-      onClose()
+      onSaved(result)
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       if (typeof detail === "string") alert(detail)
@@ -393,52 +392,21 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowAchieverDropdown(false); setShowDropdown(false); setShowSpaceDropdown(!showSpaceDropdown) }}
-                >
-                  <span className={spaceId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {spaceId ? spaces.find(s => s.id === spaceId)?.name || "选择空间" : "选择空间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showSpaceDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {spaces.map(s => (
-                      <button key={s.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                        onClick={() => { setSpaceId(s.id); setRoomId(s.rooms?.[0]?.id || ""); setShowSpaceDropdown(false) }}>
-                        <span>{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowSpaceDropdown(false); setShowAchieverDropdown(false); setShowDropdown(false); setShowRoomDropdown(!showRoomDropdown) }}
-                >
-                  <span className={roomId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {roomId ? (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "选择房间" : "选择房间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showRoomDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {(spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? (
-                      <span className="block w-full px-3 py-2 text-[12px] text-[#8f959e] cursor-default">无房间</span>
-                    ) : (
-                      (spaces.find(s => s.id === spaceId)?.rooms || []).map(r => (
-                        <button key={r.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                          onClick={() => { setRoomId(r.id); setShowRoomDropdown(false) }}>
-                          <span>{r.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <SelectDropdown
+                className="w-[122px]"
+                value={spaceId}
+                options={spaces.map(s => ({value: s.id, label: s.name}))}
+                placeholder="选择空间"
+                onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
+              />
+              <SelectDropdown
+                className="w-[122px]"
+                value={roomId}
+                options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
+                placeholder={spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? "无房间" : "选择房间"}
+                disabled={!!spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0}
+                onChange={(v) => setRoomId(v)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
@@ -450,10 +418,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                   onChange={(e) => {
                     setSearchKeyword(e.target.value)
                     if (formOwnerId) { setFormOwnerId(""); setFormOwnerName(""); setOwnerRemaining(null) }
-                    setShowDropdown(true)
                   }}
-                  onFocus={() => setShowDropdown(true)}
-                  onClick={() => setShowDropdown(true)}
                   placeholder={formOwnerId ? "" : "选择案主"}
                   className="h-8 text-[12px] pr-20"
                   autoComplete="off"
@@ -470,17 +435,23 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                   </button>
                 )}
               </div>
-              {showDropdown && (() => {
+              {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
-                const filtered = kw
-                  ? allCustomers.filter(c => (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
-                  : allCustomers
+                const filtered = allCustomers.filter(c =>
+                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
+                ).sort((a, b) => {
+                  const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
+                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
+                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  return sa - sb
+                })
+                const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
                 return (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {filtered.length === 0 ? (
+                  {visible.length === 0 ? (
                     <div className="px-3 py-2 text-[12px] text-[#8f959e]">无匹配客户</div>
                   ) : (
-                    filtered.map(c => {
+                    visible.map(c => {
                       const remaining = remainingMap[c.id]
                       const isDepleted = remaining !== undefined && remaining <= 0
                       return (
@@ -492,7 +463,6 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                             setFormOwnerId(c.id)
                             setFormOwnerName(c.nickname || c.name || "")
                             setSearchKeyword("")
-                            setShowDropdown(false)
                             setOwnerRemaining(remaining !== undefined ? remaining : null)
                           }}>
                           <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
@@ -509,31 +479,12 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">成就君</span>
-            <div data-dropdown className="relative">
-              <button type="button"
-                className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowDropdown(false); setShowAchieverDropdown(!showAchieverDropdown) }}
-              >
-                <span className={formAchieverId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                  {formAchieverId ? formAchieverName : "选择成就君"}
-                </span>
-                <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-              </button>
-              {showAchieverDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {achieverCustomers.filter(c => c.id !== formOwnerId).map(c => (
-                    <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                      onClick={() => {
-                        setFormAchieverId(c.id)
-                        setFormAchieverName(c.nickname || c.name || "")
-                        setShowAchieverDropdown(false)
-                      }}>
-                      <span>{c.nickname || c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SelectDropdown
+              value={formAchieverId}
+              options={achieverCustomers.filter(c => c.id !== formOwnerId).map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+              placeholder="选择成就君"
+              onChange={(v) => { setFormAchieverId(v); setFormAchieverName(achieverCustomers.find(c => c.id === v)?.nickname || achieverCustomers.find(c => c.id === v)?.name || "") }}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
@@ -551,9 +502,10 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
 })
 
 // ===== ERS Dialog (独立组件) =====
-const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, onClose }: {
+const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
   achieverCustomers: CustomerLight[]; session?: EmotionalReleaseSession | null; onClose: () => void
+  onSaved: (record: EmotionalReleaseSession) => void
 }) => {
   const [editingRecord, setEditingRecord] = useState<EmotionalReleaseSession | null>(null)
   const [saving, setSaving] = useState(false)
@@ -566,14 +518,10 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   const [formAchieverName, setFormAchieverName] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [searchKeyword, setSearchKeyword] = useState("")
-  const [showDropdown, setShowDropdown] = useState(false)
   const [ownerRemaining, setOwnerRemaining] = useState<number | null>(null)
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
-  const [showSpaceDropdown, setShowSpaceDropdown] = useState(false)
-  const [showRoomDropdown, setShowRoomDropdown] = useState(false)
-  const [showAchieverDropdown, setShowAchieverDropdown] = useState(false)
   const remainingFetchRef = useRef(0)
 
   useEffect(() => {
@@ -588,8 +536,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormDescription(session.description || "")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
-        setSearchKeyword(""); setShowDropdown(false)
-        setOwnerRemaining(null)
+        setSearchKeyword(""); setOwnerRemaining(null)
         if (session.owner_id && session.owner_name) {
           emotionalReleaseSessionApi.searchCustomers(session.owner_name).then(results => {
             const found = results.find(r => r.id === session.owner_id)
@@ -603,8 +550,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormOwnerId(""); setFormOwnerName("")
         setFormAchieverId(""); setFormAchieverName("")
         setFormDescription("")
-        setSearchKeyword(""); setShowDropdown(false)
-        setOwnerRemaining(null)
+        setSearchKeyword(""); setOwnerRemaining(null)
         const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
         setSpaceId(ds); setRoomId(dr)
       }
@@ -612,7 +558,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   }, [open, date, spaces, session])
 
   useEffect(() => {
-    if (!showDropdown && !formOwnerId) return
+    if (!searchKeyword.trim() && !formOwnerId) return
     const fetchId = ++remainingFetchRef.current
     const timer = window.setTimeout(async () => {
       try {
@@ -624,13 +570,12 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
       } catch {}
     }, 200)
     return () => clearTimeout(timer)
-  }, [searchKeyword, showDropdown, formOwnerId])
+  }, [searchKeyword, formOwnerId])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setShowDropdown(false); setShowSpaceDropdown(false)
-      setShowRoomDropdown(false); setShowAchieverDropdown(false)
+      setSearchKeyword("")
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
@@ -647,12 +592,13 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
+      let result: EmotionalReleaseSession
       if (editingRecord) {
-        await emotionalReleaseSessionApi.update(editingRecord.id, data)
+        result = await emotionalReleaseSessionApi.update(editingRecord.id, data)
       } else {
-        await emotionalReleaseSessionApi.create(data)
+        result = await emotionalReleaseSessionApi.create(data)
       }
-      onClose()
+      onSaved(result)
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       if (typeof detail === "string") alert(detail)
@@ -681,52 +627,21 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowAchieverDropdown(false); setShowDropdown(false); setShowSpaceDropdown(!showSpaceDropdown) }}
-                >
-                  <span className={spaceId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {spaceId ? spaces.find(s => s.id === spaceId)?.name || "选择空间" : "选择空间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showSpaceDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {spaces.map(s => (
-                      <button key={s.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                        onClick={() => { setSpaceId(s.id); setRoomId(s.rooms?.[0]?.id || ""); setShowSpaceDropdown(false) }}>
-                        <span>{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowSpaceDropdown(false); setShowAchieverDropdown(false); setShowDropdown(false); setShowRoomDropdown(!showRoomDropdown) }}
-                >
-                  <span className={roomId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {roomId ? (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "选择房间" : "选择房间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showRoomDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {(spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? (
-                      <span className="block w-full px-3 py-2 text-[12px] text-[#8f959e] cursor-default">无房间</span>
-                    ) : (
-                      (spaces.find(s => s.id === spaceId)?.rooms || []).map(r => (
-                        <button key={r.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                          onClick={() => { setRoomId(r.id); setShowRoomDropdown(false) }}>
-                          <span>{r.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <SelectDropdown
+                className="w-[122px]"
+                value={spaceId}
+                options={spaces.map(s => ({value: s.id, label: s.name}))}
+                placeholder="选择空间"
+                onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
+              />
+              <SelectDropdown
+                className="w-[122px]"
+                value={roomId}
+                options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
+                placeholder={spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? "无房间" : "选择房间"}
+                disabled={!!spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0}
+                onChange={(v) => setRoomId(v)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
@@ -738,10 +653,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                   onChange={(e) => {
                     setSearchKeyword(e.target.value)
                     if (formOwnerId) { setFormOwnerId(""); setFormOwnerName(""); setOwnerRemaining(null) }
-                    setShowDropdown(true)
                   }}
-                  onFocus={() => setShowDropdown(true)}
-                  onClick={() => setShowDropdown(true)}
                   placeholder={formOwnerId ? "" : "选择案主"}
                   className="h-8 text-[12px] pr-20"
                   autoComplete="off"
@@ -758,17 +670,23 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                   </button>
                 )}
               </div>
-              {showDropdown && (() => {
+              {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
-                const filtered = kw
-                  ? allCustomers.filter(c => (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
-                  : allCustomers
+                const filtered = allCustomers.filter(c =>
+                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
+                ).sort((a, b) => {
+                  const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
+                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
+                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  return sa - sb
+                })
+                const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
                 return (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {filtered.length === 0 ? (
+                  {visible.length === 0 ? (
                     <div className="px-3 py-2 text-[12px] text-[#8f959e]">无匹配客户</div>
                   ) : (
-                    filtered.map(c => {
+                    visible.map(c => {
                       const remaining = remainingMap[c.id]
                       const isDepleted = remaining !== undefined && remaining <= 0
                       return (
@@ -780,7 +698,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                             setFormOwnerId(c.id)
                             setFormOwnerName(c.nickname || c.name || "")
                             setSearchKeyword("")
-                            setShowDropdown(false)
                             setOwnerRemaining(remaining !== undefined ? remaining : null)
                           }}>
                           <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
@@ -797,31 +714,12 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">成就君</span>
-            <div data-dropdown className="relative">
-              <button type="button"
-                className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowDropdown(false); setShowAchieverDropdown(!showAchieverDropdown) }}
-              >
-                <span className={formAchieverId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                  {formAchieverId ? formAchieverName : "选择成就君"}
-                </span>
-                <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-              </button>
-              {showAchieverDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {achieverCustomers.filter(c => c.id !== formOwnerId).map(c => (
-                    <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                      onClick={() => {
-                        setFormAchieverId(c.id)
-                        setFormAchieverName(c.nickname || c.name || "")
-                        setShowAchieverDropdown(false)
-                      }}>
-                      <span>{c.nickname || c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SelectDropdown
+              value={formAchieverId}
+              options={achieverCustomers.filter(c => c.id !== formOwnerId).map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+              placeholder="选择成就君"
+              onChange={(v) => { setFormAchieverId(v); setFormAchieverName(achieverCustomers.find(c => c.id === v)?.nickname || achieverCustomers.find(c => c.id === v)?.name || "") }}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
@@ -839,9 +737,10 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
 })
 
 // ===== EKS Dialog (独立组件) =====
-const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, session, onClose }: {
+const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, session, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
   hostCustomers: CustomerLight[]; session?: EnergyKnotSession | null; onClose: () => void
+  onSaved: (record: EnergyKnotSession) => void
 }) => {
   const [editingRecord, setEditingRecord] = useState<EnergyKnotSession | null>(null)
   const [saving, setSaving] = useState(false)
@@ -852,14 +751,11 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const [formOwnerNames, setFormOwnerNames] = useState<string[]>([])
   const [formOwnerDescriptions, setFormOwnerDescriptions] = useState<{ id: string; name: string; description: string }[]>([])
   const [searchKeyword, setSearchKeyword] = useState("")
-  const [showDropdown, setShowDropdown] = useState(false)
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
   const [formHostIds, setFormHostIds] = useState<string[]>([])
   const [formHostNames, setFormHostNames] = useState<string[]>([])
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
-  const [showSpaceDropdown, setShowSpaceDropdown] = useState(false)
-  const [showRoomDropdown, setShowRoomDropdown] = useState(false)
   const [showHostDropdown, setShowHostDropdown] = useState(false)
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false)
   const [pendingOwner, setPendingOwner] = useState<{ id: string; nickname: string; name: string } | null>(null)
@@ -893,12 +789,11 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
         setSpaceId(ds); setRoomId(dr)
       }
-      setSearchKeyword(""); setShowDropdown(false)
-    }
+      setSearchKeyword("")}
   }, [open, date, spaces, session])
 
   useEffect(() => {
-    if (!showDropdown) return
+    if (!searchKeyword.trim()) return
     const fetchId = ++remainingFetchRef.current
     const timer = window.setTimeout(async () => {
       try {
@@ -910,13 +805,12 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
       } catch {}
     }, 200)
     return () => clearTimeout(timer)
-  }, [searchKeyword, showDropdown])
+  }, [searchKeyword])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setShowDropdown(false); setShowSpaceDropdown(false)
-      setShowRoomDropdown(false); setShowHostDropdown(false)
+      setSearchKeyword(""); setShowHostDropdown(false)
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
@@ -928,14 +822,12 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
     if (remaining !== undefined && remaining !== -1 && remaining <= 0) {
       setPendingOwner({ id: customer.id, nickname: customer.nickname, name: customer.name })
       setPurchaseDialogOpen(true)
-      setShowDropdown(false)
       return
     }
     setFormOwnerIds([...formOwnerIds, customer.id])
     setFormOwnerNames([...formOwnerNames, customer.nickname || customer.name || ""])
     setFormOwnerDescriptions([...formOwnerDescriptions, { id: customer.id, name: customer.nickname || customer.name || "", description: "" }])
-    setSearchKeyword(""); setShowDropdown(false)
-    setTimeout(() => searchInputRef.current?.blur(), 0)
+    setSearchKeyword(""); setTimeout(() => searchInputRef.current?.blur(), 0)
   }
 
   const addPurchase = async () => {
@@ -965,12 +857,13 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         host_ids: formHostIds, host_names: formHostNames,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
+      let result: EnergyKnotSession
       if (editingRecord) {
-        await energyKnotSessionApi.update(editingRecord.id, data)
+        result = await energyKnotSessionApi.update(editingRecord.id, data)
       } else {
-        await energyKnotSessionApi.create(data)
+        result = await energyKnotSessionApi.create(data)
       }
-      onClose()
+      onSaved(result)
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       if (typeof detail === "string") alert(detail)
@@ -999,52 +892,21 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowHostDropdown(false); setShowDropdown(false); setShowSpaceDropdown(!showSpaceDropdown) }}
-                >
-                  <span className={spaceId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {spaceId ? spaces.find(s => s.id === spaceId)?.name || "选择空间" : "选择空间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showSpaceDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {spaces.map(s => (
-                      <button key={s.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                        onClick={() => { setSpaceId(s.id); setRoomId(s.rooms?.[0]?.id || ""); setShowSpaceDropdown(false) }}>
-                        <span>{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowSpaceDropdown(false); setShowHostDropdown(false); setShowDropdown(false); setShowRoomDropdown(!showRoomDropdown) }}
-                >
-                  <span className={roomId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {roomId ? (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "选择房间" : "选择房间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showRoomDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {(spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? (
-                      <span className="block w-full px-3 py-2 text-[12px] text-[#8f959e] cursor-default">无房间</span>
-                    ) : (
-                      (spaces.find(s => s.id === spaceId)?.rooms || []).map(r => (
-                        <button key={r.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                          onClick={() => { setRoomId(r.id); setShowRoomDropdown(false) }}>
-                          <span>{r.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <SelectDropdown
+                className="w-[122px]"
+                value={spaceId}
+                options={spaces.map(s => ({value: s.id, label: s.name}))}
+                placeholder="选择空间"
+                onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
+              />
+              <SelectDropdown
+                className="w-[122px]"
+                value={roomId}
+                options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
+                placeholder={spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? "无房间" : "选择房间"}
+                disabled={!!spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0}
+                onChange={(v) => setRoomId(v)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
@@ -1053,24 +915,28 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               <Input
                 ref={searchInputRef}
                 value={searchKeyword}
-                onChange={(e) => { setSearchKeyword(e.target.value); setShowDropdown(true) }}
-                onFocus={() => setShowDropdown(true)}
-                onClick={() => setShowDropdown(true)}
+                onChange={(e) => setSearchKeyword(e.target.value)}
                 placeholder="选择案主"
                 className="h-8 text-[12px]"
                 autoComplete="off"
               />
-              {showDropdown && (() => {
+              {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
-                const filtered = kw
-                  ? allCustomers.filter(c => (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
-                  : allCustomers
+                const filtered = allCustomers.filter(c =>
+                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
+                ).sort((a, b) => {
+                  const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
+                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
+                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  return sa - sb
+                })
+                const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
                 return (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {filtered.length === 0 ? (
+                  {visible.length === 0 ? (
                     <div className="px-3 py-2 text-[12px] text-[#8f959e]">无匹配客户</div>
                   ) : (
-                    filtered.map(c => {
+                    visible.map(c => {
                       const remaining = remainingMap[c.id]
                       const isDepleted = remaining !== undefined && remaining <= 0
                       const alreadySelected = formOwnerIds.includes(c.id)
@@ -1142,7 +1008,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               <div data-dropdown className="relative">
                 <button type="button"
                   className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowDropdown(false); setShowHostDropdown(!showHostDropdown) }}
+                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setSearchKeyword(""); setShowHostDropdown(!showHostDropdown) }}
                 >
                   <span className="text-[#8f959e]">选择能量结老师</span>
                   <ChevronDown className="h-3 w-3 text-[#8f959e]" />
@@ -1204,9 +1070,10 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
 })
 
 // ===== ICS Dialog (独立组件) =====
-const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
+const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; teachers: CustomerLight[]
   session?: InternalCourseSession | null; onClose: () => void
+  onSaved: (record: InternalCourseSession) => void
 }) => {
   const [editingRecord, setEditingRecord] = useState<InternalCourseSession | null>(null)
   const [saving, setSaving] = useState(false)
@@ -1220,10 +1087,6 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
   const [formHostName, setFormHostName] = useState("")
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
-  const [showSpaceDropdown, setShowSpaceDropdown] = useState(false)
-  const [showRoomDropdown, setShowRoomDropdown] = useState(false)
-  const [showCourseTypeDropdown, setShowCourseTypeDropdown] = useState(false)
-  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -1250,15 +1113,6 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
     }
   }, [open, date, spaces, session])
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setShowSpaceDropdown(false); setShowRoomDropdown(false)
-      setShowCourseTypeDropdown(false); setShowTeacherDropdown(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [])
 
   const handleSave = async () => {
     setSaving(true)
@@ -1272,12 +1126,13 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
         host_ids: hostIds, host_names: hostNames,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
+      let result: InternalCourseSession
       if (editingRecord) {
-        await internalCourseSessionApi.update(editingRecord.id, data)
+        result = await internalCourseSessionApi.update(editingRecord.id, data)
       } else {
-        await internalCourseSessionApi.create(data)
+        result = await internalCourseSessionApi.create(data)
       }
-      onClose()
+      onSaved(result)
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       if (typeof detail === "string") alert(detail)
@@ -1306,76 +1161,30 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowCourseTypeDropdown(false); setShowTeacherDropdown(false); setShowSpaceDropdown(!showSpaceDropdown) }}
-                >
-                  <span className={spaceId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {spaceId ? spaces.find(s => s.id === spaceId)?.name || "选择空间" : "选择空间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showSpaceDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {spaces.map(s => (
-                      <button key={s.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                        onClick={() => { setSpaceId(s.id); setRoomId(s.rooms?.[0]?.id || ""); setShowSpaceDropdown(false) }}>
-                        <span>{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowSpaceDropdown(false); setShowCourseTypeDropdown(false); setShowTeacherDropdown(false); setShowRoomDropdown(!showRoomDropdown) }}
-                >
-                  <span className={roomId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {roomId ? (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "选择房间" : "选择房间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showRoomDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {(spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? (
-                      <span className="block w-full px-3 py-2 text-[12px] text-[#8f959e] cursor-default">无房间</span>
-                    ) : (
-                      (spaces.find(s => s.id === spaceId)?.rooms || []).map(r => (
-                        <button key={r.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                          onClick={() => { setRoomId(r.id); setShowRoomDropdown(false) }}>
-                          <span>{r.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <SelectDropdown
+                className="w-[122px]"
+                value={spaceId}
+                options={spaces.map(s => ({value: s.id, label: s.name}))}
+                placeholder="选择空间"
+                onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
+              />
+              <SelectDropdown
+                className="w-[122px]"
+                value={roomId}
+                options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
+                placeholder={spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? "无房间" : "选择房间"}
+                disabled={!!spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0}
+                onChange={(v) => setRoomId(v)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程类型</span>
-            <div data-dropdown className="relative">
-              <button type="button"
-                className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowTeacherDropdown(false); setShowCourseTypeDropdown(!showCourseTypeDropdown) }}
-              >
-                <span className="text-[#2b2f36]">{formCourseType}</span>
-                <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-              </button>
-              {showCourseTypeDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {ICS_COURSE_TYPES.map(t => (
-                    <button key={t}
-                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                      onClick={() => { setFormCourseType(t); setShowCourseTypeDropdown(false) }}>
-                      <span>{t}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SelectDropdown
+              value={formCourseType}
+              options={ICS_COURSE_TYPES.map(t => ({value: t, label: t}))}
+              onChange={(v) => setFormCourseType(v)}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程名称</span>
@@ -1383,28 +1192,12 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程老师</span>
-            <div data-dropdown className="relative">
-              <button type="button"
-                className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowCourseTypeDropdown(false); setShowTeacherDropdown(!showTeacherDropdown) }}
-              >
-                <span className={formHostId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                  {formHostId ? formHostName : "选择老师"}
-                </span>
-                <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-              </button>
-              {showTeacherDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {teachers.map(c => (
-                    <button key={c.id}
-                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                      onClick={() => { setFormHostId(c.id); setFormHostName(c.nickname || c.name || ""); setShowTeacherDropdown(false) }}>
-                      <span>{c.nickname || c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SelectDropdown
+              value={formHostId}
+              options={teachers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+              placeholder="选择老师"
+              onChange={(v) => { setFormHostId(v); setFormHostName(teachers.find(c => c.id === v)?.nickname || teachers.find(c => c.id === v)?.name || "") }}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
@@ -1422,9 +1215,10 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose }: {
 })
 
 // ===== Salon Dialog (独立组件) =====
-const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onClose }: {
+const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; courses: Course[]
   teachers: CustomerLight[]; session?: ClassRecord | null; onClose: () => void
+  onSaved: (record: ClassRecord) => void
 }) => {
   const [editingRecord, setEditingRecord] = useState<ClassRecord | null>(null)
   const [saving, setSaving] = useState(false)
@@ -1437,11 +1231,6 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
   const [formIsPublicWelfare, setFormIsPublicWelfare] = useState(false)
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
-  const [showCourseDropdown, setShowCourseDropdown] = useState(false)
-  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false)
-  const [showSpaceDropdown, setShowSpaceDropdown] = useState(false)
-  const [showRoomDropdown, setShowRoomDropdown] = useState(false)
-  const [showWelfareDropdown, setShowWelfareDropdown] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -1465,31 +1254,20 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
         const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
         setSpaceId(ds); setRoomId(dr)
       }
-      setShowCourseDropdown(false); setShowTeacherDropdown(false)
-      setShowSpaceDropdown(false); setShowRoomDropdown(false); setShowWelfareDropdown(false)
     }
   }, [open, date, spaces, session])
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setShowCourseDropdown(false); setShowTeacherDropdown(false)
-      setShowSpaceDropdown(false); setShowRoomDropdown(false); setShowWelfareDropdown(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [])
 
-  const selectedCourse = courses.find(c => c.id === formCourseId)
 
   const handleSave = async () => {
     if (!formCourseId) return
     setSaving(true)
     try {
       const teacherIds = formTeacherId ? [formTeacherId] : []
+      let result: ClassRecord
       if (editingRecord) {
         const course = courses.find(c => c.id === formCourseId)
-        await classRecordApi.update(editingRecord.id, {
+        result = await classRecordApi.update(editingRecord.id, {
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
           course_id: formCourseId, course_name: course?.name || editingRecord.course_name,
           course_description: formDescription, teacher_ids: teacherIds,
@@ -1499,7 +1277,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
       } else {
         const course = courses.find(c => c.id === formCourseId)
         if (!course) return
-        await classRecordApi.create({
+        result = await classRecordApi.create({
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
           course_id: formCourseId, course_name: course.name,
           course_description: formDescription, teacher_ids: teacherIds,
@@ -1507,7 +1285,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
           space_id: spaceId || undefined, room_id: roomId || undefined,
         })
       }
-      onClose()
+      onSaved(result)
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       if (typeof detail === "string") alert(detail)
@@ -1536,123 +1314,48 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowCourseDropdown(false); setShowTeacherDropdown(false); setShowWelfareDropdown(false); setShowSpaceDropdown(!showSpaceDropdown) }}
-                >
-                  <span className={spaceId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {spaceId ? spaces.find(s => s.id === spaceId)?.name || "选择空间" : "选择空间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showSpaceDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {spaces.map(s => (
-                      <button key={s.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                        onClick={() => { setSpaceId(s.id); setRoomId(s.rooms?.[0]?.id || ""); setShowSpaceDropdown(false) }}>
-                        <span>{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div data-dropdown className="relative flex-1">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowSpaceDropdown(false); setShowCourseDropdown(false); setShowTeacherDropdown(false); setShowWelfareDropdown(false); setShowRoomDropdown(!showRoomDropdown) }}
-                >
-                  <span className={roomId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                    {roomId ? (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "选择房间" : "选择房间"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showRoomDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {(spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? (
-                      <span className="block w-full px-3 py-2 text-[12px] text-[#8f959e] cursor-default">无房间</span>
-                    ) : (
-                      (spaces.find(s => s.id === spaceId)?.rooms || []).map(r => (
-                        <button key={r.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                          onClick={() => { setRoomId(r.id); setShowRoomDropdown(false) }}>
-                          <span>{r.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <SelectDropdown
+                className="w-[122px]"
+                value={spaceId}
+                options={spaces.map(s => ({value: s.id, label: s.name}))}
+                placeholder="选择空间"
+                onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
+              />
+              <SelectDropdown
+                className="w-[122px]"
+                value={roomId}
+                options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
+                placeholder={spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? "无房间" : "选择房间"}
+                disabled={!!spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0}
+                onChange={(v) => setRoomId(v)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程</span>
-            <div data-dropdown className="relative">
-              <button type="button"
-                className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowTeacherDropdown(false); setShowWelfareDropdown(false); setShowCourseDropdown(!showCourseDropdown) }}
-              >
-                <span className={formCourseId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                  {selectedCourse ? selectedCourse.name : "选择课程"}
-                </span>
-                <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-              </button>
-              {showCourseDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {courses.map(c => (
-                    <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                      onClick={() => { setFormCourseId(c.id); setShowCourseDropdown(false) }}>
-                      <span>{c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SelectDropdown
+              value={formCourseId}
+              options={courses.map(c => ({value: c.id, label: c.name}))}
+              placeholder="选择课程"
+              onChange={(v) => setFormCourseId(v)}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">老师</span>
-            <div data-dropdown className="relative">
-              <button type="button"
-                className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowCourseDropdown(false); setShowWelfareDropdown(false); setShowTeacherDropdown(!showTeacherDropdown) }}
-              >
-                <span className={formTeacherId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                  {formTeacherId ? teachers.find(t => t.id === formTeacherId)?.nickname || teachers.find(t => t.id === formTeacherId)?.name || "选择老师" : "选择老师"}
-                </span>
-                <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-              </button>
-              {showTeacherDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {teachers.map(c => (
-                    <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                      onClick={() => { setFormTeacherId(c.id); setShowTeacherDropdown(false) }}>
-                      <span>{c.nickname || c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SelectDropdown
+              value={formTeacherId}
+              options={teachers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+              placeholder="选择老师"
+              onChange={(v) => setFormTeacherId(v)}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">公益</span>
-            <div data-dropdown className="relative">
-              <button type="button"
-                className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                onMouseDown={(e) => e.stopPropagation()} onClick={() => { setShowRoomDropdown(false); setShowSpaceDropdown(false); setShowCourseDropdown(false); setShowTeacherDropdown(false); setShowWelfareDropdown(!showWelfareDropdown) }}
-              >
-                <span className="text-[#2b2f36]">{formIsPublicWelfare ? "是" : "否"}</span>
-                <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-              </button>
-              {showWelfareDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {[false, true].map(v => (
-                    <button key={String(v)} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                      onClick={() => { setFormIsPublicWelfare(v); setShowWelfareDropdown(false) }}>
-                      <span>{v ? "是" : "否"}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SelectDropdown
+              value={formIsPublicWelfare ? "true" : "false"}
+              options={[{value: "false", label: "否"}, {value: "true", label: "是"}]}
+              onChange={(v) => setFormIsPublicWelfare(v === "true")}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-1">备注</span>
@@ -1673,7 +1376,7 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
   dateRange: string[]; calendarCounts: Record<string, number>; detailDate: string; todayStr: string
   onPrev: () => void; onNext: () => void; onSelectDate: (d: string) => void
 }) => (
-  <div className="flex items-center justify-between gap-1 mt-2">
+  <div className="flex items-center justify-between gap-1 mt-2 h-[52px]">
     <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={onPrev}>
       <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
     </button>
@@ -1690,15 +1393,13 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
             }`}
             onClick={() => onSelectDate(d)}
           >
-            <span className={`text-[10px] leading-none ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
+            <span className={`text-[10px] leading-none h-3 flex items-center ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
               {getWeekday(d)}
             </span>
-            <span className="text-[14px] font-medium leading-tight">{d.split("-")[2]}</span>
-            {dayCount > 0 && (
-              <span className={`text-[9px] leading-none mt-0.5 ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
-                {dayCount}场
-              </span>
-            )}
+            <span className="text-[14px] font-medium leading-none h-4 flex items-center">{d.split("-")[2]}</span>
+            <span className={`text-[9px] leading-none h-3 flex items-center mt-0.5 ${isSelected ? "text-white/80" : dayCount > 0 ? "text-[#b0b5bb]" : "text-transparent"}`}>
+              {dayCount > 0 ? `${dayCount}场` : " "}
+            </span>
           </button>
         )
       })}
@@ -1762,8 +1463,6 @@ export default function DailyActivitiesPage() {
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(today)
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
-  const [showCalendarPicker, setShowCalendarPicker] = useState(false)
-  const [calendarPickerMonth, setCalendarPickerMonth] = useState(() => today.substring(0, 7))
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
@@ -1774,9 +1473,6 @@ export default function DailyActivitiesPage() {
   const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
     try { return localStorage.getItem("daily-activities-space") || "" } catch { return "" }
   })
-  const [showSpaceDropdown, setShowSpaceDropdown] = useState(false)
-  const spaceDropdownRef = useRef<HTMLDivElement | null>(null)
-
   // Activity data (5 types from dashboard)
   const [detailRecords, setDetailRecords] = useState<ClassRecord[]>([])
   const [detailGcsSessions, setDetailGcsSessions] = useState<GroupCaseSession[]>([])
@@ -1816,6 +1512,7 @@ export default function DailyActivitiesPage() {
   const [icsMaterialsDialogOpen, setIcsMaterialsDialogOpen] = useState(false)
   const [icsMaterialsRecord, setIcsMaterialsRecord] = useState<InternalCourseSession | null>(null)
 
+
   // ===== Warning dialog =====
   const [warningOpen, setWarningOpen] = useState(false)
   const [warningMsg, setWarningMsg] = useState("")
@@ -1828,9 +1525,6 @@ export default function DailyActivitiesPage() {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}") } catch { return {} }
   }, [])
   const isSuperAdmin = currentUser?.role === "超级管理员"
-
-  // ===== Refs =====
-  const calendarPickerRef = useRef<HTMLDivElement | null>(null)
 
   // ===== Derived data =====
   const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
@@ -1933,6 +1627,39 @@ export default function DailyActivitiesPage() {
     }
   }
 
+  // ===== useCallback 稳定 onClose/onSaved 引用，避免 memo 子组件无效重渲染 =====
+  const handleSalonClose = useCallback(() => { setDialogOpen(false) }, [])
+  const handleGcsClose = useCallback(() => { setGcsDialogOpen(false) }, [])
+  const handleErsClose = useCallback(() => { setErsDialogOpen(false) }, [])
+  const handleEksClose = useCallback(() => { setEksDialogOpen(false) }, [])
+  const handleIcsClose = useCallback(() => { setIcsDialogOpen(false) }, [])
+
+  const handleSalonSaved = useCallback((record: ClassRecord) => {
+    setDetailRecords(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
+    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setDialogOpen(false)
+  }, [])
+  const handleGcsSaved = useCallback((record: GroupCaseSession) => {
+    setDetailGcsSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
+    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setGcsDialogOpen(false)
+  }, [])
+  const handleErsSaved = useCallback((record: EmotionalReleaseSession) => {
+    setDetailErsSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
+    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setErsDialogOpen(false)
+  }, [])
+  const handleEksSaved = useCallback((record: EnergyKnotSession) => {
+    setDetailEksSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
+    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setEksDialogOpen(false)
+  }, [])
+  const handleIcsSaved = useCallback((record: InternalCourseSession) => {
+    setDetailIcsSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
+    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setIcsDialogOpen(false)
+  }, [])
+
   const load = () => {
     courseApi.list().then(setCourses).catch(() => {})
     spaceApi.list().then(setSpaces).catch(() => {})
@@ -1947,21 +1674,11 @@ export default function DailyActivitiesPage() {
   useEffect(() => { load() }, [])
   useEffect(() => { loadDateData(detailDate) }, [detailDate])
 
-  // Helper: close all dropdowns (used by toggle buttons to avoid mousedown flash)
-  const closeAllDropdowns = () => {
-    setShowCalendarPicker(false)
-    setShowSpaceDropdown(false)
-  }
-
-  // Click outside to close all dropdowns
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setShowCalendarPicker(false)
-      setShowSpaceDropdown(false)
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+  const handleSpaceSelect = useCallback((id: string) => {
+    startTransition(() => {
+      setSelectedSpaceId(id)
+    })
+    localStorage.setItem("daily-activities-space", id)
   }, [])
 
   // ===== Salon handlers =====
@@ -2180,116 +1897,8 @@ export default function DailyActivitiesPage() {
           {/* Date picker + action buttons */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-            <div className="relative inline-block">
-              <button
-                className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
-                onClick={() => {
-                  setCalendarPickerMonth(detailDate.substring(0, 7))
-                  setShowCalendarPicker(!showCalendarPicker)
-                }}
-              >
-                <span className="text-[16px] text-[#2b2f36] font-medium whitespace-nowrap">
-                  {formatDateChinese(detailDate)}
-                </span>
-                <ChevronDown className="h-4 w-4 text-[#8f959e]" />
-              </button>
-              {showCalendarPicker && (
-                <div data-dropdown ref={calendarPickerRef} className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-50 w-[280px]" onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-between mb-3">
-                    <button
-                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
-                      onClick={() => {
-                        const [y, m] = calendarPickerMonth.split("-").map(Number)
-                        setCalendarPickerMonth(`${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`)
-                      }}
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="text-[13px] font-medium text-[#2b2f36]">
-                      {calendarPickerMonth.split("-")[0]}年{parseInt(calendarPickerMonth.split("-")[1])}月
-                    </span>
-                    <button
-                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
-                      onClick={() => {
-                        const [y, m] = calendarPickerMonth.split("-").map(Number)
-                        setCalendarPickerMonth(`${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}`)
-                      }}
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-7 gap-0.5 mb-1">
-                    {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
-                      <div key={w} className="text-center text-[10px] text-[#8f959e] py-1">{w}</div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-7 gap-0.5">
-                    {(() => {
-                      const [year, month] = calendarPickerMonth.split("-").map(Number)
-                      const firstDay = new Date(year, month - 1, 1)
-                      const lastDay = new Date(year, month, 0)
-                      const startWeekday = firstDay.getDay()
-                      const daysInMonth = lastDay.getDate()
-                      const cells: (number | null)[] = []
-                      for (let i = 0; i < startWeekday; i++) cells.push(null)
-                      for (let d = 1; d <= daysInMonth; d++) cells.push(d)
-                      return cells.map((day, i) => {
-                        if (!day) return <div key={`empty-${i}`} className="h-7" />
-                        const dateStr = `${calendarPickerMonth}-${String(day).padStart(2, "0")}`
-                        const isSelected = dateStr === detailDate
-                        const isTodayDate = dateStr === today
-                        return (
-                          <button
-                            key={dateStr}
-                            className={`h-7 flex items-center justify-center rounded text-[12px] transition-colors ${
-                              isSelected ? "bg-[#3370ff] text-white" : isTodayDate ? "bg-[#f0f5ff] text-[#3370ff]" : "hover:bg-[#f7f8fa] text-[#2b2f36]"
-                            }`}
-                            onClick={() => {
-                              setDetailDate(dateStr)
-                              setShowCalendarPicker(false)
-                            }}
-                          >
-                            {day}
-                          </button>
-                        )
-                      })
-                    })()}
-                  </div>
-                </div>
-              )}
-            </div>
-              {spaces.length > 0 && (
-                <div data-dropdown className="relative" ref={spaceDropdownRef}>
-                  <button
-                    className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
-                    onMouseDown={(e) => e.stopPropagation()} onClick={() => { closeAllDropdowns(); setShowSpaceDropdown(!showSpaceDropdown) }}
-                  >
-                    <span className="text-[16px] text-[#2b2f36] font-medium whitespace-nowrap">
-                      {selectedSpaceId ? spaces.find(s => s.id === selectedSpaceId)?.name || "全部空间" : "全部空间"}
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-[#8f959e]" />
-                  </button>
-                  {showSpaceDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] py-1 z-50 min-w-[140px]" onMouseDown={(e) => e.stopPropagation()}>
-                      <button
-                        className="w-full text-left px-4 py-2 text-[13px] hover:bg-[#f7f8fa] text-[#2b2f36]"
-                        onClick={() => { setSelectedSpaceId(""); localStorage.setItem("daily-activities-space", ""); setShowSpaceDropdown(false) }}
-                      >
-                        全部空间
-                      </button>
-                      {spaces.map(s => (
-                        <button
-                          key={s.id}
-                          className={`w-full text-left px-4 py-2 text-[13px] hover:bg-[#f7f8fa] ${s.id === selectedSpaceId ? "text-[#3370ff] bg-[#f0f5ff]" : "text-[#2b2f36]"}`}
-                          onClick={() => { setSelectedSpaceId(s.id); localStorage.setItem("daily-activities-space", s.id); setShowSpaceDropdown(false) }}
-                        >
-                          {s.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+            <CalendarDatePicker detailDate={detailDate} onSelectDate={setDetailDate} />
+            <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
             </div>
             <div className="flex items-center gap-2">
               <DropdownMenu>
@@ -2346,7 +1955,8 @@ export default function DailyActivitiesPage() {
         courses={courses}
         teachers={teachers}
         session={salonEditSession}
-        onClose={() => { setDialogOpen(false); loadDateData(detailDate) }}
+        onClose={handleSalonClose}
+        onSaved={handleSalonSaved}
       />
 
       {/* ===== GCS Dialog ===== */}
@@ -2357,7 +1967,8 @@ export default function DailyActivitiesPage() {
         allCustomers={allCustomers}
         achieverCustomers={achieverCustomers}
         session={gcsEditSession}
-        onClose={() => { setGcsDialogOpen(false); loadDateData(detailDate) }}
+        onClose={handleGcsClose}
+        onSaved={handleGcsSaved}
       />
 
       {/* ===== ERS Dialog ===== */}
@@ -2368,7 +1979,8 @@ export default function DailyActivitiesPage() {
         allCustomers={allCustomers}
         achieverCustomers={achieverCustomers}
         session={ersEditSession}
-        onClose={() => { setErsDialogOpen(false); loadDateData(detailDate) }}
+        onClose={handleErsClose}
+        onSaved={handleErsSaved}
       />
 
       {/* ===== EKS Dialog ===== */}
@@ -2379,7 +1991,8 @@ export default function DailyActivitiesPage() {
         allCustomers={allCustomers}
         hostCustomers={eksHostCustomers}
         session={eksEditSession}
-        onClose={() => { setEksDialogOpen(false); loadDateData(detailDate) }}
+        onClose={handleEksClose}
+        onSaved={handleEksSaved}
       />
 
       {/* ===== ICS Dialog ===== */}
@@ -2389,7 +2002,8 @@ export default function DailyActivitiesPage() {
         spaces={spaces}
         teachers={teachers}
         session={icsEditSession}
-        onClose={() => { setIcsDialogOpen(false); loadDateData(detailDate) }}
+        onClose={handleIcsClose}
+        onSaved={handleIcsSaved}
       />
 
       {/* ===== Salon Delete Dialog ===== */}
