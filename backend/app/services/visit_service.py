@@ -4,7 +4,7 @@ from typing import Optional, List, Dict
 
 from app.models.visit import VisitRecord, VisitRecordCreate, CustomerSearchResult, ActivityInfo
 from app.services.customer_service import list_customers
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "visits.json"
 _visits: Dict[str, VisitRecord] = {}
@@ -16,9 +16,14 @@ def _load():
     _visits = {k: VisitRecord(**v) for k, v in data.items()}
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _visits.items()}
-    save_data(FILENAME, data)
+def _save(visit_id: str = ""):
+    if visit_id:
+        item = _visits.get(visit_id)
+        if item:
+            save_item(FILENAME, visit_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _visits.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -292,7 +297,7 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
         **data.model_dump(),
     )
     _visits[record.id] = record
-    _save()
+    _save(record.id)
     # 计算该客户到访总次数（含本次）
     record.visit_count = count_customer_visits(record.customer_id)
     # 如果创建时即为已到店，执行会员活动扣费
@@ -315,7 +320,7 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
     new_arrived = record.arrived
     record.updated_at = datetime.now(timezone.utc)
     _visits[visit_id] = record
-    _save()
+    _save(visit_id)
     # 从未到店 → 已到店：执行会员活动扣费
     if not old_arrived and new_arrived:
         _deduct_for_arrival(record)
@@ -381,7 +386,7 @@ def delete_visit(visit_id: str) -> bool:
         return False
     visit.is_deleted = True
     visit.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(visit_id)
     # 自动刷新会员身份
     from app.services import member_identity_service
     member_identity_service.refresh_member_type(visit.customer_id)

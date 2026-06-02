@@ -3,7 +3,7 @@ from typing import Optional
 
 from app.models.customer_ai_config import CustomerAIConfig, CustomerAIConfigUpdate
 from app.models.ai_config import PROVIDER_DEFAULTS
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "customer_ai_config.json"
 _config: Optional[CustomerAIConfig] = None
@@ -16,9 +16,9 @@ def _load():
         _config = CustomerAIConfig(**data)
 
 
-def _save():
+def _save(item_id: str = ""):
     if _config:
-        save_data(FILENAME, _config.model_dump(mode="json"))
+        save_item(FILENAME, "default", _config.model_dump(mode="json"))
 
 
 _load()
@@ -42,7 +42,7 @@ def update_config(data: CustomerAIConfigUpdate) -> CustomerAIConfig:
     for key, value in update_data.items():
         setattr(config, key, value)
     config.updated_at = datetime.now(timezone.utc)
-    _save()
+    _save("default")
     return config
 
 

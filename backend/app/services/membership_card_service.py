@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from typing import List, Optional, Dict
 
 from app.models.membership_card import MembershipCard, MembershipCardCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
 
 FILENAME = "membership_cards.json"
@@ -23,9 +23,14 @@ def _load():
     _deductions = load_data(DEDUCTIONS_FILE) or {}
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _cards.items()}
-    save_data(FILENAME, data)
+def _save(card_id: str = ""):
+    if card_id:
+        item = _cards.get(card_id)
+        if item:
+            save_item(FILENAME, card_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _cards.items()}
+        save_data(FILENAME, data)
 
 
 def _save_deductions():
@@ -79,7 +84,7 @@ def create_card(data: MembershipCardCreate) -> MembershipCard:
         **card_data,
     )
     _cards[card.id] = card
-    _save()
+    _save(card.id)
     _refresh_member_type(card.customer_id)
     return card
 
@@ -99,7 +104,7 @@ def update_card(card_id: str, data: dict) -> Optional[MembershipCard]:
     )
     card.updated_at = datetime.now(timezone.utc)
     _cards[card_id] = card
-    _save()
+    _save(card_id)
     _refresh_member_type(card.customer_id)
     return card
 
@@ -111,7 +116,7 @@ def delete_card(card_id: str) -> bool:
     customer_id = card.customer_id
     card.is_deleted = True
     card.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(card_id)
     _refresh_member_type(customer_id)
     return True
 
@@ -133,7 +138,7 @@ def _deduct_one(customer_id: str) -> bool:
     card.remaining_count -= 1
     card.updated_at = datetime.now(timezone.utc)
     _cards[card.id] = card
-    _save()
+    _save(card.id)
     return True
 
 
@@ -151,7 +156,7 @@ def _restore_one(customer_id: str) -> bool:
     card.remaining_count += 1
     card.updated_at = datetime.now(timezone.utc)
     _cards[card.id] = card
-    _save()
+    _save(card.id)
     return True
 
 

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.account import Account, AccountCreate, Role, RoleCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 ACCOUNTS_FILE = "accounts.json"
 ROLES_FILE = "roles.json"
@@ -17,8 +17,13 @@ def _load_accounts():
     _accounts = {k: Account(**v) for k, v in data.items()}
 
 
-def _save_accounts():
-    save_data(ACCOUNTS_FILE, {k: v.model_dump(mode="json") for k, v in _accounts.items()})
+def _save_accounts(account_id: str = ""):
+    if account_id:
+        item = _accounts.get(account_id)
+        if item:
+            save_item(ACCOUNTS_FILE, account_id, item.model_dump(mode="json"))
+    else:
+        save_data(ACCOUNTS_FILE, {k: v.model_dump(mode="json") for k, v in _accounts.items()})
 
 
 def _load_roles():
@@ -27,8 +32,13 @@ def _load_roles():
     _roles = {k: Role(**v) for k, v in data.items()}
 
 
-def _save_roles():
-    save_data(ROLES_FILE, {k: v.model_dump(mode="json") for k, v in _roles.items()})
+def _save_roles(role_id: str = ""):
+    if role_id:
+        item = _roles.get(role_id)
+        if item:
+            save_item(ROLES_FILE, role_id, item.model_dump(mode="json"))
+    else:
+        save_data(ROLES_FILE, {k: v.model_dump(mode="json") for k, v in _roles.items()})
 
 
 _load_accounts()
@@ -59,7 +69,7 @@ def create_account(data: AccountCreate) -> Account:
     now = datetime.now(timezone.utc)
     account = Account(id=str(uuid.uuid4())[:8], created_at=now, **data.model_dump())
     _accounts[account.id] = account
-    _save_accounts()
+    _save_accounts(account.id)
     return account
 
 
@@ -74,12 +84,12 @@ def update_account(account_id: str, data: dict) -> Optional[Account]:
         for k, v in filtered_data.items():
             if hasattr(account, k):
                 setattr(account, k, v)
-        _save_accounts()
+        _save_accounts(account_id)
         return account
     for k, v in data.items():
         if hasattr(account, k):
             setattr(account, k, v)
-    _save_accounts()
+    _save_accounts(account_id)
     return account
 
 
@@ -92,7 +102,7 @@ def delete_account(account_id: str) -> bool:
         return False
     account.is_deleted = True
     account.deleted_at = datetime.now(timezone.utc)
-    _save_accounts()
+    _save_accounts(account_id)
     return True
 
 
@@ -110,7 +120,7 @@ def change_password(account_id: str, old_password: str, new_password: str) -> bo
     if account.password != old_password:
         raise ValueError("原密码错误")
     account.password = new_password
-    _save_accounts()
+    _save_accounts(account_id)
     return True
 
 
@@ -124,7 +134,7 @@ def create_role(data: RoleCreate) -> Role:
     now = datetime.now(timezone.utc)
     role = Role(id=str(uuid.uuid4())[:8], created_at=now, **data.model_dump())
     _roles[role.id] = role
-    _save_roles()
+    _save_roles(role.id)
     return role
 
 
@@ -135,7 +145,7 @@ def update_role(role_id: str, data: dict) -> Optional[Role]:
     for k, v in data.items():
         if hasattr(role, k):
             setattr(role, k, v)
-    _save_roles()
+    _save_roles(role_id)
     return role
 
 
@@ -145,5 +155,5 @@ def delete_role(role_id: str) -> bool:
         return False
     role.is_deleted = True
     role.deleted_at = datetime.now(timezone.utc)
-    _save_roles()
+    _save_roles(role_id)
     return True

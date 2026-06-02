@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from typing import List, Optional, Dict
 
 from app.models.internal_course import InternalCourse, InternalCourseCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
 
 FILENAME = "internal_courses.json"
@@ -19,9 +19,14 @@ def _load():
         _courses[k] = InternalCourse(**v)
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _courses.items()}
-    save_data(FILENAME, data)
+def _save(item_id: str = ""):
+    if item_id:
+        item = _courses.get(item_id)
+        if item:
+            save_item(FILENAME, item_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _courses.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -69,7 +74,7 @@ def create_course(data: InternalCourseCreate) -> InternalCourse:
         **course_data,
     )
     _courses[course.id] = course
-    _save()
+    _save(course.id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(course.customer_id)
     return course
@@ -85,7 +90,7 @@ def update_course(course_id: str, data: dict) -> Optional[InternalCourse]:
     course.expiry_date = _calc_expiry(course.effective_date, course.course_type)
     course.updated_at = datetime.now(timezone.utc)
     _courses[course_id] = course
-    _save()
+    _save(course_id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(course.customer_id)
     return course
@@ -97,7 +102,7 @@ def delete_course(course_id: str) -> bool:
         return False
     course.is_deleted = True
     course.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(course_id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(course.customer_id)
     return True

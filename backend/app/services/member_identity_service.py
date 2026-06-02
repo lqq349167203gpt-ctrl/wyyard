@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 
 from app.models.member_identity import MemberIdentity, MemberIdentityCreate, MemberIdentityUpdate, IdentityCondition
 from app.models.customer import CustomerUpdate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
 
 FILENAME = "member_identities.json"
@@ -17,9 +17,14 @@ def _load():
     _identities = {k: MemberIdentity(**v) for k, v in data.items()}
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _identities.items()}
-    save_data(FILENAME, data)
+def _save(identity_id: str = ""):
+    if identity_id:
+        identity = _identities.get(identity_id)
+        if identity:
+            save_item(FILENAME, identity_id, identity.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _identities.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -48,7 +53,7 @@ def create_identity(data: MemberIdentityCreate) -> MemberIdentity:
         **identity_data,
     )
     _identities[identity.id] = identity
-    _save()
+    _save(identity.id)
     return identity
 
 
@@ -61,7 +66,7 @@ def update_identity(identity_id: str, data: MemberIdentityUpdate) -> Optional[Me
             setattr(identity, key, value)
     identity.updated_at = datetime.now(timezone.utc)
     _identities[identity_id] = identity
-    _save()
+    _save(identity_id)
     return identity
 
 
@@ -89,7 +94,7 @@ def delete_identity(identity_id: str) -> bool:
         return False
     identity.is_deleted = True
     identity.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(identity_id)
     return True
 
 

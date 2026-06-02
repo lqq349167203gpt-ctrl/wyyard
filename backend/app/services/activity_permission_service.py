@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "activity_permissions.json"
 ACTIVITY_TYPES = ["沙龙活动", "觉醒游戏", "情绪释放", "能量结", "内部课程"]
@@ -31,8 +31,13 @@ def _load():
         _permissions = {}
 
 
-def _save():
-    save_data(FILENAME, _permissions)
+def _save(member_type: str = ""):
+    if member_type:
+        item = _permissions.get(member_type)
+        if item:
+            save_item(FILENAME, member_type, item)
+    else:
+        save_data(FILENAME, _permissions)
 
 
 _load()

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
 from app.models.ai_config import AIConfig, AIConfigCreate, AIConfigUpdate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "ai_configs.json"
 _configs: Dict[str, AIConfig] = {}
@@ -15,9 +15,14 @@ def _load():
     _configs = {k: AIConfig(**v) for k, v in data.items()}
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _configs.items()}
-    save_data(FILENAME, data)
+def _save(config_id: str = ""):
+    if config_id:
+        config = _configs.get(config_id)
+        if config:
+            save_item(FILENAME, config_id, config.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _configs.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -43,7 +48,7 @@ def create_config(data: AIConfigCreate) -> AIConfig:
         **data.model_dump(),
     )
     _configs[config.id] = config
-    _save()
+    _save(config.id)
     return config
 
 
@@ -55,7 +60,7 @@ def update_config(config_id: str, data: AIConfigUpdate) -> Optional[AIConfig]:
     for key, value in update_data.items():
         setattr(config, key, value)
     config.updated_at = datetime.now(timezone.utc)
-    _save()
+    _save(config_id)
     return config
 
 
@@ -65,5 +70,5 @@ def delete_config(config_id: str) -> bool:
         return False
     config.is_deleted = True
     config.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(config_id)
     return True

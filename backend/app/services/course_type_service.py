@@ -1,5 +1,5 @@
 from typing import List
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services.course_service import list_courses
 
 FILENAME = "course_types.json"
@@ -17,8 +17,11 @@ def _load():
             _types.append(t)
 
 
-def _save():
-    save_data(FILENAME, {"types": _types})
+def _save(item_id: str = ""):
+    if item_id:
+        save_item(FILENAME, "types", {"types": _types})
+    else:
+        save_data(FILENAME, {"types": _types})
 
 
 _load()
@@ -31,13 +34,13 @@ def list_course_types() -> List[str]:
 def create_course_type(name: str) -> str:
     if name not in _types:
         _types.append(name)
-        _save()
+        _save(name)
     return name
 
 
 def delete_course_type(name: str) -> bool:
     if name in _types:
         _types.remove(name)
-        _save()
+        _save(name)
         return True
     return False

@@ -7,11 +7,17 @@ router = APIRouter(prefix="/api/internal-courses", tags=["internal-courses"])
 
 
 @router.get("")
-def list_courses(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None)):
+def list_courses(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None), nickname: str | None = Query(None), closer_name: str | None = Query(None)):
     items = internal_course_service.list_courses()
     if customer_ids:
         allowed = set(customer_ids.split(","))
         items = [i for i in items if i.get("customer_id") in allowed]
+    if nickname:
+        kw = nickname.lower()
+        items = [i for i in items if kw in (i.get("nickname") or "").lower()]
+    if closer_name:
+        kw = closer_name.lower()
+        items = [i for i in items if kw in (i.get("closer_name") or "").lower()]
     if page is not None:
         return paginate(items, page, page_size or 10)
     return items

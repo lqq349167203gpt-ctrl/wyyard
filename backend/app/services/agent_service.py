@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
 from app.models.agent import Agent, AgentCreate, AgentUpdate, AgentStatus
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "agents.json"
 _agents: Dict[str, Agent] = {}
@@ -15,9 +15,14 @@ def _load():
     _agents = {k: Agent(**v) for k, v in data.items()}
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _agents.items()}
-    save_data(FILENAME, data)
+def _save(item_id: str = ""):
+    if item_id:
+        item = _agents.get(item_id)
+        if item:
+            save_item(FILENAME, item_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _agents.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -45,7 +50,7 @@ def create_agent(data: AgentCreate) -> Agent:
         **data.model_dump(),
     )
     _agents[agent.id] = agent
-    _save()
+    _save(agent.id)
     return agent
 
 
@@ -57,7 +62,7 @@ def update_agent(agent_id: str, data: AgentUpdate) -> Optional[Agent]:
     for key, value in update_data.items():
         setattr(agent, key, value)
     agent.updated_at = datetime.now(timezone.utc)
-    _save()
+    _save(agent_id)
     return agent
 
 
@@ -67,5 +72,5 @@ def delete_agent(agent_id: str) -> bool:
         return False
     agent.is_deleted = True
     agent.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(agent_id)
     return True

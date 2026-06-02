@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.reminder import Reminder, ReminderCreate, ReminderCondition
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "reminders.json"
 _reminders: Dict[str, Reminder] = {}
@@ -18,11 +18,16 @@ def _load():
         _reminders[k] = Reminder(conditions=conditions, **{key: val for key, val in v.items() if key != "conditions"})
 
 
-def _save():
-    data = {}
-    for k, v in _reminders.items():
-        data[k] = v.model_dump(mode="json")
-    save_data(FILENAME, data)
+def _save(reminder_id: str = ""):
+    if reminder_id:
+        reminder = _reminders.get(reminder_id)
+        if reminder:
+            save_item(FILENAME, reminder_id, reminder.model_dump(mode="json"))
+    else:
+        data = {}
+        for k, v in _reminders.items():
+            data[k] = v.model_dump(mode="json")
+        save_data(FILENAME, data)
 
 
 _load()
@@ -48,7 +53,7 @@ def create_reminder(data: ReminderCreate) -> Reminder:
         **data.model_dump(),
     )
     _reminders[r.id] = r
-    _save()
+    _save(r.id)
     return r
 
 
@@ -63,7 +68,7 @@ def update_reminder(reminder_id: str, data: dict) -> Optional[Reminder]:
             setattr(r, key, value)
     r.updated_at = datetime.now(timezone.utc)
     _reminders[reminder_id] = r
-    _save()
+    _save(reminder_id)
     return r
 
 
@@ -73,5 +78,5 @@ def delete_reminder(reminder_id: str) -> bool:
         return False
     r.is_deleted = True
     r.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(reminder_id)
     return True

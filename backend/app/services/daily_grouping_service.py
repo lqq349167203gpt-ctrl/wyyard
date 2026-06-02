@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict
 
 from app.models.daily_grouping import DailyGrouping, DailyGroupingUpsert
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import visit_service
 
 FILENAME = "daily_groupings.json"
@@ -18,9 +18,14 @@ def _load():
         _groupings[k] = DailyGrouping(**v)
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _groupings.items()}
-    save_data(FILENAME, data)
+def _save(grouping_id: str = ""):
+    if grouping_id:
+        grouping = _groupings.get(grouping_id)
+        if grouping:
+            save_item(FILENAME, grouping_id, grouping.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _groupings.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -50,7 +55,7 @@ def upsert_grouping(data: DailyGroupingUpsert) -> DailyGrouping:
         existing.groups = data.groups
         existing.updated_at = now
         _groupings[existing.id] = existing
-        _save()
+        _save(existing.id)
         return existing
     else:
         record = DailyGrouping(
@@ -61,5 +66,5 @@ def upsert_grouping(data: DailyGroupingUpsert) -> DailyGrouping:
             updated_at=now,
         )
         _groupings[record.id] = record
-        _save()
+        _save(record.id)
         return record

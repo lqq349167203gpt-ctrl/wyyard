@@ -1,9 +1,10 @@
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.energy_knot_session import EnergyKnotSession, EnergyKnotSessionCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service, energy_knot_service
 
 FILENAME = "energy_knot_sessions.json"
@@ -18,9 +19,14 @@ def _load():
         _sessions[k] = EnergyKnotSession(**v)
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _sessions.items()}
-    save_data(FILENAME, data)
+def _save(item_id: str = ""):
+    if item_id:
+        item = _sessions.get(item_id)
+        if item:
+            save_item(FILENAME, item_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _sessions.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -54,7 +60,7 @@ def create_session(data: EnergyKnotSessionCreate) -> EnergyKnotSession:
         **data.model_dump(),
     )
     _sessions[session.id] = session
-    _save()
+    _save(session.id)
     return session
 
 
@@ -78,7 +84,7 @@ def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
             setattr(session, key, value)
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
-    _save()
+    _save(session_id)
     return session
 
 
@@ -88,7 +94,7 @@ def delete_session(session_id: str) -> bool:
         return False
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(session_id)
     return True
 
 
@@ -109,8 +115,22 @@ def search_customers(keyword: str) -> list:
 
 
 def get_remaining_count(customer_id: str) -> int:
-    """计算某用户的能量结剩余次数（所有已创建的场次均计入已用）"""
+    """计算某用户的能量结剩余次数（所有已创建的场次均计入已用，含多案主场景）"""
     knots = energy_knot_service.list_knots()
     total_purchased = sum(k.purchase_count for k in knots if k.customer_id == customer_id)
-    used = sum(1 for s in _sessions.values() if s.owner_id == customer_id and not s.is_deleted)
-    return total_purchased - used
+    used = 0
+    for s in _sessions.values():
+        if s.is_deleted:
+            continue
+        owner_ids = {s.owner_id} if s.owner_id else set()
+        try:
+            descs = json.loads(s.description or "[]")
+            if isinstance(descs, list):
+                for d in descs:
+                    if isinstance(d, dict) and d.get("id"):
+                        owner_ids.add(d["id"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+        if customer_id in owner_ids:
+            used += 1
+    return max(0, total_purchased - used)

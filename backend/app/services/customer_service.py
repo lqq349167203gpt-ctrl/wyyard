@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
 from app.models.customer import Customer, CustomerCreate, CustomerUpdate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "customers.json"
 _customers: Dict[str, Customer] = {}
@@ -16,10 +16,14 @@ def _load():
     _customers = {k: Customer(**v) for k, v in data.items()}
 
 
-def _save():
-    """保存数据到文件"""
-    data = {k: v.model_dump(mode="json") for k, v in _customers.items()}
-    save_data(FILENAME, data)
+def _save(customer_id: str = ""):
+    if customer_id:
+        item = _customers.get(customer_id)
+        if item:
+            save_item(FILENAME, customer_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _customers.items()}
+        save_data(FILENAME, data)
 
 
 # 启动时加载数据
@@ -55,7 +59,7 @@ def create_customer(data: CustomerCreate) -> Customer:
         **data.model_dump(),
     )
     _customers[customer.id] = customer
-    _save()
+    _save(customer.id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(customer.id)
     return customer
@@ -82,7 +86,7 @@ def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer
     for key, value in update_data.items():
         setattr(customer, key, value)
     customer.updated_at = datetime.now(timezone.utc)
-    _save()
+    _save(customer_id)
     return customer
 
 
@@ -92,5 +96,5 @@ def delete_customer(customer_id: str) -> bool:
         return False
     customer.is_deleted = True
     customer.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(customer_id)
     return True

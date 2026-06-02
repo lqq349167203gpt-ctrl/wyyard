@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.operation_log import OperationLog, OperationLogCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "operation_logs.json"
 _logs: Dict[str, OperationLog] = {}
@@ -17,11 +17,16 @@ def _load():
         _logs[k] = OperationLog(**v)
 
 
-def _save():
-    data = {}
-    for k, v in _logs.items():
-        data[k] = v.model_dump(mode="json")
-    save_data(FILENAME, data)
+def _save(item_id: str = ""):
+    if item_id:
+        item = _logs.get(item_id)
+        if item:
+            save_item(FILENAME, item_id, item.model_dump(mode="json"))
+    else:
+        data = {}
+        for k, v in _logs.items():
+            data[k] = v.model_dump(mode="json")
+        save_data(FILENAME, data)
 
 
 _load()
@@ -79,5 +84,5 @@ def create_log(data: OperationLogCreate, extra: dict = None) -> OperationLog:
             if hasattr(log, key):
                 setattr(log, key, value)
     _logs[log.id] = log
-    _save()
+    _save(log.id)
     return log

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.group_case import GroupCase, GroupCaseCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
 
 FILENAME = "group_cases.json"
@@ -18,9 +18,14 @@ def _load():
         _cases[k] = GroupCase(**v)
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _cases.items()}
-    save_data(FILENAME, data)
+def _save(case_id: str = ""):
+    if case_id:
+        item = _cases.get(case_id)
+        if item:
+            save_item(FILENAME, case_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _cases.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -46,7 +51,7 @@ def create_case(data: GroupCaseCreate) -> GroupCase:
         **data.model_dump(),
     )
     _cases[case.id] = case
-    _save()
+    _save(case.id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(case.customer_id)
     return case
@@ -61,7 +66,7 @@ def update_case(case_id: str, data: dict) -> Optional[GroupCase]:
             setattr(case, key, value)
     case.updated_at = datetime.now(timezone.utc)
     _cases[case_id] = case
-    _save()
+    _save(case_id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(case.customer_id)
     return case
@@ -77,7 +82,7 @@ def delete_case(case_id: str) -> tuple[bool, str]:
         return False, "该记录中有正在被使用的次数，无法删除"
     case.is_deleted = True
     case.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(case_id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(case.customer_id)
     return True, "删除成功"

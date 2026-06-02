@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.healing_record import HealingRecord, HealingRecordCreate, HealingRecordUpdate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
 
 FILENAME = "healing_records.json"
@@ -16,9 +16,14 @@ def _load():
     _records = {k: HealingRecord(**v) for k, v in data.items()}
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _records.items()}
-    save_data(FILENAME, data)
+def _save(record_id: str = ""):
+    if record_id:
+        item = _records.get(record_id)
+        if item:
+            save_item(FILENAME, record_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _records.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -48,7 +53,7 @@ def create_record(data: HealingRecordCreate) -> HealingRecord:
         **data.model_dump(),
     )
     _records[record.id] = record
-    _save()
+    _save(record.id)
     return record
 
 
@@ -61,7 +66,7 @@ def update_record(record_id: str, data: HealingRecordUpdate) -> Optional[Healing
             setattr(record, key, value)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
-    _save()
+    _save(record_id)
     return record
 
 
@@ -79,7 +84,7 @@ def delete_record(record_id: str) -> bool:
         return False
     record.is_deleted = True
     record.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(record_id)
     return True
 
 

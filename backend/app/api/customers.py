@@ -2,7 +2,13 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 
 from app.models.customer import CustomerCreate, CustomerUpdate, ChatLogParseRequest
-from app.services import customer_service
+from app.services import (
+    customer_service,
+    membership_card_service,
+    group_case_service,
+    emotional_release_service,
+    energy_knot_service,
+)
 from app.services.visit_service import count_customer_visits
 from app.services.chat_parser import parse_chat_log, generate_tags
 from app.services.excel_parser import parse_excel
@@ -15,10 +21,29 @@ class TagsGenerateRequest(BaseModel):
     tags: str
 
 
+def _fill_total_payment(customer_id: str) -> int:
+    """计算客户消费总额"""
+    total = 0
+    for c in membership_card_service.list_cards():
+        if c.customer_id == customer_id:
+            total += c.price
+    for c in group_case_service.list_cases():
+        if c.customer_id == customer_id:
+            total += c.amount
+    for r in emotional_release_service.list_releases():
+        if r.customer_id == customer_id:
+            total += r.amount
+    for k in energy_knot_service.list_knots():
+        if k.customer_id == customer_id:
+            total += k.amount
+    return total
+
+
 def _fill_visit_count(customer):
-    """填充历史到场次数"""
+    """填充历史到场次数和消费总额"""
     data = customer.model_dump(mode="json")
     data["visit_count"] = count_customer_visits(customer.id)
+    data["total_payment"] = _fill_total_payment(customer.id)
     return data
 
 

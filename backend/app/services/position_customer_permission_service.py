@@ -1,5 +1,5 @@
 from typing import Dict, List
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 # 三个独立模块
 FILENAMES = {
@@ -17,8 +17,13 @@ def _load():
         _permissions[section] = load_data(filename) or {}
 
 
-def _save(section: str):
-    save_data(FILENAMES[section], _permissions[section])
+def _save(section: str, item_id: str = ""):
+    if item_id:
+        item = _permissions[section].get(item_id)
+        if item:
+            save_item(FILENAMES[section], item_id, item)
+    else:
+        save_data(FILENAMES[section], _permissions[section])
 
 
 _load()
@@ -30,7 +35,7 @@ def get_customer_permissions(section: str, position: str) -> List[str]:
 
 def set_customer_permissions(section: str, position: str, member_types: List[str]):
     _permissions[section][position] = member_types
-    _save(section)
+    _save(section, position)
 
 
 def get_all(section: str) -> Dict[str, List[str]]:

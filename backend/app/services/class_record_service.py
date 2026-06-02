@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.class_record import ClassRecord, ClassRecordCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service, membership_card_service
 
 FILENAME = "class_records.json"
@@ -18,9 +18,14 @@ def _load():
         _records[k] = ClassRecord(**v)
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _records.items()}
-    save_data(FILENAME, data)
+def _save(item_id: str = ""):
+    if item_id:
+        item = _records.get(item_id)
+        if item:
+            save_item(FILENAME, item_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _records.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -55,7 +60,7 @@ def create_record(data: ClassRecordCreate) -> ClassRecord:
         **data.model_dump(),
     )
     _records[record.id] = record
-    _save()
+    _save(record.id)
     return record
 
 
@@ -68,7 +73,7 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
             setattr(record, key, value)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
-    _save()
+    _save(record_id)
     return record
 
 
@@ -94,7 +99,7 @@ def update_participants(record_id: str, participant_ids: List[str]):
     record.participant_ids = participant_ids
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
-    _save()
+    _save(record_id)
     return record, []
 
 
@@ -104,7 +109,7 @@ def delete_record(record_id: str) -> bool:
         return False
     record.is_deleted = True
     record.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(record_id)
     return True
 
 
@@ -136,7 +141,7 @@ def update_groups(record_id: str, groups: list):
     record.groups = [GroupMember(**g) for g in groups]
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
-    _save()
+    _save(record_id)
     return record, []
 
 

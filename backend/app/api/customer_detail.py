@@ -73,9 +73,6 @@ def _build_purchase_summary(customer_id: str) -> list:
     """构建购买汇总: 每个服务类型的总购买次数/金额和剩余次数"""
     summary = []
 
-    # 到店日期集合（仅已到店的日期才算已用）
-    arrived_dates = {v.visit_date for v in visit_service.list_visits(customer_id=customer_id) if v.arrived}
-
     # 会员活动
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
     for c in cards:
@@ -90,50 +87,50 @@ def _build_purchase_summary(customer_id: str) -> list:
             "expiry_date": c.expiry_date or "",
         })
 
-    # 觉醒游戏（仅统计已到店日期的 session）
+    # 觉醒游戏
     gc_cases = [c for c in group_case_service.list_cases() if c.customer_id == customer_id]
     gc_purchased = sum(c.purchase_count for c in gc_cases)
-    gc_used = sum(1 for s in group_case_session_service.list_sessions() if s.owner_id == customer_id and s.date in arrived_dates)
     if gc_purchased > 0:
+        gc_remaining = group_case_session_service.get_remaining_count(customer_id)
         summary.append({
             "type": "觉醒游戏",
             "name": "",
             "total_purchased": gc_purchased,
             "total_amount": sum(c.amount for c in gc_cases),
-            "used": gc_used,
-            "remaining": gc_purchased - gc_used,
+            "used": gc_purchased - gc_remaining,
+            "remaining": gc_remaining,
             "effective_date": "",
             "expiry_date": "",
         })
 
-    # 情绪释放（仅统计已到店日期的 session）
+    # 情绪释放
     er_releases = [r for r in emotional_release_service.list_releases() if r.customer_id == customer_id]
     er_purchased = sum(r.purchase_count for r in er_releases)
-    er_used = sum(1 for s in emotional_release_session_service.list_sessions() if s.owner_id == customer_id and s.date in arrived_dates)
     if er_purchased > 0:
+        er_remaining = emotional_release_session_service.get_remaining_count(customer_id)
         summary.append({
             "type": "情绪释放",
             "name": "",
             "total_purchased": er_purchased,
             "total_amount": sum(r.amount for r in er_releases),
-            "used": er_used,
-            "remaining": er_purchased - er_used,
+            "used": er_purchased - er_remaining,
+            "remaining": er_remaining,
             "effective_date": "",
             "expiry_date": "",
         })
 
-    # 能量结（仅统计已到店日期的 session）
+    # 能量结
     ek_knots = [k for k in energy_knot_service.list_knots() if k.customer_id == customer_id]
     ek_purchased = sum(k.purchase_count for k in ek_knots)
-    ek_used = sum(1 for s in energy_knot_session_service.list_sessions() if s.owner_id == customer_id and s.date in arrived_dates)
     if ek_purchased > 0:
+        ek_remaining = energy_knot_session_service.get_remaining_count(customer_id)
         summary.append({
             "type": "能量结",
             "name": "",
             "total_purchased": ek_purchased,
             "total_amount": sum(k.amount for k in ek_knots),
-            "used": ek_used,
-            "remaining": ek_purchased - ek_used,
+            "used": ek_purchased - ek_remaining,
+            "remaining": ek_remaining,
             "effective_date": "",
             "expiry_date": "",
         })

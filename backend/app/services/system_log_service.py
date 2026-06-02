@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.system_log import SystemLog, SystemLogCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "system_logs.json"
 _logs: Dict[str, SystemLog] = {}
@@ -17,11 +17,16 @@ def _load():
         _logs[k] = SystemLog(**v)
 
 
-def _save():
-    data = {}
-    for k, v in _logs.items():
-        data[k] = v.model_dump(mode="json")
-    save_data(FILENAME, data)
+def _save(log_id: str = ""):
+    if log_id:
+        log = _logs.get(log_id)
+        if log:
+            save_item(FILENAME, log_id, log.model_dump(mode="json"))
+    else:
+        data = {}
+        for k, v in _logs.items():
+            data[k] = v.model_dump(mode="json")
+        save_data(FILENAME, data)
 
 
 _load()
@@ -68,5 +73,5 @@ def create_log(data: SystemLogCreate, extra: dict = None) -> SystemLog:
             if hasattr(log, key):
                 setattr(log, key, value)
     _logs[log.id] = log
-    _save()
+    _save(log.id)
     return log

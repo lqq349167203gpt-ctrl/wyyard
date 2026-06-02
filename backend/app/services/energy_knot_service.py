@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.energy_knot import EnergyKnot, EnergyKnotCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
 
 FILENAME = "energy_knots.json"
@@ -18,9 +18,14 @@ def _load():
         _knots[k] = EnergyKnot(**v)
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _knots.items()}
-    save_data(FILENAME, data)
+def _save(knot_id: str = ""):
+    if knot_id:
+        item = _knots.get(knot_id)
+        if item:
+            save_item(FILENAME, knot_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _knots.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -46,7 +51,7 @@ def create_knot(data: EnergyKnotCreate) -> EnergyKnot:
         **data.model_dump(),
     )
     _knots[knot.id] = knot
-    _save()
+    _save(knot.id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(knot.customer_id)
     return knot
@@ -61,7 +66,7 @@ def update_knot(knot_id: str, data: dict) -> Optional[EnergyKnot]:
             setattr(knot, key, value)
     knot.updated_at = datetime.now(timezone.utc)
     _knots[knot_id] = knot
-    _save()
+    _save(knot_id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(knot.customer_id)
     return knot
@@ -78,7 +83,7 @@ def delete_knot(knot_id: str) -> tuple[bool, str]:
         return False, "该记录中有正在被使用的次数，无法删除"
     knot.is_deleted = True
     knot.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(knot_id)
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(knot.customer_id)
     return True, "删除成功"

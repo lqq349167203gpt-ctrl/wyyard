@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.emotional_release_session import EmotionalReleaseSession, EmotionalReleaseSessionCreate
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service, emotional_release_service
 
 FILENAME = "emotional_release_sessions.json"
@@ -18,9 +18,14 @@ def _load():
         _sessions[k] = EmotionalReleaseSession(**v)
 
 
-def _save():
-    data = {k: v.model_dump(mode="json") for k, v in _sessions.items()}
-    save_data(FILENAME, data)
+def _save(item_id: str = ""):
+    if item_id:
+        item = _sessions.get(item_id)
+        if item:
+            save_item(FILENAME, item_id, item.model_dump(mode="json"))
+    else:
+        data = {k: v.model_dump(mode="json") for k, v in _sessions.items()}
+        save_data(FILENAME, data)
 
 
 _load()
@@ -54,7 +59,7 @@ def create_session(data: EmotionalReleaseSessionCreate) -> EmotionalReleaseSessi
         **data.model_dump(),
     )
     _sessions[session.id] = session
-    _save()
+    _save(session.id)
     return session
 
 
@@ -79,7 +84,7 @@ def update_session(session_id: str, data: dict):
             setattr(session, key, value)
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
-    _save()
+    _save(session_id)
     return session, []
 
 
@@ -100,7 +105,7 @@ def delete_session(session_id: str) -> bool:
         return False
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(session_id)
     return True
 
 

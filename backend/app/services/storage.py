@@ -94,3 +94,32 @@ def save_data(filename: str, data: Dict[str, Any]):
         conn.commit()
     finally:
         _put_conn(conn)
+
+
+def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
+    """Upsert 单条记录，避免全表重写"""
+    table = _table_name(filename)
+    conn = _get_conn()
+    try:
+        _ensure_table(table)
+        with conn.cursor() as cur:
+            cur.execute(
+                f'INSERT INTO "{table}" (id, data) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data',
+                (item_id, json.dumps(item_data, ensure_ascii=False)),
+            )
+        conn.commit()
+    finally:
+        _put_conn(conn)
+
+
+def delete_item(filename: str, item_id: str):
+    """删除单条记录"""
+    table = _table_name(filename)
+    conn = _get_conn()
+    try:
+        _ensure_table(table)
+        with conn.cursor() as cur:
+            cur.execute(f'DELETE FROM "{table}" WHERE id = %s', (item_id,))
+        conn.commit()
+    finally:
+        _put_conn(conn)

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 from pydantic import BaseModel
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "positions.json"
 
@@ -34,8 +34,13 @@ def _load():
     _positions = {k: Position(**v) for k, v in data.items()}
 
 
-def _save():
-    save_data(FILENAME, {k: v.model_dump(mode="json") for k, v in _positions.items()})
+def _save(item_id: str = ""):
+    if item_id:
+        item = _positions.get(item_id)
+        if item:
+            save_item(FILENAME, item_id, item.model_dump(mode="json"))
+    else:
+        save_data(FILENAME, {k: v.model_dump(mode="json") for k, v in _positions.items()})
 
 
 _load()
@@ -56,7 +61,7 @@ def create_position(data: PositionCreate) -> Position:
     now = datetime.now(timezone.utc)
     position = Position(id=str(uuid.uuid4())[:8], created_at=now, **data.model_dump())
     _positions[position.id] = position
-    _save()
+    _save(position.id)
     return position
 
 
@@ -69,7 +74,7 @@ def update_position(position_id: str, data: dict) -> Optional[Position]:
     for k, v in data.items():
         if hasattr(position, k):
             setattr(position, k, v)
-    _save()
+    _save(position_id)
     return position
 
 
@@ -81,5 +86,5 @@ def delete_position(position_id: str) -> bool:
         return False
     position.is_deleted = True
     position.deleted_at = datetime.now(timezone.utc)
-    _save()
+    _save(position_id)
     return True

@@ -4,7 +4,7 @@ import threading
 from datetime import datetime, timezone, date
 from typing import List, Dict, Any, Optional
 
-from app.services.storage import load_data, save_data
+from app.services.storage import load_data, save_data, save_item
 from app.services import reminder_service, customer_service, visit_service, membership_card_service
 
 STATUS_FILE = "business_reminder_statuses.json"
@@ -29,8 +29,13 @@ def _load():
     _eval_cache = load_data(CACHE_FILE) or {}
 
 
-def _save():
-    save_data(STATUS_FILE, _statuses)
+def _save(item_id: str = ""):
+    if item_id:
+        item = _statuses.get(item_id)
+        if item:
+            save_item(STATUS_FILE, item_id, item)
+    else:
+        save_data(STATUS_FILE, _statuses)
 
 
 def _save_eval_cache():
@@ -326,7 +331,7 @@ def toggle_status(item_id: str, description: str = "") -> bool:
         if description:
             _statuses[item_id]["description"] = description
         _statuses[item_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _save()
+    _save(item_id)
     # 清除评估缓存，下次请求会重新计算 handled 状态
     global _eval_cache
     _eval_cache = {}
