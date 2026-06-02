@@ -78,8 +78,9 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-4">昵称</TableHead>
-              <TableHead>身份</TableHead>
+              <TableHead>会员身份</TableHead>
               <TableHead>到店次数</TableHead>
+              <TableHead>消费总额</TableHead>
               <TableHead>引流人</TableHead>
               <TableHead>创建日期</TableHead>
               <TableHead className="text-right pr-4">操作</TableHead>
@@ -95,6 +96,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                 <TableCell className="pl-4 text-[#2b2f36]">{c.nickname || c.name || "-"}</TableCell>
                 <TableCell className="text-[#2b2f36]">{c.member_type || "-"}</TableCell>
                 <TableCell className="text-[#2b2f36]">{c.visit_count}</TableCell>
+                <TableCell className="text-[#2b2f36]">¥{(c.total_payment ?? 0).toLocaleString()}</TableCell>
                 <TableCell className="text-[#2b2f36]">{c.referrer || "-"}</TableCell>
                 <TableCell className="text-[#8f959e]">{new Date(c.created_at).toLocaleDateString("zh-CN")}</TableCell>
                 <TableCell className="text-right pr-4">

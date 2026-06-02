@@ -12,6 +12,7 @@ import {
 import { accountApi, positionApi, customerApi } from "@/lib/api"
 import type { Account, AccountCreate, Position, Customer } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { SelectDropdown } from "@/components/select-dropdown"
 
 export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -198,6 +199,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                     value={form.owner}
                     onChange={(val) => setForm({ ...form, owner: val as string })}
                     placeholder="输入昵称搜索..."
+                    filterSelected={false}
                   />
                   {formErrors.owner && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.owner}</p>}
                 </div>
@@ -206,13 +208,12 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                 <div className="flex items-start gap-3">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">角色</span>
                   <div className="relative flex-1">
-                    <select className="w-full h-8 text-[12px] appearance-none border rounded pl-2 pr-7" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                      <option value="">选择角色</option>
-                      {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
-                    </select>
-                    <svg className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8f959e] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
+                    <SelectDropdown
+                      value={form.role}
+                      options={positions.map(p => ({ value: p.name, label: p.name }))}
+                      placeholder="选择角色"
+                      onChange={(v) => setForm({ ...form, role: v })}
+                    />
                     {formErrors.role && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.role}</p>}
                   </div>
                 </div>

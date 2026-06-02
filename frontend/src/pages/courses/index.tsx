@@ -12,6 +12,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { courseApi, courseTypeApi, type Course } from "@/lib/api"
+import { SelectDropdown } from "@/components/select-dropdown"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
@@ -28,7 +29,6 @@ export default function CoursesPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ type: "", name: "", class_count: 0 })
   const [newTypeName, setNewTypeName] = useState("")
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false)
   const [deleteTypeDialogOpen, setDeleteTypeDialogOpen] = useState(false)
   const [deletingType, setDeletingType] = useState<string | null>(null)
 
@@ -300,32 +300,12 @@ export default function CoursesPage() {
           <div className="px-6 py-5 space-y-5">
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程类型</span>
-              <div className="relative">
-                <div
-                  className="min-h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] cursor-pointer flex items-center justify-between"
-                  onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                >
-                  <span className={form.type ? "text-[#2b2f36]" : "text-muted-foreground"}>
-                    {form.type || "选择课程类型"}
-                  </span>
-                </div>
-                {showTypeDropdown && courseTypes.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm max-h-60 overflow-y-auto">
-                    {courseTypes.map((type) => (
-                      <div
-                        key={type}
-                        className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted ${form.type === type ? "bg-muted/50" : ""}`}
-                        onClick={() => { setForm({ ...form, type }); setShowTypeDropdown(false) }}
-                      >
-                        <span className="text-sm">{type}</span>
-                        {form.type === type && (
-                          <span className="text-xs text-primary">已选</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <SelectDropdown
+                value={form.type}
+                options={courseTypes.filter(t => t !== "未分类").map(t => ({value: t, label: t}))}
+                placeholder="选择课程类型"
+                onChange={(v) => setForm({ ...form, type: v })}
+              />
             </div>
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">

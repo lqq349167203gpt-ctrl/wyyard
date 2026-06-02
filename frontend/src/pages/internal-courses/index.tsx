@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react"
-import { Plus, Trash2, Edit, GraduationCap } from "lucide-react"
+import { Plus, Trash2, Edit, GraduationCap, Search, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -39,6 +39,13 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
   const [formCloserId, setFormCloserId] = useState("")
   const [formCloserName, setFormCloserName] = useState("")
 
+  // 搜索
+  const [searchNickname, setSearchNickname] = useState("")
+  const [searchCloserName, setSearchCloserName] = useState("")
+  const appliedNicknameRef = useRef("")
+  const appliedCloserNameRef = useRef("")
+  const [filterKey, setFilterKey] = useState(0)
+
   const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customersReady, setCustomersReady] = useState(false)
@@ -47,16 +54,23 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
   cpRef.current = cp
   const customersRef = useRef<Customer[]>([])
   const customersReadyRef = useRef(false)
+  const isSuperAdminRef = useRef(false)
 
   const fetchFn = useCallback(async (page: number, pageSize: number) => {
     if (!customersReadyRef.current) {
       return { items: [] as InternalCourse[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
     }
-    const allowed = customersRef.current
-    if (allowed.length === 0) {
-      return { items: [] as InternalCourse[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
+    const params: any = {}
+    if (!isSuperAdminRef.current) {
+      const allowed = customersRef.current
+      if (allowed.length === 0) {
+        return { items: [] as InternalCourse[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
+      }
+      params.customer_ids = allowed.map(c => c.id).join(",")
     }
-    return internalCourseApi.listPaginated(page, pageSize, { customer_ids: allowed.map(c => c.id).join(",") })
+    if (appliedNicknameRef.current) params.nickname = appliedNicknameRef.current
+    if (appliedCloserNameRef.current) params.closer_name = appliedCloserNameRef.current
+    return internalCourseApi.listPaginated(page, pageSize, Object.keys(params).length > 0 ? params : undefined)
   }, [])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
@@ -66,6 +80,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
     customerApi.list().then((data) => {
       let filtered = data
       const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      isSuperAdminRef.current = cu.role === "超级管理员"
       if (cu.role !== "超级管理员") {
         if (cpRef.current.length > 0) {
           filtered = data.filter(c => c.member_type && cpRef.current.includes(c.member_type))
@@ -84,6 +99,22 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
       refresh()
     })
   }, [permReady])
+
+  const handleSearch = () => {
+    appliedNicknameRef.current = searchNickname
+    appliedCloserNameRef.current = searchCloserName
+    setFilterKey(k => k + 1)
+    refresh()
+  }
+
+  const handleClearSearch = () => {
+    setSearchNickname("")
+    setSearchCloserName("")
+    appliedNicknameRef.current = ""
+    appliedCloserNameRef.current = ""
+    setFilterKey(k => k + 1)
+    refresh()
+  }
 
   const handleOpenCreate = () => {
     setEditingItem(null)
@@ -144,16 +175,45 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
 
   const content = (
     <>
-      {/* 工具栏 */}
+      {/* 搜索栏 */}
+      <div className="flex items-end gap-3 flex-wrap">
+        <div className="w-44">
+          <CustomerSearchInput
+            customers={customers}
+            value={searchNickname}
+            onChange={(v) => setSearchNickname(typeof v === "string" ? v : "")}
+            placeholder="搜索用户"
+            filterSelected={false}
+          />
+        </div>
+        <div className="w-44">
+          <CustomerSearchInput
+            customers={customers}
+            value={searchCloserName}
+            onChange={(v) => setSearchCloserName(typeof v === "string" ? v : "")}
+            placeholder="搜索成交人"
+            filterSelected={false}
+          />
+        </div>
+        <button onClick={handleSearch} className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1">
+          <Search className="h-3.5 w-3.5" /> 查询
+        </button>
+        <button onClick={handleClearSearch} className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1">
+          <X className="h-3.5 w-3.5" /> 清空
+        </button>
+        <div className="flex-1" />
+        <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
+          <Plus className="mr-1 h-3.5 w-3.5" /> 新增
+        </Button>
+      </div>
+
+      {/* 统计 */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground mt-[6px]">
           {totalItems > 0 && (
             <span>共 {totalItems} 条记录</span>
           )}
         </p>
-        <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新增
-        </Button>
       </div>
 
       {/* 表格 */}

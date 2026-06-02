@@ -105,6 +105,7 @@ export interface Customer {
   member_type: string
   paid_content: PaidContentItem[]
   visit_count: number
+  total_payment: number
   core_situation: string
   need_tags: string
   follow_up_node: string
@@ -479,7 +480,7 @@ export interface GroupCaseCreate {
 
 export const groupCaseApi = {
   list: () => request<GroupCase[]>("/api/group-cases"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<GroupCase>>(`/api/group-cases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<GroupCase>>(`/api/group-cases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
   create: (data: GroupCaseCreate) => request<GroupCase>("/api/group-cases", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<GroupCaseCreate>) => request<GroupCase>(`/api/group-cases/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/group-cases/${id}`, { method: "DELETE" }),
@@ -564,7 +565,7 @@ export interface EnergyKnotCreate {
 
 export const energyKnotApi = {
   list: () => request<EnergyKnot[]>("/api/energy-knots"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<EnergyKnot>>(`/api/energy-knots?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<EnergyKnot>>(`/api/energy-knots?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
   create: (data: EnergyKnotCreate) => request<EnergyKnot>("/api/energy-knots", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EnergyKnotCreate>) => request<EnergyKnot>(`/api/energy-knots/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/energy-knots/${id}`, { method: "DELETE" }),
@@ -595,7 +596,7 @@ export interface EmotionalReleaseCreate {
 
 export const emotionalReleaseApi = {
   list: () => request<EmotionalRelease[]>("/api/emotional-releases"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<EmotionalRelease>>(`/api/emotional-releases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<EmotionalRelease>>(`/api/emotional-releases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
   create: (data: EmotionalReleaseCreate) => request<EmotionalRelease>("/api/emotional-releases", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EmotionalReleaseCreate>) => request<EmotionalRelease>(`/api/emotional-releases/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/emotional-releases/${id}`, { method: "DELETE" }),
@@ -782,7 +783,7 @@ export interface InternalCourseCreate {
 
 export const internalCourseApi = {
   list: () => request<InternalCourse[]>("/api/internal-courses"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<InternalCourse>>(`/api/internal-courses?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<InternalCourse>>(`/api/internal-courses?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
   create: (data: InternalCourseCreate) => request<InternalCourse>("/api/internal-courses", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<InternalCourseCreate>) => request<InternalCourse>(`/api/internal-courses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/internal-courses/${id}`, { method: "DELETE" }),
@@ -823,7 +824,7 @@ export interface MembershipCardCreate {
 
 export const membershipCardApi = {
   list: () => request<MembershipCard[]>("/api/membership-cards"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
   create: (data: MembershipCardCreate) => request<MembershipCard>("/api/membership-cards", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<MembershipCardCreate>) => request<MembershipCard>(`/api/membership-cards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/membership-cards/${id}`, { method: "DELETE" }),
@@ -993,10 +994,15 @@ export interface ActivityRecord {
   session_id: string
 }
 
-export interface PaymentRecordGroup {
+export interface PaymentRecord {
   type: string
-  items: { name: string; amount: number; date: string }[]
-  total: number
+  name: string
+  quantity: number
+  amount: number
+  effective_date: string
+  expiry_date: string
+  closer_name: string
+  created_at: string
 }
 
 export interface CustomerDetail {
@@ -1004,7 +1010,7 @@ export interface CustomerDetail {
   purchase_summary: PurchaseSummaryItem[]
   activities: ActivityRecord[]
   healing_records: HealingRecord[]
-  payment_records: PaymentRecordGroup[]
+  payment_records: PaymentRecord[]
 }
 
 export const customerDetailApi = {

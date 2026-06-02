@@ -3,7 +3,7 @@ import { Plus, Trash2, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { CustomerSearchInput } from "@/components/customer-search-input"
+import { SelectDropdown } from "@/components/select-dropdown"
 import type { Customer } from "@/lib/api"
 
 interface Visitor {
@@ -328,48 +328,54 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-[#4e535a] shrink-0 w-10">组长</span>
               <div className="flex-1">
-                <CustomerSearchInput
-                  customers={dialogCustomers}
-                  value={newGroupLeaderId ? getName(newGroupLeaderId) : ""}
-                  onChange={() => {}}
-                  onSelectItem={(c) => setNewGroupLeaderId(c.id)}
+                <SelectDropdown
+                  value={newGroupLeaderId}
+                  options={dialogCustomers.filter(c => !dialogExcludeIds.includes(c.id) && c.id !== newGroupDeputyId && !newGroupMemberIds.includes(c.id)).map(c => ({ value: c.id, label: c.nickname || c.name || c.id }))}
                   placeholder="选择组长"
-                  excludeIds={[newGroupDeputyId, ...dialogExcludeIds].filter(Boolean)}
+                  onChange={(v) => {
+                    setNewGroupLeaderId(v)
+                    if (v && v === newGroupDeputyId) setNewGroupDeputyId("")
+                    if (v) setNewGroupMemberIds(newGroupMemberIds.filter(id => id !== v))
+                  }}
+                  clearable
                 />
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-[#4e535a] shrink-0 w-10">副组长</span>
               <div className="flex-1">
-                <CustomerSearchInput
-                  customers={dialogCustomers}
-                  value={newGroupDeputyId ? getName(newGroupDeputyId) : ""}
-                  onChange={() => {}}
-                  onSelectItem={(c) => setNewGroupDeputyId(c.id)}
+                <SelectDropdown
+                  value={newGroupDeputyId}
+                  options={dialogCustomers.filter(c => !dialogExcludeIds.includes(c.id) && c.id !== newGroupLeaderId && !newGroupMemberIds.includes(c.id)).map(c => ({ value: c.id, label: c.nickname || c.name || c.id }))}
                   placeholder="选择副组长"
-                  excludeIds={[newGroupLeaderId, ...dialogExcludeIds].filter(Boolean)}
+                  onChange={(v) => {
+                    setNewGroupDeputyId(v)
+                    if (v && v === newGroupLeaderId) setNewGroupLeaderId("")
+                    if (v) setNewGroupMemberIds(newGroupMemberIds.filter(id => id !== v))
+                  }}
+                  clearable
                 />
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-[12px] text-[#4e535a] shrink-0 w-10 pt-1.5">组员</span>
-              <div className="flex-1">
-                <CustomerSearchInput
-                  customers={dialogCustomers}
-                  value={newGroupMemberIds.map(id => getName(id))}
-                  onChange={(v) => {
-                    const names = Array.isArray(v) ? v : []
-                    const newIds: string[] = []
-                    names.forEach((name: string) => {
-                      const c = allCustomers.find(c => (c.nickname || c.name) === name)
-                      if (c) newIds.push(c.id)
-                    })
-                    setNewGroupMemberIds(newIds)
-                  }}
-                  placeholder="搜索添加组员"
-                  multi
-                  excludeIds={[newGroupLeaderId, newGroupDeputyId, ...newGroupMemberIds, ...dialogExcludeIds].filter(Boolean)}
+              <div className="flex-1 space-y-2">
+                <SelectDropdown
+                  value=""
+                  options={dialogCustomers.filter(c => !dialogExcludeIds.includes(c.id) && c.id !== newGroupLeaderId && c.id !== newGroupDeputyId && !newGroupMemberIds.includes(c.id)).map(c => ({ value: c.id, label: c.nickname || c.name || c.id }))}
+                  placeholder="添加组员"
+                  onChange={(v) => { if (v) setNewGroupMemberIds([...newGroupMemberIds, v]) }}
                 />
+                {newGroupMemberIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {newGroupMemberIds.map(id => (
+                      <span key={id} className="inline-flex items-center gap-1 text-[11px] bg-[#f0f1f2] text-[#646a73] px-1.5 py-0.5 rounded">
+                        {getName(id)}
+                        <button className="hover:text-[#f54a45]" onClick={() => setNewGroupMemberIds(newGroupMemberIds.filter(mid => mid !== id))}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">

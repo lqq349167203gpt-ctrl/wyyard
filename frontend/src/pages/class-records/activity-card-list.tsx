@@ -155,12 +155,14 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(record)}><Edit className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(record.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("class", record)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
                             </div>
                           </div>
-                          <div className="pl-[40px] pr-5 pb-[1px] pt-2.5 -mt-1">
+                          <div className="pl-5 pr-5 pb-[1px] pt-2.5 -mt-1">
+                            <div className="flex items-center gap-1">
+                              {isActivitiesView && (
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => onOpenMemberDialog("class", record)}><Users className="h-3.5 w-3.5" /></Button>
+                              )}
+                              <div className="flex-1 min-w-0">
                             {((record.groups || []).length === 0 && (record.participant_ids || []).length === 0) ? null : (
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
                                 {(() => {
@@ -205,6 +207,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 })()}
                               </div>
                             )}
+                              </div>
+                            </div>
                           </div>
                         </>
                       ) : (
@@ -315,12 +319,14 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setGcsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("gcs", s)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
                             </div>
                           </div>
                           <div className="pl-[40px] pr-5 pb-[1px] pt-2.5 -mt-1">
+                            <div className="flex items-start gap-1">
+                              {isActivitiesView && (
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mt-0.5" onClick={() => onOpenMemberDialog("gcs", s)}><Users className="h-3.5 w-3.5" /></Button>
+                              )}
+                              <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
                                 const allIds = new Set([s.host_id, s.achiever_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id))
@@ -360,6 +366,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   </span>
                                 ))
                               })()}
+                            </div>
+                              </div>
                             </div>
                           </div>
                         </>
@@ -464,12 +472,14 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setErsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("ers", s)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
                             </div>
                           </div>
                           <div className="pl-[40px] pr-5 pb-[1px] pt-2.5 -mt-1">
+                            <div className="flex items-start gap-1">
+                              {isActivitiesView && (
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mt-0.5" onClick={() => onOpenMemberDialog("ers", s)}><Users className="h-3.5 w-3.5" /></Button>
+                              )}
+                              <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
                                 const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id))
@@ -508,6 +518,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   </span>
                                 ))
                               })()}
+                            </div>
+                              </div>
                             </div>
                           </div>
                         </>
@@ -678,12 +690,14 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setIcsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" onClick={() => onOpenMemberDialog("ics", s)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
                             </div>
                           </div>
                           <div className="pl-[40px] pr-5 pb-[1px] pt-2.5 -mt-1">
+                            <div className="flex items-start gap-1">
+                              {isActivitiesView && (
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mt-0.5" onClick={() => onOpenMemberDialog("ics", s)}><Users className="h-3.5 w-3.5" /></Button>
+                              )}
+                              <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
                                 const allIds = (s.participant_ids || []).filter((id: string) => id)
@@ -695,6 +709,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   </span>
                                 ))
                               })()}
+                            </div>
+                              </div>
                             </div>
                           </div>
                         </>

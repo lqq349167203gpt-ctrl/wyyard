@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
-import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X } from "lucide-react"
+import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Users, Sparkles, Heart, Zap, GraduationCap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -8,9 +8,6 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   classRecordApi, groupCaseSessionApi,
   emotionalReleaseSessionApi,
@@ -80,16 +77,16 @@ const SalonCard = memo(({ record, teachers, onEdit, onDelete, onMaterials }: {
         {record.start_time && record.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
         {record.end_time && <span className="text-[11px] text-[#8f959e] font-light">{record.end_time}</span>}
       </div>
-      <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600">沙龙</span>
-          {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#e8f5e9] text-[#4caf50]">公益</span>}
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
+          {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">{record.course_name}</span>
           {getTeacherNames(record.teacher_ids, teachers).length > 0 && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">课程老师：{getTeacherNames(record.teacher_ids, teachers).join("、")}</span>
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids, teachers).join("、")}</span>
           )}
         </div>
-        {record.course_description && <p className="text-[12px] text-[#8f959e] leading-relaxed">{record.course_description}</p>}
+        {record.course_description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{record.course_description}</p>}
       </div>
       <div className="shrink-0 grid grid-cols-3 items-center justify-items-center gap-1 px-2 py-3.5">
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onMaterials(record)}>
@@ -117,15 +114,15 @@ const GcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
         {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
         {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
       </div>
-      <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-600">觉醒</span>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">觉醒</span>
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">觉醒游戏</span>
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
-          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">成就君：{session.achiever_name}</span>}
+          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
         </div>
-        {session.description && <p className="text-[12px] text-[#8f959e] leading-relaxed">{session.description}</p>}
+        {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
       </div>
       <div className="shrink-0 grid grid-cols-3 items-center justify-items-center gap-1 px-2 py-3.5">
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onMaterials(session)}>
@@ -153,15 +150,15 @@ const ErsCard = memo(({ session, onEdit, onDelete }: {
         {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
         {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
       </div>
-      <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 text-orange-600">情绪</span>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">情绪</span>
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">情绪释放</span>
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
-          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">成就君：{session.achiever_name}</span>}
+          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
         </div>
-        {session.description && <p className="text-[12px] text-[#8f959e] leading-relaxed">{session.description}</p>}
+        {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
       </div>
       <div className="shrink-0 grid grid-cols-2 items-center justify-items-center gap-1 px-2 py-3.5">
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(session)}>
@@ -193,18 +190,18 @@ const EksCard = memo(({ session, onEdit, onDelete }: {
           {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
           {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
         </div>
-        <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+        <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-600">能量</span>
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">能量</span>
             <span className="text-[14px] font-medium text-[#2b2f36] truncate">能量结</span>
             <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
             <span className="text-[14px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : session.owner_name || "未分配"}</span>
-            {session.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-[#a0a5ac]">课程老师：{session.host_names.join("、")}</span>}
+            {session.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{session.host_names.join("、")}</span>}
           </div>
           {ownerDescs.filter(d => d.description).length > 0 && (
             <div className="space-y-1">
               {ownerDescs.filter(d => d.description).map((d, i) => (
-                <p key={i} className="text-[12px] text-[#8f959e] leading-relaxed">
+                <p key={i} className="text-[12px] text-[#8f959e] font-light leading-relaxed">
                   <span>{d.name || eksNames[i] || "未知"}：</span>{d.description}
                 </p>
               ))}
@@ -235,9 +232,9 @@ const IcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
         {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
         {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
       </div>
-      <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
+      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-600">内部</span>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">内部</span>
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">{session.course_name}</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">丨课程老师：{session.host_names?.length > 0 ? session.host_names.join("、") : "暂无"}</span>
           {session.course_type && <span className="text-[12px] text-[#4e535a]">{session.course_type}</span>}
@@ -1358,7 +1355,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
             />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right mt-1">备注</span>
+            <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
             <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
               className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input text-[12px] resize-none" placeholder="输入活动简介..." />
           </div>
@@ -1376,7 +1373,7 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
   dateRange: string[]; calendarCounts: Record<string, number>; detailDate: string; todayStr: string
   onPrev: () => void; onNext: () => void; onSelectDate: (d: string) => void
 }) => (
-  <div className="flex items-center justify-between gap-1 mt-2 h-[52px]">
+  <div className="flex items-center justify-between gap-1 mt-1 h-[52px]">
     <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={onPrev}>
       <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
     </button>
@@ -1529,6 +1526,13 @@ export default function DailyActivitiesPage() {
   // ===== Derived data =====
   const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
 
+  // detailDate 变化时，确保日期在可视范围内
+  useEffect(() => {
+    if (detailDate < dateRange[0] || detailDate > dateRange[dateRange.length - 1]) {
+      setDateRangeStart(formatDate(addDays(new Date(detailDate), -7)))
+    }
+  }, [detailDate, dateRange])
+
   const onDateScrollerPrev = useCallback(() => setDateRangeStart(prev => formatDate(addDays(new Date(prev), -7))), [])
   const onDateScrollerNext = useCallback(() => setDateRangeStart(prev => formatDate(addDays(new Date(prev), 7))), [])
   const onDateScrollerSelect = useCallback((d: string) => setDetailDate(d), [])
@@ -1680,6 +1684,9 @@ export default function DailyActivitiesPage() {
     })
     localStorage.setItem("daily-activities-space", id)
   }, [])
+
+  // 新增活动类型选择下拉
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
 
   // ===== Salon handlers =====
   const handleOpenCreate = (date?: string) => {
@@ -1894,39 +1901,57 @@ export default function DailyActivitiesPage() {
     <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
       <div className="flex flex-col min-h-0 flex-1 gap-2">
         <div>
-          {/* Date picker + action buttons */}
-          <div className="flex items-center justify-between">
+          <div className="bg-[#f8faff] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
+            {/* Date picker */}
             <div className="flex items-center gap-3">
-            <CalendarDatePicker detailDate={detailDate} onSelectDate={setDetailDate} />
-            <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
+              <CalendarDatePicker detailDate={detailDate} onSelectDate={setDetailDate} />
+              <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
             </div>
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <Button size="sm" className="text-xs">
-                    <Plus className="mr-1 h-3.5 w-3.5" /> 新增 <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleOpenCreate(detailDate)}>沙龙活动</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenGcsCreate(detailDate)}>觉醒游戏</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenErsCreate(detailDate)}>情绪释放</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenEksCreate(detailDate)}>能量结</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenIcsCreate(detailDate)}>内部课程</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            {/* Date scroll bar */}
+            <DateScroller
+              dateRange={dateRange}
+              calendarCounts={calendarCounts}
+              detailDate={detailDate}
+              todayStr={today}
+              onPrev={onDateScrollerPrev}
+              onNext={onDateScrollerNext}
+              onSelectDate={onDateScrollerSelect}
+            />
           </div>
-          {/* Date scroll bar */}
-          <DateScroller
-            dateRange={dateRange}
-            calendarCounts={calendarCounts}
-            detailDate={detailDate}
-            todayStr={today}
-            onPrev={onDateScrollerPrev}
-            onNext={onDateScrollerNext}
-            onSelectDate={onDateScrollerSelect}
-          />
+        </div>
+
+        {/* 新增按钮 */}
+        <div className="flex items-center justify-end relative">
+          <Button size="sm" className="text-xs" onClick={() => setAddMenuOpen(!addMenuOpen)}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> 新增 <ChevronDown className="ml-1 h-3 w-3" />
+          </Button>
+          {addMenuOpen && (
+            <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] px-2 py-3 z-[100] w-[250px]">
+              <div className="grid grid-cols-3 gap-0">
+                {[
+                  { label: "沙龙活动", icon: BookOpen, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenCreate(detailDate) },
+                  { label: "觉醒游戏", icon: Sparkles, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenGcsCreate(detailDate) },
+                  { label: "情绪释放", icon: Heart, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenErsCreate(detailDate) },
+                  { label: "能量结", icon: Zap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenEksCreate(detailDate) },
+                  { label: "内部课程", icon: GraduationCap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenIcsCreate(detailDate) },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    className="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-[#f7f8fa] transition-colors"
+                    onClick={() => { item.onClick(); setAddMenuOpen(false) }}
+                  >
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: item.bg }}>
+                      <item.icon className="h-4.5 w-4.5" style={{ color: item.color }} />
+                    </div>
+                    <span className="text-[11px] text-[#2b2f36]">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {addMenuOpen && (
+            <div className="fixed inset-0 z-[99]" onClick={() => setAddMenuOpen(false)} />
+          )}
         </div>
 
         {/* Activity cards */}

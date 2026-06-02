@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { type Customer } from "@/lib/api"
+
+const MAX_VISIBLE = 50
 
 export interface CustomerSearchInputProps {
   /** All available customers to search from */
@@ -22,6 +24,8 @@ export interface CustomerSearchInputProps {
   excludeIds?: string[]
   /** Disabled state */
   disabled?: boolean
+  /** Filter out already-selected names from dropdown (default true) */
+  filterSelected?: boolean
   /** Extra class for the input container */
   className?: string
 }
@@ -36,11 +40,13 @@ export function CustomerSearchInput({
   positionFilter,
   excludeIds = [],
   disabled = false,
+  filterSelected = false,
   className = "",
 }: CustomerSearchInputProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
   const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Click outside to close
   useEffect(() => {
@@ -54,19 +60,21 @@ export function CustomerSearchInput({
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
 
-  // Filter customers
   const selectedNames = multi
     ? (Array.isArray(value) ? value : [])
     : (typeof value === "string" && value ? [value] : [])
 
-  let filtered = customers.filter(c => {
-    if (!c.nickname) return false
-    if (excludeIds.includes(c.id)) return false
-    if (positionFilter && !(c.positions || []).includes(positionFilter)) return false
-    if (search && !c.nickname.includes(search)) return false
-    if (selectedNames.includes(c.nickname)) return false
-    return true
-  })
+  const filtered = useMemo(() => {
+    if (!search) return []
+    const q = search.toLowerCase()
+    return customers.filter(c => {
+      if (!c.nickname) return false
+      if (excludeIds.includes(c.id)) return false
+      if (positionFilter && !(c.positions || []).includes(positionFilter)) return false
+      if (filterSelected && selectedNames.includes(c.nickname)) return false
+      return c.nickname.toLowerCase().includes(q)
+    })
+  }, [customers, search, excludeIds, positionFilter, filterSelected, selectedNames])
 
   const removeItem = (name: string) => {
     if (multi) {
@@ -80,6 +88,7 @@ export function CustomerSearchInput({
     if (multi) {
       onChange([...selectedNames, customer.nickname])
       setSearch("")
+      inputRef.current?.focus()
     } else {
       onChange(customer.nickname)
       onSelectItem?.(customer)
@@ -108,6 +117,7 @@ export function CustomerSearchInput({
             </span>
           ))}
           <input
+            ref={inputRef}
             className="flex-1 min-w-[80px] h-6 border-none outline-none text-[12px] bg-transparent"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setOpen(true) }}
@@ -124,11 +134,12 @@ export function CustomerSearchInput({
             value={typeof value === "string" && value ? value : search}
             onChange={(e) => {
               const v = e.target.value
-              if (typeof value === "string") {
-                onChange(v)
-              }
               setSearch(v)
               setOpen(true)
+              if (typeof value === "string" && value) {
+                // User is editing an already-selected value — clear selection
+                onChange("")
+              }
             }}
             onFocus={() => setOpen(true)}
             placeholder={placeholder}
@@ -149,7 +160,7 @@ export function CustomerSearchInput({
       {/* Dropdown */}
       {open && !disabled && filtered.length > 0 && (
         <div className="absolute z-50 mt-1 w-full bg-white border border-[#dee0e3] rounded-md shadow-lg max-h-48 overflow-y-auto">
-          {filtered.map(c => (
+          {filtered.slice(0, MAX_VISIBLE).map(c => (
             <div
               key={c.id}
               className="px-3 py-2 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"

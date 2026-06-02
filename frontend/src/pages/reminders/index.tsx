@@ -11,6 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { reminderApi, positionApi, accountApi, type Reminder, type ReminderCreate, type ReminderCondition } from "@/lib/api"
+import { SelectDropdown } from "@/components/select-dropdown"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
@@ -255,29 +256,23 @@ export default function RemindersPage() {
             {/* 账号角色 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">角色</span>
-              <select
+              <SelectDropdown
                 value={form.account_role}
-                onChange={(e) => setForm(prev => ({ ...prev, account_role: e.target.value }))}
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-[12px] text-[#2b2f36] appearance-none pr-7"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
-              >
-                <option value="全部">全部</option>
-                {roles.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
+                options={[{value: "全部", label: "全部"}, ...roles.map(r => ({value: r, label: r}))]}
+                placeholder="全部"
+                onChange={(v) => setForm(prev => ({ ...prev, account_role: v }))}
+              />
             </div>
 
             {/* 账号 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">账号</span>
-              <select
+              <SelectDropdown
                 value={form.account_id}
-                onChange={(e) => setForm(prev => ({ ...prev, account_id: e.target.value }))}
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-[12px] text-[#2b2f36] appearance-none pr-7"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
-              >
-                <option value="全部">全部</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.username}</option>)}
-              </select>
+                options={[{value: "全部", label: "全部"}, ...accounts.map(a => ({value: a.id, label: a.username}))]}
+                placeholder="全部"
+                onChange={(v) => setForm(prev => ({ ...prev, account_id: v }))}
+              />
             </div>
 
             {/* 条件列表 */}
@@ -288,15 +283,12 @@ export default function RemindersPage() {
               <div className="space-y-2">
                 {/* 标题行：满足所有条件 + 添加条件 */}
                 <div className="flex items-center justify-between">
-                  <select
+                  <SelectDropdown
                     value={form.condition_logic}
-                    onChange={(e) => setForm(prev => ({ ...prev, condition_logic: e.target.value as "all" | "any" }))}
-                    className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                  >
-                    <option value="all">满足所有条件</option>
-                    <option value="any">满足任一条件</option>
-                  </select>
+                    options={[{value: "all", label: "满足所有条件"}, {value: "any", label: "满足任一条件"}]}
+                    onChange={(v) => setForm(prev => ({ ...prev, condition_logic: v as "all" | "any" }))}
+                    size="sm"
+                  />
                   <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={addCondition}>
                     <Plus className="mr-1 h-3 w-3" /> 添加条件
                   </Button>
@@ -306,10 +298,11 @@ export default function RemindersPage() {
                   {form.conditions.map((cond, idx) => (
                     <div key={idx} className="flex items-center gap-2 px-3 py-2">
                       {/* 条件类型 */}
-                      <select
+                      <SelectDropdown
                         value={cond.type}
-                        onChange={(e) => {
-                          const type = e.target.value as ReminderCondition["type"]
+                        options={CONDITION_TYPE_OPTIONS}
+                        onChange={(v) => {
+                          const type = v as ReminderCondition["type"]
                           updateCondition(idx, {
                             type,
                             mode: type === "activity" ? "participation_count" : "fixed_cycle",
@@ -318,33 +311,25 @@ export default function RemindersPage() {
                             activity_type: "",
                           })
                         }}
-                        className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                      >
-                        {CONDITION_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
+                        size="sm"
+                      />
 
                       {/* 条件详情 - 同一行内横向展开 */}
                       {cond.type === "acquaintance_date" && (
                         <>
-                          <select
+                          <SelectDropdown
                             value={cond.mode}
-                            onChange={(e) => updateCondition(idx, { mode: e.target.value as "fixed_cycle" | "relative", operator: "", value: 0 })}
-                            className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                          >
-                            <option value="fixed_cycle">按固定周期</option>
-                            <option value="relative">按天</option>
-                          </select>
+                            options={[{value: "fixed_cycle", label: "按固定周期"}, {value: "relative", label: "按天"}]}
+                            onChange={(v) => updateCondition(idx, { mode: v as "fixed_cycle" | "relative", operator: "", value: 0 })}
+                            size="sm"
+                          />
                           {cond.mode === "relative" && (
-                            <select
+                            <SelectDropdown
                               value={cond.operator}
-                              onChange={(e) => updateCondition(idx, { operator: e.target.value as ReminderCondition["operator"] })}
-                              className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                            >
-                              {OPERATOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
+                              options={OPERATOR_OPTIONS}
+                              onChange={(v) => updateCondition(idx, { operator: v as ReminderCondition["operator"] })}
+                              size="sm"
+                            />
                           )}
                           <Input
                             type="number"
@@ -359,24 +344,19 @@ export default function RemindersPage() {
 
                       {cond.type === "visit_count" && (
                         <>
-                          <select
+                          <SelectDropdown
                             value={cond.mode}
-                            onChange={(e) => updateCondition(idx, { mode: e.target.value as "fixed_cycle" | "relative", operator: "", value: 0 })}
-                            className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                          >
-                            <option value="fixed_cycle">按固定周期</option>
-                            <option value="relative">按天</option>
-                          </select>
+                            options={[{value: "fixed_cycle", label: "按固定周期"}, {value: "relative", label: "按天"}]}
+                            onChange={(v) => updateCondition(idx, { mode: v as "fixed_cycle" | "relative", operator: "", value: 0 })}
+                            size="sm"
+                          />
                           {cond.mode === "relative" && (
-                            <select
+                            <SelectDropdown
                               value={cond.operator}
-                              onChange={(e) => updateCondition(idx, { operator: e.target.value as ReminderCondition["operator"] })}
-                              className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                            >
-                              {OPERATOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
+                              options={OPERATOR_OPTIONS}
+                              onChange={(v) => updateCondition(idx, { operator: v as ReminderCondition["operator"] })}
+                              size="sm"
+                            />
                           )}
                           <Input
                             type="number"
@@ -391,32 +371,25 @@ export default function RemindersPage() {
 
                       {cond.type === "activity" && (
                         <>
-                          <select
+                          <SelectDropdown
                             value={cond.activity_type}
-                            onChange={(e) => updateCondition(idx, { activity_type: e.target.value as ReminderCondition["activity_type"] })}
-                            className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                          >
-                            <option value="">选择活动</option>
-                            {ACTIVITY_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                          <select
+                            options={[{value: "", label: "选择活动"}, ...ACTIVITY_TYPE_OPTIONS]}
+                            placeholder="选择活动"
+                            onChange={(v) => updateCondition(idx, { activity_type: v as ReminderCondition["activity_type"] })}
+                            size="sm"
+                          />
+                          <SelectDropdown
                             value={cond.mode}
-                            onChange={(e) => updateCondition(idx, { mode: e.target.value as "participation_count" | "remaining_count", operator: "", value: 0 })}
-                            className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                          >
-                            <option value="participation_count">参与次数</option>
-                            <option value="remaining_count">剩余次数</option>
-                          </select>
-                          <select
+                            options={[{value: "participation_count", label: "参与次数"}, {value: "remaining_count", label: "剩余次数"}]}
+                            onChange={(v) => updateCondition(idx, { mode: v as "participation_count" | "remaining_count", operator: "", value: 0 })}
+                            size="sm"
+                          />
+                          <SelectDropdown
                             value={cond.operator}
-                            onChange={(e) => updateCondition(idx, { operator: e.target.value as ReminderCondition["operator"] })}
-                            className="h-7 rounded border border-input bg-white px-2 text-[11px] text-[#2b2f36] appearance-none pr-6"
-                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238f959e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-                          >
-                            {OPERATOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
+                            options={OPERATOR_OPTIONS}
+                            onChange={(v) => updateCondition(idx, { operator: v as ReminderCondition["operator"] })}
+                            size="sm"
+                          />
                           <Input
                             type="number"
                             value={cond.value || ""}

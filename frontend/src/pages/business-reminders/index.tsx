@@ -118,7 +118,7 @@ export default function BusinessRemindersPage() {
             <TableBody>
               {paginatedItems.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="pl-4 text-[#2b2f36] font-medium">{item.nickname}</TableCell>
+                  <TableCell className="pl-4 text-[#2b2f36]">{item.nickname}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.reminder_name}</TableCell>
                   <TableCell className="text-[#8f959e]">{item.message}</TableCell>
                   <TableCell>

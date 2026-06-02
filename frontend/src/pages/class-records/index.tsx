@@ -507,6 +507,13 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   const dateRange = useMemo(() => Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i))), [dateRangeStart])
 
+  // detailDate 变化时，确保日期在可视范围内
+  useEffect(() => {
+    if (detailDate < dateRange[0] || detailDate > dateRange[dateRange.length - 1]) {
+      setDateRangeStart(formatDate(addDays(new Date(detailDate), -7)))
+    }
+  }, [detailDate, dateRange])
+
   const detailRecords = useMemo(() => records
     .filter(r => r.date === detailDate)
     .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")), [records, detailDate])
@@ -1836,7 +1843,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             <div className="space-y-3">
               {visitorGroupSections.map((section, si) => (
                 <div key={si}>
-                  <div className="text-[10px] text-[#8f959e] px-2 mb-1 font-medium">{section.groupName}</div>
+                  <div className="text-[10px] text-[#8f959e] px-2 mb-1">{section.groupName}</div>
                   <div className="space-y-1">
                     {section.members.map((m) => (
                       <div

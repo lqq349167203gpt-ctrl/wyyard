@@ -11,6 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { memberIdentityApi, type MemberIdentity, type MemberIdentityCreate, type IdentityCondition } from "@/lib/api"
+import { SelectDropdown } from "@/components/select-dropdown"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { ActivityConfigContent } from "@/pages/activity-config"
@@ -371,14 +372,12 @@ export default function MemberIdentitiesPage() {
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">匹配条件</span>
                 <div className="flex items-center justify-between gap-2">
                   {formConditions.length > 1 && (
-                    <select
+                    <SelectDropdown
                       value={formOperator}
-                      onChange={(e) => setFormOperator(e.target.value as "all" | "any")}
-                      className="h-7 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-                    >
-                      <option value="all">全部满足</option>
-                      <option value="any">满足任意一项</option>
-                    </select>
+                      options={[{value: "all", label: "全部满足"}, {value: "any", label: "满足任意一项"}]}
+                      onChange={(v) => setFormOperator(v as "all" | "any")}
+                      size="sm"
+                    />
                   )}
                   <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={addCondition}>
                     <Plus className="mr-1 h-3 w-3" /> 新增条件
@@ -399,16 +398,12 @@ export default function MemberIdentitiesPage() {
                       <div className="border border-[#e5e6eb] rounded-lg p-3 space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">条件</span>
-                        <select
+                        <SelectDropdown
                           value={cond.type}
-                          onChange={(e) => updateCondition(ci, { type: e.target.value as IdentityCondition["type"] })}
-                          className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-                        >
-                          <option value="" disabled>请选择条件类型</option>
-                          <option value="arrival">到店情况</option>
-                          <option value="activity">活动参与</option>
-                          <option value="payment">付费项目</option>
-                        </select>
+                          options={[{value: "", label: "请选择条件类型"}, {value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "payment", label: "付费项目"}]}
+                          placeholder="请选择条件类型"
+                          onChange={(v) => updateCondition(ci, { type: v as IdentityCondition["type"] })}
+                        />
 
                         <div className="flex-1" />
 
@@ -426,15 +421,11 @@ export default function MemberIdentitiesPage() {
                       {cond.type && (cond.type === "arrival" || cond.type === "activity") && (
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">次数</span>
-                          <select
+                          <SelectDropdown
                             value={cond.count_op}
-                            onChange={(e) => updateCondition(ci, { count_op: e.target.value as IdentityCondition["count_op"] })}
-                            className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-                          >
-                            <option value=">">大于</option>
-                            <option value="=">等于</option>
-                            <option value="<">小于</option>
-                          </select>
+                            options={[{value: ">", label: "大于"}, {value: "=", label: "等于"}, {value: "<", label: "小于"}]}
+                            onChange={(v) => updateCondition(ci, { count_op: v as IdentityCondition["count_op"] })}
+                          />
                           <Input
                             type="number"
                             min={0}
@@ -451,16 +442,12 @@ export default function MemberIdentitiesPage() {
                         <>
                           <div className="flex items-center gap-2">
                             <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">项目</span>
-                            <select
+                            <SelectDropdown
                               value={getPaymentCategories(cond)[0] || ""}
-                              onChange={(e) => selectPaymentCategory(ci, e.target.value)}
-                              className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-                            >
-                              <option value="" disabled>请选择项目</option>
-                              {PAYMENT_CATEGORIES.map((cat) => (
-                                <option key={cat} value={cat}>{cat}</option>
-                              ))}
-                            </select>
+                              options={[{value: "", label: "请选择项目"}, ...PAYMENT_CATEGORIES.map(cat => ({value: cat, label: cat}))]}
+                              placeholder="请选择项目"
+                              onChange={(v) => selectPaymentCategory(ci, v)}
+                            />
                           </div>
 
                           {/* 会员活动子项 */}
@@ -511,15 +498,11 @@ export default function MemberIdentitiesPage() {
                           {getPaymentCategories(cond).some((cat: string) => COUNT_CATEGORIES.includes(cat)) && (
                             <div className="flex items-center gap-2">
                               <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">次数</span>
-                              <select
+                              <SelectDropdown
                                 value={cond.count_op}
-                                onChange={(e) => updateCondition(ci, { count_op: e.target.value as IdentityCondition["count_op"] })}
-                                className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-                              >
-                                <option value=">">大于</option>
-                                <option value="=">等于</option>
-                                <option value="<">小于</option>
-                              </select>
+                                options={[{value: ">", label: "大于"}, {value: "=", label: "等于"}, {value: "<", label: "小于"}]}
+                                onChange={(v) => updateCondition(ci, { count_op: v as IdentityCondition["count_op"] })}
+                              />
                               <Input
                                 type="number"
                                 min={0}
@@ -535,14 +518,11 @@ export default function MemberIdentitiesPage() {
                           {getPaymentCategories(cond).some((cat: string) => cat === "会员活动" || cat === "内部课程") && (
                             <div className="flex items-center gap-2">
                               <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">有效期</span>
-                              <select
+                              <SelectDropdown
                                 value={cond.validity}
-                                onChange={(e) => updateCondition(ci, { validity: e.target.value as IdentityCondition["validity"] })}
-                                className="h-8 appearance-none rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] focus:outline-none focus:border-[#3370ff] bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%238f959e%22%20d%3D%22M3%204.5l3%203%203-3%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-                              >
-                                <option value="active">仅有效期内</option>
-                                <option value="all">过期依旧保留</option>
-                              </select>
+                                options={[{value: "active", label: "仅有效期内"}, {value: "all", label: "过期依旧保留"}]}
+                                onChange={(v) => updateCondition(ci, { validity: v as IdentityCondition["validity"] })}
+                              />
                             </div>
                           )}
                         </>

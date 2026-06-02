@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Search, X } from "lucide-react"
 import { operationLogApi, accountApi, customerApi } from "@/lib/api"
+import { SelectDropdown } from "@/components/select-dropdown"
 import type { OperationLog, Account, Customer } from "@/lib/api"
 import {
   Dialog,
@@ -230,29 +231,23 @@ export default function OperationLogsPage() {
       <div className="flex items-end gap-3 flex-wrap">
         <div className="flex flex-col gap-1">
           <label className="text-[12px] text-[#8f959e]">归属人</label>
-          <select
+          <SelectDropdown
             value={operatorFilter}
-            onChange={(e) => setOperatorFilter(e.target.value)}
-            className="h-8 w-36 rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-          >
-            <option value="">全部</option>
-            {[...new Set(accounts.map(a => a.owner))].sort().map(owner => (
-              <option key={owner} value={owner}>{owner}</option>
-            ))}
-          </select>
+            options={[{value: "", label: "全部"}, ...[...new Set(accounts.map(a => a.owner))].sort().map(o => ({value: o, label: o}))]}
+            placeholder="全部"
+            onChange={(v) => setOperatorFilter(v)}
+            className="w-36"
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[12px] text-[#8f959e]">操作类型</label>
-          <select
+          <SelectDropdown
             value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-            className="h-8 w-28 rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-          >
-            <option value="">全部</option>
-            <option value="POST">新增</option>
-            <option value="UPDATE">更新</option>
-            <option value="DELETE">删除</option>
-          </select>
+            options={[{value: "", label: "全部"}, {value: "POST", label: "新增"}, {value: "UPDATE", label: "更新"}, {value: "DELETE", label: "删除"}]}
+            placeholder="全部"
+            onChange={(v) => setMethodFilter(v)}
+            className="w-28"
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[12px] text-[#8f959e]">开始日期</label>

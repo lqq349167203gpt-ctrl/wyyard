@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 interface PaginationBarProps {
@@ -17,6 +18,8 @@ export function PaginationBar({
   endIndex,
   onPageChange,
 }: PaginationBarProps) {
+  const [jumpValue, setJumpValue] = useState("")
+
   if (totalItems === 0) return null
 
   const getPageNumbers = () => {
@@ -35,8 +38,16 @@ export function PaginationBar({
     return pages
   }
 
+  const handleJump = () => {
+    const page = parseInt(jumpValue)
+    if (page >= 1 && page <= totalPages) {
+      onPageChange(page)
+      setJumpValue("")
+    }
+  }
+
   return (
-    <div className="flex items-center justify-between px-4 py-2.5">
+    <div className="flex items-center justify-between pt-[5px] pb-2.5">
       <span className="text-xs text-[#8f959e]">
         共 <span className="text-[#2b2f36] font-medium">{totalItems}</span> 条
         {totalPages > 1 && (
@@ -80,6 +91,15 @@ export function PaginationBar({
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          <span className="text-[11px] text-[#646a73] ml-1">前往</span>
+          <input
+            value={jumpValue}
+            onChange={(e) => setJumpValue(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={(e) => { if (e.key === "Enter") handleJump() }}
+            placeholder={`${currentPage}`}
+            className="w-[27px] h-7 text-center text-xs border border-[#e8e8e8] rounded outline-none focus:border-[#3370ff]"
+          />
+          <span className="text-[11px] text-[#646a73]">页</span>
         </div>
       )}
     </div>

@@ -307,6 +307,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               }}
               placeholder="昵称"
               excludeIds={addedCustomerIds}
+              filterSelected={false}
             />
           </div>
 

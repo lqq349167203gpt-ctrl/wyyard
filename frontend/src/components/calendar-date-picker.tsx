@@ -14,6 +14,10 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    setMonth(detailDate.substring(0, 7))
+  }, [detailDate])
+
+  useEffect(() => {
     const handler = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest("[data-dropdown]")) return
       if (ref.current && !ref.current.contains(e.target as Node)) {
