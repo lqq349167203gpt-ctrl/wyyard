@@ -142,75 +142,75 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                     >
                       {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
                       {isActivitiesView ? (
-                        <>
-                          <div className="px-5 pt-[12px] pb-1 space-y-1.5">
+                        <div className="flex px-5 py-3 gap-4">
+                          {/* 左栏：时间 */}
+                          <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-0.5 pt-1">
+                            {record.start_time && <span className="text-[11px] text-[#8f959e] font-light">{record.start_time}</span>}
+                            {record.start_time && record.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
+                            {record.end_time && <span className="text-[11px] text-[#8f959e] font-light">{record.end_time}</span>}
+                          </div>
+                          {/* 右栏：内容 */}
+                          <div className="flex-1 min-w-0 space-y-1">
+                            {/* 标签行 */}
                             <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{record.start_time ? `${record.start_time}~${record.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff] -ml-[11px]">沙龙</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
                               {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
-                              <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">{record.course_name}</span>
-                              {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
-                              {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenMaterials(record)}><FileUp className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(record)}><Edit className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(record.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                              </div>)}
+                              {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
                             </div>
-                          </div>
-                          <div className="pl-5 pr-5 pb-[1px] pt-2.5 -mt-1">
+                            {/* 活动名称 */}
+                            <div>
+                              <span className="text-[13px] font-medium text-[#2b2f36]">{record.course_name}</span>
+                            </div>
+                            {/* 成员行 */}
                             <div className="flex items-center gap-1">
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => onOpenMemberDialog("class", record)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
-                              <div className="flex-1 min-w-0">
-                            {((record.groups || []).length === 0 && (record.participant_ids || []).length === 0) ? null : (
-                              <div className="text-[12px] text-[#4e535a] leading-relaxed">
-                                {(() => {
-                                  const dailyGroupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
-                                  const getDailyRole = (id: string) => {
-                                    for (const g of dailyGroups) {
-                                      if (g.leader_id === id) return "正"
-                                      if (g.deputy_id === id) return "副"
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => onOpenMemberDialog("class", record)}><Users className="h-3 w-3" /></Button>
+                              <div className="flex-1 min-w-0 text-[12px] text-[#4e535a] leading-relaxed">
+                                {((record.groups || []).length === 0 && (record.participant_ids || []).length === 0) ? null : (
+                                  (() => {
+                                    const dailyGroupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
+                                    const getDailyRole = (id: string) => {
+                                      for (const g of dailyGroups) {
+                                        if (g.leader_id === id) return "正"
+                                        if (g.deputy_id === id) return "副"
+                                      }
+                                      return ""
                                     }
-                                    return ""
-                                  }
-                                  const nonEmpty: { name: string; roles: string[]; present: boolean }[][] = (record.groups || []).map((group: any) => {
-                                    const parts: { name: string; roles: string[]; present: boolean }[] = []
-                                    const excludeIds = new Set([group.leader_id, group.deputy_id].filter(Boolean))
-                                    if (group.leader_id) parts.push({ name: getMemberName(group.leader_id), roles: ["正"], present: dayVisits.some(v => v.id === group.leader_id) })
-                                    if (group.deputy_id) parts.push({ name: getMemberName(group.deputy_id), roles: ["副"], present: dayVisits.some(v => v.id === group.deputy_id) })
-                                    group.member_ids.filter((id: string) => !excludeIds.has(id)).forEach((id: string) => {
-                                      parts.push({ name: getMemberName(id), roles: [], present: dayVisits.some(v => v.id === id) })
-                                    })
-                                    return parts.length > 0 ? parts : null
-                                  }).filter(Boolean)
-                                  const groupedIds = new Set((record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])]).filter(Boolean))
-                                  const ungrouped = (record.participant_ids || []).filter((id: string) => id && !groupedIds.has(id))
-                                  if (ungrouped.length > 0) {
-                                    nonEmpty.push(ungrouped.map((id: string) => {
-                                      const daily = getDailyRole(id)
-                                      return { name: getMemberName(id), roles: daily ? [daily] : [], present: dayVisits.some(v => v.id === id) }
-                                    }))
-                                  }
-                                  return nonEmpty.map((parts: any, gi: number) => (
-                                    <span key={gi}>
-                                      {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
-                                      {parts.map((m: any, i: number) => (
-                                        <span key={i}>
-                                          {i > 0 && <span className="inline-block w-[4px]" />}
-                                          <span className={m.present ? "" : "text-[#b0b5bb]"}>{m.name}</span>
-                                          {m.roles.map((r: string, ri: number) => <span key={ri} className="inline-block ml-[-1px] pl-1 pr-[-1px] py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
-                                        </span>
-                                      ))}
-                                    </span>
-                                  ))
-                                })()}
-                              </div>
-                            )}
+                                    const nonEmpty: { name: string; roles: string[]; present: boolean }[][] = (record.groups || []).map((group: any) => {
+                                      const parts: { name: string; roles: string[]; present: boolean }[] = []
+                                      const excludeIds = new Set([group.leader_id, group.deputy_id].filter(Boolean))
+                                      if (group.leader_id) parts.push({ name: getMemberName(group.leader_id), roles: ["正"], present: dayVisits.some(v => v.id === group.leader_id) })
+                                      if (group.deputy_id) parts.push({ name: getMemberName(group.deputy_id), roles: ["副"], present: dayVisits.some(v => v.id === group.deputy_id) })
+                                      group.member_ids.filter((id: string) => !excludeIds.has(id)).forEach((id: string) => {
+                                        parts.push({ name: getMemberName(id), roles: [], present: dayVisits.some(v => v.id === id) })
+                                      })
+                                      return parts.length > 0 ? parts : null
+                                    }).filter(Boolean)
+                                    const groupedIds = new Set((record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])]).filter(Boolean))
+                                    const ungrouped = (record.participant_ids || []).filter((id: string) => id && !groupedIds.has(id))
+                                    if (ungrouped.length > 0) {
+                                      nonEmpty.push(ungrouped.map((id: string) => {
+                                        const daily = getDailyRole(id)
+                                        return { name: getMemberName(id), roles: daily ? [daily] : [], present: dayVisits.some(v => v.id === id) }
+                                      }))
+                                    }
+                                    return nonEmpty.map((parts: any, gi: number) => (
+                                      <span key={gi}>
+                                        {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
+                                        {parts.map((m: any, i: number) => (
+                                          <span key={i}>
+                                            {i > 0 && <span className="inline-block w-[4px]" />}
+                                            <span className={m.present ? "" : "text-[#b0b5bb]"}>{m.name}</span>
+                                            {m.roles.map((r: string, ri: number) => <span key={ri} className="inline-block ml-[-1px] pl-1 pr-[-1px] py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    ))
+                                  })()
+                                )}
                               </div>
                             </div>
                           </div>
-                        </>
+                        </div>
                       ) : (
                         <div className="flex">
                           <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
