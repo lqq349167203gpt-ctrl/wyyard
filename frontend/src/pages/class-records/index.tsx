@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, useCallback } from "react"
+import { useEffect, useState, useRef, useMemo, useCallback, startTransition } from "react"
 import { Plus, Trash2, X, Users, BookOpen, ChevronRight, ChevronLeft, Download, File, ChevronDown } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
 import GroupingView from "@/components/grouping-view"
@@ -10,10 +10,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { classRecordApi, groupCaseSessionApi, groupCaseApi, emotionalReleaseSessionApi, emotionalReleaseApi, energyKnotSessionApi, energyKnotApi, internalCourseSessionApi, courseApi, customerApi, uploadApi, visitApi, dailyGroupingApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type Course, type Customer, type CustomerSearchResult, type GroupCaseCustomerSearchResult, type EmotionalReleaseCustomerSearchResult, type EnergyKnotCustomerSearchResult, type InternalCourseSessionCustomerSearchResult, type VisitRecord } from "@/lib/api"
+import { classRecordApi, groupCaseSessionApi, groupCaseApi, emotionalReleaseSessionApi, emotionalReleaseApi, energyKnotSessionApi, energyKnotApi, internalCourseSessionApi, courseApi, customerApi, uploadApi, visitApi, dailyGroupingApi, spaceApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type Course, type Customer, type CustomerSearchResult, type GroupCaseCustomerSearchResult, type EmotionalReleaseCustomerSearchResult, type EnergyKnotCustomerSearchResult, type InternalCourseSessionCustomerSearchResult, type VisitRecord, type Space } from "@/lib/api"
+import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import ArrivalConfirmationView from "./arrival-confirmation"
 import ActivityCardList from "./activity-card-list"
+import { SpaceDropdown } from "@/components/space-dropdown"
+import { CalendarDatePicker } from "@/components/calendar-date-picker"
 
 const today = new Date().toISOString().split("T")[0]
 
@@ -43,6 +46,10 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const [allCustomers, setAllCustomers] = useState<Customer[]>([])
   const [teachers, setTeachers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
+  const [spaces, setSpaces] = useState<Space[]>([])
+  const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
+    try { return localStorage.getItem("class-records-space") || "" } catch { return "" }
+  })
 
   const [detailDate, setDetailDate] = useState(today)
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
@@ -59,8 +66,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     return "visitors"
   })
   const isActivitiesView = standaloneTab === "activities" || detailTab === "activities"
-  const [showCalendarPicker, setShowCalendarPicker] = useState(false)
-  const [calendarPickerMonth, setCalendarPickerMonth] = useState(() => today.substring(0, 7))
 
   // 新增/编辑弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -105,8 +110,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   // 人员分组
   const [groups, setGroups] = useState<{ name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]>([])
-  const calendarPickerRef = useRef<HTMLDivElement>(null)
-
   // 新增/编辑弹窗（觉醒游戏）
   const [gcsDialogOpen, setGcsDialogOpen] = useState(false)
   const [gcsEditingRecord, setGcsEditingRecord] = useState<GroupCaseSession | null>(null)
@@ -315,6 +318,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         setTeachers(customers.filter(c => c.positions?.includes("课程老师")))
       })
       .catch((e) => { console.error("customerApi.list failed:", e) })
+    spaceApi.list().then(setSpaces).catch(() => {})
   }
 
   const loadClassRecords = () => classRecordApi.list().then(setRecords).catch((e) => { console.error("loadClassRecords failed:", e) })
@@ -351,17 +355,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   }, [dateRangeStart, cpReady, cp])
 
   // 点击外部关闭日历选择器
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (calendarPickerRef.current && !calendarPickerRef.current.contains(e.target as Node)) {
-        setShowCalendarPicker(false)
-      }
-    }
-    if (showCalendarPicker) {
-      document.addEventListener("mousedown", handleClickOutside)
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [showCalendarPicker])
 
   // 拖拽到活动卡片的目标
   const [dragOverActivityId, setDragOverActivityId] = useState<string | null>(null)
@@ -371,26 +364,12 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const [memberDialogRecord, setMemberDialogRecord] = useState<any>(null)
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([])
   const [localHostId, setLocalHostId] = useState<string>("")
-  const [showHostDropdown, setShowHostDropdown] = useState(false)
-  const [showParticipantDropdown, setShowParticipantDropdown] = useState(false)
-
-  // 点击外部关闭下拉框
-  useEffect(() => {
-    if (!memberDialogOpen) return
-    const handler = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setShowHostDropdown(false)
-      setShowParticipantDropdown(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [memberDialogOpen])
-
   const initialSelectedIdsRef = useRef<string[]>([])
 
   const getCurrentParticipantIds = useCallback((type: string, record: any): string[] => {
     if (type === "class") {
-      return (record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
+      const groupIds = (record.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
+      return [...new Set([...groupIds, ...(record.participant_ids || [])])]
     }
     if (type === "gcs") {
       return [...(record.participant_ids || []), record.host_id, record.achiever_id].filter(Boolean)
@@ -419,11 +398,28 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     setMemberDialogOpen(true)
   }, [getCurrentParticipantIds])
 
+  const handleSpaceSelect = useCallback((id: string) => {
+    startTransition(() => {
+      setSelectedSpaceId(id)
+    })
+    localStorage.setItem("class-records-space", id)
+  }, [])
+
   const handleDropToClass = async (record: ClassRecord, customer: { customer_id: string; nickname: string }) => {
     const classGroups = (record.groups || []).map(g => ({ ...g, member_ids: [...(g.member_ids || [])] }))
     // 检查是否已分配到任何分组
     const allAssigned = classGroups.flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))
     if (allAssigned.includes(customer.customer_id)) return
+
+    // 保存分组并保留未分组参与者
+    const saveGroupsAndParticipants = async (finalGroups: any[]) => {
+      await classRecordApi.updateGroups(record.id, finalGroups)
+      // updateGroups 会覆盖 participant_ids，需要恢复未分组参与者
+      const groupIds = new Set(finalGroups.flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
+      const ungroupedIds = (record.participant_ids || []).filter((id: string) => !groupIds.has(id))
+      await classRecordApi.updateParticipants(record.id, [...groupIds, ...ungroupedIds])
+      loadClassRecords()
+    }
 
     // 查找该成员在当日分组中的角色
     let dailyGroupName = ""
@@ -451,8 +447,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       }
       classGroups[targetIdx] = targetGroup
       try {
-        await classRecordApi.updateGroups(record.id, classGroups)
-        loadClassRecords()
+        await saveGroupsAndParticipants(classGroups)
       } catch (e: any) {
         const msg = e?.response?.data?.detail || e?.message || "添加失败"
         alert(msg)
@@ -461,8 +456,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       // 无当日分组且活动无分组：新建分组并设为组长
       const newGroups = [{ name: "小组 1", leader_id: customer.customer_id, deputy_id: "", member_ids: [] }]
       try {
-        await classRecordApi.updateGroups(record.id, newGroups)
-        loadClassRecords()
+        await saveGroupsAndParticipants(newGroups)
       } catch (e: any) {
         const msg = e?.response?.data?.detail || e?.message || "添加失败"
         alert(msg)
@@ -472,8 +466,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       classGroups[0] = { ...classGroups[0], member_ids: [...classGroups[0].member_ids, customer.customer_id] }
       if (!classGroups[0].leader_id) classGroups[0].leader_id = customer.customer_id
       try {
-        await classRecordApi.updateGroups(record.id, classGroups)
-        loadClassRecords()
+        await saveGroupsAndParticipants(classGroups)
       } catch (e: any) {
         const msg = e?.response?.data?.detail || e?.message || "添加失败"
         alert(msg)
@@ -512,31 +505,34 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   type UnifiedRecord = { type: "class"; data: ClassRecord; date: string } | { type: "gcs"; data: GroupCaseSession; date: string } | { type: "ers"; data: EmotionalReleaseSession; date: string } | { type: "eks"; data: EnergyKnotSession; date: string } | { type: "ics"; data: InternalCourseSession; date: string }
 
-  const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
-  const detailRecords = records
-    .filter(r => r.date === detailDate)
-    .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""))
+  const dateRange = useMemo(() => Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i))), [dateRangeStart])
 
-  const detailGcs = groupCaseSessions.filter(s => s.date === detailDate)
-  const detailErs = emotionalReleaseSessions.filter(s => s.date === detailDate)
-  const detailEks = energyKnotSessions.filter(s => s.date === detailDate)
-  const detailIcs = internalCourseSessions.filter(s => s.date === detailDate)
+  const detailRecords = useMemo(() => records
+    .filter(r => r.date === detailDate)
+    .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")), [records, detailDate])
+
+  const detailGcs = useMemo(() => groupCaseSessions.filter(s => s.date === detailDate), [groupCaseSessions, detailDate])
+  const detailErs = useMemo(() => emotionalReleaseSessions.filter(s => s.date === detailDate), [emotionalReleaseSessions, detailDate])
+  const detailEks = useMemo(() => energyKnotSessions.filter(s => s.date === detailDate), [energyKnotSessions, detailDate])
+  const detailIcs = useMemo(() => internalCourseSessions.filter(s => s.date === detailDate), [internalCourseSessions, detailDate])
 
   // 详细视图：合并五种记录，按开始时间排序
-  const unifiedDetailRecords: UnifiedRecord[] = [
+  const unifiedDetailRecords = useMemo(() => [
     ...detailRecords.map(r => ({ type: "class" as const, data: r, date: r.date })),
     ...detailGcs.map(s => ({ type: "gcs" as const, data: s, date: s.date })),
     ...detailErs.map(s => ({ type: "ers" as const, data: s, date: s.date })),
     ...detailEks.map(s => ({ type: "eks" as const, data: s, date: s.date })),
     ...detailIcs.map(s => ({ type: "ics" as const, data: s, date: s.date })),
-  ].sort((a, b) => {
+  ]
+  .filter(r => !selectedSpaceId || (r.data as any).space_id === selectedSpaceId)
+  .sort((a, b) => {
     const at = a.data.start_time || ""
     const bt = b.data.start_time || ""
     if (!at && !bt) return 0
     if (!at) return 1
     if (!bt) return -1
     return at.localeCompare(bt)
-  })
+  }), [detailRecords, detailGcs, detailErs, detailEks, detailIcs, selectedSpaceId])
 
   const getMemberName = useCallback((id: string) => {
     const c = allCustomers.find(c => c.id === id)
@@ -551,17 +547,17 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     for (const group of groups) {
       const members: { id: string; nickname: string; role: string; present: boolean }[] = []
 
-      if (group.leader_id) {
-        members.push({ id: group.leader_id, nickname: getMemberName(group.leader_id), role: "组长", present: dayVisits.some(v => v.id === group.leader_id) })
+      if (group.leader_id && dayVisits.some(v => v.id === group.leader_id)) {
+        members.push({ id: group.leader_id, nickname: getMemberName(group.leader_id), role: "组长", present: true })
         assignedIds.add(group.leader_id)
       }
-      if (group.deputy_id) {
-        members.push({ id: group.deputy_id, nickname: getMemberName(group.deputy_id), role: "副组长", present: dayVisits.some(v => v.id === group.deputy_id) })
+      if (group.deputy_id && dayVisits.some(v => v.id === group.deputy_id)) {
+        members.push({ id: group.deputy_id, nickname: getMemberName(group.deputy_id), role: "副组长", present: true })
         assignedIds.add(group.deputy_id)
       }
       for (const mid of (group.member_ids || [])) {
-        if (mid !== group.leader_id && mid !== group.deputy_id) {
-          members.push({ id: mid, nickname: getMemberName(mid), role: "", present: dayVisits.some(v => v.id === mid) })
+        if (mid !== group.leader_id && mid !== group.deputy_id && dayVisits.some(v => v.id === mid)) {
+          members.push({ id: mid, nickname: getMemberName(mid), role: "", present: true })
           assignedIds.add(mid)
         }
       }
@@ -829,9 +825,9 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     try {
       if (type === "class") {
         const groups = [...(record.groups || [])]
+        let finalGroups: any[]
         if (groups.length === 0) {
-          const newGroups = [{ name: "小组 1", leader_id: visitorId, deputy_id: "", member_ids: [] }]
-          await classRecordApi.updateGroups(record.id, newGroups)
+          finalGroups = [{ name: "小组 1", leader_id: visitorId, deputy_id: "", member_ids: [] }]
         } else {
           const targetGroup = { ...groups[0] }
           if (isPresent) {
@@ -843,8 +839,14 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             else targetGroup.member_ids = [...targetGroup.member_ids, visitorId]
           }
           groups[0] = targetGroup
-          await classRecordApi.updateGroups(record.id, groups)
+          finalGroups = groups
         }
+        await classRecordApi.updateGroups(record.id, finalGroups)
+        // updateGroups 会覆盖 participant_ids，恢复未分组参与者
+        const groupIds = new Set(finalGroups.flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
+        const ungroupedIds = (record.participant_ids || []).filter((id: string) => !groupIds.has(id))
+        const finalUngrouped = isPresent ? ungroupedIds.filter((id: string) => id !== visitorId) : ungroupedIds
+        await classRecordApi.updateParticipants(record.id, [...groupIds, ...finalUngrouped])
         loadClassRecords()
       } else if (type === "gcs") {
         const ids = record.participant_ids || []
@@ -1684,7 +1686,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
       {/* 页面切换 */}
       {!standaloneTab && (
-      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
+      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 mb-3.5 min-h-[39px]">
         <div className="flex items-center gap-6">
           {hasPerm("class-records-visitors") && (
           <button
@@ -1734,91 +1736,11 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
       {/* 主内容区 */}
       <div className="flex flex-col min-h-0 flex-1 gap-2">
-      <div className="bg-[#f7f8fa] rounded-lg px-4 py-2 border-b-[0.5px] border-[#e8e8e8]">
+      <div className="bg-[#f7f8fa] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
       {/* 选中日期显示 + 操作按钮 */}
       <div className="flex items-center">
-        <div className="relative inline-block shrink-0">
-          <button
-            className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
-            onClick={() => {
-              setCalendarPickerMonth(detailDate.substring(0, 7))
-              setShowCalendarPicker(!showCalendarPicker)
-            }}
-          >
-            <span className="text-[16px] text-[#2b2f36] font-medium whitespace-nowrap">
-              {formatDateChinese(detailDate)}
-            </span>
-            <ChevronDown className="h-4 w-4 text-[#8f959e]" />
-          </button>
-          {/* 日历选择器弹窗 */}
-          {showCalendarPicker && (
-            <div ref={calendarPickerRef} className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-50 w-[280px]">
-              {/* 年月选择 */}
-              <div className="flex items-center justify-between mb-3">
-                <button
-                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
-                  onClick={() => {
-                    const [y, m] = calendarPickerMonth.split("-").map(Number)
-                    setCalendarPickerMonth(`${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`)
-                  }}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <span className="text-[13px] font-medium text-[#2b2f36]">
-                  {calendarPickerMonth.split("-")[0]}年{parseInt(calendarPickerMonth.split("-")[1])}月
-                </span>
-                <button
-                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
-                  onClick={() => {
-                    const [y, m] = calendarPickerMonth.split("-").map(Number)
-                    setCalendarPickerMonth(`${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}`)
-                  }}
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {/* 星期标题 */}
-              <div className="grid grid-cols-7 gap-0.5 mb-1">
-                {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
-                  <div key={w} className="text-center text-[10px] text-[#8f959e] py-1">{w}</div>
-                ))}
-              </div>
-              {/* 日期网格 */}
-              <div className="grid grid-cols-7 gap-0.5">
-                {(() => {
-                  const [year, month] = calendarPickerMonth.split("-").map(Number)
-                  const firstDay = new Date(year, month - 1, 1)
-                  const lastDay = new Date(year, month, 0)
-                  const startWeekday = firstDay.getDay()
-                  const daysInMonth = lastDay.getDate()
-                  const cells: (number | null)[] = []
-                  for (let i = 0; i < startWeekday; i++) cells.push(null)
-                  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
-                  return cells.map((day, i) => {
-                    if (!day) return <div key={`empty-${i}`} className="h-7" />
-                    const dateStr = `${calendarPickerMonth}-${String(day).padStart(2, "0")}`
-                    const isSelected = dateStr === detailDate
-                    const isTodayDate = dateStr === today
-                    return (
-                      <button
-                        key={dateStr}
-                        className={`h-7 flex items-center justify-center rounded text-[12px] transition-colors ${
-                          isSelected ? "bg-[#3370ff] text-white" : isTodayDate ? "bg-[#f0f5ff] text-[#3370ff]" : "hover:bg-[#f7f8fa] text-[#2b2f36]"
-                        }`}
-                        onClick={() => {
-                          setDetailDate(dateStr)
-                          setShowCalendarPicker(false)
-                        }}
-                      >
-                        {day}
-                      </button>
-                    )
-                  })
-                })()}
-              </div>
-            </div>
-          )}
-        </div>
+        <CalendarDatePicker detailDate={detailDate} onSelectDate={setDetailDate} />
+        <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
       </div>
         {/* 日期滚动条 */}
         <div className="flex items-center justify-between gap-1 mt-1">
@@ -1917,7 +1839,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
               {visitorGroupSections.map((section, si) => (
                 <div key={si}>
                   <div className="text-[10px] text-[#8f959e] px-2 mb-1 font-medium">{section.groupName}</div>
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     {section.members.map((m) => (
                       <div
                         key={m.id}
@@ -1928,8 +1850,8 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                           setDraggingVisitorId(m.id)
                         } : undefined}
                         onDragEnd={m.present ? () => setDraggingVisitorId(null) : undefined}
-                        className={`flex items-center justify-between px-2 py-1 rounded text-[12px] ${
-                          m.present ? `cursor-grab transition-colors ${draggingVisitorId === m.id ? "opacity-50" : "bg-white hover:bg-[#f7f8fa]"}` : "cursor-default"
+                        className={`flex items-center justify-between px-2 py-1.5 rounded text-[12px] ${
+                          m.present ? `cursor-grab transition-colors ${draggingVisitorId === m.id ? "opacity-50" : ""}` : "cursor-default"
                         }`}
                       >
                         <span className={m.present ? "text-[#2b2f36] truncate" : "text-[#b0b5bb] truncate"}>{m.nickname}</span>
@@ -2092,15 +2014,11 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">是否公益</span>
               <div className="relative">
-                <select
+                <SelectDropdown
                   value={formIsPublicWelfare ? "1" : "0"}
-                  onChange={(e) => setFormIsPublicWelfare(e.target.value === "1")}
-                  className="h-8 w-full appearance-none rounded-md border border-input bg-transparent px-2 pr-8 text-[12px] text-[#2b2f36] focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="0">否</option>
-                  <option value="1">是</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8f959e] pointer-events-none" />
+                  options={[{value: "0", label: "否"}, {value: "1", label: "是"}]}
+                  onChange={(v) => setFormIsPublicWelfare(v === "1")}
+                />
               </div>
             </div>
 
@@ -2212,66 +2130,52 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         // 可选的主持人（排除参与者）
         const availableHosts = dayVisitCustomers.filter(c => !localSelectedIds.includes(c.id))
 
-        const handleConfirm = async () => {
-          const newIds = [...localSelectedIds]
-          const hostId = isHostType ? localHostId : undefined
+        const handleAddToActivity = (visitorId: string) => {
+          setLocalSelectedIds(prev => [...prev, visitorId])
+        }
+
+        const handleRemoveFromActivity = (visitorId: string) => {
+          setLocalSelectedIds(prev => prev.filter(id => id !== visitorId))
+        }
+
+        const handleHostChange = (hostId: string) => {
+          setLocalHostId(hostId)
+          if (hostId) setLocalSelectedIds(prev => prev.filter(id => id !== hostId))
+        }
+
+        const handleSave = async () => {
           try {
             if (memberDialogType === "class") {
-              const existing = record.groups || []
-              if (existing.length === 0) {
-                if (newIds.length > 0) {
-                  await classRecordApi.updateGroups(record.id, [
-                    { name: "小组 1", leader_id: newIds[0], deputy_id: "", member_ids: newIds.slice(1) },
-                  ])
-                }
-              } else {
-                const newIdSet = new Set(newIds)
-                const updatedGroups = existing.map((g: any) => ({
-                  ...g,
-                  leader_id: g.leader_id && newIdSet.has(g.leader_id) ? g.leader_id : "",
-                  deputy_id: g.deputy_id && newIdSet.has(g.deputy_id) ? g.deputy_id : "",
-                  member_ids: (g.member_ids || []).filter((id: string) => newIdSet.has(id)),
-                }))
-                const covered = new Set<string>()
-                updatedGroups.forEach((g: any) => {
-                  if (g.leader_id) covered.add(g.leader_id)
-                  if (g.deputy_id) covered.add(g.deputy_id)
-                  ;(g.member_ids || []).forEach((id: string) => covered.add(id))
-                })
-                const leftovers = newIds.filter(id => !covered.has(id))
-                if (leftovers.length > 0) {
-                  updatedGroups[0].member_ids = [...updatedGroups[0].member_ids, ...leftovers]
-                }
-                await classRecordApi.updateGroups(record.id, updatedGroups)
-              }
+              // 根据 class 记录自身的小组清理，移除不在 localSelectedIds 中的人员
+              const cleaned = (record.groups || []).map((g: any) => ({
+                name: g.name,
+                leader_id: g.leader_id && localSelectedIds.includes(g.leader_id) ? g.leader_id : "",
+                deputy_id: g.deputy_id && localSelectedIds.includes(g.deputy_id) ? g.deputy_id : "",
+                member_ids: (g.member_ids || []).filter((id: string) => localSelectedIds.includes(id)),
+              })).filter((g: any) => g.leader_id || g.deputy_id || g.member_ids.length > 0)
+              console.log("[handleSave class]", JSON.stringify({ recordId: record.id, beforeGroups: record.groups, cleaned, localSelectedIds }))
+              await classRecordApi.updateGroups(record.id, cleaned)
+              await classRecordApi.updateParticipants(record.id, localSelectedIds)
+              console.log("[handleSave class] API calls done")
               loadClassRecords()
             } else if (memberDialogType === "gcs") {
-              const payload: any = { participant_ids: newIds }
-              if (hostId !== undefined) payload.host_id = hostId
-              await groupCaseSessionApi.update(record.id, payload)
+              await groupCaseSessionApi.update(record.id, { participant_ids: localSelectedIds, host_id: localHostId || "" } as any)
               loadGcs()
             } else if (memberDialogType === "ers") {
-              const payload: any = { participant_ids: newIds }
-              if (hostId !== undefined) payload.host_id = hostId
-              await emotionalReleaseSessionApi.update(record.id, payload)
+              await emotionalReleaseSessionApi.update(record.id, { participant_ids: localSelectedIds, host_id: localHostId || "" } as any)
               loadErs()
             } else if (memberDialogType === "eks") {
-              await energyKnotSessionApi.update(record.id, { host_ids: newIds } as any)
+              await energyKnotSessionApi.update(record.id, { host_ids: localSelectedIds } as any)
               loadEks()
             } else if (memberDialogType === "ics") {
-              await internalCourseSessionApi.update(record.id, { participant_ids: newIds } as any)
+              await internalCourseSessionApi.update(record.id, { participant_ids: localSelectedIds } as any)
               loadIcs()
             }
+            handleClose()
           } catch (e: any) {
-            const msg = e?.response?.data?.detail || e?.message || "操作失败"
+            const msg = e?.response?.data?.detail || e?.message || "保存失败"
             alert(msg)
           }
-          setMemberDialogOpen(false)
-          setMemberDialogRecord(null)
-          setMemberDialogType("")
-          setLocalHostId("")
-          setShowHostDropdown(false)
-          setShowParticipantDropdown(false)
         }
 
         const handleClose = () => {
@@ -2279,8 +2183,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           setMemberDialogRecord(null)
           setMemberDialogType("")
           setLocalHostId("")
-          setShowHostDropdown(false)
-          setShowParticipantDropdown(false)
         }
 
         return (
@@ -2294,90 +2196,48 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 {isHostType && (
                   <div className="grid grid-cols-[56px_1fr] items-center gap-2">
                     <span className="text-[12px] text-[#8f959e] text-right">主持人</span>
-                    <div data-dropdown className="relative">
-                      <button type="button"
-                        className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={() => { setShowParticipantDropdown(false); setShowHostDropdown(!showHostDropdown) }}
-                      >
-                        <span className={localHostId ? "text-[#2b2f36]" : "text-[#8f959e]"}>
-                          {localHostId ? (allCustomers.find(c => c.id === localHostId)?.nickname || "未命名") : "选择主持人"}
-                        </span>
-                        <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                      </button>
-                      {showHostDropdown && (
-                        <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                          <button className="flex items-center justify-between w-full px-3 py-2 text-[12px] text-[#8f959e] hover:bg-[#f7f8fa]"
-                            onClick={() => { setLocalHostId(""); setShowHostDropdown(false) }}>
-                            <span>无</span>
-                          </button>
-                          {availableHosts.map(c => (
-                            <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                              onClick={() => { setLocalHostId(c.id); setLocalSelectedIds(prev => prev.filter(id => id !== c.id)); setShowHostDropdown(false) }}>
-                              <span>{c.nickname || c.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <SelectDropdown
+                      value={localHostId}
+                      options={[{value: "", label: "无"}, ...availableHosts.map(c => ({value: c.id, label: c.nickname || c.name || ""}))]}
+                      placeholder="选择主持人"
+                      onChange={(v) => { if (v !== localHostId) handleHostChange(v) }}
+                    />
                   </div>
                 )}
 
                 {/* 参与者选择 */}
                 <div className="grid grid-cols-[56px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#8f959e] text-right">参与者</span>
-                  <div data-dropdown className="relative">
-                    <button type="button"
-                      className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={() => { setShowHostDropdown(false); setShowParticipantDropdown(!showParticipantDropdown) }}
-                    >
-                      <span className="text-[#8f959e]">选择参与者</span>
-                      <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                    </button>
-                    {showParticipantDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                        {availableParticipants.length === 0 ? (
-                          <span className="block w-full px-3 py-2 text-[12px] text-[#8f959e] cursor-default">无可用人员</span>
-                        ) : (
-                          availableParticipants.map(c => (
-                            <button key={c.id} className="flex items-center justify-between w-full px-3 py-2 text-[12px] hover:bg-[#f7f8fa]"
-                              onClick={() => { setLocalSelectedIds(prev => [...prev, c.id]); setShowParticipantDropdown(false) }}>
-                              <span>{c.nickname || c.name}</span>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <SelectDropdown
+                    value=""
+                    options={availableParticipants.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+                    placeholder={availableParticipants.length === 0 ? "无可用人员" : "选择参与者"}
+                    disabled={availableParticipants.length === 0}
+                    onChange={(v) => { if (v) handleAddToActivity(v) }}
+                  />
                 </div>
 
                 {/* 已选参与者 */}
-                <div>
-                  <div className="text-[11px] text-[#8f959e] mb-2">已选参与者（{localSelectedIds.length}）</div>
-                  {localSelectedIds.length > 0 && (
+                {localSelectedIds.length > 0 && (
+                  <div className="grid grid-cols-[56px_1fr] gap-2">
+                    <span /> {/* 占位，与输入框左对齐 */}
                     <div className="flex flex-wrap gap-1">
                       {selectedParticipants.map(p => (
-                        <span key={p.id} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-gray-50 text-[12px]">
-                          <span className="text-[#2b2f36]">{p.nickname}</span>
-                          {p.role && <span className="inline-block ml-0.5 px-1 py-0.5 rounded text-[10px] bg-gray-100 text-[#8f959e]">{p.role}</span>}
-                          <button
-                            className="text-[#c9cdd4] hover:text-[#f54a45]"
-                            onClick={() => setLocalSelectedIds(prev => prev.filter(id => id !== p.id))}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
+                        <span key={p.id} className="inline-flex items-center gap-1 text-[12px] bg-[#f0f1f2] text-[#646a73] px-1.5 py-0.5 rounded">
+                          {p.nickname}
+                          {p.role && <span className="text-[10px] text-[#8f959e]">{p.role}</span>}
+                          <button className="hover:text-[#f54a45]" onClick={() => handleRemoveFromActivity(p.id)}>×</button>
                         </span>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* 底部按钮 */}
               <div className="px-6 py-3 border-t border-[#e8e8e8] flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={handleClose}>取消</Button>
-                <Button size="sm" onClick={handleConfirm}>确定</Button>
+                <Button size="sm" onClick={handleSave}>保存</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -3455,14 +3315,12 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程类型</span>
-              <select
+              <SelectDropdown
                 value={icsFormCourseType}
-                onChange={(e) => setIcsFormCourseType(e.target.value)}
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs"
-              >
-                <option value="">选择类型</option>
-                {ICS_COURSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+                options={[{value: "", label: "选择类型"}, ...ICS_COURSE_TYPES.map(t => ({value: t, label: t}))]}
+                placeholder="选择类型"
+                onChange={(v) => setIcsFormCourseType(v)}
+              />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程名称</span>
