@@ -151,35 +151,34 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           {/* 右栏：内容 */}
                           <div className="flex-1 min-w-0 space-y-1">
-                            {/* 标签行 */}
+                            {/* 标签行 + 管理成员 */}
                             <div className="flex items-center gap-2">
                               <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
                               {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
                               {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
+                              <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("class", record)}>成员 ›</button>
                             </div>
                             {/* 活动名称 */}
                             <div>
                               <span className="text-[13px] font-medium text-[#2b2f36]">{record.course_name}</span>
                             </div>
-                            {/* 成员行 */}
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => onOpenMemberDialog("class", record)}><Users className="h-3 w-3" /></Button>
-                              <div className="flex-1 min-w-0 text-[12px] text-[#4e535a] leading-relaxed">
+                            {/* 成员列表 */}
+                            <div className="text-[12px] text-[#4e535a] leading-relaxed">
                                 {((record.groups || []).length === 0 && (record.participant_ids || []).length === 0) ? null : (
                                   (() => {
                                     const dailyGroupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
                                     const getDailyRole = (id: string) => {
                                       for (const g of dailyGroups) {
-                                        if (g.leader_id === id) return "正"
-                                        if (g.deputy_id === id) return "副"
+                                        if (g.leader_id === id) return "组长"
+                                        if (g.deputy_id === id) return "副组长"
                                       }
                                       return ""
                                     }
                                     const nonEmpty: { name: string; roles: string[]; present: boolean }[][] = (record.groups || []).map((group: any) => {
                                       const parts: { name: string; roles: string[]; present: boolean }[] = []
                                       const excludeIds = new Set([group.leader_id, group.deputy_id].filter(Boolean))
-                                      if (group.leader_id) parts.push({ name: getMemberName(group.leader_id), roles: ["正"], present: dayVisits.some(v => v.id === group.leader_id) })
-                                      if (group.deputy_id) parts.push({ name: getMemberName(group.deputy_id), roles: ["副"], present: dayVisits.some(v => v.id === group.deputy_id) })
+                                      if (group.leader_id) parts.push({ name: getMemberName(group.leader_id), roles: ["组长"], present: dayVisits.some(v => v.id === group.leader_id) })
+                                      if (group.deputy_id) parts.push({ name: getMemberName(group.deputy_id), roles: ["副组长"], present: dayVisits.some(v => v.id === group.deputy_id) })
                                       group.member_ids.filter((id: string) => !excludeIds.has(id)).forEach((id: string) => {
                                         parts.push({ name: getMemberName(id), roles: [], present: dayVisits.some(v => v.id === id) })
                                       })
@@ -207,7 +206,6 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                     ))
                                   })()
                                 )}
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -236,16 +234,16 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                       const dailyGroupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
                                       const getDailyRole = (id: string) => {
                                         for (const g of dailyGroups) {
-                                          if (g.leader_id === id) return "正"
-                                          if (g.deputy_id === id) return "副"
+                                          if (g.leader_id === id) return "组长"
+                                          if (g.deputy_id === id) return "副组长"
                                         }
                                         return ""
                                       }
                                       const nonEmpty: { name: string; roles: string[]; present: boolean }[][] = (record.groups || []).map((group: any) => {
                                         const members: { name: string; roles: string[]; present: boolean }[] = []
                                         const excludeIds = new Set([group.leader_id, group.deputy_id].filter(Boolean))
-                                        if (group.leader_id) members.push({ name: getMemberName(group.leader_id), roles: ["正"], present: dayVisits.some(v => v.id === group.leader_id) })
-                                        if (group.deputy_id) members.push({ name: getMemberName(group.deputy_id), roles: ["副"], present: dayVisits.some(v => v.id === group.deputy_id) })
+                                        if (group.leader_id) members.push({ name: getMemberName(group.leader_id), roles: ["组长"], present: dayVisits.some(v => v.id === group.leader_id) })
+                                        if (group.deputy_id) members.push({ name: getMemberName(group.deputy_id), roles: ["副组长"], present: dayVisits.some(v => v.id === group.deputy_id) })
                                         group.member_ids.filter((id: string) => !excludeIds.has(id)).forEach((id: string) => {
                                           members.push({ name: getMemberName(id), roles: [], present: dayVisits.some(v => v.id === id) })
                                         })
@@ -311,9 +309,10 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff] -ml-[11px]">觉醒</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc] -ml-[11px]">觉醒</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">觉醒游戏</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
+                              {isActivitiesView && <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("gcs", s)}>成员 ›</button>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
@@ -323,9 +322,6 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="pl-[40px] pr-5 pb-[1px] pt-2.5 -mt-1">
                             <div className="flex items-start gap-1">
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mt-0.5" onClick={() => onOpenMemberDialog("gcs", s)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
@@ -335,8 +331,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   if (id === s.host_id) roles.push("主持人")
                                   if (id === s.achiever_id) roles.push("达成者")
                                   for (const g of dailyGroups) {
-                                    if (g.leader_id === id) { roles.push("正"); break }
-                                    if (g.deputy_id === id) { roles.push("副"); break }
+                                    if (g.leader_id === id) { roles.push("组长"); break }
+                                    if (g.deputy_id === id) { roles.push("副组长"); break }
                                   }
                                   return roles
                                 }
@@ -380,7 +376,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">觉醒</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc]">觉醒</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">觉醒游戏</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                             </div>
@@ -396,8 +392,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                     if (id === s.host_id) roles.push("主持人")
                                     if (id === s.achiever_id) roles.push("达成者")
                                     for (const g of dailyGroups) {
-                                      if (g.leader_id === id) { roles.push("正"); break }
-                                      if (g.deputy_id === id) { roles.push("副"); break }
+                                      if (g.leader_id === id) { roles.push("组长"); break }
+                                      if (g.deputy_id === id) { roles.push("副组长"); break }
                                     }
                                     return roles
                                   }
@@ -464,9 +460,10 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff] -ml-[11px]">情绪</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b] -ml-[11px]">情绪</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">情绪释放</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
+                              {isActivitiesView && <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("ers", s)}>成员 ›</button>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
@@ -476,9 +473,6 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="pl-[40px] pr-5 pb-[1px] pt-2.5 -mt-1">
                             <div className="flex items-start gap-1">
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mt-0.5" onClick={() => onOpenMemberDialog("ers", s)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
@@ -487,8 +481,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   const roles: string[] = []
                                   if (id === s.host_id) roles.push("主持人")
                                   for (const g of dailyGroups) {
-                                    if (g.leader_id === id) { roles.push("正"); break }
-                                    if (g.deputy_id === id) { roles.push("副"); break }
+                                    if (g.leader_id === id) { roles.push("组长"); break }
+                                    if (g.deputy_id === id) { roles.push("副组长"); break }
                                   }
                                   return roles
                                 }
@@ -532,7 +526,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">情绪</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b]">情绪</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">情绪释放</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                             </div>
                             {s.description && <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{s.description}</p>}
@@ -546,8 +540,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                     const roles: string[] = []
                                     if (id === s.host_id) roles.push("主持人")
                                     for (const g of dailyGroups) {
-                                      if (g.leader_id === id) { roles.push("正"); break }
-                                      if (g.deputy_id === id) { roles.push("副"); break }
+                                      if (g.leader_id === id) { roles.push("组长"); break }
+                                      if (g.deputy_id === id) { roles.push("副组长"); break }
                                     }
                                     return roles
                                   }
@@ -624,7 +618,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff] -ml-[11px]">能量</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04] -ml-[11px]">能量</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
@@ -643,7 +637,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">能量</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04]">能量</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
                             </div>
@@ -681,10 +675,11 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">内部</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate">{s.course_name}</span>
                               <span className="text-[12px] font-normal text-[#2b2f36]">丨课程老师：{s.host_names?.length > 0 ? s.host_names.join("、") : "暂无"}</span>
                               {s.course_type && <span className="text-[12px] text-[#4e535a]">{s.course_type}</span>}
+                              {isActivitiesView && <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("ics", s)}>成员 ›</button>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
@@ -694,9 +689,6 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="pl-[40px] pr-5 pb-[1px] pt-2.5 -mt-1">
                             <div className="flex items-start gap-1">
-                              {isActivitiesView && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mt-0.5" onClick={() => onOpenMemberDialog("ics", s)}><Users className="h-3.5 w-3.5" /></Button>
-                              )}
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
@@ -723,7 +715,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">内部</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate">{s.course_name}</span>
                               <span className="text-[12px] font-normal text-[#2b2f36]">丨课程老师：{s.host_names?.length > 0 ? s.host_names.join("、") : "暂无"}</span>
                               {s.course_type && <span className="text-[12px] text-[#4e535a]">{s.course_type}</span>}
@@ -757,6 +749,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
 
                 return null
               })}
+              {visibleRecords.length > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
               {visibleCount < unifiedDetailRecords.length && (
                 <div ref={sentinelRef} className="h-4" />
               )}

@@ -116,7 +116,7 @@ const GcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
       </div>
       <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">觉醒</span>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc]">觉醒</span>
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">觉醒游戏</span>
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
@@ -152,7 +152,7 @@ const ErsCard = memo(({ session, onEdit, onDelete }: {
       </div>
       <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">情绪</span>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b]">情绪</span>
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">情绪释放</span>
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
@@ -192,7 +192,7 @@ const EksCard = memo(({ session, onEdit, onDelete }: {
         </div>
         <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">能量</span>
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04]">能量</span>
             <span className="text-[14px] font-medium text-[#2b2f36] truncate">能量结</span>
             <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
             <span className="text-[14px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : session.owner_name || "未分配"}</span>
@@ -234,7 +234,7 @@ const IcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
       </div>
       <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">内部</span>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">{session.course_name}</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">丨课程老师：{session.host_names?.length > 0 ? session.host_names.join("、") : "暂无"}</span>
           {session.course_type && <span className="text-[12px] text-[#4e535a]">{session.course_type}</span>}

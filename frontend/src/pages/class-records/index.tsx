@@ -1702,7 +1702,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             }`}
             onClick={() => setDetailTab("visitors")}
           >
-            到场人员
+            邀约到场
             {detailTab === "visitors" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
           </button>
           )}
@@ -1813,7 +1813,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       />
       ) : effectiveDetailTab === "arrival_confirmation" ? (
       /* 到场确认页面 */
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-h-0">
         <ArrivalConfirmationView
           visits={fullVisits}
           loading={loading}
@@ -2228,7 +2228,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                     <span /> {/* 占位，与输入框左对齐 */}
                     <div className="flex flex-wrap gap-1">
                       {selectedParticipants.map(p => (
-                        <span key={p.id} className="inline-flex items-center gap-1 text-[12px] bg-[#f0f1f2] text-[#646a73] px-1.5 py-0.5 rounded">
+                        <span key={p.id} className="inline-flex items-center gap-1 text-[12px] bg-[#f7f8fa] text-[#646a73] px-1.5 py-0.5 rounded">
                           {p.nickname}
                           {p.role && <span className="text-[10px] text-[#8f959e]">{p.role}</span>}
                           <button className="hover:text-[#f54a45]" onClick={() => handleRemoveFromActivity(p.id)}>×</button>

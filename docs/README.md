@@ -75,23 +75,24 @@ uvicorn app.main:app --reload --port 8000
 
 ## 数据存储
 
-所有数据存储在 `backend/data/` 目录下的 JSON 文件中：
+使用 PostgreSQL 数据库，通过 `DATABASE_URL` 环境变量配置连接（默认 `postgresql://wyyard:wyyard123@localhost:5432/wyyard`）。
 
-- `customers.json` - 用户数据
-- `visits.json` - 到场记录
-- `positions.json` - 角色数据
-- `accounts.json` - 账号数据
-- `class_records.json` - 活动日历数据
-- `course_types.json` - 沙龙类型
-- `member_identities.json` - 会员身份
-- `membership_cards.json` - 会员活动卡
-- `group_cases.json` / `group_case_sessions.json` - 觉醒游戏及场次
-- `emotional_releases.json` / `emotional_release_sessions.json` - 情绪释放及场次
-- `energy_knots.json` / `energy_knot_sessions.json` - 能量结及场次
-- `internal_courses.json` / `internal_course_sessions.json` - 内部课程及场次
-- `daily_groupings.json` - 每日人员分组
-- `operation_logs.json` - 操作日志
-- `system_logs.json` - 系统日志
+主要数据表：
+- `customers` - 用户数据
+- `visits` - 到场记录
+- `positions` - 角色数据
+- `accounts` - 账号数据
+- `class_records` - 活动日历数据
+- `course_types` - 沙龙类型
+- `member_identities` - 会员身份
+- `membership_cards` - 会员活动卡
+- `group_cases` / `group_case_sessions` - 觉醒游戏及场次
+- `emotional_releases` / `emotional_release_sessions` - 情绪释放及场次
+- `energy_knots` / `energy_knot_sessions` - 能量结及场次
+- `internal_courses` / `internal_course_sessions` - 内部课程及场次
+- `daily_groupings` - 每日人员分组
+- `operation_logs` - 操作日志
+- `system_logs` - 系统日志
 
 ## API 接口
 

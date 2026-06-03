@@ -6,7 +6,7 @@
 ## 技术栈
 - **前端**：React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS
 - **后端**：Python 3.11+ + FastAPI
-- **数据持久化**：JSON 文件（`backend/data/`）
+- **数据持久化**：PostgreSQL（psycopg2），连接串通过 `DATABASE_URL` 环境变量配置
 - **模型**：Claude API（Anthropic SDK）
 
 ## 目录结构

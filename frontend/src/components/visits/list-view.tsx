@@ -111,7 +111,7 @@ export default function ListView({ onCustomerClick }: { onCustomerClick?: (custo
               <TableHead>会员身份</TableHead>
               <TableHead>历史到场</TableHead>
               <TableHead>本次需求</TableHead>
-              <TableHead>预计到场时间</TableHead>
+              <TableHead>预计时间</TableHead>
               <TableHead>是否到店</TableHead>
               <TableHead className="text-right pr-4">操作</TableHead>
             </TableRow>

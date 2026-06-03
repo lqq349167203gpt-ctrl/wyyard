@@ -283,11 +283,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       <div className="bg-white rounded-lg">
         <div className="px-4 py-3 flex items-center gap-5 overflow-visible">
           <div className="flex items-center shrink-0">
-            <span className="text-xs font-medium text-[#2b2f36]">到场人员</span>
+            <span className="text-xs font-medium text-[#2b2f36]">预计到场</span>
             <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.length} 人</span>
           </div>
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xs text-[#4e535a] shrink-0">预计到场时间</span>
+            <span className="text-xs text-[#4e535a] shrink-0">预计时间</span>
           <Input
             type="time"
             value={visitTime}
@@ -342,7 +342,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <span className="w-[88px] shrink-0">会员身份</span>
               <span className="w-[120px] shrink-0">参与活动</span>
               <span className="w-[72px] shrink-0">剩余次数</span>
-              <span className="w-[100px] shrink-0">预计到场时间</span>
+              <span className="w-[100px] shrink-0">预计时间</span>
               <span className="w-[64px] shrink-0">是否到店</span>
               <span className="w-[72px] shrink-0 text-right">操作</span>
             </div>
