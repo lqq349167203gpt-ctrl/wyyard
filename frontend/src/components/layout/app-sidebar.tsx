@@ -1,7 +1,9 @@
 import { Link, useLocation } from "react-router-dom"
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import {
   Bot,
+  Briefcase,
+  Calendar,
   ClipboardList,
   GraduationCap,
   BookText,
@@ -13,6 +15,10 @@ import {
   FileText,
   Bell,
   TrendingUp,
+  ChevronDown,
+  Settings,
+  Users,
+  Monitor,
 } from "lucide-react"
 import {
   Sidebar,
@@ -60,33 +66,43 @@ const systemItems = [
 
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
 
-function MenuGroup({ label, items }: { label: string; items: typeof businessItems }) {
+function getPermissions(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem("userPermissions") || "[]")
+  } catch {
+    return []
+  }
+}
+
+function getIsSuperAdmin(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem("currentUser") || "{}")?.role === "超级管理员"
+  } catch {
+    return false
+  }
+}
+
+function MenuGroup({
+  label,
+  icon: Icon,
+  items,
+  isOpen,
+  onToggle,
+}: {
+  label: string
+  icon: React.ElementType
+  items: typeof businessItems
+  isOpen: boolean
+  onToggle: () => void
+}) {
   const location = useLocation()
-  const permissions = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("userPermissions") || "[]")
-    } catch {
-      return []
-    }
-  }, [])
-
-  const currentUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("currentUser") || "{}")
-    } catch {
-      return {}
-    }
-  }, [])
-
-  // 超级管理员显示所有菜单
-  const isSuperAdmin = currentUser?.role === "超级管理员"
+  const permissions = useMemo(getPermissions, [])
+  const isSuperAdmin = useMemo(getIsSuperAdmin, [])
 
   const filteredItems = items.filter(item => {
     if (!item.permission || isSuperAdmin) return true
     if (permissions.includes(item.permission)) return true
-    // 活动日历：检查子权限
     if (item.permission === "class-records" && CLASS_RECORDS_PERMISSIONS.some(p => permissions.includes(p))) return true
-    // 当日活动：有 class-records-activities 权限即可见
     if (item.permission === "daily-activities" && permissions.includes("class-records-activities")) return true
     return false
   })
@@ -94,88 +110,116 @@ function MenuGroup({ label, items }: { label: string; items: typeof businessItem
   if (filteredItems.length === 0) return null
 
   return (
-    <SidebarGroup className="px-3 py-1">
-      <SidebarGroupLabel className="text-[11px] font-normal tracking-widest text-[#8f959e] px-2 mb-0 uppercase">{label}</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu className="gap-1">
-          {filteredItems.map((item) => {
-            const isActive = location.pathname === item.path
-            return (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  render={<Link to={item.path} />}
-                  isActive={isActive}
-                  className={`h-9 text-[13px] px-2.5 rounded-md transition-colors ${
-                    isActive
-                      ? "bg-[#f5f6f7] font-normal text-[#1f2329]"
-                      : "font-normal text-[#4e535a] hover:bg-[#f5f6f7] hover:text-[#1f2329]"
-                  }`}
-                >
-                  <item.icon className={`h-[15px] w-[15px] ${isActive ? "text-[#646a73]" : "text-[#8f959e]"}`} />
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )
-          })}
-        </SidebarMenu>
-      </SidebarGroupContent>
+    <SidebarGroup className="px-3 py-0">
+      <SidebarGroupLabel
+        className="h-10 text-[13px] font-normal tracking-[0.1em] text-[#4e535a] px-2 mb-0 uppercase cursor-pointer select-none flex items-center justify-between hover:text-[#2b2f36] transition-colors"
+        onClick={onToggle}
+      >
+        <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />{label}</span>
+        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
+      </SidebarGroupLabel>
+      {isOpen && (
+        <SidebarGroupContent className="mt-0.5">
+          <SidebarMenu className="gap-1">
+            {filteredItems.map((item) => {
+              const isActive = location.pathname === item.path
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    render={<Link to={item.path} />}
+                    isActive={isActive}
+                    className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none !font-normal text-[#4e535a]"
+                  >
+                    <span className="pl-[18px]">{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            })}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      )}
     </SidebarGroup>
   )
 }
 
-function PaymentMenuGroup() {
+function PaymentMenuGroup({
+  icon: Icon,
+  isOpen,
+  onToggle,
+}: {
+  icon: React.ElementType
+  isOpen: boolean
+  onToggle: () => void
+}) {
   const location = useLocation()
-  const permissions = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("userPermissions") || "[]")
-    } catch {
-      return []
-    }
-  }, [])
+  const permissions = useMemo(getPermissions, [])
+  const isSuperAdmin = useMemo(getIsSuperAdmin, [])
 
-  const currentUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("currentUser") || "{}")
-    } catch {
-      return {}
-    }
-  }, [])
-
-  const isSuperAdmin = currentUser?.role === "超级管理员"
   const hasAccess = isSuperAdmin || PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
-
   if (!hasAccess) return null
 
   const isActive = location.pathname === "/payment"
 
   return (
-    <SidebarGroup className="px-3 py-1">
-      <SidebarGroupLabel className="text-[11px] font-normal tracking-widest text-[#8f959e] px-2 mb-0 uppercase">付费项目</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu className="gap-1">
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              render={<Link to="/payment" />}
-              isActive={isActive}
-              className={`h-9 text-[13px] px-2.5 rounded-md transition-colors ${
-                isActive
-                  ? "bg-[#f5f6f7] font-normal text-[#1f2329]"
-                  : "font-normal text-[#4e535a] hover:bg-[#f5f6f7] hover:text-[#1f2329]"
-              }`}
-            >
-              <CreditCard className={`h-[15px] w-[15px] ${isActive ? "text-[#646a73]" : "text-[#8f959e]"}`} />
-              <span>付费项目</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroupContent>
+    <SidebarGroup className="px-3 py-0">
+      <SidebarGroupLabel
+        className="h-10 text-[13px] font-normal tracking-[0.1em] text-[#4e535a] px-2 mb-0 uppercase cursor-pointer select-none flex items-center justify-between hover:text-[#2b2f36] transition-colors"
+        onClick={onToggle}
+      >
+        <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />付费项目</span>
+        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
+      </SidebarGroupLabel>
+      {isOpen && (
+        <SidebarGroupContent className="mt-0.5">
+          <SidebarMenu className="gap-1">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                render={<Link to="/payment" />}
+                isActive={isActive}
+                className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none !font-normal text-[#4e535a]"
+              >
+                <span className="pl-[18px]">付费项目</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      )}
     </SidebarGroup>
   )
 }
 
+function getActiveGroup(pathname: string): string {
+  if (businessItems.some(i => i.path === pathname)) return "业务"
+  if (courseItems.some(i => i.path === pathname)) return "疗愈活动"
+  if (pathname === "/payment") return "付费项目"
+  if (configItems.some(i => i.path === pathname)) return "信息配置"
+  if (accountItems.some(i => i.path === pathname)) return "账号管理"
+  if (systemItems.some(i => i.path === pathname)) return "系统配置"
+  return ""
+}
+
+const GROUPS = ["业务", "疗愈活动", "付费项目", "信息配置", "账号管理", "系统配置"]
+
 export function AppSidebar() {
+  const location = useLocation()
+  const activeGroup = getActiveGroup(location.pathname)
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(GROUPS.map(g => [g, g === activeGroup]))
+  )
+
+  useEffect(() => {
+    if (activeGroup) {
+      setOpenGroups(prev => ({ ...prev, [activeGroup]: true }))
+    }
+  }, [activeGroup])
+
+  const toggle = (group: string) => {
+    setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }))
+  }
+
   return (
-    <Sidebar>
+    <Sidebar style={{ "--sidebar-accent": "#f0f1f2", "--sidebar-accent-foreground": "#3370ff" } as React.CSSProperties}>
       <SidebarHeader className="px-5 pt-4 pb-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-[11px] font-semibold text-primary-foreground">
@@ -184,13 +228,13 @@ export function AppSidebar() {
           <span className="text-[13px] font-medium tracking-tight">WYYard</span>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        <MenuGroup label="业务" items={businessItems} />
-        <MenuGroup label="疗愈活动" items={courseItems} />
-        <PaymentMenuGroup />
-        <MenuGroup label="信息配置" items={configItems} />
-        <MenuGroup label="账号管理" items={accountItems} />
-        <MenuGroup label="系统配置" items={systemItems} />
+      <SidebarContent className="mt-5">
+        <MenuGroup label="业务" icon={Briefcase} items={businessItems} isOpen={openGroups["业务"]} onToggle={() => toggle("业务")} />
+        <MenuGroup label="疗愈活动" icon={Calendar} items={courseItems} isOpen={openGroups["疗愈活动"]} onToggle={() => toggle("疗愈活动")} />
+        <PaymentMenuGroup icon={CreditCard} isOpen={openGroups["付费项目"]} onToggle={() => toggle("付费项目")} />
+        <MenuGroup label="信息配置" icon={Settings} items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
+        <MenuGroup label="账号管理" icon={Users} items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
+        <MenuGroup label="系统配置" icon={Monitor} items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />
       </SidebarContent>
     </Sidebar>
   )

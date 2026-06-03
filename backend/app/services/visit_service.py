@@ -30,8 +30,8 @@ _load()
 
 
 def count_customer_visits(customer_id: str) -> int:
-    """统计某个客户的到访天数（同一天只算一次）"""
-    dates = {v.visit_date for v in _visits.values() if v.customer_id == customer_id}
+    """统计某个客户的到访天数（同一天只算一次，仅计已到店）"""
+    dates = {v.visit_date for v in _visits.values() if v.customer_id == customer_id and v.arrived}
     return len(dates)
 
 

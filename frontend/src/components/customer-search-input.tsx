@@ -28,6 +28,8 @@ export interface CustomerSearchInputProps {
   filterSelected?: boolean
   /** Extra class for the input container */
   className?: string
+  /** Called when user clicks "新增用户" in no-results state */
+  onNoResultsClick?: (searchText: string) => void
 }
 
 export function CustomerSearchInput({
@@ -42,6 +44,7 @@ export function CustomerSearchInput({
   disabled = false,
   filterSelected = false,
   className = "",
+  onNoResultsClick,
 }: CustomerSearchInputProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -158,25 +161,38 @@ export function CustomerSearchInput({
       )}
 
       {/* Dropdown */}
-      {open && !disabled && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-[#dee0e3] rounded-md shadow-lg max-h-48 overflow-y-auto">
-          {filtered.slice(0, MAX_VISIBLE).map(c => (
-            <div
-              key={c.id}
-              className="px-3 py-2 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"
-              onMouseDown={(e) => { e.preventDefault(); selectItem(c) }}
-            >
-              <span>{c.nickname}</span>
-              {c.member_type && (
-                <span className="text-[10px] text-[#8f959e] ml-auto">{c.member_type}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {open && !disabled && search && (filtered.length > 0 || onNoResultsClick) && (() => {
+        const exactMatch = filtered.some(c => c.nickname.toLowerCase() === search.trim().toLowerCase())
+        const showCreate = onNoResultsClick && !exactMatch
+        if (filtered.length === 0 && !showCreate) return null
+        return (
+          <div className="absolute z-50 mt-1 w-full bg-white border border-[#dee0e3] rounded-md shadow-lg max-h-48 overflow-y-auto">
+            {filtered.slice(0, MAX_VISIBLE).map(c => (
+              <div
+                key={c.id}
+                className="px-3 py-2 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"
+                onMouseDown={(e) => { e.preventDefault(); selectItem(c) }}
+              >
+                <span>{c.nickname}</span>
+                {c.member_type && (
+                  <span className="text-[10px] text-[#8f959e] ml-auto">{c.member_type}</span>
+                )}
+              </div>
+            ))}
+            {showCreate && (
+              <div
+                className="px-3 py-2 text-[12px] text-[#3370ff] hover:bg-[#f0f5ff] cursor-pointer text-left border-t border-[#f0f1f2]"
+                onMouseDown={(e) => { e.preventDefault(); onNoResultsClick(search.trim()); setOpen(false); setSearch("") }}
+              >
+                新增用户「{search.trim()}」
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
-      {/* No results */}
-      {open && !disabled && search && filtered.length === 0 && (
+      {/* No results without onNoResultsClick */}
+      {open && !disabled && search && filtered.length === 0 && !onNoResultsClick && (
         <div className="absolute z-50 mt-1 w-full bg-white border border-[#dee0e3] rounded-md shadow-lg px-3 py-2 text-[12px] text-[#8f959e]">
           无匹配结果
         </div>

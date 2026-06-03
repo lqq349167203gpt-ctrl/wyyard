@@ -233,6 +233,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       setShowAddUserDialog(false)
       setSelectedCustomer(created)
       setSearchKeyword(created.nickname)
+      setCustomerList(prev => [...prev, created])
     } catch (e) {
       setCustomerFormError(e instanceof Error ? e.message : "创建失败")
     } finally {
@@ -309,8 +310,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 setSearchKeyword(customer.nickname)
               }}
               placeholder="昵称"
-              excludeIds={addedCustomerIds}
-              filterSelected={false}
+              onNoResultsClick={(text) => {
+                setCustomerForm({ nickname: text })
+                setShowAddUserDialog(true)
+              }}
             />
           </div>
 
