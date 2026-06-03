@@ -128,7 +128,7 @@ function MenuGroup({
                   <SidebarMenuButton
                     render={<Link to={item.path} />}
                     isActive={isActive}
-                    className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none !font-normal text-[#4e535a]"
+                    className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
                   >
                     <span className="pl-[18px]">{item.title}</span>
                   </SidebarMenuButton>
@@ -176,7 +176,7 @@ function PaymentMenuGroup({
               <SidebarMenuButton
                 render={<Link to="/payment" />}
                 isActive={isActive}
-                className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none !font-normal text-[#4e535a]"
+                className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
               >
                 <span className="pl-[18px]">付费项目</span>
               </SidebarMenuButton>

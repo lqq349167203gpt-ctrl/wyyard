@@ -84,6 +84,10 @@
     --sidebar-ring: #3370ff;
 }
 
+[data-slot="sidebar-menu-button"][data-active] {
+    font-weight: 400;
+}
+
 .dark {
     --background: #1a1a1a;
     --foreground: #e8e8e8;
