@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback, startTransition } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, X, Users, BookOpen, ChevronRight, ChevronLeft, Download, File, ChevronDown } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
 import GroupingView from "@/components/grouping-view"
@@ -15,6 +16,7 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import ArrivalConfirmationView from "./arrival-confirmation"
 import ActivityCardList from "./activity-card-list"
+import CustomerDetailView from "@/pages/healing-records/components/detail-view"
 import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 
@@ -39,6 +41,7 @@ function formatDateChinese(d: string): string {
 }
 
 export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "activities" }) {
+  const enterToNext = useEnterToNext()
   const [records, setRecords] = useState<ClassRecord[]>([])
   const [groupCaseSessions, setGroupCaseSessions] = useState<GroupCaseSession[]>([])
   const [emotionalReleaseSessions, setEmotionalReleaseSessions] = useState<EmotionalReleaseSession[]>([])
@@ -66,6 +69,8 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     return "visitors"
   })
   const isActivitiesView = standaloneTab === "activities" || detailTab === "activities"
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
+  const [customerDetailOpen, setCustomerDetailOpen] = useState(false)
 
   // 新增/编辑弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -1796,7 +1801,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       {effectiveDetailTab === "visitors" ? (
         /* 到场人员 - 详细视图 */
         <div className="flex-1 overflow-y-auto">
-          <VisitsDetailView externalDate={detailDate} onExternalDateChange={setDetailDate} hideDateBar />
+          <VisitsDetailView externalDate={detailDate} onExternalDateChange={setDetailDate} hideDateBar onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }} />
         </div>
       ) : effectiveDetailTab === "grouping" ? (
       /* 人员分组页面：左栏人员列表 + 右栏分组管理 */
@@ -1810,6 +1815,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           await dailyGroupingApi.upsert({ date: detailDate, groups: newGroups })
           setGroups(newGroups)
         }}
+        onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
       />
       ) : effectiveDetailTab === "arrival_confirmation" ? (
       /* 到场确认页面 */
@@ -1890,6 +1896,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 dragOverActivityId={dragOverActivityId}
                 setDragOverActivityId={setDragOverActivityId}
                 onOpenMemberDialog={onOpenMemberDialog}
+                onClickParticipant={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
                 setDeleteId={setDeleteId}
                 setGcsDeleteId={setGcsDeleteId}
                 setErsDeleteId={setErsDeleteId}
@@ -1930,7 +1937,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingRecord ? "编辑活动" : "新增活动"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
               <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
@@ -2482,7 +2489,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{gcsEditingRecord ? "编辑觉醒游戏" : "新增觉醒游戏"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
               <Input type="date" value={gcsFormDate} onChange={(e) => setGcsFormDate(e.target.value)} />
@@ -2573,7 +2580,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{ersEditingRecord ? "编辑情绪释放" : "新增情绪释放"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
               <Input type="date" value={ersFormDate} onChange={(e) => setErsFormDate(e.target.value)} />
@@ -2664,7 +2671,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{eksEditingRecord ? "编辑能量结" : "新增能量结"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
               <Input type="date" value={eksFormDate} onChange={(e) => setEksFormDate(e.target.value)} />
@@ -2785,7 +2792,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增购买</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="text-[12px] text-[#8f959e]">
               {eksPendingOwner?.nickname || eksPendingOwner?.name} 暂无剩余次数，请先录入购买信息
             </div>
@@ -2813,7 +2820,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增购买</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="text-[12px] text-[#8f959e]">
               {gcsPendingOwner?.nickname || gcsPendingOwner?.name} 暂无剩余次数，请先录入购买信息
             </div>
@@ -2841,7 +2848,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增购买</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="text-[12px] text-[#8f959e]">
               {ersPendingOwner?.nickname || ersPendingOwner?.name} 暂无剩余次数，请先录入购买信息
             </div>
@@ -3305,7 +3312,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{icsEditingRecord ? "编辑内部课程" : "新增内部课程"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
               <Input type="date" value={icsFormDate} onChange={(e) => setIcsFormDate(e.target.value)} />
@@ -3561,7 +3568,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           <DialogHeader>
             <DialogTitle>确认到场</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-2" {...enterToNext}>
             <div className="space-y-1.5">
               <label className="text-[12px] text-[#8f959e]">昵称</label>
               <Input value={arrivalVisit?.nickname || ""} disabled className="h-8 text-[13px]" />
@@ -3604,6 +3611,17 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 客户详情弹窗 */}
+      <Dialog open={customerDetailOpen} onOpenChange={(open) => { setCustomerDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto p-0 gap-0">
+          <CustomerDetailView
+            selectedCustomerId={selectedCustomerId}
+            onClearSelection={() => setCustomerDetailOpen(false)}
+            hideSearch
+          />
         </DialogContent>
       </Dialog>
 

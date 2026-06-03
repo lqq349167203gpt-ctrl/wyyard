@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Bell, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -73,6 +74,7 @@ function formatCondition(c: ReminderCondition): string {
 }
 
 export default function RemindersPage() {
+  const enterToNext = useEnterToNext()
   const [items, setItems] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -246,7 +248,7 @@ export default function RemindersPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingItem ? "编辑提醒" : "新增提醒"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             {/* 提醒名称 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">名称</span>

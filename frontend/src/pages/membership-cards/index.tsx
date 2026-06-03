@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, CreditCard, Search, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -33,6 +34,7 @@ const DURATION_OPTIONS = [
 const today = new Date().toLocaleDateString("sv-SE")
 
 export function MembershipCardContent({ embedded }: { embedded?: boolean } = {}) {
+  const enterToNext = useEnterToNext()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCard, setEditingCard] = useState<MembershipCard | null>(null)
   const [saving, setSaving] = useState(false)
@@ -343,7 +345,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingCard ? "编辑会员活动" : "新增会员活动"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             {/* 用户搜索 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">用户</span>

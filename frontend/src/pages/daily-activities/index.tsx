@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Users, Sparkles, Heart, Zap, GraduationCap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -262,6 +263,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   achieverCustomers: CustomerLight[]; session?: GroupCaseSession | null; onClose: () => void
   onSaved: (record: GroupCaseSession) => void
 }) => {
+  const enterToNext = useEnterToNext()
   const [editingRecord, setEditingRecord] = useState<GroupCaseSession | null>(null)
   const [saving, setSaving] = useState(false)
   const [formDate, setFormDate] = useState(date)
@@ -373,7 +375,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
           <DialogTitle className="text-[15px]">{editingRecord ? "编辑觉醒游戏" : "新增觉醒游戏"}</DialogTitle>
         </DialogHeader>
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
             <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
@@ -504,6 +506,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   achieverCustomers: CustomerLight[]; session?: EmotionalReleaseSession | null; onClose: () => void
   onSaved: (record: EmotionalReleaseSession) => void
 }) => {
+  const enterToNext = useEnterToNext()
   const [editingRecord, setEditingRecord] = useState<EmotionalReleaseSession | null>(null)
   const [saving, setSaving] = useState(false)
   const [formDate, setFormDate] = useState(date)
@@ -608,7 +611,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
           <DialogTitle className="text-[15px]">{editingRecord ? "编辑情绪释放" : "新增情绪释放"}</DialogTitle>
         </DialogHeader>
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
             <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
@@ -739,6 +742,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   hostCustomers: CustomerLight[]; session?: EnergyKnotSession | null; onClose: () => void
   onSaved: (record: EnergyKnotSession) => void
 }) => {
+  const enterToNext = useEnterToNext()
   const [editingRecord, setEditingRecord] = useState<EnergyKnotSession | null>(null)
   const [saving, setSaving] = useState(false)
   const [formDate, setFormDate] = useState(date)
@@ -873,7 +877,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
           <DialogTitle className="text-[15px]">{editingRecord ? "编辑能量结" : "新增能量结"}</DialogTitle>
         </DialogHeader>
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
             <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
@@ -1042,7 +1046,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-[15px]">新增购买</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-center gap-3">
               <span className="text-[12px] text-[#8f959e] text-right">客户</span>
               <span className="text-[12px]">{pendingOwner?.nickname || ""}</span>
@@ -1072,6 +1076,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
   session?: InternalCourseSession | null; onClose: () => void
   onSaved: (record: InternalCourseSession) => void
 }) => {
+  const enterToNext = useEnterToNext()
   const [editingRecord, setEditingRecord] = useState<InternalCourseSession | null>(null)
   const [saving, setSaving] = useState(false)
   const [formDate, setFormDate] = useState(date)
@@ -1142,7 +1147,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
           <DialogTitle className="text-[15px]">{editingRecord ? "编辑内部课程" : "新增内部课程"}</DialogTitle>
         </DialogHeader>
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
             <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
@@ -1217,6 +1222,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
   teachers: CustomerLight[]; session?: ClassRecord | null; onClose: () => void
   onSaved: (record: ClassRecord) => void
 }) => {
+  const enterToNext = useEnterToNext()
   const [editingRecord, setEditingRecord] = useState<ClassRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [formDate, setFormDate] = useState(date)
@@ -1295,7 +1301,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
           <DialogTitle className="text-[15px]">{editingRecord ? "编辑沙龙活动" : "新增沙龙活动"}</DialogTitle>
         </DialogHeader>
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
             <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
@@ -1921,7 +1927,8 @@ export default function DailyActivitiesPage() {
         </div>
 
         {/* 新增按钮 */}
-        <div className="flex items-center justify-end relative">
+        <div className="flex items-center justify-between relative mt-2.5">
+          <span className="text-[14px] font-medium text-[#2b2f36] pl-2">当日活动</span>
           <Button size="sm" className="text-xs" onClick={() => setAddMenuOpen(!addMenuOpen)}>
             <Plus className="mr-1 h-3.5 w-3.5" /> 新增 <ChevronDown className="ml-1 h-3 w-3" />
           </Button>

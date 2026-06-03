@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, Zap, Search, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -17,6 +18,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
+  const enterToNext = useEnterToNext()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingKnot, setEditingKnot] = useState<EnergyKnot | null>(null)
   const [saving, setSaving] = useState(false)
@@ -275,7 +277,7 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingKnot ? "编辑记录" : "新增"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             {/* 用户搜索 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">用户</span>

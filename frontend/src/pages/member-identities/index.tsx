@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, ArrowUp, ArrowDown, ShieldCheck, Loader2 } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -67,6 +68,7 @@ function defaultCondition(): IdentityCondition {
 }
 
 export default function MemberIdentitiesPage() {
+  const enterToNext = useEnterToNext()
   const [activeTab, setActiveTab] = useState("identities")
   const [identities, setIdentities] = useState<MemberIdentity[]>([])
   const [loading, setLoading] = useState(true)
@@ -361,7 +363,7 @@ export default function MemberIdentitiesPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-[14px]">{editingItem ? "编辑身份" : "新增身份"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+          <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">身份名称</span>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="输入会员身份名称" />

@@ -41,7 +41,7 @@ const configItems = [
   { title: "沙龙类型", icon: BookText, path: "/positions/courses", permission: "courses" },
   { title: "会员身份", icon: ShieldCheck, path: "/config/member-identities", permission: "member-identities" },
   { title: "疗愈身份", icon: Heart, path: "/healing-identities", permission: "healing-identities" },
-  { title: "疗愈空间", icon: Building2, path: "/courses/spaces", permission: "spaces" },
+  { title: "空间配置", icon: Building2, path: "/courses/spaces", permission: "spaces" },
   { title: "提醒配置", icon: Bell, path: "/config/reminders", permission: "reminders" },
 ]
 

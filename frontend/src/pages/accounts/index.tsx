@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Edit, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +16,7 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 
 export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
+  const enterToNext = useEnterToNext()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [positions, setPositions] = useState<Position[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -190,7 +192,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
               <span className="text-sm font-medium">{editingId ? "编辑账号" : "新增账号"}</span>
               <button onClick={() => { setShowForm(false); setFormErrors({}) }}><X className="h-4 w-4 text-[#8f959e]" /></button>
             </div>
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-5 py-4 space-y-4" {...enterToNext}>
               <div className="flex items-start gap-3">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">归属人</span>
                 <div className="relative flex-1">

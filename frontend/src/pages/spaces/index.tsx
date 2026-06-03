@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Building2, DoorOpen, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,7 @@ import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
 export default function SpacesPage() {
+  const enterToNext = useEnterToNext()
   const [spaces, setSpaces] = useState<Space[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -108,7 +110,7 @@ export default function SpacesPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增疗愈空间</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">空间名称</span>
               <Input value={spaceName} onChange={(e) => setSpaceName(e.target.value)} placeholder="请输入空间名称" />
@@ -129,7 +131,7 @@ export default function SpacesPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增房间</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">房间名称</span>
               <Input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="请输入房间名称" />

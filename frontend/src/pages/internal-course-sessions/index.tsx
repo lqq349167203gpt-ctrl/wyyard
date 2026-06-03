@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, X, Calendar, GraduationCap, ChevronRight, ChevronDown, Users, FileUp, Download, File } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -25,6 +26,7 @@ const COURSE_TYPES = [
 ]
 
 export default function InternalCourseSessionsPage() {
+  const enterToNext = useEnterToNext()
   const [sessions, setSessions] = useState<InternalCourseSession[]>([])
   const [allCustomers, setAllCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -375,7 +377,7 @@ export default function InternalCourseSessionsPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingSession ? "编辑记录" : "新增"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
               <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
@@ -462,7 +464,7 @@ export default function InternalCourseSessionsPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">资料管理</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4 overflow-hidden">
+          <div className="px-6 py-5 space-y-4 overflow-hidden" {...enterToNext}>
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-[#4e535a] truncate">{materialsRecord?.course_name}</span>
               <div className="shrink-0">

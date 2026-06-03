@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -17,6 +18,7 @@ const emptyCustomer: Record<string, any> = {
 }
 
 export default function HealingRecordsPage() {
+  const enterToNext = useEnterToNext()
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -225,7 +227,7 @@ export default function HealingRecordsPage() {
           <div className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
             <h3 className="text-[14px] font-normal">{editingId ? "编辑用户" : "新建用户"}</h3>
           </div>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">昵称</span>
               <div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 }
 
 export default function AgentsPage() {
+  const enterToNext = useEnterToNext()
   const navigate = useNavigate()
   const [agents, setAgents] = useState<Agent[]>([])
   const [customerConfig, setCustomerConfig] = useState<CustomerAIConfig | null>(null)
@@ -99,7 +101,7 @@ export default function AgentsPage() {
             <DialogHeader className="px-6 pt-5 pb-4 border-b">
               <DialogTitle className="text-base">新建 Agent</DialogTitle>
             </DialogHeader>
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-6 py-5 space-y-5" {...enterToNext}>
               <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                 <Label className="text-[12px] text-[#4e535a] font-light text-right">名称</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="给 Agent 起个名字" />
@@ -154,7 +156,7 @@ export default function AgentsPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">客户管理 AI 配置</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             {customerConfig && (
               <>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">

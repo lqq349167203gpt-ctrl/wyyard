@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { ChevronLeft, ChevronRight, Edit, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -33,6 +34,7 @@ interface DetailViewProps {
 }
 
 export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick }: DetailViewProps = {}) {
+  const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
   const selectedDate = externalDate ?? internalDate
@@ -444,7 +446,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           <DialogHeader className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
             <DialogTitle className="text-[14px] font-normal">新建用户</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">昵称</span>
               <div>

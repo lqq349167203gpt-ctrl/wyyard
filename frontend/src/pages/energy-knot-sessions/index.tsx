@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, Calendar, Zap } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -18,6 +19,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 const today = new Date().toLocaleDateString("sv-SE")
 
 export default function EnergyKnotSessionsPage() {
+  const enterToNext = useEnterToNext()
   const [sessions, setSessions] = useState<EnergyKnotSession[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDate, setFilterDate] = useState("")
@@ -210,7 +212,7 @@ export default function EnergyKnotSessionsPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingSession ? "编辑记录" : "新增"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
               <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
@@ -289,7 +291,7 @@ export default function EnergyKnotSessionsPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增能量结次数</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <p className="text-[12px] text-[#4e535a]">
               用户「{pendingOwner?.nickname}」剩余次数为 0，是否新增购买？
             </p>

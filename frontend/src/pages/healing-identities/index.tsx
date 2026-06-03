@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Users, Zap, Plus, Trash2 } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -23,6 +24,7 @@ const HEALING_POSITIONS = [
 type PositionKey = typeof HEALING_POSITIONS[number]["key"]
 
 export default function HealingIdentitiesPage() {
+  const enterToNext = useEnterToNext()
   const [activePosition, setActivePosition] = useState<PositionKey>("成就君")
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -195,7 +197,7 @@ export default function HealingIdentitiesPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增{currentConfig.label}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">搜索用户</span>
               <CustomerSearchInput

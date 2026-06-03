@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, BookOpen } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -17,6 +18,7 @@ import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
 export default function CoursesPage() {
+  const enterToNext = useEnterToNext()
   const [courses, setCourses] = useState<Course[]>([])
   const [courseTypes, setCourseTypes] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -276,7 +278,7 @@ export default function CoursesPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增课程类型</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">类型名称</span>
               <Input value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} placeholder="如：冥想、瑜伽、疗愈" />
@@ -297,7 +299,7 @@ export default function CoursesPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingCourse ? "编辑课程" : "新增课程"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程类型</span>
               <SelectDropdown

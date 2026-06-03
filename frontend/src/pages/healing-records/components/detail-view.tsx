@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -273,42 +274,43 @@ export default function DetailView({
           {/* 疗愈记录 — 到店记录 */}
           {activeTab === "healing" && (() => {
             const visitRecords = (detail!.visit_records || []).sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.arrival_time || "").localeCompare(a.arrival_time || ""))
-            const pageSize = 5
+            const pageSize = 8
             const totalPages = Math.ceil(visitRecords.length / pageSize)
             const paginatedRecords = visitRecords.slice((healingPage - 1) * pageSize, healingPage * pageSize)
             return visitRecords.length===0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
               <div>
-                <div className="divide-y divide-[#f0f0f0] border-b border-[#f0f0f0]">
-                  {paginatedRecords.map((v) => (
-                    <div key={v.id} className="pt-2 pb-1.5 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#8f959e]">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}年${parseInt(m)}月${parseInt(d)}日` })()}</span>
-                        {v.arrival_time && <span className="text-[11px] text-[#8f959e]">{v.arrival_time}</span>}
-                        {v.arrived ? (
-                          <span className="text-[10px] text-[#3370ff] bg-[#f0f4ff] px-1.5 py-0.5 rounded">已到店</span>
-                        ) : (
-                          <span className="text-[10px] text-[#8f959e] bg-[#f0f0f0] px-1.5 py-0.5 rounded">未到店</span>
-                        )}
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0">需求</span>
-                        <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.needs || "暂无"}</p>
-                      </div>
-                      {v.experience && (
-                        <div className="flex items-start gap-2">
-                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0">客户</span>
-                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.experience}{v.feedback && <span className="text-[#8f959e] ml-2">回复：{v.feedback}</span>}</p>
+                <div>
+                  {paginatedRecords.map((v, idx) => (
+                    <div key={v.id} className={`flex gap-4 py-2 ${idx > 0 ? "border-t border-[#f0f0f0]" : ""}`}>
+                      <div className="w-[100px] shrink-0 pt-0.5">
+                        <div className="text-[12px] text-[#4e535a]">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{v.arrival_time && ` ${v.arrival_time}`}</div>
+                        <div className="mt-0.5">
+                          {v.arrived ? (
+                            <span className="text-[11px] text-[#3370ff] bg-[#f0f4ff] px-1.5 py-0.5 rounded">已到店</span>
+                          ) : (
+                            <span className="text-[11px] text-[#8f959e] bg-[#f0f0f0] px-1.5 py-0.5 rounded">未到店</span>
+                          )}
                         </div>
-                      )}
-                      {(() => {
-                        const hr = detail!.healing_records.find(r => r.date === v.visit_date)
-                        return hr?.growth_record ? (
-                          <div className="flex items-start gap-2">
-                            <span className="text-[12px] text-[#8f959e] shrink-0">疗愈记录</span>
-                            <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{hr.growth_record}</p>
-                          </div>
-                        ) : null
-                      })()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-2">
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">当日需求</span>
+                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.needs || <span className="text-[#8f959e]">-</span>}</p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户反馈</span>
+                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.experience || <span className="text-[#8f959e]">-</span>}{v.feedback && <span className="text-[#8f959e] font-light ml-2">疗愈师回复：{v.feedback}</span>}</p>
+                        </div>
+                        {(() => {
+                          const hr = detail!.healing_records.find(r => r.date === v.visit_date)
+                          return (
+                            <div className="flex items-start gap-2">
+                              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈记录</span>
+                              <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{hr?.growth_record || <span className="text-[#8f959e]">-</span>}</p>
+                            </div>
+                          )
+                        })()}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -436,6 +438,7 @@ function RecordForm({
   customers: Customer[]
   saving?: boolean
 }) {
+  const enterToNext = useEnterToNext()
   const [date, setDate] = useState(rec?.date || "")
   const [title, setTitle] = useState(rec?.title || "")
   const [teacher, setTeacher] = useState(rec?.teacher || "")
@@ -484,7 +487,7 @@ function RecordForm({
         <div className="px-5 py-3 border-b border-[#f0f0f0]">
           <h3 className="text-[12px] font-normal">{rec ? "编辑" : "新增"}疗愈记录</h3>
         </div>
-        <div className="px-5 py-4 space-y-3">
+        <div className="px-5 py-4 space-y-3" {...enterToNext}>
           <div className="grid grid-cols-[56px_1fr] items-center gap-2">
             <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">日期</span>
             <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-8 text-[12px]" />
