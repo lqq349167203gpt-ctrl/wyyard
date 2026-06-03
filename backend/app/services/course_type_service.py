@@ -9,7 +9,8 @@ _types: List[str] = []
 def _load():
     global _types
     data = load_data(FILENAME)
-    _types = data.get("types", [])
+    raw = data.get("types", [])
+    _types = raw.get("types", raw) if isinstance(raw, dict) else raw
     # 合并课程数据中已有的类型（向后兼容）
     existing = {c.type for c in list_courses() if c.type}
     for t in existing:

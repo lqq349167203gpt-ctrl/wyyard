@@ -227,7 +227,7 @@ export default function HealingRecordsPage() {
           </div>
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">昵称</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">昵称</span>
               <div>
                 <Input value={form.nickname || ""} onChange={(e) => { setForm({ ...form, nickname: e.target.value }); setSaveError("") }} placeholder="请输入" />
                 {saveError && saveError.includes("昵称") && <p className="text-[11px] text-[#f54a45] mt-1">{saveError}</p>}
@@ -235,7 +235,7 @@ export default function HealingRecordsPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">姓名</span>
               <Input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="请输入" />
 
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">性别</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">性别</span>
               <SelectDropdown
                 value={form.gender || ""}
                 options={[{value: "男", label: "男"}, {value: "女", label: "女"}]}
@@ -245,7 +245,7 @@ export default function HealingRecordsPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">电话</span>
               <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="请输入" />
 
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">微信</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">微信</span>
               <div>
                 <Input value={form.wechat || ""} onChange={(e) => { setForm({ ...form, wechat: e.target.value }); setSaveError("") }} placeholder="请输入" />
                 {saveError && saveError.includes("微信") && <p className="text-[11px] text-[#f54a45] mt-1">{saveError}</p>}
@@ -261,19 +261,19 @@ export default function HealingRecordsPage() {
                 />
               </div>
 
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">引流人</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">引流人</span>
               <CustomerSearchInput
                 customers={customers}
                 value={form.referrer || ""}
                 onChange={(v) => setForm({ ...form, referrer: typeof v === "string" ? v : v[0] || "" })}
-                placeholder="搜索客户昵称"
+                placeholder="请搜索"
                 excludeIds={form.id ? [form.id] : []}
                 filterSelected={false}
               />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">流量来源</span>
               <div className="flex items-center gap-2">
                 <SelectDropdown
-                  className={["小红书", "抖音", "公众号", "视频号", "好友推荐", "朋友圈"].includes(form.traffic_source) ? "flex-1" : "w-full"}
+                  className={["小红书", "抖音", "公众号", "视频号"].includes(form.traffic_source) ? "w-[calc(50%-3px)] min-w-0" : ["好友推荐", "朋友圈"].includes(form.traffic_source) ? "flex-1 min-w-0" : "w-full"}
                   value={form.traffic_source || ""}
                   options={["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐"].map(v => ({value: v, label: v}))}
                   placeholder="请选择"
@@ -283,7 +283,7 @@ export default function HealingRecordsPage() {
                   <Input value={form.traffic_source_detail || ""} onChange={(e) => setForm({ ...form, traffic_source_detail: e.target.value })} placeholder="内容链接" className="h-8 flex-1 text-[12px]" />
                 )}
                 {form.traffic_source === "好友推荐" && (
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <CustomerSearchInput
                       customers={customers}
                       value={form.traffic_source_detail || ""}
@@ -294,7 +294,7 @@ export default function HealingRecordsPage() {
                   </div>
                 )}
                 {form.traffic_source === "朋友圈" && (
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <CustomerSearchInput
                       customers={customers}
                       value={form.traffic_source_detail || ""}
@@ -306,12 +306,12 @@ export default function HealingRecordsPage() {
                 )}
               </div>
 
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">承接人</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">承接人</span>
               <CustomerSearchInput
                 customers={customers}
                 value={form.referrer_handler || ""}
                 onChange={(v) => setForm({ ...form, referrer_handler: typeof v === "string" ? v : v[0] || "" })}
-                placeholder="搜索客户昵称"
+                placeholder="请搜索"
                 excludeIds={form.id ? [form.id] : []}
                 filterSelected={false}
               />
@@ -321,16 +321,29 @@ export default function HealingRecordsPage() {
             <div className="border-t border-[#f0f0f0]" />
 
             <div className="space-y-3">
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">基础信息</span>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">工作情况</span>
+                <div className="flex gap-2">
+                  <SelectDropdown
+                    value={form.work_status || ""}
+                    options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }]}
+                    placeholder="是否在职"
+                    onChange={(v) => setForm({ ...form, work_status: v })}
+                    className="w-[100px]"
+                  />
+                  <Input value={form.work_description || ""} onChange={(e) => setForm({ ...form, work_description: e.target.value })} placeholder="描述工作内容..." className="flex-1" />
+                </div>
+              </div>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">创伤经历</span>
                 <Textarea value={form.basic_info || ""} onChange={(e) => setForm({ ...form, basic_info: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
               </div>
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">客户评估</span>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">当下卡点</span>
                 <Textarea value={form.assessment || ""} onChange={(e) => setForm({ ...form, assessment: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
               </div>
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">客户标签</span>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">到访目的</span>
                 <Textarea value={form.tags || ""} onChange={(e) => setForm({ ...form, tags: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
               </div>
             </div>

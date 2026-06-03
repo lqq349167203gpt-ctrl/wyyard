@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { visitApi, customerApi, type VisitRecord, type CustomerLight, type CustomerCreate } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 function formatDate(d: Date): string {
@@ -445,7 +446,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">昵称</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">昵称</span>
               <div>
                 <Input value={customerForm.nickname || ""} onChange={(e) => { setCustomerForm({ ...customerForm, nickname: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
                 {customerFormError && customerFormError.includes("昵称") && <p className="text-[11px] text-[#f54a45] mt-1">{customerFormError}</p>}
@@ -453,7 +454,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">姓名</span>
               <Input value={customerForm.name || ""} onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })} placeholder="请输入" />
 
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">性别</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">性别</span>
               <select value={customerForm.gender || ""} onChange={(e) => setCustomerForm({ ...customerForm, gender: e.target.value })} className="h-8 w-full rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat">
                 <option value="">请选择</option>
                 <option value="男">男</option>
@@ -462,7 +463,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">电话</span>
               <Input value={customerForm.phone || ""} onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })} placeholder="请输入" />
 
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">微信</span>
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">微信</span>
               <div>
                 <Input value={customerForm.wechat || ""} onChange={(e) => { setCustomerForm({ ...customerForm, wechat: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
                 {customerFormError && customerFormError.includes("微信") && <p className="text-[11px] text-[#f54a45] mt-1">{customerFormError}</p>}
@@ -470,8 +471,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">年龄</span>
               <Input value={customerForm.age || ""} onChange={(e) => setCustomerForm({ ...customerForm, age: e.target.value })} placeholder="请输入" />
 
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">引流人</span>
-              <Input value={customerForm.referrer || ""} onChange={(e) => setCustomerForm({ ...customerForm, referrer: e.target.value })} placeholder="请输入" />
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">引流人</span>
+              <Input value={customerForm.referrer || ""} onChange={(e) => setCustomerForm({ ...customerForm, referrer: e.target.value })} placeholder="请搜索" />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">流量来源</span>
               <Input value={customerForm.traffic_source || ""} onChange={(e) => setCustomerForm({ ...customerForm, traffic_source: e.target.value })} placeholder="请输入" />
             </div>
@@ -479,16 +480,29 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
             <div className="border-t border-[#f0f0f0]" />
 
             <div className="space-y-3">
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">基础信息</span>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">工作情况</span>
+                <div className="flex gap-2">
+                  <SelectDropdown
+                    value={customerForm.work_status || ""}
+                    options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }]}
+                    placeholder="是否在职"
+                    onChange={(v) => setCustomerForm({ ...customerForm, work_status: v })}
+                    className="w-[100px]"
+                  />
+                  <Input value={customerForm.work_description || ""} onChange={(e) => setCustomerForm({ ...customerForm, work_description: e.target.value })} placeholder="描述工作内容..." className="flex-1" />
+                </div>
+              </div>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">创伤经历</span>
                 <Textarea value={customerForm.basic_info || ""} onChange={(e) => setCustomerForm({ ...customerForm, basic_info: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
               </div>
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">客户评估</span>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">当下卡点</span>
                 <Textarea value={customerForm.assessment || ""} onChange={(e) => setCustomerForm({ ...customerForm, assessment: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
               </div>
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">客户标签</span>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">到访目的</span>
                 <Textarea value={customerForm.tags || ""} onChange={(e) => setCustomerForm({ ...customerForm, tags: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
               </div>
             </div>

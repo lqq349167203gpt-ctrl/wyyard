@@ -112,6 +112,8 @@ export interface Customer {
   follow_up_action: string
   positions: string[]
   self_tags: ("自我成长" | "共创" | "变现")[]
+  work_status: string
+  work_description: string
   basic_info: string
   assessment: string
   tags: string

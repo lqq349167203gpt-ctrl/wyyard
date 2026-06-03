@@ -52,6 +52,8 @@ class CustomerBase(BaseModel):
     follow_up_action: str = ""
     positions: List[Position] = []
     self_tags: List[SelfTag] = []
+    work_status: str = ""
+    work_description: str = ""
     basic_info: str = ""
     assessment: str = ""
     tags: str = ""
@@ -82,6 +84,8 @@ class CustomerUpdate(BaseModel):
     follow_up_action: Optional[str] = None
     positions: Optional[List[Position]] = None
     self_tags: Optional[List[SelfTag]] = None
+    work_status: Optional[str] = None
+    work_description: Optional[str] = None
     basic_info: Optional[str] = None
     assessment: Optional[str] = None
     tags: Optional[str] = None
