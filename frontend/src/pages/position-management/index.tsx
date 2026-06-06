@@ -34,12 +34,12 @@ const ALL_PAGES = [
   { key: "member-identities", label: "会员身份" },
   { key: "healing-identities", label: "疗愈身份" },
   { key: "position-management", label: "账号管理" },
-  { key: "courses", label: "沙龙类型" },
+  { key: "courses", label: "活动配置" },
   { key: "spaces", label: "疗愈空间" },
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务", keys: ["healing-records"] },
+  { label: "业务数据", keys: ["healing-records"] },
   { label: "人员到场", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival"] },
   { label: "付费项目", keys: ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"] },
   { label: "场次", keys: ["group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"] },

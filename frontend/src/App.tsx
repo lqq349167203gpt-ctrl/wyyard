@@ -33,6 +33,7 @@ import ChangePasswordPage from "@/pages/change-password"
 import RemindersPage from "@/pages/reminders"
 import BusinessRemindersPage from "@/pages/business-reminders"
 import TrafficRecordsPage from "@/pages/traffic-records"
+import ActivityRecordsPage from "@/pages/activity-records"
 
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
@@ -158,6 +159,7 @@ function App() {
               <Route path="/config/reminders" element={<RemindersPage />} />
               <Route path="/business-reminders" element={<BusinessRemindersPage />} />
               <Route path="/traffic-records" element={<TrafficRecordsPage />} />
+              <Route path="/activity-records" element={<ActivityRecordsPage />} />
             </Route>
           </Route>
         </Routes>

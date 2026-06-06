@@ -31,9 +31,10 @@ interface DetailViewProps {
   onExternalDateChange?: (date: string) => void
   hideDateBar?: boolean
   onCustomerClick?: (customerId: string) => void
+  onDataLoaded?: (visits: VisitRecord[]) => void
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded }: DetailViewProps = {}) {
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -115,6 +116,13 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     load()
     return () => { cancelled = true }
   }, [selectedDate, customerListReady])
+
+  // 通知父组件已加载的到访数据
+  useEffect(() => {
+    if (onDataLoaded && visits.length >= 0 && customerListReady) {
+      onDataLoaded(visits)
+    }
+  }, [visits, onDataLoaded, customerListReady])
 
   // 加载每日到场人数，使用 member_types + 日期范围做权限过滤
   const countsRetryRef = useRef(0)

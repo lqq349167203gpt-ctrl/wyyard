@@ -135,6 +135,7 @@ export interface CustomerLight {
   created_at: string
   traffic_source: string
   traffic_source_detail: string
+  referrer: string
 }
 
 let _customerLightCache: CustomerLight[] | null = null
@@ -341,6 +342,7 @@ export interface Course {
   name: string
   teachers: string[]  // List of teacher IDs
   class_count: number
+  organization_id: string  // 所属共创组织 ID
   created_at: string
   updated_at: string
 }
@@ -350,6 +352,7 @@ export interface CourseCreate {
   name: string
   teachers?: string[]
   class_count?: number
+  organization_id?: string
 }
 
 export const courseApi = {
@@ -365,6 +368,27 @@ export const courseTypeApi = {
   list: () => request<string[]>("/api/course-types"),
   create: (name: string) => request<{ name: string }>("/api/course-types", { method: "POST", body: JSON.stringify({ name }) }),
   delete: (name: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "DELETE" }),
+}
+
+// Organization (共创组织)
+export interface Organization {
+  id: string
+  name: string
+  member_ids: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface OrganizationCreate {
+  name: string
+  member_ids?: string[]
+}
+
+export const organizationApi = {
+  list: () => request<Organization[]>("/api/organizations"),
+  create: (data: OrganizationCreate) => request<Organization>("/api/organizations", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<OrganizationCreate>) => request<Organization>(`/api/organizations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/organizations/${id}`, { method: "DELETE" }),
 }
 
 // Class Records
@@ -1258,5 +1282,29 @@ export const businessReminderApi = {
     request<{ handled: boolean }>(`/api/business-reminders/${encodeURIComponent(id)}/toggle`, {
       method: "PATCH",
       body: JSON.stringify({ description }),
+    }),
+}
+
+// Activity Theme
+export interface ActivityTheme {
+  id: string
+  date: string
+  week_theme: string
+  day_theme: string
+  created_at: string
+  updated_at: string
+}
+
+export const activityThemeApi = {
+  list: (start_date?: string, end_date?: string) => {
+    const params = new URLSearchParams()
+    if (start_date) params.set("start_date", start_date)
+    if (end_date) params.set("end_date", end_date)
+    return request<ActivityTheme[]>(`/api/activity-themes?${params.toString()}`)
+  },
+  save: (date: string, week_theme: string, day_theme: string) =>
+    request<ActivityTheme>(`/api/activity-themes`, {
+      method: "POST",
+      body: JSON.stringify({ date, week_theme, day_theme }),
     }),
 }

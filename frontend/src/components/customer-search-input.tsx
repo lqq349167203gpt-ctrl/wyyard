@@ -103,32 +103,38 @@ export function CustomerSearchInput({
   return (
     <div className="relative" ref={ref}>
       {multi ? (
-        // Multi-select: show badges + search input
-        <div
-          className={`min-h-8 w-full rounded-md border border-[#dee0e3] bg-white px-2 py-1 flex flex-wrap gap-1 items-center ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
-          onClick={() => !disabled && setOpen(true)}
-        >
-          {selectedNames.map(name => (
-            <span key={name} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#f0f5ff] text-[11px] text-[#3370ff]">
-              {name}
-              <button
-                onClick={(e) => { e.stopPropagation(); removeItem(name) }}
-                className="hover:text-[#e02020]"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          <input
-            ref={inputRef}
-            className="flex-1 min-w-[80px] h-6 border-none outline-none text-[12px] bg-transparent"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setOpen(true) }}
-            onFocus={() => setOpen(true)}
-            placeholder={selectedNames.length === 0 ? placeholder : ""}
-            disabled={disabled}
-            autoComplete="off"
-          />
+        // Multi-select: search input on top, badges below
+        <div>
+          <div
+            className={`min-h-8 w-full rounded-md border border-[#dee0e3] bg-white px-2 py-1 flex items-center ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
+            onClick={() => !disabled && setOpen(true)}
+          >
+            <input
+              ref={inputRef}
+              className="flex-1 min-w-[80px] h-6 border-none outline-none text-[12px] bg-transparent"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setOpen(true) }}
+              onFocus={() => setOpen(true)}
+              placeholder={placeholder}
+              disabled={disabled}
+              autoComplete="off"
+            />
+          </div>
+          {selectedNames.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {selectedNames.map(name => (
+                <span key={name} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#f0f5ff] text-[11px] text-[#3370ff]">
+                  {name}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeItem(name) }}
+                    className="hover:text-[#e02020]"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         // Single select: show input with X clear button

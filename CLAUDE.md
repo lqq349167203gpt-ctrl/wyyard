@@ -37,8 +37,9 @@ wyyard_project/
 ## 页面清单
 | 分组 | 页面 | 路由 |
 |------|------|------|
-| 业务 | 用户管理 | /customers |
-| 业务 | 疗愈记录 | /healing-records |
+| 业务数据 | 用户管理 | /customers |
+| 业务数据 | 活动记录 | /activity-records |
+| 疗愈活动 | 客户信息 | /healing-records |
 | 疗愈活动 | 人员到场 | /courses/class-records |
 | 疗愈活动 | 活动安排 | /courses/daily-activities |
 | 付费项目 | 付费项目 | /payment |

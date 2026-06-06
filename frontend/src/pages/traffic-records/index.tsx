@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from "react"
-import { TrendingUp } from "lucide-react"
+import { useEffect, useState, useRef, useMemo } from "react"
+import { TrendingUp, Search, X } from "lucide-react"
+import { SelectDropdown } from "@/components/select-dropdown"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -8,18 +9,18 @@ import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
 const SOURCE_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  "小红书": { label: "小红书", color: "#ff2442", bg: "#fff0f0" },
-  "抖音": { label: "抖音", color: "#111", bg: "#f5f5f5" },
-  "公众号": { label: "公众号", color: "#07c160", bg: "#f0fff4" },
-  "视频号": { label: "视频号", color: "#576b95", bg: "#f0f4ff" },
-  "朋友圈": { label: "朋友圈", color: "#576b95", bg: "#f0f4ff" },
-  "美团": { label: "美团", color: "#ffb400", bg: "#fffbe6" },
-  "大众点评": { label: "大众点评", color: "#ff6633", bg: "#fff4f0" },
-  "好友推荐": { label: "好友推荐", color: "#3370ff", bg: "#f0f5ff" },
+  "小红书": { label: "小红书", color: "#4e535a", bg: "#f5f6f7" },
+  "抖音": { label: "抖音", color: "#4e535a", bg: "#f5f6f7" },
+  "公众号": { label: "公众号", color: "#4e535a", bg: "#f5f6f7" },
+  "视频号": { label: "视频号", color: "#4e535a", bg: "#f5f6f7" },
+  "朋友圈": { label: "朋友圈", color: "#4e535a", bg: "#f5f6f7" },
+  "美团": { label: "美团", color: "#4e535a", bg: "#f5f6f7" },
+  "大众点评": { label: "大众点评", color: "#4e535a", bg: "#f5f6f7" },
+  "好友推荐": { label: "好友推荐", color: "#4e535a", bg: "#f5f6f7" },
 }
 
 function formatDate(dateStr: string) {
-  if (!dateStr) return "—"
+  if (!dateStr) return "-"
   const d = new Date(dateStr)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
@@ -32,9 +33,20 @@ function getDetailLabel(source: string) {
 }
 
 export default function TrafficRecordsPage() {
-  const [customers, setCustomers] = useState<CustomerLight[]>([])
+  const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
   const [loading, setLoading] = useState(true)
   const retryRef = useRef(0)
+
+  // 搜索状态
+  const [filterReferrer, setFilterReferrer] = useState("")
+  const [filterSource, setFilterSource] = useState("")
+  const [filterStartDate, setFilterStartDate] = useState("")
+  const [filterEndDate, setFilterEndDate] = useState("")
+  // 已应用的筛选
+  const [appliedReferrer, setAppliedReferrer] = useState("")
+  const [appliedSource, setAppliedSource] = useState("")
+  const [appliedStartDate, setAppliedStartDate] = useState("")
+  const [appliedEndDate, setAppliedEndDate] = useState("")
 
   useEffect(() => {
     let cancelled = false
@@ -44,9 +56,8 @@ export default function TrafficRecordsPage() {
         const list = await customerApi.light()
         if (cancelled) return
         const filtered = list
-          .filter((c) => c.traffic_source)
           .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
-        setCustomers(filtered)
+        setAllCustomers(filtered)
         setLoading(false)
       } catch {
         if (!cancelled && retryRef.current < 2) {
@@ -61,17 +72,97 @@ export default function TrafficRecordsPage() {
     return () => { cancelled = true }
   }, [])
 
+  const handleSearch = () => {
+    setAppliedReferrer(filterReferrer)
+    setAppliedSource(filterSource)
+    setAppliedStartDate(filterStartDate)
+    setAppliedEndDate(filterEndDate)
+  }
+
+  const handleClear = () => {
+    setFilterReferrer("")
+    setFilterSource("")
+    setFilterStartDate("")
+    setFilterEndDate("")
+    setAppliedReferrer("")
+    setAppliedSource("")
+    setAppliedStartDate("")
+    setAppliedEndDate("")
+  }
+
+  const customers = useMemo(() => allCustomers.filter((c) => {
+    if (appliedReferrer && c.referrer !== appliedReferrer) return false
+    if (appliedSource === "__none__" && c.traffic_source) return false
+    if (appliedSource && appliedSource !== "__none__" && c.traffic_source !== appliedSource) return false
+    if (appliedStartDate) {
+      const d = (c.created_at || "").split("T")[0]
+      if (d < appliedStartDate) return false
+    }
+    if (appliedEndDate) {
+      const d = (c.created_at || "").split("T")[0]
+      if (d > appliedEndDate) return false
+    }
+    return true
+  }), [allCustomers, appliedReferrer, appliedSource, appliedStartDate, appliedEndDate])
+
+  const referrers = useMemo(() => [...new Set(allCustomers.map(c => c.referrer).filter(Boolean))].sort(), [allCustomers])
+
+  const sources = [...new Set(allCustomers.map(c => c.traffic_source).filter(Boolean))].sort()
+
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(customers)
 
   return (
-    <div className="px-6 pt-12 pb-6 space-y-3">
-      <div className="flex items-center justify-between pb-2">
-        <div>
-          <h1 className="text-lg font-semibold">引流记录</h1>
-          <p className="text-xs text-muted-foreground mt-1.5">
-            共 {customers.length} 条引流记录
-          </p>
+    <div className="p-6 space-y-5">
+      <div>
+        <h1 className="text-lg font-semibold">引流记录</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">共 {customers.length} 条引流记录</p>
+      </div>
+
+      {/* 搜索栏 */}
+      <div className="flex items-end gap-3 flex-wrap">
+        <SelectDropdown
+          className="w-36"
+          value={filterReferrer}
+          options={[{value: "", label: "全部引流人"}, ...referrers.map(r => ({value: r, label: r}))]}
+          placeholder="全部引流人"
+          onChange={(v) => setFilterReferrer(v)}
+        />
+        <SelectDropdown
+          className="w-36"
+          value={filterSource}
+          options={[{value: "", label: "全部来源"}, {value: "__none__", label: "无来源"}, ...sources.filter(s => s !== "其他").map(s => ({value: s, label: s}))]}
+          placeholder="全部来源"
+          onChange={(v) => setFilterSource(v)}
+        />
+        <div className="flex items-center h-8 rounded-md border border-input overflow-hidden">
+          <input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            className={`h-full px-2 text-[12px] border-none outline-none bg-transparent ${!filterStartDate ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
+          />
+          <span className="text-[12px] text-[#8f959e] px-1">~</span>
+          <input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            className={`h-full px-2 text-[12px] border-none outline-none bg-transparent ${!filterEndDate ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
+          />
         </div>
+        <button
+          onClick={handleSearch}
+          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
+        >
+          <Search className="h-3.5 w-3.5" />
+          查询
+        </button>
+        <button
+          onClick={handleClear}
+          className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
+        >
+          <X className="h-3.5 w-3.5" />
+          清空
+        </button>
       </div>
 
       {loading ? (
@@ -92,6 +183,7 @@ export default function TrafficRecordsPage() {
                 <TableHead className="pl-4">添加日期</TableHead>
                 <TableHead>新增客户</TableHead>
                 <TableHead>流量来源</TableHead>
+                <TableHead>引流人</TableHead>
                 <TableHead className="pr-4">链接/昵称</TableHead>
               </TableRow>
             </TableHeader>
@@ -111,12 +203,17 @@ export default function TrafficRecordsPage() {
                         >
                           {badge.label}
                         </span>
-                      ) : (
+                      ) : c.traffic_source ? (
                         <span className="text-[#2b2f36]">{c.traffic_source}</span>
+                      ) : (
+                        <span className="text-[#8f959e]">-</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-[#2b2f36]">
+                      {c.referrer || <span className="text-[#8f959e]">-</span>}
+                    </TableCell>
                     <TableCell className="pr-4 text-[#2b2f36]">
-                      {detailLabel && c.traffic_source_detail ? c.traffic_source_detail : <span className="text-[#8f959e]">—</span>}
+                      {detailLabel && c.traffic_source_detail ? c.traffic_source_detail : <span className="text-[#8f959e]">-</span>}
                     </TableCell>
                   </TableRow>
                 )

@@ -35,16 +35,17 @@ import {
 const businessItems = [
   { title: "业务提醒", icon: Bell, path: "/business-reminders", permission: "business-reminders" },
   { title: "引流记录", icon: TrendingUp, path: "/traffic-records", permission: "traffic-records" },
-  { title: "客户信息", icon: Heart, path: "/healing-records", permission: "healing-records" },
+  { title: "活动记录", icon: CalendarCheck, path: "/activity-records", permission: "activity-records" },
 ]
 
 const courseItems = [
+  { title: "客户信息", icon: Heart, path: "/healing-records", permission: "healing-records" },
   { title: "人员到场", icon: CalendarCheck, path: "/courses/class-records", permission: "class-records" },
   { title: "活动安排", icon: CalendarCheck, path: "/courses/daily-activities", permission: "daily-activities" },
 ]
 
 const configItems = [
-  { title: "沙龙类型", icon: BookText, path: "/positions/courses", permission: "courses" },
+  { title: "活动配置", icon: BookText, path: "/positions/courses", permission: "courses" },
   { title: "会员身份", icon: ShieldCheck, path: "/config/member-identities", permission: "member-identities" },
   { title: "疗愈身份", icon: Heart, path: "/healing-identities", permission: "healing-identities" },
   { title: "空间配置", icon: Building2, path: "/courses/spaces", permission: "spaces" },
@@ -189,7 +190,7 @@ function PaymentMenuGroup({
 }
 
 function getActiveGroup(pathname: string): string {
-  if (businessItems.some(i => i.path === pathname)) return "业务"
+  if (businessItems.some(i => i.path === pathname)) return "业务数据"
   if (courseItems.some(i => i.path === pathname)) return "疗愈活动"
   if (pathname === "/payment") return "付费项目"
   if (configItems.some(i => i.path === pathname)) return "信息配置"
@@ -198,7 +199,7 @@ function getActiveGroup(pathname: string): string {
   return ""
 }
 
-const GROUPS = ["业务", "疗愈活动", "付费项目", "信息配置", "账号管理", "系统配置"]
+const GROUPS = ["业务数据", "疗愈活动", "付费项目", "信息配置", "账号管理", "系统配置"]
 
 export function AppSidebar() {
   const location = useLocation()
@@ -229,7 +230,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="mt-5">
-        <MenuGroup label="业务" icon={Briefcase} items={businessItems} isOpen={openGroups["业务"]} onToggle={() => toggle("业务")} />
+        <MenuGroup label="业务数据" icon={Briefcase} items={businessItems} isOpen={openGroups["业务数据"]} onToggle={() => toggle("业务数据")} />
         <MenuGroup label="疗愈活动" icon={Calendar} items={courseItems} isOpen={openGroups["疗愈活动"]} onToggle={() => toggle("疗愈活动")} />
         <PaymentMenuGroup icon={CreditCard} isOpen={openGroups["付费项目"]} onToggle={() => toggle("付费项目")} />
         <MenuGroup label="信息配置" icon={Settings} items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />

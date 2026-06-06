@@ -109,6 +109,7 @@ async def list_customers_light():
             "created_at": c.created_at.isoformat() if c.created_at else "",
             "traffic_source": c.traffic_source or "",
             "traffic_source_detail": c.traffic_source_detail or "",
+            "referrer": c.referrer or "",
         }
         for c in customers
     ]

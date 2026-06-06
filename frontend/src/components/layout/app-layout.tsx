@@ -28,7 +28,7 @@ const PAGE_TITLES: Record<string, string> = {
 
   "/system-logs": "无忧 - 系统日志",
   "/positions/management": "无忧 - 账号管理",
-  "/positions/courses": "无忧 - 沙龙类型",
+  "/positions/courses": "无忧 - 活动配置",
   "/config/member-identities": "无忧 - 会员身份",
   "/courses/spaces": "无忧 - 疗愈空间",
   "/healing-identities": "无忧 - 疗愈身份",

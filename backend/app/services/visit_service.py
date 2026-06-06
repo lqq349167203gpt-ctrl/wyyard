@@ -117,8 +117,24 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
     return activities
 
 
+_activity_counts_cache: dict[str, int] | None = None
+_activity_counts_ts: float = 0
+_welfare_counts_cache: dict[str, int] | None = None
+_welfare_counts_ts: float = 0
+
+def _invalidate_counts_cache():
+    global _activity_counts_cache, _activity_counts_ts, _welfare_counts_cache, _welfare_counts_ts
+    _activity_counts_cache = None
+    _activity_counts_ts = 0
+    _welfare_counts_cache = None
+    _welfare_counts_ts = 0
+
 def _build_customer_activity_counts() -> dict[str, int]:
-    """一次扫描构建所有客户的活动总次数 {customer_id: count}"""
+    """一次扫描构建所有客户的活动总次数 {customer_id: count}，带 5 秒缓存"""
+    global _activity_counts_cache, _activity_counts_ts
+    now = datetime.now().timestamp()
+    if _activity_counts_cache is not None and now - _activity_counts_ts < 5:
+        return _activity_counts_cache
     from collections import defaultdict
     from app.services import (
         class_record_service,
@@ -147,7 +163,10 @@ def _build_customer_activity_counts() -> dict[str, int]:
         for cid in (s.participant_ids + s.host_ids):
             if cid:
                 counts[cid] += 1
-    return dict(counts)
+    result = dict(counts)
+    _activity_counts_cache = result
+    _activity_counts_ts = now
+    return result
 
 
 def _count_customer_activities(customer_id: str) -> int:
@@ -198,7 +217,11 @@ def _count_customer_activities_by_type(customer_id: str, activity_type: str) -> 
 
 
 def _build_customer_welfare_counts() -> dict[str, int]:
-    """一次扫描构建所有客户的公益活动次数"""
+    """一次扫描构建所有客户的公益活动次数，带 5 秒缓存"""
+    global _welfare_counts_cache, _welfare_counts_ts
+    now = datetime.now().timestamp()
+    if _welfare_counts_cache is not None and now - _welfare_counts_ts < 5:
+        return _welfare_counts_cache
     from collections import defaultdict
     from app.services import class_record_service
 
@@ -207,7 +230,10 @@ def _build_customer_welfare_counts() -> dict[str, int]:
         if cr.is_public_welfare:
             for cid in cr.participant_ids:
                 counts[cid] += 1
-    return dict(counts)
+    result = dict(counts)
+    _welfare_counts_cache = result
+    _welfare_counts_ts = now
+    return result
 
 
 def _count_customer_welfare_activities(customer_id: str) -> int:
@@ -285,6 +311,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None) -
 
 
 def create_visit(data: VisitRecordCreate) -> VisitRecord:
+    _invalidate_counts_cache()
     # 检查当天是否已到场
     for v in _visits.values():
         if v.customer_id == data.customer_id and v.visit_date == data.visit_date and not v.is_deleted:
@@ -310,6 +337,7 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
 
 
 def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
+    _invalidate_counts_cache()
     record = _visits.get(visit_id)
     if not record:
         return None
@@ -381,6 +409,7 @@ def _deduct_for_arrival(visit):
 
 
 def delete_visit(visit_id: str) -> bool:
+    _invalidate_counts_cache()
     visit = _visits.get(visit_id)
     if not visit:
         return False

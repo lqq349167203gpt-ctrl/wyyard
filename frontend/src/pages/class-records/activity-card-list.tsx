@@ -1,10 +1,11 @@
 import { memo, useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Users, FileUp, Edit, Trash2 } from "lucide-react"
-import type {
-  ClassRecord, GroupCaseSession, EmotionalReleaseSession,
-  EnergyKnotSession, InternalCourseSession,
-} from "@/lib/api"
+import type { ClassRecordActions } from "./use-class-record-dialogs"
+import type { GcsActions } from "./use-gcs-dialogs"
+import type { ErsActions } from "./use-ers-dialogs"
+import type { EksActions } from "./use-eks-dialogs"
+import type { IcsActions } from "./use-ics-dialogs"
 
 interface DayVisit {
   id: string
@@ -18,11 +19,6 @@ interface UnifiedDetailRecord {
   date: string
 }
 
-interface DropCustomer {
-  customer_id: string
-  nickname: string
-}
-
 interface ActivityCardListProps {
   records: UnifiedDetailRecord[]
   isActivitiesView: boolean
@@ -32,29 +28,11 @@ interface ActivityCardListProps {
   setDragOverActivityId: (id: string | null) => void
   onOpenMemberDialog: (type: string, record: any) => void
   onClickParticipant: (id: string) => void
-  setDeleteId: (id: string | null) => void
-  setGcsDeleteId: (id: string | null) => void
-  setErsDeleteId: (id: string | null) => void
-  setEksDeleteId: (id: string | null) => void
-  setIcsDeleteId: (id: string | null) => void
-  handleOpenEdit: (record: ClassRecord) => void
-  handleOpenMaterials: (record: ClassRecord) => void
-  handleOpenGroups: (record: ClassRecord) => void
-  handleDropToClass: (record: ClassRecord, customer: DropCustomer) => void
-  handleOpenGcsEdit: (session: GroupCaseSession) => void
-  handleOpenGcsMaterials: (session: GroupCaseSession) => void
-  handleOpenGcsMembers: (session: GroupCaseSession) => void
-  handleDropToGcs: (session: GroupCaseSession, customer: Pick<DropCustomer, "customer_id">) => void
-  handleOpenErsEdit: (session: EmotionalReleaseSession) => void
-  handleOpenErsMaterials: (session: EmotionalReleaseSession) => void
-  handleOpenErsMembers: (session: EmotionalReleaseSession) => void
-  handleDropToErs: (session: EmotionalReleaseSession, customer: Pick<DropCustomer, "customer_id">) => void
-  handleOpenEksEdit: (session: EnergyKnotSession) => void
-  handleDropToEks: (session: EnergyKnotSession, customer: Pick<DropCustomer, "customer_id">) => void
-  handleOpenIcsEdit: (session: InternalCourseSession) => void
-  handleOpenIcsMaterials: (session: InternalCourseSession) => void
-  handleOpenIcsMembers: (session: InternalCourseSession) => void
-  handleDropToIcs: (session: InternalCourseSession, customer: Pick<DropCustomer, "customer_id">) => void
+  classActions: ClassRecordActions
+  gcsActions: GcsActions
+  ersActions: ErsActions
+  eksActions: EksActions
+  icsActions: IcsActions
   getTeacherNames: (teacherIds: string[]) => string[]
   getMemberName: (id: string) => string
   dailyGroups: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
@@ -70,29 +48,11 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
     setDragOverActivityId,
     onOpenMemberDialog,
     onClickParticipant,
-    setDeleteId,
-    setGcsDeleteId,
-    setErsDeleteId,
-    setEksDeleteId,
-    setIcsDeleteId,
-    handleOpenEdit,
-    handleOpenMaterials,
-    handleOpenGroups,
-    handleDropToClass,
-    handleOpenGcsEdit,
-    handleOpenGcsMaterials,
-    handleOpenGcsMembers,
-    handleDropToGcs,
-    handleOpenErsEdit,
-    handleOpenErsMaterials,
-    handleOpenErsMembers,
-    handleDropToErs,
-    handleOpenEksEdit,
-    handleDropToEks,
-    handleOpenIcsEdit,
-    handleOpenIcsMaterials,
-    handleOpenIcsMembers,
-    handleDropToIcs,
+    classActions,
+    gcsActions,
+    ersActions,
+    eksActions,
+    icsActions,
     getTeacherNames,
     getMemberName,
     dailyGroups,
@@ -138,7 +98,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         setDragOverActivityId(null)
                         try {
                           const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToClass(record, data)
+                          classActions.handleDropToClass(record, data)
                         } catch {}
                       } : undefined}
                     >
@@ -168,7 +128,6 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                                 {((record.groups || []).length === 0 && (record.participant_ids || []).length === 0) ? null : (
                                   (() => {
-                                    const dailyGroupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
                                     const getDailyRole = (id: string) => {
                                       for (const g of dailyGroups) {
                                         if (g.leader_id === id) return "组长"
@@ -233,7 +192,6 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <div className="bg-white rounded px-2 py-1.5 h-full flex items-center">
                                   <div className="text-[12px] text-[#4e535a]">
                                     {(() => {
-                                      const dailyGroupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean)))
                                       const getDailyRole = (id: string) => {
                                         for (const g of dailyGroups) {
                                           if (g.leader_id === id) return "组长"
@@ -301,7 +259,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         setDragOverActivityId(null)
                         try {
                           const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToGcs(s, data)
+                          gcsActions.handleDrop(s, data)
                         } catch {}
                       } : undefined}
                     >
@@ -316,9 +274,9 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                               {isActivitiesView && <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("gcs", s)}>成员 ›</button>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenGcsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setGcsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => gcsActions.handleOpenMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => gcsActions.handleOpenEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => gcsActions.setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                             </div>
                           </div>
@@ -452,7 +410,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         setDragOverActivityId(null)
                         try {
                           const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToErs(s, data)
+                          ersActions.handleDrop(s, data)
                         } catch {}
                       } : undefined}
                     >
@@ -467,9 +425,9 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                               {isActivitiesView && <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("ers", s)}>成员 ›</button>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenErsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setErsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => ersActions.handleOpenMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => ersActions.handleOpenEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => ersActions.setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                             </div>
                           </div>
@@ -589,15 +547,12 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                 if (ur.type === "eks") {
                   const s = ur.data
                   let eksNames: string[] = []
-                  let ownerDescs: {id: string; name: string; description: string}[] = []
                   try {
                     const items = JSON.parse(s.description || "[]")
                     if (Array.isArray(items)) {
-                      ownerDescs = items
                       eksNames = items.map((d: any) => d.name).filter(Boolean)
                     }
                   } catch { /* empty */ }
-                  const fallbackNames = (s.owner_name || "").split("、")
                   return (
                     <div
                       key={`eks-${s.id}`}
@@ -610,7 +565,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         setDragOverActivityId(null)
                         try {
                           const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToEks(s, data)
+                          eksActions.handleDrop(s, data)
                         } catch {}
                       } : undefined}
                     >
@@ -624,8 +579,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEksEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEksDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => eksActions.handleOpenEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => eksActions.setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                             </div>
                           </div>
@@ -667,7 +622,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         setDragOverActivityId(null)
                         try {
                           const data = JSON.parse(e.dataTransfer.getData("text/plain"))
-                          handleDropToIcs(s, data)
+                          icsActions.handleDrop(s, data)
                         } catch {}
                       } : undefined}
                     >
@@ -683,9 +638,9 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               {s.course_type && <span className="text-[12px] text-[#4e535a]">{s.course_type}</span>}
                               {isActivitiesView && <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("ics", s)}>成员 ›</button>}
                               {!isActivitiesView && (<div className="ml-auto flex items-center gap-1">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenIcsEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setIcsDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => icsActions.handleOpenMaterials(s)}><FileUp className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => icsActions.handleOpenEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => icsActions.setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                               </div>)}
                             </div>
                           </div>
