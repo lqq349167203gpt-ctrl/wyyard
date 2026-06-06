@@ -1562,241 +1562,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, onClose, on
   )
 })
 
-// ===== ThemesTab Component =====
-function ThemesTab() {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [themes, setThemes] = useState<ActivityTheme[]>([])
-  const [loading, setLoading] = useState(true)
-  const [calOpen, setCalOpen] = useState(false)
-  const [calYear, setCalYear] = useState(year)
-  const calRef = useRef<HTMLDivElement>(null)
-  const [editWeekIndex, setEditWeekIndex] = useState<number | null>(null)
-
-  const { start, end } = useMemo(() => {
-    const s = `${year}-${String(month).padStart(2, "0")}-01`
-    const lastDay = new Date(year, month, 0).getDate()
-    const e = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
-    return { start: s, end: e }
-  }, [year, month])
-
-  // 按周分组（日历网格）
-  const weeks = useMemo(() => {
-    const result: { weekStart: string; days: { date: string; weekday: string; inMonth: boolean }[] }[] = []
-    const startDate = new Date(start)
-    const endDate = new Date(end)
-
-    // 找到本月第一天所在周的周一
-    const firstDay = new Date(startDate)
-    const dayOfWeek = firstDay.getDay()
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-    firstDay.setDate(firstDay.getDate() + mondayOffset)
-
-    let current = new Date(firstDay)
-    while (current <= endDate || result.length === 0 || current.getDay() !== 1) {
-      const weekDays: { date: string; weekday: string; inMonth: boolean }[] = []
-      const weekStart = formatDate(current)
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(current)
-        d.setDate(d.getDate() + i)
-        const dateStr = formatDate(d)
-        const inMonth = d >= startDate && d <= endDate
-        weekDays.push({
-          date: dateStr,
-          weekday: ["日", "一", "二", "三", "四", "五", "六"][d.getDay()],
-          inMonth,
-        })
-      }
-      result.push({ weekStart, days: weekDays })
-      current.setDate(current.getDate() + 7)
-      // 停止条件：已过月末且当前周已完整
-      if (current > endDate && current.getDay() === 1) break
-    }
-    // 去掉最后多余的空周
-    while (result.length > 0 && result[result.length - 1].days.every(d => !d.inMonth)) {
-      result.pop()
-    }
-    return result
-  }, [start, end])
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    activityThemeApi.list(start, end).then(data => {
-      if (!cancelled) { setThemes(data); setLoading(false) }
-    }).catch(() => {
-      if (!cancelled) { setThemes([]); setLoading(false) }
-    })
-    return () => { cancelled = true }
-  }, [start, end])
-
-  const themeMap = useMemo(() => {
-    const map = new Map<string, ActivityTheme>()
-    for (const t of themes) map.set(t.date, t)
-    return map
-  }, [themes])
-
-  const saveTheme = async (date: string, weekTheme: string, dayTheme: string) => {
-    const result = await activityThemeApi.save(date, weekTheme, dayTheme)
-    setThemes(prev => {
-      const idx = prev.findIndex(t => t.date === date)
-      if (idx >= 0) {
-        const next = [...prev]
-        next[idx] = result
-        return next
-      }
-      return [...prev, result]
-    })
-  }
-
-  const prevMonth = () => {
-    if (month === 1) { setYear(y => y - 1); setMonth(12) }
-    else setMonth(m => m - 1)
-  }
-  const nextMonth = () => {
-    if (month === 12) { setYear(y => y + 1); setMonth(1) }
-    else setMonth(m => m + 1)
-  }
-  const selectMonth = (m: number) => {
-    setYear(calYear)
-    setMonth(m)
-    setCalOpen(false)
-  }
-
-  useEffect(() => {
-    if (!calOpen) return
-    const handler = (e: MouseEvent) => {
-      if (calRef.current && !calRef.current.contains(e.target as Node)) setCalOpen(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [calOpen])
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      {/* 月份导航 */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <button onClick={prevMonth} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
-            <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
-          </button>
-          <div className="relative inline-block" ref={calRef}>
-            <button
-              className="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-[#f7f8fa] transition-colors"
-              onClick={() => { setCalYear(year); setCalOpen(!calOpen) }}
-            >
-              <span className="text-[14px] font-medium text-[#2b2f36]">{year}年{month}月</span>
-            </button>
-            {calOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-50 w-[240px]">
-                <div className="flex items-center justify-between mb-3">
-                  <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => setCalYear(y => y - 1)}>
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="text-[13px] font-medium text-[#2b2f36]">{calYear}年</span>
-                  <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => setCalYear(y => y + 1)}>
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-1">
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
-                    const isSelected = calYear === year && m === month
-                    return (
-                      <button
-                        key={m}
-                        className={`h-8 rounded text-[12px] transition-colors ${
-                          isSelected ? "bg-[#3370ff] text-white" : "hover:bg-[#f7f8fa] text-[#2b2f36]"
-                        }`}
-                        onClick={() => selectMonth(m)}
-                      >
-                        {m}月
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          <button onClick={nextMonth} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
-            <ChevronRight className="h-4 w-4 text-[#4e535a]" />
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-      ) : (
-        <div className="border border-[#e8e8e8] rounded-lg overflow-hidden">
-          {/* 星期头 */}
-          <div className="grid grid-cols-[120px_repeat(7,1fr)] bg-[#f8faff] border-b border-[#e8e8e8]">
-            <div className="px-3 py-2 text-[11px] text-[#8f959e]">周主题</div>
-            {["一", "二", "三", "四", "五", "六", "日"].map(d => (
-              <div key={d} className="px-1 py-2 text-center text-[11px] text-[#8f959e] border-l border-[#e8e8e8]">
-                周{d}
-              </div>
-            ))}
-          </div>
-          {/* 周行 */}
-          {weeks.map((week, wi) => {
-            const weekTheme = themeMap.get(week.days.find(d => d.inMonth)?.date || "")?.week_theme || ""
-            return (
-              <div key={wi} className="grid grid-cols-[120px_repeat(7,1fr)] border-b border-[#e8e8e8] last:border-b-0">
-                {/* 周主题列 */}
-                <button
-                  className="px-3 py-2 text-left hover:bg-[#f0f5ff] transition-colors border-r border-[#e8e8e8] flex flex-col justify-center min-h-[64px]"
-                  onClick={() => setEditWeekIndex(wi)}
-                >
-                  <span className="text-[12px] text-[#2b2f36] leading-snug line-clamp-2">
-                    {weekTheme || <span className="text-[#c9cdd4]">点击设置</span>}
-                  </span>
-                </button>
-                {/* 每日格子 */}
-                {week.days.map((day) => {
-                  const dayTheme = themeMap.get(day.date)?.day_theme || ""
-                  const dayNum = day.date.split("-")[2].replace(/^0/, "")
-                  return (
-                    <button
-                      key={day.date}
-                      className={`px-1 py-1.5 text-left hover:bg-[#f0f5ff] transition-colors border-l border-[#e8e8e8] flex flex-col min-h-[64px] ${
-                        !day.inMonth ? "bg-[#fafafa]" : ""
-                      }`}
-                      onClick={() => setEditWeekIndex(wi)}
-                    >
-                      <span className={`text-[11px] leading-none mb-1 ${day.inMonth ? "text-[#2b2f36]" : "text-[#dcdfe4]"}`}>
-                        {dayNum}
-                      </span>
-                      <span className={`text-[11px] leading-snug line-clamp-2 ${day.inMonth && dayTheme ? "text-[#4e535a]" : "text-[#dcdfe4]"}`}>
-                        {day.inMonth ? (dayTheme || "-") : ""}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* 编辑弹窗 */}
-      {editWeekIndex !== null && weeks[editWeekIndex] && (
-        <WeekThemeDialog
-          open={editWeekIndex !== null}
-          weekIndex={editWeekIndex}
-          weekDays={weeks[editWeekIndex].days.filter(d => d.inMonth)}
-          themeMap={themeMap}
-          onClose={() => setEditWeekIndex(null)}
-          onSaved={saveTheme}
-        />
-      )}
-    </div>
-  )
-}
-
 export default function DailyActivitiesPage() {
-  // ===== Tab state =====
-  const [activeTab, setActiveTab] = useState<"activities" | "themes">("activities")
-
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(today)
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
@@ -1853,6 +1619,74 @@ export default function DailyActivitiesPage() {
   // ===== Warning dialog =====
   const [warningOpen, setWarningOpen] = useState(false)
   const [warningMsg, setWarningMsg] = useState("")
+
+  // ===== Theme state =====
+  const [themes, setThemes] = useState<ActivityTheme[]>([])
+  const [themeEditWeekIndex, setThemeEditWeekIndex] = useState<number | null>(null)
+
+  const themeMonthStart = useMemo(() => {
+    const d = new Date(detailDate)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`
+  }, [detailDate])
+  const themeMonthEnd = useMemo(() => {
+    const d = new Date(detailDate)
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+  }, [detailDate])
+
+  const themeMap = useMemo(() => {
+    const map = new Map<string, ActivityTheme>()
+    for (const t of themes) map.set(t.date, t)
+    return map
+  }, [themes])
+
+  const currentTheme = themeMap.get(detailDate)
+  const weekThemeStr = currentTheme?.week_theme || ""
+  const dayThemeStr = currentTheme?.day_theme || ""
+
+  // 计算当前日期所在周在本月的周索引
+  const themeWeeks = useMemo(() => {
+    const result: { days: { date: string; weekday: string; inMonth: boolean }[] }[] = []
+    const startDate = new Date(themeMonthStart)
+    const endDate = new Date(themeMonthEnd)
+    const firstDay = new Date(startDate)
+    const dayOfWeek = firstDay.getDay()
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    firstDay.setDate(firstDay.getDate() + mondayOffset)
+    let current = new Date(firstDay)
+    while (current <= endDate || result.length === 0) {
+      const weekDays: { date: string; weekday: string; inMonth: boolean }[] = []
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(current)
+        d.setDate(d.getDate() + i)
+        const dateStr = formatDate(d)
+        weekDays.push({ date: dateStr, weekday: ["日", "一", "二", "三", "四", "五", "六"][d.getDay()], inMonth: d >= startDate && d <= endDate })
+      }
+      result.push({ days: weekDays })
+      current.setDate(current.getDate() + 7)
+      if (current > endDate && current.getDay() === 1) break
+    }
+    while (result.length > 0 && result[result.length - 1].days.every(d => !d.inMonth)) result.pop()
+    return result
+  }, [themeMonthStart, themeMonthEnd])
+
+  const currentWeekIndex = useMemo(() => {
+    return themeWeeks.findIndex(w => w.days.some(d => d.date === detailDate))
+  }, [themeWeeks, detailDate])
+
+  // 加载主题
+  useEffect(() => {
+    activityThemeApi.list(themeMonthStart, themeMonthEnd).then(setThemes).catch(() => setThemes([]))
+  }, [themeMonthStart, themeMonthEnd])
+
+  const saveTheme = async (date: string, weekTheme: string, dayTheme: string) => {
+    const result = await activityThemeApi.save(date, weekTheme, dayTheme)
+    setThemes(prev => {
+      const idx = prev.findIndex(t => t.date === date)
+      if (idx >= 0) { const next = [...prev]; next[idx] = result; return next }
+      return [...prev, result]
+    })
+  }
 
   // ===== Permissions =====
   const userPermissions = useMemo(() => {
@@ -2239,30 +2073,6 @@ export default function DailyActivitiesPage() {
   // ===== JSX =====
   return (
     <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
-      {/* Tab bar */}
-      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 mb-3.5 min-h-[39px]">
-        <div className="flex items-center gap-6">
-          {([
-            { key: "activities", label: "当日活动" },
-            { key: "themes", label: "月度主题" },
-          ] as const).map(tab => (
-            <button
-              key={tab.key}
-              className={`relative py-2.5 text-[13px] font-normal transition-colors ${
-                activeTab === tab.key ? "text-[#2b2f36] font-medium" : "text-[#8f959e] hover:text-[#4e535a]"
-              }`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-[-0.5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {activeTab === "activities" && (
       <div className="flex flex-col min-h-0 flex-1 gap-2">
         <div>
           <div className="bg-[#f8faff] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
@@ -2271,6 +2081,22 @@ export default function DailyActivitiesPage() {
               <CalendarDatePicker detailDate={detailDate} onSelectDate={setDetailDate} />
               <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
             </div>
+            {/* 主题横幅 */}
+            <button
+              className="w-full flex items-center gap-3 mt-2 px-3 py-2 rounded-md bg-white border border-[#e8e8e8] hover:border-[#3370ff] transition-colors text-left"
+              onClick={() => { if (currentWeekIndex >= 0) setThemeEditWeekIndex(currentWeekIndex) }}
+            >
+              <span className="text-[12px] text-[#8f959e] shrink-0">本周</span>
+              <span className="text-[12px] text-[#2b2f36] flex-1 truncate">
+                {weekThemeStr || <span className="text-[#c9cdd4]">点击设置本周主题</span>}
+              </span>
+              <span className="text-[11px] text-[#8f959e] shrink-0">|</span>
+              <span className="text-[12px] text-[#8f959e] shrink-0">{detailDate.split("-").slice(1).join("/")}</span>
+              <span className="text-[12px] text-[#2b2f36] flex-1 truncate">
+                {dayThemeStr || <span className="text-[#c9cdd4]">点击设置当日主题</span>}
+              </span>
+              <Edit className="h-3.5 w-3.5 text-[#8f959e] shrink-0" />
+            </button>
             {/* Date scroll bar */}
             <DateScroller
               dateRange={dateRange}
@@ -2336,10 +2162,17 @@ export default function DailyActivitiesPage() {
           )}
         </div>
       </div>
-      )}
 
-      {activeTab === "themes" && (
-        <ThemesTab />
+      {/* ===== Theme Edit Dialog ===== */}
+      {themeEditWeekIndex !== null && themeWeeks[themeEditWeekIndex] && (
+        <WeekThemeDialog
+          open={themeEditWeekIndex !== null}
+          weekIndex={themeEditWeekIndex}
+          weekDays={themeWeeks[themeEditWeekIndex].days.filter(d => d.inMonth)}
+          themeMap={themeMap}
+          onClose={() => setThemeEditWeekIndex(null)}
+          onSaved={saveTheme}
+        />
       )}
 
       {/* ===== Salon Dialog ===== */}
