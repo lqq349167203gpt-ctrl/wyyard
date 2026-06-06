@@ -2074,41 +2074,72 @@ export default function DailyActivitiesPage() {
   return (
     <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
       <div className="flex flex-col min-h-0 flex-1 gap-2">
-        <div>
-          <div className="bg-[#f8faff] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
-            {/* Date picker */}
-            <div className="flex items-center gap-3">
-              <CalendarDatePicker detailDate={detailDate} onSelectDate={setDetailDate} />
-              <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
-            </div>
-            {/* 主题横幅 */}
-            <button
-              className="w-full flex items-center gap-3 mt-2 px-3 py-2 rounded-md bg-white border border-[#e8e8e8] hover:border-[#3370ff] transition-colors text-left"
-              onClick={() => { if (currentWeekIndex >= 0) setThemeEditWeekIndex(currentWeekIndex) }}
-            >
-              <span className="text-[12px] text-[#8f959e] shrink-0">本周</span>
-              <span className="text-[12px] text-[#2b2f36] flex-1 truncate">
-                {weekThemeStr || <span className="text-[#c9cdd4]">点击设置本周主题</span>}
-              </span>
-              <span className="text-[11px] text-[#8f959e] shrink-0">|</span>
-              <span className="text-[12px] text-[#8f959e] shrink-0">{detailDate.split("-").slice(1).join("/")}</span>
-              <span className="text-[12px] text-[#2b2f36] flex-1 truncate">
-                {dayThemeStr || <span className="text-[#c9cdd4]">点击设置当日主题</span>}
-              </span>
-              <Edit className="h-3.5 w-3.5 text-[#8f959e] shrink-0" />
+        {/* 月份导航 + 空间 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setDetailDate(formatDate(addDays(new Date(detailDate), -1)))} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
+              <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
             </button>
-            {/* Date scroll bar */}
-            <DateScroller
-              dateRange={dateRange}
-              calendarCounts={calendarCounts}
-              detailDate={detailDate}
-              todayStr={today}
-              onPrev={onDateScrollerPrev}
-              onNext={onDateScrollerNext}
-              onSelectDate={onDateScrollerSelect}
-            />
+            <span className="text-[14px] font-medium text-[#2b2f36]">{new Date(detailDate).getMonth() + 1}月</span>
+            <button onClick={() => setDetailDate(formatDate(addDays(new Date(detailDate), 1)))} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
+              <ChevronRight className="h-4 w-4 text-[#4e535a]" />
+            </button>
           </div>
+          <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
         </div>
+
+        {/* 日历网格 */}
+        <div className="border border-[#e8e8e8] rounded-lg overflow-hidden">
+          {/* 星期头 */}
+          <div className="grid grid-cols-7 bg-[#f8faff] border-b border-[#e8e8e8]">
+            {["一", "二", "三", "四", "五", "六", "日"].map(d => (
+              <div key={d} className="px-1 py-2 text-center text-[11px] text-[#8f959e]">{d}</div>
+            ))}
+          </div>
+          {/* 日期格子 */}
+          {themeWeeks.map((week, wi) => (
+            <div key={wi} className="grid grid-cols-7 border-b border-[#e8e8e8] last:border-b-0">
+              {week.days.map((day) => {
+                const dayTheme = themeMap.get(day.date)?.day_theme || ""
+                const dayNum = day.date.split("-")[2].replace(/^0/, "")
+                const isSelected = day.date === detailDate
+                const isToday = day.date === today
+                return (
+                  <button
+                    key={day.date}
+                    className={`px-1 py-1.5 text-left transition-colors border-r border-[#e8e8e8] last:border-r-0 flex flex-col min-h-[52px] ${
+                      !day.inMonth ? "bg-[#fafafa]" : isSelected ? "bg-[#3370ff]" : isToday ? "bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
+                    }`}
+                    onClick={() => day.inMonth && setDetailDate(day.date)}
+                  >
+                    <span className={`text-[11px] leading-none mb-0.5 ${
+                      !day.inMonth ? "text-[#dcdfe4]" : isSelected ? "text-white font-medium" : "text-[#2b2f36]"
+                    }`}>
+                      {dayNum}
+                    </span>
+                    <span className={`text-[10px] leading-snug line-clamp-1 ${
+                      !day.inMonth ? "" : isSelected ? "text-white/80" : dayTheme ? "text-[#4e535a]" : "text-transparent"
+                    }`}>
+                      {day.inMonth ? (dayTheme || "-") : ""}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* 本周主题栏 */}
+        <button
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md bg-[#f8faff] border border-[#e8e8e8] hover:border-[#3370ff] transition-colors text-left"
+          onClick={() => { if (currentWeekIndex >= 0) setThemeEditWeekIndex(currentWeekIndex) }}
+        >
+          <span className="text-[12px] text-[#8f959e] shrink-0">本周主题</span>
+          <span className="flex-1 text-[12px] text-[#2b2f36] truncate">
+            {weekThemeStr || <span className="text-[#c9cdd4]">点击设置</span>}
+          </span>
+          <Edit className="h-3.5 w-3.5 text-[#8f959e] shrink-0" />
+        </button>
 
         {/* 新增按钮 */}
         <div className="flex items-center justify-between relative mt-2.5">
