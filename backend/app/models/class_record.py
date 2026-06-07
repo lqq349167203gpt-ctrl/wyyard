@@ -22,6 +22,7 @@ class ClassRecordBase(BaseModel):
     materials: List[dict] = []
     groups: List[GroupMember] = []
     is_public_welfare: bool = False
+    activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
 
@@ -35,6 +36,7 @@ class ClassRecordCreate(BaseModel):
     course_description: str = ""
     teacher_ids: List[str] = []
     is_public_welfare: bool = False
+    activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
 

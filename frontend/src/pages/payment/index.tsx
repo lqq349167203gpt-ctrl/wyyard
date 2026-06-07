@@ -1,15 +1,17 @@
 import { useState, useMemo } from "react"
-import { CreditCard, Wallet, Heart, Zap, GraduationCap } from "lucide-react"
+import { CreditCard, Wallet, Heart, Zap, GraduationCap, Layers } from "lucide-react"
 import { MembershipCardContent } from "@/pages/membership-cards"
 import { GroupCasesContent } from "@/pages/group-cases"
 import { EmotionalReleasesContent } from "@/pages/emotional-releases"
 import { EnergyKnotsContent } from "@/pages/energy-knots"
 import { InternalCoursesContent } from "@/pages/internal-courses"
+import { OhCardReadingsContent } from "@/pages/oh-card-readings"
 
 const PAYMENT_TABS = [
   { key: "membership-cards", label: "会员活动", icon: CreditCard, component: MembershipCardContent, permission: "membership-cards" },
   { key: "group-cases", label: "觉醒游戏", icon: Wallet, component: GroupCasesContent, permission: "group-cases" },
   { key: "emotional-releases", label: "情绪释放", icon: Heart, component: EmotionalReleasesContent, permission: "emotional-releases" },
+  { key: "oh-card-readings", label: "OH卡梳理", icon: Layers, component: OhCardReadingsContent, permission: "oh-card-readings" },
   { key: "energy-knots", label: "能量结", icon: Zap, component: EnergyKnotsContent, permission: "energy-knots" },
   { key: "internal-courses", label: "内部课程", icon: GraduationCap, component: InternalCoursesContent, permission: "internal-courses" },
 ]

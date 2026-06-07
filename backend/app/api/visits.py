@@ -21,10 +21,11 @@ def _fill_member_type(record):
 async def list_visits(
     date: str = None,
     customer_id: str = None,
+    space_id: str = None,
     page: int | None = Query(None, ge=1),
     page_size: int | None = Query(None, ge=1, le=100),
 ):
-    records = visit_service.list_visits(date, customer_id)
+    records = visit_service.list_visits(date, customer_id, space_id)
     items = [_fill_member_type(r) for r in records]
     if page is not None:
         return paginate(items, page, page_size or 10)
@@ -37,6 +38,7 @@ async def get_visit_counts(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
     member_types: str | None = Query(None),
+    space_id: str | None = Query(None),
 ):
     """返回各日期的到场人数统计 {date: count}，不做活动计数。支持 member_types 过滤权限"""
     ids = None
@@ -53,7 +55,7 @@ async def get_visit_counts(
         ids = [x for x in customer_ids.split(",") if x]
         if not ids:
             return {}
-    return visit_service.get_date_counts(ids, start_date, end_date)
+    return visit_service.get_date_counts(ids, start_date, end_date, space_id)
 
 
 @router.get("/search-customers")

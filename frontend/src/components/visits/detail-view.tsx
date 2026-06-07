@@ -32,9 +32,10 @@ interface DetailViewProps {
   hideDateBar?: boolean
   onCustomerClick?: (customerId: string) => void
   onDataLoaded?: (visits: VisitRecord[]) => void
+  spaceId?: string
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded, spaceId }: DetailViewProps = {}) {
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -103,7 +104,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     let cancelled = false
     setLoading(true)
     const load = () => {
-      visitApi.list(selectedDate)
+      visitApi.list(selectedDate, undefined, spaceId)
         .then((data) => { if (!cancelled) setVisits(data) })
         .catch(() => {
           if (!cancelled && visitsRetryRef.current < 2) {
@@ -115,7 +116,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
     load()
     return () => { cancelled = true }
-  }, [selectedDate, customerListReady])
+  }, [selectedDate, customerListReady, spaceId])
 
   // 通知父组件已加载的到访数据
   useEffect(() => {
@@ -130,7 +131,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
     const memberTypes = cp.join(",")
     const load = () => {
-      visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate })
+      visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate, spaceId })
         .then(setDailyCounts)
         .catch(() => {
           if (countsRetryRef.current < 2) {
@@ -189,12 +190,13 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         nickname: selectedCustomer.nickname,
         member_type: selectedCustomer.member_type,
         needs,
+        space_id: spaceId || undefined,
       })
       setSelectedCustomer(null)
       setSearchKeyword("")
       setNeeds("")
       setVisitTime("09:00")
-      const data = await visitApi.list(selectedDate)
+      const data = await visitApi.list(selectedDate, undefined, spaceId)
       setVisits(data)
       refreshCounts()
     } catch (e) {
@@ -209,7 +211,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     try {
       await visitApi.delete(deleteId)
       setDeleteId(null)
-      const data = await visitApi.list(selectedDate)
+      const data = await visitApi.list(selectedDate, undefined, spaceId)
       setVisits(data)
       refreshCounts()
     } catch (e) {
@@ -223,7 +225,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     try {
       await visitApi.update(editVisit.id, { visit_date: editDate, needs: editNeeds })
       setEditVisit(null)
-      const data = await visitApi.list(selectedDate)
+      const data = await visitApi.list(selectedDate, undefined, spaceId)
       setVisits(data)
     } catch (e) {
       alert(e instanceof Error ? e.message : "更新失败")

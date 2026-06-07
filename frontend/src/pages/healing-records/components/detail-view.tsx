@@ -360,6 +360,13 @@ export default function DetailView({
                             <span>{s.name}</span>
                             <span>{s.effective_date || "-"}/{s.expiry_date || "-"}</span>
                           </span>
+                        ) : s.type === "其他项目" ? (
+                          <span className="inline-flex items-baseline gap-2">
+                            <span>{s.name}</span>
+                            <span>{s.activity_mode || "线下"}</span>
+                            <span>{s.remaining === "不限" ? "不限次" : (typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`)}</span>
+                            <span>{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
+                          </span>
                         ) : (
                           <span>{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
                         )}

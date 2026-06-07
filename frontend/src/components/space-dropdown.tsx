@@ -20,7 +20,7 @@ export const SpaceDropdown = memo(function SpaceDropdown({ spaces, selectedSpace
 
   if (spaces.length === 0) return null
 
-  const selectedName = selectedSpaceId ? spaces.find(s => s.id === selectedSpaceId)?.name || "全部空间" : "全部空间"
+  const selectedName = spaces.find(s => s.id === selectedSpaceId)?.name || spaces[0]?.name || ""
 
   return (
     <div className="relative shrink-0" ref={ref}>
@@ -33,12 +33,6 @@ export const SpaceDropdown = memo(function SpaceDropdown({ spaces, selectedSpace
       </button>
       {open && (
         <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] py-1 z-50 min-w-[140px]">
-          <button
-            className={`w-full text-left px-4 py-2 text-[13px] hover:bg-[#f7f8fa] ${!selectedSpaceId ? "text-[#3370ff] bg-[#f0f5ff]" : "text-[#2b2f36]"}`}
-            onClick={() => { onSelect(""); setOpen(false) }}
-          >
-            全部空间
-          </button>
           {spaces.map(s => (
             <button
               key={s.id}

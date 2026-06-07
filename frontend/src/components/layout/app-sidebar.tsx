@@ -52,7 +52,7 @@ const configItems = [
   { title: "提醒配置", icon: Bell, path: "/config/reminders", permission: "reminders" },
 ]
 
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"]
+const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"]
 
 const accountItems = [
   { title: "账号管理", icon: GraduationCap, path: "/positions/management", permission: "position-management" },
@@ -159,7 +159,8 @@ function PaymentMenuGroup({
   const hasAccess = isSuperAdmin || PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
   if (!hasAccess) return null
 
-  const isActive = location.pathname === "/payment"
+  const showPayment = isSuperAdmin || permissions.includes("membership-cards") || permissions.includes("group-cases") || permissions.includes("emotional-releases") || permissions.includes("energy-knots") || permissions.includes("internal-courses")
+  const showOtherProjects = isSuperAdmin || permissions.includes("other-projects")
 
   return (
     <SidebarGroup className="px-3 py-0">
@@ -173,15 +174,28 @@ function PaymentMenuGroup({
       {isOpen && (
         <SidebarGroupContent className="mt-0.5">
           <SidebarMenu className="gap-1">
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                render={<Link to="/payment" />}
-                isActive={isActive}
-                className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
-              >
-                <span className="pl-[18px]">付费项目</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {showPayment && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<Link to="/payment" />}
+                  isActive={location.pathname === "/payment"}
+                  className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
+                >
+                  <span className="pl-[18px]">付费项目</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {showOtherProjects && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<Link to="/other-projects" />}
+                  isActive={location.pathname === "/other-projects"}
+                  className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
+                >
+                  <span className="pl-[18px]">其他项目</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarGroupContent>
       )}
@@ -192,7 +206,7 @@ function PaymentMenuGroup({
 function getActiveGroup(pathname: string): string {
   if (businessItems.some(i => i.path === pathname)) return "业务数据"
   if (courseItems.some(i => i.path === pathname)) return "疗愈活动"
-  if (pathname === "/payment") return "付费项目"
+  if (pathname === "/payment" || pathname === "/other-projects") return "付费项目"
   if (configItems.some(i => i.path === pathname)) return "信息配置"
   if (accountItems.some(i => i.path === pathname)) return "账号管理"
   if (systemItems.some(i => i.path === pathname)) return "系统配置"

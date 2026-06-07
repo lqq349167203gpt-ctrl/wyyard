@@ -48,6 +48,7 @@ uvicorn app.main:app --reload --port 8000
 - **会员活动**：管理会员活动信息
 - **觉醒游戏**：管理觉醒游戏项目
 - **情绪释放**：管理情绪释放项目
+- **OH卡梳理**：管理OH卡梳理项目
 - **能量结**：管理能量结项目
 - **内部课程**：管理内部课程
 
@@ -90,6 +91,7 @@ uvicorn app.main:app --reload --port 8000
 - `emotional_releases` / `emotional_release_sessions` - 情绪释放及场次
 - `energy_knots` / `energy_knot_sessions` - 能量结及场次
 - `internal_courses` / `internal_course_sessions` - 内部课程及场次
+- `oh_card_readings` / `oh_card_reading_sessions` - OH卡梳理及场次
 - `daily_groupings` - 每日人员分组
 - `operation_logs` - 操作日志
 - `system_logs` - 系统日志
@@ -116,6 +118,8 @@ API 接口统一以 `/api/` 开头，每个资源一个路由文件，位于 `ba
 - `/api/energy-knot-sessions` - 能量结场次
 - `/api/internal-courses` - 内部课程
 - `/api/internal-course-sessions` - 内部课程场次
+- `/api/oh-card-readings` - OH卡梳理
+- `/api/oh-card-reading-sessions` - OH卡梳理场次
 - `/api/class-records` - 活动日历
 - `/api/daily-groupings` - 每日人员分组
 - `/api/accounts` - 账号管理

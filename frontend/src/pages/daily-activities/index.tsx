@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Users, Sparkles, Heart, Zap, GraduationCap } from "lucide-react"
+import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Users, Sparkles, Heart, Zap, GraduationCap, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -14,9 +14,9 @@ import {
   emotionalReleaseSessionApi,
   energyKnotSessionApi, energyKnotApi,
   internalCourseSessionApi, courseApi, customerApi, uploadApi, spaceApi,
-  activityThemeApi,
+  activityThemeApi, ohCardReadingSessionApi,
   type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession,
-  type EnergyKnotSession, type InternalCourseSession,
+  type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession,
   type Course, type CustomerLight, type Space,
   type InternalCourseSessionCustomerSearchResult,
   type GroupCaseCustomerSearchResult,
@@ -50,6 +50,14 @@ function getTeacherNames(teacherIds: string[], teachers: CustomerLight[]) {
   return teacherIds.map(id => teachers.find(t => t.id === id)).filter(Boolean).map(t => t!.nickname || t!.name || "未命名")
 }
 
+function getRoomLabel(spaceId: string | undefined, roomId: string | undefined, spaces: Space[]): string {
+  if (!spaceId || !roomId) return ""
+  const space = spaces.find(s => s.id === spaceId)
+  if (!space) return ""
+  const room = space.rooms?.find(r => r.id === roomId)
+  return room?.name || ""
+}
+
 // ===== Memoized card components (extracted to avoid re-render on dropdown state changes) =====
 
 interface CardCallbacks {
@@ -66,11 +74,15 @@ interface CardCallbacks {
   onEditIcs: (s: InternalCourseSession) => void
   onDeleteIcs: (id: string) => void
   onMaterialsIcs: (s: InternalCourseSession) => void
+  onEditOcr: (s: OhCardReadingSession) => void
+  onDeleteOcr: (id: string) => void
+  onMaterialsOcr: (s: OhCardReadingSession) => void
   teachers: CustomerLight[]
+  spaces: Space[]
 }
 
-const SalonCard = memo(({ record, teachers, onEdit, onDelete, onMaterials }: {
-  record: ClassRecord; teachers: CustomerLight[]
+const SalonCard = memo(({ record, teachers, spaces, onEdit, onDelete, onMaterials }: {
+  record: ClassRecord; teachers: CustomerLight[]; spaces: Space[]
   onEdit: (r: ClassRecord) => void; onDelete: (id: string) => void; onMaterials: (r: ClassRecord) => void
 }) => (
   <div key={`class-${record.id}`} className="bg-white">
@@ -87,6 +99,12 @@ const SalonCard = memo(({ record, teachers, onEdit, onDelete, onMaterials }: {
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">{record.course_name}</span>
           {getTeacherNames(record.teacher_ids, teachers).length > 0 && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids, teachers).join("、")}</span>
+          )}
+          {getRoomLabel(record.space_id, record.room_id, spaces) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(record.space_id, record.room_id, spaces)}</span>
+          )}
+          {record.activity_mode && record.activity_mode !== "线下" && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
           )}
         </div>
         {record.course_description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{record.course_description}</p>}
@@ -106,8 +124,8 @@ const SalonCard = memo(({ record, teachers, onEdit, onDelete, onMaterials }: {
   </div>
 ))
 
-const GcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
-  session: GroupCaseSession
+const GcsCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
+  session: GroupCaseSession; spaces: Space[]
   onEdit: (s: GroupCaseSession) => void; onDelete: (id: string) => void; onMaterials: (s: GroupCaseSession) => void
 }) => (
   <div key={`gcs-${session.id}`} className="bg-white">
@@ -124,6 +142,12 @@ const GcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
           {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
+          {getRoomLabel(session.space_id, session.room_id, spaces) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          )}
+          {session.activity_mode && session.activity_mode !== "线下" && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
+          )}
         </div>
         {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
       </div>
@@ -142,8 +166,8 @@ const GcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
   </div>
 ))
 
-const ErsCard = memo(({ session, onEdit, onDelete }: {
-  session: EmotionalReleaseSession
+const ErsCard = memo(({ session, spaces, onEdit, onDelete }: {
+  session: EmotionalReleaseSession; spaces: Space[]
   onEdit: (s: EmotionalReleaseSession) => void; onDelete: (id: string) => void
 }) => (
   <div key={`ers-${session.id}`} className="bg-white">
@@ -160,6 +184,12 @@ const ErsCard = memo(({ session, onEdit, onDelete }: {
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
           {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
+          {getRoomLabel(session.space_id, session.room_id, spaces) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          )}
+          {session.activity_mode && session.activity_mode !== "线下" && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
+          )}
         </div>
         {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
       </div>
@@ -175,8 +205,50 @@ const ErsCard = memo(({ session, onEdit, onDelete }: {
   </div>
 ))
 
-const EksCard = memo(({ session, onEdit, onDelete }: {
-  session: EnergyKnotSession
+const OcrCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
+  session: OhCardReadingSession; spaces: Space[]
+  onEdit: (s: OhCardReadingSession) => void; onDelete: (id: string) => void; onMaterials: (s: OhCardReadingSession) => void
+}) => (
+  <div key={`ocr-${session.id}`} className="bg-white">
+    <div className="flex">
+      <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
+        {session.start_time && <span className="text-[11px] text-[#8f959e] font-light">{session.start_time}</span>}
+        {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
+        {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
+      </div>
+      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0f7ff] text-[#2b7fff]">OH</span>
+          <span className="text-[14px] font-medium text-[#2b2f36] truncate">OH卡梳理</span>
+          <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
+          <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
+          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
+          {getRoomLabel(session.space_id, session.room_id, spaces) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          )}
+          {session.activity_mode && session.activity_mode !== "线下" && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
+          )}
+        </div>
+        {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
+      </div>
+      <div className="shrink-0 grid grid-cols-3 items-center justify-items-center gap-1 px-2 py-3.5">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onMaterials(session)}>
+          <FileUp className="h-3.5 w-3.5" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(session)}>
+          <Edit className="h-3.5 w-3.5" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(session.id)}>
+          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+        </Button>
+      </div>
+    </div>
+  </div>
+))
+
+const EksCard = memo(({ session, spaces, onEdit, onDelete }: {
+  session: EnergyKnotSession; spaces: Space[]
   onEdit: (s: EnergyKnotSession) => void; onDelete: (id: string) => void
 }) => {
   let eksNames: string[] = []
@@ -200,6 +272,12 @@ const EksCard = memo(({ session, onEdit, onDelete }: {
             <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
             <span className="text-[14px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : session.owner_name || "未分配"}</span>
             {session.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{session.host_names.join("、")}</span>}
+            {getRoomLabel(session.space_id, session.room_id, spaces) && (
+              <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+            )}
+            {session.activity_mode && session.activity_mode !== "线下" && (
+              <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
+            )}
           </div>
           {ownerDescs.filter(d => d.description).length > 0 && (
             <div className="space-y-1">
@@ -224,8 +302,8 @@ const EksCard = memo(({ session, onEdit, onDelete }: {
   )
 })
 
-const IcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
-  session: InternalCourseSession
+const IcsCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
+  session: InternalCourseSession; spaces: Space[]
   onEdit: (s: InternalCourseSession) => void; onDelete: (id: string) => void; onMaterials: (s: InternalCourseSession) => void
 }) => (
   <div key={`ics-${session.id}`} className="bg-white">
@@ -241,6 +319,12 @@ const IcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">{session.course_name}</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">丨课程老师：{session.host_names?.length > 0 ? session.host_names.join("、") : "暂无"}</span>
           {session.course_type && <span className="text-[12px] text-[#4e535a]">{session.course_type}</span>}
+          {getRoomLabel(session.space_id, session.room_id, spaces) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          )}
+          {session.activity_mode && session.activity_mode !== "线下" && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
+          )}
         </div>
         {session.course_description && <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{session.course_description}</p>}
       </div>
@@ -260,9 +344,9 @@ const IcsCard = memo(({ session, onEdit, onDelete, onMaterials }: {
 ))
 
 // ===== GCS Dialog (独立组件，避免父组件 state 变化导致重渲染) =====
-const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, onClose, onSaved }: {
+const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
-  achieverCustomers: CustomerLight[]; session?: GroupCaseSession | null; onClose: () => void
+  achieverCustomers: CustomerLight[]; session?: GroupCaseSession | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: GroupCaseSession) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -276,6 +360,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   const [formAchieverId, setFormAchieverId] = useState("")
   const [formAchieverName, setFormAchieverName] = useState("")
   const [formDescription, setFormDescription] = useState("")
+  const [formActivityMode, setFormActivityMode] = useState("线下")
   const [searchKeyword, setSearchKeyword] = useState("")
   const [ownerRemaining, setOwnerRemaining] = useState<number | null>(null)
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
@@ -294,6 +379,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormOwnerId(session.owner_id); setFormOwnerName(session.owner_name || "")
         setFormAchieverId(session.achiever_id || ""); setFormAchieverName(session.achiever_name || "")
         setFormDescription(session.description || "")
+        setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
         setSearchKeyword(""); setOwnerRemaining(null)
@@ -310,12 +396,13 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormOwnerId(""); setFormOwnerName("")
         setFormAchieverId(""); setFormAchieverName("")
         setFormDescription("")
+        setFormActivityMode("线下")
         setSearchKeyword(""); setOwnerRemaining(null)
-        const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
+        const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
         setSpaceId(ds); setRoomId(dr)
       }
     }
-  }, [open, date, spaces, session])
+  }, [open, date, spaces, session, defaultSpaceId])
 
   // Fetch remaining counts for dropdown
   useEffect(() => {
@@ -356,6 +443,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         owner_id: formOwnerId, owner_name: formOwnerName,
         description: formDescription || undefined,
         achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
+        activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
       let result: GroupCaseSession
@@ -409,6 +497,14 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                 onChange={(v) => setRoomId(v)}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
+            <SelectDropdown
+              value={formActivityMode}
+              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
+              onChange={setFormActivityMode}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
@@ -503,9 +599,9 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
 })
 
 // ===== ERS Dialog (独立组件) =====
-const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, onClose, onSaved }: {
+const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
-  achieverCustomers: CustomerLight[]; session?: EmotionalReleaseSession | null; onClose: () => void
+  achieverCustomers: CustomerLight[]; session?: EmotionalReleaseSession | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: EmotionalReleaseSession) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -519,6 +615,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   const [formAchieverId, setFormAchieverId] = useState("")
   const [formAchieverName, setFormAchieverName] = useState("")
   const [formDescription, setFormDescription] = useState("")
+  const [formActivityMode, setFormActivityMode] = useState("线下")
   const [searchKeyword, setSearchKeyword] = useState("")
   const [ownerRemaining, setOwnerRemaining] = useState<number | null>(null)
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
@@ -536,6 +633,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormOwnerId(session.owner_id); setFormOwnerName(session.owner_name || "")
         setFormAchieverId(session.achiever_id || ""); setFormAchieverName(session.achiever_name || "")
         setFormDescription(session.description || "")
+        setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
         setSearchKeyword(""); setOwnerRemaining(null)
@@ -552,12 +650,13 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormOwnerId(""); setFormOwnerName("")
         setFormAchieverId(""); setFormAchieverName("")
         setFormDescription("")
+        setFormActivityMode("线下")
         setSearchKeyword(""); setOwnerRemaining(null)
-        const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
+        const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
         setSpaceId(ds); setRoomId(dr)
       }
     }
-  }, [open, date, spaces, session])
+  }, [open, date, spaces, session, defaultSpaceId])
 
   useEffect(() => {
     if (!searchKeyword.trim() && !formOwnerId) return
@@ -592,6 +691,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         owner_id: formOwnerId, owner_name: formOwnerName,
         description: formDescription || undefined,
         achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
+        activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
       let result: EmotionalReleaseSession
@@ -612,6 +712,262 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
       <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
           <DialogTitle className="text-[15px]">{editingRecord ? "编辑情绪释放" : "新增情绪释放"}</DialogTitle>
+        </DialogHeader>
+        <div className="px-6 py-5 space-y-5" {...enterToNext}>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
+            <SelectDropdown
+              value={formActivityMode}
+              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
+              onChange={setFormActivityMode}
+            />
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">日期</span>
+            <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">时间</span>
+            <div className="flex items-center gap-2">
+              <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <span className="text-[12px] text-[#8f959e]">至</span>
+              <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
+            </div>
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">空间</span>
+            <div className="flex items-center gap-2">
+              <SelectDropdown
+                className="w-[122px]"
+                value={spaceId}
+                options={spaces.map(s => ({value: s.id, label: s.name}))}
+                placeholder="选择空间"
+                onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
+              />
+              <SelectDropdown
+                className="w-[122px]"
+                value={roomId}
+                options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
+                placeholder={spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? "无房间" : "选择房间"}
+                disabled={!!spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0}
+                onChange={(v) => setRoomId(v)}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
+            <SelectDropdown
+              value={formActivityMode}
+              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
+              onChange={setFormActivityMode}
+            />
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-start gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
+            <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="relative">
+                <Input
+                  value={formOwnerId ? formOwnerName : searchKeyword}
+                  onChange={(e) => {
+                    setSearchKeyword(e.target.value)
+                    if (formOwnerId) { setFormOwnerId(""); setFormOwnerName(""); setOwnerRemaining(null) }
+                  }}
+                  placeholder={formOwnerId ? "" : "选择案主"}
+                  className="h-8 text-[12px] pr-20"
+                  autoComplete="off"
+                />
+                {formOwnerId && ownerRemaining !== null && (
+                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${ownerRemaining <= 0 ? "text-red-500" : "text-[#8f959e]"}`}>
+                    剩余{ownerRemaining}次
+                  </span>
+                )}
+                {formOwnerId && (
+                  <button className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8f959e] hover:text-[#2b2f36]"
+                    onClick={() => { setFormOwnerId(""); setFormOwnerName(""); setSearchKeyword(""); setOwnerRemaining(null) }}>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {searchKeyword.trim().length > 0 && (() => {
+                const kw = searchKeyword.trim().toLowerCase()
+                const filtered = allCustomers.filter(c =>
+                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
+                ).sort((a, b) => {
+                  const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
+                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
+                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  return sa - sb
+                })
+                const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
+                return (
+                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+                  {visible.length === 0 ? (
+                    <div className="px-3 py-2 text-[12px] text-[#8f959e]">无匹配客户</div>
+                  ) : (
+                    visible.map(c => {
+                      const remaining = remainingMap[c.id]
+                      const isDepleted = remaining !== undefined && remaining <= 0
+                      return (
+                        <button key={c.id}
+                          className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
+                          disabled={isDepleted}
+                          onClick={() => {
+                            if (isDepleted) return
+                            setFormOwnerId(c.id)
+                            setFormOwnerName(c.nickname || c.name || "")
+                            setSearchKeyword("")
+                            setOwnerRemaining(remaining !== undefined ? remaining : null)
+                          }}>
+                          <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
+                          <span className={`text-[#8f959e] ${isDepleted ? "text-red-500" : ""}`}>
+                            {remaining !== undefined ? (remaining === -1 ? "" : `余${remaining}`) : ""}
+                          </span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )})()}
+            </div>
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">成就君</span>
+            <SelectDropdown
+              value={formAchieverId}
+              options={achieverCustomers.filter(c => c.id !== formOwnerId).map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+              placeholder="选择成就君"
+              onChange={(v) => { setFormAchieverId(v); setFormAchieverName(achieverCustomers.find(c => c.id === v)?.nickname || achieverCustomers.find(c => c.id === v)?.name || "") }}
+            />
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-start gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
+            <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+              className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input text-[12px] resize-none" placeholder="输入课程简介..." />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-6 pb-5 pt-2">
+          <Button variant="outline" size="sm" onClick={onClose}>取消</Button>
+          <Button size="sm" onClick={handleSave} disabled={saving || !formOwnerId}>{saving ? "保存中..." : "保存"}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+})
+
+// ===== OCR Dialog (独立组件) =====
+const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, defaultSpaceId, onClose, onSaved }: {
+  open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
+  achieverCustomers: CustomerLight[]; session?: OhCardReadingSession | null; defaultSpaceId?: string; onClose: () => void
+  onSaved: (record: OhCardReadingSession) => void
+}) => {
+  const enterToNext = useEnterToNext()
+  const [editingRecord, setEditingRecord] = useState<OhCardReadingSession | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [formDate, setFormDate] = useState(date)
+  const [formStartTime, setFormStartTime] = useState("09:00")
+  const [formEndTime, setFormEndTime] = useState("10:00")
+  const [formOwnerId, setFormOwnerId] = useState("")
+  const [formOwnerName, setFormOwnerName] = useState("")
+  const [formAchieverId, setFormAchieverId] = useState("")
+  const [formAchieverName, setFormAchieverName] = useState("")
+  const [formDescription, setFormDescription] = useState("")
+  const [formActivityMode, setFormActivityMode] = useState("线下")
+  const [searchKeyword, setSearchKeyword] = useState("")
+  const [ownerRemaining, setOwnerRemaining] = useState<number | null>(null)
+  const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
+  const [spaceId, setSpaceId] = useState("")
+  const [roomId, setRoomId] = useState("")
+  const remainingFetchRef = useRef(0)
+
+  useEffect(() => {
+    if (open) {
+      if (session) {
+        setEditingRecord(session)
+        setFormDate(session.date)
+        setFormStartTime(session.start_time || "09:00")
+        setFormEndTime(session.end_time || "10:00")
+        setFormOwnerId(session.owner_id); setFormOwnerName(session.owner_name || "")
+        setFormAchieverId(session.achiever_id || ""); setFormAchieverName(session.achiever_name || "")
+        setFormDescription(session.description || "")
+        setFormActivityMode(session.activity_mode || "线下")
+        setSpaceId(session.space_id || (spaces[0]?.id || ""))
+        setRoomId(session.room_id || "")
+        setSearchKeyword(""); setOwnerRemaining(null)
+        if (session.owner_id && session.owner_name) {
+          ohCardReadingSessionApi.searchCustomers(session.owner_name).then(results => {
+            const found = results.find(r => r.id === session.owner_id)
+            if (found) setOwnerRemaining(found.remaining)
+          }).catch(() => {})
+        }
+      } else {
+        setEditingRecord(null)
+        setFormDate(date)
+        setFormStartTime("09:00"); setFormEndTime("10:00")
+        setFormOwnerId(""); setFormOwnerName("")
+        setFormAchieverId(""); setFormAchieverName("")
+        setFormDescription("")
+        setFormActivityMode("线下")
+        setSearchKeyword(""); setOwnerRemaining(null)
+        const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
+        setSpaceId(ds); setRoomId(dr)
+      }
+    }
+  }, [open, date, spaces, session, defaultSpaceId])
+
+  useEffect(() => {
+    if (!searchKeyword.trim() && !formOwnerId) return
+    const fetchId = ++remainingFetchRef.current
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await ohCardReadingSessionApi.searchCustomers(searchKeyword)
+        if (fetchId !== remainingFetchRef.current) return
+        const map: Record<string, number> = {}
+        results.forEach(r => { map[r.id] = r.remaining })
+        setRemainingMap(map)
+      } catch {}
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [searchKeyword, formOwnerId])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
+      setSearchKeyword("")
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  const handleSave = async () => {
+    if (!formOwnerId) return
+    setSaving(true)
+    try {
+      const data = {
+        date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
+        owner_id: formOwnerId, owner_name: formOwnerName,
+        description: formDescription || undefined,
+        achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
+        activity_mode: formActivityMode,
+        space_id: spaceId || undefined, room_id: roomId || undefined,
+      }
+      let result: OhCardReadingSession
+      if (editingRecord) {
+        result = await ohCardReadingSessionApi.update(editingRecord.id, data)
+      } else {
+        result = await ohCardReadingSessionApi.create(data)
+      }
+      onSaved(result)
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail
+      if (typeof detail === "string") alert(detail)
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+        <DialogHeader className="px-6 pt-5 pb-4 border-b">
+          <DialogTitle className="text-[15px]">{editingRecord ? "编辑OH卡梳理" : "新增OH卡梳理"}</DialogTitle>
         </DialogHeader>
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
@@ -645,6 +1001,14 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                 onChange={(v) => setRoomId(v)}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
+            <SelectDropdown
+              value={formActivityMode}
+              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
+              onChange={setFormActivityMode}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
@@ -739,9 +1103,9 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
 })
 
 // ===== EKS Dialog (独立组件) =====
-const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, session, onClose, onSaved }: {
+const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
-  hostCustomers: CustomerLight[]; session?: EnergyKnotSession | null; onClose: () => void
+  hostCustomers: CustomerLight[]; session?: EnergyKnotSession | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: EnergyKnotSession) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -757,6 +1121,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
   const [formHostIds, setFormHostIds] = useState<string[]>([])
   const [formHostNames, setFormHostNames] = useState<string[]>([])
+  const [formActivityMode, setFormActivityMode] = useState("线下")
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
   const [showHostDropdown, setShowHostDropdown] = useState(false)
@@ -793,6 +1158,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         setFormOwnerIds(descs.map(d => d.id).filter(Boolean))
         setFormOwnerNames(descs.map(d => d.name).filter(Boolean))
         setFormHostIds([]); setFormHostNames([])
+        setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
       } else {
@@ -801,11 +1167,12 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         setFormStartTime("09:00"); setFormEndTime("10:00")
         setFormOwnerIds([]); setFormOwnerNames([]); setFormOwnerDescriptions([])
         setFormHostIds([]); setFormHostNames([])
-        const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
+        setFormActivityMode("线下")
+        const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
         setSpaceId(ds); setRoomId(dr)
       }
       setSearchKeyword("")}
-  }, [open, date, spaces, session])
+  }, [open, date, spaces, session, defaultSpaceId])
 
   useEffect(() => {
     if (!searchKeyword.trim()) return
@@ -870,6 +1237,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         owner_id: formOwnerIds[0], owner_name: formOwnerNames.join("、"),
         description: JSON.stringify(formOwnerDescriptions),
         host_ids: formHostIds, host_names: formHostNames,
+        activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
       let result: EnergyKnotSession
@@ -923,6 +1291,14 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                 onChange={(v) => setRoomId(v)}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
+            <SelectDropdown
+              value={formActivityMode}
+              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
+              onChange={setFormActivityMode}
+            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">案主</span>
@@ -1086,9 +1462,9 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
 })
 
 // ===== ICS Dialog (独立组件) =====
-const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSaved }: {
+const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; teachers: CustomerLight[]
-  session?: InternalCourseSession | null; onClose: () => void
+  session?: InternalCourseSession | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: InternalCourseSession) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -1102,6 +1478,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
   const [formDescription, setFormDescription] = useState("")
   const [formHostId, setFormHostId] = useState("")
   const [formHostName, setFormHostName] = useState("")
+  const [formActivityMode, setFormActivityMode] = useState("线下")
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
 
@@ -1116,6 +1493,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
         setFormCourseName(session.course_name || "")
         setFormDescription(session.course_description || "")
         setFormHostId(""); setFormHostName("")
+        setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
       } else {
@@ -1124,11 +1502,12 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
         setFormStartTime("09:00"); setFormEndTime("10:00")
         setFormCourseType(ICS_COURSE_TYPES[0]); setFormCourseName(""); setFormDescription("")
         setFormHostId(""); setFormHostName("")
-        const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
+        setFormActivityMode("线下")
+        const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
         setSpaceId(ds); setRoomId(dr)
       }
     }
-  }, [open, date, spaces, session])
+  }, [open, date, spaces, session, defaultSpaceId])
 
 
   const handleSave = async () => {
@@ -1141,6 +1520,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
         course_type: formCourseType, course_name: formCourseName,
         course_description: formDescription || undefined,
         host_ids: hostIds, host_names: hostNames,
+        activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
       }
       let result: InternalCourseSession
@@ -1208,6 +1588,14 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
             <Input value={formCourseName} onChange={(e) => setFormCourseName(e.target.value)} className="h-8 text-[12px]" placeholder="输入课程名称" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
+            <SelectDropdown
+              value={formActivityMode}
+              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
+              onChange={setFormActivityMode}
+            />
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程老师</span>
             <SelectDropdown
               value={formHostId}
@@ -1232,9 +1620,9 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, onClose, onSave
 })
 
 // ===== Salon Dialog (独立组件) =====
-const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onClose, onSaved }: {
+const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; courses: Course[]
-  teachers: CustomerLight[]; session?: ClassRecord | null; onClose: () => void
+  teachers: CustomerLight[]; session?: ClassRecord | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: ClassRecord) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -1247,6 +1635,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
   const [formTeacherId, setFormTeacherId] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [formIsPublicWelfare, setFormIsPublicWelfare] = useState(false)
+  const [formActivityMode, setFormActivityMode] = useState("线下")
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
 
@@ -1261,6 +1650,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
         setFormTeacherId(session.teacher_ids[0] || "")
         setFormDescription(session.course_description || "")
         setFormIsPublicWelfare(session.is_public_welfare || false)
+        setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
       } else {
@@ -1269,11 +1659,12 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
         setFormStartTime("09:00"); setFormEndTime("10:00")
         setFormCourseId(""); setFormTeacherId("")
         setFormDescription(""); setFormIsPublicWelfare(false)
-        const ds = spaces[0]?.id || ""; const dr = ds ? spaces[0]?.rooms?.[0]?.id || "" : ""
+        setFormActivityMode("线下")
+        const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
         setSpaceId(ds); setRoomId(dr)
       }
     }
-  }, [open, date, spaces, session])
+  }, [open, date, spaces, session, defaultSpaceId])
 
 
 
@@ -1290,6 +1681,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
           course_id: formCourseId, course_name: course?.name || editingRecord.course_name,
           course_description: formDescription, teacher_ids: teacherIds,
           is_public_welfare: formIsPublicWelfare,
+          activity_mode: formActivityMode,
           space_id: spaceId || undefined, room_id: roomId || undefined,
         })
       } else {
@@ -1300,6 +1692,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
           course_id: formCourseId, course_name: course.name,
           course_description: formDescription, teacher_ids: teacherIds,
           is_public_welfare: formIsPublicWelfare,
+          activity_mode: formActivityMode,
           space_id: spaceId || undefined, room_id: roomId || undefined,
         })
       }
@@ -1356,6 +1749,14 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, onCl
               options={courses.map(c => ({value: c.id, label: c.name}))}
               placeholder="选择课程"
               onChange={(v) => setFormCourseId(v)}
+            />
+          </div>
+          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
+            <SelectDropdown
+              value={formActivityMode}
+              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
+              onChange={setFormActivityMode}
             />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
@@ -1429,7 +1830,7 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
 ))
 
 const ActivityCardList = memo(({ records, callbacks }: {
-  records: { type: "class" | "gcs" | "ers" | "eks" | "ics"; data: any }[]
+  records: { type: "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"; data: any }[]
   callbacks: CardCallbacks
 }) => {
   const [visibleCount, setVisibleCount] = useState(15)
@@ -1454,19 +1855,22 @@ const ActivityCardList = memo(({ records, callbacks }: {
   <div className="divide-y divide-[#e8e8e8] border-y border-[#e8e8e8]">
     {records.slice(0, visibleCount).map((ur) => {
       if (ur.type === "class") {
-        return <SalonCard key={`class-${(ur.data as ClassRecord).id}`} record={ur.data as ClassRecord} teachers={callbacks.teachers} onEdit={callbacks.onEditClass} onDelete={callbacks.onDeleteClass} onMaterials={callbacks.onMaterialsClass} />
+        return <SalonCard key={`class-${(ur.data as ClassRecord).id}`} record={ur.data as ClassRecord} teachers={callbacks.teachers} spaces={callbacks.spaces} onEdit={callbacks.onEditClass} onDelete={callbacks.onDeleteClass} onMaterials={callbacks.onMaterialsClass} />
       }
       if (ur.type === "gcs") {
-        return <GcsCard key={`gcs-${(ur.data as GroupCaseSession).id}`} session={ur.data as GroupCaseSession} onEdit={callbacks.onEditGcs} onDelete={callbacks.onDeleteGcs} onMaterials={callbacks.onMaterialsGcs} />
+        return <GcsCard key={`gcs-${(ur.data as GroupCaseSession).id}`} session={ur.data as GroupCaseSession} spaces={callbacks.spaces} onEdit={callbacks.onEditGcs} onDelete={callbacks.onDeleteGcs} onMaterials={callbacks.onMaterialsGcs} />
       }
       if (ur.type === "ers") {
-        return <ErsCard key={`ers-${(ur.data as EmotionalReleaseSession).id}`} session={ur.data as EmotionalReleaseSession} onEdit={callbacks.onEditErs} onDelete={callbacks.onDeleteErs} />
+        return <ErsCard key={`ers-${(ur.data as EmotionalReleaseSession).id}`} session={ur.data as EmotionalReleaseSession} spaces={callbacks.spaces} onEdit={callbacks.onEditErs} onDelete={callbacks.onDeleteErs} />
       }
       if (ur.type === "eks") {
-        return <EksCard key={`eks-${(ur.data as EnergyKnotSession).id}`} session={ur.data as EnergyKnotSession} onEdit={callbacks.onEditEks} onDelete={callbacks.onDeleteEks} />
+        return <EksCard key={`eks-${(ur.data as EnergyKnotSession).id}`} session={ur.data as EnergyKnotSession} spaces={callbacks.spaces} onEdit={callbacks.onEditEks} onDelete={callbacks.onDeleteEks} />
       }
       if (ur.type === "ics") {
-        return <IcsCard key={`ics-${(ur.data as InternalCourseSession).id}`} session={ur.data as InternalCourseSession} onEdit={callbacks.onEditIcs} onDelete={callbacks.onDeleteIcs} onMaterials={callbacks.onMaterialsIcs} />
+        return <IcsCard key={`ics-${(ur.data as InternalCourseSession).id}`} session={ur.data as InternalCourseSession} spaces={callbacks.spaces} onEdit={callbacks.onEditIcs} onDelete={callbacks.onDeleteIcs} onMaterials={callbacks.onMaterialsIcs} />
+      }
+      if (ur.type === "ocr") {
+        return <OcrCard key={`ocr-${(ur.data as OhCardReadingSession).id}`} session={ur.data as OhCardReadingSession} spaces={callbacks.spaces} onEdit={callbacks.onEditOcr} onDelete={callbacks.onDeleteOcr} onMaterials={callbacks.onMaterialsOcr} />
       }
       return null
     })}
@@ -1478,17 +1882,32 @@ const ActivityCardList = memo(({ records, callbacks }: {
 })
 
 // ===== WeekThemeDialog =====
-const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, onClose, onSaved }: {
+const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onClose, onSaved }: {
   open: boolean
   weekIndex: number
   weekDays: { date: string; weekday: string }[]
   themeMap: Map<string, ActivityTheme>
+  spaces: Space[]
   onClose: () => void
-  onSaved: (date: string, weekTheme: string, dayTheme: string) => Promise<void>
+  onSaved: (date: string, weekTheme: string, dayTheme: string, spaceIds: string[]) => Promise<void>
 }) => {
   const [weekTheme, setWeekTheme] = useState("")
   const [dayThemes, setDayThemes] = useState<Record<string, string>>({})
+  const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([])
+  const [spaceDropdownOpen, setSpaceDropdownOpen] = useState(false)
+  const spaceDropdownRef = useRef<HTMLDivElement>(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!spaceDropdownOpen) return
+    const h = (e: MouseEvent) => {
+      if (spaceDropdownRef.current && !spaceDropdownRef.current.contains(e.target as Node)) {
+        setSpaceDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [spaceDropdownOpen])
 
   useEffect(() => {
     if (open) {
@@ -1499,6 +1918,13 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, onClose, on
         dt[day.date] = themeMap.get(day.date)?.day_theme || ""
       }
       setDayThemes(dt)
+      // 初始化已选空间：从当前主题的 space_id 读取
+      const spaceIds = new Set<string>()
+      for (const day of weekDays) {
+        const t = themeMap.get(day.date)
+        if (t?.space_id) spaceIds.add(t.space_id)
+      }
+      setSelectedSpaceIds(Array.from(spaceIds))
     }
   }, [open, weekDays, themeMap])
 
@@ -1506,7 +1932,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, onClose, on
     setSaving(true)
     try {
       for (const day of weekDays) {
-        await onSaved(day.date, weekTheme, dayThemes[day.date] || "")
+        await onSaved(day.date, weekTheme, dayThemes[day.date] || "", selectedSpaceIds)
       }
       onClose()
     } catch (e: any) {
@@ -1525,27 +1951,86 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, onClose, on
           <DialogTitle className="text-[15px]">第{weekIndex + 1}周 {dateRangeLabel}</DialogTitle>
         </DialogHeader>
         <div className="px-6 py-5 space-y-5">
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">大主题</span>
+          <div className="grid grid-cols-[80px_1fr] items-start gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right font-light pt-2">所属空间</span>
+            <div className="space-y-1.5">
+              <div ref={spaceDropdownRef} className="relative">
+                <button
+                  type="button"
+                  className="flex items-center justify-between w-full h-8 px-2 text-[12px] rounded-md border border-input bg-transparent"
+                  onClick={() => setSpaceDropdownOpen(!spaceDropdownOpen)}
+                >
+                  <span className={`truncate ${selectedSpaceIds.length > 0 ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
+                    {selectedSpaceIds.length > 0 ? `已选 ${selectedSpaceIds.length} 个空间` : "选择空间"}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 text-[#8f959e] shrink-0 ml-1" />
+                </button>
+                {spaceDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                    {spaces.map((space) => (
+                      <button
+                        key={space.id}
+                        type="button"
+                        className="block w-full text-left px-2 py-2 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] truncate"
+                        onClick={() => {
+                          setSelectedSpaceIds(prev =>
+                            prev.includes(space.id) ? prev.filter(id => id !== space.id) : [...prev, space.id]
+                          )
+                          setSpaceDropdownOpen(false)
+                        }}
+                      >
+                        {space.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {selectedSpaceIds.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {selectedSpaceIds.map(id => {
+                    const space = spaces.find(s => s.id === id)
+                    if (!space) return null
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#f0f5ff] text-[11px] text-[#3370ff]"
+                      >
+                        {space.name}
+                        <button
+                          type="button"
+                          className="hover:text-[#e02020]"
+                          onClick={() => setSelectedSpaceIds(prev => prev.filter(sid => sid !== id))}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-[80px_1fr] items-center gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right font-light">周主题</span>
             <Input
               value={weekTheme}
               onChange={(e) => setWeekTheme(e.target.value)}
-              placeholder="输入本周大主题"
+              placeholder="输入本周主题"
               className="h-8 text-[12px]"
             />
           </div>
           <div className="space-y-3">
-            <span className="text-[12px] text-[#8f959e]">每日小主题</span>
+            <span className="text-[12px] text-[#8f959e] font-light">每日主题</span>
             <div className="space-y-2">
               {weekDays.map((day) => (
                 <div key={day.date} className="grid grid-cols-[80px_1fr] items-center gap-3">
-                  <span className="text-[12px] text-[#8f959e] text-right">
+                  <span className="text-[12px] text-[#8f959e] text-right font-light">
                     {day.date.split("-").slice(1).join("/")} 周{day.weekday}
                   </span>
                   <Input
                     value={dayThemes[day.date] || ""}
                     onChange={(e) => setDayThemes(prev => ({ ...prev, [day.date]: e.target.value }))}
-                    placeholder="输入小主题"
+                    placeholder="输入每日主题"
                     className="h-8 text-[12px]"
                   />
                 </div>
@@ -1565,6 +2050,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, onClose, on
 export default function DailyActivitiesPage() {
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(today)
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -1582,6 +2068,7 @@ export default function DailyActivitiesPage() {
   const [detailErsSessions, setDetailErsSessions] = useState<EmotionalReleaseSession[]>([])
   const [detailEksSessions, setDetailEksSessions] = useState<EnergyKnotSession[]>([])
   const [detailIcsSessions, setDetailIcsSessions] = useState<InternalCourseSession[]>([])
+  const [detailOcrSessions, setDetailOcrSessions] = useState<OhCardReadingSession[]>([])
 
   // ===== Salon dialog state (minimal - form state lives in SalonDialog) =====
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -1615,6 +2102,13 @@ export default function DailyActivitiesPage() {
   const [icsMaterialsDialogOpen, setIcsMaterialsDialogOpen] = useState(false)
   const [icsMaterialsRecord, setIcsMaterialsRecord] = useState<InternalCourseSession | null>(null)
 
+  // ===== OCR dialog state =====
+  const [ocrDialogOpen, setOcrDialogOpen] = useState(false)
+  const [ocrEditSession, setOcrEditSession] = useState<OhCardReadingSession | null>(null)
+  const [ocrDeleteId, setOcrDeleteId] = useState<string | null>(null)
+  const [ocrMaterialsDialogOpen, setOcrMaterialsDialogOpen] = useState(false)
+  const [ocrMaterialsRecord, setOcrMaterialsRecord] = useState<OhCardReadingSession | null>(null)
+
 
   // ===== Warning dialog =====
   const [warningOpen, setWarningOpen] = useState(false)
@@ -1636,7 +2130,13 @@ export default function DailyActivitiesPage() {
 
   const themeMap = useMemo(() => {
     const map = new Map<string, ActivityTheme>()
-    for (const t of themes) map.set(t.date, t)
+    for (const t of themes) {
+      const existing = map.get(t.date)
+      // 优先使用有 space_id 的主题（覆盖旧的无空间数据）
+      if (!existing || (t.space_id && !existing.space_id)) {
+        map.set(t.date, t)
+      }
+    }
     return map
   }, [themes])
 
@@ -1674,18 +2174,22 @@ export default function DailyActivitiesPage() {
     return themeWeeks.findIndex(w => w.days.some(d => d.date === detailDate))
   }, [themeWeeks, detailDate])
 
-  // 加载主题
+  // 加载主题（按空间筛选）
   useEffect(() => {
-    activityThemeApi.list(themeMonthStart, themeMonthEnd).then(setThemes).catch(() => setThemes([]))
-  }, [themeMonthStart, themeMonthEnd])
+    const spaceFilter = selectedSpaceId ? [selectedSpaceId] : undefined
+    activityThemeApi.list(themeMonthStart, themeMonthEnd, spaceFilter).then(setThemes).catch(() => setThemes([]))
+  }, [themeMonthStart, themeMonthEnd, selectedSpaceId])
 
-  const saveTheme = async (date: string, weekTheme: string, dayTheme: string) => {
-    const result = await activityThemeApi.save(date, weekTheme, dayTheme)
-    setThemes(prev => {
-      const idx = prev.findIndex(t => t.date === date)
-      if (idx >= 0) { const next = [...prev]; next[idx] = result; return next }
-      return [...prev, result]
-    })
+  const saveTheme = async (date: string, weekTheme: string, dayTheme: string, spaceIds: string[]) => {
+    const targetSpaceIds = spaceIds.length > 0 ? spaceIds : (selectedSpaceId ? [selectedSpaceId] : [""])
+    for (const sid of targetSpaceIds) {
+      const result = await activityThemeApi.save(date, weekTheme, dayTheme, sid)
+      setThemes(prev => {
+        const idx = prev.findIndex(t => t.date === date && t.space_id === sid)
+        if (idx >= 0) { const next = [...prev]; next[idx] = result; return next }
+        return [...prev, result]
+      })
+    }
   }
 
   // ===== Permissions =====
@@ -1718,6 +2222,7 @@ export default function DailyActivitiesPage() {
       ...detailErsSessions.map(s => ({ type: "ers" as const, data: s })),
       ...detailEksSessions.map(s => ({ type: "eks" as const, data: s })),
       ...detailIcsSessions.map(s => ({ type: "ics" as const, data: s })),
+      ...detailOcrSessions.map(s => ({ type: "ocr" as const, data: s })),
     ]
     const filtered = selectedSpaceId ? all.filter(r => (r.data as any).space_id === selectedSpaceId) : all
     return filtered.sort((a, b) => {
@@ -1728,7 +2233,7 @@ export default function DailyActivitiesPage() {
       if (!bt) return -1
       return at.localeCompare(bt)
     })
-  }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, selectedSpaceId])
+  }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, detailOcrSessions, selectedSpaceId])
 
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
   const achieverCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("成就君")), [allCustomers])
@@ -1750,14 +2255,15 @@ export default function DailyActivitiesPage() {
   const loadDateData = async (date: string) => {
     setDetailLoading(true)
     try {
-      const dashboard = await classRecordApi.dashboard(date)
-      const { class_records: records, gcs_sessions: gcs, ers_sessions: ers, eks_sessions: eks, ics_sessions: ics } = dashboard
+      const dashboard = await classRecordApi.dashboard(date, selectedSpaceId || undefined)
+      const { class_records: records, gcs_sessions: gcs, ers_sessions: ers, eks_sessions: eks, ics_sessions: ics, ocr_sessions: ocr } = dashboard
 
       setDetailRecords(records)
       setDetailGcsSessions(gcs)
       setDetailErsSessions(ers)
       setDetailEksSessions(eks)
       setDetailIcsSessions(ics)
+      setDetailOcrSessions(ocr || [])
       setCalendarCounts(dashboard.calendar_counts)
 
       // Collect unique customer IDs from all records
@@ -1788,6 +2294,12 @@ export default function DailyActivitiesPage() {
       for (const s of ics) {
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
+      for (const s of (ocr || [])) {
+        if (s.owner_id) ids.add(s.owner_id)
+        if (s.achiever_id) ids.add(s.achiever_id)
+        if (s.host_id) ids.add(s.host_id)
+        for (const pid of (s.participant_ids || [])) ids.add(pid)
+      }
 
       const uniqueIds = [...ids]
       if (uniqueIds.length > 0) {
@@ -1811,6 +2323,7 @@ export default function DailyActivitiesPage() {
   const handleErsClose = useCallback(() => { setErsDialogOpen(false) }, [])
   const handleEksClose = useCallback(() => { setEksDialogOpen(false) }, [])
   const handleIcsClose = useCallback(() => { setIcsDialogOpen(false) }, [])
+  const handleOcrClose = useCallback(() => { setOcrDialogOpen(false) }, [])
 
   const handleSalonSaved = useCallback((record: ClassRecord) => {
     setDetailRecords(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
@@ -1837,10 +2350,21 @@ export default function DailyActivitiesPage() {
     setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
     setIcsDialogOpen(false)
   }, [])
+  const handleOcrSaved = useCallback((record: OhCardReadingSession) => {
+    setDetailOcrSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
+    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setOcrDialogOpen(false)
+  }, [])
 
   const load = () => {
     courseApi.list().then(setCourses).catch(() => {})
-    spaceApi.list().then(setSpaces).catch(() => {})
+    spaceApi.list().then((list) => {
+      setSpaces(list)
+      if (!selectedSpaceId && list.length > 0) {
+        setSelectedSpaceId(list[0].id)
+        localStorage.setItem("daily-activities-space", list[0].id)
+      }
+    }).catch(() => {})
     customerApi.light()
       .then((customers) => {
         setAllCustomers(customers)
@@ -1850,7 +2374,7 @@ export default function DailyActivitiesPage() {
   }
 
   useEffect(() => { load() }, [])
-  useEffect(() => { loadDateData(detailDate) }, [detailDate])
+  useEffect(() => { loadDateData(detailDate) }, [detailDate, selectedSpaceId])
 
   const handleSpaceSelect = useCallback((id: string) => {
     startTransition(() => {
@@ -2052,9 +2576,60 @@ export default function DailyActivitiesPage() {
     } catch {}
   }
 
+  // ===== OCR handlers =====
+  const handleOpenOcrCreate = (date?: string) => {
+    setOcrEditSession(null)
+    setOcrDialogOpen(true)
+  }
+
+  const handleOpenOcrEdit = useCallback((session: OhCardReadingSession) => {
+    setOcrEditSession(session)
+    setOcrDialogOpen(true)
+  }, [])
+
+  const handleOcrDelete = async () => {
+    if (!ocrDeleteId) return
+    try {
+      await ohCardReadingSessionApi.delete(ocrDeleteId)
+      setOcrDeleteId(null)
+      loadDateData(detailDate)
+    } catch (e) { handleApiError(e) }
+  }
+
+  const handleOpenOcrMaterials = useCallback((session: OhCardReadingSession) => {
+    setOcrMaterialsRecord(session)
+    setOcrMaterialsDialogOpen(true)
+  }, [])
+
+  const handleUploadOcrMaterial = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !ocrMaterialsRecord) return
+    setUploading(true)
+    try {
+      const material = await uploadApi.uploadMaterial(file)
+      const newMaterials = [...(ocrMaterialsRecord.materials || []), material]
+      await ohCardReadingSessionApi.update(ocrMaterialsRecord.id, { materials: newMaterials } as any)
+      setOcrMaterialsRecord({ ...ocrMaterialsRecord, materials: newMaterials })
+      loadDateData(detailDate)
+    } catch { alert("上传失败，请重试") }
+    finally { setUploading(false); e.target.value = "" }
+  }
+
+  const handleDeleteOcrMaterial = async (filename: string) => {
+    if (!ocrMaterialsRecord) return
+    try {
+      await uploadApi.deleteMaterial(filename)
+      const newMaterials = (ocrMaterialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      await ohCardReadingSessionApi.update(ocrMaterialsRecord.id, { materials: newMaterials } as any)
+      setOcrMaterialsRecord({ ...ocrMaterialsRecord, materials: newMaterials })
+      loadDateData(detailDate)
+    } catch {}
+  }
+
   // ===== Render helpers =====
   const cardCallbacks = useMemo(() => ({
     teachers,
+    spaces,
     onEditClass: handleOpenEdit,
     onDeleteClass: setDeleteId,
     onMaterialsClass: handleOpenMaterials,
@@ -2068,78 +2643,140 @@ export default function DailyActivitiesPage() {
     onEditIcs: handleOpenIcsEdit,
     onDeleteIcs: setIcsDeleteId,
     onMaterialsIcs: handleOpenIcsMaterials,
-  } as CardCallbacks), [teachers, handleOpenEdit, handleOpenMaterials, handleOpenGcsEdit, handleOpenGcsMaterials, handleOpenErsEdit, handleOpenEksEdit, handleOpenIcsEdit, handleOpenIcsMaterials])
+    onEditOcr: handleOpenOcrEdit,
+    onDeleteOcr: setOcrDeleteId,
+    onMaterialsOcr: handleOpenOcrMaterials,
+  } as CardCallbacks), [teachers, spaces, handleOpenEdit, handleOpenMaterials, handleOpenGcsEdit, handleOpenGcsMaterials, handleOpenErsEdit, handleOpenEksEdit, handleOpenIcsEdit, handleOpenIcsMaterials, handleOpenOcrEdit, handleOpenOcrMaterials])
 
   // ===== JSX =====
   return (
     <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
       <div className="flex flex-col min-h-0 flex-1 gap-2">
         {/* 月份导航 + 空间 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setDetailDate(formatDate(addDays(new Date(detailDate), -1)))} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
+            <button onClick={() => { const d = new Date(detailDate); d.setMonth(d.getMonth() - 1); d.setDate(1); setDetailDate(formatDate(d)) }} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
               <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
             </button>
-            <span className="text-[14px] font-medium text-[#2b2f36]">{new Date(detailDate).getMonth() + 1}月</span>
-            <button onClick={() => setDetailDate(formatDate(addDays(new Date(detailDate), 1)))} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
+            <button
+              className="text-[16px] font-medium text-[#2b2f36] hover:bg-[#f7f8fa] px-1 rounded transition-colors"
+              onClick={() => setMonthPickerOpen(!monthPickerOpen)}
+            >
+              {new Date(detailDate).getFullYear()}年{new Date(detailDate).getMonth() + 1}月
+            </button>
+            {monthPickerOpen && (
+              <>
+                <div className="fixed inset-0 z-[99]" onClick={() => setMonthPickerOpen(false)} />
+                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-[100]" style={{ width: "220px" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <button className="p-0.5 rounded hover:bg-[#f7f8fa]" onClick={() => { const d = new Date(detailDate); d.setFullYear(d.getFullYear() - 1); setDetailDate(formatDate(d)) }}>
+                      <ChevronLeft className="h-3.5 w-3.5 text-[#4e535a]" />
+                    </button>
+                    <span className="text-[13px] font-medium text-[#2b2f36]">{new Date(detailDate).getFullYear()}年</span>
+                    <button className="p-0.5 rounded hover:bg-[#f7f8fa]" onClick={() => { const d = new Date(detailDate); d.setFullYear(d.getFullYear() + 1); setDetailDate(formatDate(d)) }}>
+                      <ChevronRight className="h-3.5 w-3.5 text-[#4e535a]" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                      const d = new Date(detailDate)
+                      const isSelected = d.getMonth() + 1 === m
+                      return (
+                        <button
+                          key={m}
+                          className={`px-1.5 py-1.5 text-[12px] rounded transition-colors whitespace-nowrap ${isSelected ? "bg-[#3370ff] text-white" : "hover:bg-[#f7f8fa] text-[#2b2f36]"}`}
+                          onClick={() => { const nd = new Date(d.getFullYear(), m - 1, 1); setDetailDate(formatDate(nd)); setMonthPickerOpen(false) }}
+                        >
+                          {m}月
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+            <button onClick={() => { const d = new Date(detailDate); d.setMonth(d.getMonth() + 1); d.setDate(1); setDetailDate(formatDate(d)) }} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
               <ChevronRight className="h-4 w-4 text-[#4e535a]" />
             </button>
+            <div className="w-px h-4 bg-[#e8e8e8] mx-1" />
+            <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
           </div>
-          <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
         </div>
 
-        {/* 日历网格 */}
-        <div className="border border-[#e8e8e8] rounded-lg overflow-hidden">
-          {/* 星期头 */}
-          <div className="grid grid-cols-7 bg-[#f8faff] border-b border-[#e8e8e8]">
-            {["一", "二", "三", "四", "五", "六", "日"].map(d => (
-              <div key={d} className="px-1 py-2 text-center text-[11px] text-[#8f959e]">{d}</div>
-            ))}
-          </div>
-          {/* 日期格子 */}
-          {themeWeeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 border-b border-[#e8e8e8] last:border-b-0">
-              {week.days.map((day) => {
-                const dayTheme = themeMap.get(day.date)?.day_theme || ""
-                const dayNum = day.date.split("-")[2].replace(/^0/, "")
-                const isSelected = day.date === detailDate
-                const isToday = day.date === today
-                return (
-                  <button
-                    key={day.date}
-                    className={`px-1 py-1.5 text-left transition-colors border-r border-[#e8e8e8] last:border-r-0 flex flex-col min-h-[52px] ${
-                      !day.inMonth ? "bg-[#fafafa]" : isSelected ? "bg-[#3370ff]" : isToday ? "bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
-                    }`}
-                    onClick={() => day.inMonth && setDetailDate(day.date)}
-                  >
-                    <span className={`text-[11px] leading-none mb-0.5 ${
-                      !day.inMonth ? "text-[#dcdfe4]" : isSelected ? "text-white font-medium" : "text-[#2b2f36]"
-                    }`}>
-                      {dayNum}
-                    </span>
-                    <span className={`text-[10px] leading-snug line-clamp-1 ${
-                      !day.inMonth ? "" : isSelected ? "text-white/80" : dayTheme ? "text-[#4e535a]" : "text-transparent"
-                    }`}>
-                      {day.inMonth ? (dayTheme || "-") : ""}
-                    </span>
-                  </button>
+        {/* 周视图日历 */}
+        <div className="border border-[#e8e8e8] rounded overflow-x-auto">
+          <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%", minWidth: "600px" }}>
+            <colgroup>
+              <col style={{ width: "80px" }} />
+              {Array.from({ length: 7 }, (_, i) => <col key={i} style={{ width: `${(100 - 13.33) / 7}%` }} />)}
+            </colgroup>
+            <thead>
+              <tr className="bg-[#f8faff]">
+                <th className="px-2 py-1.5 text-center text-[12px] text-[#8f959e] font-normal" style={{ borderRight: "0.5px solid #f0f0f0" }}>周主题</th>
+                {["一", "二", "三", "四", "五", "六", "日"].map(d => (
+                  <th key={d} className="px-1 py-1.5 text-center text-[11px] text-[#8f959e] font-normal">{d}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {themeWeeks.flatMap((week, wi) => {
+                const firstTheme = themeMap.get(week.days[0]?.date || "")
+                const weekThemeText = firstTheme?.week_theme || ""
+                const isLastWeek = wi === themeWeeks.length - 1
+                const dateRow = (
+                  <tr key={`date-${wi}`}>
+                    <td
+                      rowSpan={2}
+                      className="px-2 text-center text-[12px] text-[#2b2f36] cursor-pointer hover:bg-[#f0f5ff] overflow-hidden text-ellipsis whitespace-nowrap"
+                      style={{ height: "28px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
+                      onClick={() => setThemeEditWeekIndex(wi)}
+                    >
+                      {weekThemeText}
+                    </td>
+                    {week.days.map((day) => {
+                      const dayNum = day.date.split("-")[2].replace(/^0/, "")
+                      const isSelected = day.date === detailDate
+                      const isToday = day.date === today
+                      return (
+                        <td
+                          key={`date-${day.date}`}
+                          className={`px-1 text-center text-[10px] cursor-pointer transition-colors ${
+                            !day.inMonth ? "bg-[#fafafa]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "bg-[#fafafa] text-[#b0b5bb]"
+                          }`}
+                          style={{ height: "20px" }}
+                          onClick={() => day.inMonth && setDetailDate(day.date)}
+                        >
+                          {day.inMonth ? <div className="relative w-full h-full flex flex-col items-center justify-center"><span className={`${(calendarCounts[day.date] || 0) > 0 ? "text-[#2b2f36]" : "text-[#b0b5bb]"}`}>{dayNum}</span>{(calendarCounts[day.date] || 0) > 0 && <span className="w-2 h-px bg-[#dde8ff] mt-px" />}</div> : ""}
+                        </td>
+                      )
+                    })}
+                  </tr>
                 )
+                const themeRow = (
+                  <tr key={`theme-${wi}`}>
+                    {week.days.map((day) => {
+                      const dayTheme = themeMap.get(day.date)?.day_theme || ""
+                      const isSelected = day.date === detailDate
+                      return (
+                        <td
+                          key={`theme-${day.date}`}
+                          className={`px-1 text-center text-[12px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap ${
+                            !day.inMonth ? "" : ""
+                          }`}
+                          style={{ height: "30px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
+                          onClick={() => day.inMonth && setDetailDate(day.date)}
+                        >
+                          {day.inMonth ? (dayTheme || "") : ""}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+                return [dateRow, themeRow]
               })}
-            </div>
-          ))}
+            </tbody>
+          </table>
         </div>
-
-        {/* 本周主题栏 */}
-        <button
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md bg-[#f8faff] border border-[#e8e8e8] hover:border-[#3370ff] transition-colors text-left"
-          onClick={() => { if (currentWeekIndex >= 0) setThemeEditWeekIndex(currentWeekIndex) }}
-        >
-          <span className="text-[12px] text-[#8f959e] shrink-0">本周主题</span>
-          <span className="flex-1 text-[12px] text-[#2b2f36] truncate">
-            {weekThemeStr || <span className="text-[#c9cdd4]">点击设置</span>}
-          </span>
-          <Edit className="h-3.5 w-3.5 text-[#8f959e] shrink-0" />
-        </button>
 
         {/* 新增按钮 */}
         <div className="flex items-center justify-between relative mt-2.5">
@@ -2156,6 +2793,7 @@ export default function DailyActivitiesPage() {
                   { label: "情绪释放", icon: Heart, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenErsCreate(detailDate) },
                   { label: "能量结", icon: Zap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenEksCreate(detailDate) },
                   { label: "内部课程", icon: GraduationCap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenIcsCreate(detailDate) },
+                  { label: "OH卡梳理", icon: Layers, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenOcrCreate(detailDate) },
                 ].map((item) => (
                   <button
                     key={item.label}
@@ -2201,6 +2839,7 @@ export default function DailyActivitiesPage() {
           weekIndex={themeEditWeekIndex}
           weekDays={themeWeeks[themeEditWeekIndex].days.filter(d => d.inMonth)}
           themeMap={themeMap}
+          spaces={spaces}
           onClose={() => setThemeEditWeekIndex(null)}
           onSaved={saveTheme}
         />
@@ -2214,6 +2853,7 @@ export default function DailyActivitiesPage() {
         courses={courses}
         teachers={teachers}
         session={salonEditSession}
+        defaultSpaceId={selectedSpaceId}
         onClose={handleSalonClose}
         onSaved={handleSalonSaved}
       />
@@ -2226,6 +2866,7 @@ export default function DailyActivitiesPage() {
         allCustomers={allCustomers}
         achieverCustomers={achieverCustomers}
         session={gcsEditSession}
+        defaultSpaceId={selectedSpaceId}
         onClose={handleGcsClose}
         onSaved={handleGcsSaved}
       />
@@ -2238,6 +2879,7 @@ export default function DailyActivitiesPage() {
         allCustomers={allCustomers}
         achieverCustomers={achieverCustomers}
         session={ersEditSession}
+        defaultSpaceId={selectedSpaceId}
         onClose={handleErsClose}
         onSaved={handleErsSaved}
       />
@@ -2250,6 +2892,7 @@ export default function DailyActivitiesPage() {
         allCustomers={allCustomers}
         hostCustomers={eksHostCustomers}
         session={eksEditSession}
+        defaultSpaceId={selectedSpaceId}
         onClose={handleEksClose}
         onSaved={handleEksSaved}
       />
@@ -2261,8 +2904,22 @@ export default function DailyActivitiesPage() {
         spaces={spaces}
         teachers={teachers}
         session={icsEditSession}
+        defaultSpaceId={selectedSpaceId}
         onClose={handleIcsClose}
         onSaved={handleIcsSaved}
+      />
+
+      {/* ===== OCR Dialog ===== */}
+      <OcrDialog
+        open={ocrDialogOpen}
+        date={detailDate}
+        spaces={spaces}
+        allCustomers={allCustomers}
+        achieverCustomers={achieverCustomers}
+        session={ocrEditSession}
+        defaultSpaceId={selectedSpaceId}
+        onClose={handleOcrClose}
+        onSaved={handleOcrSaved}
       />
 
       {/* ===== Salon Delete Dialog ===== */}
@@ -2340,6 +2997,22 @@ export default function DailyActivitiesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={handleIcsDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      )}
+
+      {/* ===== OCR Delete Dialog ===== */}
+      {!!ocrDeleteId && (
+      <AlertDialog open={!!ocrDeleteId} onOpenChange={(open) => !open && setOcrDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除OH卡梳理</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条OH卡梳理记录吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleOcrDelete}>删除</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -2435,6 +3108,38 @@ export default function DailyActivitiesPage() {
               <FileUp className="h-3.5 w-3.5" />
               {uploading ? "上传中..." : "上传文件"}
               <input type="file" className="hidden" onChange={handleUploadIcsMaterial} disabled={uploading} />
+            </label>
+          </div>
+        </DialogContent>
+      </Dialog>
+      )}
+
+      {/* ===== OCR Materials Dialog ===== */}
+      {ocrMaterialsDialogOpen && (
+      <Dialog open={ocrMaterialsDialogOpen} onOpenChange={(open) => { if (!open) setOcrMaterialsDialogOpen(false) }}>
+        <DialogContent className="max-w-md p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b flex flex-row items-center justify-between">
+            <DialogTitle className="text-[15px]">资料管理</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4">
+            {(ocrMaterialsRecord?.materials || []).length === 0 ? (
+              <p className="text-[12px] text-[#8f959e] text-center py-4">暂无资料</p>
+            ) : (
+              <div className="space-y-2">
+                {(ocrMaterialsRecord?.materials || []).map((m, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-gray-50 rounded px-3 py-2">
+                    <File className="h-4 w-4 text-[#8f959e] shrink-0" />
+                    <span className="text-[12px] text-[#2b2f36] truncate flex-1">{m.name || m.url.split("/").pop() || "文件"}</span>
+                    <a href={m.url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 text-[#8f959e] hover:text-[#3370ff]" /></a>
+                    <button onClick={() => handleDeleteOcrMaterial(m.url.split("/").pop() || "")}><Trash2 className="h-4 w-4 text-destructive" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="flex items-center justify-center gap-2 h-10 rounded-md border border-dashed border-[#e8e8e8] text-[12px] text-[#8f959e] cursor-pointer hover:bg-[#f7f8fa]">
+              <FileUp className="h-3.5 w-3.5" />
+              {uploading ? "上传中..." : "上传文件"}
+              <input type="file" className="hidden" onChange={handleUploadOcrMaterial} disabled={uploading} />
             </label>
           </div>
         </DialogContent>

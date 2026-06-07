@@ -18,6 +18,9 @@ from app.services import (
     energy_knot_session_service,
     internal_course_session_service,
     healing_record_service,
+    other_project_service,
+    oh_card_reading_service,
+    oh_card_reading_session_service,
 )
 
 router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
@@ -149,6 +152,37 @@ def _build_purchase_summary(customer_id: str) -> list:
             "expiry_date": c.expiry_date or "",
         })
 
+    # OH卡梳理
+    ocr_readings = [r for r in oh_card_reading_service.list_readings() if r.customer_id == customer_id]
+    ocr_purchased = sum(r.purchase_count for r in ocr_readings)
+    if ocr_purchased > 0:
+        ocr_remaining = oh_card_reading_session_service.get_remaining_count(customer_id)
+        summary.append({
+            "type": "OH卡梳理",
+            "name": "",
+            "total_purchased": ocr_purchased,
+            "total_amount": sum(r.amount for r in ocr_readings),
+            "used": ocr_purchased - ocr_remaining,
+            "remaining": ocr_remaining,
+            "effective_date": "",
+            "expiry_date": "",
+        })
+
+    # 其他项目
+    op_projects = [p for p in other_project_service.list_projects() if p.customer_id == customer_id]
+    for p in op_projects:
+        summary.append({
+            "type": "其他项目",
+            "name": p.project_name,
+            "total_purchased": p.remaining_count if p.remaining_count is not None else "不限",
+            "total_amount": p.fee,
+            "used": "-",
+            "remaining": p.remaining_count if p.remaining_count is not None else "不限",
+            "effective_date": p.effective_date,
+            "expiry_date": p.expiry_date or "",
+            "activity_mode": p.activity_mode or "线下",
+        })
+
     return summary
 
 
@@ -259,6 +293,30 @@ def _build_activities(customer_id: str) -> list:
                 "is_public_welfare": False,
             })
 
+    # OH卡梳理
+    for s in oh_card_reading_session_service.list_sessions():
+        ocr_name = f"OH卡梳理【{s.owner_name}】" if s.owner_name else "OH卡梳理"
+        if s.owner_id == customer_id:
+            activities.append({
+                "type": "OH卡梳理",
+                "date": s.date,
+                "name": ocr_name,
+                "role": "案主",
+                "host": s.host_name or s.achiever_name or "",
+                "session_id": s.id,
+                "is_public_welfare": False,
+            })
+        elif customer_id in s.participant_ids:
+            activities.append({
+                "type": "OH卡梳理",
+                "date": s.date,
+                "name": ocr_name,
+                "role": "参与者",
+                "host": s.host_name or s.achiever_name or "",
+                "session_id": s.id,
+                "is_public_welfare": False,
+            })
+
     activities.sort(key=lambda a: a["date"], reverse=True)
     return activities
 
@@ -335,6 +393,35 @@ def _build_payment_records(customer_id: str) -> list:
             "expiry_date": c.expiry_date or "",
             "closer_name": "",
             "created_at": c.effective_date,
+        })
+
+    # OH卡梳理
+    ocr = [r for r in oh_card_reading_service.list_readings() if r.customer_id == customer_id]
+    for r in ocr:
+        records.append({
+            "type": "OH卡梳理",
+            "name": "OH卡梳理",
+            "quantity": r.purchase_count,
+            "amount": r.amount,
+            "effective_date": r.created_at.strftime("%Y-%m-%d"),
+            "expiry_date": "",
+            "closer_name": r.closer_name or "",
+            "created_at": r.created_at.strftime("%Y-%m-%d"),
+        })
+
+    # 其他项目
+    op = [p for p in other_project_service.list_projects() if p.customer_id == customer_id]
+    for p in op:
+        created = p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at or "")
+        records.append({
+            "type": "其他项目",
+            "name": p.project_name,
+            "quantity": p.remaining_count if p.remaining_count is not None else "不限",
+            "amount": p.fee,
+            "effective_date": p.effective_date,
+            "expiry_date": p.expiry_date or "",
+            "closer_name": p.closer_name or "",
+            "created_at": created,
         })
 
     # 按创建日期倒序

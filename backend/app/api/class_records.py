@@ -221,7 +221,7 @@ def calendar_counts():
 
 
 @router.get("/dashboard")
-def dashboard(date: str = Query(...)):
+def dashboard(date: str = Query(...), space_id: str = Query("")):
     """单次请求返回当天全部数据，替代 8 个独立 API 调用"""
     from app.services import (
         group_case_session_service,
@@ -238,19 +238,21 @@ def dashboard(date: str = Query(...)):
     start_date = (d - timedelta(days=7)).strftime("%Y-%m-%d")
     end_date = (d + timedelta(days=13)).strftime("%Y-%m-%d")
 
-    # 日历计数：所有日期（不等同于 calendar-counts 端点，不做权限过滤）
+    # 日历计数：按空间筛选
     from collections import defaultdict
     cal_counts: dict[str, int] = defaultdict(int)
+    def _match_space(record) -> bool:
+        return not space_id or getattr(record, "space_id", "") == space_id
     for r in class_record_service.list_records():
-        if r.date: cal_counts[r.date] += 1
+        if r.date and _match_space(r): cal_counts[r.date] += 1
     for s in group_case_session_service.list_sessions():
-        if s.date: cal_counts[s.date] += 1
+        if s.date and _match_space(s): cal_counts[s.date] += 1
     for s in emotional_release_session_service.list_sessions():
-        if s.date: cal_counts[s.date] += 1
+        if s.date and _match_space(s): cal_counts[s.date] += 1
     for s in energy_knot_session_service.list_sessions():
-        if s.date: cal_counts[s.date] += 1
+        if s.date and _match_space(s): cal_counts[s.date] += 1
     for s in internal_course_session_service.list_sessions():
-        if s.date: cal_counts[s.date] += 1
+        if s.date and _match_space(s): cal_counts[s.date] += 1
 
     return {
         "class_records": class_record_service.list_records(date),

@@ -20,7 +20,10 @@ from app.api.energy_knots import router as energy_knots_router
 from app.api.membership_cards import router as membership_cards_router
 from app.api.emotional_releases import router as emotional_releases_router
 from app.api.internal_courses import router as internal_courses_router
+from app.api.other_projects import router as other_projects_router
 from app.api.emotional_release_sessions import router as emotional_release_sessions_router
+from app.api.oh_card_readings import router as oh_card_readings_router
+from app.api.oh_card_reading_sessions import router as oh_card_reading_sessions_router
 from app.api.energy_knot_sessions import router as energy_knot_sessions_router
 from app.api.internal_course_sessions import router as internal_course_sessions_router
 from app.api.member_identities import router as member_identities_router
@@ -68,7 +71,10 @@ app.include_router(energy_knots_router)
 app.include_router(membership_cards_router)
 app.include_router(emotional_releases_router)
 app.include_router(internal_courses_router)
+app.include_router(other_projects_router)
 app.include_router(emotional_release_sessions_router)
+app.include_router(oh_card_readings_router)
+app.include_router(oh_card_reading_sessions_router)
 app.include_router(energy_knot_sessions_router)
 app.include_router(internal_course_sessions_router)
 app.include_router(member_identities_router)

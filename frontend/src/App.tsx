@@ -34,8 +34,9 @@ import RemindersPage from "@/pages/reminders"
 import BusinessRemindersPage from "@/pages/business-reminders"
 import TrafficRecordsPage from "@/pages/traffic-records"
 import ActivityRecordsPage from "@/pages/activity-records"
+import OtherProjectsPage from "@/pages/other-projects"
 
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"]
+const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
 
 const PATH_PERMISSIONS: Record<string, string> = {
@@ -64,6 +65,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/config/reminders": "reminders",
   "/business-reminders": "business-reminders",
   "/traffic-records": "traffic-records",
+  "/other-projects": "other-projects",
 }
 
 function ProtectedRoute() {
@@ -140,6 +142,7 @@ function App() {
               <Route path="/courses/class-records" element={<ClassRecordsPage />} />
               <Route path="/courses/daily-activities" element={<DailyActivitiesPage />} />
               <Route path="/payment" element={<PaymentPage />} />
+              <Route path="/other-projects" element={<OtherProjectsPage />} />
               <Route path="/courses/group-case-sessions" element={<GroupCaseSessionsPage />} />
               <Route path="/courses/emotional-release-sessions" element={<EmotionalReleaseSessionsPage />} />
               <Route path="/courses/energy-knot-sessions" element={<EnergyKnotSessionsPage />} />

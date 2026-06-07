@@ -13,6 +13,7 @@ class EnergyKnotSessionBase(BaseModel):
     participant_ids: List[str] = []  # 参与者
     host_ids: List[str] = []  # 课程老师（多选）
     host_names: List[str] = []
+    activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
 

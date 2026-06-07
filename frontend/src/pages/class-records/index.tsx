@@ -11,7 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi, energyKnotSessionApi, internalCourseSessionApi, courseApi, customerApi, visitApi, dailyGroupingApi, spaceApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type Course, type Customer, type VisitRecord, type Space } from "@/lib/api"
+import { classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi, energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi, courseApi, customerApi, visitApi, dailyGroupingApi, spaceApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession, type Course, type Customer, type VisitRecord, type Space } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import ArrivalConfirmationView from "./arrival-confirmation"
@@ -24,6 +24,7 @@ import { useGcsDialogs } from "./use-gcs-dialogs"
 import { useErsDialogs } from "./use-ers-dialogs"
 import { useEksDialogs } from "./use-eks-dialogs"
 import { useIcsDialogs } from "./use-ics-dialogs"
+import { useOcrDialogs } from "./use-ocr-dialogs"
 
 const today = new Date().toISOString().split("T")[0]
 
@@ -112,6 +113,9 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     internalCourseSessionApi.list()
       .then(setInternalCourseSessions)
       .catch((e) => { console.error("internalCourseSessionApi.list failed:", e) })
+    ohCardReadingSessionApi.list()
+      .then(setOhCardReadingSessions)
+      .catch((e) => { console.error("ohCardReadingSessionApi.list failed:", e) })
     courseApi.list().then(setCourses).catch((e) => { console.error("courseApi.list failed:", e) })
     customerApi.list()
       .then((customers) => {
@@ -119,7 +123,13 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         setTeachers(customers.filter(c => c.positions?.includes("课程老师")))
       })
       .catch((e) => { console.error("customerApi.list failed:", e) })
-    spaceApi.list().then(setSpaces).catch(() => {})
+    spaceApi.list().then((data) => {
+      setSpaces(data)
+      if (!selectedSpaceId && data.length > 0) {
+        setSelectedSpaceId(data[0].id)
+        localStorage.setItem("class-records-space", data[0].id)
+      }
+    }).catch(() => {})
   }
 
   const loadClassRecords = () => classRecordApi.list().then(setRecords).catch((e) => { console.error("loadClassRecords failed:", e) })
@@ -127,6 +137,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const loadErs = () => emotionalReleaseSessionApi.list().then(setEmotionalReleaseSessions).catch((e) => { console.error("loadErs failed:", e) })
   const loadEks = () => energyKnotSessionApi.list().then(setEnergyKnotSessions).catch((e) => { console.error("loadEks failed:", e) })
   const loadIcs = () => internalCourseSessionApi.list().then(setInternalCourseSessions).catch((e) => { console.error("loadIcs failed:", e) })
+  const loadOcr = () => ohCardReadingSessionApi.list().then(setOhCardReadingSessions).catch((e) => { console.error("loadOcr failed:", e) })
 
   useEffect(() => { load() }, [])
 
@@ -134,11 +145,11 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   // visitors tab 由 VisitsDetailView 自行加载，避免重复 API 调用
   useEffect(() => {
     if (effectiveDetailTab === "visitors") return
-    visitApi.list(detailDate).then((visits) => {
+    visitApi.list(detailDate, undefined, selectedSpaceId).then((visits) => {
       setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
       setFullVisits(visits)
     }).catch(() => { setDayVisits([]); setFullVisits([]) })
-  }, [detailDate, effectiveDetailTab])
+  }, [detailDate, effectiveDetailTab, selectedSpaceId])
 
   // 加载人员分组
   useEffect(() => {
@@ -152,10 +163,10 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     if (!cpReady) return
     const memberTypes = cp.join(",")
     const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
-    visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate })
+    visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate, spaceId: selectedSpaceId || undefined })
       .then(setVisitCounts)
       .catch(() => {})
-  }, [dateRangeStart, cpReady, cp])
+  }, [dateRangeStart, cpReady, cp, selectedSpaceId])
 
   // 点击外部关闭日历选择器
 
@@ -186,6 +197,9 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     if (type === "ics") {
       return [...(record.participant_ids || [])].filter(Boolean)
     }
+    if (type === "ocr") {
+      return [...(record.participant_ids || []), record.host_id, record.achiever_id].filter(Boolean)
+    }
     return []
   }, [])
 
@@ -193,7 +207,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     setMemberDialogType(type)
     setMemberDialogRecord(record)
     const ids = getCurrentParticipantIds(type, record)
-    const hostId = (type === "gcs" || type === "ers") ? (record.host_id || "") : ""
+    const hostId = (type === "gcs" || type === "ers" || type === "ocr") ? (record.host_id || "") : ""
     // 主持人、成就君、案主不在参与者列表中显示
     const excludeIds = [hostId, record.achiever_id, record.owner_id].filter(Boolean)
     setLocalSelectedIds(ids.filter(id => !excludeIds.includes(id)))
@@ -211,6 +225,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   const [energyKnotSessions, setEnergyKnotSessions] = useState<EnergyKnotSession[]>([])
   const [internalCourseSessions, setInternalCourseSessions] = useState<InternalCourseSession[]>([])
+  const [ohCardReadingSessions, setOhCardReadingSessions] = useState<OhCardReadingSession[]>([])
 
   const dateRange = useMemo(() => Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i))), [dateRangeStart])
 
@@ -229,6 +244,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const detailErs = useMemo(() => emotionalReleaseSessions.filter(s => s.date === detailDate), [emotionalReleaseSessions, detailDate])
   const detailEks = useMemo(() => energyKnotSessions.filter(s => s.date === detailDate), [energyKnotSessions, detailDate])
   const detailIcs = useMemo(() => internalCourseSessions.filter(s => s.date === detailDate), [internalCourseSessions, detailDate])
+  const detailOcr = useMemo(() => ohCardReadingSessions.filter(s => s.date === detailDate), [ohCardReadingSessions, detailDate])
 
   // 详细视图：合并五种记录，按开始时间排序
   const unifiedDetailRecords = useMemo(() => [
@@ -237,6 +253,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     ...detailErs.map(s => ({ type: "ers" as const, data: s, date: s.date })),
     ...detailEks.map(s => ({ type: "eks" as const, data: s, date: s.date })),
     ...detailIcs.map(s => ({ type: "ics" as const, data: s, date: s.date })),
+    ...detailOcr.map(s => ({ type: "ocr" as const, data: s, date: s.date })),
   ]
   .filter(r => !selectedSpaceId || (r.data as any).space_id === selectedSpaceId)
   .sort((a, b) => {
@@ -246,7 +263,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     if (!at) return 1
     if (!bt) return -1
     return at.localeCompare(bt)
-  }), [detailRecords, detailGcs, detailErs, detailEks, detailIcs, selectedSpaceId])
+  }), [detailRecords, detailGcs, detailErs, detailEks, detailIcs, detailOcr, selectedSpaceId])
 
   const getMemberName = useCallback((id: string) => {
     const c = allCustomers.find(c => c.id === id)
@@ -316,6 +333,10 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const icsDialogs = useIcsDialogs({
     allCustomers, dayVisits, draggingVisitorId, setDraggingVisitorId,
     getMemberName, onReload: loadIcs,
+  })
+  const ocrDialogs = useOcrDialogs({
+    allCustomers, dayVisits, draggingVisitorId, setDraggingVisitorId,
+    getMemberName, onReload: loadOcr, onApiError: handleApiError,
   })
 
   // 权限检查
@@ -411,6 +432,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                   + emotionalReleaseSessions.filter(s => s.date === d).length
                   + energyKnotSessions.filter(s => s.date === d).length
                   + internalCourseSessions.filter(s => s.date === d).length
+                  + ohCardReadingSessions.filter(s => s.date === d).length
               return (
                 <button
                   key={d}
@@ -447,6 +469,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             hideDateBar
             onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
             onDataLoaded={handleVisitsDataLoaded}
+            spaceId={selectedSpaceId}
           />
         </div>
       ) : effectiveDetailTab === "grouping" ? (
@@ -477,7 +500,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           onCancelArrived={async (visit) => {
             try {
               await visitApi.update(visit.id, { arrived: false, arrival_time: "" } as any)
-              const visits = await visitApi.list(detailDate)
+              const visits = await visitApi.list(detailDate, undefined, selectedSpaceId)
               setFullVisits(visits)
               setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
             } catch (e) { handleApiError(e) }
@@ -548,9 +571,11 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 ersActions={ersDialogs.actions}
                 eksActions={eksDialogs.actions}
                 icsActions={icsDialogs.actions}
+                ocrActions={ocrDialogs.actions}
                 getTeacherNames={getTeacherNames}
                 getMemberName={getMemberName}
                 dailyGroups={groups}
+                spaces={spaces}
               />
             )}
 
@@ -565,12 +590,13 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       {ersDialogs.dialogs}
       {eksDialogs.dialogs}
       {icsDialogs.dialogs}
+      {ocrDialogs.dialogs}
 
       {/* 成员选择弹窗 */}
       {memberDialogOpen && memberDialogRecord && (() => {
         const record = memberDialogRecord
-        const isHostType = memberDialogType === "gcs" || memberDialogType === "ers"
-        const activityName = memberDialogType === "class" ? record.course_name : memberDialogType === "gcs" ? "觉醒游戏" : memberDialogType === "ers" ? "情绪释放" : memberDialogType === "ics" ? record.course_name : ""
+        const isHostType = memberDialogType === "gcs" || memberDialogType === "ers" || memberDialogType === "ocr"
+        const activityName = memberDialogType === "class" ? record.course_name : memberDialogType === "gcs" ? "觉醒游戏" : memberDialogType === "ers" ? "情绪释放" : memberDialogType === "ocr" ? "OH卡梳理" : memberDialogType === "ics" ? record.course_name : ""
 
         // 当日到场客户（用于筛选范围）
         const dayVisitCustomers = allCustomers.filter(c => dayVisits.some(v => v.id === c.id))
@@ -636,6 +662,9 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             } else if (memberDialogType === "ics") {
               await internalCourseSessionApi.update(record.id, { participant_ids: localSelectedIds } as any)
               loadIcs()
+            } else if (memberDialogType === "ocr") {
+              await ohCardReadingSessionApi.update(record.id, { participant_ids: localSelectedIds, host_id: localHostId || "" } as any)
+              loadOcr()
             }
             handleClose()
           } catch (e: any) {
@@ -757,7 +786,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                   try {
                     await visitApi.update(arrivalVisit.id, { arrived: true, arrival_time: arrivalTime })
                     // 刷新数据
-                    const visits = await visitApi.list(detailDate)
+                    const visits = await visitApi.list(detailDate, undefined, selectedSpaceId)
                     setFullVisits(visits)
                     setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
                     setArrivalDialogOpen(false)

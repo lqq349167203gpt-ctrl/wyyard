@@ -29,37 +29,42 @@ def _save(item_id: str = ""):
 _load()
 
 
-def list_themes(start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[ActivityTheme]:
+def list_themes(start_date: Optional[str] = None, end_date: Optional[str] = None, space_ids: Optional[List[str]] = None) -> List[ActivityTheme]:
     result = list(_themes.values())
     if start_date:
         result = [t for t in result if t.date >= start_date]
     if end_date:
         result = [t for t in result if t.date <= end_date]
+    if space_ids is not None:
+        # 同时返回指定空间的主题和无空间的旧数据（兼容）
+        result = [t for t in result if t.space_id in space_ids or t.space_id == ""]
     result.sort(key=lambda t: t.date)
     return result
 
 
-def save_theme(date: str, week_theme: str, day_theme: str) -> ActivityTheme:
-    """按 date upsert，同一天的 week_theme 会覆盖整周"""
-    existing = _themes.get(date)
+def save_theme(date: str, week_theme: str, day_theme: str, space_id: str = "") -> ActivityTheme:
+    """按 date+space_id upsert"""
+    key = f"{date}:{space_id}" if space_id else date
+    existing = _themes.get(key)
     now = datetime.now()
     if existing:
         existing.week_theme = week_theme
         existing.day_theme = day_theme
         existing.updated_at = now
-        _save(date)
+        _save(key)
         return existing
     else:
         theme = ActivityTheme(
-            id=date,
+            id=key,
             date=date,
+            space_id=space_id,
             week_theme=week_theme,
             day_theme=day_theme,
             created_at=now,
             updated_at=now,
         )
-        _themes[date] = theme
-        _save(date)
+        _themes[key] = theme
+        _save(key)
         return theme
 
 

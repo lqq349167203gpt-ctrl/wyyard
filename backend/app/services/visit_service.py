@@ -252,7 +252,7 @@ def get_visit(visit_id: str) -> Optional[VisitRecord]:
     return r
 
 
-def get_date_counts(customer_ids: list[str] | None = None, start_date: str | None = None, end_date: str | None = None) -> dict[str, int]:
+def get_date_counts(customer_ids: list[str] | None = None, start_date: str | None = None, end_date: str | None = None, space_id: str | None = None) -> dict[str, int]:
     """返回各日期的到场人数统计，不做活动计数。customer_ids 用于权限过滤"""
     allowed = set(customer_ids) if customer_ids else None
     counts: dict[str, int] = {}
@@ -265,11 +265,13 @@ def get_date_counts(customer_ids: list[str] | None = None, start_date: str | Non
             continue
         if allowed is not None and v.customer_id not in allowed:
             continue
+        if space_id is not None and v.space_id != space_id:
+            continue
         counts[v.visit_date] = counts.get(v.visit_date, 0) + 1
     return counts
 
 
-def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None) -> List[VisitRecord]:
+def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, space_id: Optional[str] = None) -> List[VisitRecord]:
     from app.services import membership_card_service
 
     records = [v for v in _visits.values() if not v.is_deleted]
@@ -277,6 +279,8 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None) -
         records = [r for r in records if r.visit_date == date]
     if customer_id:
         records = [r for r in records if r.customer_id == customer_id]
+    if space_id is not None:
+        records = [r for r in records if r.space_id == space_id]
 
     # 批量构建所有客户的活动计数（一次扫描，O(total_records)）
     all_activity_counts = _build_customer_activity_counts()

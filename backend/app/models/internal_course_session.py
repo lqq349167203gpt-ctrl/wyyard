@@ -14,6 +14,7 @@ class InternalCourseSessionBase(BaseModel):
     host_names: List[str] = []
     participant_ids: List[str] = []  # 参与者
     materials: List[dict] = []
+    activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
 

@@ -265,6 +265,7 @@ export interface VisitRecord {
   needs: string
   activity_id: string
   activity_type: string
+  space_id: string
   arrived: boolean
   arrival_time?: string
   visit_count: number
@@ -290,6 +291,7 @@ export interface VisitRecordCreate {
   needs?: string
   activity_id?: string
   activity_type?: string
+  space_id?: string
   arrived?: boolean
   arrival_time?: string
 }
@@ -304,17 +306,19 @@ export interface CustomerSearchResult {
 }
 
 export const visitApi = {
-  list: (date?: string, customerId?: string) => {
+  list: (date?: string, customerId?: string, spaceId?: string) => {
     const params = new URLSearchParams()
     if (date) params.set("date", date)
     if (customerId) params.set("customer_id", customerId)
+    if (spaceId) params.set("space_id", spaceId)
     const qs = params.toString()
     return request<VisitRecord[]>(`/api/visits${qs ? `?${qs}` : ""}`)
   },
-  listPaginated: (date?: string, customerId?: string, page = 1, pageSize = 10) => {
+  listPaginated: (date?: string, customerId?: string, page = 1, pageSize = 10, spaceId?: string) => {
     const params = new URLSearchParams()
     if (date) params.set("date", date)
     if (customerId) params.set("customer_id", customerId)
+    if (spaceId) params.set("space_id", spaceId)
     params.set("page", String(page))
     params.set("page_size", String(pageSize))
     return request<PaginatedResponse<VisitRecord>>(`/api/visits?${params.toString()}`)
@@ -324,12 +328,13 @@ export const visitApi = {
   update: (id: string, data: Partial<VisitRecordCreate> & { activity_participation?: { name: string; role: string; participated: boolean }[]; experience?: string; feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/visits/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/visits/search-customers?q=${encodeURIComponent(keyword)}`),
-  counts: (params?: { customerIds?: string; startDate?: string; endDate?: string; memberTypes?: string }) => {
+  counts: (params?: { customerIds?: string; startDate?: string; endDate?: string; memberTypes?: string; spaceId?: string }) => {
     const qs = new URLSearchParams()
     if (params?.customerIds !== undefined) qs.set("customer_ids", params.customerIds)
     if (params?.startDate) qs.set("start_date", params.startDate)
     if (params?.endDate) qs.set("end_date", params.endDate)
     if (params?.memberTypes !== undefined) qs.set("member_types", params.memberTypes)
+    if (params?.spaceId) qs.set("space_id", params.spaceId)
     const str = qs.toString()
     return request<Record<string, number>>(`/api/visits/counts${str ? `?${str}` : ""}`)
   },
@@ -461,7 +466,7 @@ export const classRecordApi = {
   updateGroups: (id: string, groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/groups`, { method: "PATCH", body: JSON.stringify({ groups }) }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/class-records/search-customers?q=${encodeURIComponent(keyword)}`),
   calendarCounts: () => request<Record<string, number>>("/api/class-records/calendar-counts"),
-  dashboard: (date: string) => request<DashboardData>(`/api/class-records/dashboard?date=${date}`),
+  dashboard: (date: string, spaceId?: string) => request<DashboardData>(`/api/class-records/dashboard?date=${date}${spaceId ? `&space_id=${spaceId}` : ""}`),
 }
 
 export interface DashboardData {
@@ -565,6 +570,83 @@ export const groupCaseSessionApi = {
   update: (id: string, data: Partial<GroupCaseSessionCreate>) => request<GroupCaseSession & { warnings?: string[] }>(`/api/group-case-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/group-case-sessions/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<GroupCaseCustomerSearchResult[]>(`/api/group-case-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
+}
+
+// OH Card Readings
+export interface OhCardReading {
+  id: string
+  customer_id: string
+  nickname: string
+  purchase_count: number
+  amount: number
+  closer_id: string | null
+  closer_name: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OhCardReadingCreate {
+  customer_id: string
+  nickname: string
+  purchase_count?: number
+  amount?: number
+  closer_id?: string | null
+  closer_name?: string | null
+}
+
+export const ohCardReadingApi = {
+  list: () => request<OhCardReading[]>("/api/oh-card-readings"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<OhCardReading>>(`/api/oh-card-readings?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  create: (data: OhCardReadingCreate) => request<OhCardReading>("/api/oh-card-readings", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<OhCardReadingCreate>) => request<OhCardReading>(`/api/oh-card-readings/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/oh-card-readings/${id}`, { method: "DELETE" }),
+  searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/oh-card-readings/search-customers?q=${encodeURIComponent(keyword)}`),
+}
+
+// OH Card Reading Sessions
+export interface OhCardReadingSession {
+  id: string
+  date: string
+  start_time: string | null
+  end_time: string | null
+  owner_id: string
+  owner_name: string
+  description: string
+  participant_ids: string[]
+  achiever_id: string
+  achiever_name: string
+  host_id: string
+  host_name: string
+  materials: Material[]
+  space_id: string
+  room_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OhCardReadingSessionCreate {
+  date: string
+  start_time?: string | null
+  end_time?: string | null
+  owner_id: string
+  owner_name: string
+  description?: string
+  participant_ids?: string[]
+  achiever_id?: string
+  achiever_name?: string
+  host_id?: string
+  host_name?: string
+  space_id?: string
+  room_id?: string
+}
+
+export const ohCardReadingSessionApi = {
+  list: (date?: string) => request<OhCardReadingSession[]>(`/api/oh-card-reading-sessions${date ? `?date=${date}` : ""}`),
+  listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<OhCardReadingSession>>(`/api/oh-card-reading-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
+  create: (data: OhCardReadingSessionCreate) => request<OhCardReadingSession>("/api/oh-card-reading-sessions", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<OhCardReadingSessionCreate>) => request<OhCardReadingSession & { warnings?: string[] }>(`/api/oh-card-reading-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/oh-card-reading-sessions/${id}`, { method: "DELETE" }),
+  searchCustomers: (keyword: string) => request<GroupCaseCustomerSearchResult[]>(`/api/oh-card-reading-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
 // Energy Knots
@@ -857,6 +939,66 @@ export const membershipCardApi = {
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/membership-cards/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
+// Other Projects
+export interface OtherProject {
+  id: string
+  customer_id: string
+  nickname: string
+  project_name: string
+  fee: number
+  activity_mode: string
+  effective_date: string
+  duration_type: string | null
+  duration_value: number | null
+  remaining_count: number | null
+  expiry_date: string | null
+  closer_id: string | null
+  closer_name: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OtherProjectCreate {
+  customer_id: string
+  nickname: string
+  project_name: string
+  fee: number
+  activity_mode: string
+  effective_date: string
+  duration_type?: string | null
+  duration_value?: number | null
+  remaining_count?: number | null
+  expiry_date?: string | null
+  closer_id?: string | null
+  closer_name?: string | null
+}
+
+export const otherProjectApi = {
+  list: () => request<OtherProject[]>("/api/other-projects"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<OtherProject>>(`/api/other-projects?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  create: (data: OtherProjectCreate) => request<OtherProject>("/api/other-projects", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<OtherProjectCreate>) => request<OtherProject>(`/api/other-projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/other-projects/${id}`, { method: "DELETE" }),
+  searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/other-projects/search-customers?q=${encodeURIComponent(keyword)}`),
+  getAvailableProjects: (customerId: string) => request<{ id: string; project_name: string; activity_mode: string; remaining_count: number | null; effective_date: string; expiry_date: string; created_at: string }[]>(`/api/other-projects/${customerId}/available-projects`),
+  deduct: (data: { customer_id: string; other_project_id: string; count: number }) => request<any>("/api/other-projects/deductions", { method: "POST", body: JSON.stringify(data) }),
+  listDeductions: (customerId?: string) => request<OtherProjectDeduction[]>(`/api/other-projects/deductions${customerId ? `?customer_id=${customerId}` : ""}`),
+}
+
+export interface OtherProjectDeduction {
+  id: string
+  customer_id: string
+  nickname: string
+  other_project_id: string
+  project_name: string
+  activity_mode: string
+  project_created_at: string
+  count: number
+  deduction_date: string
+  remaining_after: number
+  created_at: string
+}
+
 // Space
 export interface Room {
   id: string
@@ -1009,6 +1151,10 @@ export interface PurchaseSummaryItem {
   total_amount: number
   used: number | string
   remaining: number | string
+  name?: string
+  effective_date?: string
+  expiry_date?: string
+  activity_mode?: string
 }
 
 export interface ActivityRecord {
@@ -1289,6 +1435,7 @@ export const businessReminderApi = {
 export interface ActivityTheme {
   id: string
   date: string
+  space_id: string
   week_theme: string
   day_theme: string
   created_at: string
@@ -1296,15 +1443,16 @@ export interface ActivityTheme {
 }
 
 export const activityThemeApi = {
-  list: (start_date?: string, end_date?: string) => {
+  list: (start_date?: string, end_date?: string, space_ids?: string[]) => {
     const params = new URLSearchParams()
     if (start_date) params.set("start_date", start_date)
     if (end_date) params.set("end_date", end_date)
+    if (space_ids) space_ids.forEach(id => params.append("space_ids", id))
     return request<ActivityTheme[]>(`/api/activity-themes?${params.toString()}`)
   },
-  save: (date: string, week_theme: string, day_theme: string) =>
+  save: (date: string, week_theme: string, day_theme: string, space_id: string = "") =>
     request<ActivityTheme>(`/api/activity-themes`, {
       method: "POST",
-      body: JSON.stringify({ date, week_theme, day_theme }),
+      body: JSON.stringify({ date, space_id, week_theme, day_theme }),
     }),
 }
