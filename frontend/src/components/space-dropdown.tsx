@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, memo } from "react"
-import { ChevronDown } from "lucide-react"
 import type { Space } from "@/lib/api"
 
 export const SpaceDropdown = memo(function SpaceDropdown({ spaces, selectedSpaceId, onSelect }: { spaces: Space[]; selectedSpaceId: string; onSelect: (id: string) => void }) {
@@ -25,11 +24,10 @@ export const SpaceDropdown = memo(function SpaceDropdown({ spaces, selectedSpace
   return (
     <div className="relative shrink-0" ref={ref}>
       <button
-        className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
+        className="flex items-center px-1.5 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
         onClick={() => setOpen(!open)}
       >
         <span className="text-[16px] text-[#2b2f36] font-medium whitespace-nowrap">{selectedName}</span>
-        <ChevronDown className="h-4 w-4 text-[#8f959e]" />
       </button>
       {open && (
         <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] py-1 z-50 min-w-[140px]">

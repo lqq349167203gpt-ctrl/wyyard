@@ -1213,6 +1213,7 @@ export interface SystemLogCreate {
 export interface OperationLogQuery {
   operator?: string
   method?: string
+  section?: string
   date_from?: string
   date_to?: string
   entity_id?: string
@@ -1266,6 +1267,7 @@ export const operationLogApi = {
     const qs = new URLSearchParams()
     if (params?.operator) qs.set("operator", params.operator)
     if (params?.method) qs.set("method", params.method)
+    if (params?.section) qs.set("section", params.section)
     if (params?.date_from) qs.set("date_from", params.date_from)
     if (params?.date_to) qs.set("date_to", params.date_to)
     if (params?.entity_id) qs.set("entity_id", params.entity_id)
@@ -1277,6 +1279,7 @@ export const operationLogApi = {
     const qs = new URLSearchParams()
     if (params?.operator) qs.set("operator", params.operator)
     if (params?.method) qs.set("method", params.method)
+    if (params?.section) qs.set("section", params.section)
     if (params?.date_from) qs.set("date_from", params.date_from)
     if (params?.date_to) qs.set("date_to", params.date_to)
     if (params?.entity_id) qs.set("entity_id", params.entity_id)

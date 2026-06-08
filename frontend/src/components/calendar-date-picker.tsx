@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo } from "react"
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 const today = new Date().toISOString().split("T")[0]
 
@@ -43,7 +43,7 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
   return (
     <div data-dropdown className="relative inline-block shrink-0">
       <button
-        className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
+        className="flex items-center px-1.5 py-0.5 rounded hover:bg-[#f7f8fa] transition-colors"
         onClick={() => {
           setMonth(detailDate.substring(0, 7))
           setOpen(!open)
@@ -52,7 +52,6 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
         <span className="text-[16px] text-[#2b2f36] font-medium whitespace-nowrap">
           {formatDateChinese(detailDate)}
         </span>
-        <ChevronDown className="h-4 w-4 text-[#8f959e]" />
       </button>
       {open && (
         <div ref={ref} className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-50 w-[280px]">

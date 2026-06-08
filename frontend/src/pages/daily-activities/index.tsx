@@ -2654,7 +2654,7 @@ export default function DailyActivitiesPage() {
       <div className="flex flex-col min-h-0 flex-1 gap-2">
         {/* 月份导航 + 空间 */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 relative">
+          <div className="flex items-center gap-0 relative">
             <button onClick={() => { const d = new Date(detailDate); d.setMonth(d.getMonth() - 1); d.setDate(1); setDetailDate(formatDate(d)) }} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
               <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
             </button>
@@ -2698,8 +2698,7 @@ export default function DailyActivitiesPage() {
             <button onClick={() => { const d = new Date(detailDate); d.setMonth(d.getMonth() + 1); d.setDate(1); setDetailDate(formatDate(d)) }} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
               <ChevronRight className="h-4 w-4 text-[#4e535a]" />
             </button>
-            <div className="w-px h-4 bg-[#e8e8e8] mx-1" />
-            <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
+            <div className="ml-1.5"><SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} /></div>
           </div>
         </div>
 

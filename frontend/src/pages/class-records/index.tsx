@@ -411,7 +411,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       <div className="flex flex-col min-h-0 flex-1 gap-2">
       <div className="bg-[#f8faff] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
       {/* 选中日期显示 + 操作按钮 */}
-      <div className="flex items-center">
+      <div className="flex items-center gap-1.5">
         <CalendarDatePicker detailDate={detailDate} onSelectDate={(d) => startTransition(() => setDetailDate(d))} />
         <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
       </div>
@@ -427,12 +427,20 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
               const isVisitorsTab = effectiveDetailTab === "visitors" || effectiveDetailTab === "arrival_confirmation" || effectiveDetailTab === "grouping"
               const dayCount = isVisitorsTab
                 ? (visitCounts[d] || 0)
-                : records.filter(r => r.date === d).length
-                  + groupCaseSessions.filter(s => s.date === d).length
-                  + emotionalReleaseSessions.filter(s => s.date === d).length
-                  + energyKnotSessions.filter(s => s.date === d).length
-                  + internalCourseSessions.filter(s => s.date === d).length
-                  + ohCardReadingSessions.filter(s => s.date === d).length
+                : (selectedSpaceId
+                    ? records.filter(r => r.date === d && r.space_id === selectedSpaceId).length
+                      + groupCaseSessions.filter(s => s.date === d && s.space_id === selectedSpaceId).length
+                      + emotionalReleaseSessions.filter(s => s.date === d && s.space_id === selectedSpaceId).length
+                      + energyKnotSessions.filter(s => s.date === d && s.space_id === selectedSpaceId).length
+                      + internalCourseSessions.filter(s => s.date === d && s.space_id === selectedSpaceId).length
+                      + ohCardReadingSessions.filter(s => s.date === d && s.space_id === selectedSpaceId).length
+                    : records.filter(r => r.date === d).length
+                      + groupCaseSessions.filter(s => s.date === d).length
+                      + emotionalReleaseSessions.filter(s => s.date === d).length
+                      + energyKnotSessions.filter(s => s.date === d).length
+                      + internalCourseSessions.filter(s => s.date === d).length
+                      + ohCardReadingSessions.filter(s => s.date === d).length
+                  )
               return (
                 <button
                   key={d}
