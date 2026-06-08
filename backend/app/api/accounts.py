@@ -32,11 +32,35 @@ async def create_account(data: AccountCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+ALL_PAGE_KEYS = [
+    "healing-records", "activity-records", "traffic-records",
+    "class-records-visitors", "class-records-activities", "class-records-arrival",
+    "daily-activities", "payment", "membership-cards", "group-cases",
+    "emotional-releases", "energy-knots", "internal-courses", "other-projects",
+    "agents", "business-reminders", "system-logs", "operation-logs",
+    "member-identities", "healing-identities", "position-management",
+    "courses", "spaces", "reminders",
+]
+
+
 @router.post("/login")
 async def login(data: LoginRequest):
     result = account_service.login(data.username, data.password)
     if not result:
         return {"success": False, "message": "账号或密码错误"}
+
+    if result.role == "超级管理员":
+        from app.services import member_identity_service
+        all_identities = [i.name for i in member_identity_service.list_identities()]
+        return {
+            "success": True,
+            "account": result,
+            "permissions": ALL_PAGE_KEYS,
+            "customer_permissions": all_identities,
+            "customer_permissions_class_records": all_identities,
+            "customer_permissions_payment": all_identities,
+        }
+
     permissions = position_permission_service.get_permissions(result.role)
     return {
         "success": True,
