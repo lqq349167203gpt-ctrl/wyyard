@@ -31,7 +31,7 @@ export default function LoginPage() {
       const result = await accountApi.login(username, password)
       if (result.success) {
         const permissions = result.permissions || []
-        if (permissions.length === 0) {
+        if (permissions.length === 0 && result.account?.role !== "超级管理员") {
           setError("当前账号未配置系统权限")
           setLoading(false)
           return
