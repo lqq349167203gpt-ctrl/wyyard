@@ -35,6 +35,7 @@ _load()
 def list_logs(
     operator: Optional[str] = None,
     method: Optional[str] = None,
+    section: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     entity_id: Optional[str] = None,
@@ -43,6 +44,8 @@ def list_logs(
     logs = list(_logs.values())
     if operator:
         logs = [l for l in logs if l.operator == operator]
+    if section:
+        logs = [l for l in logs if l.section == section]
     if method:
         if method == "UPDATE":
             logs = [l for l in logs if l.method in ("PUT", "PATCH")]

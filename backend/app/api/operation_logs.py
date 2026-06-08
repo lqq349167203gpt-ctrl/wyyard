@@ -10,6 +10,7 @@ router = APIRouter(prefix="/api/operation-logs", tags=["operation-logs"])
 def list_logs(
     operator: Optional[str] = None,
     method: Optional[str] = None,
+    section: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     entity_id: Optional[str] = None,
@@ -20,6 +21,7 @@ def list_logs(
     items = operation_log_service.list_logs(
         operator=operator,
         method=method,
+        section=section,
         date_from=date_from,
         date_to=date_to,
         entity_id=entity_id,

@@ -35,6 +35,13 @@ SECTION_MAP = {
     "/api/position-permissions": "角色权限",
     "/api/position-customer-permissions": "角色权限",
     "/api/system-logs": "系统日志",
+    "/api/other-projects": "其他项目",
+    "/api/oh-card-readings": "OH卡梳理",
+    "/api/oh-card-reading-sessions": "OH卡梳理",
+    "/api/reminders": "提醒配置",
+    "/api/business-reminders": "业务提醒",
+    "/api/activity-themes": "活动安排",
+    "/api/organizations": "沙龙类型",
 }
 
 # 路径前缀 → (section, service_module, get_function_name)
@@ -62,6 +69,12 @@ GETTER_MAP = {
     "/api/positions": ("角色权限", "position_service", "get_position"),
     "/api/position-permissions": ("角色权限", "position_permission_service", "get_permissions"),
     "/api/position-customer-permissions": ("角色权限", "position_customer_permission_service", "get_data"),
+    "/api/other-projects": ("其他项目", "other_project_service", "get_project"),
+    "/api/oh-card-readings": ("OH卡梳理", "oh_card_reading_service", "get_reading"),
+    "/api/oh-card-reading-sessions": ("OH卡梳理", "oh_card_reading_session_service", "get_session"),
+    "/api/reminders": ("提醒配置", "reminder_service", "get_reminder"),
+    "/api/activity-themes": ("活动安排", "activity_theme_service", "get_theme"),
+    "/api/organizations": ("沙龙类型", "organization_service", "get_organization"),
 }
 
 PAGE_LABELS: dict[str, str] = {
@@ -93,6 +106,13 @@ PAGE_LABELS: dict[str, str] = {
     "position-management": "角色权限",
     "courses": "沙龙类型",
     "spaces": "疗愈空间",
+    "other-projects": "其他项目",
+    "oh-card-readings": "OH卡梳理",
+    "oh-card-reading-sessions": "OH卡梳理",
+    "reminders": "提醒配置",
+    "business-reminders": "业务提醒",
+    "activity-themes": "活动安排",
+    "organizations": "沙龙类型",
 }
 
 SKIP_PATHS = [
@@ -172,7 +192,7 @@ def get_entity_id(path: str) -> str:
     if match:
         eid = match.group(1)
         # Skip action-like path segments (not real entity IDs)
-        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups"):
+        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups", "deductions", "verify"):
             return ""
         return eid
     return ""
@@ -544,6 +564,81 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     entity_name = get_entity_name(body) if body else ""
     if not entity_name and before:
         entity_name = get_entity_name(before)
+
+    # 业务提醒切换状态
+    if "/api/business-reminders/" in path and path.rstrip("/").endswith("/toggle"):
+        item_id_match = re.search(r"/api/business-reminders/([^/]+)/toggle", path)
+        item_id = item_id_match.group(1) if item_id_match else ""
+        desc = body.get("description", "")
+        if desc:
+            return f"切换提醒状态：{desc}"
+        # 尝试从 service 获取提醒描述
+        try:
+            from app.services import business_reminder_service
+            items = business_reminder_service._load()
+            for item in items:
+                if item.get("id") == item_id or f"{item.get('user_id', '')}:{item.get('id', '')}" == item_id:
+                    desc = item.get("description", "")
+                    if desc:
+                        return f"切换提醒状态：{desc}"
+        except Exception:
+            pass
+        return "切换提醒状态"
+
+    # 其他项目扣减：生成"用户名 · 项目名 扣减N次"格式
+    if path.rstrip("/") == "/api/other-projects/deductions" and method == "POST":
+        customer_id = body.get("customer_id", "")
+        project_id = body.get("other_project_id", "")
+        count = body.get("count", 1)
+        customer_name = ""
+        project_name = ""
+        try:
+            from app.services import customer_service, other_project_service
+            c = customer_service.get_customer(customer_id)
+            if c:
+                customer_name = c.nickname or c.name
+            p = other_project_service.get_project(project_id)
+            if p:
+                project_name = p.project_name
+        except Exception:
+            pass
+        parts = []
+        if customer_name:
+            parts.append(customer_name)
+        if project_name:
+            parts.append(project_name)
+        parts.append(f"扣减{count}次")
+        return " · ".join(parts) if len(parts) > 1 else parts[0]
+
+    # 其他项目新增：生成"客户 · 项目名（¥金额，N次）"格式
+    if path.rstrip("/") == "/api/other-projects" and method == "POST":
+        project_name = body.get("project_name", "")
+        nickname = (body.get("nickname") or "").strip()
+        fee = body.get("fee")
+        remaining = body.get("remaining_count")
+        parts = []
+        if nickname:
+            parts.append(nickname)
+        if project_name:
+            parts.append(project_name)
+        detail_parts = []
+        if fee is not None:
+            detail_parts.append(f"¥{fee}")
+        if remaining is not None:
+            detail_parts.append(f"{remaining}次")
+        if detail_parts:
+            return f"{' · '.join(parts)}（{'，'.join(detail_parts)}）" if parts else f"新增其他项目（{'，'.join(detail_parts)}）"
+        return f"新增其他项目：{' · '.join(parts)}" if parts else "新增其他项目"
+
+    # 活动主题：显示日期和主题内容
+    if path.rstrip("/") == "/api/activity-themes" and method == "POST":
+        date = body.get("date", "")
+        week_theme = body.get("week_theme", "")
+        day_theme = body.get("day_theme", "")
+        theme = day_theme or week_theme
+        if theme:
+            return f"设置活动主题：{date}（{theme}）"
+        return f"设置活动主题：{date}"
 
     # 活动权限配置：通过 diff 描述具体变更
     if path.rstrip("/") == "/api/activity-permissions":
