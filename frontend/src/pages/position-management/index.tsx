@@ -11,24 +11,26 @@ import type { Position, Account } from "@/lib/api"
 import { AccountsContent } from "@/pages/accounts"
 
 const ALL_PAGES = [
-
-
   { key: "healing-records", label: "客户信息" },
+  { key: "activity-records", label: "活动记录" },
+  { key: "traffic-records", label: "引流记录" },
   { key: "class-records-visitors", label: "到场人员" },
   { key: "class-records-activities", label: "当日活动" },
   { key: "class-records-arrival", label: "到场确认" },
+  { key: "daily-activities", label: "活动安排" },
+  { key: "payment", label: "付费项目" },
   { key: "membership-cards", label: "会员活动" },
   { key: "group-cases", label: "觉醒游戏" },
   { key: "emotional-releases", label: "情绪释放" },
   { key: "energy-knots", label: "能量结" },
   { key: "internal-courses", label: "内部课程" },
+  { key: "other-projects", label: "其他项目" },
   { key: "group-case-sessions", label: "觉醒游戏场次" },
   { key: "emotional-release-sessions", label: "情绪释放场次" },
   { key: "energy-knot-sessions", label: "能量结场次" },
   { key: "internal-course-sessions", label: "内部课程场次" },
   { key: "agents", label: "AI 配置" },
-
-
+  { key: "business-reminders", label: "业务提醒" },
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
   { key: "member-identities", label: "会员身份" },
@@ -36,16 +38,17 @@ const ALL_PAGES = [
   { key: "position-management", label: "账号管理" },
   { key: "courses", label: "活动配置" },
   { key: "spaces", label: "疗愈空间" },
+  { key: "reminders", label: "提醒配置" },
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务数据", keys: ["healing-records"] },
-  { label: "人员到场", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival"] },
-  { label: "付费项目", keys: ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"] },
+  { label: "业务数据", keys: ["healing-records", "activity-records", "traffic-records"] },
+  { label: "人员到场", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
+  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
   { label: "场次", keys: ["group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"] },
-  { label: "信息配置", keys: ["courses", "member-identities", "healing-identities", "spaces"] },
+  { label: "信息配置", keys: ["courses", "member-identities", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management"] },
-  { label: "系统配置", keys: ["agents", "system-logs", "operation-logs"] },
+  { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs"] },
 ]
 
 // 需要按会员身份类型过滤客户的页面
