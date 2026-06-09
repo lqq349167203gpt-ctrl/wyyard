@@ -7,112 +7,112 @@ from app.services.operation_log_service import create_log
 from app.models.operation_log import OperationLogCreate
 
 SECTION_MAP = {
-    "/api/customers": "客户信息",
-    "/api/visits": "到场人员",
+    "/api/customers": "用户管理",
+    "/api/visits": "人员到场",
     "/api/healing-records": "客户信息",
-    "/api/courses": "沙龙类型",
-    "/api/course-types": "沙龙类型",
-    "/api/spaces": "疗愈空间",
+    "/api/courses": "活动配置",
+    "/api/course-types": "活动配置",
+    "/api/spaces": "空间配置",
     "/api/member-identities": "会员身份",
-    "/api/activity-permissions": "活动配置",
-    "/api/membership-cards": "会员活动",
-    "/api/group-cases": "觉醒游戏",
-    "/api/group-case-sessions": "觉醒游戏",
-    "/api/emotional-releases": "情绪释放",
-    "/api/emotional-release-sessions": "情绪释放",
-    "/api/energy-knots": "能量结",
-    "/api/energy-knot-sessions": "能量结",
-    "/api/internal-courses": "内部课程",
-    "/api/internal-course-sessions": "内部课程",
+    "/api/activity-permissions": "活动安排",
+    "/api/membership-cards": "付费项目",
+    "/api/group-cases": "活动安排",
+    "/api/group-case-sessions": "活动安排",
+    "/api/emotional-releases": "活动安排",
+    "/api/emotional-release-sessions": "活动安排",
+    "/api/energy-knots": "活动安排",
+    "/api/energy-knot-sessions": "活动安排",
+    "/api/internal-courses": "活动安排",
+    "/api/internal-course-sessions": "活动安排",
     "/api/agents": "AI 配置",
     "/api/ai-configs": "AI 配置",
     "/api/class-records": "人员到场",
     "/api/accounts": "账号管理",
-    "/api/positions": "角色权限",
-    "/api/healing-identities": "疗愈身份",
-    "/api/account-change-password": "修改密码",
+    "/api/positions": "角色管理",
+    "/api/healing-identities": "疗愈老师",
+    "/api/account-change-password": "密码修改",
     "/api/daily-groupings": "人员到场",
-    "/api/position-permissions": "角色权限",
-    "/api/position-customer-permissions": "角色权限",
+    "/api/position-permissions": "角色管理",
+    "/api/position-customer-permissions": "角色管理",
     "/api/system-logs": "系统日志",
-    "/api/other-projects": "其他项目",
-    "/api/oh-card-readings": "OH卡梳理",
-    "/api/oh-card-reading-sessions": "OH卡梳理",
+    "/api/other-projects": "活动安排",
+    "/api/oh-card-readings": "活动安排",
+    "/api/oh-card-reading-sessions": "活动安排",
     "/api/reminders": "提醒配置",
-    "/api/business-reminders": "业务提醒",
+    "/api/business-reminders": "提醒配置",
     "/api/activity-themes": "活动安排",
-    "/api/organizations": "沙龙类型",
+    "/api/organizations": "组织管理",
 }
 
 # 路径前缀 → (section, service_module, get_function_name)
 GETTER_MAP = {
-    "/api/customers": ("客户信息", "customer_service", "get_customer"),
+    "/api/customers": ("用户管理", "customer_service", "get_customer"),
     "/api/healing-records": ("客户信息", "healing_record_service", "get_record"),
-    "/api/courses": ("沙龙类型", "course_service", "get_course"),
-    "/api/spaces": ("疗愈空间", "space_service", "get_space"),
+    "/api/courses": ("活动配置", "course_service", "get_course"),
+    "/api/spaces": ("空间配置", "space_service", "get_space"),
     "/api/member-identities": ("会员身份", "member_identity_service", "get_identity"),
-    "/api/membership-cards": ("会员活动", "membership_card_service", "get_card"),
-    "/api/group-cases": ("觉醒游戏", "group_case_service", "get_case"),
-    "/api/group-case-sessions": ("觉醒游戏", "group_case_session_service", "get_session"),
-    "/api/emotional-releases": ("情绪释放", "emotional_release_service", "get_release"),
-    "/api/emotional-release-sessions": ("情绪释放", "emotional_release_session_service", "get_session"),
-    "/api/energy-knots": ("能量结", "energy_knot_service", "get_knot"),
-    "/api/energy-knot-sessions": ("能量结", "energy_knot_session_service", "get_session"),
-    "/api/internal-courses": ("内部课程", "internal_course_service", "get_course"),
-    "/api/internal-course-sessions": ("内部课程", "internal_course_session_service", "get_session"),
+    "/api/membership-cards": ("付费项目", "membership_card_service", "get_card"),
+    "/api/group-cases": ("活动安排", "group_case_service", "get_case"),
+    "/api/group-case-sessions": ("活动安排", "group_case_session_service", "get_session"),
+    "/api/emotional-releases": ("活动安排", "emotional_release_service", "get_release"),
+    "/api/emotional-release-sessions": ("活动安排", "emotional_release_session_service", "get_session"),
+    "/api/energy-knots": ("活动安排", "energy_knot_service", "get_knot"),
+    "/api/energy-knot-sessions": ("活动安排", "energy_knot_session_service", "get_session"),
+    "/api/internal-courses": ("活动安排", "internal_course_service", "get_course"),
+    "/api/internal-course-sessions": ("活动安排", "internal_course_session_service", "get_session"),
     "/api/agents": ("AI 配置", "agent_service", "get_agent"),
     "/api/ai-configs": ("AI 配置", "ai_config_service", "get_config"),
     "/api/class-records": ("人员到场", "class_record_service", "get_record"),
     "/api/accounts": ("账号管理", "account_service", "get_account"),
-    "/api/visits": ("到场人员", "visit_service", "get_visit"),
+    "/api/visits": ("人员到场", "visit_service", "get_visit"),
     "/api/daily-groupings": ("人员到场", "daily_grouping_service", "get_grouping"),
-    "/api/positions": ("角色权限", "position_service", "get_position"),
-    "/api/position-permissions": ("角色权限", "position_permission_service", "get_permissions"),
-    "/api/position-customer-permissions": ("角色权限", "position_customer_permission_service", "get_data"),
-    "/api/other-projects": ("其他项目", "other_project_service", "get_project"),
-    "/api/oh-card-readings": ("OH卡梳理", "oh_card_reading_service", "get_reading"),
-    "/api/oh-card-reading-sessions": ("OH卡梳理", "oh_card_reading_session_service", "get_session"),
+    "/api/positions": ("角色管理", "position_service", "get_position"),
+    "/api/position-permissions": ("角色管理", "position_permission_service", "get_permissions"),
+    "/api/position-customer-permissions": ("角色管理", "position_customer_permission_service", "get_data"),
+    "/api/other-projects": ("活动安排", "other_project_service", "get_project"),
+    "/api/oh-card-readings": ("活动安排", "oh_card_reading_service", "get_reading"),
+    "/api/oh-card-reading-sessions": ("活动安排", "oh_card_reading_session_service", "get_session"),
     "/api/reminders": ("提醒配置", "reminder_service", "get_reminder"),
     "/api/activity-themes": ("活动安排", "activity_theme_service", "get_theme"),
-    "/api/organizations": ("沙龙类型", "organization_service", "get_organization"),
+    "/api/organizations": ("组织管理", "organization_service", "get_organization"),
 }
 
 PAGE_LABELS: dict[str, str] = {
     "dashboard": "工作台",
-    "customers": "客户信息",
+    "customers": "用户管理",
     "healing-records": "客户信息",
     "class-records": "人员到场",
-    "class-records-visitors": "到场人员",
-    "class-records-activities": "当日活动",
-    "class-records-arrival": "到场确认",
-    "membership-cards": "会员活动",
-    "group-cases": "觉醒游戏",
-    "emotional-releases": "情绪释放",
-    "energy-knots": "能量结",
-    "internal-courses": "内部课程",
-    "group-case-sessions": "觉醒游戏场次",
-    "emotional-release-sessions": "情绪释放场次",
-    "energy-knot-sessions": "能量结场次",
-    "internal-course-sessions": "内部课程场次",
+    "class-records-visitors": "人员到场",
+    "class-records-activities": "人员到场",
+    "class-records-arrival": "人员到场",
+    "membership-cards": "付费项目",
+    "group-cases": "活动安排",
+    "emotional-releases": "活动安排",
+    "energy-knots": "活动安排",
+    "internal-courses": "活动安排",
+    "group-case-sessions": "活动安排",
+    "emotional-release-sessions": "活动安排",
+    "energy-knot-sessions": "活动安排",
+    "internal-course-sessions": "活动安排",
     "agents": "AI 配置",
     "knowledge": "知识库",
     "business": "业务数据",
     "system-logs": "系统日志",
     "operation-logs": "操作日志",
     "accounts": "账号管理",
-    "change-password": "修改密码",
+    "change-password": "密码修改",
     "member-identities": "会员身份",
-    "healing-identities": "疗愈身份",
-    "position-management": "角色权限",
-    "courses": "沙龙类型",
-    "spaces": "疗愈空间",
-    "other-projects": "其他项目",
-    "oh-card-readings": "OH卡梳理",
-    "oh-card-reading-sessions": "OH卡梳理",
+    "healing-identities": "疗愈老师",
+    "position-management": "角色管理",
+    "courses": "活动配置",
+    "spaces": "空间配置",
+    "other-projects": "活动安排",
+    "oh-card-readings": "活动安排",
+    "oh-card-reading-sessions": "活动安排",
     "reminders": "提醒配置",
-    "business-reminders": "业务提醒",
+    "business-reminders": "提醒配置",
     "activity-themes": "活动安排",
-    "organizations": "沙龙类型",
+    "organizations": "组织管理",
 }
 
 SKIP_PATHS = [
@@ -130,7 +130,7 @@ SKIP_PATHS = [
 FIELD_NAMES = {
     "nickname": "昵称", "name": "名称", "title": "标题", "username": "用户名",
     "phone": "手机", "email": "邮箱", "gender": "性别", "birthday": "生日",
-    "member_type": "会员类型", "activity_types": "活动类型", "member_identity": "会员身份", "healing_identity": "疗愈身份",
+    "member_type": "会员类型", "activity_types": "活动类型", "member_identity": "会员身份", "healing_identity": "疗愈老师",
     "note": "备注", "description": "描述", "content": "内容", "section": "板块",
     "status": "状态", "type": "类型", "date": "日期", "start_time": "开始时间",
     "end_time": "结束时间", "teacher_ids": "课程老师", "course_name": "沙龙名称",
@@ -144,15 +144,15 @@ FIELD_NAMES = {
     "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "疗愈师回复",
     "needs": "需求", "activity_participation": "活动参与", "visit_date": "到访日期",
     "visit_time": "预计时间", "nickname": "昵称", "customer_id": "客户",
-    "space_id": "空间", "room_id": "房间", "position": "职位", "role": "角色", "permissions": "权限",
+    "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "角色", "permissions": "权限",
     "groups": "分组", "materials": "资料", "images": "图片",
     "location": "地点", "address": "地址",
     "start_date": "开始日期", "end_date": "结束日期",
-    "owner_id": "案主", "space_name": "空间",
+    "owner_id": "案主", "space_name": "空间名",
     "card_type": "卡类型", "remaining_count": "剩余次数",
     "customer_id": "用户", "customer_name": "用户",
     "password": "密码", "old_password": "旧密码", "new_password": "新密码",
-    "positions": "疗愈身份",
+    "positions": "疗愈老师",
     "referrer": "引流人", "traffic_source": "流量来源", "age": "年龄",
     "visit_count": "到店次数", "paid_content": "付费内容",
     "work_status": "工作状态", "work_description": "工作描述",
@@ -165,6 +165,10 @@ FIELD_NAMES = {
     "operator": "匹配方式", "conditions": "匹配条件",
     "customers": "客户信息可见身份", "class_records": "人员到场可见身份", "payment": "付费项目可见身份",
     "purchase_count": "购买次数", "closer_name": "成交人", "closer_id": "成交人", "category": "分类",
+    "referrer_handler": "引流处理人", "traffic_source_detail": "流量来源详情",
+    "total_payment": "累计付费",
+    "activity_mode": "活动模式", "class_count": "课时数", "course_id": "课程",
+    "effective_date": "生效日期", "organization_id": "组织", "rooms": "房间", "teachers": "老师", "themes": "主题",
 }
 
 
@@ -192,7 +196,7 @@ def get_entity_id(path: str) -> str:
     if match:
         eid = match.group(1)
         # Skip action-like path segments (not real entity IDs)
-        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups", "deductions", "verify"):
+        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups", "deductions", "verify", "toggle", "sync-from-customers"):
             return ""
         return eid
     return ""
@@ -468,6 +472,7 @@ def build_change_description(before: dict, after: dict) -> str:
     id_name_pairs = {
         "host_id": "host_name", "owner_id": "owner_name",
         "closer_id": "closer_name",
+        "space_id": "space_name", "room_id": "room_name",
     }
     skip_keys = set()
     for id_key, name_key in id_name_pairs.items():
@@ -630,6 +635,32 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             return f"{' · '.join(parts)}（{'，'.join(detail_parts)}）" if parts else f"新增其他项目（{'，'.join(detail_parts)}）"
         return f"新增其他项目：{' · '.join(parts)}" if parts else "新增其他项目"
 
+    # 活动主题批量：显示日期范围、周主题和每日主题
+    if "/api/activity-themes/batch" in path and method == "POST":
+        themes = body.get("themes", [])
+        if themes:
+            dates = sorted(set(t.get("date", "") for t in themes if t.get("date")))
+            week_theme = themes[0].get("week_theme", "")
+            date_range = f"{dates[0]}~{dates[-1]}" if len(dates) > 1 else (dates[0] if dates else "")
+            # 收集有 day_theme 的日期
+            day_parts = []
+            for t in themes:
+                dt = t.get("day_theme", "")
+                if dt:
+                    date_str = t.get("date", "")
+                    # 只取月/日
+                    md = date_str[5:] if len(date_str) >= 10 else date_str
+                    day_parts.append(f"{md}：{dt}")
+            parts = []
+            if week_theme:
+                parts.append(f"周主题：{week_theme}")
+            if day_parts:
+                parts.append("，".join(day_parts))
+            if parts:
+                return f"设置活动主题：{date_range}（{'；'.join(parts)}）"
+            return f"设置活动主题：{date_range}"
+        return "设置活动主题"
+
     # 活动主题：显示日期和主题内容
     if path.rstrip("/") == "/api/activity-themes" and method == "POST":
         date = body.get("date", "")
@@ -657,18 +688,24 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
 
     name = entity_name or get_entity_id(path) or "记录"
 
+    section = get_section(path)
+    entity_type = section.replace("配置", "").replace("管理", "")
+    # 嵌套资源：/api/spaces/{id}/rooms → 房间
+    if "/rooms" in path and section == "空间配置":
+        entity_type = "房间"
+
     if method == "POST":
         summary = _build_create_summary(body)
         if summary:
-            return f"新增 {name}：{summary}"
-        return f"新增 {name}"
+            return f"新增{entity_type} {name}：{summary}"
+        return f"新增{entity_type} {name}"
     elif method in ("PUT", "PATCH"):
         desc = build_change_description(before or {}, body)
         if desc:
             return f"{name}：{desc}"
-        return f"保存 {name}（无变更）"
+        return f"保存{name}（无变更）"
     elif method == "DELETE":
-        return f"删除 {name}"
+        return f"删除{entity_type} {name}"
     return f"操作 {name}"
 
 

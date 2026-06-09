@@ -430,6 +430,8 @@ export interface ClassRecord {
   is_public_welfare: boolean
   space_id: string
   room_id: string
+  room_name: string
+  space_name: string
   created_at: string
   updated_at: string
 }
@@ -445,6 +447,8 @@ export interface ClassRecordCreate {
   is_public_welfare?: boolean
   space_id?: string
   room_id?: string
+  room_name?: string
+  space_name?: string
 }
 
 export const classRecordApi = {
@@ -475,6 +479,7 @@ export interface DashboardData {
   ers_sessions: EmotionalReleaseSession[]
   eks_sessions: EnergyKnotSession[]
   ics_sessions: InternalCourseSession[]
+  ocr_sessions: OhCardReadingSession[]
   visits: VisitRecord[]
   visit_counts: Record<string, number>
   calendar_counts: Record<string, number>
@@ -482,7 +487,7 @@ export interface DashboardData {
 }
 
 export interface UnifiedRecord {
-  type: "class" | "gcs" | "ers" | "eks" | "ics"
+  type: "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"
   data: any
   date: string
 }
@@ -496,6 +501,7 @@ export interface GroupCase {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  organization_id: string | null
   created_at: string
   updated_at: string
 }
@@ -507,6 +513,7 @@ export interface GroupCaseCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  organization_id?: string | null
 }
 
 export const groupCaseApi = {
@@ -535,6 +542,8 @@ export interface GroupCaseSession {
   materials: Material[]
   space_id: string
   room_id: string
+  room_name: string
+  space_name: string
   created_at: string
   updated_at: string
 }
@@ -553,6 +562,8 @@ export interface GroupCaseSessionCreate {
   host_name?: string
   space_id?: string
   room_id?: string
+  room_name?: string
+  space_name?: string
 }
 
 export interface GroupCaseCustomerSearchResult {
@@ -581,6 +592,7 @@ export interface OhCardReading {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  organization_id: string | null
   created_at: string
   updated_at: string
 }
@@ -592,6 +604,7 @@ export interface OhCardReadingCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  organization_id?: string | null
 }
 
 export const ohCardReadingApi = {
@@ -620,6 +633,8 @@ export interface OhCardReadingSession {
   materials: Material[]
   space_id: string
   room_id: string
+  room_name: string
+  space_name: string
   created_at: string
   updated_at: string
 }
@@ -638,6 +653,8 @@ export interface OhCardReadingSessionCreate {
   host_name?: string
   space_id?: string
   room_id?: string
+  room_name?: string
+  space_name?: string
 }
 
 export const ohCardReadingSessionApi = {
@@ -658,6 +675,7 @@ export interface EnergyKnot {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  organization_id: string | null
   created_at: string
   updated_at: string
 }
@@ -669,6 +687,7 @@ export interface EnergyKnotCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  organization_id?: string | null
 }
 
 export const energyKnotApi = {
@@ -689,6 +708,7 @@ export interface EmotionalRelease {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  organization_id: string | null
   created_at: string
   updated_at: string
 }
@@ -700,6 +720,7 @@ export interface EmotionalReleaseCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  organization_id?: string | null
 }
 
 export const emotionalReleaseApi = {
@@ -728,6 +749,8 @@ export interface EmotionalReleaseSession {
   materials: Material[]
   space_id: string
   room_id: string
+  room_name: string
+  space_name: string
   created_at: string
   updated_at: string
 }
@@ -746,6 +769,8 @@ export interface EmotionalReleaseSessionCreate {
   host_name?: string
   space_id?: string
   room_id?: string
+  room_name?: string
+  space_name?: string
 }
 
 export interface EmotionalReleaseCustomerSearchResult {
@@ -779,6 +804,8 @@ export interface EnergyKnotSession {
   host_names: string[]
   space_id: string
   room_id: string
+  room_name: string
+  space_name: string
   created_at: string
   updated_at: string
 }
@@ -795,6 +822,8 @@ export interface EnergyKnotSessionCreate {
   host_names?: string[]
   space_id?: string
   room_id?: string
+  room_name?: string
+  space_name?: string
 }
 
 export interface EnergyKnotCustomerSearchResult {
@@ -829,6 +858,8 @@ export interface InternalCourseSession {
   materials: Material[]
   space_id: string
   room_id: string
+  room_name: string
+  space_name: string
   created_at: string
   updated_at: string
 }
@@ -845,6 +876,8 @@ export interface InternalCourseSessionCreate {
   participant_ids?: string[]
   space_id?: string
   room_id?: string
+  room_name?: string
+  space_name?: string
 }
 
 export interface InternalCourseSessionCustomerSearchResult {
@@ -874,6 +907,7 @@ export interface InternalCourse {
   expiry_date: string | null
   closer_id: string | null
   closer_name: string | null
+  organization_id: string | null
   created_at: string
   updated_at: string
 }
@@ -887,6 +921,7 @@ export interface InternalCourseCreate {
   expiry_date?: string | null
   closer_id?: string | null
   closer_name?: string | null
+  organization_id?: string | null
 }
 
 export const internalCourseApi = {
@@ -912,6 +947,7 @@ export interface MembershipCard {
   expiry_date: string | null
   closer_id: string | null
   closer_name: string | null
+  organization_id: string | null
   created_at: string
   updated_at: string
 }
@@ -928,6 +964,7 @@ export interface MembershipCardCreate {
   expiry_date?: string | null
   closer_id?: string | null
   closer_name?: string | null
+  organization_id?: string | null
 }
 
 export const membershipCardApi = {
@@ -954,6 +991,7 @@ export interface OtherProject {
   expiry_date: string | null
   closer_id: string | null
   closer_name: string | null
+  organization_id: string | null
   created_at: string
   updated_at: string
 }
@@ -971,6 +1009,7 @@ export interface OtherProjectCreate {
   expiry_date?: string | null
   closer_id?: string | null
   closer_name?: string | null
+  organization_id?: string | null
 }
 
 export const otherProjectApi = {
@@ -1030,7 +1069,9 @@ export const spaceApi = {
   update: (id: string, data: Partial<SpaceCreate>) => request<Space>(`/api/spaces/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/spaces/${id}`, { method: "DELETE" }),
   addRoom: (spaceId: string, data: { name: string }) => request<Room>(`/api/spaces/${spaceId}/rooms`, { method: "POST", body: JSON.stringify(data) }),
-  deleteRoom: (spaceId: string, roomId: string) => request<{ message: string }>(`/api/spaces/${spaceId}/rooms/${roomId}`, { method: "DELETE" }),
+  updateRoom: (spaceId: string, roomId: string, data: { name: string }) => request<Room>(`/api/spaces/${spaceId}/rooms/${roomId}`, { method: "PATCH", body: JSON.stringify(data) }),
+  checkRoomReferenced: (spaceId: string, roomId: string) => request<{ referenced: boolean }>(`/api/spaces/${spaceId}/rooms/${roomId}/referenced`),
+  deleteRoom: (spaceId: string, roomId: string, force?: boolean) => request<{ message: string; soft_deleted?: boolean }>(`/api/spaces/${spaceId}/rooms/${roomId}${force ? "?force=true" : ""}`, { method: "DELETE" }),
 }
 
 // Reminder
@@ -1457,5 +1498,10 @@ export const activityThemeApi = {
     request<ActivityTheme>(`/api/activity-themes`, {
       method: "POST",
       body: JSON.stringify({ date, space_id, week_theme, day_theme }),
+    }),
+  batchSave: (themes: { date: string; space_id: string; week_theme: string; day_theme: string }[]) =>
+    request<ActivityTheme[]>(`/api/activity-themes/batch`, {
+      method: "POST",
+      body: JSON.stringify({ themes }),
     }),
 }

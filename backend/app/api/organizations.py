@@ -13,12 +13,18 @@ async def list_organizations():
 
 @router.post("")
 async def create_organization(data: OrganizationCreate):
-    return organization_service.create_organization(data)
+    try:
+        return organization_service.create_organization(data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.patch("/{org_id}")
 async def update_organization(org_id: str, data: dict):
-    result = organization_service.update_organization(org_id, data)
+    try:
+        result = organization_service.update_organization(org_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not result:
         raise HTTPException(status_code=404, detail="组织不存在")
     return result

@@ -32,6 +32,7 @@ export default function HealingIdentitiesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingMember, setDeletingMember] = useState<Customer | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const [selectedNicknames, setSelectedNicknames] = useState<string[]>([])
 
@@ -72,12 +73,19 @@ export default function HealingIdentitiesPage() {
   }
 
   const handleDelete = async () => {
-    if (!deletingMember) return
-    const newPositions = deletingMember.positions.filter(p => p !== activePosition)
-    await customerApi.update(deletingMember.id, { positions: newPositions })
-    setDeleteDialogOpen(false)
-    setDeletingMember(null)
-    loadCustomers()
+    if (!deletingMember || deleting) return
+    setDeleting(true)
+    try {
+      const newPositions = deletingMember.positions.filter(p => p !== activePosition)
+      await customerApi.update(deletingMember.id, { positions: newPositions })
+      setDeleteDialogOpen(false)
+      setDeletingMember(null)
+      loadCustomers()
+    } catch (error) {
+      console.error("删除失败:", error)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const resetForm = () => {
@@ -89,8 +97,8 @@ export default function HealingIdentitiesPage() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between pb-2">
         <div>
-          <h1 className="text-lg font-semibold">疗愈身份</h1>
-          <p className="text-xs text-muted-foreground mt-1.5">管理疗愈相关身份人员配置</p>
+          <h1 className="text-lg font-semibold">疗愈老师</h1>
+          <p className="text-xs text-muted-foreground mt-1.5">管理疗愈老师人员配置</p>
         </div>
       </div>
 
@@ -193,7 +201,7 @@ export default function HealingIdentitiesPage() {
 
       {/* 新增弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md p-0 gap-0">
+        <DialogContent className="max-w-md p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">新增{currentConfig.label}</DialogTitle>
           </DialogHeader>
@@ -205,6 +213,7 @@ export default function HealingIdentitiesPage() {
                 value={selectedNicknames}
                 onChange={(v) => setSelectedNicknames(v as string[])}
                 multi
+                filterSelected
                 excludeIds={members.map(m => m.id)}
                 placeholder="输入昵称或姓名搜索..."
               />
@@ -230,8 +239,10 @@ export default function HealingIdentitiesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>确定</AlertDialogAction>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+              {deleting ? "移除中..." : "确定"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
