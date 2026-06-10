@@ -11,7 +11,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { visitApi, customerApi, type VisitRecord, type CustomerLight, type CustomerCreate } from "@/lib/api"
+import { visitApi, customerApi, accountApi, type VisitRecord, type CustomerLight, type CustomerCreate } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
@@ -33,9 +33,10 @@ interface DetailViewProps {
   onCustomerClick?: (customerId: string) => void
   onDataLoaded?: (visits: VisitRecord[]) => void
   spaceId?: string
+  onRequireSpaces?: () => void
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded, spaceId }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded, spaceId, onRequireSpaces }: DetailViewProps = {}) {
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -55,7 +56,15 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLight | null>(null)
   const [visitTime, setVisitTime] = useState("09:00")
   const [needs, setNeeds] = useState("")
+  const [referrerHandler, setReferrerHandler] = useState(() => {
+    try {
+      const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      return cu.owner || cu.nickname || ""
+    } catch { return "" }
+  })
+  const [selectedReferrerHandler, setSelectedReferrerHandler] = useState<CustomerLight | null>(null)
   const [saving, setSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editVisit, setEditVisit] = useState<VisitRecord | null>(null)
   const [editDate, setEditDate] = useState("")
@@ -64,14 +73,28 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [showAddUserDialog, setShowAddUserDialog] = useState(false)
   const [showConfirmNewUser, setShowConfirmNewUser] = useState(false)
   const [customerForm, setCustomerForm] = useState<Partial<CustomerCreate>>({})
+  const [ageRange, setAgeRange] = useState("")
   const [creatingCustomer, setCreatingCustomer] = useState(false)
   const [customerFormError, setCustomerFormError] = useState("")
+
+  // 如果 localStorage 中没有 owner，从账号列表获取当前用户的归属人
+  useEffect(() => {
+    if (!referrerHandler) {
+      const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      if (cu.id) {
+        accountApi.list().then(accounts => {
+          const me = accounts.find((a: any) => a.id === cu.id)
+          if (me?.owner) setReferrerHandler(me.owner)
+        }).catch(() => {})
+      }
+    }
+  }, [])
 
   const { permissions: cp, ready: permReady } = useCustomerPermissions("class_records")
   const [customerListReady, setCustomerListReady] = useState(false)
 
   const visibleIds = useMemo(() => new Set(customerList.map(c => c.id)), [customerList])
-  const addedCustomerIds = useMemo(() => visits.map(v => v.customer_id), [visits])
+  const _addedCustomerIds = useMemo(() => visits.map(v => v.customer_id), [visits])
   const filteredVisits = useMemo(() => {
     if (!customerListReady) return []
     return visits.filter(v => visibleIds.has(v.customer_id))
@@ -154,12 +177,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         if (cancelled) return
         let filtered = data
         const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
-        if (cu.role !== "超级管理员") {
-          if (cp.length > 0) {
-            filtered = data.filter(c => c.member_type && cp.includes(c.member_type))
-          } else {
-            filtered = []
-          }
+        if (cu.role !== "超级管理员" && cp.length > 0) {
+          filtered = data.filter(c => !c.member_type || cp.includes(c.member_type))
         }
         setCustomerList(filtered)
         setCustomerListReady(true)
@@ -177,6 +196,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   }, [permReady, cp])
 
   const handleAdd = async () => {
+    if (onRequireSpaces) {
+      onRequireSpaces()
+      return
+    }
     if (!selectedCustomer) {
       if (searchKeyword.trim()) setShowConfirmNewUser(true)
       return
@@ -190,6 +213,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         nickname: selectedCustomer.nickname,
         member_type: selectedCustomer.member_type,
         needs,
+        referrer_handler: selectedReferrerHandler?.nickname || referrerHandler || "",
         space_id: spaceId || undefined,
       })
       setSelectedCustomer(null)
@@ -200,7 +224,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       setVisits(data)
       refreshCounts()
     } catch (e) {
-      alert(e instanceof Error ? e.message : "添加失败")
+      setErrorMessage(e instanceof Error ? e.message : "添加失败")
     } finally {
       setSaving(false)
     }
@@ -239,11 +263,16 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     setCreatingCustomer(true)
     setCustomerFormError("")
     try {
-      const created = await customerApi.create(customerForm)
+      const data = { ...customerForm }
+      if (ageRange) {
+        data.age = data.age ? `${data.age} (${ageRange})` : ageRange
+      }
+      const created = await customerApi.create(data)
       setShowAddUserDialog(false)
       setSelectedCustomer(created)
       setSearchKeyword(created.nickname)
       setCustomerList(prev => [...prev, created])
+      customerApi.clearLightCache()
     } catch (e) {
       setCustomerFormError(e instanceof Error ? e.message : "创建失败")
     } finally {
@@ -300,17 +329,16 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
             <span className="text-xs font-medium text-[#2b2f36]">预计到场</span>
             <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.length} 人</span>
           </div>
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xs text-[#4e535a] shrink-0">预计时间</span>
+          <div className="flex items-center gap-3 min-w-0 ml-5">
+            <span className="text-xs text-[#4e535a] shrink-0">邀约人员</span>
           <Input
             type="time"
             value={visitTime}
             onChange={(e) => setVisitTime(e.target.value)}
             className="h-8 text-xs w-24 shrink-0"
           />
-          <span className="text-xs text-[#4e535a] shrink-0">人员</span>
           {/* 搜索用户 */}
-          <div className="w-36">
+          <div className="w-24">
             <CustomerSearchInput
               customers={customerList as any[]}
               value={searchKeyword}
@@ -319,15 +347,14 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 setSelectedCustomer(customer)
                 setSearchKeyword(customer.nickname)
               }}
-              placeholder="昵称"
+              placeholder="客户昵称"
               onNoResultsClick={(text) => {
                 setCustomerForm({ nickname: text })
+                setAgeRange("")
                 setShowAddUserDialog(true)
               }}
             />
           </div>
-
-          <span className="text-xs text-[#4e535a] shrink-0">需求</span>
           {/* 本次需求 */}
           <div className="w-[400px] min-w-[400px] shrink-0">
             <Textarea
@@ -336,6 +363,18 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               placeholder="本次到场的需求是..."
               className="h-8 text-xs min-h-[32px] resize-none"
               rows={1}
+            />
+          </div>
+          <div className="w-24">
+            <CustomerSearchInput
+              customers={customerList as any[]}
+              value={referrerHandler}
+              onChange={(v) => setReferrerHandler(v as string)}
+              onSelectItem={(customer) => {
+                setSelectedReferrerHandler(customer)
+                setReferrerHandler(customer.nickname)
+              }}
+              placeholder="邀约人"
             />
           </div>
 
@@ -359,7 +398,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <span className="w-[120px] shrink-0">参与活动</span>
               <span className="w-[72px] shrink-0">剩余次数</span>
               <span className="w-[100px] shrink-0">预计时间</span>
-              <span className="w-[64px] shrink-0">是否到店</span>
+              <span className="w-[64px] shrink-0">邀约人</span>
               <span className="w-[72px] shrink-0 text-right">操作</span>
             </div>
             {filteredVisits.slice(0, visibleCount).map((v) => (
@@ -375,9 +414,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                   <span className="w-[120px] shrink-0 text-[12px] text-[#8f959e]"><span className="text-[#2b2f36]">{v.activity_count}</span> 次{v.welfare_count > 0 && <span className="text-[#8f959e]">（公益<span className="text-[#2b2f36]">{v.welfare_count}</span>次）</span>}</span>
                   <span className="w-[72px] shrink-0 text-[12px] text-[#8f959e]">{v.remaining_count == null ? "无卡" : v.remaining_count === -1 ? "不限" : <><span className="text-[#2b2f36]">{v.remaining_count}</span> 次</>}</span>
                   <span className="w-[100px] shrink-0 text-[12px] text-[#8f959e] whitespace-nowrap">{v.visit_time || "09:00"}</span>
-                  <span className={`w-[64px] shrink-0 text-[12px] ${v.arrived ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
-                    {v.arrived ? "到店" : "未到店"}
-                  </span>
+                  <span className="w-[64px] shrink-0 text-[12px] text-[#2b2f36] truncate">{v.referrer_handler || <span className="text-[#8f959e]">-</span>}</span>
                   <div className="w-[72px] shrink-0 flex items-center justify-end gap-1">
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditVisit(v); setEditDate(v.visit_date); setEditNeeds(v.needs) }}>
                       <Edit className="h-3.5 w-3.5" />
@@ -406,6 +443,19 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 错误提示 */}
+      <AlertDialog open={!!errorMessage} onOpenChange={(open) => !open && setErrorMessage("")}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>提示</AlertDialogTitle>
+            <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorMessage("")}>确定</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -448,7 +498,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setShowConfirmNewUser(false); setCustomerForm({ nickname: searchKeyword.trim() }); setShowAddUserDialog(true) }}>确定</AlertDialogAction>
+            <AlertDialogAction onClick={() => { setShowConfirmNewUser(false); setCustomerForm({ nickname: searchKeyword.trim() }); setAgeRange(""); setShowAddUserDialog(true) }}>确定</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -456,9 +506,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       {/* 新增用户弹窗 */}
       <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
         <DialogContent className="w-[640px] max-w-[90vw] p-0 gap-0">
-          <DialogHeader className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
-            <DialogTitle className="text-[14px] font-normal">新建用户</DialogTitle>
-          </DialogHeader>
+          <div className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
+            <h3 className="text-[14px] font-normal">新建用户</h3>
+          </div>
           <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">昵称</span>
@@ -470,11 +520,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <Input value={customerForm.name || ""} onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })} placeholder="请输入" />
 
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">性别</span>
-              <select value={customerForm.gender || ""} onChange={(e) => setCustomerForm({ ...customerForm, gender: e.target.value })} className="h-8 w-full rounded-md border border-[#dee0e3] bg-white pl-2 pr-7 text-[12px] text-[#2b2f36] outline-none focus:border-[#3370ff] transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238f959e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat">
-                <option value="">请选择</option>
-                <option value="男">男</option>
-                <option value="女">女</option>
-              </select>
+              <SelectDropdown
+                value={customerForm.gender || ""}
+                options={[{value: "男", label: "男"}, {value: "女", label: "女"}]}
+                placeholder="请选择"
+                onChange={(v) => setCustomerForm({ ...customerForm, gender: v })}
+              />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">电话</span>
               <Input value={customerForm.phone || ""} onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })} placeholder="请输入" />
 
@@ -484,12 +535,67 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 {customerFormError && customerFormError.includes("微信") && <p className="text-[11px] text-[#f54a45] mt-1">{customerFormError}</p>}
               </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">年龄</span>
-              <Input value={customerForm.age || ""} onChange={(e) => setCustomerForm({ ...customerForm, age: e.target.value })} placeholder="请输入" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={customerForm.age || ""} onChange={(e) => { const v = e.target.value; const n = parseInt(v); let range = ""; if (n >= 60) range = "60+"; else if (n >= 51) range = "51~60"; else if (n >= 41) range = "41~50"; else if (n >= 31) range = "31~40"; else if (n >= 18) range = "18~30"; setCustomerForm({ ...customerForm, age: v }); setAgeRange(range); }} placeholder="具体年龄" />
+                <SelectDropdown
+                  value={ageRange}
+                  options={["18~30", "31~40", "41~50", "51~60", "60+"].map(v => ({value: v, label: v}))}
+                  placeholder="年龄段"
+                  onChange={(v) => setAgeRange(v)}
+                />
+              </div>
 
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">引流人</span>
-              <Input value={customerForm.referrer || ""} onChange={(e) => setCustomerForm({ ...customerForm, referrer: e.target.value })} placeholder="请搜索" />
+              <CustomerSearchInput
+                customers={customerList as any[]}
+                value={customerForm.referrer || ""}
+                onChange={(v) => setCustomerForm({ ...customerForm, referrer: typeof v === "string" ? v : v[0] || "" })}
+                placeholder="请搜索"
+                filterSelected={false}
+              />
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">承接人</span>
+              <CustomerSearchInput
+                customers={customerList as any[]}
+                value={customerForm.referrer_handler || ""}
+                onChange={(v) => setCustomerForm({ ...customerForm, referrer_handler: typeof v === "string" ? v : v[0] || "" })}
+                placeholder="请搜索"
+                filterSelected={false}
+              />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">流量来源</span>
-              <Input value={customerForm.traffic_source || ""} onChange={(e) => setCustomerForm({ ...customerForm, traffic_source: e.target.value })} placeholder="请输入" />
+              <div className="flex items-center gap-2">
+                <SelectDropdown
+                  className={["小红书", "抖音", "公众号", "视频号"].includes(customerForm.traffic_source || "") ? "w-[calc(50%-3px)] min-w-0" : ["好友推荐", "朋友圈"].includes(customerForm.traffic_source || "") ? "flex-1 min-w-0" : "w-full"}
+                  value={customerForm.traffic_source || ""}
+                  options={["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐"].map(v => ({value: v, label: v}))}
+                  placeholder="请选择"
+                  onChange={(v) => setCustomerForm({ ...customerForm, traffic_source: v, traffic_source_detail: "" })}
+                />
+                {["小红书", "抖音", "公众号", "视频号"].includes(customerForm.traffic_source || "") && (
+                  <Input value={customerForm.traffic_source_detail || ""} onChange={(e) => setCustomerForm({ ...customerForm, traffic_source_detail: e.target.value })} placeholder="内容链接" className="h-8 flex-1 text-[12px]" />
+                )}
+                {(customerForm.traffic_source || "") === "好友推荐" && (
+                  <div className="flex-1 min-w-0">
+                    <CustomerSearchInput
+                      customers={customerList as any[]}
+                      value={customerForm.traffic_source_detail || ""}
+                      onChange={(v) => setCustomerForm({ ...customerForm, traffic_source_detail: typeof v === "string" ? v : v[0] || "" })}
+                      placeholder="好友昵称"
+                      filterSelected={false}
+                    />
+                  </div>
+                )}
+                {(customerForm.traffic_source || "") === "朋友圈" && (
+                  <div className="flex-1 min-w-0">
+                    <CustomerSearchInput
+                      customers={customerList as any[]}
+                      value={customerForm.traffic_source_detail || ""}
+                      onChange={(v) => setCustomerForm({ ...customerForm, traffic_source_detail: typeof v === "string" ? v : v[0] || "" })}
+                      placeholder="所属人"
+                      filterSelected={false}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="border-t border-[#f0f0f0]" />

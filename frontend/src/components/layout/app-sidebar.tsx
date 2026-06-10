@@ -47,7 +47,8 @@ const courseItems = [
 const configItems = [
   { title: "活动配置", icon: BookText, path: "/positions/courses", permission: "courses" },
   { title: "会员身份", icon: ShieldCheck, path: "/config/member-identities", permission: "member-identities" },
-  { title: "疗愈身份", icon: Heart, path: "/healing-identities", permission: "healing-identities" },
+  { title: "疗愈老师", icon: Heart, path: "/healing-identities", permission: "healing-identities" },
+  { title: "组织管理", icon: Users, path: "/organizations", permission: "organizations" },
   { title: "空间配置", icon: Building2, path: "/courses/spaces", permission: "spaces" },
   { title: "提醒配置", icon: Bell, path: "/config/reminders", permission: "reminders" },
 ]
@@ -119,26 +120,31 @@ function MenuGroup({
         <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />{label}</span>
         <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
       </SidebarGroupLabel>
-      {isOpen && (
-        <SidebarGroupContent className="mt-0.5">
-          <SidebarMenu className="gap-1">
-            {filteredItems.map((item) => {
-              const isActive = location.pathname === item.path
-              return (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    render={<Link to={item.path} />}
-                    isActive={isActive}
-                    className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
-                  >
-                    <span className="pl-[18px]">{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            })}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      )}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden min-h-0">
+          <SidebarGroupContent className="mt-0.5">
+            <SidebarMenu className="gap-1">
+              {filteredItems.map((item) => {
+                const isActive = location.pathname === item.path
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      render={<Link to={item.path} />}
+                      isActive={isActive}
+                      className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
+                    >
+                      <span className="pl-[18px]">{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </div>
+      </div>
     </SidebarGroup>
   )
 }
@@ -171,34 +177,39 @@ function PaymentMenuGroup({
         <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />付费项目</span>
         <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
       </SidebarGroupLabel>
-      {isOpen && (
-        <SidebarGroupContent className="mt-0.5">
-          <SidebarMenu className="gap-1">
-            {showPayment && (
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  render={<Link to="/payment" />}
-                  isActive={location.pathname === "/payment"}
-                  className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
-                >
-                  <span className="pl-[18px]">付费项目</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {showOtherProjects && (
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  render={<Link to="/other-projects" />}
-                  isActive={location.pathname === "/other-projects"}
-                  className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
-                >
-                  <span className="pl-[18px]">其他项目</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      )}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden min-h-0">
+          <SidebarGroupContent className="mt-0.5">
+            <SidebarMenu className="gap-1">
+              {showPayment && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    render={<Link to="/payment" />}
+                    isActive={location.pathname === "/payment"}
+                    className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
+                  >
+                    <span className="pl-[18px]">付费项目</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {showOtherProjects && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    render={<Link to="/other-projects" />}
+                    isActive={location.pathname === "/other-projects"}
+                    className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
+                  >
+                    <span className="pl-[18px]">其他项目</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </div>
+      </div>
     </SidebarGroup>
   )
 }
@@ -225,12 +236,15 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (activeGroup) {
-      setOpenGroups(prev => ({ ...prev, [activeGroup]: true }))
+      setOpenGroups(Object.fromEntries(GROUPS.map(g => [g, g === activeGroup])))
     }
   }, [activeGroup])
 
   const toggle = (group: string) => {
-    setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }))
+    setOpenGroups(prev => {
+      const isCurrentlyOpen = prev[group]
+      return Object.fromEntries(GROUPS.map(g => [g, g === group ? !isCurrentlyOpen : false]))
+    })
   }
 
   return (

@@ -15,6 +15,7 @@ import PositionsPage from "@/pages/positions"
 import PositionManagementPage from "@/pages/position-management"
 import CoursesPage from "@/pages/courses"
 import SpacesPage from "@/pages/spaces"
+import OrganizationsPage from "@/pages/organizations"
 import ClassRecordsPage from "@/pages/class-records"
 import DailyActivitiesPage from "@/pages/daily-activities"
 import PaymentPage from "@/pages/payment"
@@ -61,6 +62,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/positions/courses": "courses",
   "/config/member-identities": "member-identities",
   "/courses/spaces": "spaces",
+  "/organizations": "organizations",
   "/healing-identities": "healing-identities",
   "/config/reminders": "reminders",
   "/business-reminders": "business-reminders",
@@ -138,6 +140,7 @@ function App() {
               <Route path="/positions/teacher" element={<PositionsPage />} />
               <Route path="/positions/management" element={<PositionManagementPage />} />
               <Route path="/positions/courses" element={<CoursesPage />} />
+              <Route path="/organizations" element={<OrganizationsPage />} />
               <Route path="/courses/spaces" element={<SpacesPage />} />
               <Route path="/courses/class-records" element={<ClassRecordsPage />} />
               <Route path="/courses/daily-activities" element={<DailyActivitiesPage />} />

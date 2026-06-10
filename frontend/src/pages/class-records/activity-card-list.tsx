@@ -48,6 +48,7 @@ interface ActivityCardListProps {
   getMemberName: (id: string) => string
   dailyGroups: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
   spaces: Space[]
+  courseMap: Record<string, string>
 }
 
 const ActivityCardList = memo((props: ActivityCardListProps) => {
@@ -70,6 +71,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
     getMemberName,
     dailyGroups,
     spaces,
+    courseMap,
   } = props
 
   const [visibleCount, setVisibleCount] = useState(15)
@@ -138,7 +140,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                             {/* 活动名称 */}
                             <div>
-                              <span className="text-[13px] font-medium text-[#2b2f36]">{record.course_name}</span>
+                              <span className="text-[13px] font-medium text-[#2b2f36]">{courseMap[record.course_id] || record.course_name}</span>
                             </div>
                             {/* 成员列表 */}
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -197,7 +199,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             <div className="flex items-center gap-2">
                               <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
                               {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
-                              <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">{record.course_name}</span>
+                              <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-[3px]">{courseMap[record.course_id] || record.course_name}</span>
                               {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
                               {getRoomLabel(record.space_id, record.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(record.space_id, record.room_id, spaces)}</span>}
                               {record.activity_mode && record.activity_mode !== "线下" && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>}

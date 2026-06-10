@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from "react"
-import { Plus, Trash2, Edit } from "lucide-react"
+import { Plus, Trash2, Edit, Download } from "lucide-react"
+import * as XLSX from "xlsx"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { SelectDropdown } from "@/components/select-dropdown"
-import type { Customer } from "@/lib/api"
+import type { Customer, VisitRecord, MembershipCard } from "@/lib/api"
 
 interface Visitor {
   id: string
@@ -23,6 +24,8 @@ interface Props {
   date: string
   dayVisits: Visitor[]
   allCustomers: Customer[]
+  visits: VisitRecord[]
+  membershipCards: MembershipCard[]
   groups: Group[]
   setGroups: (groups: Group[]) => void
   onSave: (groups: Group[]) => Promise<void>
@@ -50,7 +53,7 @@ function RoleRow({ label, selectedId, getName, onCustomerClick }: {
   )
 }
 
-export default function GroupingView({ date, dayVisits, allCustomers, groups, setGroups, onSave, onCustomerClick }: Props) {
+export default function GroupingView({ date, dayVisits, allCustomers, visits, membershipCards, groups, setGroups, onSave, onCustomerClick }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropGroupIdx, setDropGroupIdx] = useState<number | null>(null)
   const [addGroupOpen, setAddGroupOpen] = useState(false)
@@ -119,7 +122,9 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
 
   const getName = (id: string) => {
     const c = allCustomers.find(c => c.id === id)
-    return c?.nickname || c?.name || id
+    const result = c?.nickname || c?.name || id
+    if (!c) console.log("[GroupingView] getName: customer NOT found for id:", id, "allCustomers count:", allCustomers.length)
+    return result
   }
 
   const addGroup = () => {
@@ -170,6 +175,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
   }
 
   const handleDragStart = (e: React.DragEvent, visitorId: string) => {
+    console.log("[GroupingView] drag start:", visitorId, "dayVisits:", dayVisits.map(v => v.id))
     if (usedIds.has(visitorId)) {
       e.preventDefault()
       return
@@ -190,6 +196,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
     setDropGroupIdx(null)
     setDraggingId(null)
     const visitorId = e.dataTransfer.getData("text/plain")
+    console.log("[GroupingView] drop:", visitorId, "groupIdx:", groupIdx, "usedIds:", [...usedIds])
     if (visitorId && !usedIds.has(visitorId)) {
       addMemberToGroup(groupIdx, visitorId)
     }
@@ -198,6 +205,66 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
   const handleDragEnd = () => {
     setDraggingId(null)
     setDropGroupIdx(null)
+  }
+
+  const handleExport = () => {
+    // 构建客户 ID → 客户信息的映射
+    const customerMap = new Map(allCustomers.map(c => [c.id, c]))
+    // 构建客户 ID → 当日到访记录的映射
+    const visitMap = new Map(visits.filter(v => v.visit_date === date).map(v => [v.customer_id, v]))
+    // 构建客户 ID → 会员卡类型的映射（取最新的一张卡）
+    const cardMap = new Map<string, string>()
+    membershipCards.forEach(card => {
+      if (!cardMap.has(card.customer_id)) {
+        cardMap.set(card.customer_id, card.card_type)
+      }
+    })
+    // 构建客户 ID → 是否组长的映射
+    const leaderIds = new Set(groups.map(g => g.leader_id).filter(Boolean))
+
+    const rows: any[] = []
+
+    // 按分组遍历
+    groups.forEach(group => {
+      const allMemberIds = [group.leader_id, group.deputy_id, ...group.member_ids].filter(Boolean)
+      const uniqueIds = [...new Set(allMemberIds)]
+      uniqueIds.forEach(id => {
+        const customer = customerMap.get(id)
+        const visit = visitMap.get(id)
+        rows.push({
+          "引流人": customer?.referrer || "",
+          "客户昵称": customer?.nickname || getName(id),
+          "预计时间": visit?.visit_time || "09:00",
+          "活动参与次数": visit?.activity_count ?? 0,
+          "会员类型": cardMap.get(id) || customer?.member_type || "",
+          "当日需求": visit?.needs || "",
+          "是否组长": leaderIds.has(id) ? "是" : "否",
+          "邀约人": visit?.referrer_handler || "",
+        })
+      })
+    })
+
+    // 未分组的人员
+    const ungrouped = dayVisits.filter(v => !usedIds.has(v.id))
+    ungrouped.forEach(v => {
+      const customer = customerMap.get(v.id)
+      const visit = visitMap.get(v.id)
+      rows.push({
+        "引流人": customer?.referrer || "",
+        "客户昵称": customer?.nickname || v.nickname,
+        "预计时间": visit?.visit_time || "09:00",
+        "活动参与次数": visit?.activity_count ?? 0,
+        "会员类型": cardMap.get(v.id) || customer?.member_type || "",
+        "当日需求": visit?.needs || "",
+        "是否组长": "否",
+        "邀约人": visit?.referrer_handler || "",
+      })
+    })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "人员分组")
+    XLSX.writeFile(wb, `人员分组_${date}.xlsx`)
   }
 
   return (
@@ -243,9 +310,14 @@ export default function GroupingView({ date, dayVisits, allCustomers, groups, se
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-medium text-[#2b2f36]">分组</span>
           </div>
-          <Button size="sm" className="h-7 text-xs bg-[#3370ff] hover:bg-[#2860e1] text-white" onClick={addGroup}>
-            <Plus className="mr-1 h-3 w-3" /> 新增
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExport}>
+              <Download className="mr-1 h-3 w-3" /> 导出
+            </Button>
+            <Button size="sm" className="h-7 text-xs bg-[#3370ff] hover:bg-[#2860e1] text-white" onClick={addGroup}>
+              <Plus className="mr-1 h-3 w-3" /> 新增
+            </Button>
+          </div>
         </div>
 
         {groups.length === 0 ? (

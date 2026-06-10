@@ -455,7 +455,7 @@ export function useClassRecordDialogs({
                 )}
                 {showTeacherDropdown && teachers.length === 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-sm p-3 text-xs text-muted-foreground text-center">
-                    暂无课程老师，请先在疗愈身份中添加
+                    暂无课程老师，请先在疗愈老师中添加
                   </div>
                 )}
               </div>

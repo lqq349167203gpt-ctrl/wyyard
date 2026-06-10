@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
+import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Users, Sparkles, Heart, Zap, GraduationCap, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -50,12 +51,13 @@ function getTeacherNames(teacherIds: string[], teachers: CustomerLight[]) {
   return teacherIds.map(id => teachers.find(t => t.id === id)).filter(Boolean).map(t => t!.nickname || t!.name || "未命名")
 }
 
-function getRoomLabel(spaceId: string | undefined, roomId: string | undefined, spaces: Space[]): string {
-  if (!spaceId || !roomId) return ""
+function getRoomLabel(spaceId: string | undefined, roomId: string | undefined, spaces: Space[], roomName?: string, spaceName?: string): string {
+  if (!spaceId) return ""
   const space = spaces.find(s => s.id === spaceId)
-  if (!space) return ""
-  const room = space.rooms?.find(r => r.id === roomId)
-  return room?.name || ""
+  const sName = space?.name || spaceName
+  const rName = roomName || (space && roomId ? space.rooms?.find(r => r.id === roomId)?.name : "")
+  if (sName && rName) return `${sName}/${rName}`
+  return rName || sName || ""
 }
 
 // ===== Memoized card components (extracted to avoid re-render on dropdown state changes) =====
@@ -79,10 +81,11 @@ interface CardCallbacks {
   onMaterialsOcr: (s: OhCardReadingSession) => void
   teachers: CustomerLight[]
   spaces: Space[]
+  courseMap: Record<string, string>
 }
 
-const SalonCard = memo(({ record, teachers, spaces, onEdit, onDelete, onMaterials }: {
-  record: ClassRecord; teachers: CustomerLight[]; spaces: Space[]
+const SalonCard = memo(({ record, teachers, spaces, courseMap, onEdit, onDelete, onMaterials }: {
+  record: ClassRecord; teachers: CustomerLight[]; spaces: Space[]; courseMap: Record<string, string>
   onEdit: (r: ClassRecord) => void; onDelete: (id: string) => void; onMaterials: (r: ClassRecord) => void
 }) => (
   <div key={`class-${record.id}`} className="bg-white">
@@ -96,12 +99,12 @@ const SalonCard = memo(({ record, teachers, spaces, onEdit, onDelete, onMaterial
         <div className="flex items-center gap-2">
           <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
           {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
-          <span className="text-[14px] font-medium text-[#2b2f36] truncate">{record.course_name}</span>
+          <span className="text-[14px] font-medium text-[#2b2f36] truncate">{courseMap[record.course_id] || record.course_name}</span>
           {getTeacherNames(record.teacher_ids, teachers).length > 0 && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids, teachers).join("、")}</span>
           )}
-          {getRoomLabel(record.space_id, record.room_id, spaces) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(record.space_id, record.room_id, spaces)}</span>
+          {getRoomLabel(record.space_id, record.room_id, spaces, record.room_name, record.space_name) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(record.space_id, record.room_id, spaces, record.room_name, record.space_name)}</span>
           )}
           {record.activity_mode && record.activity_mode !== "线下" && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
@@ -142,8 +145,8 @@ const GcsCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
           {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
           )}
           {session.activity_mode && session.activity_mode !== "线下" && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
@@ -184,8 +187,8 @@ const ErsCard = memo(({ session, spaces, onEdit, onDelete }: {
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
           {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
           )}
           {session.activity_mode && session.activity_mode !== "线下" && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
@@ -223,8 +226,8 @@ const OcrCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
           <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
           {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
           )}
           {session.activity_mode && session.activity_mode !== "线下" && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
@@ -272,8 +275,8 @@ const EksCard = memo(({ session, spaces, onEdit, onDelete }: {
             <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
             <span className="text-[14px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : session.owner_name || "未分配"}</span>
             {session.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{session.host_names.join("、")}</span>}
-            {getRoomLabel(session.space_id, session.room_id, spaces) && (
-              <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+            {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
+              <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
             )}
             {session.activity_mode && session.activity_mode !== "线下" && (
               <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
@@ -319,8 +322,8 @@ const IcsCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">{session.course_name}</span>
           <span className="text-[14px] font-medium text-[#2b2f36]">丨课程老师：{session.host_names?.length > 0 ? session.host_names.join("、") : "暂无"}</span>
           {session.course_type && <span className="text-[12px] text-[#4e535a]">{session.course_type}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces)}</span>
+          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
+            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
           )}
           {session.activity_mode && session.activity_mode !== "线下" && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
@@ -445,6 +448,8 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
+        room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
+        space_name: spaces.find(s => s.id === spaceId)?.name || "",
       }
       let result: GroupCaseSession
       if (editingRecord) {
@@ -693,6 +698,8 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
+        room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
+        space_name: spaces.find(s => s.id === spaceId)?.name || "",
       }
       let result: EmotionalReleaseSession
       if (editingRecord) {
@@ -949,6 +956,8 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
+        room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
+        space_name: spaces.find(s => s.id === spaceId)?.name || "",
       }
       let result: OhCardReadingSession
       if (editingRecord) {
@@ -1239,6 +1248,8 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         host_ids: formHostIds, host_names: formHostNames,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
+        room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
+        space_name: spaces.find(s => s.id === spaceId)?.name || "",
       }
       let result: EnergyKnotSession
       if (editingRecord) {
@@ -1522,6 +1533,8 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
         host_ids: hostIds, host_names: hostNames,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
+        room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
+        space_name: spaces.find(s => s.id === spaceId)?.name || "",
       }
       let result: InternalCourseSession
       if (editingRecord) {
@@ -1683,6 +1696,8 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
           is_public_welfare: formIsPublicWelfare,
           activity_mode: formActivityMode,
           space_id: spaceId || undefined, room_id: roomId || undefined,
+          room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
+        space_name: spaces.find(s => s.id === spaceId)?.name || "",
         })
       } else {
         const course = courses.find(c => c.id === formCourseId)
@@ -1694,6 +1709,8 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
           is_public_welfare: formIsPublicWelfare,
           activity_mode: formActivityMode,
           space_id: spaceId || undefined, room_id: roomId || undefined,
+          room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
+        space_name: spaces.find(s => s.id === spaceId)?.name || "",
         })
       }
       onSaved(result)
@@ -1855,7 +1872,7 @@ const ActivityCardList = memo(({ records, callbacks }: {
   <div className="divide-y divide-[#e8e8e8] border-y border-[#e8e8e8]">
     {records.slice(0, visibleCount).map((ur) => {
       if (ur.type === "class") {
-        return <SalonCard key={`class-${(ur.data as ClassRecord).id}`} record={ur.data as ClassRecord} teachers={callbacks.teachers} spaces={callbacks.spaces} onEdit={callbacks.onEditClass} onDelete={callbacks.onDeleteClass} onMaterials={callbacks.onMaterialsClass} />
+        return <SalonCard key={`class-${(ur.data as ClassRecord).id}`} record={ur.data as ClassRecord} teachers={callbacks.teachers} spaces={callbacks.spaces} courseMap={callbacks.courseMap} onEdit={callbacks.onEditClass} onDelete={callbacks.onDeleteClass} onMaterials={callbacks.onMaterialsClass} />
       }
       if (ur.type === "gcs") {
         return <GcsCard key={`gcs-${(ur.data as GroupCaseSession).id}`} session={ur.data as GroupCaseSession} spaces={callbacks.spaces} onEdit={callbacks.onEditGcs} onDelete={callbacks.onDeleteGcs} onMaterials={callbacks.onMaterialsGcs} />
@@ -1889,7 +1906,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
   themeMap: Map<string, ActivityTheme>
   spaces: Space[]
   onClose: () => void
-  onSaved: (date: string, weekTheme: string, dayTheme: string, spaceIds: string[]) => Promise<void>
+  onSaved: (themes: { date: string; space_id: string; week_theme: string; day_theme: string }[]) => Promise<void>
 }) => {
   const [weekTheme, setWeekTheme] = useState("")
   const [dayThemes, setDayThemes] = useState<Record<string, string>>({})
@@ -1928,12 +1945,21 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
     }
   }, [open, weekDays, themeMap])
 
+  const [spaceError, setSpaceError] = useState(false)
+
   const handleSave = async () => {
+    if (selectedSpaceIds.length === 0) {
+      setSpaceError(true)
+      return
+    }
     setSaving(true)
     try {
-      for (const day of weekDays) {
-        await onSaved(day.date, weekTheme, dayThemes[day.date] || "", selectedSpaceIds)
-      }
+      const themes = weekDays.flatMap(day =>
+        selectedSpaceIds.map(sid => ({
+          date: day.date, space_id: sid, week_theme: weekTheme, day_theme: dayThemes[day.date] || "",
+        }))
+      )
+      await onSaved(themes)
       onClose()
     } catch (e: any) {
       alert(e?.message || "保存失败")
@@ -1976,6 +2002,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
                           setSelectedSpaceIds(prev =>
                             prev.includes(space.id) ? prev.filter(id => id !== space.id) : [...prev, space.id]
                           )
+                          setSpaceError(false)
                           setSpaceDropdownOpen(false)
                         }}
                       >
@@ -2008,6 +2035,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
                   })}
                 </div>
               )}
+              {spaceError && <p className="text-xs text-destructive">请选择所属空间</p>}
             </div>
           </div>
           <div className="grid grid-cols-[80px_1fr] items-center gap-3">
@@ -2048,6 +2076,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
 })
 
 export default function DailyActivitiesPage() {
+  const navigate = useNavigate()
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(today)
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
@@ -2059,8 +2088,9 @@ export default function DailyActivitiesPage() {
   const [teachers, setTeachers] = useState<CustomerLight[]>([])
   const [calendarCounts, setCalendarCounts] = useState<Record<string, number>>({})
   const [spaces, setSpaces] = useState<Space[]>([])
+  const [noSpacesDialogOpen, setNoSpacesDialogOpen] = useState(false)
   const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
-    try { return localStorage.getItem("daily-activities-space") || "" } catch { return "" }
+    try { return localStorage.getItem("selected-space-id") || "" } catch { return "" }
   })
   // Activity data (5 types from dashboard)
   const [detailRecords, setDetailRecords] = useState<ClassRecord[]>([])
@@ -2190,6 +2220,19 @@ export default function DailyActivitiesPage() {
         return [...prev, result]
       })
     }
+  }
+
+  const saveBatchThemes = async (themes: { date: string; space_id: string; week_theme: string; day_theme: string }[]) => {
+    const results = await activityThemeApi.batchSave(themes)
+    setThemes(prev => {
+      const next = [...prev]
+      for (const result of results) {
+        const idx = next.findIndex(t => t.date === result.date && t.space_id === result.space_id)
+        if (idx >= 0) next[idx] = result
+        else next.push(result)
+      }
+      return next
+    })
   }
 
   // ===== Permissions =====
@@ -2360,9 +2403,11 @@ export default function DailyActivitiesPage() {
     courseApi.list().then(setCourses).catch(() => {})
     spaceApi.list().then((list) => {
       setSpaces(list)
-      if (!selectedSpaceId && list.length > 0) {
-        setSelectedSpaceId(list[0].id)
-        localStorage.setItem("daily-activities-space", list[0].id)
+      if (list.length > 0) {
+        if (!selectedSpaceId || !list.some(s => s.id === selectedSpaceId)) {
+          setSelectedSpaceId(list[0].id)
+          localStorage.setItem("selected-space-id", list[0].id)
+        }
       }
     }).catch(() => {})
     customerApi.light()
@@ -2380,7 +2425,7 @@ export default function DailyActivitiesPage() {
     startTransition(() => {
       setSelectedSpaceId(id)
     })
-    localStorage.setItem("daily-activities-space", id)
+    localStorage.setItem("selected-space-id", id)
   }, [])
 
   // 新增活动类型选择下拉
@@ -2627,9 +2672,16 @@ export default function DailyActivitiesPage() {
   }
 
   // ===== Render helpers =====
+  const courseMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const c of courses) map[c.id] = c.name
+    return map
+  }, [courses])
+
   const cardCallbacks = useMemo(() => ({
     teachers,
     spaces,
+    courseMap,
     onEditClass: handleOpenEdit,
     onDeleteClass: setDeleteId,
     onMaterialsClass: handleOpenMaterials,
@@ -2646,7 +2698,7 @@ export default function DailyActivitiesPage() {
     onEditOcr: handleOpenOcrEdit,
     onDeleteOcr: setOcrDeleteId,
     onMaterialsOcr: handleOpenOcrMaterials,
-  } as CardCallbacks), [teachers, spaces, handleOpenEdit, handleOpenMaterials, handleOpenGcsEdit, handleOpenGcsMaterials, handleOpenErsEdit, handleOpenEksEdit, handleOpenIcsEdit, handleOpenIcsMaterials, handleOpenOcrEdit, handleOpenOcrMaterials])
+  } as CardCallbacks), [teachers, spaces, courseMap, handleOpenEdit, handleOpenMaterials, handleOpenGcsEdit, handleOpenGcsMaterials, handleOpenErsEdit, handleOpenEksEdit, handleOpenIcsEdit, handleOpenIcsMaterials, handleOpenOcrEdit, handleOpenOcrMaterials])
 
   // ===== JSX =====
   return (
@@ -2728,7 +2780,7 @@ export default function DailyActivitiesPage() {
                       rowSpan={2}
                       className="px-2 text-center text-[12px] text-[#2b2f36] cursor-pointer hover:bg-[#f0f5ff] overflow-hidden text-ellipsis whitespace-nowrap"
                       style={{ height: "28px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
-                      onClick={() => setThemeEditWeekIndex(wi)}
+                      onClick={() => { if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
                     >
                       {weekThemeText}
                     </td>
@@ -2780,7 +2832,7 @@ export default function DailyActivitiesPage() {
         {/* 新增按钮 */}
         <div className="flex items-center justify-between relative mt-2.5">
           <span className="text-[14px] font-medium text-[#2b2f36] pl-2">当日活动</span>
-          <Button size="sm" className="text-xs" onClick={() => setAddMenuOpen(!addMenuOpen)}>
+          <Button size="sm" className="text-xs" onClick={() => { if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setAddMenuOpen(!addMenuOpen) }}>
             <Plus className="mr-1 h-3.5 w-3.5" /> 新增 <ChevronDown className="ml-1 h-3 w-3" />
           </Button>
           {addMenuOpen && (
@@ -2840,7 +2892,7 @@ export default function DailyActivitiesPage() {
           themeMap={themeMap}
           spaces={spaces}
           onClose={() => setThemeEditWeekIndex(null)}
-          onSaved={saveTheme}
+          onSaved={saveBatchThemes}
         />
       )}
 
@@ -3159,6 +3211,22 @@ export default function DailyActivitiesPage() {
         </AlertDialogContent>
       </AlertDialog>
       )}
+
+      {/* ===== 空间未配置提示 ===== */}
+      <AlertDialog open={noSpacesDialogOpen} onOpenChange={setNoSpacesDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>提示</AlertDialogTitle>
+            <AlertDialogDescription>需要先配置空间，才能配置活动和设置主题。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setNoSpacesDialogOpen(false); navigate("/courses/spaces") }}>
+              前往配置
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

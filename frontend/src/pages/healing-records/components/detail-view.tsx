@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { uploadApi, customerApi, healingRecordApi, customerDetailApi, type Customer, type Material, type CustomerDetail } from "@/lib/api"
+import { uploadApi, customerApi, healingRecordApi, customerDetailApi, type Customer, type CustomerLight, type Material, type CustomerDetail } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,7 +35,7 @@ export default function DetailView({
   onClearSelection: () => void
   hideSearch?: boolean
 }) {
-  const [customerList, setCustomerList] = useState<Customer[]>([])
+  const [customerList, setCustomerList] = useState<CustomerLight[]>([])
   const [searchValue, setSearchValue] = useState("")
   const [detail, setDetail] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -145,7 +145,7 @@ export default function DetailView({
             </div>
           ))}
           <div className="flex items-baseline gap-2">
-            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈身份</span>
+            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈老师</span>
             <span className="text-[12px] text-[#2b2f36]">
               {(c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).length === 0
                 ? "-"
@@ -155,7 +155,7 @@ export default function DetailView({
               }
             </span>
           </div>
-          {[["消费总额",`¥${detail!.payment_records.reduce((sum, g) => sum + g.amount, 0).toLocaleString()}`],["承接人",c.referrer_handler||"-"],["引流人",c.referrer||"-"],["流量来源",c.traffic_source||"-"]].map(([l,v])=>(
+          {[["消费总额",`¥${detail!.payment_records.reduce((sum, g) => sum + g.amount, 0).toLocaleString()}`],["引流人",c.referrer||"-"],["承接人",c.referrer_handler||"-"],["流量来源",c.traffic_source||"-"]].map(([l,v])=>(
             <div key={l} className="flex items-baseline gap-2">
               <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
               <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
@@ -442,7 +442,7 @@ function RecordForm({
   cid: string
   cname: string
   onSave: (data: any) => void
-  customers: Customer[]
+  customers: Customer[] | CustomerLight[]
   saving?: boolean
 }) {
   const enterToNext = useEnterToNext()

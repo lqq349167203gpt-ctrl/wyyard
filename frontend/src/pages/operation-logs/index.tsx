@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Search, X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
-import { operationLogApi, accountApi, customerApi, positionPermissionApi, positionCustomerPermissionApi, memberIdentityApi } from "@/lib/api"
+import { operationLogApi, accountApi, customerApi, organizationApi, positionPermissionApi, positionCustomerPermissionApi, memberIdentityApi } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
-import type { OperationLog, Account, Customer } from "@/lib/api"
+import type { OperationLog, Account, Customer, Organization } from "@/lib/api"
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,34 @@ import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
 const PAGE_SIZE = 20
+
+const PAGE_LABELS: Record<string, string> = {
+  "healing-records": "客户信息",
+  "activity-records": "活动记录",
+  "traffic-records": "引流记录",
+  "class-records-visitors": "到场人员",
+  "class-records-activities": "当日活动",
+  "class-records-arrival": "到场确认",
+  "daily-activities": "活动安排",
+  "payment": "付费项目",
+  "membership-cards": "会员活动",
+  "group-cases": "觉醒游戏",
+  "emotional-releases": "情绪释放",
+  "energy-knots": "能量结",
+  "internal-courses": "内部课程",
+  "other-projects": "其他项目",
+  "agents": "AI 配置",
+  "business-reminders": "业务提醒",
+  "system-logs": "系统日志",
+  "operation-logs": "操作日志",
+  "member-identities": "会员身份",
+  "healing-identities": "疗愈老师",
+  "position-management": "账号管理",
+  "courses": "活动配置",
+  "organizations": "组织管理",
+  "spaces": "疗愈空间",
+  "reminders": "提醒配置",
+}
 
 const METHOD_LABELS: Record<string, string> = {
   POST: "新增",
@@ -32,38 +60,50 @@ const METHOD_COLORS: Record<string, string> = {
 }
 
 const FIELD_CN: Record<string, string> = {
-  nickname: "昵称", name: "名称", title: "标题", username: "用户名",
-  phone: "电话", wechat: "微信", gender: "性别", age: "年龄",
-  member_type: "会员类型", member_identity: "会员身份",
-  note: "备注", description: "描述", content: "内容",
-  status: "状态", date: "日期", start_time: "开始时间", end_time: "结束时间",
-  teacher_ids: "老师", course_name: "沙龙名称", course_type: "课程类型",
-  owner_name: "案主", host_name: "主持人", host_names: "主持人",
-  participant_ids: "参与者", achiever_name: "成就君",
+  nickname: "昵称", name: "名称", title: "标题", username: "用户名", owner: "归属人",
+  phone: "电话", email: "邮箱", wechat: "微信", gender: "性别", age: "年龄", birthday: "生日",
+  member_type: "会员类型", member_identity: "会员身份", healing_identity: "疗愈老师", activity_types: "活动类型",
+  note: "备注", description: "描述", content: "内容", section: "板块",
+  status: "状态", type: "类型", date: "日期", start_time: "开始时间", end_time: "结束时间",
+  enabled: "启用状态",
+  teacher_ids: "老师", teachers: "老师", course_name: "沙龙名称", course_type: "课程类型", course_description: "沙龙描述",
+  owner_name: "案主", owner_id: "案主", host_name: "主持人", host_names: "主持人", host_id: "主持人", host_ids: "主持人",
+  participant_ids: "参与者", achiever_name: "成就君", achiever_id: "成就君",
   leader_id: "组长", deputy_id: "副组长", member_ids: "成员",
-  price: "价格", amount: "金额", count: "次数",
-  sort_order: "排序", is_public_welfare: "公益",
+  closer_name: "成交人", closer_id: "成交人",
+  price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
+  sort_order: "排序", is_public_welfare: "公益", category: "分类",
   arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "疗愈师回复",
-  referrer: "引流人", traffic_source: "流量来源",
-  basic_info: "基础信息", assessment: "客户评估", tags: "标签",
-  visit_count: "到店次数", paid_content: "付费内容",
-  positions: "疗愈身份", role: "角色", permissions: "权限",
-  groups: "分组", materials: "资料", images: "图片",
+  needs: "需求", activity_participation: "活动参与",
+  visit_date: "到访日期", visit_time: "预计时间", visit_count: "到店次数",
+  referrer: "引流人", traffic_source: "流量来源", paid_content: "付费内容",
+  basic_info: "基础信息", assessment: "客户评估", tags: "标签", self_tags: "个人标签",
+  work_status: "工作状态", work_description: "工作描述",
+  positions: "疗愈老师", position: "职位", role: "角色", permissions: "权限",
+  groups: "分组", materials: "资料", images: "图片", rooms: "房间",
   location: "地点", address: "地址",
   start_date: "开始日期", end_date: "结束日期",
-  remaining_count: "剩余次数", card_type: "卡类型",
-  customer_id: "客户", space_id: "空间", room_id: "房间",
-  owner_id: "案主", space_name: "空间名称",
+  remaining_count: "剩余次数", card_type: "卡类型", purchase_count: "购买次数",
+  customer_id: "客户", customer_name: "用户",
+  space_id: "空间", room_id: "房间", space_name: "空间名", room_name: "房间名",
+  organization_id: "组织",
+  password: "密码", old_password: "旧密码", new_password: "新密码",
   core_situation: "核心情况", need_tags: "需求标签",
   follow_up_node: "跟进节点", follow_up_action: "跟进动作",
-  tracking_plan: "跟进计划", self_tags: "个人标签",
+  tracking_plan: "跟进计划",
+  pages: "页面权限", member_types: "用户信息权限",
+  operator: "匹配方式", conditions: "匹配条件",
+  customers: "客户信息可见身份", class_records: "人员到场可见身份", payment: "付费项目可见身份",
+  referrer_handler: "引流处理人", traffic_source_detail: "流量来源详情",
+  total_payment: "累计付费",
+  activity_mode: "活动模式", course_id: "课程",
+  effective_date: "生效日期", themes: "主题",
 }
 
 const SECTION_OPTIONS = [
-  "客户信息", "到场人员", "沙龙类型", "疗愈空间", "会员身份", "活动配置",
-  "会员活动", "觉醒游戏", "情绪释放", "能量结", "内部课程", "OH卡梳理", "其他项目",
-  "人员到场", "账号管理", "角色权限", "疗愈身份", "修改密码", "AI 配置", "系统日志",
-  "提醒配置", "业务提醒", "活动安排",
+  "用户管理", "客户信息", "人员到场", "活动安排", "活动配置", "付费项目",
+  "会员身份", "疗愈老师", "组织管理", "空间配置", "提醒配置",
+  "账号管理", "角色管理", "密码修改", "AI 配置", "系统日志", "知识库", "业务数据", "操作日志",
 ]
 
 const ALL_PAGES = [
@@ -86,9 +126,10 @@ const ALL_PAGES = [
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
   { key: "member-identities", label: "会员身份" },
-  { key: "healing-identities", label: "疗愈身份" },
+  { key: "healing-identities", label: "疗愈老师" },
   { key: "position-management", label: "账号管理" },
   { key: "courses", label: "活动配置" },
+  { key: "organizations", label: "组织管理" },
   { key: "spaces", label: "疗愈空间" },
   { key: "reminders", label: "提醒配置" },
 ]
@@ -97,7 +138,7 @@ const PERMISSION_GROUPS = [
   { label: "业务数据", keys: ["healing-records", "activity-records", "traffic-records"] },
   { label: "人员到场", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
-  { label: "信息配置", keys: ["courses", "member-identities", "healing-identities", "spaces", "reminders"] },
+  { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management"] },
   { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs"] },
 ]
@@ -118,6 +159,7 @@ export default function OperationLogsPage() {
   const [selectedLog, setSelectedLog] = useState<OperationLog | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [organizations, setOrganizations] = useState<Organization[]>([])
   const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, dateFrom, dateTo })
 
   // 权限编辑弹窗状态
@@ -149,11 +191,15 @@ export default function OperationLogsPage() {
   useEffect(() => {
     accountApi.list().then(setAccounts).catch(() => {})
     customerApi.list().then(setCustomers).catch(() => {})
+    organizationApi.list().then(setOrganizations).catch(() => {})
   }, [])
 
   const getNameById = (id: string) => {
     const c = customers.find(c => c.id === id)
-    return c?.nickname || c?.name || id
+    if (c) return c.nickname || c.name
+    const o = organizations.find(o => o.id === id)
+    if (o) return o.name
+    return id
   }
 
   const handleSearch = () => {
@@ -268,13 +314,28 @@ export default function OperationLogsPage() {
 
   const dayGroups = groupByDay(pagedLogs)
 
-  const renderChanges = (before: Record<string, unknown> | null, after: Record<string, unknown> | null) => {
+  const SECTION_ENTITY: Record<string, string> = {
+    "空间配置": "空间", "活动配置": "活动", "用户管理": "客户", "客户信息": "客户",
+    "人员到场": "记录", "活动安排": "活动", "付费项目": "项目", "会员身份": "身份",
+    "疗愈老师": "老师", "组织管理": "组织", "提醒配置": "提醒", "账号管理": "账号",
+    "角色管理": "角色", "AI 配置": "配置", "系统日志": "日志",
+  }
+
+  const getEntityLabel = (section?: string, path?: string): string | null => {
+    if (!section) return null
+    if (path && /\/api\/spaces\/[^/]+\/rooms/.test(path)) return "房间"
+    if (path && /\/api\/courses\/[^/]+/.test(path) && section === "活动配置") return "活动"
+    return SECTION_ENTITY[section] || null
+  }
+
+  const renderChanges = (before: Record<string, unknown> | null, after: Record<string, unknown> | null, section?: string, path?: string) => {
     if (!after || !before) return null
 
-    const skipKeys = ["id", "created_at", "updated_at", "is_deleted", "deleted_at"]
+    const skipKeys = ["id", "created_at", "updated_at", "is_deleted", "deleted_at", "icon", "is_system", "password", "old_password", "new_password"]
     // 跳过 _id 字段（当对应的 _name 也存在时），避免案主/主持人/成交人 等重复显示
     const idNamePairs: Record<string, string> = {
       owner_id: "owner_name", host_id: "host_name", closer_id: "closer_name",
+      space_id: "space_name", room_id: "room_name",
     }
     const allKeys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
     const changedKeys = allKeys.filter(k => {
@@ -303,12 +364,12 @@ export default function OperationLogsPage() {
               {changedKeys.map((key, i) => {
                 return (
                   <tr key={key} className={i < changedKeys.length - 1 ? "border-b border-[#f0f0f0]" : ""}>
-                    <td className="px-3 py-2 text-[#8f959e] whitespace-nowrap">{FIELD_CN[key] || key}</td>
+                    <td className="px-3 py-2 text-[#8f959e] whitespace-nowrap">{(key === "name" ? getEntityLabel(section, path) : null) || FIELD_CN[key] || key}</td>
                     <td className="px-3 py-2 align-top">
-                      <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(before[key]) || "-"}</pre>
+                      <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(before[key], key) || "-"}</pre>
                     </td>
                     <td className="px-3 py-2 align-top">
-                      <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(after[key]) || "-"}</pre>
+                      <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(after[key], key) || "-"}</pre>
                     </td>
                   </tr>
                 )
@@ -325,15 +386,20 @@ export default function OperationLogsPage() {
     return s.replace(/[0-9a-f]{8,}(?:-[0-9a-f]{4,})*/gi, (match) => getNameById(match))
   }
 
-  const formatCellValue = (val: unknown): string => {
+  const formatCellValue = (val: unknown, key?: string): string => {
     if (val === null || val === undefined) return ""
     if (typeof val === "boolean") return val ? "是" : "否"
     if (Array.isArray(val)) {
       if (val.length === 0) return "（空）"
+      if (key === "rooms") {
+        return val.map((r: any) => r.name || r.id || "").filter(Boolean).join("、") || "（空）"
+      }
       return val.map(v => {
         if (typeof v === "object" && v !== null) return resolveIdsInString(JSON.stringify(v))
         const s = String(v)
         if (s.length >= 8 && /^[0-9a-f-]+$/i.test(s)) return getNameById(s)
+        // 页面权限字段：翻译为中文
+        if (key === "pages" && PAGE_LABELS[s]) return PAGE_LABELS[s]
         return s
       }).join("、")
     }
@@ -513,38 +579,9 @@ export default function OperationLogsPage() {
                 <span className="text-[#8f959e]">操作内容：</span>
                 <span className="text-[#2b2b2b]">{selectedLog.content}</span>
               </div>
-              {selectedLog.before_data || selectedLog.after_data
-                ? renderChanges(selectedLog.before_data || {}, selectedLog.after_data || {})
+              {selectedLog.method !== "POST" && (selectedLog.before_data || selectedLog.after_data)
+                ? renderChanges(selectedLog.before_data || {}, selectedLog.after_data || {}, selectedLog.section, selectedLog.path)
                 : null}
-              {/* 权限/账号管理快捷操作 */}
-              {selectedLog.section === "角色权限" && (
-                <div className="pt-2 border-t border-[#e8e8e8]">
-                  <button
-                    className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1]"
-                    onClick={() => {
-                      setSelectedLog(null)
-                      // 从 entity_id 或 path 中提取角色名称
-                      const posName = selectedLog.entity_id || ""
-                      if (posName) openPermissionDialog(posName)
-                    }}
-                  >
-                    更新权限配置
-                  </button>
-                </div>
-              )}
-              {selectedLog.section === "账号管理" && (
-                <div className="pt-2 border-t border-[#e8e8e8]">
-                  <button
-                    className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1]"
-                    onClick={() => {
-                      setSelectedLog(null)
-                      navigate("/positions/management")
-                    }}
-                  >
-                    管理账号
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>

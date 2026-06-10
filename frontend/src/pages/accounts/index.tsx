@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Edit, Trash2, X } from "lucide-react"
+import { Plus, Edit, Trash2, X, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -10,6 +10,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
 import { accountApi, positionApi, customerApi } from "@/lib/api"
 import type { Account, AccountCreate, Position, Customer } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -26,6 +29,13 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   const [isEditingSystem, setIsEditingSystem] = useState(false)
   const [formErrors, setFormErrors] = useState<{ owner?: string; role?: string; username?: string; password?: string }>({})
   const [customerList, setCustomerList] = useState<Customer[]>([])
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [changePwdId, setChangePwdId] = useState<string | null>(null)
+  const [changePwdForm, setChangePwdForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" })
+  const [changePwdErrors, setChangePwdErrors] = useState<{ old?: string; new?: string; confirm?: string }>({})
+  const [changePwdSaving, setChangePwdSaving] = useState(false)
 
   useEffect(() => { loadData(); customerApi.list().then(setCustomerList).catch(() => {}) }, [])
 
@@ -40,9 +50,10 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
 
     // 必填验证
     if (!form.owner.trim()) errors.owner = "归属人不能为空"
+    else if (!customerList.some(c => c.nickname === form.owner.trim())) errors.owner = "归属人必须是客户列表中的昵称"
     if (!form.role.trim()) errors.role = "角色不能为空"
     if (!form.username.trim()) errors.username = "账号不能为空"
-    if (!form.password.trim()) errors.password = "密码不能为空"
+    if (!editingId && !form.password.trim()) errors.password = "密码不能为空"
 
     // 唯一性验证（仅新增时）
     if (!editingId) {
@@ -60,9 +71,11 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     }
 
     setFormErrors({})
+    setSaving(true)
     try {
       if (editingId) {
-        await accountApi.update(editingId, form)
+        const { password, ...updateData } = form
+        await accountApi.update(editingId, updateData)
       } else {
         await accountApi.create(form)
       }
@@ -71,34 +84,70 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
       setForm({ owner: "", role: "", username: "", password: "", enabled: true })
       loadData()
     } catch (error: any) {
-      // 处理后端返回的错误
       const message = error.message || "操作失败"
       if (message.includes("归属人")) {
         setFormErrors({ owner: message })
       } else if (message.includes("账号")) {
         setFormErrors({ username: message })
       }
+    } finally {
+      setSaving(false)
     }
   }
 
   const handleEdit = (a: Account) => {
     setEditingId(a.id)
     setIsEditingSystem(!!a.is_system)
-    setForm({ owner: a.owner, role: a.role, username: a.username, password: a.password, enabled: a.enabled })
+    setForm({ owner: a.owner, role: a.role, username: a.username, password: "", enabled: a.enabled })
+    setFormErrors({})
     setShowForm(true)
   }
 
   const handleDelete = async () => {
-    if (deleteId) {
+    if (!deleteId || deleting) return
+    setDeleting(true)
+    try {
       await accountApi.delete(deleteId)
       setDeleteId(null)
       loadData()
+    } catch (e: any) {
+      console.error("删除失败:", e?.message || e)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleSavePassword = async () => {
+    const errors: { old?: string; new?: string; confirm?: string } = {}
+    if (!changePwdForm.oldPassword) errors.old = "请输入原密码"
+    if (!changePwdForm.newPassword) errors.new = "请输入新密码"
+    else if (changePwdForm.newPassword.length < 6) errors.new = "新密码至少需要6位"
+    if (changePwdForm.newPassword !== changePwdForm.confirmPassword) errors.confirm = "两次密码不一致"
+    if (Object.keys(errors).length > 0) { setChangePwdErrors(errors); return }
+    setChangePwdErrors({})
+    setChangePwdSaving(true)
+    try {
+      await accountApi.changePassword(changePwdId!, changePwdForm.oldPassword, changePwdForm.newPassword)
+      setChangePwdId(null)
+      setChangePwdForm({ oldPassword: "", newPassword: "", confirmPassword: "" })
+    } catch (e: any) {
+      setChangePwdErrors({ old: e.message || "修改失败" })
+    } finally {
+      setChangePwdSaving(false)
     }
   }
 
   const handleToggle = async (a: Account) => {
-    await accountApi.update(a.id, { enabled: !a.enabled })
-    loadData()
+    if (togglingId) return
+    setTogglingId(a.id)
+    try {
+      await accountApi.update(a.id, { enabled: !a.enabled })
+      loadData()
+    } catch (e: any) {
+      console.error("切换状态失败:", e?.message || e)
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   return (
@@ -109,7 +158,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
             <h1 className="text-lg font-semibold">账号管理</h1>
             <p className="text-xs text-muted-foreground mt-1.5">管理系统登录账号，角色从角色权限中选择</p>
           </div>
-          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setForm({ owner: "", role: "", username: "", password: "", enabled: true }); setShowForm(true) }}>
+          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setIsEditingSystem(false); setForm({ owner: "", role: "", username: "", password: "", enabled: true }); setShowForm(true) }}>
             <Plus className="h-3.5 w-3.5 mr-1" /> 新增账号
           </Button>
         </div>
@@ -118,7 +167,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
       {embedded && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">管理系统登录账号，角色从角色权限中选择</span>
-          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setForm({ owner: "", role: "", username: "", password: "", enabled: true }); setShowForm(true) }}>
+          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setIsEditingSystem(false); setForm({ owner: "", role: "", username: "", password: "", enabled: true }); setShowForm(true) }}>
             <Plus className="h-3.5 w-3.5 mr-1" /> 新增账号
           </Button>
         </div>
@@ -159,10 +208,11 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                       <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-50 text-green-600">永久</span>
                     ) : (
                       <button
-                        className={`text-[12px] px-2 py-0.5 rounded-full ${a.enabled ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}
+                        className={`text-[12px] px-2 py-0.5 rounded-full ${a.enabled ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"} ${togglingId === a.id ? "opacity-50" : ""}`}
                         onClick={() => handleToggle(a)}
+                        disabled={togglingId === a.id}
                       >
-                        {a.enabled ? "启用" : "禁用"}
+                        {togglingId === a.id ? "切换中..." : (a.enabled ? "启用" : "禁用")}
                       </button>
                     )}
                   </TableCell>
@@ -170,6 +220,9 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                     <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(a)}>
                         <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setChangePwdId(a.id); setChangePwdForm({ oldPassword: "", newPassword: "", confirmPassword: "" }); setChangePwdErrors({}) }}>
+                        <KeyRound className="h-3.5 w-3.5" />
                       </Button>
                       {!a.is_system && (
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(a.id)}>
@@ -185,48 +238,47 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
         )}
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setShowForm(false); setFormErrors({}) }}>
-          <div className="bg-white rounded-lg w-[400px] shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b">
-              <span className="text-sm font-medium">{editingId ? "编辑账号" : "新增账号"}</span>
-              <button onClick={() => { setShowForm(false); setFormErrors({}) }}><X className="h-4 w-4 text-[#8f959e]" /></button>
+      <Dialog open={showForm} onOpenChange={(open) => { if (!open) { setShowForm(false); setFormErrors({}) } }}>
+        <DialogContent className="w-[400px] max-w-[90vw] p-0 gap-0">
+          <DialogHeader className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
+            <DialogTitle className="text-[14px] font-normal">{editingId ? "编辑账号" : "新增账号"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 py-4 space-y-4" {...enterToNext}>
+            <div className="flex items-start gap-3">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">归属人</span>
+              <div className="relative flex-1">
+                <CustomerSearchInput
+                  customers={customerList}
+                  value={form.owner}
+                  onChange={(val) => setForm({ ...form, owner: val as string })}
+                  placeholder="输入昵称搜索..."
+                  filterSelected={false}
+                />
+                {formErrors.owner && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.owner}</p>}
+              </div>
             </div>
-            <div className="px-5 py-4 space-y-4" {...enterToNext}>
+            {!isEditingSystem && (
               <div className="flex items-start gap-3">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">归属人</span>
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">角色</span>
                 <div className="relative flex-1">
-                  <CustomerSearchInput
-                    customers={customerList}
-                    value={form.owner}
-                    onChange={(val) => setForm({ ...form, owner: val as string })}
-                    placeholder="输入昵称搜索..."
-                    filterSelected={false}
+                  <SelectDropdown
+                    value={form.role}
+                    options={[{ value: "超级管理员", label: "超级管理员" }, ...positions.map(p => ({ value: p.name, label: p.name }))]}
+                    placeholder="选择角色"
+                    onChange={(v) => setForm({ ...form, role: v })}
                   />
-                  {formErrors.owner && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.owner}</p>}
+                  {formErrors.role && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.role}</p>}
                 </div>
               </div>
-              {!isEditingSystem && (
-                <div className="flex items-start gap-3">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">角色</span>
-                  <div className="relative flex-1">
-                    <SelectDropdown
-                      value={form.role}
-                      options={positions.map(p => ({ value: p.name, label: p.name }))}
-                      placeholder="选择角色"
-                      onChange={(v) => setForm({ ...form, role: v })}
-                    />
-                    {formErrors.role && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.role}</p>}
-                  </div>
-                </div>
-              )}
-              <div className="flex items-start gap-3">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">账号</span>
-                <div className="flex-1">
-                  <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="输入登录账号" className="h-8" />
-                  {formErrors.username && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.username}</p>}
-                </div>
+            )}
+            <div className="flex items-start gap-3">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">账号</span>
+              <div className="flex-1">
+                <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="输入登录账号" className="h-8" />
+                {formErrors.username && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.username}</p>}
               </div>
+            </div>
+            {!editingId && (
               <div className="flex items-start gap-3">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">密码</span>
                 <div className="flex-1">
@@ -234,28 +286,28 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                   {formErrors.password && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.password}</p>}
                 </div>
               </div>
-              {!isEditingSystem && (
-                <div className="flex items-center gap-3">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0">是否启用</span>
-                  <div className="relative flex-1">
-                    <select className="w-full h-8 text-[12px] appearance-none border rounded pl-2 pr-7" value={form.enabled ? "true" : "false"} onChange={(e) => setForm({ ...form, enabled: e.target.value === "true" })}>
-                      <option value="true">启用</option>
-                      <option value="false">禁用</option>
-                    </select>
-                    <svg className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8f959e] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
+            )}
+            {!isEditingSystem && (
+              <div className="flex items-center gap-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0">是否启用</span>
+                <div className="relative flex-1">
+                  <select className="w-full h-8 text-[12px] appearance-none border rounded pl-2 pr-7" value={form.enabled ? "true" : "false"} onChange={(e) => setForm({ ...form, enabled: e.target.value === "true" })}>
+                    <option value="true">启用</option>
+                    <option value="false">禁用</option>
+                  </select>
+                  <svg className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8f959e] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
                 </div>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t">
-              <Button variant="outline" size="sm" onClick={() => { setShowForm(false); setFormErrors({}) }}>取消</Button>
-              <Button size="sm" onClick={handleSave}>保存</Button>
-            </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+          <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">
+            <Button variant="outline" size="sm" onClick={() => { setShowForm(false); setFormErrors({}) }}>取消</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
@@ -264,11 +316,50 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
             <AlertDialogDescription>确定要删除该账号吗？此操作不可撤销。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>确定删除</AlertDialogAction>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}>{deleting ? "删除中..." : "确定删除"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 修改密码弹窗 */}
+      {changePwdId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setChangePwdId(null); setChangePwdErrors({}) }}>
+          <div className="bg-white rounded-lg w-[400px] shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <span className="text-sm font-medium">修改密码</span>
+              <button onClick={() => { setChangePwdId(null); setChangePwdErrors({}) }}><X className="h-4 w-4 text-[#8f959e]" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">原密码</span>
+                <div className="flex-1">
+                  <Input type="password" value={changePwdForm.oldPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, oldPassword: e.target.value })} placeholder="输入原密码" className="h-8" />
+                  {changePwdErrors.old && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.old}</p>}
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">新密码</span>
+                <div className="flex-1">
+                  <Input type="password" value={changePwdForm.newPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, newPassword: e.target.value })} placeholder="输入新密码（至少6位）" className="h-8" />
+                  {changePwdErrors.new && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.new}</p>}
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">确认密码</span>
+                <div className="flex-1">
+                  <Input type="password" value={changePwdForm.confirmPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, confirmPassword: e.target.value })} placeholder="再次输入新密码" className="h-8" />
+                  {changePwdErrors.confirm && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.confirm}</p>}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t">
+              <Button variant="outline" size="sm" onClick={() => { setChangePwdId(null); setChangePwdErrors({}) }}>取消</Button>
+              <Button size="sm" onClick={handleSavePassword} disabled={changePwdSaving}>{changePwdSaving ? "保存中..." : "确认修改"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

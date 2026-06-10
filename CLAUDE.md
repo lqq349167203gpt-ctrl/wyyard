@@ -45,7 +45,8 @@ wyyard_project/
 | 付费项目 | 付费项目 | /payment |
 | 信息配置 | 沙龙类型 | /positions/courses |
 | 信息配置 | 会员身份 | /config/member-identities |
-| 信息配置 | 疗愈身份 | /healing-identities |
+| 信息配置 | 疗愈老师 | /healing-identities |
+| 信息配置 | 组织管理 | /organizations |
 | 信息配置 | 疗愈空间 | /courses/spaces |
 | 信息配置 | 提醒配置 | /config/reminders |
 | 账号管理 | 账号管理 | /accounts |

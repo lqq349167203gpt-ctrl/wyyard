@@ -263,6 +263,7 @@ export interface VisitRecord {
   member_type: string
   daily_card_usage: number
   needs: string
+  referrer_handler: string
   activity_id: string
   activity_type: string
   space_id: string
@@ -289,6 +290,7 @@ export interface VisitRecordCreate {
   member_type?: string
   daily_card_usage?: number
   needs?: string
+  referrer_handler?: string
   activity_id?: string
   activity_type?: string
   space_id?: string
@@ -372,6 +374,7 @@ export const courseApi = {
 export const courseTypeApi = {
   list: () => request<string[]>("/api/course-types"),
   create: (name: string) => request<{ name: string }>("/api/course-types", { method: "POST", body: JSON.stringify({ name }) }),
+  rename: (oldName: string, newName: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(oldName)}`, { method: "PATCH", body: JSON.stringify({ new_name: newName }) }),
   delete: (name: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "DELETE" }),
 }
 
@@ -428,6 +431,7 @@ export interface ClassRecord {
   materials: Material[]
   groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]
   is_public_welfare: boolean
+  activity_mode?: string
   space_id: string
   room_id: string
   room_name: string
@@ -445,6 +449,7 @@ export interface ClassRecordCreate {
   course_description?: string
   teacher_ids?: string[]
   is_public_welfare?: boolean
+  activity_mode?: string
   space_id?: string
   room_id?: string
   room_name?: string
@@ -540,6 +545,7 @@ export interface GroupCaseSession {
   host_id: string
   host_name: string
   materials: Material[]
+  activity_mode?: string
   space_id: string
   room_id: string
   room_name: string
@@ -631,6 +637,7 @@ export interface OhCardReadingSession {
   host_id: string
   host_name: string
   materials: Material[]
+  activity_mode?: string
   space_id: string
   room_id: string
   room_name: string
@@ -747,6 +754,7 @@ export interface EmotionalReleaseSession {
   host_id: string
   host_name: string
   materials: Material[]
+  activity_mode?: string
   space_id: string
   room_id: string
   room_name: string
@@ -802,6 +810,7 @@ export interface EnergyKnotSession {
   participant_ids: string[]
   host_ids: string[]
   host_names: string[]
+  activity_mode?: string
   space_id: string
   room_id: string
   room_name: string
@@ -856,6 +865,7 @@ export interface InternalCourseSession {
   host_names: string[]
   participant_ids: string[]
   materials: Material[]
+  activity_mode?: string
   space_id: string
   room_id: string
   room_name: string
@@ -1205,6 +1215,7 @@ export interface ActivityRecord {
   role: string
   host: string
   session_id: string
+  is_public_welfare?: boolean
 }
 
 export interface PaymentRecord {
@@ -1224,6 +1235,7 @@ export interface CustomerDetail {
   activities: ActivityRecord[]
   healing_records: HealingRecord[]
   payment_records: PaymentRecord[]
+  visit_records: VisitRecord[]
 }
 
 export const customerDetailApi = {
@@ -1381,6 +1393,8 @@ export const positionPermissionApi = {
   getAll: () => request<Record<string, string[]>>("/api/position-permissions"),
   get: (position: string) => request<{ position: string; pages: string[] }>(`/api/position-permissions/${position}`),
   set: (position: string, pages: string[]) => request<{ message: string }>("/api/position-permissions", { method: "PUT", body: JSON.stringify({ position, pages }) }),
+  setFull: (position: string, pages: string[], customers: string[], classRecords: string[], payment: string[], pagePermissions?: Record<string, string[]>) => request<{ message: string }>("/api/position-permissions/full", { method: "PUT", body: JSON.stringify({ position, pages, customers, class_records: classRecords, payment, page_permissions: pagePermissions || {} }) }),
+  getPagePermissions: () => request<Record<string, Record<string, string[]>>>("/api/position-permissions/page-permissions"),
 }
 
 // Position Customer Permissions (section: customers | class_records | payment)

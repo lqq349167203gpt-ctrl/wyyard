@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, X, DoorOpen } from "lucide-react"
+import { Plus, Trash2, Edit, DoorOpen } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -21,7 +21,7 @@ export default function SpacesPage() {
   const enterToNext = useEnterToNext()
   const [spaces, setSpaces] = useState<Space[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedSpace, setSelectedSpace] = useState<string>("全部")
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string>("全部")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false)
   const [deleteSpaceDialogOpen, setDeleteSpaceDialogOpen] = useState(false)
@@ -29,6 +29,8 @@ export default function SpacesPage() {
   const [deletingSpace, setDeletingSpace] = useState<Space | null>(null)
   const [editingSpace, setEditingSpace] = useState<Space | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deletingRoom, setDeletingRoom] = useState(false)
   const [spaceName, setSpaceName] = useState("")
   const [roomName, setRoomName] = useState("")
   const [formSpaceId, setFormSpaceId] = useState("")
@@ -54,10 +56,10 @@ export default function SpacesPage() {
     loadSpaces()
   }, [])
 
-  const currentSpace = spaces.find(s => s.name === selectedSpace)
+  const currentSpace = spaces.find(s => s.id === selectedSpaceId)
 
   // 全部=所有空间的房间，选中某空间=该空间的房间
-  const allRooms = selectedSpace === "全部"
+  const allRooms = selectedSpaceId === "全部"
     ? spaces.flatMap(s => s.rooms.map(r => ({ ...r, spaceId: s.id, spaceName: s.name })))
     : (currentSpace?.rooms.map(r => ({ ...r, spaceId: currentSpace.id, spaceName: currentSpace.name })) || [])
 
@@ -101,10 +103,11 @@ export default function SpacesPage() {
   }
 
   const handleDeleteSpace = async () => {
-    if (!deletingSpace) return
+    if (!deletingSpace || deleting) return
+    setDeleting(true)
     try {
       await spaceApi.delete(deletingSpace.id)
-      if (selectedSpace === deletingSpace.name) setSelectedSpace("全部")
+      if (selectedSpaceId === deletingSpace.id) setSelectedSpaceId("全部")
       setDeleteSpaceDialogOpen(false)
       setDeletingSpace(null)
       loadSpaces()
@@ -112,6 +115,8 @@ export default function SpacesPage() {
       setDeleteSpaceDialogOpen(false)
       setSpaceBlockedMessage(e?.message || "删除失败")
       setSpaceBlockedOpen(true)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -128,12 +133,13 @@ export default function SpacesPage() {
   }
 
   const handleConfirmDelete = async () => {
-    if (!deleteRoomInfo.open) return
+    if (!deleteRoomInfo.open || deletingRoom) return
     if (deleteRoomInfo.isReferenced) {
-      if (deleteRoomInput !== deleteRoomInfo.roomName) {
+      if (deleteRoomInput.toLowerCase() !== deleteRoomInfo.roomName.toLowerCase()) {
         setDeleteRoomError("输入的名称不匹配")
         return
       }
+      setDeletingRoom(true)
       try {
         await spaceApi.deleteRoom(deleteRoomInfo.spaceId, deleteRoomInfo.roomId, true)
         setDeleteRoomInfo({ open: false, spaceId: "", roomId: "", roomName: "", isReferenced: false, checking: false })
@@ -141,14 +147,19 @@ export default function SpacesPage() {
         loadSpaces()
       } catch (e: any) {
         setDeleteRoomError(e?.message || "删除失败")
+      } finally {
+        setDeletingRoom(false)
       }
     } else {
+      setDeletingRoom(true)
       try {
         await spaceApi.deleteRoom(deleteRoomInfo.spaceId, deleteRoomInfo.roomId)
         setDeleteRoomInfo({ open: false, spaceId: "", roomId: "", roomName: "", isReferenced: false, checking: false })
         loadSpaces()
       } catch (e: any) {
         setDeleteRoomError(e?.message || "删除失败")
+      } finally {
+        setDeletingRoom(false)
       }
     }
   }
@@ -208,11 +219,11 @@ export default function SpacesPage() {
                 {/* 全部 */}
                 <div
                   className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
-                    selectedSpace === "全部"
+                    selectedSpaceId === "全部"
                       ? "bg-[#f0f5ff] text-[#3370ff]"
                       : "text-[#646a73] hover:bg-[#f7f8fa]"
                   }`}
-                  onClick={() => setSelectedSpace("全部")}
+                  onClick={() => setSelectedSpaceId("全部")}
                 >
                   <span className="text-[13px] font-light">全部</span>
                   <Badge variant="secondary" className="text-[11px] font-normal shrink-0 ml-2">
@@ -226,17 +237,26 @@ export default function SpacesPage() {
                   <div
                     key={space.id}
                     className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors group ${
-                      selectedSpace === space.name
+                      selectedSpaceId === space.id
                         ? "bg-[#f0f5ff] text-[#3370ff]"
                         : "text-[#2b2f36] hover:bg-[#f7f8fa]"
                     }`}
-                    onClick={() => setSelectedSpace(space.name)}
+                    onClick={() => setSelectedSpaceId(space.id)}
                   >
                     <span className="text-[13px] truncate">{space.name}</span>
                     <div className="flex items-center gap-1 shrink-0 ml-2">
-                      <Badge variant="secondary" className="text-[11px] font-normal">
-                        {space.rooms.length}
-                      </Badge>
+                      <button
+                        className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingSpace(space)
+                          setSpaceName(space.name)
+                          setSpaceError("")
+                          setSpaceDialogOpen(true)
+                        }}
+                      >
+                        <Edit className="h-3 w-3 text-[#8f959e]" />
+                      </button>
                       <button
                         className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
                         onClick={(e) => {
@@ -252,6 +272,9 @@ export default function SpacesPage() {
                       >
                         <Trash2 className="h-3 w-3 text-[#8f959e]" />
                       </button>
+                      <Badge variant="secondary" className="text-[11px] font-normal">
+                        {space.rooms.length}
+                      </Badge>
                     </div>
                   </div>
                 ))}
@@ -269,7 +292,7 @@ export default function SpacesPage() {
                 {allRooms.length} 个房间
               </Badge>
             </div>
-            <Button size="sm" className="h-7 text-xs" onClick={() => { setFormSpaceId(currentSpace?.id || ""); setRoomName(""); setDialogOpen(true) }}>
+            <Button size="sm" className="h-7 text-xs" onClick={() => { setFormSpaceId(selectedSpaceId !== "全部" ? selectedSpaceId : ""); setRoomName(""); setRoomError(""); setDialogOpen(true) }}>
               <Plus className="mr-1 h-3 w-3" /> 添加房间
             </Button>
           </div>
@@ -402,8 +425,10 @@ export default function SpacesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <Button variant="destructive" size="sm" onClick={handleDeleteSpace}>删除</Button>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <Button variant="destructive" size="sm" onClick={handleDeleteSpace} disabled={deleting}>
+              {deleting ? "删除中..." : "删除"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -452,8 +477,8 @@ export default function SpacesPage() {
             )}
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => { setDeleteRoomInfo({ open: false, spaceId: "", roomId: "", roomName: "", isReferenced: false, checking: false }); setDeleteRoomInput(""); setDeleteRoomError("") }}>取消</Button>
-              <Button size="sm" variant="destructive" onClick={handleConfirmDelete} disabled={deleteRoomInfo.checking || (deleteRoomInfo.isReferenced && !deleteRoomInput)}>
-                确认删除
+              <Button size="sm" variant="destructive" onClick={handleConfirmDelete} disabled={deleteRoomInfo.checking || deletingRoom || (deleteRoomInfo.isReferenced && !deleteRoomInput)}>
+                {deletingRoom ? "删除中..." : "确认删除"}
               </Button>
             </div>
           </div>

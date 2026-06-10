@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, BookOpen, Users } from "lucide-react"
+import { Plus, Trash2, Edit, BookOpen } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -12,51 +13,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { courseApi, courseTypeApi, organizationApi, customerApi, type Course, type Organization, type Customer } from "@/lib/api"
+import { courseApi, courseTypeApi, organizationApi, type Course, type Organization } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
-import { CustomerSearchInput } from "@/components/customer-search-input"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 
 export default function CoursesPage() {
-  const [activeTab, setActiveTab] = useState("courses")
-
-  return (
-    <div className="px-6 pt-4 pb-6 space-y-3">
-      {/* Tab 切换 */}
-      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 min-h-[39px]">
-        <div className="flex items-center gap-6">
-          {[
-            { key: "courses", label: "课程类型" },
-            { key: "organizations", label: "组织管理" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              className={`relative px-1 pb-2 text-[14px] transition-colors ${
-                activeTab === tab.key
-                  ? "text-[#3370ff]"
-                  : "text-[#2b2f36] hover:text-[#4e535a]"
-              }`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {activeTab === "courses" && <CoursesTab />}
-      {activeTab === "organizations" && <OrganizationsTab />}
-    </div>
-  )
-}
-
-// ===================== 课程类型 Tab =====================
-
-function CoursesTab() {
   const enterToNext = useEnterToNext()
   const [courses, setCourses] = useState<Course[]>([])
   const [courseTypes, setCourseTypes] = useState<string[]>([])
@@ -73,6 +35,13 @@ function CoursesTab() {
   const [newTypeName, setNewTypeName] = useState("")
   const [deleteTypeDialogOpen, setDeleteTypeDialogOpen] = useState(false)
   const [deletingType, setDeletingType] = useState<string | null>(null)
+  const [typeBlockedOpen, setTypeBlockedOpen] = useState(false)
+  const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
+  const [editTypeDialogOpen, setEditTypeDialogOpen] = useState(false)
+  const [editingType, setEditingType] = useState<string | null>(null)
+  const [editTypeName, setEditTypeName] = useState("")
+  const [editTypeError, setEditTypeError] = useState("")
+  const navigate = useNavigate()
 
   const loadData = useCallback(() => {
     courseApi.list().then(setCourses).catch(() => {})
@@ -87,6 +56,7 @@ function CoursesTab() {
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredCourses)
 
   const handleOpenCreate = () => {
+    if (organizations.length === 0) { setNoOrgDialogOpen(true); return }
     setEditingCourse(null)
     const defaultType = selectedType === "全部" ? (courseTypes[0] || "") : selectedType
     const defaultOrgId = organizations.length > 0 ? organizations[0].id : ""
@@ -141,6 +111,12 @@ function CoursesTab() {
 
   const handleDeleteType = async () => {
     if (!deletingType) return
+    const count = courses.filter(c => c.type === deletingType).length
+    if (count > 0) {
+      setDeleteTypeDialogOpen(false)
+      setTypeBlockedOpen(true)
+      return
+    }
     try {
       await courseTypeApi.delete(deletingType)
       if (selectedType === deletingType) setSelectedType("全部")
@@ -152,18 +128,45 @@ function CoursesTab() {
     }
   }
 
+  const handleRenameType = async () => {
+    if (!editingType || !editTypeName.trim()) return
+    if (editTypeName.trim() === editingType) { setEditTypeDialogOpen(false); return }
+    setSaving(true)
+    setEditTypeError("")
+    try {
+      await courseTypeApi.rename(editingType, editTypeName.trim())
+      if (selectedType === editingType) setSelectedType(editTypeName.trim())
+      setEditTypeDialogOpen(false)
+      setEditingType(null)
+      loadData()
+    } catch (e: any) {
+      setEditTypeError(e?.message || "重命名失败")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const getOrgName = (orgId: string) => organizations.find(o => o.id === orgId)?.name || ""
 
   return (
     <>
-      {/* 主内容区 - 左右布局 */}
-      <div className="flex gap-4" style={{ height: 'calc(100vh - 140px)' }}>
+      <div className="px-6 pt-12 pb-6 space-y-3">
+        {/* 页面头部 */}
+        <div className="flex items-center justify-between pb-2">
+          <div>
+            <h1 className="text-lg font-semibold text-left">活动配置</h1>
+            <p className="text-xs text-muted-foreground mt-1.5">共 {courses.length} 个活动</p>
+          </div>
+        </div>
+
+        {/* 主内容区 - 左右布局 */}
+        <div className="flex gap-4" style={{ height: 'calc(100vh - 180px)' }}>
         {/* 左侧 - 课程类型列表 */}
         <div className="w-[234px] bg-white rounded-lg flex flex-col shrink-0">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#f0f0f0]">
-            <span className="text-[13px] font-medium text-[#2b2f36]">课程类型</span>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => { setNewTypeName(""); setTypeDialogOpen(true) }}>
-              <Plus className="h-3.5 w-3.5" />
+          <div className="flex items-center justify-between px-4 h-11 border-b border-[#f0f0f0]">
+            <span className="text-[13px] font-medium text-[#2b2f36]">活动类型</span>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-[#3370ff] hover:text-[#3370ff] hover:bg-[#f0f5ff]" onClick={() => { setNewTypeName(""); setTypeDialogOpen(true) }}>
+              新增
             </Button>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -179,7 +182,7 @@ function CoursesTab() {
                   return (
                     <div
                       key={type}
-                      className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
+                      className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors group ${
                         selectedType === type
                           ? "bg-[#f0f5ff] text-[#3370ff]"
                           : "text-[#646a73] hover:bg-[#f7f8fa]"
@@ -187,9 +190,28 @@ function CoursesTab() {
                       onClick={() => setSelectedType(type)}
                     >
                       <span className="text-[13px] font-light truncate">{type}</span>
-                      <Badge variant="secondary" className="text-[11px] font-normal shrink-0 ml-2">
-                        {count}
-                      </Badge>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        {!isAll && (
+                          <button
+                            className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const count = courses.filter(c => c.type === type).length
+                              if (count > 0) {
+                                setTypeBlockedOpen(true)
+                              } else {
+                                setDeletingType(type)
+                                setDeleteTypeDialogOpen(true)
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 text-[#8f959e]" />
+                          </button>
+                        )}
+                        <Badge variant="secondary" className="text-[11px] font-normal">
+                          {count}
+                        </Badge>
+                      </div>
                     </div>
                   )
                 })}
@@ -201,7 +223,7 @@ function CoursesTab() {
                   return (
                     <div
                       key={type}
-                      className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
+                      className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors group ${
                         selectedType === type
                           ? "bg-[#f0f5ff] text-[#3370ff]"
                           : "text-[#2b2f36] hover:bg-[#f7f8fa]"
@@ -209,9 +231,38 @@ function CoursesTab() {
                       onClick={() => setSelectedType(type)}
                     >
                       <span className="text-[13px] truncate">{type}</span>
-                      <Badge variant="secondary" className="text-[11px] font-normal shrink-0 ml-2">
-                        {count}
-                      </Badge>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <button
+                          className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingType(type)
+                            setEditTypeName(type)
+                            setEditTypeError("")
+                            setEditTypeDialogOpen(true)
+                          }}
+                        >
+                          <Edit className="h-3 w-3 text-[#8f959e]" />
+                        </button>
+                        <button
+                          className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                          onClick={(e) => {
+                              e.stopPropagation()
+                              const count = courses.filter(c => c.type === type).length
+                              if (count > 0) {
+                                setTypeBlockedOpen(true)
+                              } else {
+                                setDeletingType(type)
+                                setDeleteTypeDialogOpen(true)
+                              }
+                            }}
+                        >
+                          <Trash2 className="h-3 w-3 text-[#8f959e]" />
+                        </button>
+                        <Badge variant="secondary" className="text-[11px] font-normal">
+                          {count}
+                        </Badge>
+                      </div>
                     </div>
                   )
                 })}
@@ -222,37 +273,30 @@ function CoursesTab() {
 
         {/* 右侧 - 课程列表 */}
         <div className="flex-1 bg-white rounded-lg flex flex-col min-w-0">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#f0f0f0]">
+          <div className="flex items-center justify-between px-4 h-11 border-b border-[#f0f0f0]">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-medium text-[#2b2f36]">{selectedType}</span>
+              <span className="text-[13px] font-medium text-[#2b2f36]">活动列表</span>
               <Badge variant="secondary" className="text-[11px] font-normal">
-                {filteredCourses.length} 个课程
+                {filteredCourses.length} 个活动
               </Badge>
-              {selectedType !== "全部" && (
-                <button
-                  className="h-5 w-5 flex items-center justify-center rounded hover:bg-[#f0f0f0] transition-colors"
-                  onClick={() => { setDeletingType(selectedType); setDeleteTypeDialogOpen(true) }}
-                >
-                  <Trash2 className="h-3 w-3 text-[#8f959e]" />
-                </button>
-              )}
             </div>
             <Button size="sm" className="h-7 text-xs" onClick={handleOpenCreate}>
-              <Plus className="mr-1 h-3 w-3" /> 新增课程
+              <Plus className="mr-1 h-3 w-3" /> 新增
             </Button>
           </div>
           <div className="flex-1 overflow-y-auto">
             {filteredCourses.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">该类型下暂无课程</p>
-                <p className="text-xs text-muted-foreground mt-1">点击上方"新增课程"按钮添加</p>
+                <p className="text-sm text-muted-foreground">该类型下暂无活动</p>
+                <p className="text-xs text-muted-foreground mt-1">点击上方"新增"按钮添加</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-4">课程名称</TableHead>
+                    <TableHead className="pl-4">活动名称</TableHead>
+                    <TableHead>活动类型</TableHead>
                     <TableHead>所属组织</TableHead>
                     <TableHead>已上课数</TableHead>
                     <TableHead className="text-right pr-4">操作</TableHead>
@@ -263,6 +307,9 @@ function CoursesTab() {
                     <TableRow key={course.id}>
                       <TableCell className="pl-4">
                         <span className="text-[13px] text-[#2b2f36] font-medium">{course.name}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-[13px] text-[#8f959e]">{course.type || "-"}</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-[13px] text-[#8f959e]">{getOrgName(course.organization_id) || "-"}</span>
@@ -296,12 +343,13 @@ function CoursesTab() {
           />
         </div>
       </div>
+      </div>
 
       {/* 新增类型弹窗 */}
       <Dialog open={typeDialogOpen} onOpenChange={setTypeDialogOpen}>
         <DialogContent className="max-w-sm p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">新增课程类型</DialogTitle>
+            <DialogTitle className="text-base">新增活动类型</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
@@ -320,21 +368,21 @@ function CoursesTab() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">{editingCourse ? "编辑课程" : "新增课程"}</DialogTitle>
+            <DialogTitle className="text-base">{editingCourse ? "编辑活动" : "新增活动"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程类型</span>
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">活动类型</span>
               <SelectDropdown
                 value={form.type}
                 options={courseTypes.filter(t => t !== "未分类").map(t => ({value: t, label: t}))}
-                placeholder="选择课程类型"
+                placeholder="选择活动类型"
                 onChange={(v) => setForm({ ...form, type: v })}
               />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程名称</span>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="请输入课程名称" />
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">活动名称</span>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="请输入活动名称" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">所属组织</span>
@@ -362,9 +410,9 @@ function CoursesTab() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除课程</AlertDialogTitle>
+            <AlertDialogTitle>删除活动</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除课程「{deletingCourse?.name}」吗？此操作不可撤销。
+              确定要删除活动「{deletingCourse?.name}」吗？此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -378,230 +426,68 @@ function CoursesTab() {
       <AlertDialog open={deleteTypeDialogOpen} onOpenChange={setDeleteTypeDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除课程类型</AlertDialogTitle>
+            <AlertDialogTitle>删除活动类型</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除类型「{deletingType}」吗？该类型下的课程不会被删除。
+              确定要删除类型「{deletingType}」吗？
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteType}>删除</AlertDialogAction>
+            <Button variant="destructive" size="sm" onClick={handleDeleteType}>删除</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
-  )
-}
 
-// ===================== 组织管理 Tab =====================
+      <AlertDialog open={typeBlockedOpen} onOpenChange={setTypeBlockedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>无法删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              该活动类型存在具体活动，无法删除
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>知道了</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-function OrganizationsTab() {
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deletingOrg, setDeletingOrg] = useState<Organization | null>(null)
-  const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [orgName, setOrgName] = useState("")
-  const [memberNames, setMemberNames] = useState<string[]>([])
-  const [memberIdMap, setMemberIdMap] = useState<Map<string, string>>(new Map())
+      <AlertDialog open={noOrgDialogOpen} onOpenChange={setNoOrgDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>需要先配置组织</AlertDialogTitle>
+            <AlertDialogDescription>系统中暂无组织信息，请先前往组织管理页面配置组织。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/organizations")}>前往配置</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-  const loadData = useCallback(async () => {
-    try {
-      const orgs = await organizationApi.list().catch((e) => { console.error("加载组织失败:", e); return [] as Organization[] })
-      setOrganizations(orgs)
-    } catch {}
-    try {
-      const custs = await customerApi.list().catch((e) => { console.error("加载客户失败:", e); return [] as Customer[] })
-      setCustomers(custs)
-    } catch {}
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { loadData() }, [loadData])
-
-  useEffect(() => {
-    const newMap = new Map<string, string>()
-    for (const c of customers) {
-      newMap.set(c.nickname, c.id)
-    }
-    setMemberIdMap(newMap)
-  }, [customers])
-
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(organizations)
-
-  const getMemberNicknames = (org: Organization) =>
-    org.member_ids
-      .map(id => customers.find(c => c.id === id)?.nickname)
-      .filter((n): n is string => !!n)
-
-  const handleOpenCreate = () => {
-    setEditingOrg(null)
-    setOrgName("")
-    setMemberNames([])
-    setDialogOpen(true)
-  }
-
-  const handleOpenEdit = (org: Organization) => {
-    setEditingOrg(org)
-    setOrgName(org.name)
-    setMemberNames(getMemberNicknames(org))
-    setDialogOpen(true)
-  }
-
-  const handleSaveOrg = async () => {
-    if (!orgName.trim()) return
-    setSaving(true)
-    try {
-      const memberIds = memberNames.map(n => memberIdMap.get(n)).filter((id): id is string => !!id)
-      if (editingOrg) {
-        await organizationApi.update(editingOrg.id, { name: orgName.trim(), member_ids: memberIds })
-      } else {
-        await organizationApi.create({ name: orgName.trim(), member_ids: memberIds })
-      }
-      setDialogOpen(false)
-      setEditingOrg(null)
-      loadData()
-    } catch (error) {
-      console.error("保存组织失败:", error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDeleteOrg = async () => {
-    if (!deletingOrg) return
-    try {
-      await organizationApi.delete(deletingOrg.id)
-      setDeleteDialogOpen(false)
-      setDeletingOrg(null)
-      loadData()
-    } catch (error) {
-      console.error("删除组织失败:", error)
-    }
-  }
-
-  return (
-    <>
-      <div className="flex items-center justify-between pb-2">
-        <p className="text-xs text-muted-foreground">共 {organizations.length} 个组织</p>
-        <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新增组织
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-      ) : organizations.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="rounded-full bg-muted p-3 mb-3">
-            <Users className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="text-sm text-muted-foreground">暂无组织</p>
-          <p className="text-xs text-muted-foreground mt-1">点击上方"新增组织"按钮添加</p>
-        </div>
-      ) : (
-        <>
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">组织名称</TableHead>
-                <TableHead>成员数</TableHead>
-                <TableHead>成员列表</TableHead>
-                <TableHead className="text-right pr-4">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedItems.map((org) => {
-                const names = getMemberNicknames(org)
-                return (
-                  <TableRow key={org.id}>
-                    <TableCell className="pl-4">
-                      <span className="text-[13px] text-[#2b2f36] font-medium">{org.name}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-[13px] text-[#2b2f36]">{names.length} 人</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-[13px] text-[#8f959e] max-w-[400px] truncate inline-block">
-                        {names.length > 0 ? names.join("、") : "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right pr-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(org)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setDeletingOrg(org); setDeleteDialogOpen(true) }}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-          <PaginationBar
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            startIndex={startIndex}
-            endIndex={endIndex}
-            onPageChange={goToPage}
-          />
-        </>
-      )}
-
-      {/* 新增/编辑组织弹窗 */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md p-0 gap-0 max-h-none overflow-visible" initialFocus={false}>
+      {/* 编辑类型弹窗 */}
+      <Dialog open={editTypeDialogOpen} onOpenChange={setEditTypeDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">{editingOrg ? "编辑组织" : "新增组织"}</DialogTitle>
+            <DialogTitle className="text-base">编辑活动类型</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">组织名称</span>
-              <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="请输入组织名称" />
-            </div>
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">组织成员</span>
-              <CustomerSearchInput
-                customers={customers}
-                value={memberNames}
-                onChange={(v) => setMemberNames(Array.isArray(v) ? v : [])}
-                multi
-                filterSelected
-                placeholder="搜索客户昵称添加成员"
-              />
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">类型名称</span>
+              <div>
+                <Input value={editTypeName} onChange={(e) => { setEditTypeName(e.target.value); setEditTypeError("") }} placeholder="请输入类型名称" />
+                {editTypeError && <p className="text-xs text-destructive mt-1">{editTypeError}</p>}
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" size="sm" onClick={() => { setDialogOpen(false); setEditingOrg(null) }}>取消</Button>
-              <Button size="sm" onClick={handleSaveOrg} disabled={saving || !orgName.trim()}>
+              <Button variant="outline" size="sm" onClick={() => { setEditTypeDialogOpen(false); setEditingType(null); setEditTypeError("") }}>取消</Button>
+              <Button size="sm" onClick={handleRenameType} disabled={saving || !editTypeName.trim()}>
                 {saving ? "保存中..." : "保存"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* 删除组织确认弹窗 */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除组织</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除组织「{deletingOrg?.name}」吗？该组织下的课程不会被删除，但会取消关联。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteOrg}>删除</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   )
 }

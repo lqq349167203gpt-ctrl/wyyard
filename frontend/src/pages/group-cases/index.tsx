@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, Wallet, Search, X } from "lucide-react"
 import {
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { customerApi, groupCaseApi, type Customer, type GroupCase } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { SelectDropdown } from "@/components/select-dropdown"
+import { useOrganizations } from "@/hooks/use-organizations"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
@@ -31,6 +34,11 @@ export function GroupCasesContent({ embedded }: { embedded?: boolean } = {}) {
   const [formAmount, setFormAmount] = useState("")
   const [formCloserId, setFormCloserId] = useState("")
   const [formCloserName, setFormCloserName] = useState("")
+  const [formOrganizationId, setFormOrganizationId] = useState("")
+  const { organizations, hasAnyOrganization } = useOrganizations()
+  const navigate = useNavigate()
+  const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
+  const [noAssignmentDialogOpen, setNoAssignmentDialogOpen] = useState(false)
 
   // 搜索
   const [searchNickname, setSearchNickname] = useState("")
@@ -110,6 +118,8 @@ export function GroupCasesContent({ embedded }: { embedded?: boolean } = {}) {
   }
 
   const handleOpenCreate = () => {
+    if (!hasAnyOrganization) { setNoOrgDialogOpen(true); return }
+    if (organizations.length === 0) { setNoAssignmentDialogOpen(true); return }
     setEditingCase(null)
     setFormCustomerId("")
     setFormNickname("")
@@ -117,6 +127,7 @@ export function GroupCasesContent({ embedded }: { embedded?: boolean } = {}) {
     setFormAmount("")
     setFormCloserId("")
     setFormCloserName("")
+    setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
     setDialogOpen(true)
   }
 
@@ -128,6 +139,7 @@ export function GroupCasesContent({ embedded }: { embedded?: boolean } = {}) {
     setFormAmount(String(item.amount))
     setFormCloserId(item.closer_id || "")
     setFormCloserName(item.closer_name || "")
+    setFormOrganizationId(item.organization_id || "")
     setDialogOpen(true)
   }
 
@@ -142,6 +154,7 @@ export function GroupCasesContent({ embedded }: { embedded?: boolean } = {}) {
         amount: parseFloat(formAmount) || 0,
         closer_id: formCloserId || null,
         closer_name: formCloserName || null,
+        organization_id: formOrganizationId || null,
       }
       if (editingCase) {
         await groupCaseApi.update(editingCase.id, data)
@@ -319,6 +332,16 @@ export function GroupCasesContent({ embedded }: { embedded?: boolean } = {}) {
 
             {/* 成交人搜索 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">所属组织</span>
+              <SelectDropdown
+                value={formOrganizationId}
+                options={organizations.map(o => ({ value: o.id, label: o.name }))}
+                placeholder="选择组织"
+                onChange={setFormOrganizationId}
+              />
+            </div>
+
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
               <CustomerSearchInput
                 customers={customers}
@@ -364,6 +387,31 @@ export function GroupCasesContent({ embedded }: { embedded?: boolean } = {}) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setDeleteError(null)}>知道了</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={noOrgDialogOpen} onOpenChange={setNoOrgDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>需要先配置组织</AlertDialogTitle>
+            <AlertDialogDescription>系统中暂无组织信息，请先前往组织管理页面配置组织。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/organizations")}>前往配置</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={noAssignmentDialogOpen} onOpenChange={setNoAssignmentDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>未分配所属组织</AlertDialogTitle>
+            <AlertDialogDescription>当前账号未被分配所属组织，请联系管理者分配。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setNoAssignmentDialogOpen(false)}>知道了</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

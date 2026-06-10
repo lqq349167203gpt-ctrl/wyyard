@@ -82,6 +82,7 @@ export default function RemindersPage() {
   const [deletingItem, setDeletingItem] = useState<Reminder | null>(null)
   const [editingItem, setEditingItem] = useState<Reminder | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState<ReminderCreate>(emptyForm())
 
   const [roles, setRoles] = useState<string[]>([])
@@ -100,6 +101,8 @@ export default function RemindersPage() {
     positionApi.list().then(list => setRoles(list.map((p: { name: string }) => p.name))).catch(() => {})
     accountApi.list().then((list: { id: string; username: string }[]) => setAccounts(list)).catch(() => {})
   }, [])
+
+  const accountMap = Object.fromEntries(accounts.map(a => [a.id, a.username]))
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(items)
 
@@ -132,18 +135,28 @@ export default function RemindersPage() {
         await reminderApi.create(form)
       }
       setDialogOpen(false)
+      setEditingItem(null)
       loadData()
+    } catch (e: any) {
+      console.error("保存失败:", e?.message || e)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async () => {
-    if (!deletingItem) return
-    await reminderApi.delete(deletingItem.id)
-    setDeleteDialogOpen(false)
-    setDeletingItem(null)
-    loadData()
+    if (!deletingItem || deleting) return
+    setDeleting(true)
+    try {
+      await reminderApi.delete(deletingItem.id)
+      setDeleteDialogOpen(false)
+      setDeletingItem(null)
+      loadData()
+    } catch (e: any) {
+      console.error("删除失败:", e?.message || e)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const updateCondition = (index: number, patch: Partial<ReminderCondition>) => {
@@ -206,7 +219,7 @@ export default function RemindersPage() {
                     <span className="text-[13px] text-[#2b2f36]">{item.account_role}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-[#2b2f36]">{item.account_id}</span>
+                    <span className="text-[13px] text-[#2b2f36]">{item.account_id === "全部" ? "全部" : (accountMap[item.account_id] || item.account_id)}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -243,8 +256,8 @@ export default function RemindersPage() {
       )}
 
       {/* 新增/编辑弹窗 */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0 gap-0">
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingItem(null) }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{editingItem ? "编辑提醒" : "新增提醒"}</DialogTitle>
           </DialogHeader>
@@ -445,8 +458,10 @@ export default function RemindersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>删除</AlertDialogAction>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+              {deleting ? "删除中..." : "删除"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

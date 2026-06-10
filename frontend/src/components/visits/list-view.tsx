@@ -112,7 +112,7 @@ export default function ListView({ onCustomerClick }: { onCustomerClick?: (custo
               <TableHead>历史到场</TableHead>
               <TableHead>本次需求</TableHead>
               <TableHead>预计时间</TableHead>
-              <TableHead>是否到店</TableHead>
+              <TableHead>邀约人</TableHead>
               <TableHead className="text-right pr-4">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -140,15 +140,7 @@ export default function ListView({ onCustomerClick }: { onCustomerClick?: (custo
                 <TableCell className="text-[13px] text-[#2b2f36]">{v.visit_count} 次</TableCell>
                 <TableCell className="text-[13px] text-[#2b2f36] max-w-[200px] truncate">{v.needs || <span className="text-[#8f959e]">-</span>}</TableCell>
                 <TableCell className="text-[13px] text-[#8f959e]">{v.visit_time || "09:00"}</TableCell>
-                <TableCell>
-                  <span className={`text-[12px] px-2 py-0.5 rounded-full ${
-                    v.arrived
-                      ? "bg-green-50 text-green-600"
-                      : "bg-gray-50 text-[#8f959e]"
-                  }`}>
-                    {v.arrived ? "已到店" : "未到店"}
-                  </span>
-                </TableCell>
+                <TableCell className="text-[13px] text-[#2b2f36]">{v.referrer_handler || <span className="text-[#8f959e]">-</span>}</TableCell>
                 <TableCell className="text-right pr-4">
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(v.id)}>
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />

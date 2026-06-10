@@ -31,7 +31,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/positions/courses": "无忧 - 活动配置",
   "/config/member-identities": "无忧 - 会员身份",
   "/courses/spaces": "无忧 - 疗愈空间",
-  "/healing-identities": "无忧 - 疗愈身份",
+  "/healing-identities": "无忧 - 疗愈老师",
   "/operation-logs": "无忧 - 操作日志",
   "/traffic-records": "无忧 - 引流记录",
 }

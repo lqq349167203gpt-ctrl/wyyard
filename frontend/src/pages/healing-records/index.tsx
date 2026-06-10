@@ -9,10 +9,10 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import ListView from "./components/list-view"
 import DetailView from "./components/detail-view"
-import { customerApi, type Customer, type CustomerCreate } from "@/lib/api"
+import { customerApi, type Customer, type CustomerCreate, type CustomerLight } from "@/lib/api"
 
 const emptyCustomer: Record<string, any> = {
-  nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referrer_handler: "",
+  nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "",
   member_type: "", paid_content: [], visit_count: 0,
   basic_info: "", assessment: "", tags: "", traffic_source: "", traffic_source_detail: "",
 }
@@ -29,7 +29,7 @@ export default function HealingRecordsPage() {
   const [saveError, setSaveError] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; nickname: string } | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customers, setCustomers] = useState<CustomerLight[]>([])
 
   // 搜索状态
   const [searchNickname, setSearchNickname] = useState("")
@@ -272,6 +272,15 @@ export default function HealingRecordsPage() {
                 excludeIds={form.id ? [form.id] : []}
                 filterSelected={false}
               />
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">承接人</span>
+              <CustomerSearchInput
+                customers={customers}
+                value={form.referrer_handler || ""}
+                onChange={(v) => setForm({ ...form, referrer_handler: typeof v === "string" ? v : v[0] || "" })}
+                placeholder="请搜索"
+                excludeIds={form.id ? [form.id] : []}
+                filterSelected={false}
+              />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">流量来源</span>
               <div className="flex items-center gap-2">
                 <SelectDropdown
@@ -307,17 +316,6 @@ export default function HealingRecordsPage() {
                   </div>
                 )}
               </div>
-
-              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">承接人</span>
-              <CustomerSearchInput
-                customers={customers}
-                value={form.referrer_handler || ""}
-                onChange={(v) => setForm({ ...form, referrer_handler: typeof v === "string" ? v : v[0] || "" })}
-                placeholder="请搜索"
-                excludeIds={form.id ? [form.id] : []}
-                filterSelected={false}
-              />
-              <span className="col-span-2" />
             </div>
 
             <div className="border-t border-[#f0f0f0]" />

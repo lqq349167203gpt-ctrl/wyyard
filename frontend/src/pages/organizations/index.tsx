@@ -237,13 +237,17 @@ export default function OrganizationsPage() {
                       <span className="text-[13px] truncate">{org.name}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className={`text-[11px] ${isActive ? "text-[#3370ff]/70" : "text-[#8f959e]"}`}>
-                        {count}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      <button
+                        className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenEdit(org)
+                        }}
+                      >
+                        <Edit className="h-3 w-3 text-[#8f959e]" />
+                      </button>
+                      <button
+                        className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
                         onClick={(e) => {
                           e.stopPropagation()
                           if (org.member_ids.length > 0) {
@@ -255,8 +259,11 @@ export default function OrganizationsPage() {
                           setDeleteDialogOpen(true)
                         }}
                       >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
+                        <Trash2 className="h-3 w-3 text-[#8f959e]" />
+                      </button>
+                      <span className={`text-[11px] ${isActive ? "text-[#3370ff]/70" : "text-[#8f959e]"}`}>
+                        {count}
+                      </span>
                     </div>
                   </div>
                 )

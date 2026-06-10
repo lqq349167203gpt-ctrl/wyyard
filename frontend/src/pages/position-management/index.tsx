@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react"
-import { Plus, Trash2, X, Edit } from "lucide-react"
+import { Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table"
-import { positionApi, positionPermissionApi, positionCustomerPermissionApi, memberIdentityApi, accountApi } from "@/lib/api"
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { positionApi, positionPermissionApi, memberIdentityApi, accountApi } from "@/lib/api"
 import type { Position, Account } from "@/lib/api"
 import { AccountsContent } from "@/pages/accounts"
 
@@ -14,7 +17,7 @@ const ALL_PAGES = [
   { key: "healing-records", label: "客户信息" },
   { key: "activity-records", label: "活动记录" },
   { key: "traffic-records", label: "引流记录" },
-  { key: "class-records-visitors", label: "到场人员" },
+  { key: "class-records-visitors", label: "邀约到场" },
   { key: "class-records-activities", label: "当日活动" },
   { key: "class-records-arrival", label: "到场确认" },
   { key: "daily-activities", label: "活动安排" },
@@ -30,23 +33,23 @@ const ALL_PAGES = [
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
   { key: "member-identities", label: "会员身份" },
-  { key: "healing-identities", label: "疗愈身份" },
+  { key: "healing-identities", label: "疗愈老师" },
   { key: "position-management", label: "账号管理" },
   { key: "courses", label: "活动配置" },
+  { key: "organizations", label: "组织管理" },
   { key: "spaces", label: "疗愈空间" },
   { key: "reminders", label: "提醒配置" },
 ]
 
 const PERMISSION_GROUPS = [
   { label: "业务数据", keys: ["healing-records", "activity-records", "traffic-records"] },
-  { label: "人员到场", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
+  { label: "活动管理", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
-  { label: "信息配置", keys: ["courses", "member-identities", "healing-identities", "spaces", "reminders"] },
+  { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management"] },
   { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs"] },
 ]
 
-// 需要按会员身份类型过滤客户的页面
 const CUSTOMER_FILTER_PAGES = [
   "healing-records",
   "class-records-visitors", "class-records-activities", "class-records-arrival",
@@ -58,41 +61,49 @@ export default function PositionManagementPage() {
   const [positions, setPositions] = useState<Position[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [permissions, setPermissions] = useState<Record<string, string[]>>({})
-  const [customerPermissions, setCustomerPermissions] = useState<Record<string, string[]>>({})
-  const [customerPermissionsCR, setCustomerPermissionsCR] = useState<Record<string, string[]>>({})
-  const [customerPermissionsPay, setCustomerPermissionsPay] = useState<Record<string, string[]>>({})
+  const [pagePermissions, setPagePermissions] = useState<Record<string, Record<string, string[]>>>({})
   const [memberIdentityNames, setMemberIdentityNames] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 弹窗状态
-  const [showDialog, setShowDialog] = useState(false)
-  const [editingPosition, setEditingPosition] = useState<Position | null>(null)
+  // 左侧选中
+  const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null)
+  // 权限 Tab 切换
+  const [permTab, setPermTab] = useState<"page" | "customer">("page")
+
+  // 权限编辑状态
+  const [formPermissions, setFormPermissions] = useState<string[]>([])
+  const [formPagePermissions, setFormPagePermissions] = useState<Record<string, string[]>>({})
+  const [saving, setSaving] = useState(false)
+
+  // 新增角色 Dialog
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [formName, setFormName] = useState("")
   const [formDescription, setFormDescription] = useState("")
-  const [formPermissions, setFormPermissions] = useState<string[]>([])
-  const [formCustomerPermissions, setFormCustomerPermissions] = useState<string[]>([])
-  const [formCustomerPermissionsCR, setFormCustomerPermissionsCR] = useState<string[]>([])
-  const [formCustomerPermissionsPay, setFormCustomerPermissionsPay] = useState<string[]>([])
+
+  // 保存结果 Dialog
+  const [saveResultOpen, setSaveResultOpen] = useState(false)
+  const [saveResult, setSaveResult] = useState<{ success: boolean; message: string }>({ success: true, message: "" })
+
+  // 删除确认 Dialog
   const [deletePosition, setDeletePosition] = useState<Position | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
+  const [editingPosition, setEditingPosition] = useState<Position | null>(null)
+  const [editName, setEditName] = useState("")
+  const [deleting, setDeleting] = useState(false)
 
   const loadData = async () => {
     try {
-      const [p, a, perm, cPerm, cPermCR, cPermPay, identities] = await Promise.all([
+      const [p, a, perm, pagePerm, identities] = await Promise.all([
         positionApi.list(),
         accountApi.list(),
         positionPermissionApi.getAll(),
-        positionCustomerPermissionApi.getAll("customers"),
-        positionCustomerPermissionApi.getAll("class_records"),
-        positionCustomerPermissionApi.getAll("payment"),
+        positionPermissionApi.getPagePermissions(),
         memberIdentityApi.list(),
       ])
       setPositions(p)
       setAccounts(a)
       setPermissions(perm)
-      setCustomerPermissions(cPerm)
-      setCustomerPermissionsCR(cPermCR)
-      setCustomerPermissionsPay(cPermPay)
+      setPagePermissions(pagePerm)
       setMemberIdentityNames(identities.map(i => i.name))
     } catch {} finally {
       setLoading(false)
@@ -101,85 +112,113 @@ export default function PositionManagementPage() {
 
   useEffect(() => { loadData() }, [])
 
+  // 选中角色变化时，加载权限到 form 状态
+  useEffect(() => {
+    if (!selectedPositionId) return
+    const pos = positions.find(p => p.id === selectedPositionId)
+    if (!pos) return
+    setFormPermissions(permissions[pos.name] || [])
+    // 加载按页面存储的权限
+    const pagePerms: Record<string, string[]> = {}
+    CUSTOMER_FILTER_PAGES.forEach(pageKey => {
+      pagePerms[pageKey] = pagePermissions[pageKey]?.[pos.name] || []
+    })
+    setFormPagePermissions(pagePerms)
+    setPermTab("page")
+  }, [selectedPositionId, positions, permissions, pagePermissions])
+
+  const selectedPosition = positions.find(p => p.id === selectedPositionId) || null
+  const isSystemRole = selectedPosition?.is_system || false
+
   const getPersonCount = (positionName: string) => {
     return accounts.filter(a => a.role === positionName).length
   }
 
-  const openCreateDialog = () => {
-    setEditingPosition(null)
-    setFormName("")
-    setFormDescription("")
-    setFormPermissions(ALL_PAGES.map(p => p.key))
-    setFormCustomerPermissions([...memberIdentityNames])
-    setFormCustomerPermissionsCR([...memberIdentityNames])
-    setFormCustomerPermissionsPay([...memberIdentityNames])
-    setShowDialog(true)
-  }
-
-  const openEditDialog = (position: Position) => {
-    setEditingPosition(position)
-    setFormName(position.name)
-    setFormDescription(position.description || "")
-    setFormPermissions(permissions[position.name] || [])
-    setFormCustomerPermissions(customerPermissions[position.name] || [])
-    setFormCustomerPermissionsCR(customerPermissionsCR[position.name] || [])
-    setFormCustomerPermissionsPay(customerPermissionsPay[position.name] || [])
-    setShowDialog(true)
-  }
-
-  const handleSave = async () => {
-    if (!formName.trim()) return
-
-    let positionName = formName.trim()
-
-    if (editingPosition) {
-      await positionApi.update(editingPosition.id, { name: positionName, description: formDescription })
-    } else {
-      const created = await positionApi.create({ name: positionName, description: formDescription })
-      positionName = created.name
+  const autoFillPagePerms = (pageKey: string) => {
+    if (!formPagePermissions[pageKey] || formPagePermissions[pageKey].length === 0) {
+      setFormPagePermissions(prev => ({ ...prev, [pageKey]: [...memberIdentityNames] }))
     }
-
-    await Promise.all([
-      positionPermissionApi.set(positionName, formPermissions),
-      positionCustomerPermissionApi.setBatch(positionName, {
-        customers: formCustomerPermissions,
-        class_records: formCustomerPermissionsCR,
-        payment: formCustomerPermissionsPay,
-      }),
-    ])
-
-    setShowDialog(false)
-    setEditingPosition(null)
-    loadData()
-  }
-
-  const handleDelete = async () => {
-    if (!deletePosition) return
-    await positionApi.delete(deletePosition.id)
-    setDeletePosition(null)
-    loadData()
-  }
-
-  const getSectionForPage = (pageKey: string): string | null => {
-    if (pageKey === "healing-records") return "customers"
-    if (["class-records-visitors", "class-records-activities", "class-records-arrival"].includes(pageKey)) return "class_records"
-    if (["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"].includes(pageKey)) return "payment"
-    return null
-  }
-
-  const autoFillCustomerPerms = (section: string) => {
-    if (section === "customers" && formCustomerPermissions.length === 0) setFormCustomerPermissions([...memberIdentityNames])
-    else if (section === "class_records" && formCustomerPermissionsCR.length === 0) setFormCustomerPermissionsCR([...memberIdentityNames])
-    else if (section === "payment" && formCustomerPermissionsPay.length === 0) setFormCustomerPermissionsPay([...memberIdentityNames])
   }
 
   const handleTogglePermission = (pageKey: string) => {
+    if (isSystemRole) return
     setFormPermissions(prev => {
       const next = prev.includes(pageKey) ? prev.filter(k => k !== pageKey) : [...prev, pageKey]
-      const section = getSectionForPage(pageKey)
-      if (section && next.includes(pageKey)) autoFillCustomerPerms(section)
+      if (next.includes(pageKey) && CUSTOMER_FILTER_PAGES.includes(pageKey)) {
+        autoFillPagePerms(pageKey)
+      }
       return next
     })
+  }
+
+  const handleCreate = async () => {
+    if (!formName.trim()) return
+    const created = await positionApi.create({ name: formName.trim(), description: formDescription })
+    // 给新角色设置全选权限
+    const pagePerms: Record<string, string[]> = {}
+    CUSTOMER_FILTER_PAGES.forEach(pageKey => {
+      pagePerms[pageKey] = [...memberIdentityNames]
+    })
+    await positionPermissionApi.setFull(
+      created.name,
+      ALL_PAGES.map(p => p.key),
+      [], [], [],
+      pagePerms
+    )
+    setCreateDialogOpen(false)
+    setFormName("")
+    setFormDescription("")
+    await loadData()
+    setSelectedPositionId(created.id)
+  }
+
+  const handleEditName = async () => {
+    if (!editingPosition || !editName.trim()) return
+    try {
+      await positionApi.update(editingPosition.id, { name: editName.trim() })
+      setEditingPosition(null)
+      setEditName("")
+      await loadData()
+    } catch (e: any) {
+      alert(e?.message || "修改失败")
+    }
+  }
+
+  const handleSave = async () => {
+    if (!selectedPosition || isSystemRole || saving) return
+    setSaving(true)
+    try {
+      await positionPermissionApi.setFull(
+        selectedPosition.name,
+        formPermissions,
+        [], [], [],
+        formPagePermissions
+      )
+      setSaveResult({ success: true, message: "权限保存成功" })
+    } catch (e: any) {
+      setSaveResult({ success: false, message: e?.message || "保存失败" })
+    } finally {
+      setSaving(false)
+      setSaveResultOpen(true)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deletePosition || deleting) return
+    setDeleting(true)
+    try {
+      await positionApi.delete(deletePosition.id)
+      if (selectedPositionId === deletePosition.id) {
+        setSelectedPositionId(null)
+      }
+      setDeletePosition(null)
+      setDeleteConfirmName("")
+      loadData()
+    } catch (e: any) {
+      console.error("删除失败:", e?.message || e)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -212,226 +251,322 @@ export default function PositionManagementPage() {
       {activeTab === "accounts" && <AccountsContent embedded />}
 
       {activeTab === "roles" && (
-        <>
-      <div className="flex items-center justify-between pb-2">
-        <div>
-          <p className="text-xs text-muted-foreground">管理各角色类型与页面权限配置</p>
-        </div>
-        <Button size="sm" className="h-8 text-xs" onClick={openCreateDialog}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> 新增身份
-        </Button>
-      </div>
-
-      <div className="bg-white rounded-lg">
-        {loading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : positions.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">暂无身份类型，点击上方按钮创建</div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">身份名称</TableHead>
-                <TableHead>角色简介</TableHead>
-                <TableHead>账号数</TableHead>
-                <TableHead className="text-right pr-4">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {positions.map((pos) => (
-                <TableRow key={pos.id}>
-                  <TableCell className="pl-4">
-                    <span className="text-[13px] text-[#2b2f36] font-medium">{pos.name}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-[13px] text-[#8f959e]">{pos.description || "-"}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-[13px] text-[#8f959e]">{getPersonCount(pos.name)}</span>
-                  </TableCell>
-                  <TableCell className="text-right pr-4">
-                    {pos.is_system ? (
-                      <span className="text-[11px] text-[#b0b5bb]">系统角色</span>
-                    ) : (
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditDialog(pos)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeletePosition(pos)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
-
-      {/* 新增/编辑弹窗 */}
-      {showDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowDialog(false)}>
-          <div className="bg-white rounded-lg w-[520px] shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b">
-              <span className="text-sm font-medium">{editingPosition ? "编辑身份" : "新增身份"}</span>
-              <button onClick={() => setShowDialog(false)}>
-                <X className="h-4 w-4 text-[#8f959e]" />
-              </button>
+        <div className="flex gap-4" style={{ height: 'calc(100vh - 180px)' }}>
+          {/* 左侧面板 */}
+          <div className="w-[234px] bg-white rounded-lg flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-4 h-11 border-b border-[#f0f0f0]">
+              <span className="text-[13px] font-medium text-[#2b2f36]">角色列表</span>
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-[#3370ff] hover:text-[#3370ff] hover:bg-[#f0f5ff]" onClick={() => setCreateDialogOpen(true)}>
+                新增
+              </Button>
             </div>
-            <div className="px-5 py-4 max-h-[500px] overflow-y-auto space-y-4">
-              <div className="flex items-center gap-3">
-                <Label className="text-xs text-muted-foreground w-14 shrink-0 text-right">身份名称</Label>
-                <Input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="输入身份类型名称"
-                  className="h-8 flex-1"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Label className="text-xs text-muted-foreground w-14 shrink-0 text-right">角色简介</Label>
-                <Input
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="输入角色简介"
-                  className="h-8 flex-1"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label className="text-xs text-muted-foreground">页面权限</Label>
-                {PERMISSION_GROUPS.map((group) => (
-                  <div key={group.label} className="border border-[#e8e8e8] rounded-lg overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#f7f8fa] border-b border-[#e8e8e8]">
-                      <span className="text-[12px] font-medium text-[#2b2f36]">{group.label}</span>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={group.keys.every(k => formPermissions.includes(k))}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormPermissions(prev => [...new Set([...prev, ...group.keys])])
-                              // 勾选需客户过滤的页面组时，默认全选对应模块的会员身份
-                              if (group.keys.some(k => CUSTOMER_FILTER_PAGES.includes(k))) {
-                                const sec = getSectionForPage(group.keys.find(k => CUSTOMER_FILTER_PAGES.includes(k))!)
-                                if (sec) autoFillCustomerPerms(sec)
-                              }
-                            } else {
-                              setFormPermissions(prev => prev.filter(k => !group.keys.includes(k)))
-                            }
-                          }}
-                          className="rounded"
-                        />
-                        <span className="text-[11px] text-[#8f959e]">全选</span>
-                      </label>
+            <div className="flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">加载中...</div>
+              ) : positions.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">暂无角色</div>
+              ) : (
+                positions.map((pos) => {
+                  const isSelected = selectedPositionId === pos.id
+                  return (
+                    <div
+                      key={pos.id}
+                      className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors group ${
+                        isSelected ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36] hover:bg-[#f7f8fa]"
+                      }`}
+                      onClick={() => setSelectedPositionId(pos.id)}
+                    >
+                      <span className="text-[13px] truncate">{pos.name}</span>
+                      <div className="flex items-center gap-1">
+                        {!pos.is_system && (
+                          <>
+                            <button
+                              className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                              onClick={(e) => { e.stopPropagation(); setEditingPosition(pos); setEditName(pos.name) }}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </button>
+                            <button
+                              className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                              onClick={(e) => { e.stopPropagation(); setDeletePosition(pos); setDeleteConfirmName("") }}
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </button>
+                          </>
+                        )}
+                        <span className={`text-[11px] ${isSelected ? "text-[#3370ff]/70" : "text-[#8f959e]"}`}>
+                          {getPersonCount(pos.name)}人
+                        </span>
+                      </div>
                     </div>
-                    <div className="px-4 py-2.5 grid grid-cols-2 gap-1">
-                      {group.keys.map((key) => {
-                        const page = ALL_PAGES.find(p => p.key === key)
-                        return (
-                          <label key={key} className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-[#f7f8fa] cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formPermissions.includes(key)}
-                              onChange={() => handleTogglePermission(key)}
-                              className="rounded"
-                            />
-                            <span className="text-[13px] text-[#2b2b2b]">{page?.label || key}</span>
-                          </label>
-                        )
-                      })}
-                    </div>
-                    {(() => {
-                      const section = getSectionForPage(group.keys.find(k => CUSTOMER_FILTER_PAGES.includes(k)) || "")
-                      if (!section) return null
-                      const anyChecked = group.keys.some(k => CUSTOMER_FILTER_PAGES.includes(k) && formPermissions.includes(k))
-                      if (!anyChecked) return null
-                      const perms = section === "customers" ? formCustomerPermissions
-                        : section === "class_records" ? formCustomerPermissionsCR
-                        : formCustomerPermissionsPay
-                      const setPerms = section === "customers" ? setFormCustomerPermissions
-                        : section === "class_records" ? setFormCustomerPermissionsCR
-                        : setFormCustomerPermissionsPay
+                  )
+                })
+              )}
+            </div>
+          </div>
+
+          {/* 右侧面板 */}
+          <div className="flex-1 bg-white rounded-lg flex flex-col min-w-0">
+            <div className="flex items-center justify-between px-4 h-11 border-b border-[#f0f0f0]">
+              <div className="flex items-center gap-6">
+                <button
+                  className={`relative px-1 pb-0.5 text-[13px] transition-colors ${permTab === "page" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
+                  onClick={() => setPermTab("page")}
+                >
+                  页面权限
+                  {permTab === "page" && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#3370ff] rounded-t-sm" />}
+                </button>
+                <button
+                  className={`relative px-1 pb-0.5 text-[13px] transition-colors ${permTab === "customer" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
+                  onClick={() => setPermTab("customer")}
+                >
+                  用户信息权限
+                  {permTab === "customer" && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#3370ff] rounded-t-sm" />}
+                </button>
+                {selectedPosition && isSystemRole && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#f0f1f2] text-[#8f959e]">系统角色</span>
+                )}
+              </div>
+              {selectedPosition && !isSystemRole && (
+                <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
+                  {saving ? "保存中..." : "保存"}
+                </Button>
+              )}
+            </div>
+            {!selectedPosition ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">请从左侧选择角色</p>
+                  <p className="text-xs text-muted-foreground mt-1">选择后可编辑该角色的页面权限和用户信息权限</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {/* 页面权限 */}
+                  {permTab === "page" && <div>
+                    {PERMISSION_GROUPS.map((group) => {
+                      const checkedCount = group.keys.filter(k => formPermissions.includes(k)).length
                       return (
-                        <div className="px-4 py-2.5 border-t border-[#e8e8e8] bg-[#fafbfc]">
-                          <span className="text-[11px] text-[#8f959e] block mb-2">选择该角色可见的会员身份类型</span>
-                          {memberIdentityNames.length === 0 ? (
-                            <span className="text-[12px] text-[#b0b5bb] block py-1">暂无会员身份类型，请先在"会员身份"页面创建</span>
-                          ) : (
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                              {memberIdentityNames.map((name) => (
-                                <label key={name} className="flex items-center gap-2 py-0.5 cursor-pointer">
+                        <div key={group.label} className="mb-4">
+                          <div className="flex items-center justify-between px-3 py-2 bg-[#f7f8fa] rounded-md mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[12px] font-medium text-[#2b2f36]">{group.label}</span>
+                              <span className="text-[11px] text-[#8f959e]">({checkedCount}/{group.keys.length})</span>
+                            </div>
+                            {!isSystemRole && (
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={group.keys.every(k => formPermissions.includes(k))}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setFormPermissions(prev => [...new Set([...prev, ...group.keys])])
+                                      // 自动填充相关页面的用户信息权限
+                                      group.keys.filter(k => CUSTOMER_FILTER_PAGES.includes(k)).forEach(k => autoFillPagePerms(k))
+                                    } else {
+                                      setFormPermissions(prev => prev.filter(k => !group.keys.includes(k)))
+                                    }
+                                  }}
+                                  className="rounded"
+                                />
+                                <span className="text-[11px] text-[#8f959e]">全选</span>
+                              </label>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 px-3">
+                            {group.keys.map((key) => {
+                              const page = ALL_PAGES.find(p => p.key === key)
+                              return (
+                                <label key={key} className={`flex items-center gap-3 py-1.5 rounded ${isSystemRole ? "" : "hover:bg-[#fafbfc] cursor-pointer"}`}>
                                   <input
                                     type="checkbox"
-                                    checked={perms.includes(name)}
-                                    onChange={() => {
-                                      setPerms(prev =>
-                                        prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-                                      )
+                                    checked={formPermissions.includes(key)}
+                                    onChange={() => handleTogglePermission(key)}
+                                    disabled={isSystemRole}
+                                    className="rounded"
+                                  />
+                                  <span className="text-[13px] text-[#2b2b2b]">{page?.label || key}</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>}
+
+                  {/* 用户信息权限 */}
+                  {permTab === "customer" && <div>
+                    <div className="mb-3">
+                      <span className="text-[12px] text-[#8f959e]">选择该角色有权限浏览的用户信息</span>
+                    </div>
+                    <div>
+                      {CUSTOMER_FILTER_PAGES.map((pageKey) => {
+                        const page = ALL_PAGES.find(p => p.key === pageKey)
+                        if (!page) return null
+                        // 只显示已启用页面权限的页面
+                        if (!formPermissions.includes(pageKey)) return null
+
+                        const perms = formPagePermissions[pageKey] || []
+                        const checkedCount = memberIdentityNames.filter(n => perms.includes(n)).length
+
+                        return (
+                          <div key={pageKey} className="mb-4">
+                            <div className="flex items-center justify-between px-3 py-2 bg-[#f7f8fa] rounded-md mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[12px] font-medium text-[#2b2f36]">{page.label}</span>
+                                <span className="text-[11px] text-[#8f959e]">({checkedCount}/{memberIdentityNames.length})</span>
+                              </div>
+                              {!isSystemRole && (
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={memberIdentityNames.length > 0 && memberIdentityNames.every(n => perms.includes(n))}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setFormPagePermissions(prev => ({ ...prev, [pageKey]: [...memberIdentityNames] }))
+                                      } else {
+                                        setFormPagePermissions(prev => ({ ...prev, [pageKey]: [] }))
+                                      }
                                     }}
                                     className="rounded"
                                   />
-                                  <span className="text-[12px] text-[#2b2b2b]">{name}</span>
+                                  <span className="text-[11px] text-[#8f959e]">全选</span>
                                 </label>
-                              ))}
+                              )}
                             </div>
-                          )}
+                            <div className="px-3">
+                              {memberIdentityNames.length === 0 ? (
+                                <span className="text-[12px] text-[#b0b5bb]">暂无会员身份类型，请先在"会员身份"页面创建</span>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                  {memberIdentityNames.map((name) => (
+                                    <label key={name} className={`flex items-center gap-3 py-1.5 rounded ${isSystemRole ? "" : "hover:bg-[#fafbfc] cursor-pointer"}`}>
+                                      <input
+                                        type="checkbox"
+                                        checked={perms.includes(name)}
+                                        onChange={() => {
+                                          if (isSystemRole) return
+                                          setFormPagePermissions(prev => ({
+                                            ...prev,
+                                            [pageKey]: prev[pageKey]?.includes(name)
+                                              ? prev[pageKey].filter(n => n !== name)
+                                              : [...(prev[pageKey] || []), name]
+                                          }))
+                                        }}
+                                        disabled={isSystemRole}
+                                        className="rounded"
+                                      />
+                                      <span className="text-[13px] text-[#2b2b2b]">{name}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {CUSTOMER_FILTER_PAGES.filter(k => formPermissions.includes(k)).length === 0 && (
+                        <div className="text-center py-8 text-[12px] text-[#b0b5bb]">
+                          请先在"页面权限"中启用相关页面
                         </div>
-                      )
-                    })()}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t">
-              <Button variant="outline" size="sm" onClick={() => setShowDialog(false)}>取消</Button>
-              <Button size="sm" onClick={handleSave} disabled={!formName.trim()}>保存</Button>
-            </div>
+                      )}
+                    </div>
+                  </div>}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* 删除确认弹窗 */}
-      {deletePosition && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setDeletePosition(null); setDeleteConfirmName("") }}>
-          <div className="bg-white rounded-lg w-[360px] shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b">
-              <span className="text-sm font-medium">删除角色</span>
-              <button onClick={() => { setDeletePosition(null); setDeleteConfirmName("") }}>
-                <X className="h-4 w-4 text-[#8f959e]" />
-              </button>
+      {/* 新增角色 Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">新增角色</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">名称</span>
+              <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="输入角色名称" />
             </div>
-            <div className="px-5 py-4 space-y-3">
-              <p className="text-xs text-[#2b2f36]">
-                确定要删除「<span className="font-medium">{deletePosition.name}</span>」吗？该角色下的人员不会被删除。
-              </p>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">请输入角色名称确认删除</Label>
-                <Input
-                  value={deleteConfirmName}
-                  onChange={(e) => setDeleteConfirmName(e.target.value)}
-                  placeholder={deletePosition.name}
-                  className="h-8"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t">
-              <Button variant="outline" size="sm" onClick={() => { setDeletePosition(null); setDeleteConfirmName("") }}>取消</Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDelete}
-                disabled={deleteConfirmName !== deletePosition.name}
-              >
-                确定删除
-              </Button>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">简介</span>
+              <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="输入角色简介（可选）" />
             </div>
           </div>
-        </div>
-      )}
-        </>
-      )}
+          <div className="flex justify-end gap-2 px-5 py-3 border-t">
+            <Button variant="outline" size="sm" onClick={() => setCreateDialogOpen(false)}>取消</Button>
+            <Button size="sm" onClick={handleCreate} disabled={!formName.trim()}>创建</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑角色名称 Dialog */}
+      <Dialog open={!!editingPosition} onOpenChange={(open) => { if (!open) { setEditingPosition(null); setEditName("") } }}>
+        <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">编辑角色名称</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5">
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">名称</span>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="输入角色名称" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 px-5 py-3 border-t">
+            <Button variant="outline" size="sm" onClick={() => { setEditingPosition(null); setEditName("") }}>取消</Button>
+            <Button size="sm" onClick={handleEditName} disabled={!editName.trim()}>保存</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 保存结果 Dialog */}
+      <Dialog open={saveResultOpen} onOpenChange={setSaveResultOpen}>
+        <DialogContent className="max-w-xs p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{saveResult.success ? "保存成功" : "保存失败"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5">
+            <p className="text-[13px] text-[#2b2f36]">{saveResult.message}</p>
+          </div>
+          <div className="flex justify-end px-5 py-3 border-t">
+            <Button size="sm" onClick={() => setSaveResultOpen(false)}>确定</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认 Dialog */}
+      <AlertDialog open={!!deletePosition} onOpenChange={() => { setDeletePosition(null); setDeleteConfirmName("") }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除角色</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除「{deletePosition?.name}」吗？该角色下的人员不会被删除。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-6 pb-2">
+            <label className="text-xs text-muted-foreground mb-1 block">请输入角色名称确认删除</label>
+            <Input
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              placeholder={deletePosition?.name}
+              className="h-8"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteConfirmName !== deletePosition?.name || deleting}
+            >
+              {deleting ? "删除中..." : "确定删除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

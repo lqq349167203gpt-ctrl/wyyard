@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback, startTransition } from "react"
+import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { BookOpen, ChevronRight, ChevronLeft, X } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
@@ -8,10 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
-  AlertDialog, AlertDialogAction, AlertDialogContent,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi, energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi, courseApi, customerApi, visitApi, dailyGroupingApi, spaceApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession, type Course, type Customer, type VisitRecord, type Space } from "@/lib/api"
+import { classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi, energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi, courseApi, customerApi, visitApi, dailyGroupingApi, spaceApi, membershipCardApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession, type Course, type Customer, type VisitRecord, type Space, type MembershipCard } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import ArrivalConfirmationView from "./arrival-confirmation"
@@ -39,6 +40,7 @@ function getWeekday(d: string): string {
 }
 
 export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "activities" }) {
+  const navigate = useNavigate()
   const enterToNext = useEnterToNext()
   const [records, setRecords] = useState<ClassRecord[]>([])
   const [groupCaseSessions, setGroupCaseSessions] = useState<GroupCaseSession[]>([])
@@ -49,7 +51,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const [loading, setLoading] = useState(true)
   const [spaces, setSpaces] = useState<Space[]>([])
   const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
-    try { return localStorage.getItem("class-records-space") || "" } catch { return "" }
+    try { return localStorage.getItem("selected-space-id") || "" } catch { return "" }
   })
 
   const [detailDate, setDetailDate] = useState(today)
@@ -84,6 +86,12 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
 
   // 人员分组
   const [groups, setGroups] = useState<{ name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]>([])
+
+  // 会员卡
+  const [membershipCards, setMembershipCards] = useState<MembershipCard[]>([])
+
+  // 空间未配置提示弹窗
+  const [noSpacesDialogOpen, setNoSpacesDialogOpen] = useState(false)
 
   // 会员活动余额不足警告弹窗
   const [warningOpen, setWarningOpen] = useState(false)
@@ -127,9 +135,10 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       setSpaces(data)
       if (!selectedSpaceId && data.length > 0) {
         setSelectedSpaceId(data[0].id)
-        localStorage.setItem("class-records-space", data[0].id)
+        localStorage.setItem("selected-space-id", data[0].id)
       }
     }).catch(() => {})
+    membershipCardApi.list().then(setMembershipCards).catch((e) => { console.error("membershipCardApi.list failed:", e) })
   }
 
   const loadClassRecords = () => classRecordApi.list().then(setRecords).catch((e) => { console.error("loadClassRecords failed:", e) })
@@ -220,7 +229,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     startTransition(() => {
       setSelectedSpaceId(id)
     })
-    localStorage.setItem("class-records-space", id)
+    localStorage.setItem("selected-space-id", id)
   }, [])
 
   const [energyKnotSessions, setEnergyKnotSessions] = useState<EnergyKnotSession[]>([])
@@ -478,6 +487,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
             onDataLoaded={handleVisitsDataLoaded}
             spaceId={selectedSpaceId}
+            onRequireSpaces={spaces.length === 0 ? () => setNoSpacesDialogOpen(true) : undefined}
           />
         </div>
       ) : effectiveDetailTab === "grouping" ? (
@@ -486,6 +496,8 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         date={detailDate}
         dayVisits={dayVisits}
         allCustomers={allCustomers}
+        visits={fullVisits}
+        membershipCards={membershipCards}
         groups={groups}
         setGroups={setGroups}
         onSave={async (newGroups) => {
@@ -584,6 +596,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
                 getMemberName={getMemberName}
                 dailyGroups={groups}
                 spaces={spaces}
+                courseMap={Object.fromEntries(courses.map(c => [c.id, c.name]))}
               />
             )}
 
@@ -756,6 +769,22 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setWarningOpen(false)}>确定</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 空间未配置提示 */}
+      <AlertDialog open={noSpacesDialogOpen} onOpenChange={setNoSpacesDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>提示</AlertDialogTitle>
+            <AlertDialogDescription>需要先配置空间，才能添加到场人员。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setNoSpacesDialogOpen(false); navigate("/courses/spaces") }}>
+              前往配置
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

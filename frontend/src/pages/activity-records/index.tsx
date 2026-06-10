@@ -294,6 +294,11 @@ function ActivityCard({ record, getName }: { record: UnifiedRecord; getName: (id
             </span>
           )}
           <span className="text-[13px] font-medium text-[#2b2f36]">{activityName}</span>
+          {(data.room_name || data.space_name) && (
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">
+              {data.space_name && data.room_name ? `${data.space_name}/${data.room_name}` : data.room_name || data.space_name}
+            </span>
+          )}
           {ownerName && <span className="text-[#8f959e]">案主：<span className="text-[#2b2f36]">{ownerName}</span></span>}
           {teacherNames && <span className="text-[#8f959e]">老师：<span className="text-[#2b2f36]">{teacherNames}</span></span>}
           {hostName && <span className="text-[#8f959e]">主持人：<span className="text-[#2b2f36]">{hostName}</span></span>}
