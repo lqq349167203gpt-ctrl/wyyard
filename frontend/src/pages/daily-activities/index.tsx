@@ -5,7 +5,6 @@ import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SelectDropdown } from "@/components/select-dropdown"
-import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1778,13 +1777,12 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right pt-2">老师</span>
-            <CustomerSearchInput
-              customers={teachers}
+            <SelectDropdown
               value={formTeacherIds}
+              options={teachers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+              placeholder="选择老师"
               onChange={(v) => setFormTeacherIds(Array.isArray(v) ? v : [v])}
-              placeholder="搜索老师"
               multi={true}
-              filterSelected={false}
             />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
