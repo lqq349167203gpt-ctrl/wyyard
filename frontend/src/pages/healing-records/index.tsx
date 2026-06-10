@@ -27,6 +27,8 @@ export default function HealingRecordsPage() {
   const [form, setForm] = useState<Record<string, any>>(emptyCustomer)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState("")
+  const [referrerError, setReferrerError] = useState("")
+  const [referrerHandlerError, setReferrerHandlerError] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; nickname: string } | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [customers, setCustomers] = useState<CustomerLight[]>([])
@@ -116,14 +118,19 @@ export default function HealingRecordsPage() {
 
     // 验证引流人和承接人必须是已有客户昵称
     const nicknames = new Set(customers.map(c => c.nickname))
+    let hasError = false
+    setReferrerError("")
+    setReferrerHandlerError("")
+
     if (form.referrer?.trim() && !nicknames.has(form.referrer.trim())) {
-      setSaveError("引流人必须是已有的客户昵称")
-      return
+      setReferrerError("引流人必须是已有的客户昵称")
+      hasError = true
     }
     if (form.referrer_handler?.trim() && !nicknames.has(form.referrer_handler.trim())) {
-      setSaveError("承接人必须是已有的客户昵称")
-      return
+      setReferrerHandlerError("承接人必须是已有的客户昵称")
+      hasError = true
     }
+    if (hasError) return
 
     setSaving(true)
     setSaveError("")
@@ -276,23 +283,29 @@ export default function HealingRecordsPage() {
               </div>
 
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">引流人</span>
-              <CustomerSearchInput
-                customers={customers}
-                value={form.referrer || ""}
-                onChange={(v) => setForm({ ...form, referrer: typeof v === "string" ? v : v[0] || "" })}
-                placeholder="请搜索"
-                excludeIds={form.id ? [form.id] : []}
-                filterSelected={false}
-              />
+              <div>
+                <CustomerSearchInput
+                  customers={customers}
+                  value={form.referrer || ""}
+                  onChange={(v) => { setForm({ ...form, referrer: typeof v === "string" ? v : v[0] || "" }); setReferrerError("") }}
+                  placeholder="请搜索"
+                  excludeIds={form.id ? [form.id] : []}
+                  filterSelected={false}
+                />
+                {referrerError && <p className="text-[11px] text-[#f54a45] mt-0.5">{referrerError}</p>}
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">承接人</span>
-              <CustomerSearchInput
-                customers={customers}
-                value={form.referrer_handler || ""}
-                onChange={(v) => setForm({ ...form, referrer_handler: typeof v === "string" ? v : v[0] || "" })}
-                placeholder="请搜索"
-                excludeIds={form.id ? [form.id] : []}
-                filterSelected={false}
-              />
+              <div>
+                <CustomerSearchInput
+                  customers={customers}
+                  value={form.referrer_handler || ""}
+                  onChange={(v) => { setForm({ ...form, referrer_handler: typeof v === "string" ? v : v[0] || "" }); setReferrerHandlerError("") }}
+                  placeholder="请搜索"
+                  excludeIds={form.id ? [form.id] : []}
+                  filterSelected={false}
+                />
+                {referrerHandlerError && <p className="text-[11px] text-[#f54a45] mt-0.5">{referrerHandlerError}</p>}
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">流量来源</span>
               <div className="flex items-center gap-2">
                 <SelectDropdown
