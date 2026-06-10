@@ -388,10 +388,7 @@ export default function CoursesPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">所属组织</span>
               <SelectDropdown
                 value={form.organization_id || ""}
-                options={[
-                  { value: "", label: "无" },
-                  ...organizations.map(o => ({ value: o.id, label: o.name })),
-                ]}
+                options={organizations.map(o => ({ value: o.id, label: o.name }))}
                 placeholder="选择组织"
                 onChange={(v) => setForm({ ...form, organization_id: v })}
               />
