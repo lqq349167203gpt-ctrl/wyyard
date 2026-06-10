@@ -42,12 +42,12 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务数据", keys: ["healing-records", "activity-records", "traffic-records"] },
-  { label: "活动管理", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
+  { label: "业务数据", keys: ["business-reminders", "traffic-records", "activity-records"] },
+  { label: "疗愈活动", keys: ["healing-records", "class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management"] },
-  { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs"] },
+  { label: "系统配置", keys: ["agents", "system-logs", "operation-logs"] },
 ]
 
 const CUSTOMER_FILTER_PAGES = [
