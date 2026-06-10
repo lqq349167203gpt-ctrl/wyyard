@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SelectDropdown } from "@/components/select-dropdown"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1645,7 +1646,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
   const [formStartTime, setFormStartTime] = useState("09:00")
   const [formEndTime, setFormEndTime] = useState("10:00")
   const [formCourseId, setFormCourseId] = useState("")
-  const [formTeacherId, setFormTeacherId] = useState("")
+  const [formTeacherIds, setFormTeacherIds] = useState<string[]>([])
   const [formDescription, setFormDescription] = useState("")
   const [formIsPublicWelfare, setFormIsPublicWelfare] = useState(false)
   const [formActivityMode, setFormActivityMode] = useState("线下")
@@ -1660,7 +1661,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         setFormStartTime(session.start_time || "")
         setFormEndTime(session.end_time || "")
         setFormCourseId(session.course_id)
-        setFormTeacherId(session.teacher_ids[0] || "")
+        setFormTeacherIds(session.teacher_ids || [])
         setFormDescription(session.course_description || "")
         setFormIsPublicWelfare(session.is_public_welfare || false)
         setFormActivityMode(session.activity_mode || "线下")
@@ -1670,7 +1671,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         setEditingRecord(null)
         setFormDate(date)
         setFormStartTime("09:00"); setFormEndTime("10:00")
-        setFormCourseId(""); setFormTeacherId("")
+        setFormCourseId(""); setFormTeacherIds([])
         setFormDescription(""); setFormIsPublicWelfare(false)
         setFormActivityMode("线下")
         const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
@@ -1685,14 +1686,13 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
     if (!formCourseId) return
     setSaving(true)
     try {
-      const teacherIds = formTeacherId ? [formTeacherId] : []
       let result: ClassRecord
       if (editingRecord) {
         const course = courses.find(c => c.id === formCourseId)
         result = await classRecordApi.update(editingRecord.id, {
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
           course_id: formCourseId, course_name: course?.name || editingRecord.course_name,
-          course_description: formDescription, teacher_ids: teacherIds,
+          course_description: formDescription, teacher_ids: formTeacherIds,
           is_public_welfare: formIsPublicWelfare,
           activity_mode: formActivityMode,
           space_id: spaceId || undefined, room_id: roomId || undefined,
@@ -1705,7 +1705,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         result = await classRecordApi.create({
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
           course_id: formCourseId, course_name: course.name,
-          course_description: formDescription, teacher_ids: teacherIds,
+          course_description: formDescription, teacher_ids: formTeacherIds,
           is_public_welfare: formIsPublicWelfare,
           activity_mode: formActivityMode,
           space_id: spaceId || undefined, room_id: roomId || undefined,
@@ -1776,13 +1776,15 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
               onChange={setFormActivityMode}
             />
           </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">老师</span>
-            <SelectDropdown
-              value={formTeacherId}
-              options={teachers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
-              placeholder="选择老师"
-              onChange={(v) => setFormTeacherId(v)}
+          <div className="grid grid-cols-[70px_1fr] items-start gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right pt-2">老师</span>
+            <CustomerSearchInput
+              customers={teachers}
+              value={formTeacherIds}
+              onChange={(v) => setFormTeacherIds(Array.isArray(v) ? v : [v])}
+              placeholder="搜索老师"
+              multi={true}
+              filterSelected={false}
             />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
