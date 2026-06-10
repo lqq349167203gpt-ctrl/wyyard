@@ -37,25 +37,29 @@ wyyard_project/
 ## 页面清单
 | 分组 | 页面 | 路由 |
 |------|------|------|
-| 业务数据 | 用户管理 | /customers |
+| 业务数据 | 客户信息 | /healing-records |
 | 业务数据 | 活动记录 | /activity-records |
-| 疗愈活动 | 客户信息 | /healing-records |
-| 疗愈活动 | 人员到场 | /courses/class-records |
-| 疗愈活动 | 活动安排 | /courses/daily-activities |
+| 业务数据 | 引流记录 | /traffic-records |
+| 活动管理 | 邀约到场 | /courses/class-records |
+| 活动管理 | 当日活动 | /courses/class-records |
+| 活动管理 | 到场确认 | /courses/class-records |
+| 活动管理 | 活动安排 | /courses/daily-activities |
 | 付费项目 | 付费项目 | /payment |
-| 信息配置 | 沙龙类型 | /positions/courses |
+| 付费项目 | 会员活动 | /membership-cards |
+| 付费项目 | 觉醒游戏 | /group-cases |
+| 付费项目 | 情绪释放 | /emotional-releases |
+| 付费项目 | 能量结 | /energy-knots |
+| 付费项目 | 内部课程 | /internal-courses |
+| 付费项目 | 其他项目 | /other-projects |
+| 信息配置 | 活动配置 | /positions/courses |
+| 信息配置 | 组织管理 | /organizations |
 | 信息配置 | 会员身份 | /config/member-identities |
 | 信息配置 | 疗愈老师 | /healing-identities |
-| 信息配置 | 组织管理 | /organizations |
 | 信息配置 | 疗愈空间 | /courses/spaces |
 | 信息配置 | 提醒配置 | /config/reminders |
-| 账号管理 | 账号管理 | /accounts |
-| 账号管理 | 角色管理 | /positions/management |
-| 账号管理 | 修改密码 | /change-password |
-| 系统配置 | 工作台 | / |
+| 账号管理 | 账号管理 | /positions/management |
 | 系统配置 | AI 配置 | /agents |
-| 系统配置 | 知识库 | /knowledge |
-| 系统配置 | 业务数据 | /business |
+| 系统配置 | 业务提醒 | /business-reminders |
 | 系统配置 | 操作日志 | /operation-logs |
 | 系统配置 | 系统日志 | /system-logs |
 
