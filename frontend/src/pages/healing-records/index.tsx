@@ -123,11 +123,11 @@ export default function HealingRecordsPage() {
     setReferrerHandlerError("")
 
     if (form.referrer?.trim() && !nicknames.has(form.referrer.trim())) {
-      setReferrerError("引流人必须是已有的客户昵称")
+      setReferrerError("引流人不存在")
       hasError = true
     }
     if (form.referrer_handler?.trim() && !nicknames.has(form.referrer_handler.trim())) {
-      setReferrerHandlerError("承接人必须是已有的客户昵称")
+      setReferrerHandlerError("承接人不存在")
       hasError = true
     }
     if (hasError) return
