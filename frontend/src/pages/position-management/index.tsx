@@ -35,6 +35,7 @@ const ALL_PAGES = [
   { key: "member-identities", label: "会员身份" },
   { key: "healing-identities", label: "疗愈老师" },
   { key: "position-management", label: "账号管理" },
+  { key: "change-password", label: "密码修改" },
   { key: "courses", label: "活动配置" },
   { key: "organizations", label: "组织管理" },
   { key: "spaces", label: "疗愈空间" },
@@ -46,7 +47,7 @@ const PERMISSION_GROUPS = [
   { label: "疗愈活动", keys: ["healing-records", "class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
-  { label: "账号管理", keys: ["position-management"] },
+  { label: "账号管理", keys: ["position-management", "change-password"] },
   { label: "系统配置", keys: ["agents", "system-logs", "operation-logs"] },
 ]
 

@@ -57,7 +57,7 @@ const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-relea
 
 const accountItems = [
   { title: "账号管理", icon: GraduationCap, path: "/positions/management", permission: "position-management" },
-  { title: "密码修改", icon: ShieldCheck, path: "/change-password", permission: "" },
+  { title: "密码修改", icon: ShieldCheck, path: "/change-password", permission: "change-password" },
 ]
 
 const systemItems = [
