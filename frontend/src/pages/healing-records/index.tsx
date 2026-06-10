@@ -113,6 +113,18 @@ export default function HealingRecordsPage() {
 
   const handleSave = async () => {
     if (!form.nickname?.trim()) return
+
+    // 验证引流人和承接人必须是已有客户昵称
+    const nicknames = new Set(customers.map(c => c.nickname))
+    if (form.referrer?.trim() && !nicknames.has(form.referrer.trim())) {
+      setSaveError("引流人必须是已有的客户昵称")
+      return
+    }
+    if (form.referrer_handler?.trim() && !nicknames.has(form.referrer_handler.trim())) {
+      setSaveError("承接人必须是已有的客户昵称")
+      return
+    }
+
     setSaving(true)
     setSaveError("")
     try {
