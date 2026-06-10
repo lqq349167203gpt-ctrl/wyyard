@@ -122,7 +122,7 @@ class TestCustomerCreateFields:
         assert resp.json()["assessment"] != ""
 
     def test_positions_field(self, client):
-        """疗愈身份字段（列表）"""
+        """疗愈老师字段（列表）"""
         resp = client.post("/api/customers", json={
             "nickname": f"身份_{_u()}",
             "positions": ["成就君", "课程老师"],

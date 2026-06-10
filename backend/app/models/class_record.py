@@ -25,6 +25,8 @@ class ClassRecordBase(BaseModel):
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
+    room_name: str = ""
+    space_name: str = ""
 
 
 class ClassRecordCreate(BaseModel):
@@ -35,10 +37,13 @@ class ClassRecordCreate(BaseModel):
     course_name: str
     course_description: str = ""
     teacher_ids: List[str] = []
+    participant_ids: List[str] = []
     is_public_welfare: bool = False
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
+    room_name: str = ""
+    space_name: str = ""
 
 
 class ClassRecord(ClassRecordBase):

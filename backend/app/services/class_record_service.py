@@ -31,6 +31,19 @@ def _save(item_id: str = ""):
 _load()
 
 
+def _build_course_map() -> dict:
+    from app.services.course_service import list_courses
+    return {c.id: c.name for c in list_courses()}
+
+
+def _fill_course_name(records: List[ClassRecord]) -> List[ClassRecord]:
+    course_map = _build_course_map()
+    for r in records:
+        if r.course_id and r.course_id in course_map:
+            r.course_name = course_map[r.course_id]
+    return records
+
+
 def list_records(date: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[ClassRecord]:
     records = [v for v in _records.values() if not v.is_deleted]
     if date:
@@ -40,7 +53,7 @@ def list_records(date: Optional[str] = None, start_date: Optional[str] = None, e
     if end_date:
         records = [r for r in records if r.date <= end_date]
     records.sort(key=lambda r: r.created_at, reverse=True)
-    return records
+    return _fill_course_name(records)
 
 
 def get_record(record_id: str) -> Optional[ClassRecord]:
@@ -54,7 +67,6 @@ def create_record(data: ClassRecordCreate) -> ClassRecord:
     now = datetime.now(timezone.utc)
     record = ClassRecord(
         id=str(uuid.uuid4())[:8],
-        participant_ids=[],
         created_at=now,
         updated_at=now,
         **data.model_dump(),
@@ -169,3 +181,13 @@ def search_customers(keyword: str) -> list:
                 "remaining": _get_card_remaining(c.id),
             })
     return results
+
+
+def rename_course_name(old_name: str, new_name: str) -> int:
+    count = 0
+    for record in _records.values():
+        if record.course_name == old_name:
+            record.course_name = new_name
+            _save(record.id)
+            count += 1
+    return count

@@ -20,6 +20,7 @@ class VisitRecordBase(BaseModel):
     member_type: str = ""
     daily_card_usage: int = 0
     needs: str = ""
+    referrer_handler: str = ""  # 承接人
     activity_id: str = ""
     activity_type: str = ""
     space_id: str = ""  # 所属空间

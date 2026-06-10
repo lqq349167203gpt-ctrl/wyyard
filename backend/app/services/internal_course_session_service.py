@@ -111,3 +111,23 @@ def search_customers(keyword: str) -> list:
                 "member_type": c.member_type,
             })
     return results
+
+
+def rename_course_name(old_name: str, new_name: str) -> int:
+    count = 0
+    for session in _sessions.values():
+        if session.course_name == old_name:
+            session.course_name = new_name
+            _save(session.id)
+            count += 1
+    return count
+
+
+def rename_course_type(old_type: str, new_type: str) -> int:
+    count = 0
+    for session in _sessions.values():
+        if session.course_type == old_type:
+            session.course_type = new_type
+            _save(session.id)
+            count += 1
+    return count

@@ -10,6 +10,7 @@ class RoomBase(BaseModel):
 class Room(RoomBase):
     id: str
     space_id: str
+    is_deleted: bool = False
 
 
 class SpaceBase(BaseModel):

@@ -10,18 +10,19 @@ router = APIRouter(prefix="/api/oh-card-readings", tags=["oh-card-readings"])
 @router.get("")
 def list_readings(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None), nickname: str | None = Query(None), closer_name: str | None = Query(None)):
     items = oh_card_reading_service.list_readings()
+    items_dict = [i.model_dump() if hasattr(i, "model_dump") else i for i in items]
     if customer_ids:
         allowed = set(customer_ids.split(","))
-        items = [i for i in items if i.get("customer_id") in allowed]
+        items_dict = [i for i in items_dict if i.get("customer_id") in allowed]
     if nickname:
         kw = nickname.lower()
-        items = [i for i in items if kw in (i.get("nickname") or "").lower()]
+        items_dict = [i for i in items_dict if kw in (i.get("nickname") or "").lower()]
     if closer_name:
         kw = closer_name.lower()
-        items = [i for i in items if kw in (i.get("closer_name") or "").lower()]
+        items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower()]
     if page is not None:
-        return paginate(items, page, page_size or 10)
-    return items
+        return paginate(items_dict, page, page_size or 10)
+    return items_dict
 
 
 @router.post("")

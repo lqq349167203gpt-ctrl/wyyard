@@ -61,12 +61,24 @@ def update_course(course_id: str, data: dict) -> Optional[Course]:
     course = _courses.get(course_id)
     if not course:
         return None
+    old_name = course.name
+    old_type = course.type
     for key, value in data.items():
         if hasattr(course, key):
             setattr(course, key, value)
     course.updated_at = datetime.now(timezone.utc)
     _courses[course_id] = course
     _save(course_id)
+    # 级联更新：活动名称变更
+    if "name" in data and data["name"] != old_name:
+        from app.services.class_record_service import rename_course_name as rename_cr
+        from app.services.internal_course_session_service import rename_course_name as rename_ics
+        rename_cr(old_name, data["name"])
+        rename_ics(old_name, data["name"])
+    # 级联更新：活动类型变更
+    if "type" in data and data["type"] != old_type:
+        from app.services.internal_course_session_service import rename_course_type as rename_ics_type
+        rename_ics_type(old_type, data["type"])
     return course
 
 
@@ -78,3 +90,15 @@ def delete_course(course_id: str) -> bool:
     course.deleted_at = datetime.now(timezone.utc)
     _save(course_id)
     return True
+
+
+def rename_course_type(old_name: str, new_name: str) -> int:
+    count = 0
+    for course in _courses.values():
+        if not course.is_deleted and course.type == old_name:
+            course.type = new_name
+            course.updated_at = datetime.now(timezone.utc)
+            count += 1
+    if count > 0:
+        _save()
+    return count

@@ -81,6 +81,21 @@ def list_unified(
     # 从客户数据实时填充名称
     items = _fill_names(items)
 
+    # 回填 space_name / room_name（含已删除的空间/房间）
+    from app.services import space_service
+    _space_map: dict[str, str] = {}
+    _room_map: dict[str, str] = {}
+    for sp in space_service.get_all_spaces():
+        _space_map[sp.id] = sp.name
+        for rm in sp.rooms:
+            _room_map[rm.id] = rm.name
+    for item in items:
+        d = item["data"]
+        sid = d.get("space_id", "")
+        rid = d.get("room_id", "")
+        d["space_name"] = _space_map.get(sid, "") if sid else ""
+        d["room_name"] = _room_map.get(rid, "") if rid else ""
+
     # Apply filters
     if type:
         items = [i for i in items if i["type"] == type]
@@ -228,6 +243,7 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
+        oh_card_reading_session_service,
         visit_service,
         daily_grouping_service,
     )
@@ -237,6 +253,23 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     d = datetime.strptime(date, "%Y-%m-%d")
     start_date = (d - timedelta(days=7)).strftime("%Y-%m-%d")
     end_date = (d + timedelta(days=13)).strftime("%Y-%m-%d")
+
+    # 构建 room_id → room_name / space_id → space_name 映射（含已删除）
+    from app.services import space_service
+    room_map: dict[str, str] = {}
+    space_map: dict[str, str] = {}
+    for sp in space_service.get_all_spaces():
+        space_map[sp.id] = sp.name
+        for rm in sp.rooms:
+            room_map[rm.id] = rm.name
+
+    def _fill_room_name(records):
+        """根据 space_id / room_id 始终同步 space_name / room_name"""
+        for r in records:
+            sid = getattr(r, "space_id", "")
+            rid = getattr(r, "room_id", "")
+            r.space_name = space_map.get(sid, "") if sid else ""
+            r.room_name = room_map.get(rid, "") if rid else ""
 
     # 日历计数：按空间筛选
     from collections import defaultdict
@@ -253,13 +286,25 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         if s.date and _match_space(s): cal_counts[s.date] += 1
     for s in internal_course_session_service.list_sessions():
         if s.date and _match_space(s): cal_counts[s.date] += 1
+    for s in oh_card_reading_session_service.list_sessions():
+        if s.date and _match_space(s): cal_counts[s.date] += 1
+
+    records_cr = class_record_service.list_records(date)
+    records_gcs = group_case_session_service.list_sessions(date)
+    records_ers = emotional_release_session_service.list_sessions(date)
+    records_eks = energy_knot_session_service.list_sessions(date)
+    records_ics = internal_course_session_service.list_sessions(date)
+    records_ocr = oh_card_reading_session_service.list_sessions(date)
+    for lst in (records_cr, records_gcs, records_ers, records_eks, records_ics, records_ocr):
+        _fill_room_name(lst)
 
     return {
-        "class_records": class_record_service.list_records(date),
-        "gcs_sessions": group_case_session_service.list_sessions(date),
-        "ers_sessions": emotional_release_session_service.list_sessions(date),
-        "eks_sessions": energy_knot_session_service.list_sessions(date),
-        "ics_sessions": internal_course_session_service.list_sessions(date),
+        "class_records": records_cr,
+        "gcs_sessions": records_gcs,
+        "ers_sessions": records_ers,
+        "eks_sessions": records_eks,
+        "ics_sessions": records_ics,
+        "ocr_sessions": records_ocr,
         "visits": visit_service.list_visits(date),
         "visit_counts": visit_service.get_date_counts(start_date=start_date, end_date=end_date),
         "calendar_counts": dict(cal_counts),

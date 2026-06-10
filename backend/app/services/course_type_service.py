@@ -39,6 +39,24 @@ def create_course_type(name: str) -> str:
     return name
 
 
+def rename_course_type(old_name: str, new_name: str) -> bool:
+    if old_name not in _types:
+        return False
+    if new_name in _types and new_name != old_name:
+        raise ValueError("类型名称已存在")
+    idx = _types.index(old_name)
+    _types[idx] = new_name
+    _save(old_name)
+    # 同步更新课程数据中的类型字段
+    from app.services.course_service import rename_course_type as sync_courses
+    from app.services.internal_course_session_service import rename_course_type as sync_sessions
+    from app.services.internal_course_service import rename_course_type as sync_internal
+    sync_courses(old_name, new_name)
+    sync_sessions(old_name, new_name)
+    sync_internal(old_name, new_name)
+    return True
+
+
 def delete_course_type(name: str) -> bool:
     if name in _types:
         _types.remove(name)

@@ -16,6 +16,8 @@ class EnergyKnotSessionBase(BaseModel):
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
+    room_name: str = ""
+    space_name: str = ""
 
 
 class EnergyKnotSessionCreate(EnergyKnotSessionBase):

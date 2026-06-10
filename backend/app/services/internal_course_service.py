@@ -122,3 +122,13 @@ def search_customers(keyword: str) -> list:
                 "member_type": c.member_type,
             })
     return results
+
+
+def rename_course_type(old_type: str, new_type: str) -> int:
+    count = 0
+    for course in _courses.values():
+        if course.course_type == old_type:
+            course.course_type = new_type
+            _save(course.id)
+            count += 1
+    return count

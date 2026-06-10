@@ -15,6 +15,7 @@ class MembershipCardBase(BaseModel):
     expiry_date: Optional[str] = None  # 到期日期（自动计算）
     closer_id: Optional[str] = None  # 成交人ID
     closer_name: Optional[str] = None  # 成交人昵称
+    organization_id: Optional[str] = None
 
 
 class MembershipCardCreate(MembershipCardBase):

@@ -74,6 +74,8 @@ def get_space(space_id: str) -> Optional[Space]:
 
 
 def create_space(data: SpaceCreate) -> Space:
+    if not data.name or not data.name.strip():
+        raise ValueError("空间名称不能为空")
     existing = [s for s in _spaces.values() if not s.is_deleted and s.name == data.name]
     if existing:
         raise ValueError("当前名称已存在")
@@ -91,6 +93,8 @@ def create_space(data: SpaceCreate) -> Space:
 
 
 def update_space(space_id: str, data: dict) -> Optional[Space]:
+    if "name" in data and (not data["name"] or not data["name"].strip()):
+        raise ValueError("空间名称不能为空")
     space = _spaces.get(space_id)
     if not space:
         return None
@@ -121,6 +125,8 @@ def delete_space(space_id: str) -> bool:
 
 
 def add_room(space_id: str, data: RoomCreate) -> Optional[Room]:
+    if not data.name or not data.name.strip():
+        raise ValueError("房间名称不能为空")
     space = _spaces.get(space_id)
     if not space:
         return None
@@ -150,6 +156,8 @@ def is_room_referenced(room_id: str) -> bool:
 
 
 def update_room(space_id: str, room_id: str, data: dict) -> Optional[Room]:
+    if "name" in data and (not data["name"] or not data["name"].strip()):
+        raise ValueError("房间名称不能为空")
     space = _spaces.get(space_id)
     if not space:
         return None

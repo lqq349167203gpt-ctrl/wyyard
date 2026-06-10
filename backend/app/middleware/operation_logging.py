@@ -81,15 +81,19 @@ PAGE_LABELS: dict[str, str] = {
     "dashboard": "工作台",
     "customers": "用户管理",
     "healing-records": "客户信息",
+    "activity-records": "活动记录",
+    "traffic-records": "引流记录",
     "class-records": "人员到场",
-    "class-records-visitors": "人员到场",
-    "class-records-activities": "人员到场",
-    "class-records-arrival": "人员到场",
-    "membership-cards": "付费项目",
-    "group-cases": "活动安排",
-    "emotional-releases": "活动安排",
-    "energy-knots": "活动安排",
-    "internal-courses": "活动安排",
+    "class-records-visitors": "到场人员",
+    "class-records-activities": "当日活动",
+    "class-records-arrival": "到场确认",
+    "daily-activities": "活动安排",
+    "payment": "付费项目",
+    "membership-cards": "会员活动",
+    "group-cases": "觉醒游戏",
+    "emotional-releases": "情绪释放",
+    "energy-knots": "能量结",
+    "internal-courses": "内部课程",
     "group-case-sessions": "活动安排",
     "emotional-release-sessions": "活动安排",
     "energy-knot-sessions": "活动安排",
@@ -103,14 +107,14 @@ PAGE_LABELS: dict[str, str] = {
     "change-password": "密码修改",
     "member-identities": "会员身份",
     "healing-identities": "疗愈老师",
-    "position-management": "角色管理",
+    "position-management": "账号管理",
     "courses": "活动配置",
-    "spaces": "空间配置",
-    "other-projects": "活动安排",
+    "spaces": "疗愈空间",
+    "other-projects": "其他项目",
     "oh-card-readings": "活动安排",
     "oh-card-reading-sessions": "活动安排",
     "reminders": "提醒配置",
-    "business-reminders": "提醒配置",
+    "business-reminders": "业务提醒",
     "activity-themes": "活动安排",
     "organizations": "组织管理",
 }
@@ -128,7 +132,7 @@ SKIP_PATHS = [
 ]
 
 FIELD_NAMES = {
-    "nickname": "昵称", "name": "名称", "title": "标题", "username": "用户名",
+    "nickname": "昵称", "name": "名称", "title": "标题", "username": "用户名", "owner": "归属人",
     "phone": "手机", "email": "邮箱", "gender": "性别", "birthday": "生日",
     "member_type": "会员类型", "activity_types": "活动类型", "member_identity": "会员身份", "healing_identity": "疗愈老师",
     "note": "备注", "description": "描述", "content": "内容", "section": "板块",
@@ -143,14 +147,14 @@ FIELD_NAMES = {
     "sort_order": "排序", "is_public_welfare": "公益",
     "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "疗愈师回复",
     "needs": "需求", "activity_participation": "活动参与", "visit_date": "到访日期",
-    "visit_time": "预计时间", "nickname": "昵称", "customer_id": "客户",
+    "visit_time": "预计时间", "customer_id": "客户",
     "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "角色", "permissions": "权限",
     "groups": "分组", "materials": "资料", "images": "图片",
     "location": "地点", "address": "地址",
     "start_date": "开始日期", "end_date": "结束日期",
     "owner_id": "案主", "space_name": "空间名",
     "card_type": "卡类型", "remaining_count": "剩余次数",
-    "customer_id": "用户", "customer_name": "用户",
+    "customer_name": "用户",
     "password": "密码", "old_password": "旧密码", "new_password": "新密码",
     "positions": "疗愈老师",
     "referrer": "引流人", "traffic_source": "流量来源", "age": "年龄",
@@ -161,7 +165,7 @@ FIELD_NAMES = {
     "wechat": "微信", "core_situation": "核心情况",
     "need_tags": "需求标签", "follow_up_node": "跟进节点",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
-    "pages": "页面权限", "member_types": "用户信息权限",
+    "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
     "operator": "匹配方式", "conditions": "匹配条件",
     "customers": "客户信息可见身份", "class_records": "人员到场可见身份", "payment": "付费项目可见身份",
     "purchase_count": "购买次数", "closer_name": "成交人", "closer_id": "成交人", "category": "分类",
@@ -169,6 +173,7 @@ FIELD_NAMES = {
     "total_payment": "累计付费",
     "activity_mode": "活动模式", "class_count": "课时数", "course_id": "课程",
     "effective_date": "生效日期", "organization_id": "组织", "rooms": "房间", "teachers": "老师", "themes": "主题",
+    "enabled": "启用状态", "is_system": "系统角色",
 }
 
 
@@ -196,7 +201,7 @@ def get_entity_id(path: str) -> str:
     if match:
         eid = match.group(1)
         # Skip action-like path segments (not real entity IDs)
-        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups", "deductions", "verify", "toggle", "sync-from-customers"):
+        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups", "deductions", "verify", "toggle", "sync-from-customers", "full"):
             return ""
         return eid
     return ""
@@ -205,6 +210,21 @@ def get_entity_id(path: str) -> str:
 def get_before_data(path: str, entity_id: str, body: dict = None) -> dict:
     body = body or {}
     clean_path = re.sub(r"/[a-f0-9-]+$", "", path)
+
+    # position-permissions full: merge page permissions and customer permissions
+    if "/api/position-permissions/full" in path:
+        position = body.get("position", "")
+        if position:
+            try:
+                from app.services import position_permission_service, position_customer_permission_service
+                pages = position_permission_service.get_permissions(position)
+                c = position_customer_permission_service.get_customer_permissions("customers", position)
+                cr = position_customer_permission_service.get_customer_permissions("class_records", position)
+                p = position_customer_permission_service.get_customer_permissions("payment", position)
+                return {"position": position, "pages": pages, "customers": c, "class_records": cr, "payment": p}
+            except Exception:
+                pass
+        return None
 
     # position-permissions: entity key is body["position"]
     if "/api/position-permissions" in path and not "/api/position-customer-permissions" in path:
@@ -511,6 +531,27 @@ def build_change_description(before: dict, after: dict) -> str:
             if parts:
                 changes.append(f"{field_name}：{'，'.join(parts)}")
             continue
+        if isinstance(new_val, dict) and any(isinstance(v, list) for v in new_val.values()):
+            # page_permissions 格式：{page_key: [member_types]}
+            label = FIELD_NAMES.get(key, key)
+            old_dict = old_val if isinstance(old_val, dict) else {}
+            page_changes = []
+            for pk, new_list in new_val.items():
+                old_list = old_dict.get(pk, [])
+                if set(new_list) != set(old_list):
+                    added = set(new_list) - set(old_list)
+                    removed = set(old_list) - set(new_list)
+                    page_label = PAGE_LABELS.get(pk, pk)
+                    parts = []
+                    if added:
+                        parts.append(f"+{'、'.join(added)}")
+                    if removed:
+                        parts.append(f"-{'、'.join(removed)}")
+                    if parts:
+                        page_changes.append(f"{page_label}：{'，'.join(parts)}")
+            if page_changes:
+                changes.append(f"{label}：{'；'.join(page_changes)}")
+            continue
         if isinstance(new_val, dict) and any(isinstance(v, dict) for v in new_val.values()):
             # 活动权限格式：{activity_type: {view, participate}}
             label = FIELD_NAMES.get(key, key)
@@ -680,6 +721,14 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                 return f"活动权限：{desc}"
         return "更新活动权限配置"
 
+    # 角色完整权限：合并页面权限和用户信息权限
+    if "/api/position-permissions/full" in path:
+        position = body.get("position", "")
+        desc = build_change_description(before or {}, body)
+        if desc:
+            return f"{position}：{desc}"
+        return f"保存{position}（无变更）"
+
     # 批量操作
     if "/batch/" in path:
         if "reorder" in path:
@@ -760,6 +809,10 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             section = get_section(path)
             content = build_log_content(method, path, body, before_data)
             entity_id = get_entity_id(path)
+
+            # 特殊处理：position-permissions/full 端点使用 body 中的 position 作为 entity_id
+            if "/api/position-permissions/full" in path:
+                entity_id = body.get("position", "")
 
             create_log(OperationLogCreate(
                 section=section,

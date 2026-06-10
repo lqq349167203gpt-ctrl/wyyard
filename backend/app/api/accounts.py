@@ -21,7 +21,9 @@ class ChangePasswordRequest(BaseModel):
 
 @router.get("")
 async def list_accounts():
-    return account_service.list_accounts()
+    accounts = account_service.list_accounts()
+    # 移除密码字段，不返回给前端
+    return [acc.model_dump(exclude={"password"}) for acc in accounts]
 
 
 @router.post("")
@@ -39,7 +41,7 @@ ALL_PAGE_KEYS = [
     "emotional-releases", "energy-knots", "internal-courses", "other-projects",
     "agents", "business-reminders", "system-logs", "operation-logs",
     "member-identities", "healing-identities", "position-management",
-    "courses", "spaces", "reminders",
+    "courses", "organizations", "spaces", "reminders",
 ]
 
 
@@ -49,12 +51,16 @@ async def login(data: LoginRequest):
     if not result:
         return {"success": False, "message": "账号或密码错误"}
 
+    # 移除密码字段，不返回给前端
+    account_data = result.model_dump()
+    account_data.pop("password", None)
+
     if result.role == "超级管理员":
         from app.services import member_identity_service
         all_identities = [i.name for i in member_identity_service.list_identities()]
         return {
             "success": True,
-            "account": result,
+            "account": account_data,
             "permissions": ALL_PAGE_KEYS,
             "customer_permissions": all_identities,
             "customer_permissions_class_records": all_identities,
@@ -64,7 +70,7 @@ async def login(data: LoginRequest):
     permissions = position_permission_service.get_permissions(result.role)
     return {
         "success": True,
-        "account": result,
+        "account": account_data,
         "permissions": permissions,
         "customer_permissions": position_customer_permission_service.get_customer_permissions("customers", result.role),
         "customer_permissions_class_records": position_customer_permission_service.get_customer_permissions("class_records", result.role),
@@ -89,6 +95,11 @@ async def delete_account(account_id: str):
 
 @router.post("/{account_id}/change-password")
 async def change_password(account_id: str, data: ChangePasswordRequest):
+    # 验证新密码长度
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="新密码至少需要6位")
+    if len(data.new_password) > 50:
+        raise HTTPException(status_code=400, detail="新密码不能超过50位")
     try:
         result = account_service.change_password(account_id, data.old_password, data.new_password)
         if not result:

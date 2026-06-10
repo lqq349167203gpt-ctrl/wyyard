@@ -10,6 +10,7 @@ class GroupCaseBase(BaseModel):
     amount: float = 0.0
     closer_id: Optional[str] = None
     closer_name: Optional[str] = None
+    organization_id: Optional[str] = None
 
 
 class GroupCaseCreate(GroupCaseBase):

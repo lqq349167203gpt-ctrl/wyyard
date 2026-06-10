@@ -12,6 +12,7 @@ class InternalCourseBase(BaseModel):
     expiry_date: Optional[str] = None
     closer_id: Optional[str] = None
     closer_name: Optional[str] = None
+    organization_id: Optional[str] = None
 
 
 class InternalCourseCreate(InternalCourseBase):
