@@ -98,6 +98,9 @@ const FIELD_CN: Record<string, string> = {
   total_payment: "累计付费",
   activity_mode: "活动模式", course_id: "课程",
   effective_date: "生效日期", themes: "主题",
+  duration_type: "时长类型", duration_value: "时长", expiry_date: "到期日期",
+  fee: "费用金额", project_name: "项目名称",
+  daily_card_usage: "每日扣费", activity_id: "活动", activity_type: "活动类型",
 }
 
 const SECTION_OPTIONS = [
@@ -405,6 +408,10 @@ export default function OperationLogsPage() {
     }
     if (typeof val === "object") return resolveIdsInString(JSON.stringify(val, null, 2))
     const s = String(val)
+    if (key === "operator") {
+      if (s === "all") return "全部满足"
+      if (s === "any") return "满足任意一项"
+    }
     if (s.length >= 8 && /^[0-9a-f-]+$/i.test(s)) return getNameById(s)
     return s
   }
