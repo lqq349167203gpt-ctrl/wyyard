@@ -15,7 +15,7 @@ import {
   emotionalReleaseSessionApi,
   energyKnotSessionApi, energyKnotApi,
   internalCourseSessionApi, courseApi, customerApi, uploadApi, spaceApi,
-  activityThemeApi, ohCardReadingSessionApi,
+  activityThemeApi, ohCardReadingSessionApi, visitApi,
   type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession,
   type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession,
   type Course, type CustomerLight, type Space,
@@ -2083,6 +2083,7 @@ export default function DailyActivitiesPage() {
   const [detailEksSessions, setDetailEksSessions] = useState<EnergyKnotSession[]>([])
   const [detailIcsSessions, setDetailIcsSessions] = useState<InternalCourseSession[]>([])
   const [detailOcrSessions, setDetailOcrSessions] = useState<OhCardReadingSession[]>([])
+  const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string }[]>([])
 
   // ===== Salon dialog state (minimal - form state lives in SalonDialog) =====
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -2262,6 +2263,49 @@ export default function DailyActivitiesPage() {
     })
   }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, detailOcrSessions, selectedSpaceId])
 
+  // 过滤掉已删除人员的活动记录
+  const filteredDetailRecords = useMemo(() => {
+    if (dayVisits.length === 0) return unifiedDetailRecords
+    const visitorIds = new Set(dayVisits.map(v => v.id))
+    return unifiedDetailRecords.map(ur => {
+      const d = ur.data as any
+      let changed = false
+      const patch: any = {}
+      if (d.teacher_ids?.some((id: string) => !visitorIds.has(id))) {
+        patch.teacher_ids = d.teacher_ids.filter((id: string) => visitorIds.has(id)); changed = true
+      }
+      if (d.participant_ids?.some((id: string) => !visitorIds.has(id))) {
+        patch.participant_ids = d.participant_ids.filter((id: string) => visitorIds.has(id)); changed = true
+      }
+      if (d.host_id && !visitorIds.has(d.host_id)) { patch.host_id = ""; patch.host_name = ""; changed = true }
+      if (d.achiever_id && !visitorIds.has(d.achiever_id)) { patch.achiever_id = ""; patch.achiever_name = ""; changed = true }
+      if (d.host_ids?.some((id: string) => !visitorIds.has(id))) {
+        const keepIdx = d.host_ids.map((id: string, i: number) => visitorIds.has(id) ? i : -1).filter((i: number) => i >= 0)
+        patch.host_ids = keepIdx.map((i: number) => d.host_ids[i])
+        patch.host_names = keepIdx.map((i: number) => d.host_names?.[i] || "")
+        changed = true
+      }
+      // 过滤 groups 中已删除的成员
+      if (d.groups?.length > 0) {
+        const cleanedGroups = d.groups.map((g: any) => ({
+          ...g,
+          leader_id: g.leader_id && visitorIds.has(g.leader_id) ? g.leader_id : "",
+          deputy_id: g.deputy_id && visitorIds.has(g.deputy_id) ? g.deputy_id : "",
+          member_ids: (g.member_ids || []).filter((id: string) => visitorIds.has(id)),
+        })).filter((g: any) => g.leader_id || g.deputy_id || g.member_ids.length > 0)
+        if (cleanedGroups.length !== d.groups.length || cleanedGroups.some((g: any, i: number) =>
+          g.leader_id !== d.groups[i]?.leader_id || g.deputy_id !== d.groups[i]?.deputy_id ||
+          g.member_ids.length !== d.groups[i]?.member_ids.length
+        )) {
+          patch.groups = cleanedGroups
+          changed = true
+        }
+      }
+      if (!changed) return ur
+      return { ...ur, data: { ...d, ...patch } }
+    })
+  }, [unifiedDetailRecords, dayVisits])
+
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
   const achieverCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("成就君")), [allCustomers])
   const eksHostCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("能量结老师")), [allCustomers])
@@ -2338,6 +2382,12 @@ export default function DailyActivitiesPage() {
           return newCustomers.length > 0 ? [...prev, ...newCustomers] : prev
         })
       }
+
+      // 加载当日到场人员（用于过滤已删除人员）
+      try {
+        const visits = await visitApi.list(date, undefined, selectedSpaceId || undefined)
+        setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname })))
+      } catch { setDayVisits([]) }
     } finally {
       setDetailLoading(false)
       setLoading(false)
@@ -2856,13 +2906,13 @@ export default function DailyActivitiesPage() {
               <Loader2 className="h-8 w-8 text-muted-foreground mb-2 animate-spin" />
               <p className="text-sm text-muted-foreground">加载中...</p>
             </div>
-          ) : unifiedDetailRecords.length === 0 ? (
+          ) : filteredDetailRecords.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">{detailDate === today ? "今天暂无记录" : `${detailDate} 暂无记录`}</p>
             </div>
           ) : (
-            <ActivityCardList records={unifiedDetailRecords} callbacks={cardCallbacks} />
+            <ActivityCardList records={filteredDetailRecords} callbacks={cardCallbacks} />
           )}
         </div>
       </div>

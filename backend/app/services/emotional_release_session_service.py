@@ -71,13 +71,11 @@ def update_session(session_id: str, data: dict):
     if not session:
         return None, []
 
-    # 校验 participant_ids 必须在当日到场名单中
+    # 自动过滤不在到场名单中的人员
     if "participant_ids" in data:
         visits = visit_service.list_visits(session.date)
         visit_ids = {v.customer_id for v in visits}
-        for pid in data["participant_ids"]:
-            if pid not in visit_ids:
-                raise ValueError(f"成员 {pid} 不在 {session.date} 的到场名单中")
+        data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):

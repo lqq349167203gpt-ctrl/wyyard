@@ -69,9 +69,22 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
   const hasUserModified = useRef(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 当日到场人员 ID 集合
+  const visitIds = useMemo(() => new Set(dayVisits.map(v => v.id)), [dayVisits])
+
+  // 过滤掉不在当日到场的人员（防止已删除人员残留）
+  const displayGroups = useMemo(() => {
+    return groups.map(g => ({
+      ...g,
+      leader_id: g.leader_id && visitIds.has(g.leader_id) ? g.leader_id : "",
+      deputy_id: g.deputy_id && visitIds.has(g.deputy_id) ? g.deputy_id : "",
+      member_ids: g.member_ids.filter(id => visitIds.has(id)),
+    }))
+  }, [groups, visitIds])
+
   // 每组已占用的人员 ID 集合
   const usedIds = new Set<string>()
-  groups.forEach(g => {
+  displayGroups.forEach(g => {
     if (g.leader_id) usedIds.add(g.leader_id)
     if (g.deputy_id) usedIds.add(g.deputy_id)
     g.member_ids.forEach(id => usedIds.add(id))
@@ -229,7 +242,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     })
     // 构建客户 ID → 角色的映射
     const roleMap = new Map<string, string>()
-    groups.forEach(group => {
+    displayGroups.forEach(group => {
       if (group.leader_id) roleMap.set(group.leader_id, "组长")
       if (group.deputy_id) roleMap.set(group.deputy_id, "副组长")
     })
@@ -237,7 +250,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     const rows: any[] = []
 
     // 按分组遍历
-    groups.forEach(group => {
+    displayGroups.forEach(group => {
       const allMemberIds = [group.leader_id, group.deputy_id, ...group.member_ids].filter(Boolean)
       const uniqueIds = [...new Set(allMemberIds)]
       uniqueIds.forEach(id => {
@@ -419,14 +432,14 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
           </div>
         </div>
 
-        {groups.length === 0 ? (
+        {displayGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-sm text-muted-foreground">暂无分组</p>
             <p className="text-xs text-muted-foreground mt-1">点击"新增"创建分组，拖拽左侧人员加入</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {groups.map((group, idx) => {
+            {displayGroups.map((group, idx) => {
               return (
               <div
                 key={idx}

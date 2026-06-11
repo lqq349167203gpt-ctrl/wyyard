@@ -1,10 +1,13 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
+logger = logging.getLogger(__name__)
+
 from app.models.visit import VisitRecord, VisitRecordCreate, CustomerSearchResult, ActivityInfo
 from app.services.customer_service import list_customers
-from app.services.storage import load_data, save_data, save_item
+from app.services.storage import load_data, save_data, save_item, delete_item
 
 FILENAME = "visits.json"
 _visits: Dict[str, VisitRecord] = {}
@@ -412,17 +415,164 @@ def _deduct_for_arrival(visit):
                 membership_card_service.deduct_for_activity(cid, f"class:{cr.id}")
 
 
+def _remove_from_parallel_lists(ids: list, names: list, target_id: str):
+    """从并行的 ids/names 列表中移除指定 id，返回 (new_ids, new_names)"""
+    new_ids, new_names = [], []
+    for i, cid in enumerate(ids):
+        if cid != target_id:
+            new_ids.append(cid)
+            new_names.append(names[i] if i < len(names) else "")
+    return new_ids, new_names
+
+
+def _cleanup_activity_records(customer_id: str, date: str):
+    """删除到场人员时，同步清理当日所有活动记录中的该人员"""
+    from app.services import (
+        class_record_service, group_case_session_service,
+        emotional_release_session_service, energy_knot_session_service,
+        internal_course_session_service, oh_card_reading_session_service,
+    )
+
+    # 沙龙：teacher_ids, participant_ids, groups
+    try:
+        for cr in class_record_service.list_records(date=date):
+            changed = False
+            if customer_id in cr.teacher_ids:
+                cr.teacher_ids = [x for x in cr.teacher_ids if x != customer_id]
+                changed = True
+            if customer_id in cr.participant_ids:
+                cr.participant_ids = [x for x in cr.participant_ids if x != customer_id]
+                changed = True
+            # 清理 groups 中的该人员
+            if cr.groups:
+                for g in cr.groups:
+                    if g.leader_id == customer_id:
+                        g.leader_id = ""
+                        changed = True
+                    if g.deputy_id == customer_id:
+                        g.deputy_id = ""
+                        changed = True
+                    if customer_id in g.member_ids:
+                        g.member_ids = [x for x in g.member_ids if x != customer_id]
+                        changed = True
+                cr.groups = [g for g in cr.groups if g.leader_id or g.deputy_id or g.member_ids]
+            if changed:
+                class_record_service._save(cr.id)
+    except Exception:
+        logger.exception("清理沙龙记录失败 customer=%s date=%s", customer_id, date)
+
+    # 觉醒游戏：host_id, achiever_id, participant_ids
+    try:
+        for s in group_case_session_service.list_sessions(date=date):
+            changed = False
+            if s.host_id == customer_id:
+                s.host_id = ""; s.host_name = ""; changed = True
+            if s.achiever_id == customer_id:
+                s.achiever_id = ""; s.achiever_name = ""; changed = True
+            if customer_id in s.participant_ids:
+                s.participant_ids = [x for x in s.participant_ids if x != customer_id]
+                changed = True
+            if changed:
+                group_case_session_service._save(s.id)
+    except Exception:
+        logger.exception("清理觉醒游戏记录失败 customer=%s date=%s", customer_id, date)
+
+    # 情绪释放：host_id, achiever_id, participant_ids
+    try:
+        for s in emotional_release_session_service.list_sessions(date=date):
+            changed = False
+            if s.host_id == customer_id:
+                s.host_id = ""; s.host_name = ""; changed = True
+            if s.achiever_id == customer_id:
+                s.achiever_id = ""; s.achiever_name = ""; changed = True
+            if customer_id in s.participant_ids:
+                s.participant_ids = [x for x in s.participant_ids if x != customer_id]
+                changed = True
+            if changed:
+                emotional_release_session_service._save(s.id)
+    except Exception:
+        logger.exception("清理情绪释放记录失败 customer=%s date=%s", customer_id, date)
+
+    # 能量结：host_ids, participant_ids
+    try:
+        for s in energy_knot_session_service.list_sessions(date=date):
+            changed = False
+            if customer_id in s.host_ids:
+                s.host_ids, s.host_names = _remove_from_parallel_lists(s.host_ids, s.host_names, customer_id)
+                changed = True
+            if customer_id in s.participant_ids:
+                s.participant_ids = [x for x in s.participant_ids if x != customer_id]
+                changed = True
+            if changed:
+                energy_knot_session_service._save(s.id)
+    except Exception:
+        logger.exception("清理能量结记录失败 customer=%s date=%s", customer_id, date)
+
+    # 内部课程：host_ids, participant_ids
+    try:
+        for s in internal_course_session_service.list_sessions(date=date):
+            changed = False
+            if customer_id in s.host_ids:
+                s.host_ids, s.host_names = _remove_from_parallel_lists(s.host_ids, s.host_names, customer_id)
+                changed = True
+            if customer_id in s.participant_ids:
+                s.participant_ids = [x for x in s.participant_ids if x != customer_id]
+                changed = True
+            if changed:
+                internal_course_session_service._save(s.id)
+    except Exception:
+        logger.exception("清理内部课程记录失败 customer=%s date=%s", customer_id, date)
+
+    # OH卡梳理：host_id, achiever_id, participant_ids
+    try:
+        for s in oh_card_reading_session_service.list_sessions(date=date):
+            changed = False
+            if s.host_id == customer_id:
+                s.host_id = ""; s.host_name = ""; changed = True
+            if s.achiever_id == customer_id:
+                s.achiever_id = ""; s.achiever_name = ""; changed = True
+            if customer_id in s.participant_ids:
+                s.participant_ids = [x for x in s.participant_ids if x != customer_id]
+                changed = True
+            if changed:
+                oh_card_reading_session_service._save(s.id)
+    except Exception:
+        logger.exception("清理OH卡梳理记录失败 customer=%s date=%s", customer_id, date)
+
+    # 清理分组
+    try:
+        from app.services import daily_grouping_service
+        grouping = daily_grouping_service.get_grouping(date)
+        if grouping and grouping.groups:
+            cleaned = []
+            for g in grouping.groups:
+                if g.leader_id == customer_id: g.leader_id = ""
+                if g.deputy_id == customer_id: g.deputy_id = ""
+                g.member_ids = [x for x in g.member_ids if x != customer_id]
+                if g.leader_id or g.deputy_id or g.member_ids:
+                    cleaned.append(g)
+            grouping.groups = cleaned
+            daily_grouping_service._save(grouping.id)
+    except Exception:
+        logger.exception("清理分组失败 customer=%s date=%s", customer_id, date)
+
+    logger.info("活动记录清理完成 customer=%s date=%s", customer_id, date)
+
+
 def delete_visit(visit_id: str) -> bool:
     _invalidate_counts_cache()
-    visit = _visits.get(visit_id)
+    visit = _visits.pop(visit_id, None)
     if not visit:
         return False
-    visit.is_deleted = True
-    visit.deleted_at = datetime.now(timezone.utc)
-    _save(visit_id)
+    delete_item(FILENAME, visit_id)
     # 自动刷新会员身份
     from app.services import member_identity_service
     member_identity_service.refresh_member_type(visit.customer_id)
+    # 同步清理活动记录中的该人员
+    try:
+        _cleanup_activity_records(visit.customer_id, visit.visit_date)
+    except Exception:
+        logger.exception("清理活动记录失败 visit_id=%s customer=%s", visit_id, visit.customer_id)
     return True
 
 

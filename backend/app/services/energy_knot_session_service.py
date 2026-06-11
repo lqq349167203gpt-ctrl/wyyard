@@ -71,13 +71,11 @@ def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
     if not session:
         return None
 
-    # 校验 host_ids 必须在当日到场名单中
+    # 自动过滤不在到场名单中的人员
     if "host_ids" in data:
         visits = visit_service.list_visits(session.date)
         visit_ids = {v.customer_id for v in visits}
-        for hid in data["host_ids"]:
-            if hid not in visit_ids:
-                raise ValueError(f"成员 {hid} 不在 {session.date} 的到场名单中")
+        data["host_ids"] = [hid for hid in data["host_ids"] if hid in visit_ids]
 
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):

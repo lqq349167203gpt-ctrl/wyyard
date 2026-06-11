@@ -45,9 +45,11 @@ def upsert_grouping(data: DailyGroupingUpsert) -> DailyGrouping:
     visit_ids = {v.customer_id for v in visits}
 
     for g in data.groups:
-        for member_id in [g.leader_id, g.deputy_id] + (g.member_ids or []):
-            if member_id and member_id not in visit_ids:
-                raise ValueError(f"成员 {member_id} 不在 {data.date} 的到场名单中")
+        if g.leader_id and g.leader_id not in visit_ids:
+            g.leader_id = ""
+        if g.deputy_id and g.deputy_id not in visit_ids:
+            g.deputy_id = ""
+        g.member_ids = [mid for mid in (g.member_ids or []) if mid in visit_ids]
 
     now = datetime.now(timezone.utc)
     existing = get_grouping(data.date)

@@ -134,7 +134,7 @@ def update_groups(record_id: str, groups: list):
     if not record:
         return None, []
 
-    # 校验成员必须在当日到场名单中
+    # 校验成员必须在当日到场名单中，自动过滤已删除的人员
     visits = visit_service.list_visits(record.date)
     visit_ids = {v.customer_id for v in visits}
 
@@ -143,11 +143,17 @@ def update_groups(record_id: str, groups: list):
         lid = g.get("leader_id", "")
         did = g.get("deputy_id", "")
         mids = g.get("member_ids", [])
-        for mid in [lid, did] + mids:
-            if mid and mid not in visit_ids:
-                raise ValueError(f"成员 {mid} 不在 {record.date} 的到场名单中")
-            if mid:
-                all_member_ids.add(mid)
+        if lid and lid not in visit_ids:
+            g["leader_id"] = ""
+        elif lid:
+            all_member_ids.add(lid)
+        if did and did not in visit_ids:
+            g["deputy_id"] = ""
+        elif did:
+            all_member_ids.add(did)
+        valid_mids = [mid for mid in mids if mid in visit_ids]
+        g["member_ids"] = valid_mids
+        all_member_ids.update(valid_mids)
 
     record.participant_ids = list(all_member_ids)
     record.groups = [GroupMember(**g) for g in groups]

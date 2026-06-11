@@ -167,6 +167,26 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     }).catch(() => setGroups([]))
   }, [detailDate])
 
+  // 人员删除后，同步清理分组中的该人员并持久化
+  useEffect(() => {
+    if (groups.length === 0 || dayVisits.length === 0) return
+    const visitIdSet = new Set(dayVisits.map(v => v.id))
+    const hasStale = groups.some(g =>
+      (g.leader_id && !visitIdSet.has(g.leader_id)) ||
+      (g.deputy_id && !visitIdSet.has(g.deputy_id)) ||
+      g.member_ids.some(id => !visitIdSet.has(id))
+    )
+    if (!hasStale) return
+    const cleaned = groups.map(g => ({
+      ...g,
+      leader_id: g.leader_id && visitIdSet.has(g.leader_id) ? g.leader_id : "",
+      deputy_id: g.deputy_id && visitIdSet.has(g.deputy_id) ? g.deputy_id : "",
+      member_ids: g.member_ids.filter(id => visitIdSet.has(id)),
+    })).filter(g => g.leader_id || g.deputy_id || g.member_ids.length > 0)
+    setGroups(cleaned)
+    dailyGroupingApi.upsert({ date: detailDate, groups: cleaned }).catch(() => {})
+  }, [dayVisits, groups])
+
   // 加载日期范围内的到场人数（轻量 API，日期滑块需要）
   useEffect(() => {
     if (!cpReady) return
@@ -273,6 +293,56 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     if (!bt) return -1
     return at.localeCompare(bt)
   }), [detailRecords, detailGcs, detailErs, detailEks, detailIcs, detailOcr, selectedSpaceId])
+
+  // 过滤掉已删除人员的活动记录（参与者、老师、成就君等）
+  const filteredRecords = useMemo(() => {
+    if (dayVisits.length === 0) return unifiedDetailRecords
+    const visitorIds = new Set(dayVisits.map(v => v.id))
+    return unifiedDetailRecords.map(ur => {
+      const d = ur.data as any
+      let filtered = false
+      const patch: any = {}
+
+      // 沙龙：过滤 teacher_ids 和 participant_ids
+      if (d.teacher_ids?.some((id: string) => !visitorIds.has(id))) {
+        patch.teacher_ids = d.teacher_ids.filter((id: string) => visitorIds.has(id))
+        filtered = true
+      }
+      if (d.participant_ids?.some((id: string) => !visitorIds.has(id))) {
+        patch.participant_ids = d.participant_ids.filter((id: string) => visitorIds.has(id))
+        filtered = true
+      }
+
+      // 觉醒游戏/OH卡：过滤 host_id, achiever_id, participant_ids
+      if (d.host_id && !visitorIds.has(d.host_id)) { patch.host_id = ""; filtered = true }
+      if (d.achiever_id && !visitorIds.has(d.achiever_id)) { patch.achiever_id = ""; patch.achiever_name = ""; filtered = true }
+      if (d.host_ids?.some((id: string) => !visitorIds.has(id))) {
+        patch.host_ids = d.host_ids.filter((id: string) => visitorIds.has(id))
+        patch.host_names = (d.host_names || []).filter((_: string, i: number) => visitorIds.has(d.host_ids[i]))
+        filtered = true
+      }
+
+      // 沙龙：过滤 groups 中已删除的成员
+      if (d.groups?.length > 0) {
+        const cleanedGroups = d.groups.map((g: any) => ({
+          ...g,
+          leader_id: g.leader_id && visitorIds.has(g.leader_id) ? g.leader_id : "",
+          deputy_id: g.deputy_id && visitorIds.has(g.deputy_id) ? g.deputy_id : "",
+          member_ids: (g.member_ids || []).filter((id: string) => visitorIds.has(id)),
+        })).filter((g: any) => g.leader_id || g.deputy_id || g.member_ids.length > 0)
+        if (cleanedGroups.length !== d.groups.length || cleanedGroups.some((g: any, i: number) =>
+          g.leader_id !== d.groups[i]?.leader_id || g.deputy_id !== d.groups[i]?.deputy_id ||
+          g.member_ids.length !== d.groups[i]?.member_ids.length
+        )) {
+          patch.groups = cleanedGroups
+          filtered = true
+        }
+      }
+
+      if (!filtered) return ur
+      return { ...ur, data: { ...d, ...patch } }
+    })
+  }, [unifiedDetailRecords, dayVisits])
 
   const getMemberName = useCallback((id: string) => {
     const c = allCustomers.find(c => c.id === id)
@@ -571,14 +641,14 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
         )}
         {/* 右栏：课程卡片列表 */}
         <div className="flex-1 overflow-y-auto">
-            {unifiedDetailRecords.length === 0 ? (
+            {filteredRecords.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">{detailDate === today ? "今天暂无记录" : `${detailDate} 暂无记录`}</p>
               </div>
             ) : (
               <ActivityCardList
-                records={unifiedDetailRecords}
+                records={filteredRecords}
                 isActivitiesView={isActivitiesView}
                 standaloneTab={standaloneTab}
                 dayVisits={dayVisits}
