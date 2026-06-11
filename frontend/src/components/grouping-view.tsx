@@ -294,8 +294,8 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     // 设置行高为30，内容垂直居中
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
     ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
-    // 设置所有单元格垂直居中 + 浅色边框
-    const thinBorder = { style: "thin", color: { rgb: "E0E0E0" } }
+    // 设置所有单元格垂直居中 + 边框
+    const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
     const baseStyle = {
       alignment: { vertical: "center" },
       border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
@@ -308,8 +308,16 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
         }
       }
     }
+    // 参与次数列（第3列）内容左对齐
+    const countColStyle = { alignment: { vertical: "center", horizontal: "left" } }
+    for (let row = 1; row <= range.e.r; row++) {
+      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 })
+      if (ws[cellRef]) {
+        ws[cellRef].s = { ...ws[cellRef].s, ...countColStyle }
+      }
+    }
     // 设置表头字体加粗 + 灰色背景
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E8EAED" } } }
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "D0D3D6" } } }
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
       if (ws[cellRef]) {
