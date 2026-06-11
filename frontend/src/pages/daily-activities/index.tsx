@@ -282,13 +282,13 @@ const EksCard = memo(({ session, spaces, onEdit, onDelete }: {
               <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
             )}
           </div>
-          {ownerDescs.filter(d => d.description || d.count).length > 0 && (
+          {ownerDescs.length > 0 && (
             <div className="space-y-1">
-              {ownerDescs.filter(d => d.description || d.count).map((d, i) => (
+              {ownerDescs.map((d, i) => (
                 <p key={i} className="text-[12px] text-[#8f959e] font-light leading-relaxed">
                   <span>{d.name || eksNames[i] || "未知"}</span>
-                  {d.count && d.count > 1 && <span className="ml-1 text-[#b0b5bb]">({d.count}部位)</span>}
-                  {d.description && <span>：{d.description}</span>}
+                  <span>：{d.count ?? 1}部位</span>
+                  {d.description && <span>，{d.description}</span>}
                 </p>
               ))}
             </div>
