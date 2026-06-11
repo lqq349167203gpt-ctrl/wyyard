@@ -2826,9 +2826,9 @@ export default function DailyActivitiesPage() {
                   { label: "沙龙活动", icon: BookOpen, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenCreate(detailDate) },
                   { label: "觉醒游戏", icon: Sparkles, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenGcsCreate(detailDate) },
                   { label: "情绪释放", icon: Heart, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenErsCreate(detailDate) },
+                  { label: "OH卡梳理", icon: Layers, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenOcrCreate(detailDate) },
                   { label: "能量结", icon: Zap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenEksCreate(detailDate) },
                   { label: "内部课程", icon: GraduationCap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenIcsCreate(detailDate) },
-                  { label: "OH卡梳理", icon: Layers, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenOcrCreate(detailDate) },
                 ].map((item) => (
                   <button
                     key={item.label}
