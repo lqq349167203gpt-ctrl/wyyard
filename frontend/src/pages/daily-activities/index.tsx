@@ -1360,7 +1360,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                   <div key={i} className="flex items-center gap-2">
                     <span className="text-[12px] font-medium shrink-0">{name}</span>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[11px] text-[#8f959e]">次数</span>
+                      <span className="text-[11px] text-[#8f959e]">部位数</span>
                       <Input
                         type="number"
                         min={1}
