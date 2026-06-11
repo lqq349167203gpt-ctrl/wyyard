@@ -306,7 +306,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       }
     }
     // 设置表头字体加粗 + 灰色背景
-    const headerStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "4E5969" } } }
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E8EAED" } } }
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
       if (ws[cellRef]) {
