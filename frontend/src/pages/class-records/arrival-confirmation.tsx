@@ -334,7 +334,7 @@ export default function ArrivalConfirmationView({
           </DialogHeader>
           <div className="px-5 py-4 space-y-3">
             <div className="flex items-start gap-2">
-              <label className="text-[12px] text-[#8f959e] pt-2 shrink-0">客户反馈</label>
+              <label className="text-[12px] text-[#8f959e] pt-2 w-[60px] text-right shrink-0">客户反馈</label>
               <textarea
                 value={editExpText}
                 onChange={(e) => setEditExpText(e.target.value)}
@@ -344,7 +344,7 @@ export default function ArrivalConfirmationView({
               />
             </div>
             <div className="flex items-start gap-2">
-              <label className="text-[12px] text-[#8f959e] pt-2 shrink-0">疗愈师回复</label>
+              <label className="text-[12px] text-[#8f959e] pt-2 w-[60px] text-right shrink-0">疗愈师回复</label>
               <textarea
                 value={editFeedbackText}
                 onChange={(e) => setEditFeedbackText(e.target.value)}
