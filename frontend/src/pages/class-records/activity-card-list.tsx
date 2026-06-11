@@ -671,22 +671,40 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
-                                const allIds = (s.participant_ids || []).filter((id: string) => id)
-                                if (allIds.length === 0) return null
-                                return allIds.map((id: string, i: number) => {
+                                const allIds = new Set((s.participant_ids || []).filter((id: string) => id) as string[])
+                                const getRoles = (id: string): string[] => {
                                   const roles: string[] = []
                                   for (const g of dailyGroups) {
                                     if (g.leader_id === id) { roles.push("组长"); break }
                                     if (g.deputy_id === id) { roles.push("副组长"); break }
                                   }
-                                  return (
-                                    <span key={id}>
-                                      {i > 0 && <span className="inline-block w-[6px]" />}
-                                      <span className={`${dayVisits.some(v => v.id === id) ? "" : "text-[#b0b5bb]"} cursor-pointer hover:text-[#3370ff]`} onClick={() => onClickParticipant(id)}>{getMemberName(id)}</span>
-                                      {roles.map((r, ri) => <span key={ri} className="inline-block ml-[1px] px-1 py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
-                                    </span>
-                                  )
-                                })
+                                  return roles
+                                }
+                                const nonEmpty: { id: string; name: string; roles: string[]; present: boolean }[][] = []
+                                for (const g of dailyGroups) {
+                                  const ids = [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter((id: string) => id && allIds.has(id))
+                                  if (ids.length > 0) {
+                                    nonEmpty.push(ids.map((id: string) => ({ id, name: getMemberName(id), roles: getRoles(id), present: dayVisits.some(v => v.id === id) })))
+                                  }
+                                }
+                                const groupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])]).filter(Boolean) as string[])
+                                const ungrouped = [...allIds].filter((id: string) => !groupedIds.has(id))
+                                if (ungrouped.length > 0) {
+                                  nonEmpty.push(ungrouped.map((id: string) => ({ id, name: getMemberName(id), roles: getRoles(id), present: dayVisits.some(v => v.id === id) })))
+                                }
+                                if (nonEmpty.length === 0) return null
+                                return nonEmpty.map((members, gi) => (
+                                  <span key={gi}>
+                                    {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
+                                    {members.map((m, i) => (
+                                      <span key={i}>
+                                        {i > 0 && <span className="inline-block w-[6px]" />}
+                                        <span className={`${m.present ? "" : "text-[#b0b5bb]"} cursor-pointer hover:text-[#3370ff]`} onClick={() => onClickParticipant(m.id)}>{m.name}</span>
+                                        {m.roles.map((r, ri) => <span key={ri} className="inline-block ml-[1px] px-1 py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
+                                      </span>
+                                    ))}
+                                  </span>
+                                ))
                               })()}
                             </div>
                               </div>
@@ -715,22 +733,40 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             <div className="bg-gray-50 rounded p-[1px] flex-1">
                               <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
                                 {(() => {
-                                  const allIds = (s.participant_ids || []).filter((id: string) => id)
-                                  if (allIds.length === 0) return <span className="text-[#8f959e]">暂无</span>
-                                  return allIds.map((id: string, i: number) => {
+                                  const allIds = new Set((s.participant_ids || []).filter((id: string) => id) as string[])
+                                  const getRoles = (id: string): string[] => {
                                     const roles: string[] = []
                                     for (const g of dailyGroups) {
                                       if (g.leader_id === id) { roles.push("组长"); break }
                                       if (g.deputy_id === id) { roles.push("副组长"); break }
                                     }
-                                    return (
-                                      <span key={id}>
-                                        {i > 0 && <span className="inline-block w-[6px]" />}
-                                        <span className={`${dayVisits.some(v => v.id === id) ? "" : "text-[#b0b5bb]"} cursor-pointer hover:text-[#3370ff]`} onClick={() => onClickParticipant(id)}>{getMemberName(id)}</span>
-                                        {roles.map((r, ri) => <span key={ri} className="inline-block ml-[1px] px-1 py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
-                                      </span>
-                                    )
-                                  })
+                                    return roles
+                                  }
+                                  const nonEmpty: { id: string; name: string; roles: string[]; present: boolean }[][] = []
+                                  for (const g of dailyGroups) {
+                                    const ids = [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter((id: string) => id && allIds.has(id))
+                                    if (ids.length > 0) {
+                                      nonEmpty.push(ids.map((id: string) => ({ id, name: getMemberName(id), roles: getRoles(id), present: dayVisits.some(v => v.id === id) })))
+                                    }
+                                  }
+                                  const groupedIds = new Set(dailyGroups.flatMap(g => [g.leader_id, g.deputy_id, ...(g.member_ids || [])]).filter(Boolean) as string[])
+                                  const ungrouped = [...allIds].filter((id: string) => !groupedIds.has(id))
+                                  if (ungrouped.length > 0) {
+                                    nonEmpty.push(ungrouped.map((id: string) => ({ id, name: getMemberName(id), roles: getRoles(id), present: dayVisits.some(v => v.id === id) })))
+                                  }
+                                  if (nonEmpty.length === 0) return <span className="text-[#8f959e]">暂无</span>
+                                  return nonEmpty.map((members, gi) => (
+                                    <span key={gi}>
+                                      {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
+                                      {members.map((m, i) => (
+                                        <span key={i}>
+                                          {i > 0 && <span className="inline-block w-[6px]" />}
+                                          <span className={`${m.present ? "" : "text-[#b0b5bb]"} cursor-pointer hover:text-[#3370ff]`} onClick={() => onClickParticipant(m.id)}>{m.name}</span>
+                                          {m.roles.map((r, ri) => <span key={ri} className="inline-block ml-[1px] px-1 py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  ))
                                 })()}
                               </div>
                             </div>
