@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { Plus, Trash2, Edit, Download } from "lucide-react"
 import * as XLSX from "xlsx-js-style"
+import JSZip from "jszip"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -207,7 +208,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     setDropGroupIdx(null)
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
     // 构建客户 ID → 客户信息的映射
     const customerMap = new Map(allCustomers.map(c => [c.id, c]))
     // 构建客户 ID → 当日到访记录的映射
@@ -329,9 +330,32 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
         }
       }
     }
+    // 移除 !sheetPr（xlsx-js-style 不支持，通过 JSZip 后处理实现）
+    delete ws['!sheetPr']
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "人员分组")
-    XLSX.writeFile(wb, `人员分组_${date}.xlsx`)
+    // 使用 JSZip 后处理隐藏网格线
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as unknown as ArrayBuffer
+    const zip = await JSZip.loadAsync(buf)
+    const sheetFile = zip.file("xl/worksheets/sheet1.xml")
+    if (sheetFile) {
+      let xml = await sheetFile.async("string")
+      // 在 sheetData 前插入 sheetViews 隐藏网格线
+      if (!xml.includes("sheetViews")) {
+        xml = xml.replace(
+          /<sheetData>/,
+          '<sheetViews><sheetView showGridLines="0" tabSelected="1" workbookViewId="0"/></sheetViews><sheetData>'
+        )
+      }
+      zip.file("xl/worksheets/sheet1.xml", xml)
+    }
+    const out = await zip.generateAsync({ type: "blob" })
+    const url = URL.createObjectURL(out)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `人员分组_${date}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
