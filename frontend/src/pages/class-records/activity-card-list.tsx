@@ -168,7 +168,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                         <span key={i}>
                                           {i > 0 && <span className="inline-block w-[6px]" />}
                                           <span className={`${m.present ? "" : "text-[#b0b5bb]"} cursor-pointer hover:text-[#3370ff]`} onClick={() => onClickParticipant(m.id)}>{m.name}</span>
-                                          {m.roles.map((r, ri) => <span key={ri} className="inline-block ml-[-1px] pl-1 pr-[-1px] py-0.5 rounded text-[10px] text-[#8f959e]">{r}</span>)}
+                                          {m.roles.map((r, ri) => <span key={ri} className="inline-block ml-[-1px] pl-1 pr-[-1px] py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
                                         </span>
                                       ))}
                                     </span>
@@ -232,7 +232,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                             <span key={i}>
                                               {i > 0 && <span className="inline-block w-[6px]" />}
                                               <span className={`${m.present ? "" : "text-[#b0b5bb]"} cursor-pointer hover:text-[#3370ff]`} onClick={() => onClickParticipant(m.id)}>{m.name}</span>
-                                              {m.roles.map((r, ri) => <span key={ri} className="inline-block ml-[-1px] pl-1 pr-[-1px] py-0.5 rounded text-[10px] text-[#8f959e]">{r}</span>)}
+                                              {m.roles.map((r, ri) => <span key={ri} className="inline-block ml-[-1px] pl-1 pr-[-1px] py-0.5 rounded text-[10px] text-[#b0b5bb]">{r}</span>)}
                                             </span>
                                           ))}
                                         </span>
