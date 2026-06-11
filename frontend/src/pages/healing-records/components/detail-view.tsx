@@ -207,7 +207,7 @@ export default function DetailView({
           {[
             { key: "activities" as const, label: "活动记录" },
             { key: "healing" as const, label: "疗愈记录" },
-            { key: "purchase" as const, label: "项目次数" },
+            { key: "purchase" as const, label: "剩余次数" },
             { key: "payment" as const, label: "交易记录" },
           ].map(tab => (
             <button
