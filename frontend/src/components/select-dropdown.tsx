@@ -18,6 +18,7 @@ interface SelectDropdownSingleProps {
   clearable?: boolean
   multi?: false
   hideCheckbox?: boolean
+  hideSelectedStyle?: boolean
 }
 
 interface SelectDropdownMultiProps {
@@ -31,6 +32,7 @@ interface SelectDropdownMultiProps {
   clearable?: boolean
   multi: true
   hideCheckbox?: boolean
+  hideSelectedStyle?: boolean
 }
 
 type SelectDropdownProps = SelectDropdownSingleProps | SelectDropdownMultiProps
@@ -48,6 +50,7 @@ export const SelectDropdown = memo(function SelectDropdown({
   clearable = false,
   multi = false,
   hideCheckbox = false,
+  hideSelectedStyle = false,
 }: SelectDropdownProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
@@ -178,7 +181,7 @@ export const SelectDropdown = memo(function SelectDropdown({
             return (
               <button key={opt.value}
                 type="button"
-                className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[11px]" : "px-2 py-2 text-[12px]"} ${isSelected ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
+                className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[11px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
                 onMouseDown={() => select(opt.value)}
               >
                 {multi && !hideCheckbox && (

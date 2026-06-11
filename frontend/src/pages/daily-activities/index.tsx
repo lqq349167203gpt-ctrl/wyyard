@@ -1413,6 +1413,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               }}
               multi={true}
               hideCheckbox={true}
+              hideSelectedStyle={true}
             />
           </div>
         </div>
