@@ -1306,9 +1306,9 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
             <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
               <div className="flex flex-wrap items-center gap-1 min-h-[32px] rounded-md border border-input bg-transparent px-2 py-1">
                 {formOwnerNames.map((name, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 bg-[#f0f5ff] text-[#3370ff] text-[11px] px-1.5 py-0.5 rounded">
+                  <span key={i} className="inline-flex items-center gap-1 bg-[#f0f1f2] text-[#2b2f36] text-[11px] px-1.5 py-0.5 rounded">
                     {name}
-                    <button className="h-3 w-3 flex items-center justify-center hover:text-[#2860e0]" onClick={() => {
+                    <button className="h-3 w-3 flex items-center justify-center text-[#8f959e] hover:text-[#f54a45]" onClick={() => {
                       setFormOwnerIds(formOwnerIds.filter((_, j) => j !== i))
                       setFormOwnerNames(formOwnerNames.filter((_, j) => j !== i))
                       setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i))
