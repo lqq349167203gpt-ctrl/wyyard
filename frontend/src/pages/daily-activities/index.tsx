@@ -1763,6 +1763,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
               placeholder="选择老师"
               onChange={(v) => setFormTeacherIds(Array.isArray(v) ? v : [v])}
               multi={true}
+              hideSelectedStyle={true}
             />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">

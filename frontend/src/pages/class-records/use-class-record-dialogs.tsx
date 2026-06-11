@@ -438,10 +438,13 @@ export function useClassRecordDialogs({
                     {teachers.map((teacher) => (
                       <div
                         key={teacher.id}
-                        className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted"
+                        className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted ${formTeacherId === teacher.id ? "bg-muted/50" : ""}`}
                         onClick={() => { setFormTeacherId(teacher.id); setShowTeacherDropdown(false) }}
                       >
                         <span className="text-[12px]">{teacher.nickname || teacher.name || "未命名"}</span>
+                        {formTeacherId === teacher.id && (
+                          <span className="text-xs text-primary">已选</span>
+                        )}
                       </div>
                     ))}
                   </div>
