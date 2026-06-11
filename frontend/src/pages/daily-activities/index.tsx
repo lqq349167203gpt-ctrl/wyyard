@@ -1412,6 +1412,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                 setFormHostNames(ids.map(id => hostCustomers.find(c => c.id === id)?.nickname || hostCustomers.find(c => c.id === id)?.name || "").filter(Boolean))
               }}
               multi={true}
+              hideCheckbox={true}
             />
           </div>
         </div>
