@@ -275,7 +275,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       })
     })
 
-    const ws = XLSX.utils.json_to_sheet(rows)
+    const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
     // 设置列宽
     ws['!cols'] = [
       { wch: 10 }, // 引流人
