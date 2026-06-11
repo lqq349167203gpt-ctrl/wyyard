@@ -1370,7 +1370,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                           next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
                           setFormOwnerDescriptions(next)
                         }}
-                        className="w-9 h-7 text-[12px] text-center"
+                        className="w-9 h-7 text-[12px] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     </div>
                     <Input
