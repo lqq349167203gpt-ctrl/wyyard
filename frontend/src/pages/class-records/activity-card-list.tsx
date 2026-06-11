@@ -134,7 +134,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f0f0f0]">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                                   <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -223,7 +223,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               }
                               if (nonEmpty.length === 0) return null
                               return (
-                                <div className="bg-[#fafbfc] rounded px-2.5 py-2 flex-1">
+                                <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f0f0f0] flex-1">
                                     <div className="text-[12px] text-[#4e535a]">
                                       {nonEmpty.map((members, gi) => (
                                         <span key={gi}>
@@ -289,7 +289,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f0f0f0]">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -445,7 +445,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f0f0f0]">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -666,7 +666,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f0f0f0]">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -819,7 +819,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f0f0f0]">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
