@@ -339,8 +339,8 @@ export default function ArrivalConfirmationView({
                 value={editExpText}
                 onChange={(e) => setEditExpText(e.target.value)}
                 placeholder="输入客户反馈..."
-                rows={4}
-                className="w-full rounded-xl border border-[#e8eaed] p-4 text-[15px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
+                rows={3}
+                className="w-full rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
               />
             </div>
             <div>
@@ -349,8 +349,8 @@ export default function ArrivalConfirmationView({
                 value={editFeedbackText}
                 onChange={(e) => setEditFeedbackText(e.target.value)}
                 placeholder="输入疗愈师回复..."
-                rows={5}
-                className="w-full rounded-xl border border-[#e8eaed] p-4 text-[15px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
+                rows={4}
+                className="w-full rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
               />
             </div>
             <div className="flex justify-end gap-2">
