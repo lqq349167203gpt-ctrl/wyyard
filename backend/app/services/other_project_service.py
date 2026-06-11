@@ -73,6 +73,8 @@ def create_project(data: OtherProjectCreate) -> OtherProject:
     )
     _projects[project.id] = project
     _save(project.id)
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(project.customer_id)
     return project
 
 
@@ -91,6 +93,8 @@ def update_project(project_id: str, data: dict) -> Optional[OtherProject]:
     project.updated_at = datetime.now(timezone.utc)
     _projects[project_id] = project
     _save(project_id)
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(project.customer_id)
     return project
 
 
@@ -101,6 +105,8 @@ def delete_project(project_id: str) -> bool:
     project.is_deleted = True
     project.deleted_at = datetime.now(timezone.utc)
     _save(project_id)
+    from app.services.member_identity_service import refresh_member_type
+    refresh_member_type(project.customer_id)
     return True
 
 
