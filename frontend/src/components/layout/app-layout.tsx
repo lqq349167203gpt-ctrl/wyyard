@@ -11,7 +11,7 @@ const PAGE_TITLES: Record<string, string> = {
 
   "/visits": "无忧 - 到场人员",
   "/healing-records": "无忧 - 客户信息",
-  "/courses/class-records": "无忧 - 人员到场",
+  "/courses/class-records": "无忧 - 人员安排",
   "/courses/daily-activities": "无忧 - 活动安排",
   "/payment/membership-cards": "无忧 - 会员活动",
   "/payment/group-cases": "无忧 - 觉醒游戏",

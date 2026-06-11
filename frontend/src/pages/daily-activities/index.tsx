@@ -1133,8 +1133,6 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const [formActivityMode, setFormActivityMode] = useState("线下")
   const [spaceId, setSpaceId] = useState("")
   const [roomId, setRoomId] = useState("")
-  const [showHostDropdown, setShowHostDropdown] = useState(false)
-  const hostDropdownRef = useRef<HTMLDivElement>(null)
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false)
   const [pendingOwner, setPendingOwner] = useState<{ id: string; nickname: string; name: string } | null>(null)
   const [purchaseCount, setPurchaseCount] = useState("1")
@@ -1142,17 +1140,6 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const [purchaseSaving, setPurchaseSaving] = useState(false)
   const remainingFetchRef = useRef(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!showHostDropdown) return
-    const handleClick = (e: MouseEvent) => {
-      if (hostDropdownRef.current && !hostDropdownRef.current.contains(e.target as Node)) {
-        setShowHostDropdown(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [showHostDropdown])
 
   useEffect(() => {
     if (open) {
@@ -1201,7 +1188,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setSearchKeyword(""); setShowHostDropdown(false)
+      setSearchKeyword("")
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
@@ -1318,7 +1305,6 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                 ref={searchInputRef}
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
-                onFocus={() => setShowHostDropdown(false)}
                 placeholder="选择案主"
                 className="h-8 text-[12px]"
                 autoComplete="off"
@@ -1392,49 +1378,19 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               </div>
             </div>
           )}
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">能量结老师</span>
-            <div className="space-y-2">
-              {formHostNames.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {formHostNames.map((name, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 bg-gray-50 rounded px-2 py-1 text-[12px]">
-                      {name}
-                      <button onClick={() => {
-                        setFormHostIds(formHostIds.filter((_, j) => j !== i))
-                        setFormHostNames(formHostNames.filter((_, j) => j !== i))
-                      }}><X className="h-3 w-3 text-[#8f959e]" /></button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div ref={hostDropdownRef} className="relative">
-                <button type="button"
-                  className="flex items-center justify-between w-full h-8 px-3 rounded-md border border-input bg-transparent text-[12px]"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={() => { setSearchKeyword(""); setShowHostDropdown(!showHostDropdown) }}
-                >
-                  <span className="text-[#8f959e]">选择能量结老师</span>
-                  <ChevronDown className="h-3 w-3 text-[#8f959e]" />
-                </button>
-                {showHostDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                    {hostCustomers.map(c => (
-                      <button key={c.id}
-                        className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${formHostIds.includes(c.id) ? "text-[#b0b5bb] cursor-default" : "hover:bg-[#f7f8fa]"}`}
-                        onClick={() => {
-                          if (formHostIds.includes(c.id)) return
-                          setFormHostIds([...formHostIds, c.id])
-                          setFormHostNames([...formHostNames, c.nickname || c.name || ""])
-                          setShowHostDropdown(false)
-                        }}>
-                        <span>{c.nickname || c.name}</span>
-                        {formHostIds.includes(c.id) && <span className="text-[10px]">已添加</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+          <div className="grid grid-cols-[70px_1fr] items-start gap-3">
+            <span className="text-[12px] text-[#8f959e] text-right pt-2">能量结老师</span>
+            <SelectDropdown
+              value={formHostIds}
+              options={hostCustomers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
+              placeholder="选择能量结老师"
+              onChange={(v) => {
+                const ids = Array.isArray(v) ? v : [v]
+                setFormHostIds(ids)
+                setFormHostNames(ids.map(id => hostCustomers.find(c => c.id === id)?.nickname || hostCustomers.find(c => c.id === id)?.name || "").filter(Boolean))
+              }}
+              multi={true}
+            />
           </div>
         </div>
         <div className="flex justify-end gap-2 px-6 pb-5 pt-2">

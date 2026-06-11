@@ -327,13 +327,8 @@ export function useClassRecordDialogs({
         targetIdx = classGroups.length - 1
       }
       const targetGroup = { ...classGroups[targetIdx], member_ids: [...classGroups[targetIdx].member_ids] }
-      if (dailyRole === "leader") {
-        targetGroup.leader_id = customer.customer_id
-      } else if (dailyRole === "deputy") {
-        targetGroup.deputy_id = customer.customer_id
-      } else {
-        targetGroup.member_ids = [...targetGroup.member_ids, customer.customer_id]
-      }
+      // 拖拽只添加为组员，不自动分配组长/副组长
+      targetGroup.member_ids = [...targetGroup.member_ids, customer.customer_id]
       classGroups[targetIdx] = targetGroup
       try {
         await saveGroupsAndParticipants(classGroups)
@@ -342,7 +337,8 @@ export function useClassRecordDialogs({
         alert(msg)
       }
     } else if (classGroups.length === 0) {
-      const newGroups = [{ name: "小组 1", leader_id: customer.customer_id, deputy_id: "", member_ids: [] }]
+      // 创建小组但不自动分配组长
+      const newGroups = [{ name: "小组 1", leader_id: "", deputy_id: "", member_ids: [customer.customer_id] }]
       try {
         await saveGroupsAndParticipants(newGroups)
       } catch (e: any) {
@@ -350,8 +346,8 @@ export function useClassRecordDialogs({
         alert(msg)
       }
     } else {
+      // 只添加为组员，不自动分配组长
       classGroups[0] = { ...classGroups[0], member_ids: [...classGroups[0].member_ids, customer.customer_id] }
-      if (!classGroups[0].leader_id) classGroups[0].leader_id = customer.customer_id
       try {
         await saveGroupsAndParticipants(classGroups)
       } catch (e: any) {

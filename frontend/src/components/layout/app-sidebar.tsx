@@ -40,7 +40,7 @@ const businessItems = [
 
 const courseItems = [
   { title: "客户信息", icon: Heart, path: "/healing-records", permission: "healing-records" },
-  { title: "人员到场", icon: CalendarCheck, path: "/courses/class-records", permission: "class-records" },
+  { title: "人员安排", icon: CalendarCheck, path: "/courses/class-records", permission: "class-records" },
   { title: "活动安排", icon: CalendarCheck, path: "/courses/daily-activities", permission: "daily-activities" },
 ]
 

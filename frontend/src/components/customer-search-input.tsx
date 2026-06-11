@@ -132,7 +132,7 @@ export function CustomerSearchInput({
       inputRef.current?.focus()
     } else {
       onChange(customer.nickname)
-      if (onSelectItem && 'gender' in customer) {
+      if (onSelectItem) {
         onSelectItem(customer as Customer)
       }
       setOpen(false)

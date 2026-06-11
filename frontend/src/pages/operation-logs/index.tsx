@@ -93,7 +93,7 @@ const FIELD_CN: Record<string, string> = {
   tracking_plan: "跟进计划",
   pages: "页面权限", member_types: "用户信息权限",
   operator: "匹配方式", conditions: "匹配条件",
-  customers: "客户信息可见身份", class_records: "人员到场可见身份", payment: "付费项目可见身份",
+  customers: "客户信息可见身份", class_records: "人员安排可见身份", payment: "付费项目可见身份",
   referrer_handler: "引流处理人", traffic_source_detail: "流量来源详情",
   total_payment: "累计付费",
   activity_mode: "活动模式", course_id: "课程",
@@ -101,7 +101,7 @@ const FIELD_CN: Record<string, string> = {
 }
 
 const SECTION_OPTIONS = [
-  "用户管理", "客户信息", "人员到场", "活动安排", "活动配置", "付费项目",
+  "用户管理", "客户信息", "人员安排", "活动安排", "活动配置", "付费项目",
   "会员身份", "疗愈老师", "组织管理", "空间配置", "提醒配置",
   "账号管理", "角色管理", "密码修改", "AI 配置", "系统日志", "知识库", "业务数据", "操作日志",
 ]
@@ -136,7 +136,7 @@ const ALL_PAGES = [
 
 const PERMISSION_GROUPS = [
   { label: "业务数据", keys: ["healing-records", "activity-records", "traffic-records"] },
-  { label: "人员到场", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
+  { label: "人员安排", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management"] },
@@ -316,7 +316,7 @@ export default function OperationLogsPage() {
 
   const SECTION_ENTITY: Record<string, string> = {
     "空间配置": "空间", "活动配置": "活动", "用户管理": "客户", "客户信息": "客户",
-    "人员到场": "记录", "活动安排": "活动", "付费项目": "项目", "会员身份": "身份",
+    "人员安排": "记录", "活动安排": "活动", "付费项目": "项目", "会员身份": "身份",
     "疗愈老师": "老师", "组织管理": "组织", "提醒配置": "提醒", "账号管理": "账号",
     "角色管理": "角色", "AI 配置": "配置", "系统日志": "日志",
   }
