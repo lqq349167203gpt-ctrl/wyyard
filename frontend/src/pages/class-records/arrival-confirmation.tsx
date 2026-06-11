@@ -309,13 +309,16 @@ export default function ArrivalConfirmationView({
             <DialogTitle className="text-base">疗愈记录 - {editVisit?.nickname}</DialogTitle>
           </DialogHeader>
           <div className="px-5 py-4">
-            <textarea
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              placeholder="输入疗愈记录..."
-              rows={8}
-              className="w-full rounded-xl border border-[#e8eaed] p-4 text-[15px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
-            />
+            <div className="flex items-start gap-2">
+              <label className="text-[12px] text-[#8f959e] pt-2 w-[60px] text-right shrink-0">当日记录</label>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                placeholder="输入疗愈记录..."
+                rows={3}
+                className="flex-1 rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
+              />
+            </div>
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" size="sm" onClick={() => setEditVisit(null)}>取消</Button>
               <Button size="sm" onClick={handleSaveHR} disabled={savingHR}>
