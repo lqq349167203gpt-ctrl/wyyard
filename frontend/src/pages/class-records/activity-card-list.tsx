@@ -291,9 +291,10 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="flex items-start gap-1.5">
-                              <div className="flex-1 min-w-0">
-                            <div className="text-[12px] text-[#4e535a] leading-relaxed">
+                            <div className="bg-[#f7f8fa] rounded px-2.5 py-2">
+                              <div className="flex items-start gap-1.5">
+                                <div className="flex-1 min-w-0">
+                              <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
                                 const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id))
                                 const getRoles = (id: string): string[] => {
@@ -335,6 +336,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                               </div>
                             </div>
+                          </div>
                           </div>
                         </>
                       ) : (
@@ -446,9 +448,10 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="flex items-start gap-1.5">
-                              <div className="flex-1 min-w-0">
-                            <div className="text-[12px] text-[#4e535a] leading-relaxed">
+                            <div className="bg-[#f7f8fa] rounded px-2.5 py-2">
+                              <div className="flex items-start gap-1.5">
+                                <div className="flex-1 min-w-0">
+                              <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
                                 const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id))
                                 const getRoles = (id: string): string[] => {
@@ -489,6 +492,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                               </div>
                             </div>
+                          </div>
                           </div>
                         </>
                       ) : (
@@ -667,9 +671,10 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="flex items-start gap-1.5">
-                              <div className="flex-1 min-w-0">
-                            <div className="text-[12px] text-[#4e535a] leading-relaxed">
+                            <div className="bg-[#f7f8fa] rounded px-2.5 py-2">
+                              <div className="flex items-start gap-1.5">
+                                <div className="flex-1 min-w-0">
+                              <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
                                 const allIds = new Set((s.participant_ids || []).filter((id: string) => id) as string[])
                                 const getRoles = (id: string): string[] => {
@@ -709,6 +714,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                               </div>
                             </div>
+                          </div>
                           </div>
                         </>
                       ) : (
@@ -819,9 +825,10 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="flex items-start gap-1.5">
-                              <div className="flex-1 min-w-0">
-                            <div className="text-[12px] text-[#4e535a] leading-relaxed">
+                            <div className="bg-[#f7f8fa] rounded px-2.5 py-2">
+                              <div className="flex items-start gap-1.5">
+                                <div className="flex-1 min-w-0">
+                              <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
                                 const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id))
                                 const getRoles = (id: string): string[] => {
@@ -863,6 +870,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                               </div>
                             </div>
+                          </div>
                           </div>
                         </>
                       ) : (
