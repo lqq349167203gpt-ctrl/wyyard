@@ -120,7 +120,8 @@ def _get_payment_categories(condition: IdentityCondition) -> list:
 def _check_condition(condition: IdentityCondition, customer_id: str,
                      arrival_count: int, activity_count: int,
                      customer_cards, customer_courses, customer_group_cases,
-                     customer_emotional_releases, customer_energy_knots, today_str: str) -> bool:
+                     customer_emotional_releases, customer_energy_knots,
+                     customer_oh_card_readings, today_str: str) -> bool:
     t = condition.type
     if t == "arrival":
         return _compare_count(arrival_count, condition.count_op, condition.count_value)
@@ -156,6 +157,10 @@ def _check_condition(condition: IdentityCondition, customer_id: str,
                 total = sum(c.purchase_count for c in customer_energy_knots)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True
+            elif cat == "OH卡梳理":
+                total = sum(c.purchase_count for c in customer_oh_card_readings)
+                if _compare_count(total, condition.count_op, condition.count_value):
+                    return True
         return False
     return False
 
@@ -172,6 +177,7 @@ def refresh_member_type(customer_id: str):
     # 预计算用户数据
     from app.services import membership_card_service, visit_service, internal_course_service
     from app.services import group_case_service, emotional_release_service, energy_knot_service
+    from app.services import oh_card_reading_service
     all_cards = membership_card_service.list_cards()
     customer_cards = [c for c in all_cards if c.customer_id == customer_id]
 
@@ -187,6 +193,9 @@ def refresh_member_type(customer_id: str):
     all_energy_knots = energy_knot_service.list_knots()
     customer_energy_knots = [c for c in all_energy_knots if c.customer_id == customer_id]
 
+    all_oh_card_readings = oh_card_reading_service.list_readings()
+    customer_oh_card_readings = [c for c in all_oh_card_readings if c.customer_id == customer_id]
+
     all_visits = visit_service.list_visits()
     customer_visits = [v for v in all_visits if v.customer_id == customer_id]
     arrival_count = sum(1 for v in customer_visits if v.arrived)
@@ -201,7 +210,7 @@ def refresh_member_type(customer_id: str):
         results = [_check_condition(cond, customer_id, arrival_count, activity_count,
                                     customer_cards, customer_courses,
                                     customer_group_cases, customer_emotional_releases,
-                                    customer_energy_knots, today_str)
+                                    customer_energy_knots, customer_oh_card_readings, today_str)
                    for cond in identity.conditions]
         if identity.operator == "any":
             matched = any(results)
