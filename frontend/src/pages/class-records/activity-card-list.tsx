@@ -224,8 +224,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               }
                               if (nonEmpty.length === 0) return null
                               return (
-                                <div className="bg-gray-50 rounded p-[1px] flex-1">
-                                  <div className="bg-white rounded px-2 py-1.5 h-full flex items-center">
+                                <div className="bg-[#f7f8fa] rounded px-2.5 py-2 flex-1">
                                     <div className="text-[12px] text-[#4e535a]">
                                       {nonEmpty.map((members, gi) => (
                                         <span key={gi}>
@@ -240,7 +239,6 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                         </span>
                                       ))}
                                     </div>
-                                  </div>
                                 </div>
                               )
                             })()}
