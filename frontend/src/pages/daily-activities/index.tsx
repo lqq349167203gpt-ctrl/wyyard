@@ -1357,41 +1357,37 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               <span />
               <div className="space-y-2">
                 {formOwnerNames.map((name, i) => (
-                  <div key={i} className="bg-gray-50 rounded p-2 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[12px] font-medium">{name}</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px] text-[#8f959e]">次数</span>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={formOwnerDescriptions[i]?.count ?? 1}
-                            onChange={(e) => {
-                              const next = [...formOwnerDescriptions]
-                              next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
-                              setFormOwnerDescriptions(next)
-                            }}
-                            className="w-14 h-7 text-[12px] text-center"
-                          />
-                        </div>
-                      </div>
-                      <button onClick={() => {
-                        setFormOwnerIds(formOwnerIds.filter((_, j) => j !== i))
-                        setFormOwnerNames(formOwnerNames.filter((_, j) => j !== i))
-                        setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i))
-                      }}><X className="h-3 w-3 text-[#8f959e]" /></button>
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[12px] font-medium shrink-0">{name}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[11px] text-[#8f959e]">次数</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={formOwnerDescriptions[i]?.count ?? 1}
+                        onChange={(e) => {
+                          const next = [...formOwnerDescriptions]
+                          next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
+                          setFormOwnerDescriptions(next)
+                        }}
+                        className="w-14 h-7 text-[12px] text-center"
+                      />
                     </div>
                     <Input
-                      placeholder={`${name}的情况介绍...`}
+                      placeholder="情况介绍..."
                       value={formOwnerDescriptions[i]?.description || ""}
                       onChange={(e) => {
                         const next = [...formOwnerDescriptions]
                         next[i] = { ...next[i], description: e.target.value }
                         setFormOwnerDescriptions(next)
                       }}
-                      className="h-8 text-[12px]"
+                      className="flex-1 h-7 text-[12px]"
                     />
+                    <button className="shrink-0" onClick={() => {
+                      setFormOwnerIds(formOwnerIds.filter((_, j) => j !== i))
+                      setFormOwnerNames(formOwnerNames.filter((_, j) => j !== i))
+                      setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i))
+                    }}><X className="h-3 w-3 text-[#8f959e]" /></button>
                   </div>
                 ))}
               </div>
