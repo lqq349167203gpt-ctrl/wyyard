@@ -134,7 +134,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               {isActivitiesView && <button className="ml-auto text-[11px] text-[#8f959e] hover:text-[#3370ff] transition-colors" onClick={() => onOpenMemberDialog("class", record)}>成员 ›</button>}
                             </div>
                           </div>
-                          <div className="pl-5 pr-5 pb-[1px] pt-2.5 -mt-1">
+                          <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
                             <div className="flex items-start gap-1.5">
                               <div className="flex-1 min-w-0">
                                 <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -290,7 +290,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               </div>)}
                             </div>
                           </div>
-                          <div className="pl-5 pr-5 pb-[1px] pt-2.5 -mt-1">
+                          <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
                             <div className="flex items-start gap-1.5">
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -445,7 +445,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               </div>)}
                             </div>
                           </div>
-                          <div className="pl-5 pr-5 pb-[1px] pt-2.5 -mt-1">
+                          <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
                             <div className="flex items-start gap-1.5">
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -666,7 +666,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               </div>)}
                             </div>
                           </div>
-                          <div className="pl-5 pr-5 pb-[1px] pt-2.5 -mt-1">
+                          <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
                             <div className="flex items-start gap-1.5">
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -818,7 +818,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               </div>)}
                             </div>
                           </div>
-                          <div className="pl-5 pr-5 pb-[1px] pt-2.5 -mt-1">
+                          <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
                             <div className="flex items-start gap-1.5">
                               <div className="flex-1 min-w-0">
                             <div className="text-[12px] text-[#4e535a] leading-relaxed">
