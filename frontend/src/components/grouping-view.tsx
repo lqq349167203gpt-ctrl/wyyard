@@ -306,7 +306,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       }
     }
     // 设置表头字体加粗 + 灰色背景
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "F2F3F5" } } }
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E8EAED" } } }
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
       if (ws[cellRef]) {
@@ -314,7 +314,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       }
     }
     // 设置组长行背景色（仅组长，不包括副组长）
-    const leaderStyle = { fill: { fgColor: { rgb: "F0F5FF" } } }
+    const leaderStyle = { fill: { fgColor: { rgb: "F7F8FA" } } }
     for (let row = 1; row <= range.e.r; row++) {
       const roleCellRef = XLSX.utils.encode_cell({ r: row, c: 6 }) // 组长情况列
       const roleCell = ws[roleCellRef]
