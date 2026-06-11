@@ -226,8 +226,12 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
         cardMap.set(card.customer_id, card.card_type)
       }
     })
-    // 构建客户 ID → 是否组长的映射
-    const leaderIds = new Set(groups.map(g => g.leader_id).filter(Boolean))
+    // 构建客户 ID → 角色的映射
+    const roleMap = new Map<string, string>()
+    groups.forEach(group => {
+      if (group.leader_id) roleMap.set(group.leader_id, "组长")
+      if (group.deputy_id) roleMap.set(group.deputy_id, "副组长")
+    })
 
     const rows: any[] = []
 
@@ -238,7 +242,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       uniqueIds.forEach(id => {
         const customer = customerMap.get(id)
         const visit = visitMap.get(id)
-        const isLeader = leaderIds.has(id)
+        const role = roleMap.get(id) || ""
         rows.push({
           "引流人": customer?.referrer || "",
           "客户昵称": customer?.nickname || getName(id),
@@ -246,8 +250,8 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
           "参与次数": arrivedCountMap.get(id) || 0,
           "会员身份": cardMap.get(id) || customer?.member_type || "",
           "当日需求": visit?.needs || "",
-          "是否组长": isLeader ? "是" : "-",
-          "组长获得的信息": isLeader ? (visit?.needs || "") : "",
+          "组长情况": role || "-",
+          "组长获得的信息": role === "组长" ? (visit?.needs || "") : "",
           "邀约人": visit?.referrer_handler || "",
         })
       })
@@ -265,7 +269,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
         "参与次数": arrivedCountMap.get(v.id) || 0,
         "会员身份": cardMap.get(v.id) || customer?.member_type || "",
         "当日需求": visit?.needs || "",
-        "是否组长": "-",
+        "组长情况": "-",
         "组长获得的信息": "",
         "邀约人": visit?.referrer_handler || "",
       })
@@ -280,7 +284,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       { wch: 10 }, // 参与次数
       { wch: 12 }, // 会员身份
       { wch: 40 }, // 当日需求
-      { wch: 10 }, // 是否组长
+      { wch: 10 }, // 组长情况
       { wch: 30 }, // 组长获得的信息
       { wch: 10 }, // 邀约人
     ]
@@ -291,6 +295,20 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
       if (ws[cellRef]) {
         ws[cellRef].s = headerStyle
+      }
+    }
+    // 设置组长/副组长行背景色
+    const leaderStyle = { fill: { fgColor: { rgb: "F0F5FF" } } }
+    for (let row = 1; row <= range.e.r; row++) {
+      const roleCellRef = XLSX.utils.encode_cell({ r: row, c: 6 }) // 组长情况列
+      const roleCell = ws[roleCellRef]
+      if (roleCell && (roleCell.v === "组长" || roleCell.v === "副组长")) {
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
+          if (ws[cellRef]) {
+            ws[cellRef].s = leaderStyle
+          }
+        }
       }
     }
     const wb = XLSX.utils.book_new()
