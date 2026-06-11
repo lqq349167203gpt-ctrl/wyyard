@@ -44,7 +44,7 @@ export function useEksDialogs({
   const [formOwnerNames, setFormOwnerNames] = useState<string[]>([])
   const [formHostIds, setFormHostIds] = useState<string[]>([])
   const [formHostNames, setFormHostNames] = useState<string[]>([])
-  const [formOwnerDescriptions, setFormOwnerDescriptions] = useState<{id: string; name: string; description: string}[]>([])
+  const [formOwnerDescriptions, setFormOwnerDescriptions] = useState<{id: string; name: string; description: string; count: number}[]>([])
   const [searchField, setSearchField] = useState<"owner" | "host" | null>(null)
   const [searchKeyword, setSearchKeyword] = useState("")
   const [searchResults, setSearchResults] = useState<EnergyKnotCustomerSearchResult[]>([])
@@ -83,13 +83,14 @@ export function useEksDialogs({
           id: ids[i] || parsed[i]?.id || "",
           name,
           description: parsed[i]?.description || "",
+          count: parsed[i]?.count ?? 1,
         }))
         setFormOwnerDescriptions(merged)
       } else {
-        setFormOwnerDescriptions(names.map((name, i) => ({ id: ids[i] || "", name, description: "" })))
+        setFormOwnerDescriptions(names.map((name, i) => ({ id: ids[i] || "", name, description: "", count: 1 })))
       }
     } catch {
-      setFormOwnerDescriptions(names.map((name, i) => ({ id: ids[i] || "", name, description: "" })))
+      setFormOwnerDescriptions(names.map((name, i) => ({ id: ids[i] || "", name, description: "", count: 1 })))
     }
     setSearchField(null)
     setSearchKeyword("")
@@ -124,7 +125,7 @@ export function useEksDialogs({
       if (!formOwnerIds.includes(customer.id)) {
         setFormOwnerIds([...formOwnerIds, customer.id])
         setFormOwnerNames([...formOwnerNames, customer.nickname || customer.name])
-        setFormOwnerDescriptions([...formOwnerDescriptions, { id: customer.id, name: customer.nickname || customer.name, description: "" }])
+        setFormOwnerDescriptions([...formOwnerDescriptions, { id: customer.id, name: customer.nickname || customer.name, description: "", count: 1 }])
       }
     } else if (searchField === "host") {
       if (!formHostIds.includes(customer.id)) {
@@ -197,7 +198,7 @@ export function useEksDialogs({
       if (!formOwnerIds.includes(pendingOwner.id)) {
         setFormOwnerIds([...formOwnerIds, pendingOwner.id])
         setFormOwnerNames([...formOwnerNames, pendingOwner.nickname])
-        setFormOwnerDescriptions([...formOwnerDescriptions, { id: pendingOwner.id, name: pendingOwner.nickname, description: "" }])
+        setFormOwnerDescriptions([...formOwnerDescriptions, { id: pendingOwner.id, name: pendingOwner.nickname, description: "", count: 1 }])
       }
       setPurchaseDialogOpen(false)
       setPendingOwner(null)
@@ -293,6 +294,20 @@ export function useEksDialogs({
                           placeholder="情况介绍..."
                           className="flex-1 h-8 text-xs"
                         />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[11px] text-[#8f959e]">次数</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={formOwnerDescriptions[i]?.count ?? 1}
+                            onChange={(e) => {
+                              const updated = [...formOwnerDescriptions]
+                              updated[i] = { ...updated[i], count: Math.max(1, parseInt(e.target.value) || 1) }
+                              setFormOwnerDescriptions(updated)
+                            }}
+                            className="w-14 h-8 text-xs text-center"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
