@@ -1370,7 +1370,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                           next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
                           setFormOwnerDescriptions(next)
                         }}
-                        className="w-14 h-7 text-[12px] text-center"
+                        className="w-11 h-7 text-[12px] text-center"
                       />
                     </div>
                     <Input
