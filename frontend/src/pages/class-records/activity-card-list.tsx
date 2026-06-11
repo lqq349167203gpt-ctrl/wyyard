@@ -119,8 +119,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         } catch {}
                       } : undefined}
                     >
-                      {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
-                      {isActivitiesView ? (
+                                            {isActivitiesView ? (
                         <>
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
@@ -271,8 +270,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         } catch {}
                       } : undefined}
                     >
-                      {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
-                      {isActivitiesView ? (
+                                            {isActivitiesView ? (
                         <>
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
@@ -428,8 +426,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         } catch {}
                       } : undefined}
                     >
-                      {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
-                      {isActivitiesView ? (
+                                            {isActivitiesView ? (
                         <>
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
@@ -589,8 +586,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         } catch {}
                       } : undefined}
                     >
-                      {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
-                      {isActivitiesView ? (
+                                            {isActivitiesView ? (
                         <>
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
@@ -650,8 +646,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         } catch {}
                       } : undefined}
                     >
-                      {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
-                      {isActivitiesView ? (
+                                            {isActivitiesView ? (
                         <>
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
@@ -805,8 +800,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                         } catch {}
                       } : undefined}
                     >
-                      {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
-                      {isActivitiesView ? (
+                                            {isActivitiesView ? (
                         <>
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
@@ -945,8 +939,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
 
                 return null
               })}
-              {visibleRecords.length > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
-              {visibleCount < unifiedDetailRecords.length && (
+                            {visibleCount < unifiedDetailRecords.length && (
                 <div ref={sentinelRef} className="h-4" />
               )}
             </div>
