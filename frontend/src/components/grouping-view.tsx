@@ -244,7 +244,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
         const visit = visitMap.get(id)
         const role = roleMap.get(id) || ""
         rows.push({
-          "引流人": customer?.referrer || "",
+          "引流人": customer?.referrer || "-",
           "客户昵称": customer?.nickname || getName(id),
           "预计时间": visit?.visit_time || "09:00",
           "参与次数": arrivedCountMap.get(id) || 0,
