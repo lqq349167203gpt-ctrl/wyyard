@@ -322,8 +322,8 @@ const IcsCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
         <div className="flex items-center gap-2">
           <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
           <span className="text-[14px] font-medium text-[#2b2f36] truncate">{session.course_name}</span>
+          {session.course_type && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{session.course_type}</span>}
           {session.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{session.host_names.join("、")}</span>}
-          {session.course_type && <span className="text-[12px] text-[#4e535a]">{session.course_type}</span>}
           {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
             <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
           )}
