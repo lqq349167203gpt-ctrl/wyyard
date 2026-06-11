@@ -262,6 +262,17 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     })
 
     const ws = XLSX.utils.json_to_sheet(rows)
+    // 设置列宽，当日需求列增加200px宽度
+    ws['!cols'] = [
+      { wch: 10 }, // 引流人
+      { wch: 12 }, // 客户昵称
+      { wch: 10 }, // 预计时间
+      { wch: 12 }, // 活动参与次数
+      { wch: 12 }, // 会员类型
+      { wch: 40 }, // 当日需求
+      { wch: 10 }, // 是否组长
+      { wch: 10 }, // 邀约人
+    ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "人员分组")
     XLSX.writeFile(wb, `人员分组_${date}.xlsx`)
