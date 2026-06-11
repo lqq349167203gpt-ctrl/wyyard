@@ -1304,14 +1304,26 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">案主</span>
             <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
-              <Input
-                ref={searchInputRef}
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                placeholder="选择案主"
-                className="h-8 text-[12px]"
-                autoComplete="off"
-              />
+              <div className="flex flex-wrap items-center gap-1 min-h-[32px] rounded-md border border-input bg-transparent px-2 py-1">
+                {formOwnerNames.map((name, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 bg-[#f0f5ff] text-[#3370ff] text-[11px] px-1.5 py-0.5 rounded">
+                    {name}
+                    <button className="h-3 w-3 flex items-center justify-center hover:text-[#2860e0]" onClick={() => {
+                      setFormOwnerIds(formOwnerIds.filter((_, j) => j !== i))
+                      setFormOwnerNames(formOwnerNames.filter((_, j) => j !== i))
+                      setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i))
+                    }}><X className="h-2.5 w-2.5" /></button>
+                  </span>
+                ))}
+                <input
+                  ref={searchInputRef}
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  placeholder={formOwnerNames.length === 0 ? "选择案主" : ""}
+                  className="flex-1 min-w-[60px] text-[12px] bg-transparent outline-none placeholder:text-[#b0b5bb]"
+                  autoComplete="off"
+                />
+              </div>
               {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
                 const filtered = allCustomers.filter(c =>
@@ -1358,7 +1370,6 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               <div className="space-y-2">
                 {formOwnerNames.map((name, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <span className="text-[12px] font-medium shrink-0">{name}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-[11px] text-[#8f959e]">部位数</span>
                       <Input
@@ -1383,11 +1394,6 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                       }}
                       className="flex-1 h-7 text-[11px]"
                     />
-                    <button className="shrink-0" onClick={() => {
-                      setFormOwnerIds(formOwnerIds.filter((_, j) => j !== i))
-                      setFormOwnerNames(formOwnerNames.filter((_, j) => j !== i))
-                      setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i))
-                    }}><X className="h-3 w-3 text-[#8f959e]" /></button>
                   </div>
                 ))}
               </div>
