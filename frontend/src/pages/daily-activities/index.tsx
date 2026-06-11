@@ -1125,7 +1125,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const [formEndTime, setFormEndTime] = useState("10:00")
   const [formOwnerIds, setFormOwnerIds] = useState<string[]>([])
   const [formOwnerNames, setFormOwnerNames] = useState<string[]>([])
-  const [formOwnerDescriptions, setFormOwnerDescriptions] = useState<{ id: string; name: string; description: string }[]>([])
+  const [formOwnerDescriptions, setFormOwnerDescriptions] = useState<{ id: string; name: string; description: string; count: number }[]>([])
   const [searchKeyword, setSearchKeyword] = useState("")
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
   const [formHostIds, setFormHostIds] = useState<string[]>([])
@@ -1148,8 +1148,11 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         setFormDate(session.date)
         setFormStartTime(session.start_time || "09:00")
         setFormEndTime(session.end_time || "10:00")
-        let descs: { id: string; name: string; description: string }[] = []
-        try { const items = JSON.parse(session.description || "[]"); if (Array.isArray(items)) descs = items } catch {}
+        let descs: { id: string; name: string; description: string; count: number }[] = []
+        try {
+          const items = JSON.parse(session.description || "[]")
+          if (Array.isArray(items)) descs = items.map((item: any) => ({ ...item, count: item.count ?? 1 }))
+        } catch {}
         setFormOwnerDescriptions(descs)
         setFormOwnerIds(descs.map(d => d.id).filter(Boolean))
         setFormOwnerNames(descs.map(d => d.name).filter(Boolean))
@@ -1204,7 +1207,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
     }
     setFormOwnerIds([...formOwnerIds, customer.id])
     setFormOwnerNames([...formOwnerNames, customer.nickname || customer.name || ""])
-    setFormOwnerDescriptions([...formOwnerDescriptions, { id: customer.id, name: customer.nickname || customer.name || "", description: "" }])
+    setFormOwnerDescriptions([...formOwnerDescriptions, { id: customer.id, name: customer.nickname || customer.name || "", description: "", count: 1 }])
     setSearchKeyword(""); setTimeout(() => searchInputRef.current?.blur(), 0)
   }
 
@@ -1218,7 +1221,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
       })
       setFormOwnerIds([...formOwnerIds, pendingOwner.id])
       setFormOwnerNames([...formOwnerNames, pendingOwner.nickname])
-      setFormOwnerDescriptions([...formOwnerDescriptions, { id: pendingOwner.id, name: pendingOwner.nickname, description: "" }])
+      setFormOwnerDescriptions([...formOwnerDescriptions, { id: pendingOwner.id, name: pendingOwner.nickname, description: "", count: 1 }])
       setPurchaseDialogOpen(false); setPendingOwner(null)
     } catch (e) { console.error("新增购买失败:", e) }
     finally { setPurchaseSaving(false) }
@@ -1363,16 +1366,32 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                         setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i))
                       }}><X className="h-3 w-3 text-[#8f959e]" /></button>
                     </div>
-                    <Input
-                      placeholder={`${name}的情况介绍...`}
-                      value={formOwnerDescriptions[i]?.description || ""}
-                      onChange={(e) => {
-                        const next = [...formOwnerDescriptions]
-                        next[i] = { ...next[i], description: e.target.value }
-                        setFormOwnerDescriptions(next)
-                      }}
-                      className="h-8 text-[12px]"
-                    />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder={`${name}的情况介绍...`}
+                        value={formOwnerDescriptions[i]?.description || ""}
+                        onChange={(e) => {
+                          const next = [...formOwnerDescriptions]
+                          next[i] = { ...next[i], description: e.target.value }
+                          setFormOwnerDescriptions(next)
+                        }}
+                        className="flex-1 h-8 text-[12px]"
+                      />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[11px] text-[#8f959e]">次数</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={formOwnerDescriptions[i]?.count ?? 1}
+                          onChange={(e) => {
+                            const next = [...formOwnerDescriptions]
+                            next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
+                            setFormOwnerDescriptions(next)
+                          }}
+                          className="w-14 h-8 text-[12px] text-center"
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
