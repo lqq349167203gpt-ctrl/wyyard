@@ -476,23 +476,14 @@ export default function MemberIdentitiesPage() {
 
                           {/* 内部课程子项 */}
                           {getPaymentCategories(cond).includes("内部课程") && (
-                            <div className="flex items-start gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right pt-1.5">内部课程</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {COURSE_TYPES.map((item) => (
-                                  <label
-                                    key={item}
-                                    className={`flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] cursor-pointer transition-colors ${
-                                      cond.items.includes(item)
-                                        ? "bg-[#3370ff] text-white border-[#3370ff]"
-                                        : "border-[#dee0e3] bg-white text-[#2b2f36] hover:bg-[#f7f8fa]"
-                                    }`}
-                                  >
-                                    <input type="checkbox" checked={cond.items.includes(item)} onChange={() => toggleItem(ci, item)} className="hidden" />
-                                    {item}
-                                  </label>
-                                ))}
-                              </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">内部课程</span>
+                              <SelectDropdown
+                                value={cond.items[0] || ""}
+                                options={[{value: "", label: "请选择课程"}, ...COURSE_TYPES.map(t => ({value: t, label: t}))]}
+                                placeholder="请选择课程"
+                                onChange={(v) => updateCondition(ci, { items: v ? [v] : [] })}
+                              />
                             </div>
                           )}
 

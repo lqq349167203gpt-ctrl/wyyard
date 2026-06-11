@@ -12,7 +12,9 @@ def list_identities():
 
 @router.post("")
 def create_identity(data: MemberIdentityCreate):
-    return member_identity_service.create_identity(data)
+    result = member_identity_service.create_identity(data)
+    member_identity_service.refresh_all()
+    return result
 
 
 @router.put("/{identity_id}")
@@ -20,6 +22,7 @@ def update_identity(identity_id: str, data: MemberIdentityUpdate):
     identity = member_identity_service.update_identity(identity_id, data)
     if not identity:
         raise HTTPException(status_code=404, detail="记录不存在")
+    member_identity_service.refresh_all()
     return identity
 
 
@@ -27,6 +30,7 @@ def update_identity(identity_id: str, data: MemberIdentityUpdate):
 def delete_identity(identity_id: str):
     if not member_identity_service.delete_identity(identity_id):
         raise HTTPException(status_code=404, detail="记录不存在")
+    member_identity_service.refresh_all()
     return {"message": "删除成功"}
 
 
