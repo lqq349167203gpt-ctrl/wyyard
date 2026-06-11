@@ -53,7 +53,11 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     else if (!customerList.some(c => c.nickname === form.owner.trim())) errors.owner = "归属人必须是客户列表中的昵称"
     if (!form.role.trim()) errors.role = "角色不能为空"
     if (!form.username.trim()) errors.username = "账号不能为空"
-    if (!editingId && !form.password.trim()) errors.password = "密码不能为空"
+    if (!editingId) {
+      if (!form.password.trim()) errors.password = "密码不能为空"
+      else if (form.password.length < 8 || form.password.length > 15) errors.password = "密码需要8~15位"
+      else if (!/[a-zA-Z]/.test(form.password) || !/[0-9]/.test(form.password)) errors.password = "密码必须包含字母和数字"
+    }
 
     // 唯一性验证（仅新增时）
     if (!editingId) {
@@ -121,7 +125,8 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     const errors: { old?: string; new?: string; confirm?: string } = {}
     if (!changePwdForm.oldPassword) errors.old = "请输入原密码"
     if (!changePwdForm.newPassword) errors.new = "请输入新密码"
-    else if (changePwdForm.newPassword.length < 6) errors.new = "新密码至少需要6位"
+    else if (changePwdForm.newPassword.length < 8 || changePwdForm.newPassword.length > 15) errors.new = "密码需要8~15位"
+    else if (!/[a-zA-Z]/.test(changePwdForm.newPassword) || !/[0-9]/.test(changePwdForm.newPassword)) errors.new = "密码必须包含字母和数字"
     if (changePwdForm.newPassword !== changePwdForm.confirmPassword) errors.confirm = "两次密码不一致"
     if (Object.keys(errors).length > 0) { setChangePwdErrors(errors); return }
     setChangePwdErrors({})
@@ -282,7 +287,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
               <div className="flex items-start gap-3">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">密码</span>
                 <div className="flex-1">
-                  <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="输入密码" className="h-8" />
+                  <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8~15位，包含字母和数字" className="h-8" />
                   {formErrors.password && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.password}</p>}
                 </div>
               </div>
@@ -341,7 +346,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
               <div className="flex items-start gap-3">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">新密码</span>
                 <div className="flex-1">
-                  <Input type="password" value={changePwdForm.newPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, newPassword: e.target.value })} placeholder="输入新密码（至少6位）" className="h-8" />
+                  <Input type="password" value={changePwdForm.newPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, newPassword: e.target.value })} placeholder="8~15位，包含字母和数字" className="h-8" />
                   {changePwdErrors.new && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.new}</p>}
                 </div>
               </div>

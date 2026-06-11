@@ -28,6 +28,11 @@ async def list_accounts():
 
 @router.post("")
 async def create_account(data: AccountCreate):
+    # 验证密码规则：8~15位，必须包含字母和数字
+    if len(data.password) < 8 or len(data.password) > 15:
+        raise HTTPException(status_code=400, detail="密码需要8~15位")
+    if not any(c.isalpha() for c in data.password) or not any(c.isdigit() for c in data.password):
+        raise HTTPException(status_code=400, detail="密码必须包含字母和数字")
     try:
         return account_service.create_account(data)
     except ValueError as e:
@@ -95,11 +100,11 @@ async def delete_account(account_id: str):
 
 @router.post("/{account_id}/change-password")
 async def change_password(account_id: str, data: ChangePasswordRequest):
-    # 验证新密码长度
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="新密码至少需要6位")
-    if len(data.new_password) > 50:
-        raise HTTPException(status_code=400, detail="新密码不能超过50位")
+    # 验证新密码规则：8~15位，必须包含字母和数字
+    if len(data.new_password) < 8 or len(data.new_password) > 15:
+        raise HTTPException(status_code=400, detail="密码需要8~15位")
+    if not any(c.isalpha() for c in data.new_password) or not any(c.isdigit() for c in data.new_password):
+        raise HTTPException(status_code=400, detail="密码必须包含字母和数字")
     try:
         result = account_service.change_password(account_id, data.old_password, data.new_password)
         if not result:

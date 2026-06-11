@@ -23,7 +23,8 @@ export default function ChangePasswordPage() {
 
     if (!form.oldPassword.trim()) newErrors.oldPassword = "请输入原密码"
     if (!form.newPassword.trim()) newErrors.newPassword = "请输入新密码"
-    if (form.newPassword.length < 6) newErrors.newPassword = "密码至少6位"
+    if (form.newPassword.length < 8 || form.newPassword.length > 15) newErrors.newPassword = "密码需要8~15位"
+    else if (!/[a-zA-Z]/.test(form.newPassword) || !/[0-9]/.test(form.newPassword)) newErrors.newPassword = "密码必须包含字母和数字"
     if (!form.confirmPassword.trim()) newErrors.confirmPassword = "请确认新密码"
     if (form.newPassword !== form.confirmPassword) newErrors.confirmPassword = "两次密码不一致"
 
@@ -97,7 +98,7 @@ export default function ChangePasswordPage() {
                 type="password"
                 value={form.newPassword}
                 onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-                placeholder="输入新密码（至少6位）"
+                placeholder="8~15位，包含字母和数字"
                 className="h-8"
               />
               {errors.newPassword && <p className="text-[11px] text-red-500 mt-0.5">{errors.newPassword}</p>}
