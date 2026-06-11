@@ -1365,7 +1365,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
             </div>
           </div>
           {formOwnerNames.length > 0 && (
-            <div className="grid grid-cols-[70px_1fr] gap-3 -mt-1.5">
+            <div className="grid grid-cols-[70px_1fr] gap-3 -mt-2">
               <span />
               <div className="space-y-2">
                 {formOwnerNames.map((name, i) => (
