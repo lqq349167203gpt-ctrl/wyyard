@@ -125,9 +125,9 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{record.start_time ? `${record.start_time}~${record.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">{courseMap[record.course_id] || record.course_name}</span>
-                              {record.is_public_welfare && <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
+                              {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
                               {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
                               {getRoomLabel(record.space_id, record.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(record.space_id, record.room_id, spaces)}</span>}
                               {record.activity_mode && record.activity_mode !== "线下" && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>}
@@ -188,8 +188,8 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
-                              {record.is_public_welfare && <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
+                              {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">{courseMap[record.course_id] || record.course_name}</span>
                               {getTeacherNames(record.teacher_ids).length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids).join("、")}</span>}
                               {getRoomLabel(record.space_id, record.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(record.space_id, record.room_id, spaces)}</span>}
@@ -277,7 +277,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc] ">觉醒</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc] ">觉醒</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">觉醒游戏</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
@@ -346,7 +346,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc]">觉醒</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc]">觉醒</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">觉醒游戏</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
@@ -432,7 +432,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b] ">情绪</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b] ">情绪</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">情绪释放</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
@@ -500,7 +500,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b]">情绪</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b]">情绪</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">情绪释放</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
                               {s.activity_mode && s.activity_mode !== "线下" && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>}
@@ -591,7 +591,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04] ">能量</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04] ">能量</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
@@ -612,7 +612,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04]">能量</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04]">能量</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
@@ -652,7 +652,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate">{s.course_name}</span>
                               {s.course_type && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{s.course_type}</span>}
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
@@ -720,7 +720,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-1.5 py-0 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate">{s.course_name}</span>
                               {s.course_type && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{s.course_type}</span>}
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
@@ -805,7 +805,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
-                              <span className="inline-block px-[9px] py-0 rounded text-[10px] font-normal bg-[#f0f7ff] text-[#2b7fff] ">OH</span>
+                              <span className="inline-block px-[9px] py-0.5 rounded text-[10px] font-normal bg-[#f0f7ff] text-[#2b7fff] ">OH</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">OH卡梳理</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
@@ -874,7 +874,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           </div>
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block px-[9px] py-0 rounded text-[10px] font-normal bg-[#f0f7ff] text-[#2b7fff]">OH</span>
+                              <span className="inline-block px-[9px] py-0.5 rounded text-[10px] font-normal bg-[#f0f7ff] text-[#2b7fff]">OH</span>
                               <span className="text-[12px] font-medium text-[#2b2f36] truncate ">OH卡梳理</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{s.owner_name || getMemberName(s.owner_id) || "未分配"}</span>
                               {s.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{s.achiever_name}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
