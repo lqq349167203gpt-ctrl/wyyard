@@ -255,7 +255,7 @@ const EksCard = memo(({ session, spaces, onEdit, onDelete }: {
   onEdit: (s: EnergyKnotSession) => void; onDelete: (id: string) => void
 }) => {
   let eksNames: string[] = []
-  let ownerDescs: { id: string; name: string; description: string }[] = []
+  let ownerDescs: { id: string; name: string; description: string; count?: number }[] = []
   try {
     const items = JSON.parse(session.description || "[]")
     if (Array.isArray(items)) { ownerDescs = items; eksNames = items.map((d: any) => d.name).filter(Boolean) }
@@ -282,11 +282,13 @@ const EksCard = memo(({ session, spaces, onEdit, onDelete }: {
               <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
             )}
           </div>
-          {ownerDescs.filter(d => d.description).length > 0 && (
+          {ownerDescs.filter(d => d.description || d.count).length > 0 && (
             <div className="space-y-1">
-              {ownerDescs.filter(d => d.description).map((d, i) => (
+              {ownerDescs.filter(d => d.description || d.count).map((d, i) => (
                 <p key={i} className="text-[12px] text-[#8f959e] font-light leading-relaxed">
-                  <span>{d.name || eksNames[i] || "未知"}：</span>{d.description}
+                  <span>{d.name || eksNames[i] || "未知"}</span>
+                  {d.count && d.count > 1 && <span className="ml-1 text-[#b0b5bb]">({d.count}部位)</span>}
+                  {d.description && <span>：{d.description}</span>}
                 </p>
               ))}
             </div>
