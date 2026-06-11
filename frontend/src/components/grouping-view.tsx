@@ -212,6 +212,13 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     const customerMap = new Map(allCustomers.map(c => [c.id, c]))
     // 构建客户 ID → 当日到访记录的映射
     const visitMap = new Map(visits.filter(v => v.visit_date === date).map(v => [v.customer_id, v]))
+    // 构建客户 ID → 已到店次数的映射
+    const arrivedCountMap = new Map<string, number>()
+    visits.forEach(v => {
+      if (v.arrived) {
+        arrivedCountMap.set(v.customer_id, (arrivedCountMap.get(v.customer_id) || 0) + 1)
+      }
+    })
     // 构建客户 ID → 会员卡类型的映射（取最新的一张卡）
     const cardMap = new Map<string, string>()
     membershipCards.forEach(card => {
@@ -236,7 +243,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
           "引流人": customer?.referrer || "",
           "客户昵称": customer?.nickname || getName(id),
           "预计时间": visit?.visit_time || "09:00",
-          "参与次数": visit?.activity_count ?? 0,
+          "参与次数": arrivedCountMap.get(id) || 0,
           "会员身份": cardMap.get(id) || customer?.member_type || "",
           "当日需求": visit?.needs || "",
           "是否组长": isLeader ? "是" : "-",
@@ -255,7 +262,7 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
         "引流人": customer?.referrer || "",
         "客户昵称": customer?.nickname || v.nickname,
         "预计时间": visit?.visit_time || "09:00",
-        "参与次数": visit?.activity_count ?? 0,
+        "参与次数": arrivedCountMap.get(v.id) || 0,
         "会员身份": cardMap.get(v.id) || customer?.member_type || "",
         "当日需求": visit?.needs || "",
         "是否组长": "-",
@@ -274,9 +281,18 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       { wch: 12 }, // 会员身份
       { wch: 40 }, // 当日需求
       { wch: 10 }, // 是否组长
-      { wch: 40 }, // 组长获得的信息
+      { wch: 30 }, // 组长获得的信息
       { wch: 10 }, // 邀约人
     ]
+    // 设置表头字体加粗
+    const headerStyle = { font: { bold: true } }
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
+      if (ws[cellRef]) {
+        ws[cellRef].s = headerStyle
+      }
+    }
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "人员分组")
     XLSX.writeFile(wb, `人员分组_${date}.xlsx`)
