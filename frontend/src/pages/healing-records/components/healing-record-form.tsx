@@ -119,13 +119,13 @@ export default function HealingRecordForm({
           </div>
 
           <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-            <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2">成长记录</span>
+            <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2">当日记录</span>
             <Textarea
               value={growthRecord}
               onChange={(e) => setGrowthRecord(e.target.value)}
               placeholder="详细记录"
-              rows={4}
-              className="text-xs resize-none"
+              rows={3}
+              className="text-[12px] rounded-[4px] resize-none"
             />
           </div>
 
