@@ -1763,6 +1763,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
               placeholder="选择老师"
               onChange={(v) => setFormTeacherIds(Array.isArray(v) ? v : [v])}
               multi={true}
+              hideCheckbox={true}
               hideSelectedStyle={true}
             />
           </div>
