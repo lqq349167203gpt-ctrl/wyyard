@@ -164,7 +164,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   if (nonEmpty.length === 0) return null
                                   return nonEmpty.map((parts, gi) => (
                                     <span key={gi}>
-                                      {gi > 0 && <span className="inline-block w-[6px]" />}
+                                      {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                       {parts.map((m, i) => (
                                         <span key={i}>
                                           {i > 0 && <span className="inline-block w-[6px]" />}
@@ -228,7 +228,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                     <div className="text-[12px] text-[#4e535a]">
                                       {nonEmpty.map((members, gi) => (
                                         <span key={gi}>
-                                          {gi > 0 && <span className="inline-block w-[6px]" />}
+                                          {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                           {members.map((m, i) => (
                                             <span key={i}>
                                               {i > 0 && <span className="inline-block w-[6px]" />}
@@ -321,7 +321,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 if (nonEmpty.length === 0) return null
                                 return nonEmpty.map((parts, gi) => (
                                   <span key={gi}>
-                                    {gi > 0 && <span className="inline-block w-[6px]" />}
+                                    {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                     {parts.map((m, i) => (
                                       <span key={i}>
                                         {i > 0 && <span className="inline-block w-[6px]" />}
@@ -384,7 +384,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   if (nonEmpty.length === 0) return <span className="text-[#8f959e]">暂无</span>
                                   return nonEmpty.map((parts, gi) => (
                                     <span key={gi}>
-                                      {gi > 0 && <span className="inline-block w-[6px]" />}
+                                      {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                       {parts.map((m, i) => (
                                         <span key={i}>
                                           {i > 0 && <span className="inline-block w-[6px]" />}
@@ -475,7 +475,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 if (nonEmpty.length === 0) return null
                                 return nonEmpty.map((parts, gi) => (
                                   <span key={gi}>
-                                    {gi > 0 && <span className="inline-block w-[6px]" />}
+                                    {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                     {parts.map((m, i) => (
                                       <span key={i}>
                                         {i > 0 && <span className="inline-block w-[6px]" />}
@@ -536,7 +536,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   if (nonEmpty.length === 0) return <span className="text-[#8f959e]">暂无</span>
                                   return nonEmpty.map((parts, gi) => (
                                     <span key={gi}>
-                                      {gi > 0 && <span className="inline-block w-[6px]" />}
+                                      {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                       {parts.map((m, i) => (
                                         <span key={i}>
                                           {i > 0 && <span className="inline-block w-[6px]" />}
@@ -695,7 +695,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 if (nonEmpty.length === 0) return null
                                 return nonEmpty.map((members, gi) => (
                                   <span key={gi}>
-                                    {gi > 0 && <span className="inline-block w-[6px]" />}
+                                    {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                     {members.map((m, i) => (
                                       <span key={i}>
                                         {i > 0 && <span className="inline-block w-[6px]" />}
@@ -757,7 +757,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   if (nonEmpty.length === 0) return <span className="text-[#8f959e]">暂无</span>
                                   return nonEmpty.map((members, gi) => (
                                     <span key={gi}>
-                                      {gi > 0 && <span className="inline-block w-[6px]" />}
+                                      {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                       {members.map((m, i) => (
                                         <span key={i}>
                                           {i > 0 && <span className="inline-block w-[6px]" />}
@@ -849,7 +849,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 if (nonEmpty.length === 0) return null
                                 return nonEmpty.map((parts, gi) => (
                                   <span key={gi}>
-                                    {gi > 0 && <span className="inline-block w-[6px]" />}
+                                    {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                     {parts.map((m, i) => (
                                       <span key={i}>
                                         {i > 0 && <span className="inline-block w-[6px]" />}
@@ -912,7 +912,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                   if (nonEmpty.length === 0) return <span className="text-[#8f959e]">暂无</span>
                                   return nonEmpty.map((parts, gi) => (
                                     <span key={gi}>
-                                      {gi > 0 && <span className="inline-block w-[6px]" />}
+                                      {gi > 0 && <span className="inline-block w-[1.5px] h-[8px] bg-[#e8eaed] mx-[7px]" />}
                                       {parts.map((m, i) => (
                                         <span key={i}>
                                           {i > 0 && <span className="inline-block w-[6px]" />}
