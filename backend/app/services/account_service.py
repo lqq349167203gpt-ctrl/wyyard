@@ -1,4 +1,5 @@
 import uuid
+import bcrypt
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
@@ -9,6 +10,17 @@ ACCOUNTS_FILE = "accounts.json"
 ROLES_FILE = "roles.json"
 _accounts: Dict[str, Account] = {}
 _roles: Dict[str, Role] = {}
+
+
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _check_password(password: str, hashed: str) -> bool:
+    # 兼容明文密码：如果 hashed 不是 bcrypt 格式，直接比较
+    if not hashed.startswith("$2b$"):
+        return password == hashed
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 def _load_accounts():
@@ -45,6 +57,20 @@ _load_accounts()
 _load_roles()
 
 
+def _migrate_plaintext_passwords():
+    """将明文密码迁移为 bcrypt 哈希"""
+    changed = False
+    for account in _accounts.values():
+        if not account.password.startswith("$2b$"):
+            account.password = _hash_password(account.password)
+            changed = True
+    if changed:
+        _save_accounts()
+
+
+_migrate_plaintext_passwords()
+
+
 # ===== 账号 =====
 
 def list_accounts() -> List[Account]:
@@ -67,7 +93,9 @@ def create_account(data: AccountCreate) -> Account:
             raise ValueError("账号已存在")
 
     now = datetime.now(timezone.utc)
-    account = Account(id=str(uuid.uuid4())[:8], created_at=now, **data.model_dump())
+    account_data = data.model_dump()
+    account_data["password"] = _hash_password(account_data["password"])
+    account = Account(id=str(uuid.uuid4())[:8], created_at=now, **account_data)
     _accounts[account.id] = account
     _save_accounts(account.id)
     return account
@@ -108,7 +136,7 @@ def delete_account(account_id: str) -> bool:
 
 def login(username: str, password: str) -> Optional[Account]:
     for account in _accounts.values():
-        if account.username == username and account.password == password and account.enabled:
+        if account.username == username and _check_password(password, account.password) and account.enabled:
             return account
     return None
 
@@ -117,9 +145,9 @@ def change_password(account_id: str, old_password: str, new_password: str) -> bo
     account = _accounts.get(account_id)
     if not account:
         return False
-    if account.password != old_password:
+    if not _check_password(old_password, account.password):
         raise ValueError("原密码错误")
-    account.password = new_password
+    account.password = _hash_password(new_password)
     _save_accounts(account_id)
     return True
 
