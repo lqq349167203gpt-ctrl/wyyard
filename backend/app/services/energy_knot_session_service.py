@@ -113,22 +113,23 @@ def search_customers(keyword: str) -> list:
 
 
 def get_remaining_count(customer_id: str) -> int:
-    """计算某用户的能量结剩余次数（所有已创建的场次均计入已用，含多案主场景）"""
+    """计算某用户的能量结剩余次数（按部位数扣除）"""
     knots = energy_knot_service.list_knots()
     total_purchased = sum(k.purchase_count for k in knots if k.customer_id == customer_id)
     used = 0
     for s in _sessions.values():
         if s.is_deleted:
             continue
-        owner_ids = {s.owner_id} if s.owner_id else set()
+        found_in_desc = False
         try:
             descs = json.loads(s.description or "[]")
             if isinstance(descs, list):
                 for d in descs:
-                    if isinstance(d, dict) and d.get("id"):
-                        owner_ids.add(d["id"])
+                    if isinstance(d, dict) and d.get("id") == customer_id:
+                        used += max(1, d.get("count", 1))
+                        found_in_desc = True
         except (json.JSONDecodeError, TypeError):
             pass
-        if customer_id in owner_ids:
+        if not found_in_desc and s.owner_id == customer_id:
             used += 1
     return max(0, total_purchased - used)

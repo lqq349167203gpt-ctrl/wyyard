@@ -174,6 +174,9 @@ FIELD_NAMES = {
     "activity_mode": "活动模式", "class_count": "课时数", "course_id": "课程",
     "effective_date": "生效日期", "organization_id": "组织", "rooms": "房间", "teachers": "老师", "themes": "主题",
     "enabled": "启用状态", "is_system": "系统角色",
+    "daily_card_usage": "日卡使用", "activity_id": "活动ID", "activity_type": "活动类型",
+    "healing_notes": "疗愈笔记", "activity_count": "活动次数", "welfare_count": "公益次数",
+    "activities": "活动记录",
 }
 
 
@@ -804,6 +807,10 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         # 只记录成功的写操作（跳过 4xx/5xx）
         if response.status_code >= 400:
             return response
+
+        # 过滤掉前端可能回传的计算字段（不应记录为变更）
+        for computed_key in ("total_payment", "visit_count", "activity_count", "welfare_count"):
+            body.pop(computed_key, None)
 
         try:
             section = get_section(path)

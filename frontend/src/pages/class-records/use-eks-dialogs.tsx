@@ -48,6 +48,8 @@ export function useEksDialogs({
   const [searchField, setSearchField] = useState<"owner" | "host" | null>(null)
   const [searchKeyword, setSearchKeyword] = useState("")
   const [searchResults, setSearchResults] = useState<EnergyKnotCustomerSearchResult[]>([])
+  const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
+  const [ownerErrors, setOwnerErrors] = useState<Record<string, string>>({})
   const [, setSearching] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const searchTimeoutRef = useRef<number | null>(null)
@@ -97,6 +99,12 @@ export function useEksDialogs({
     setSearchResults([])
     setShowDropdown(false)
     setDialogOpen(true)
+    // 加载案主的剩余次数用于校验
+    if (ids.length > 0) {
+      energyKnotSessionApi.searchCustomers("").then(results => {
+        setRemainingMap(prev => { const next = { ...prev }; results.forEach(r => { next[r.id] = r.remaining }); return next })
+      }).catch(() => {})
+    }
   }
 
   const handleSearch = (keyword: string) => {
@@ -108,6 +116,7 @@ export function useEksDialogs({
       try {
         const results = await energyKnotSessionApi.searchCustomers(keyword)
         setSearchResults(results.filter(r => !formOwnerIds.includes(r.id) && !formHostIds.includes(r.id)))
+        setRemainingMap(prev => { const next = { ...prev }; results.forEach(r => { next[r.id] = r.remaining }); return next })
         setShowDropdown(true)
       } catch { setSearchResults([]) }
       finally { setSearching(false) }
@@ -152,6 +161,27 @@ export function useEksDialogs({
 
   const handleSave = async () => {
     if (formOwnerIds.length === 0) return
+    // 校验部位数是否超过剩余次数
+    let oldDescs: {id: string; count: number}[] = []
+    if (editingRecord) {
+      try { oldDescs = JSON.parse(editingRecord.description || "[]") } catch { oldDescs = [] }
+    }
+    const errors: Record<string, string> = {}
+    for (const desc of formOwnerDescriptions) {
+      if (!desc.id) continue
+      const remaining = remainingMap[desc.id]
+      if (remaining === undefined || remaining === -1) continue
+      const oldCount = oldDescs.find(d => d.id === desc.id)?.count ?? 0
+      const effective = remaining + oldCount
+      if (desc.count > effective) {
+        errors[desc.id] = `剩余次数不足（剩余 ${remaining} 次，需要 ${desc.count} 次）`
+      }
+    }
+    if (Object.keys(errors).length > 0) {
+      setOwnerErrors(errors)
+      return
+    }
+    setOwnerErrors({})
     setSaving(true)
     try {
       const data = {
@@ -195,6 +225,8 @@ export function useEksDialogs({
         purchase_count: parseInt(purchaseCount) || 0,
         amount: parseFloat(purchaseAmount) || 0,
       })
+      // 刷新剩余次数
+      setRemainingMap(prev => ({ ...prev, [pendingOwner.id]: (prev[pendingOwner.id] ?? 0) + (parseInt(purchaseCount) || 0) }))
       if (!formOwnerIds.includes(pendingOwner.id)) {
         setFormOwnerIds([...formOwnerIds, pendingOwner.id])
         setFormOwnerNames([...formOwnerNames, pendingOwner.nickname])
@@ -276,40 +308,49 @@ export function useEksDialogs({
                 </div>
                 {formOwnerNames.length > 0 && (
                   <div className="space-y-2">
-                    {formOwnerNames.map((name, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[12px] font-medium text-[#2b2f36]">{name}</span>
-                          <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0] text-muted-foreground" onClick={() => handleRemoveOwner(i)}>
-                            <X className="h-2.5 w-2.5" />
-                          </button>
+                    {formOwnerNames.map((name, i) => {
+                      const ownerId = formOwnerDescriptions[i]?.id
+                      return (
+                        <div key={i}>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-[12px] font-medium text-[#2b2f36]">{name}</span>
+                              <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0] text-muted-foreground" onClick={() => handleRemoveOwner(i)}>
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </div>
+                            <Input
+                              value={formOwnerDescriptions[i]?.description || ""}
+                              onChange={(e) => {
+                                const updated = [...formOwnerDescriptions]
+                                updated[i] = { ...updated[i], description: e.target.value }
+                                setFormOwnerDescriptions(updated)
+                              }}
+                              placeholder="情况介绍..."
+                              className="flex-1 h-8 text-xs"
+                            />
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-[11px] text-[#8f959e]">次数</span>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={formOwnerDescriptions[i]?.count ?? 1}
+                                onChange={(e) => {
+                                  const updated = [...formOwnerDescriptions]
+                                  updated[i] = { ...updated[i], count: Math.max(1, parseInt(e.target.value) || 1) }
+                                  setFormOwnerDescriptions(updated)
+                                  if (ownerId) setOwnerErrors(prev => { const next = { ...prev }; delete next[ownerId]; return next })
+                                }}
+                                className="w-14 h-8 text-xs text-center"
+                              />
+                            </div>
+                          </div>
+                          {ownerId && ownerErrors[ownerId] && (
+                            <div className="text-[11px] text-red-500 mt-0.5 ml-1">{ownerErrors[ownerId]}</div>
+                          )}
                         </div>
-                        <Input
-                          value={formOwnerDescriptions[i]?.description || ""}
-                          onChange={(e) => {
-                            const updated = [...formOwnerDescriptions]
-                            updated[i] = { ...updated[i], description: e.target.value }
-                            setFormOwnerDescriptions(updated)
-                          }}
-                          placeholder="情况介绍..."
-                          className="flex-1 h-8 text-xs"
-                        />
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[11px] text-[#8f959e]">次数</span>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={formOwnerDescriptions[i]?.count ?? 1}
-                            onChange={(e) => {
-                              const updated = [...formOwnerDescriptions]
-                              updated[i] = { ...updated[i], count: Math.max(1, parseInt(e.target.value) || 1) }
-                              setFormOwnerDescriptions(updated)
-                            }}
-                            className="w-14 h-8 text-xs text-center"
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>

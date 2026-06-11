@@ -1130,6 +1130,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const [formOwnerDescriptions, setFormOwnerDescriptions] = useState<{ id: string; name: string; description: string; count: number }[]>([])
   const [searchKeyword, setSearchKeyword] = useState("")
   const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
+  const [ownerErrors, setOwnerErrors] = useState<Record<string, string>>({})
   const [formHostIds, setFormHostIds] = useState<string[]>([])
   const [formHostNames, setFormHostNames] = useState<string[]>([])
   const [formActivityMode, setFormActivityMode] = useState("线下")
@@ -1221,6 +1222,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         customer_id: pendingOwner.id, nickname: pendingOwner.nickname,
         purchase_count: parseInt(purchaseCount) || 0, amount: parseFloat(purchaseAmount) || 0,
       })
+      setRemainingMap(prev => ({ ...prev, [pendingOwner.id]: (prev[pendingOwner.id] ?? 0) + (parseInt(purchaseCount) || 0) }))
       setFormOwnerIds([...formOwnerIds, pendingOwner.id])
       setFormOwnerNames([...formOwnerNames, pendingOwner.nickname])
       setFormOwnerDescriptions([...formOwnerDescriptions, { id: pendingOwner.id, name: pendingOwner.nickname, description: "", count: 1 }])
@@ -1231,6 +1233,27 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
 
   const handleSave = async () => {
     if (formOwnerIds.length === 0) return
+    // 校验部位数是否超过剩余次数
+    let oldDescs: {id: string; count: number}[] = []
+    if (editingRecord) {
+      try { oldDescs = JSON.parse(editingRecord.description || "[]") } catch { oldDescs = [] }
+    }
+    const errors: Record<string, string> = {}
+    for (const desc of formOwnerDescriptions) {
+      if (!desc.id) continue
+      const remaining = remainingMap[desc.id]
+      if (remaining === undefined || remaining === -1) continue
+      const oldCount = oldDescs.find(d => d.id === desc.id)?.count ?? 0
+      const effective = remaining + oldCount
+      if (desc.count > effective) {
+        errors[desc.id] = `剩余次数不足（剩余 ${remaining} 次，需要 ${desc.count} 次）`
+      }
+    }
+    if (Object.keys(errors).length > 0) {
+      setOwnerErrors(errors)
+      return
+    }
+    setOwnerErrors({})
     setSaving(true)
     try {
       const data = {
@@ -1370,35 +1393,44 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
             <div className="grid grid-cols-[70px_1fr] gap-3 -mt-3">
               <span />
               <div className="space-y-2">
-                {formOwnerNames.map((name, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="text-[11px] shrink-0">{name}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[11px] text-[#8f959e]">部位数</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={formOwnerDescriptions[i]?.count ?? 1}
-                        onChange={(e) => {
-                          const next = [...formOwnerDescriptions]
-                          next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
-                          setFormOwnerDescriptions(next)
-                        }}
-                        className="w-[30px] h-7 text-[11px] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
+                {formOwnerNames.map((name, i) => {
+                  const ownerId = formOwnerDescriptions[i]?.id
+                  return (
+                    <div key={i}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] shrink-0">{name}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[11px] text-[#8f959e]">部位数</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={formOwnerDescriptions[i]?.count ?? 1}
+                            onChange={(e) => {
+                              const next = [...formOwnerDescriptions]
+                              next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
+                              setFormOwnerDescriptions(next)
+                              if (ownerId) setOwnerErrors(prev => { const n = { ...prev }; delete n[ownerId]; return n })
+                            }}
+                            className="w-[30px] h-7 text-[11px] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                        </div>
+                        <Input
+                          placeholder="情况介绍..."
+                          value={formOwnerDescriptions[i]?.description || ""}
+                          onChange={(e) => {
+                            const next = [...formOwnerDescriptions]
+                            next[i] = { ...next[i], description: e.target.value }
+                            setFormOwnerDescriptions(next)
+                          }}
+                          className="flex-1 h-7 text-[11px]"
+                        />
+                      </div>
+                      {ownerId && ownerErrors[ownerId] && (
+                        <div className="text-[11px] text-red-500 mt-0.5 ml-1">{ownerErrors[ownerId]}</div>
+                      )}
                     </div>
-                    <Input
-                      placeholder="情况介绍..."
-                      value={formOwnerDescriptions[i]?.description || ""}
-                      onChange={(e) => {
-                        const next = [...formOwnerDescriptions]
-                        next[i] = { ...next[i], description: e.target.value }
-                        setFormOwnerDescriptions(next)
-                      }}
-                      className="flex-1 h-7 text-[11px]"
-                    />
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

@@ -347,8 +347,8 @@ export default function DetailView({
                     const noCount = typeof s.remaining === "number" && s.remaining === 0
                     return (
                     <div key={i} className="flex items-center gap-2 py-3">
-                      <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{s.type}</span>
-                      <span className="text-[12px] text-[#2b2f36] flex-1 min-w-0">
+                      <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">{s.type}</span>
+                      <span className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
                         {s.type === "会员活动" ? (
                           <span className="inline-flex items-baseline gap-2">
                             <span>{s.name}</span>
