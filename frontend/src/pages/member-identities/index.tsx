@@ -399,7 +399,7 @@ export default function MemberIdentitiesPage() {
                       <span />
                       <div className="border border-[#e5e6eb] rounded-lg p-3 space-y-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">条件</span>
+                        <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
                           value={cond.type}
                           options={[{value: "", label: "请选择条件类型"}, {value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "payment", label: "付费项目"}]}
@@ -422,7 +422,7 @@ export default function MemberIdentitiesPage() {
                       {/* 到店/活动 → 按次数 */}
                       {cond.type && (cond.type === "arrival" || cond.type === "activity") && (
                         <div className="flex items-center gap-2">
-                          <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">次数</span>
+                          <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">次数</span>
                           <SelectDropdown
                             value={cond.count_op}
                             options={[{value: ">", label: "大于"}, {value: "=", label: "等于"}, {value: "<", label: "小于"}]}
@@ -443,7 +443,7 @@ export default function MemberIdentitiesPage() {
                       {cond.type && (cond.type === "payment" || cond.type === "card" || cond.type === "course") && (
                         <>
                           <div className="flex items-center gap-2">
-                            <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">项目</span>
+                            <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">项目</span>
                             <SelectDropdown
                               value={getPaymentCategories(cond)[0] || ""}
                               options={[{value: "", label: "请选择项目"}, ...PAYMENT_CATEGORIES.map(cat => ({value: cat, label: cat}))]}
@@ -455,7 +455,7 @@ export default function MemberIdentitiesPage() {
                           {/* 会员活动子项 */}
                           {getPaymentCategories(cond).includes("会员活动") && (
                             <div className="flex items-start gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right pt-1.5">会员活动</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right pt-1.5">会员活动</span>
                               <div className="flex flex-wrap gap-1.5">
                                 {CARD_TYPES.map((item) => (
                                   <label
@@ -477,7 +477,7 @@ export default function MemberIdentitiesPage() {
                           {/* 内部课程子项 */}
                           {getPaymentCategories(cond).includes("内部课程") && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">内部课程</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">内部课程</span>
                               <SelectDropdown
                                 value={cond.items[0] || ""}
                                 options={[{value: "", label: "请选择课程"}, ...COURSE_TYPES.map(t => ({value: t, label: t}))]}
@@ -490,7 +490,7 @@ export default function MemberIdentitiesPage() {
                           {/* 觉醒游戏/情绪释放/能量结 → 购买次数 */}
                           {getPaymentCategories(cond).some((cat: string) => COUNT_CATEGORIES.includes(cat)) && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">次数</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">次数</span>
                               <SelectDropdown
                                 value={cond.count_op}
                                 options={[{value: ">", label: "大于"}, {value: "=", label: "等于"}, {value: "<", label: "小于"}]}
@@ -510,7 +510,7 @@ export default function MemberIdentitiesPage() {
                           {/* 有效期（会员活动或内部课程选中时显示） */}
                           {getPaymentCategories(cond).some((cat: string) => cat === "会员活动" || cat === "内部课程") && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-10 text-right">有效期</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">有效期</span>
                               <SelectDropdown
                                 value={cond.validity}
                                 options={[{value: "active", label: "仅有效期内"}, {value: "all", label: "过期依旧保留"}]}
