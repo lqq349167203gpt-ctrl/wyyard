@@ -231,14 +231,16 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       uniqueIds.forEach(id => {
         const customer = customerMap.get(id)
         const visit = visitMap.get(id)
+        const isLeader = leaderIds.has(id)
         rows.push({
           "引流人": customer?.referrer || "",
           "客户昵称": customer?.nickname || getName(id),
           "预计时间": visit?.visit_time || "09:00",
-          "活动参与次数": visit?.activity_count ?? 0,
-          "会员类型": cardMap.get(id) || customer?.member_type || "",
+          "参与次数": visit?.activity_count ?? 0,
+          "会员身份": cardMap.get(id) || customer?.member_type || "",
           "当日需求": visit?.needs || "",
-          "是否组长": leaderIds.has(id) ? "是" : "否",
+          "是否组长": isLeader ? "是" : "-",
+          "组长获得的信息": isLeader ? (visit?.needs || "") : "",
           "邀约人": visit?.referrer_handler || "",
         })
       })
@@ -253,24 +255,26 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
         "引流人": customer?.referrer || "",
         "客户昵称": customer?.nickname || v.nickname,
         "预计时间": visit?.visit_time || "09:00",
-        "活动参与次数": visit?.activity_count ?? 0,
-        "会员类型": cardMap.get(v.id) || customer?.member_type || "",
+        "参与次数": visit?.activity_count ?? 0,
+        "会员身份": cardMap.get(v.id) || customer?.member_type || "",
         "当日需求": visit?.needs || "",
-        "是否组长": "否",
+        "是否组长": "-",
+        "组长获得的信息": "",
         "邀约人": visit?.referrer_handler || "",
       })
     })
 
     const ws = XLSX.utils.json_to_sheet(rows)
-    // 设置列宽，当日需求列增加200px宽度
+    // 设置列宽
     ws['!cols'] = [
       { wch: 10 }, // 引流人
       { wch: 12 }, // 客户昵称
       { wch: 10 }, // 预计时间
-      { wch: 12 }, // 活动参与次数
-      { wch: 12 }, // 会员类型
+      { wch: 10 }, // 参与次数
+      { wch: 12 }, // 会员身份
       { wch: 40 }, // 当日需求
       { wch: 10 }, // 是否组长
+      { wch: 40 }, // 组长获得的信息
       { wch: 10 }, // 邀约人
     ]
     const wb = XLSX.utils.book_new()
