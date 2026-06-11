@@ -332,25 +332,25 @@ export default function ArrivalConfirmationView({
           <DialogHeader className="px-5 pt-5 pb-4 border-b border-[#f0f0f0]">
             <DialogTitle className="text-base">客户反馈 - {editExpVisit?.nickname}</DialogTitle>
           </DialogHeader>
-          <div className="px-5 py-4 space-y-4">
-            <div>
-              <label className="text-[12px] text-[#8f959e] mb-1.5 block">客户反馈</label>
+          <div className="px-5 py-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <label className="text-[12px] text-[#8f959e] pt-2 shrink-0">客户反馈</label>
               <textarea
                 value={editExpText}
                 onChange={(e) => setEditExpText(e.target.value)}
                 placeholder="输入客户反馈..."
                 rows={3}
-                className="w-full rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
+                className="flex-1 rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
               />
             </div>
-            <div>
-              <label className="text-[12px] text-[#8f959e] mb-1.5 block">疗愈师回复</label>
+            <div className="flex items-start gap-2">
+              <label className="text-[12px] text-[#8f959e] pt-2 shrink-0">疗愈师回复</label>
               <textarea
                 value={editFeedbackText}
                 onChange={(e) => setEditFeedbackText(e.target.value)}
                 placeholder="输入疗愈师回复..."
-                rows={4}
-                className="w-full rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
+                rows={3}
+                className="flex-1 rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
               />
             </div>
             <div className="flex justify-end gap-2">
