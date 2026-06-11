@@ -288,9 +288,11 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       { wch: 30 }, // 组长获得的信息
       { wch: 10 }, // 邀约人
     ]
+    // 设置行高（默认15，增加一倍为30）
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+    ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
     // 设置表头字体加粗
     const headerStyle = { font: { bold: true } }
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
       if (ws[cellRef]) {
