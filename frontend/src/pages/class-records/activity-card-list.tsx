@@ -567,10 +567,12 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                 if (ur.type === "eks") {
                   const s = ur.data
                   let eksNames: string[] = []
+                  let eksDetails: { name: string; count: number }[] = []
                   try {
                     const items = JSON.parse(s.description || "[]")
                     if (Array.isArray(items)) {
                       eksNames = items.map((d: any) => d.name).filter(Boolean)
+                      eksDetails = items.filter((d: any) => d.name).map((d: any) => ({ name: d.name, count: d.count ?? 1 }))
                     }
                   } catch { /* empty */ }
                   return (
@@ -596,7 +598,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             <div className="flex items-center gap-0.5">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
                               <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04] ">能量</span>
-                              <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-2.5 ">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
+                              <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-2.5 ">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksDetails.length > 0 ? eksDetails.map(d => `${d.name}(${d.count}部位)`).join("、") : s.owner_name || "未分配"}</span>
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
                               {s.activity_mode && s.activity_mode !== "线下" && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>}
@@ -617,7 +619,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                           <div className="flex-1 min-w-0 pl-3 pr-5 py-3.5 space-y-1.5">
                             <div className="flex items-center gap-0.5">
                               <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04]">能量</span>
-                              <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-2.5 ">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : s.owner_name || "未分配"}</span>
+                              <span className="text-[12px] font-medium text-[#2b2f36] truncate ml-2.5 ">能量结</span><span className="text-[12px] font-bold text-[#2b2f36] mx-0.5">·</span><span className="text-[12px] font-medium text-[#2b2f36]">{eksDetails.length > 0 ? eksDetails.map(d => `${d.name}(${d.count}部位)`).join("、") : s.owner_name || "未分配"}</span>
                               {s.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{s.host_names.join("、")}</span>}
                               {getRoomLabel(s.space_id, s.room_id, spaces) && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(s.space_id, s.room_id, spaces)}</span>}
                               {s.activity_mode && s.activity_mode !== "线下" && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>}
