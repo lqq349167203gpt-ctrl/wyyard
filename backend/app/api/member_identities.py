@@ -1,6 +1,9 @@
+import logging
 from fastapi import APIRouter, HTTPException, Request
 from app.services import member_identity_service
 from app.models.member_identity import MemberIdentityCreate, MemberIdentityUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/member-identities", tags=["member-identities"])
 
@@ -13,7 +16,10 @@ def list_identities():
 @router.post("")
 def create_identity(data: MemberIdentityCreate):
     result = member_identity_service.create_identity(data)
-    member_identity_service.refresh_all()
+    try:
+        member_identity_service.refresh_all()
+    except Exception as e:
+        logger.error(f"刷新用户身份失败: {e}")
     return result
 
 
@@ -22,7 +28,10 @@ def update_identity(identity_id: str, data: MemberIdentityUpdate):
     identity = member_identity_service.update_identity(identity_id, data)
     if not identity:
         raise HTTPException(status_code=404, detail="记录不存在")
-    member_identity_service.refresh_all()
+    try:
+        member_identity_service.refresh_all()
+    except Exception as e:
+        logger.error(f"刷新用户身份失败: {e}")
     return identity
 
 
@@ -30,7 +39,10 @@ def update_identity(identity_id: str, data: MemberIdentityUpdate):
 def delete_identity(identity_id: str):
     if not member_identity_service.delete_identity(identity_id):
         raise HTTPException(status_code=404, detail="记录不存在")
-    member_identity_service.refresh_all()
+    try:
+        member_identity_service.refresh_all()
+    except Exception as e:
+        logger.error(f"刷新用户身份失败: {e}")
     return {"message": "删除成功"}
 
 

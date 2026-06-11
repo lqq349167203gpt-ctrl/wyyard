@@ -1,8 +1,8 @@
-# wyyard_project 文档
+# wyyard 文档
 
 ## 项目概述
 
-wyyard_project 是一个企业级 AI 综合管理平台，提供用户管理、活动日历、付费项目、账号权限、系统日志等完整业务模块。
+wyyard 是一个疗愈行业后台管理平台，提供用户管理、活动日历、付费项目、会员身份匹配、账号权限、系统日志等完整业务模块。
 
 ## 快速开始
 
@@ -10,6 +10,7 @@ wyyard_project 是一个企业级 AI 综合管理平台，提供用户管理、�
 
 - Node.js 18+
 - Python 3.11+
+- PostgreSQL 14+
 - npm 或 yarn
 
 ### 启动前端
@@ -32,7 +33,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-后端将在 http://localhost:8000 启动。
+后端将在 http://localhost:8000 启动。**必须从 `backend/` 目录启动**，否则会报 `ModuleNotFoundError: No module named 'app'`。
 
 ## 功能模块
 

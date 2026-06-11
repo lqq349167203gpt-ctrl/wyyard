@@ -52,6 +52,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
   const [formDurationValue, setFormDurationValue] = useState("")
   const [formRemainingCount, setFormRemainingCount] = useState("")
   const [formUnlimited, setFormUnlimited] = useState(false)
+  const [formPrice, setFormPrice] = useState("")
   const [formCloserId, setFormCloserId] = useState("")
   const [formCloserName, setFormCloserName] = useState("")
   const [formOrganizationId, setFormOrganizationId] = useState("")
@@ -124,6 +125,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
   const handleSelectCardType = (type: string) => {
     setFormCardType(type)
     const config = CARD_TYPES[type]
+    setFormPrice(String(config.price))
     if (config.defaultCount) {
       setFormRemainingCount(String(config.defaultCount))
       setFormUnlimited(false)
@@ -170,6 +172,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
     setFormDurationValue("")
     setFormRemainingCount("")
     setFormUnlimited(false)
+    setFormPrice("")
     setFormCloserId("")
     setFormCloserName("")
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
@@ -186,6 +189,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
     setFormDurationValue(item.duration_value ? String(item.duration_value) : "")
     setFormRemainingCount(item.remaining_count !== null && item.remaining_count !== undefined ? String(item.remaining_count) : "")
     setFormUnlimited(item.remaining_count === null || item.remaining_count === undefined)
+    setFormPrice(String(item.price))
     setFormCloserId(item.closer_id || "")
     setFormCloserName(item.closer_name || "")
     setFormOrganizationId(item.organization_id || "")
@@ -201,7 +205,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
         customer_id: formCustomerId,
         nickname: formNickname,
         card_type: formCardType,
-        price: config.price,
+        price: formPrice ? parseFloat(formPrice) : config.price,
         effective_date: formEffectiveDate,
         duration_type: formDurationType,
         duration_value: formDurationValue ? parseInt(formDurationValue) : null,
@@ -401,6 +405,21 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
                 ))}
               </div>
             </div>
+
+            {/* 费用金额 */}
+            {formCardType && (
+              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">费用金额</span>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={formPrice}
+                  onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ""))}
+                  placeholder={CARD_TYPES[formCardType] ? `${CARD_TYPES[formCardType].price}` : ""}
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
 
             {/* 时长输入（常规通卡/半年卡） */}
             {showDuration && (

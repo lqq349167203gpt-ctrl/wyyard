@@ -117,11 +117,13 @@ def _get_payment_categories(condition: IdentityCondition) -> list:
     return condition.payment_categories or []
 
 
-def _check_condition(condition: IdentityCondition, customer_id: str,
+def _check_condition(condition, customer_id: str,
                      arrival_count: int, activity_count: int,
                      customer_cards, customer_courses, customer_group_cases,
                      customer_emotional_releases, customer_energy_knots,
                      customer_oh_card_readings, customer_other_projects, today_str: str) -> bool:
+    if isinstance(condition, dict):
+        condition = IdentityCondition(**condition)
     t = condition.type
     if t == "arrival":
         return _compare_count(arrival_count, condition.count_op, condition.count_value)
@@ -233,7 +235,55 @@ def refresh_member_type(customer_id: str):
 
 
 def refresh_all():
-    """批量刷新所有用户的 member_type"""
+    """批量刷新所有用户的 member_type，共享数据源避免重复加载"""
+    from app.services import membership_card_service, visit_service, internal_course_service
+    from app.services import group_case_service, emotional_release_service, energy_knot_service
+    from app.services import oh_card_reading_service, other_project_service
+
+    identities = list_identities()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # 全局数据只加载一次
+    all_cards = membership_card_service.list_cards()
+    all_courses = internal_course_service.list_courses()
+    all_group_cases = group_case_service.list_cases()
+    all_emotional_releases = emotional_release_service.list_releases()
+    all_energy_knots = energy_knot_service.list_knots()
+    all_oh_card_readings = oh_card_reading_service.list_readings()
+    all_other_projects = other_project_service.list_projects()
+    all_visits = visit_service.list_visits()
+
     customers = customer_service.list_customers()
     for c in customers:
-        refresh_member_type(c.id)
+        customer_cards = [x for x in all_cards if x.customer_id == c.id]
+        customer_courses = [x for x in all_courses if x.customer_id == c.id]
+        customer_group_cases = [x for x in all_group_cases if x.customer_id == c.id]
+        customer_emotional_releases = [x for x in all_emotional_releases if x.customer_id == c.id]
+        customer_energy_knots = [x for x in all_energy_knots if x.customer_id == c.id]
+        customer_oh_card_readings = [x for x in all_oh_card_readings if x.customer_id == c.id]
+        customer_other_projects = [x for x in all_other_projects if x.customer_id == c.id]
+        customer_visits = [v for v in all_visits if v.customer_id == c.id]
+        arrival_count = sum(1 for v in customer_visits if v.arrived)
+        activity_count = sum(1 for v in customer_visits if v.activity_id)
+
+        member_type = ""
+        for identity in identities:
+            if not identity.conditions:
+                member_type = identity.name
+                break
+            results = [_check_condition(cond, c.id, arrival_count, activity_count,
+                                        customer_cards, customer_courses,
+                                        customer_group_cases, customer_emotional_releases,
+                                        customer_energy_knots, customer_oh_card_readings,
+                                        customer_other_projects, today_str)
+                       for cond in identity.conditions]
+            if identity.operator == "any":
+                matched = any(results)
+            else:
+                matched = all(results)
+            if matched:
+                member_type = identity.name
+                break
+
+        if c.member_type != member_type:
+            customer_service.update_customer(c.id, CustomerUpdate(member_type=member_type))

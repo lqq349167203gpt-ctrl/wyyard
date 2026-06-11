@@ -11,7 +11,7 @@
 
 ## 目录结构
 ```
-wyyard_project/
+wyyard/
 ├── CLAUDE.md                 # 项目规范（本文件）
 ├── frontend/                 # React 前端
 │   ├── src/

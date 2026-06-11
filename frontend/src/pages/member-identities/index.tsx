@@ -55,7 +55,7 @@ function conditionSummary(c: IdentityCondition): string {
         const validity = c.validity === "active" ? "有效" : "含过期"
         parts.push(`${prefix}${validity}：${subItems}`)
       } else {
-        parts.push(`${cat} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`)
+        parts.push(`${cat} 购买次数 ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`)
       }
     }
     return parts.join("，")
@@ -64,7 +64,7 @@ function conditionSummary(c: IdentityCondition): string {
 }
 
 function defaultCondition(): IdentityCondition {
-  return { type: "" as any, items: [], payment_categories: [], count_op: ">", count_value: 0, validity: "active" }
+  return { type: "" as any, items: [], payment_categories: [], count_op: ">", count_value: "" as any, validity: "active" }
 }
 
 export default function MemberIdentitiesPage() {
@@ -113,7 +113,10 @@ export default function MemberIdentitiesPage() {
     if (!formName.trim()) return
     setSaving(true)
     try {
-      const validConditions = formConditions.filter(c => c.type)
+      const validConditions = formConditions.filter(c => c.type).map(c => ({
+        ...c,
+        count_value: parseInt(c.count_value as any) || 0,
+      }))
       const data: MemberIdentityCreate = {
         name: formName.trim(),
         conditions: validConditions,
@@ -196,7 +199,7 @@ export default function MemberIdentitiesPage() {
         updated.items = []
         updated.payment_categories = []
         updated.count_op = ">"
-        updated.count_value = 0
+        updated.count_value = "" as any
         updated.validity = "active"
       }
       return updated
@@ -402,7 +405,7 @@ export default function MemberIdentitiesPage() {
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
                           value={cond.type}
-                          options={[{value: "", label: "请选择条件类型"}, {value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "payment", label: "付费项目"}]}
+                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "payment", label: "付费项目"}]}
                           placeholder="请选择条件类型"
                           onChange={(v) => updateCondition(ci, { type: v as IdentityCondition["type"] })}
                         />
@@ -429,10 +432,10 @@ export default function MemberIdentitiesPage() {
                             onChange={(v) => updateCondition(ci, { count_op: v as IdentityCondition["count_op"] })}
                           />
                           <Input
-                            type="number"
-                            min={0}
+                            type="text"
+                            inputMode="numeric"
                             value={cond.count_value}
-                            onChange={(e) => updateCondition(ci, { count_value: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => updateCondition(ci, { count_value: e.target.value.replace(/[^0-9]/g, "") } as any)}
                             className="w-20 h-8 text-[12px]"
                           />
                           <span className="text-[12px] text-[#4e535a]">次</span>
@@ -446,7 +449,7 @@ export default function MemberIdentitiesPage() {
                             <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">项目</span>
                             <SelectDropdown
                               value={getPaymentCategories(cond)[0] || ""}
-                              options={[{value: "", label: "请选择项目"}, ...PAYMENT_CATEGORIES.map(cat => ({value: cat, label: cat}))]}
+                              options={PAYMENT_CATEGORIES.map(cat => ({value: cat, label: cat}))}
                               placeholder="请选择项目"
                               onChange={(v) => selectPaymentCategory(ci, v)}
                             />
@@ -480,7 +483,7 @@ export default function MemberIdentitiesPage() {
                               <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">内部课程</span>
                               <SelectDropdown
                                 value={cond.items[0] || ""}
-                                options={[{value: "", label: "请选择课程"}, ...COURSE_TYPES.map(t => ({value: t, label: t}))]}
+                                options={COURSE_TYPES.map(t => ({value: t, label: t}))}
                                 placeholder="请选择课程"
                                 onChange={(v) => updateCondition(ci, { items: v ? [v] : [] })}
                               />
@@ -497,10 +500,10 @@ export default function MemberIdentitiesPage() {
                                 onChange={(v) => updateCondition(ci, { count_op: v as IdentityCondition["count_op"] })}
                               />
                               <Input
-                                type="number"
-                                min={0}
+                                type="text"
+                                inputMode="numeric"
                                 value={cond.count_value}
-                                onChange={(e) => updateCondition(ci, { count_value: parseInt(e.target.value) || 0 })}
+                                onChange={(e) => updateCondition(ci, { count_value: e.target.value.replace(/[^0-9]/g, "") } as any)}
                                 className="w-20 h-8 text-[12px]"
                               />
                               <span className="text-[12px] text-[#4e535a]">次</span>

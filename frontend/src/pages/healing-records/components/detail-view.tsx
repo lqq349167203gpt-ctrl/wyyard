@@ -49,7 +49,7 @@ export default function DetailView({
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => { customerApi.light().then(setCustomerList).catch(() => {}) }, [])
+  useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
   // 客户到店日期集合（用于标记未参加活动）
   const arrivedDates = new Set((detail?.visit_records || []).filter(v => v.arrived).map(v => v.visit_date))
 

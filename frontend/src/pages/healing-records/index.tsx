@@ -45,6 +45,7 @@ export default function HealingRecordsPage() {
   const [filterKey, setFilterKey] = useState(0)
 
   useEffect(() => {
+    customerApi.clearLightCache()
     customerApi.light().then(setCustomers).catch(() => {})
   }, [])
 
