@@ -1370,7 +1370,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               <div className="space-y-2">
                 {formOwnerNames.map((name, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <span className="text-[12px] font-medium shrink-0">{name}</span>
+                    <span className="text-[12px] shrink-0">{name}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-[11px] text-[#8f959e]">部位数</span>
                       <Input
@@ -1382,7 +1382,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                           next[i] = { ...next[i], count: Math.max(1, parseInt(e.target.value) || 1) }
                           setFormOwnerDescriptions(next)
                         }}
-                        className="w-9 h-7 text-[11px] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        className="w-[30px] h-7 text-[11px] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     </div>
                     <Input
