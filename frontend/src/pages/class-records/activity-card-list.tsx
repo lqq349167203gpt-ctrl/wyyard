@@ -121,6 +121,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                     >
                                             {isActivitiesView ? (
                         <>
+                          {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{record.start_time ? `${record.start_time}~${record.end_time || ""}` : "未设置时间"}</span>
@@ -134,7 +135,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f5f5f5]">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                                   <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -223,7 +224,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                               }
                               if (nonEmpty.length === 0) return null
                               return (
-                                <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f5f5f5] flex-1">
+                                <div className="bg-[#fafbfc] rounded px-2.5 py-2 flex-1">
                                     <div className="text-[12px] text-[#4e535a]">
                                       {nonEmpty.map((members, gi) => (
                                         <span key={gi}>
@@ -272,6 +273,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                     >
                                             {isActivitiesView ? (
                         <>
+                          {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
@@ -289,7 +291,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f5f5f5]">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -428,6 +430,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                     >
                                             {isActivitiesView ? (
                         <>
+                          {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
@@ -445,7 +448,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f5f5f5]">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -588,6 +591,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                     >
                                             {isActivitiesView ? (
                         <>
+                          {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
@@ -648,6 +652,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                     >
                                             {isActivitiesView ? (
                         <>
+                          {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
@@ -666,7 +671,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f5f5f5]">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
@@ -802,6 +807,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                     >
                                             {isActivitiesView ? (
                         <>
+                          {idx > 0 && <div className="border-t border-[#f5f5f5] mx-5" />}
                           <div className="px-5 pt-[12px] pb-1 space-y-1.5">
                             <div className="flex items-center gap-0.5">
                               <span className="text-[11px] text-[#8f959e] font-light shrink-0 w-20">{s.start_time ? `${s.start_time}~${s.end_time || ""}` : "未设置时间"}</span>
@@ -819,7 +825,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             </div>
                           </div>
                           <div className="pl-5 pr-5 pb-[1px] pt-[15px] -mt-1">
-                            <div className="bg-[#fafbfc] rounded px-2.5 py-2 border-b border-[#f5f5f5]">
+                            <div className="bg-[#fafbfc] rounded px-2.5 py-2">
                               <div className="flex items-start gap-1.5">
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
