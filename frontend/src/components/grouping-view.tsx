@@ -291,18 +291,22 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     // 设置行高为30，内容垂直居中
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
     ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
-    // 设置所有单元格垂直居中
-    const centerStyle = { alignment: { vertical: "center" } }
+    // 设置所有单元格垂直居中 + 浅色边框
+    const thinBorder = { style: "thin", color: { rgb: "E0E0E0" } }
+    const baseStyle = {
+      alignment: { vertical: "center" },
+      border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+    }
     for (let row = 0; row <= range.e.r; row++) {
       for (let col = range.s.c; col <= range.e.c; col++) {
         const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
         if (ws[cellRef]) {
-          ws[cellRef].s = { ...ws[cellRef].s, ...centerStyle }
+          ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
         }
       }
     }
-    // 设置表头字体加粗
-    const headerStyle = { font: { bold: true } }
+    // 设置表头字体加粗 + 灰色背景
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "F2F3F5" } } }
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
       if (ws[cellRef]) {
