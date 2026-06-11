@@ -288,6 +288,8 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
       { wch: 30 }, // 组长获得的信息
       { wch: 10 }, // 邀约人
     ]
+    // 隐藏默认网格线
+    ws['!showGridLines'] = false
     // 设置行高为30，内容垂直居中
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
     ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
