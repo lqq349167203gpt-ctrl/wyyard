@@ -513,8 +513,8 @@ function RecordForm({
             />
           </div>
           <div className="grid grid-cols-[56px_1fr] items-start gap-2">
-            <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2">成长记录</span>
-            <Textarea value={growth} onChange={e => setGrowth(e.target.value)} rows={4} className="text-[12px] resize-none" />
+            <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2">当日记录</span>
+            <Textarea value={growth} onChange={e => setGrowth(e.target.value)} rows={3} className="text-[12px] rounded-[4px] resize-none" />
           </div>
           <div className="grid grid-cols-[56px_1fr] items-start gap-2">
             <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-1">附件</span>
