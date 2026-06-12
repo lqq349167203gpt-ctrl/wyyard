@@ -472,6 +472,7 @@ export interface Course {
   teachers: string[]  // List of teacher IDs
   class_count: number
   organization_id: string  // 所属共创组织 ID
+  sort_order: number
   created_at: string
   updated_at: string
 }
@@ -482,6 +483,7 @@ export interface CourseCreate {
   teachers?: string[]
   class_count?: number
   organization_id?: string
+  sort_order?: number
 }
 
 export const courseApi = {
@@ -498,6 +500,7 @@ export const courseTypeApi = {
   create: (name: string) => request<{ name: string }>("/api/course-types", { method: "POST", body: JSON.stringify({ name }) }),
   rename: (oldName: string, newName: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(oldName)}`, { method: "PATCH", body: JSON.stringify({ new_name: newName }) }),
   delete: (name: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  reorder: (names: string[]) => request<string[]>("/api/course-types", { method: "PATCH", body: JSON.stringify({ names }) }),
 }
 
 // Organization (共创组织)

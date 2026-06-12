@@ -9,6 +9,7 @@ class CourseBase(BaseModel):
     teachers: List[str] = []  # List of teacher IDs (课程老师)
     class_count: int = 0  # 已上课数
     organization_id: str = ""  # 所属共创组织 ID
+    sort_order: int = 0
 
 
 class CourseCreate(CourseBase):

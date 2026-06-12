@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, BookOpen } from "lucide-react"
+import { Plus, Trash2, Edit, BookOpen, ArrowUp, ArrowDown } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -53,7 +53,46 @@ export default function CoursesPage() {
   useEffect(() => { loadData() }, [loadData])
 
   const filteredCourses = selectedType === "全部" ? courses : courses.filter(c => c.type === selectedType)
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredCourses)
+  const sortedCourses = [...filteredCourses].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedCourses)
+
+  const handleMoveCourse = async (course: Course, direction: "up" | "down") => {
+    const idx = sortedCourses.findIndex(c => c.id === course.id)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= sortedCourses.length) return
+    const reordered = [...sortedCourses]
+    const tmp = reordered[idx]
+    reordered[idx] = reordered[targetIdx]
+    reordered[targetIdx] = tmp
+    try {
+      const updates = reordered
+        .map((c, i) => ({ c, newOrder: i }))
+        .filter(({ c, newOrder }) => (c.sort_order ?? 9999) !== newOrder)
+      await Promise.all(updates.map(({ c, newOrder }) => courseApi.update(c.id, { sort_order: newOrder })))
+      loadData()
+    } catch (error) {
+      console.error("排序失败:", error)
+    }
+  }
+
+  const handleMoveType = async (typeName: string, direction: "up" | "down") => {
+    const types = courseTypes.filter(t => t !== "未分类")
+    const idx = types.indexOf(typeName)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= types.length) return
+    const reordered = [...types]
+    const tmp = reordered[idx]
+    reordered[idx] = reordered[targetIdx]
+    reordered[targetIdx] = tmp
+    try {
+      await courseTypeApi.reorder(reordered)
+      loadData()
+    } catch (error) {
+      console.error("排序失败:", error)
+    }
+  }
 
   const handleOpenCreate = () => {
     if (organizations.length === 0) { setNoOrgDialogOpen(true); return }
@@ -230,7 +269,17 @@ export default function CoursesPage() {
                       }`}
                       onClick={() => setSelectedType(type)}
                     >
-                      <span className="text-[13px] truncate">{type}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveType(type, "up") }}>
+                            <ArrowUp className="h-3 w-3" />
+                          </button>
+                          <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveType(type, "down") }}>
+                            <ArrowDown className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <span className="text-[13px] truncate">{type}</span>
+                      </div>
                       <div className="flex items-center gap-1 shrink-0 ml-2">
                         <button
                           className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
@@ -304,9 +353,19 @@ export default function CoursesPage() {
                 </TableHeader>
                 <TableBody>
                   {paginatedItems.map((course) => (
-                    <TableRow key={course.id}>
+                    <TableRow key={course.id} className="group">
                       <TableCell className="pl-4">
-                        <span className="text-[13px] text-[#2b2f36] font-medium">{course.name}</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveCourse(course, "up") }}>
+                              <ArrowUp className="h-3 w-3" />
+                            </button>
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveCourse(course, "down") }}>
+                              <ArrowDown className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span className="text-[13px] text-[#2b2f36] font-medium">{course.name}</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-[13px] text-[#8f959e]">{course.type || "-"}</span>

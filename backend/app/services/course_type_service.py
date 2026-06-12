@@ -63,3 +63,14 @@ def delete_course_type(name: str) -> bool:
         _save(name)
         return True
     return False
+
+
+def reorder_course_types(ordered_names: List[str]) -> List[str]:
+    """按给定顺序重排活动类型"""
+    global _types
+    existing_set = set(_types)
+    ordered = [n for n in ordered_names if n in existing_set]
+    remaining = [n for n in _types if n not in ordered]
+    _types = ordered + remaining
+    _save()
+    return _types

@@ -42,3 +42,12 @@ def delete_type(name: str):
     if not course_type_service.delete_course_type(name):
         raise HTTPException(status_code=404, detail="类型不存在")
     return {"message": "删除成功"}
+
+
+class CourseTypeReorder(BaseModel):
+    names: list[str]
+
+
+@router.patch("")
+def reorder_types(data: CourseTypeReorder):
+    return course_type_service.reorder_course_types(data.names)
