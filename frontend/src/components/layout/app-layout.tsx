@@ -1,9 +1,11 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { Button } from "@/components/ui/button"
-import { LogOut } from "lucide-react"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { SystemHelperChat, type ChatMessage } from "@/components/system-helper-chat"
+import { LogOut, MessageCircle } from "lucide-react"
 
 const PAGE_TITLES: Record<string, string> = {
 
@@ -39,14 +41,26 @@ const PAGE_TITLES: Record<string, string> = {
 export function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
+  const userId = currentUser.id || "anonymous"
+  const ownerName = currentUser.owner || ""
+
+  const [helperOpen, setHelperOpen] = useState(false)
+  const [helperMessages, setHelperMessages] = useState<ChatMessage[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`systemHelperMessages_${userId}`) || "[]")
+    } catch { return [] }
+  })
+  const [helperSending, setHelperSending] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem(`systemHelperMessages_${userId}`, JSON.stringify(helperMessages))
+  }, [helperMessages, userId])
 
   useEffect(() => {
     const title = PAGE_TITLES[location.pathname] || "无忧茶苑"
     document.title = title
   }, [location.pathname])
-
-  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
-  const ownerName = currentUser.owner || ""
 
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn")
@@ -65,6 +79,9 @@ export function AppLayout() {
             {ownerName && (
               <span className="text-xs text-[#8f959e]">{ownerName}</span>
             )}
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e]" onClick={() => setHelperOpen(true)}>
+              <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> 系统助手
+            </Button>
             <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e]" onClick={handleLogout}>
               <LogOut className="h-3.5 w-3.5 mr-1.5" /> 退出登录
             </Button>
@@ -74,6 +91,23 @@ export function AppLayout() {
           <Outlet />
         </main>
       </SidebarInset>
+
+      <Sheet open={helperOpen} onOpenChange={setHelperOpen}>
+        <SheetContent side="right" className="p-0 sm:max-w-sm" showCloseButton={false}>
+          <SheetHeader className="px-4 py-3 border-b flex flex-row items-center justify-between space-y-0">
+            <SheetTitle className="text-sm flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-[#3370ff]" />
+              系统助手
+            </SheetTitle>
+            <Button variant="ghost" size="icon-sm" onClick={() => setHelperOpen(false)} className="h-6 w-6">
+              <span className="text-xs text-[#8f959e]">✕</span>
+            </Button>
+          </SheetHeader>
+          <div className="h-[calc(100vh-57px)]">
+            <SystemHelperChat messages={helperMessages} setMessages={setHelperMessages} sending={helperSending} setSending={setHelperSending} onNavigate={(route) => { setHelperOpen(false); navigate(route) }} currentUser={currentUser} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </SidebarProvider>
   )
 }

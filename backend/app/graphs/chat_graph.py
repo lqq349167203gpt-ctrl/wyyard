@@ -11,15 +11,19 @@ class ChatState(TypedDict):
     messages: Annotated[list, add_messages]
     system_prompt: str
     model: str
+    api_key: str
+    base_url: str
+    temperature: float
+    max_tokens: int
 
 
 def chat_node(state: ChatState) -> ChatState:
     llm = ChatOpenAI(
-        model=state.get("model", settings.llm_model),
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
-        temperature=0.7,
-        max_tokens=4096,
+        model=state.get("model") or settings.llm_model,
+        api_key=state.get("api_key") or settings.llm_api_key,
+        base_url=state.get("base_url") or settings.llm_base_url,
+        temperature=state.get("temperature") if state.get("temperature") is not None else 0.7,
+        max_tokens=state.get("max_tokens") or 4096,
     )
 
     messages = []

@@ -85,6 +85,64 @@ export const agentApi = {
 }
 
 
+// System Helper
+export const systemHelperApi = {
+  chat: async function* (
+    message: string,
+    history: { role: string; content: string }[] = [],
+    userRole?: string,
+    permissions?: string[],
+    signal?: AbortSignal
+  ): AsyncGenerator<string> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    try {
+      const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      if (user?.id) headers["X-User-Id"] = user.id
+    } catch {}
+
+    const res = await fetch("/api/system-helper/chat", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ message, history, user_role: userRole, permissions }),
+      signal,
+    })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.detail || `请求失败: ${res.status}`)
+    }
+
+    const reader = res.body?.getReader()
+    if (!reader) throw new Error("无法读取响应流")
+
+    const decoder = new TextDecoder()
+    let buffer = ""
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim()
+          if (data === "[DONE]") return
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.content) yield parsed.content
+          } catch {}
+        }
+      }
+    }
+  },
+}
+
+
 // Customer
 export interface PaidContentItem {
   type: "399次卡" | "3999会员" | "半年卡" | "2w疗愈师"
@@ -237,6 +295,36 @@ export const customerAiConfigApi = {
   get: () => request<CustomerAIConfig>("/api/customer-ai-config"),
   providers: () => request<Record<string, { base_url: string; model: string }>>("/api/customer-ai-config/providers"),
   update: (data: CustomerAIConfigUpdate) => request<CustomerAIConfig>("/api/customer-ai-config", { method: "PATCH", body: JSON.stringify(data) }),
+}
+
+// System Helper Config
+export interface SystemHelperConfig {
+  id: string
+  provider: string
+  model: string
+  api_key: string
+  base_url: string
+  system_prompt: string
+  temperature: number
+  max_tokens: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SystemHelperConfigUpdate {
+  provider?: string
+  model?: string
+  api_key?: string
+  base_url?: string
+  system_prompt?: string
+  temperature?: number
+  max_tokens?: number
+}
+
+export const systemHelperConfigApi = {
+  get: () => request<SystemHelperConfig>("/api/system-helper-config"),
+  providers: () => request<Record<string, { base_url: string; model: string }>>("/api/system-helper-config/providers"),
+  update: (data: SystemHelperConfigUpdate) => request<SystemHelperConfig>("/api/system-helper-config", { method: "PATCH", body: JSON.stringify(data) }),
 }
 
 // Health
