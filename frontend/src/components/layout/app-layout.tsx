@@ -5,7 +5,7 @@ import { AppSidebar } from "./app-sidebar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SystemHelperChat, type ChatMessage } from "@/components/system-helper-chat"
-import { LogOut, MessageCircle } from "lucide-react"
+import { LogOut } from "lucide-react"
 
 const PAGE_TITLES: Record<string, string> = {
 
@@ -79,10 +79,10 @@ export function AppLayout() {
             {ownerName && (
               <span className="text-xs text-[#8f959e]">{ownerName}</span>
             )}
-            <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e]" onClick={() => setHelperOpen(true)}>
-              <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> 系统助手
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e] font-normal" onClick={() => setHelperOpen(true)}>
+              茶苑助手
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e]" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e] font-normal" onClick={handleLogout}>
               <LogOut className="h-3.5 w-3.5 mr-1.5" /> 退出登录
             </Button>
           </div>
@@ -95,9 +95,8 @@ export function AppLayout() {
       <Sheet open={helperOpen} onOpenChange={setHelperOpen}>
         <SheetContent side="right" className="p-0 sm:max-w-sm" showCloseButton={false}>
           <SheetHeader className="px-4 py-3 border-b flex flex-row items-center justify-between space-y-0">
-            <SheetTitle className="text-sm flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-[#3370ff]" />
-              系统助手
+            <SheetTitle className="text-sm">
+              茶苑助手
             </SheetTitle>
             <Button variant="ghost" size="icon-sm" onClick={() => setHelperOpen(false)} className="h-6 w-6">
               <span className="text-xs text-[#8f959e]">✕</span>

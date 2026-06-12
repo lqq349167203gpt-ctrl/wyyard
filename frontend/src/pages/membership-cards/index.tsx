@@ -312,7 +312,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
               {paginatedItems.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="pl-4 text-[#2b2f36]">{item.created_at.split("T")[0]}</TableCell>
-                  <TableCell className="text-[#2b2f36] font-medium">{item.nickname}</TableCell>
+                  <TableCell className="text-[#2b2f36]">{item.nickname}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-[11px] font-normal">
                       {item.card_type}

@@ -117,7 +117,7 @@ export function SystemHelperChat({ messages, setMessages, sending, setSending, o
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <HelpCircle className="h-10 w-10 text-[#8f959e] mb-3" />
-            <p className="text-sm text-[#2b2f36] font-medium">系统助手</p>
+            <p className="text-sm text-[#2b2f36] font-medium">茶苑助手</p>
             <p className="text-xs text-[#8f959e] mt-1">问我任何系统操作相关的问题</p>
             <div className="mt-4 space-y-2 w-full">
               {EXAMPLE_QUESTIONS.map((q) => (

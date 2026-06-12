@@ -67,7 +67,7 @@ DEFAULT_SYSTEM_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 助手�
 
 
 class SystemHelperConfig(BaseModel):
-    """系统助手 AI 配置，全局唯一"""
+    """茶苑助手 AI 配置，全局唯一"""
     id: str = "default"
     provider: str = "glm"
     model: str = "glm-5"

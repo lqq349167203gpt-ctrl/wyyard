@@ -200,7 +200,7 @@ export function ProjectDeductionTab() {
             <TableBody>
               {deductions.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="pl-4 text-[#2b2f36] font-medium">{d.nickname}</TableCell>
+                  <TableCell className="pl-4 text-[#2b2f36]">{d.nickname}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-[11px] font-normal">
                       {PROJECT_TYPE_LABELS[d.project_type] || d.project_type}
