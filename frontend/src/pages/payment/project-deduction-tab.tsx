@@ -233,8 +233,8 @@ export function ProjectDeductionTab() {
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             {/* 用户搜索 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">用户</span>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">用户</span>
               <CustomerSearchInput
                 customers={customers}
                 value={customerName || ""}
@@ -248,8 +248,8 @@ export function ProjectDeductionTab() {
             </div>
 
             {/* 项目类型 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">类型</span>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-[14px]">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">类型</span>
               {!customerId ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">请先选择用户</div>
               ) : (
@@ -309,8 +309,8 @@ export function ProjectDeductionTab() {
             )}
 
             {/* 次数 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">次数</span>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">次数</span>
               <Input
                 type="text"
                 inputMode="numeric"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Users, Zap, Plus, Trash2 } from "lucide-react"
+import { Users, Zap, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -47,8 +47,13 @@ export default function HealingIdentitiesPage() {
 
   const currentConfig = HEALING_POSITIONS.find(p => p.key === activePosition)!
   const members = customers.filter(c => c.positions?.includes(activePosition))
+  const sortedMembers = [...members].sort((a, b) => {
+    const orderA = a.position_sort_orders?.[activePosition] ?? 9999
+    const orderB = b.position_sort_orders?.[activePosition] ?? 9999
+    return orderA - orderB
+  })
 
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(members)
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedMembers)
 
   const handleAddMembers = async () => {
     if (selectedNicknames.length === 0) return
@@ -77,7 +82,8 @@ export default function HealingIdentitiesPage() {
     setDeleting(true)
     try {
       const newPositions = deletingMember.positions.filter(p => p !== activePosition)
-      await customerApi.update(deletingMember.id, { positions: newPositions })
+      const { [activePosition]: _, ...restOrders } = deletingMember.position_sort_orders || {}
+      await customerApi.update(deletingMember.id, { positions: newPositions, position_sort_orders: restOrders })
       setDeleteDialogOpen(false)
       setDeletingMember(null)
       loadCustomers()
@@ -85,6 +91,34 @@ export default function HealingIdentitiesPage() {
       console.error("删除失败:", error)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleMove = async (member: Customer, direction: "up" | "down") => {
+    const idx = sortedMembers.findIndex(m => m.id === member.id)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= sortedMembers.length) return
+
+    const reordered = [...sortedMembers]
+    const tmp = reordered[idx]
+    reordered[idx] = reordered[targetIdx]
+    reordered[targetIdx] = tmp
+
+    try {
+      const updates = reordered
+        .map((m, i) => ({ m, newOrder: i }))
+        .filter(({ m, newOrder }) => (m.position_sort_orders?.[activePosition] ?? 9999) !== newOrder)
+      await Promise.all(
+        updates.map(({ m, newOrder }) =>
+          customerApi.update(m.id, {
+            position_sort_orders: { ...(m.position_sort_orders || {}), [activePosition]: newOrder },
+          })
+        )
+      )
+      loadCustomers()
+    } catch (error) {
+      console.error("排序失败:", error)
     }
   }
 
@@ -172,8 +206,20 @@ export default function HealingIdentitiesPage() {
                 </TableHeader>
                 <TableBody>
                   {paginatedItems.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="text-xs pl-4">{member.nickname}</TableCell>
+                    <TableRow key={member.id} className="group">
+                      <TableCell className="text-xs pl-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMove(member, "up") }}>
+                              <ArrowUp className="h-3 w-3" />
+                            </button>
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMove(member, "down") }}>
+                              <ArrowDown className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span>{member.nickname}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs">{member.name || "-"}</TableCell>
                       <TableCell className="text-xs">{member.member_type || "-"}</TableCell>
                       <TableCell className="text-xs">{member.visit_count || 0}</TableCell>

@@ -762,8 +762,8 @@ function DeductionTab() {
             </div>
 
             {/* 选择项目 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">项目</span>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-[14px]">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目</span>
               {!deductCustomerId ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">请先选择用户</div>
               ) : loadingProjects ? (
@@ -794,8 +794,8 @@ function DeductionTab() {
             )}
 
             {/* 次数 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">次数</span>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">次数</span>
               <Input
                 type="number"
                 value={deductCount}

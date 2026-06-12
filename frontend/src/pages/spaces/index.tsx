@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, DoorOpen } from "lucide-react"
+import { Plus, Trash2, Edit, DoorOpen, ArrowUp, ArrowDown } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -57,6 +57,46 @@ export default function SpacesPage() {
   }, [])
 
   const currentSpace = spaces.find(s => s.id === selectedSpaceId)
+  const sortedSpaces = [...spaces].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+
+  const handleMoveSpace = async (space: Space, direction: "up" | "down") => {
+    const idx = sortedSpaces.findIndex(s => s.id === space.id)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= sortedSpaces.length) return
+    const reordered = [...sortedSpaces]
+    const tmp = reordered[idx]
+    reordered[idx] = reordered[targetIdx]
+    reordered[targetIdx] = tmp
+    try {
+      const updates = reordered
+        .map((s, i) => ({ s, newOrder: i }))
+        .filter(({ s, newOrder }) => (s.sort_order ?? 9999) !== newOrder)
+      await Promise.all(updates.map(({ s, newOrder }) => spaceApi.update(s.id, { sort_order: newOrder })))
+      loadSpaces()
+    } catch (error) {
+      console.error("排序失败:", error)
+    }
+  }
+
+  const handleMoveRoom = async (spaceId: string, roomId: string, direction: "up" | "down") => {
+    const space = spaces.find(s => s.id === spaceId)
+    if (!space) return
+    const ids = space.rooms.map(r => r.id)
+    const idx = ids.indexOf(roomId)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= ids.length) return
+    const tmp = ids[idx]
+    ids[idx] = ids[targetIdx]
+    ids[targetIdx] = tmp
+    try {
+      await spaceApi.reorderRooms(spaceId, ids)
+      loadSpaces()
+    } catch (error) {
+      console.error("排序失败:", error)
+    }
+  }
 
   // 全部=所有空间的房间，选中某空间=该空间的房间
   const allRooms = selectedSpaceId === "全部"
@@ -73,7 +113,7 @@ export default function SpacesPage() {
       if (editingSpace) {
         await spaceApi.update(editingSpace.id, { name: spaceName.trim() })
       } else {
-        await spaceApi.create({ name: spaceName.trim() })
+        await spaceApi.create({ name: spaceName.trim(), sort_order: spaces.length })
       }
       setSpaceDialogOpen(false)
       setSpaceName("")
@@ -233,7 +273,7 @@ export default function SpacesPage() {
                 {/* 分割线 */}
                 <div className="mx-4 my-1 border-t border-[#f0f0f0]" />
                 {/* 各空间 */}
-                {spaces.map((space) => (
+                {sortedSpaces.map((space) => (
                   <div
                     key={space.id}
                     className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors group ${
@@ -243,7 +283,17 @@ export default function SpacesPage() {
                     }`}
                     onClick={() => setSelectedSpaceId(space.id)}
                   >
-                    <span className="text-[13px] truncate">{space.name}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveSpace(space, "up") }}>
+                          <ArrowUp className="h-3 w-3" />
+                        </button>
+                        <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveSpace(space, "down") }}>
+                          <ArrowDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <span className="text-[13px] truncate">{space.name}</span>
+                    </div>
                     <div className="flex items-center gap-1 shrink-0 ml-2">
                       <button
                         className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
@@ -314,9 +364,19 @@ export default function SpacesPage() {
                 </TableHeader>
                 <TableBody>
                   {paginatedItems.map((room) => (
-                    <TableRow key={room.id}>
+                    <TableRow key={room.id} className="group">
                       <TableCell className="pl-4">
-                        <span className="text-[13px] text-[#2b2f36]">{room.name}</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveRoom((room as any).spaceId, room.id, "up") }}>
+                              <ArrowUp className="h-3 w-3" />
+                            </button>
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveRoom((room as any).spaceId, room.id, "down") }}>
+                              <ArrowDown className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span className="text-[13px] text-[#2b2f36]">{room.name}</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-[13px] text-[#8f959e]">{(room as any).spaceName}</span>

@@ -36,6 +36,8 @@ import BusinessRemindersPage from "@/pages/business-reminders"
 import TrafficRecordsPage from "@/pages/traffic-records"
 import ActivityRecordsPage from "@/pages/activity-records"
 import OtherProjectsPage from "@/pages/other-projects"
+import ChatHistoryPage from "@/pages/chat-history"
+import ConsumptionRecordsPage from "@/pages/consumption-records"
 
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
@@ -68,6 +70,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/business-reminders": "business-reminders",
   "/traffic-records": "traffic-records",
   "/other-projects": "other-projects",
+  "/chat-history": "chat-history",
+  "/consumption-records": "consumption-records",
 }
 
 function ProtectedRoute() {
@@ -166,6 +170,8 @@ function App() {
               <Route path="/business-reminders" element={<BusinessRemindersPage />} />
               <Route path="/traffic-records" element={<TrafficRecordsPage />} />
               <Route path="/activity-records" element={<ActivityRecordsPage />} />
+              <Route path="/consumption-records" element={<ConsumptionRecordsPage />} />
+              <Route path="/chat-history" element={<ChatHistoryPage />} />
             </Route>
           </Route>
         </Routes>

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 
 class PaidItem(str, Enum):
@@ -60,6 +60,7 @@ class CustomerBase(BaseModel):
     traffic_source: str = ""
     traffic_source_detail: str = ""
     tracking_plan: str = ""
+    position_sort_orders: Dict[str, int] = {}
 
 
 class CustomerCreate(CustomerBase):
@@ -92,6 +93,7 @@ class CustomerUpdate(BaseModel):
     traffic_source: Optional[str] = None
     traffic_source_detail: Optional[str] = None
     tracking_plan: Optional[str] = None
+    position_sort_orders: Optional[Dict[str, int]] = None
 
 
 class Customer(CustomerBase):

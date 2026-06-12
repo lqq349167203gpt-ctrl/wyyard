@@ -2339,8 +2339,8 @@ export default function DailyActivitiesPage() {
   }, [unifiedDetailRecords, dayVisits])
 
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
-  const achieverCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("成就君")), [allCustomers])
-  const eksHostCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("能量结老师")), [allCustomers])
+  const achieverCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("成就君")).sort((a, b) => (a.position_sort_orders?.["成就君"] ?? 9999) - (b.position_sort_orders?.["成就君"] ?? 9999)), [allCustomers])
+  const eksHostCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("能量结老师")).sort((a, b) => (a.position_sort_orders?.["能量结老师"] ?? 9999) - (b.position_sort_orders?.["能量结老师"] ?? 9999)), [allCustomers])
 
   // ===== Helpers =====
   const handleApiError = (error: any) => {
@@ -2479,7 +2479,7 @@ export default function DailyActivitiesPage() {
     customerApi.light()
       .then((customers) => {
         setAllCustomers(customers)
-        setTeachers(customers.filter(c => c.positions?.includes("课程老师")))
+        setTeachers(customers.filter(c => c.positions?.includes("课程老师")).sort((a, b) => (a.position_sort_orders?.["课程老师"] ?? 9999) - (b.position_sort_orders?.["课程老师"] ?? 9999)))
       })
       .catch(() => {})
   }

@@ -61,6 +61,15 @@ def get_all_rooms() -> List[Room]:
     return rooms
 
 
+def get_room_name(room_id: str) -> Optional[str]:
+    """根据 room_id 返回房间名称"""
+    for sp in _spaces.values():
+        for r in sp.rooms:
+            if r.id == room_id:
+                return r.name
+    return None
+
+
 def get_all_spaces() -> List[Space]:
     """返回所有空间（含已删除），用于 space_name 回填"""
     return list(_spaces.values())
@@ -174,6 +183,20 @@ def update_room(space_id: str, room_id: str, data: dict) -> Optional[Room]:
     space.updated_at = datetime.now(timezone.utc)
     _save(space_id)
     return room
+
+
+def reorder_rooms(space_id: str, room_ids: List[str]) -> Optional[Space]:
+    space = _spaces.get(space_id)
+    if not space:
+        return None
+    room_map = {r.id: r for r in space.rooms}
+    ordered = [room_map[rid] for rid in room_ids if rid in room_map]
+    # 追加未在列表中的房间（已删除的等）
+    remaining = [r for r in space.rooms if r.id not in room_ids]
+    space.rooms = ordered + remaining
+    space.updated_at = datetime.now(timezone.utc)
+    _save(space_id)
+    return space
 
 
 def delete_room(space_id: str, room_id: str, force: bool = False) -> dict:

@@ -39,6 +39,7 @@ wyyard/
 |------|------|------|
 | 业务数据 | 客户信息 | /healing-records |
 | 业务数据 | 活动记录 | /activity-records |
+| 业务数据 | 消费记录 | /consumption-records |
 | 业务数据 | 引流记录 | /traffic-records |
 | 活动管理 | 邀约到场 | /courses/class-records |
 | 活动管理 | 当日活动 | /courses/class-records |

@@ -130,6 +130,7 @@ SKIP_PATHS = [
     "/api/uploads",  # 文件上传是二进制 multipart，不能 decode("utf-8")
     "/api/operation-logs",  # 操作日志自身是只读 API，不记录自身操作
     "/api/system-logs",  # 系统日志自身是只读 API，不记录自身操作
+    "/api/system-helper",  # 茶苑助手对话不记录操作日志
 ]
 
 FIELD_NAMES = {
@@ -173,11 +174,16 @@ FIELD_NAMES = {
     "referrer_handler": "引流处理人", "traffic_source_detail": "流量来源详情",
     "total_payment": "累计付费",
     "activity_mode": "活动模式", "class_count": "课时数", "course_id": "课程",
+    "room_ids": "房间顺序",
+    "position_sort_orders": "排序顺序",
     "effective_date": "生效日期", "organization_id": "组织", "rooms": "房间", "teachers": "老师", "themes": "主题",
     "enabled": "启用状态", "is_system": "系统角色",
     "daily_card_usage": "日卡使用", "activity_id": "活动ID", "activity_type": "活动类型",
     "healing_notes": "疗愈笔记", "activity_count": "活动次数", "welfare_count": "公益次数",
     "activities": "活动记录",
+    "provider": "模型供应商", "model": "模型", "api_key": "API密钥", "base_url": "接口地址",
+    "system_prompt": "系统提示词", "temperature": "温度", "max_tokens": "最大Token数",
+    "project_name": "项目名称", "fee": "费用", "duration_type": "时长类型", "duration_value": "时长值",
 }
 
 
@@ -322,6 +328,38 @@ def _resolve_customer_names(customer_ids: list) -> list:
         return [cid[:8] for cid in customer_ids]
 
 
+def _resolve_room_names(room_ids: list) -> list:
+    """将房间 UUID 列表解析为房间名称列表。"""
+    if not room_ids:
+        return []
+    try:
+        from app.services import space_service
+        names = []
+        for rid in room_ids:
+            name = space_service.get_room_name(rid)
+            if name:
+                names.append(name)
+            else:
+                # fallback: 直接从数据库查
+                try:
+                    from app.services.storage import load_data
+                    for sp_data in load_data("spaces.json").values():
+                        for r in sp_data.get("rooms", []):
+                            if r.get("id") == rid:
+                                names.append(r.get("name", rid[:8]))
+                                break
+                        else:
+                            continue
+                        break
+                    else:
+                        names.append(rid[:8])
+                except Exception:
+                    names.append(rid[:8])
+        return names
+    except Exception:
+        return [rid[:8] for rid in room_ids]
+
+
 def _resolve_customer_name_if_uuid(val: str) -> str:
     """如果值看起来像 UUID（8位以上 hex 字符串），尝试解析为客户昵称。"""
     if len(val) >= 8 and all(c in "0123456789abcdef-" for c in val.lower()):
@@ -340,6 +378,11 @@ def _format_value(val, field_name: str = "") -> str:
         return ""
     if isinstance(val, bool):
         return "是" if val else "否"
+    if isinstance(val, dict):
+        if field_name == "position_sort_orders":
+            parts = [f"{k}:{v}" for k, v in val.items() if isinstance(v, int)]
+            return "，".join(parts) if parts else str(val)[:30]
+        return str(val)[:30]
     if isinstance(val, list):
         if len(val) == 0:
             return ""
@@ -363,6 +406,8 @@ def _format_value(val, field_name: str = "") -> str:
             return "、".join(parts)
         # For string lists, show first 5 items
         if isinstance(val[0], str):
+            if field_name == "room_ids":
+                return "、".join(_resolve_room_names(val))
             # Translate page keys to Chinese labels
             items = [PAGE_LABELS.get(v, v) for v in val] if field_name in ("pages", "permissions") else val
             # Resolve UUID-looking strings to customer names
@@ -522,11 +567,16 @@ def build_change_description(before: dict, after: dict) -> str:
             continue
         # 列表类型字段：显示增减项而非全量
         if isinstance(old_val, list) and isinstance(new_val, list):
+            field_name = FIELD_NAMES.get(key, key)
+            # room_ids 重排序：显示新顺序
+            if key == "room_ids":
+                new_names = _resolve_room_names(new_val)
+                changes.append(f"{field_name}设为{'、'.join(new_names)}")
+                continue
             old_set = set(old_val)
             new_set = set(new_val)
             added = new_set - old_set
             removed = old_set - new_set
-            field_name = FIELD_NAMES.get(key, key)
             parts = []
             if added:
                 parts.append(f"+{_format_value(list(added), key)}")
@@ -763,6 +813,14 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         if "reorder" in path:
             return "排序调整"
         return "批量操作"
+
+    # 空间房间排序：直接解析 room_ids 为房间名
+    if "/rooms-order" in path and method == "PATCH":
+        room_ids = body.get("room_ids", [])
+        if room_ids:
+            names = _resolve_room_names(room_ids)
+            return f"{name}：房间顺序设为{'、'.join(names)}"
+        return f"{name}：调整房间顺序"
 
     name = entity_name or get_entity_id(path) or "记录"
 

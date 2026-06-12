@@ -55,6 +55,17 @@ async def add_room(space_id: str, data: RoomCreate):
     return room
 
 
+@router.patch("/{space_id}/rooms-order")
+async def reorder_rooms(space_id: str, data: dict):
+    room_ids = data.get("room_ids", [])
+    if not room_ids:
+        raise HTTPException(status_code=400, detail="room_ids 不能为空")
+    result = space_service.reorder_rooms(space_id, room_ids)
+    if not result:
+        raise HTTPException(status_code=404, detail="空间不存在")
+    return result
+
+
 @router.get("/{space_id}/rooms/{room_id}/referenced")
 async def check_room_referenced(space_id: str, room_id: str):
     return {"referenced": space_service.is_room_referenced(room_id)}

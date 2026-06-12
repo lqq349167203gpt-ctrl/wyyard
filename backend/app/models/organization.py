@@ -6,6 +6,7 @@ from typing import List, Optional
 class OrganizationBase(BaseModel):
     name: str
     member_ids: List[str] = []
+    sort_order: int = 0
 
 
 class OrganizationCreate(OrganizationBase):

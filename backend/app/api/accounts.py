@@ -44,7 +44,7 @@ ALL_PAGE_KEYS = [
     "class-records-visitors", "class-records-activities", "class-records-arrival",
     "daily-activities", "payment", "membership-cards", "group-cases",
     "emotional-releases", "energy-knots", "internal-courses", "other-projects",
-    "agents", "business-reminders", "system-logs", "operation-logs",
+    "agents", "business-reminders", "system-logs", "operation-logs", "chat-history", "consumption-records",
     "member-identities", "healing-identities", "position-management",
     "courses", "organizations", "spaces", "reminders",
 ]

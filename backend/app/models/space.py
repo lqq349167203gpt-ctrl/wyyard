@@ -15,6 +15,7 @@ class Room(RoomBase):
 
 class SpaceBase(BaseModel):
     name: str
+    sort_order: int = 0
 
 
 class SpaceCreate(SpaceBase):

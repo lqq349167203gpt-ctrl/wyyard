@@ -370,7 +370,7 @@ export function useEksDialogs({
                   }}
                 >
                   <option value="">选择课程老师</option>
-                  {allCustomers.filter(c => c.positions?.includes("能量结老师")).map(c => (
+                  {allCustomers.filter(c => c.positions?.includes("能量结老师")).sort((a, b) => (a.position_sort_orders?.["能量结老师"] ?? 9999) - (b.position_sort_orders?.["能量结老师"] ?? 9999)).map(c => (
                     <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
                   ))}
                 </select>

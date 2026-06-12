@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
-import { Plus, Trash2, Edit, Users, Building2 } from "lucide-react"
+import { Plus, Trash2, Edit, Users, Building2, ArrowUp, ArrowDown } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -62,6 +62,52 @@ export default function OrganizationsPage() {
   }, [customers])
 
   const activeOrg = organizations.find(o => o.id === activeOrgId) || null
+
+  const sortedOrganizations = [...organizations].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+
+  const handleMoveOrg = async (org: Organization, direction: "up" | "down") => {
+    const idx = sortedOrganizations.findIndex(o => o.id === org.id)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= sortedOrganizations.length) return
+
+    const reordered = [...sortedOrganizations]
+    const tmp = reordered[idx]
+    reordered[idx] = reordered[targetIdx]
+    reordered[targetIdx] = tmp
+
+    try {
+      const updates = reordered
+        .map((o, i) => ({ o, newOrder: i }))
+        .filter(({ o, newOrder }) => (o.sort_order ?? 9999) !== newOrder)
+      await Promise.all(
+        updates.map(({ o, newOrder }) =>
+          organizationApi.update(o.id, { sort_order: newOrder })
+        )
+      )
+      loadData()
+    } catch (error) {
+      console.error("排序失败:", error)
+    }
+  }
+
+  const handleMoveMember = async (memberId: string, direction: "up" | "down") => {
+    if (!activeOrg) return
+    const ids = [...activeOrg.member_ids]
+    const idx = ids.indexOf(memberId)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= ids.length) return
+    const tmp = ids[idx]
+    ids[idx] = ids[targetIdx]
+    ids[targetIdx] = tmp
+    try {
+      await organizationApi.update(activeOrg.id, { member_ids: ids })
+      loadData()
+    } catch (error) {
+      console.error("排序失败:", error)
+    }
+  }
 
   const getMemberNicknames = (org: Organization) =>
     org.member_ids
@@ -136,7 +182,7 @@ export default function OrganizationsPage() {
       if (editingOrg) {
         await organizationApi.update(editingOrg.id, { name: trimmedName, member_ids: memberIds })
       } else {
-        await organizationApi.create({ name: trimmedName, member_ids: memberIds })
+        await organizationApi.create({ name: trimmedName, member_ids: memberIds, sort_order: organizations.length })
       }
       setDialogOpen(false)
       setEditingOrg(null)
@@ -219,7 +265,7 @@ export default function OrganizationsPage() {
             ) : organizations.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted-foreground">暂无组织</div>
             ) : (
-              organizations.map((org) => {
+              sortedOrganizations.map((org) => {
                 const isActive = activeOrgId === org.id
                 const count = getMemberNicknames(org).length
                 return (
@@ -232,7 +278,15 @@ export default function OrganizationsPage() {
                     }`}
                     onClick={() => setActiveOrgId(org.id)}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "up") }}>
+                          <ArrowUp className="h-3 w-3" />
+                        </button>
+                        <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "down") }}>
+                          <ArrowDown className="h-3 w-3" />
+                        </button>
+                      </div>
                       <Building2 className={`h-4 w-4 shrink-0 ${isActive ? "text-[#3370ff]" : "text-[#8f959e]"}`} />
                       <span className="text-[13px] truncate">{org.name}</span>
                     </div>
@@ -308,6 +362,7 @@ export default function OrganizationsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-xs font-medium w-[40px] text-center">排序</TableHead>
                     <TableHead className="text-xs font-medium pl-4">昵称</TableHead>
                     <TableHead className="text-xs font-medium">姓名</TableHead>
                     <TableHead className="text-xs font-medium">会员类型</TableHead>
@@ -318,6 +373,16 @@ export default function OrganizationsPage() {
                 <TableBody>
                   {members.map((member) => (
                     <TableRow key={member.id}>
+                      <TableCell className="px-0">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "up") }}>
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "down") }}>
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs pl-4">{member.nickname}</TableCell>
                       <TableCell className="text-xs">{member.name || "-"}</TableCell>
                       <TableCell className="text-xs">{member.member_type || "-"}</TableCell>
@@ -339,6 +404,7 @@ export default function OrganizationsPage() {
                     .filter(n => n.startsWith("[已删除:"))
                     .map((name, idx) => (
                       <TableRow key={`deleted-${idx}`} className="opacity-50">
+                        <TableCell />
                         <TableCell className="text-xs pl-4">{name}</TableCell>
                         <TableCell className="text-xs">-</TableCell>
                         <TableCell className="text-xs">-</TableCell>

@@ -45,9 +45,8 @@ def get_available_projects(customer_id: str) -> list:
     for p in projects:
         if p.customer_id != customer_id:
             continue
-        if p.remaining_count is None:
-            continue
-        if p.remaining_count <= 0:
+        # remaining_count 为 None 表示不限次，仍可销卡
+        if p.remaining_count is not None and p.remaining_count <= 0:
             continue
         if p.expiry_date and p.expiry_date < today:
             continue

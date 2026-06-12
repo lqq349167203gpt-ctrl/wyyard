@@ -36,6 +36,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/healing-identities": "无忧 - 疗愈老师",
   "/operation-logs": "无忧 - 操作日志",
   "/traffic-records": "无忧 - 引流记录",
+  "/chat-history": "无忧 - 沟通记录",
+  "/consumption-records": "无忧 - 消费记录",
 }
 
 export function AppLayout() {

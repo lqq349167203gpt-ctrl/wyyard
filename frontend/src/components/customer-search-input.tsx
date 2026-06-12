@@ -114,6 +114,11 @@ export function CustomerSearchInput({
       if (positionFilter && !(c.positions || []).includes(positionFilter)) return false
       if (filterSelected && selectedNames.includes(c.nickname)) return false
       return c.nickname.toLowerCase().includes(q)
+    }).sort((a, b) => {
+      if (!positionFilter) return 0
+      const orderA = a.position_sort_orders?.[positionFilter] ?? 9999
+      const orderB = b.position_sort_orders?.[positionFilter] ?? 9999
+      return orderA - orderB
     })
   }, [customers, search, excludeIds, positionFilter, filterSelected, selectedNames])
 

@@ -400,7 +400,7 @@ export function useGcsDialogs({
                 }}
               >
                 <option value="">选择成就君</option>
-                {allCustomers.filter(c => c.positions?.includes("成就君")).map(c => (
+                {allCustomers.filter(c => c.positions?.includes("成就君")).sort((a, b) => (a.position_sort_orders?.["成就君"] ?? 9999) - (b.position_sort_orders?.["成就君"] ?? 9999)).map(c => (
                   <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
                 ))}
               </select>

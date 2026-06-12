@@ -128,7 +128,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     customerApi.list()
       .then((customers) => {
         setAllCustomers(customers)
-        setTeachers(customers.filter(c => c.positions?.includes("课程老师")))
+        setTeachers(customers.filter(c => c.positions?.includes("课程老师")).sort((a, b) => (a.position_sort_orders?.["课程老师"] ?? 9999) - (b.position_sort_orders?.["课程老师"] ?? 9999)))
       })
       .catch((e) => { console.error("customerApi.list failed:", e) })
     spaceApi.list().then((data) => {

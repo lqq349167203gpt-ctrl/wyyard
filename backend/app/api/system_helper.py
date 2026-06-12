@@ -1,4 +1,5 @@
 import json
+import uuid
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -7,6 +8,8 @@ from pydantic import BaseModel
 
 from app.config.settings import settings
 from app.services import system_helper_config_service
+from app.services.chat_history_service import save_message
+from app.models.chat_history import ChatRecordCreate
 
 router = APIRouter(prefix="/api/system-helper", tags=["system-helper"])
 
@@ -19,6 +22,8 @@ class ChatMessage(BaseModel):
 class SystemHelperRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
+    user_id: str = ""
+    user_name: str = ""
     user_role: str = ""
     permissions: list[str] = []
 
@@ -94,10 +99,35 @@ async def chat(data: SystemHelperRequest):
             messages.append(AIMessage(content=msg.content))
     messages.append(HumanMessage(content=data.message))
 
+    # 保存用户消息
+    session_id = str(uuid.uuid4())[:8]
+    if data.user_id:
+        save_message(ChatRecordCreate(
+            user_id=data.user_id,
+            user_name=data.user_name,
+            user_role=data.user_role,
+            role="user",
+            content=data.message,
+            session_id=session_id,
+        ))
+
     async def generate():
+        full_content = ""
         for chunk in llm.stream(messages):
             if chunk.content:
+                full_content += chunk.content
                 yield f"data: {json.dumps({'content': chunk.content})}\n\n"
         yield "data: [DONE]\n\n"
+
+        # 保存 AI 回复
+        if data.user_id and full_content:
+            save_message(ChatRecordCreate(
+                user_id=data.user_id,
+                user_name=data.user_name,
+                user_role=data.user_role,
+                role="assistant",
+                content=full_content,
+                session_id=session_id,
+            ))
 
     return StreamingResponse(generate(), media_type="text/event-stream")

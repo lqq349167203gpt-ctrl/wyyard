@@ -97,15 +97,21 @@ export const systemHelperApi = {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
+    let userId = ""
+    let userName = ""
     try {
       const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
-      if (user?.id) headers["X-User-Id"] = user.id
+      if (user?.id) {
+        headers["X-User-Id"] = user.id
+        userId = user.id
+        userName = user.owner || user.username || ""
+      }
     } catch {}
 
     const res = await fetch("/api/system-helper/chat", {
       method: "POST",
       headers,
-      body: JSON.stringify({ message, history, user_role: userRole, permissions }),
+      body: JSON.stringify({ message, history, user_id: userId, user_name: userName, user_role: userRole, permissions }),
       signal,
     })
 
@@ -139,6 +145,32 @@ export const systemHelperApi = {
         }
       }
     }
+  },
+}
+
+
+// Chat History
+export interface ChatRecord {
+  id: string
+  user_id: string
+  user_name: string
+  user_role: string
+  role: "user" | "assistant"
+  content: string
+  session_id: string
+  created_at: string
+}
+
+export const chatHistoryApi = {
+  listPaginated: (params: { user_id?: string; date_from?: string; date_to?: string; keyword?: string }, page: number, pageSize: number = 20) => {
+    const query = new URLSearchParams()
+    if (params.user_id) query.set("user_id", params.user_id)
+    if (params.date_from) query.set("date_from", params.date_from)
+    if (params.date_to) query.set("date_to", params.date_to)
+    if (params.keyword) query.set("keyword", params.keyword)
+    query.set("page", String(page))
+    query.set("page_size", String(pageSize))
+    return request<PaginatedResponse<ChatRecord>>(`/api/chat-history?${query.toString()}`)
   },
 }
 
@@ -178,6 +210,7 @@ export interface Customer {
   traffic_source: string
   traffic_source_detail: string
   tracking_plan: string
+  position_sort_orders: Record<string, number>
   created_at: string
   updated_at: string
 }
@@ -190,6 +223,7 @@ export interface CustomerLight {
   name: string
   member_type: string
   positions: string[]
+  position_sort_orders: Record<string, number>
   created_at: string
   traffic_source: string
   traffic_source_detail: string
@@ -471,6 +505,7 @@ export interface Organization {
   id: string
   name: string
   member_ids: string[]
+  sort_order: number
   created_at: string
   updated_at: string
 }
@@ -478,6 +513,7 @@ export interface Organization {
 export interface OrganizationCreate {
   name: string
   member_ids?: string[]
+  sort_order?: number
 }
 
 export const organizationApi = {
@@ -1171,12 +1207,14 @@ export interface Space {
   id: string
   name: string
   rooms: Room[]
+  sort_order: number
   created_at: string
   updated_at: string
 }
 
 export interface SpaceCreate {
   name: string
+  sort_order?: number
 }
 
 export interface RoomCreate {
@@ -1194,6 +1232,7 @@ export const spaceApi = {
   updateRoom: (spaceId: string, roomId: string, data: { name: string }) => request<Room>(`/api/spaces/${spaceId}/rooms/${roomId}`, { method: "PATCH", body: JSON.stringify(data) }),
   checkRoomReferenced: (spaceId: string, roomId: string) => request<{ referenced: boolean }>(`/api/spaces/${spaceId}/rooms/${roomId}/referenced`),
   deleteRoom: (spaceId: string, roomId: string, force?: boolean) => request<{ message: string; soft_deleted?: boolean }>(`/api/spaces/${spaceId}/rooms/${roomId}${force ? "?force=true" : ""}`, { method: "DELETE" }),
+  reorderRooms: (spaceId: string, roomIds: string[]) => request<Space>(`/api/spaces/${spaceId}/rooms-order`, { method: "PATCH", body: JSON.stringify({ room_ids: roomIds }) }),
 }
 
 // Reminder
@@ -1630,4 +1669,44 @@ export const activityThemeApi = {
       method: "POST",
       body: JSON.stringify({ themes }),
     }),
+}
+
+// Consumption Records
+export interface ConsumptionPaymentRecord {
+  date: string
+  nickname: string
+  type: string
+  name: string
+  quantity: number | string
+  amount: number
+  effective_date: string
+  expiry_date: string
+  closer_name: string
+}
+
+export interface DeductionRecord {
+  date: string
+  nickname: string
+  type: string
+  name: string
+  count: number
+}
+
+export const consumptionRecordsApi = {
+  listPayments: (params: { date_from?: string; date_to?: string }, page: number, pageSize: number) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    searchParams.set("page", String(page))
+    searchParams.set("page_size", String(pageSize))
+    return request<PaginatedResponse<ConsumptionPaymentRecord>>(`/api/consumption-records/payments?${searchParams.toString()}`)
+  },
+  listDeductions: (params: { date_from?: string; date_to?: string }, page: number, pageSize: number) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    searchParams.set("page", String(page))
+    searchParams.set("page_size", String(pageSize))
+    return request<PaginatedResponse<DeductionRecord>>(`/api/consumption-records/deductions?${searchParams.toString()}`)
+  },
 }

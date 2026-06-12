@@ -110,6 +110,7 @@ async def list_customers_light():
             "traffic_source": c.traffic_source or "",
             "traffic_source_detail": c.traffic_source_detail or "",
             "referrer": c.referrer or "",
+            "position_sort_orders": c.position_sort_orders or {},
         }
         for c in customers
     ]

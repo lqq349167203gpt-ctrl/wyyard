@@ -19,6 +19,7 @@ import {
   Settings,
   Users,
   Monitor,
+  MessageSquare,
 } from "lucide-react"
 import {
   Sidebar,
@@ -36,6 +37,7 @@ const businessItems = [
   { title: "业务提醒", icon: Bell, path: "/business-reminders", permission: "business-reminders" },
   { title: "引流记录", icon: TrendingUp, path: "/traffic-records", permission: "traffic-records" },
   { title: "活动记录", icon: CalendarCheck, path: "/activity-records", permission: "activity-records" },
+  { title: "消费记录", icon: CreditCard, path: "/consumption-records", permission: "consumption-records" },
 ]
 
 const courseItems = [
@@ -62,6 +64,7 @@ const accountItems = [
 
 const systemItems = [
   { title: "AI 配置", icon: Bot, path: "/agents", permission: "agents" },
+  { title: "沟通记录", icon: MessageSquare, path: "/chat-history", permission: "chat-history" },
   { title: "系统日志", icon: FileText, path: "/system-logs", permission: "system-logs" },
   { title: "操作日志", icon: ClipboardList, path: "/operation-logs", permission: "operation-logs" },
 ]
