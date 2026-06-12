@@ -586,7 +586,7 @@ export default function OperationLogsPage() {
                 <span className="text-[#8f959e]">操作内容：</span>
                 <span className="text-[#2b2b2b]">{selectedLog.content}</span>
               </div>
-              {selectedLog.method !== "POST" && (selectedLog.before_data || selectedLog.after_data)
+              {selectedLog.method !== "POST" && selectedLog.method !== "DELETE" && (selectedLog.before_data || selectedLog.after_data)
                 ? renderChanges(selectedLog.before_data || {}, selectedLog.after_data || {}, selectedLog.section, selectedLog.path)
                 : null}
             </div>

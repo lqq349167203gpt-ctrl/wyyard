@@ -16,13 +16,13 @@ SECTION_MAP = {
     "/api/member-identities": "会员身份",
     "/api/activity-permissions": "活动安排",
     "/api/membership-cards": "付费项目",
-    "/api/group-cases": "活动安排",
+    "/api/group-cases": "付费项目",
     "/api/group-case-sessions": "活动安排",
-    "/api/emotional-releases": "活动安排",
+    "/api/emotional-releases": "付费项目",
     "/api/emotional-release-sessions": "活动安排",
-    "/api/energy-knots": "活动安排",
+    "/api/energy-knots": "付费项目",
     "/api/energy-knot-sessions": "活动安排",
-    "/api/internal-courses": "活动安排",
+    "/api/internal-courses": "付费项目",
     "/api/internal-course-sessions": "活动安排",
     "/api/agents": "AI 配置",
     "/api/ai-configs": "AI 配置",
@@ -35,9 +35,10 @@ SECTION_MAP = {
     "/api/position-permissions": "角色管理",
     "/api/position-customer-permissions": "角色管理",
     "/api/system-logs": "系统日志",
-    "/api/other-projects": "活动安排",
-    "/api/oh-card-readings": "活动安排",
+    "/api/other-projects": "付费项目",
+    "/api/oh-card-readings": "付费项目",
     "/api/oh-card-reading-sessions": "活动安排",
+    "/api/project-deductions": "付费项目",
     "/api/reminders": "提醒配置",
     "/api/business-reminders": "提醒配置",
     "/api/activity-themes": "活动安排",
@@ -658,6 +659,31 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             parts.append(project_name)
         parts.append(f"扣减{count}次")
         return " · ".join(parts) if len(parts) > 1 else parts[0]
+
+    # 项目销卡：生成"用户名 · 项目类型 扣减N次"格式
+    if path.rstrip("/") == "/api/project-deductions" and method == "POST":
+        customer_id = body.get("customer_id", "")
+        project_type = body.get("project_type", "")
+        count = body.get("count", 1)
+        customer_name = ""
+        try:
+            from app.services import customer_service
+            c = customer_service.get_customer(customer_id)
+            if c:
+                customer_name = c.nickname or c.name
+        except Exception:
+            pass
+        type_labels = {
+            "membership-cards": "会员活动", "group-cases": "觉醒游戏",
+            "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
+        }
+        type_label = type_labels.get(project_type, project_type)
+        parts = []
+        if customer_name:
+            parts.append(customer_name)
+        parts.append(type_label)
+        parts.append(f"扣减{count}次")
+        return " · ".join(parts)
 
     # 其他项目新增：生成"客户 · 项目名（¥金额，N次）"格式
     if path.rstrip("/") == "/api/other-projects" and method == "POST":
