@@ -296,21 +296,23 @@ export default function MemberIdentitiesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedItems.map((item, index) => (
+              {paginatedItems.map((item, index) => {
+                const globalIndex = startIndex - 1 + index
+                return (
                 <TableRow key={item.id}>
                   <TableCell className="pl-4">
                     <div className="flex flex-col gap-0.5">
                       <button
                         className="h-5 w-5 flex items-center justify-center rounded hover:bg-[#f0f0f0] transition-colors disabled:opacity-30"
-                        disabled={index === 0}
-                        onClick={() => handleMoveUp(index)}
+                        disabled={globalIndex === 0}
+                        onClick={() => handleMoveUp(globalIndex)}
                       >
                         <ArrowUp className="h-3 w-3 text-[#8f959e]" />
                       </button>
                       <button
                         className="h-5 w-5 flex items-center justify-center rounded hover:bg-[#f0f0f0] transition-colors disabled:opacity-30"
-                        disabled={index === identities.length - 1}
-                        onClick={() => handleMoveDown(index)}
+                        disabled={globalIndex === identities.length - 1}
+                        onClick={() => handleMoveDown(globalIndex)}
                       >
                         <ArrowDown className="h-3 w-3 text-[#8f959e]" />
                       </button>
@@ -346,7 +348,8 @@ export default function MemberIdentitiesPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                )
+              })}
             </TableBody>
           </Table>
         )}

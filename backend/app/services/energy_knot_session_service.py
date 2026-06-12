@@ -132,4 +132,6 @@ def get_remaining_count(customer_id: str) -> int:
             pass
         if not found_in_desc and s.owner_id == customer_id:
             used += 1
-    return max(0, total_purchased - used)
+    from app.services import project_deduction_service
+    manual_deductions = project_deduction_service.get_deduction_total(customer_id, "energy-knots")
+    return max(0, total_purchased - used - manual_deductions)

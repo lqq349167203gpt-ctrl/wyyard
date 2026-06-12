@@ -128,4 +128,6 @@ def get_remaining_count(customer_id: str) -> int:
     releases = emotional_release_service.list_releases()
     total_purchased = sum(r.purchase_count for r in releases if r.customer_id == customer_id)
     used = sum(1 for s in _sessions.values() if s.owner_id == customer_id and not s.is_deleted)
-    return total_purchased - used
+    from app.services import project_deduction_service
+    manual_deductions = project_deduction_service.get_deduction_total(customer_id, "emotional-releases")
+    return total_purchased - used - manual_deductions

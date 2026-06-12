@@ -128,4 +128,6 @@ def get_remaining_count(customer_id: str) -> int:
     readings = oh_card_reading_service.list_readings()
     total_purchased = sum(r.purchase_count for r in readings if r.customer_id == customer_id)
     used = sum(1 for s in _sessions.values() if s.owner_id == customer_id and not s.is_deleted)
-    return total_purchased - used
+    from app.services import project_deduction_service
+    manual_deductions = project_deduction_service.get_deduction_total(customer_id, "oh-card-readings")
+    return total_purchased - used - manual_deductions

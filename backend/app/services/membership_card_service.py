@@ -68,6 +68,22 @@ def get_card(card_id: str) -> Optional[MembershipCard]:
     return card
 
 
+def deduct_card(card_id: str, count: int = 1) -> int:
+    """扣减指定卡片的剩余次数，返回扣减后的 remaining_count"""
+    card = _cards.get(card_id)
+    if not card or card.is_deleted:
+        raise ValueError("卡片不存在")
+    if card.remaining_count is None:
+        raise ValueError("该卡为不限次卡，无法销卡")
+    if card.remaining_count < count:
+        raise ValueError(f"剩余次数不足（剩余 {card.remaining_count} 次）")
+    card.remaining_count -= count
+    card.updated_at = datetime.now(timezone.utc)
+    _cards[card_id] = card
+    _save(card_id)
+    return card.remaining_count
+
+
 def create_card(data: MembershipCardCreate) -> MembershipCard:
     now = datetime.now(timezone.utc)
     card_data = data.model_dump()

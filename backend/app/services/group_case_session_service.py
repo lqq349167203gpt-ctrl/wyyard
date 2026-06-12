@@ -128,4 +128,6 @@ def get_remaining_count(customer_id: str) -> int:
     cases = group_case_service.list_cases()
     total_purchased = sum(c.purchase_count for c in cases if c.customer_id == customer_id)
     used = sum(1 for s in _sessions.values() if s.owner_id == customer_id and not s.is_deleted)
-    return total_purchased - used
+    from app.services import project_deduction_service
+    manual_deductions = project_deduction_service.get_deduction_total(customer_id, "group-cases")
+    return total_purchased - used - manual_deductions

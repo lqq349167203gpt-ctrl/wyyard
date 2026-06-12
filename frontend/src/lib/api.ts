@@ -1048,6 +1048,30 @@ export interface OtherProjectDeduction {
   created_at: string
 }
 
+export interface ProjectDeduction {
+  id: string
+  customer_id: string
+  nickname: string
+  project_type: string
+  project_id: string
+  project_name: string
+  count: number
+  deduction_date: string
+  remaining_after: number
+  created_at: string
+}
+
+export const projectDeductionApi = {
+  list: (customerId?: string) =>
+    request<ProjectDeduction[]>(`/api/project-deductions${customerId ? `?customer_id=${customerId}` : ""}`),
+  create: (data: { customer_id: string; project_type: string; project_id: string; count: number }) =>
+    request<ProjectDeduction>("/api/project-deductions", { method: "POST", body: JSON.stringify(data) }),
+  getAvailableItems: (customerId: string, projectType: string) =>
+    request<{ id: string; name: string; remaining_count: number; detail?: string; card_type?: string; expiry_date?: string }[]>(
+      `/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`
+    ),
+}
+
 // Space
 export interface Room {
   id: string

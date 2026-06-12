@@ -42,6 +42,7 @@ from app.api.reminders import router as reminders_router
 from app.api.business_reminders import router as business_reminders_router
 from app.api.organizations import router as organizations_router
 from app.api.activity_themes import router as activity_themes_router
+from app.api.project_deductions import router as project_deductions_router
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
@@ -93,6 +94,7 @@ app.include_router(reminders_router)
 app.include_router(business_reminders_router)
 app.include_router(organizations_router)
 app.include_router(activity_themes_router)
+app.include_router(project_deductions_router)
 
 
 @app.get("/api/health")
