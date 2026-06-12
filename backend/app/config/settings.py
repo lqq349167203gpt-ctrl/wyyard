@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
 
+    # 数据库
+    database_url: str = "postgresql://wyyard:FYSTHXQTXQQ3@localhost:5432/wyyard"
+
     # 服务器
     host: str = "127.0.0.1"
     port: int = 8000

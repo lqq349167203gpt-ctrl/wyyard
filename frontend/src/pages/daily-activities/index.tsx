@@ -2466,7 +2466,7 @@ export default function DailyActivitiesPage() {
   }, [])
 
   const load = () => {
-    courseApi.list().then(setCourses).catch(() => {})
+    courseApi.list().then(data => setCourses([...data].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)))).catch(() => {})
     spaceApi.list().then((list) => {
       setSpaces(list)
       if (list.length > 0) {

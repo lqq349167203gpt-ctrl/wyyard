@@ -6,7 +6,10 @@ export function useOrganizations() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    organizationApi.list().then(setOrganizations).catch(() => {}).finally(() => setLoading(false))
+    organizationApi.list()
+      .then(data => setOrganizations([...data].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   const hasAnyOrganization = organizations.length > 0

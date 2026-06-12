@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -10,10 +9,9 @@ import psycopg2.pool
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://wyyard:wyyard123@localhost:5432/wyyard",
-)
+from app.config.settings import settings
+
+DB_URL = settings.database_url
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 
