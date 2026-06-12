@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, BookOpen, ArrowUp, ArrowDown } from "lucide-react"
@@ -52,8 +52,8 @@ export default function CoursesPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const filteredCourses = selectedType === "全部" ? courses : courses.filter(c => c.type === selectedType)
-  const sortedCourses = [...filteredCourses].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+  const filteredCourses = useMemo(() => selectedType === "全部" ? courses : courses.filter(c => c.type === selectedType), [courses, selectedType])
+  const sortedCourses = useMemo(() => [...filteredCourses].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)), [filteredCourses])
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedCourses)
 
   const handleMoveCourse = async (course: Course, direction: "up" | "down") => {
