@@ -14,12 +14,18 @@ _cards: Dict[str, MembershipCard] = {}
 _deductions: Dict[str, list] = {}
 
 
+def _migrate_closers(item: MembershipCard) -> MembershipCard:
+    if not item.closers and item.closer_id:
+        item.closers = [{"id": item.closer_id, "name": item.closer_name or "", "amount": 0}]
+    return item
+
+
 def _load():
     global _cards, _deductions
     data = load_data(FILENAME)
     _cards = {}
     for k, v in data.items():
-        _cards[k] = MembershipCard(**v)
+        _cards[k] = _migrate_closers(MembershipCard(**v))
     _deductions = load_data(DEDUCTIONS_FILE) or {}
 
 

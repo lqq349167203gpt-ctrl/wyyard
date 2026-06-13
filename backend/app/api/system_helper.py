@@ -10,6 +10,7 @@ from app.config.settings import settings
 from app.services import system_helper_config_service
 from app.services.chat_history_service import save_message
 from app.models.chat_history import ChatRecordCreate
+from app.services.ai_entry_service import parse_entry_intent, execute_entry, analyze_image_intent
 
 router = APIRouter(prefix="/api/system-helper", tags=["system-helper"])
 
@@ -131,3 +132,39 @@ async def chat(data: SystemHelperRequest):
             ))
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+class ParseEntryRequest(BaseModel):
+    message: str
+    history: list[ChatMessage] = []
+
+
+class ExecuteEntryRequest(BaseModel):
+    action: str
+    data: dict = {}
+
+
+@router.post("/parse-entry")
+async def parse_entry(data: ParseEntryRequest):
+    history = [{"role": m.role, "content": m.content} for m in data.history]
+    result = parse_entry_intent(data.message, history)
+    return result
+
+
+@router.post("/execute-entry")
+async def exec_entry(data: ExecuteEntryRequest):
+    result = execute_entry(data.action, data.data)
+    return result
+
+
+class AnalyzeImageRequest(BaseModel):
+    image: str  # base64 encoded image
+    text: str = ""
+    history: list[ChatMessage] = []
+
+
+@router.post("/analyze-image")
+async def analyze_image(data: AnalyzeImageRequest):
+    history = [{"role": m.role, "content": m.content} for m in data.history]
+    result = analyze_image_intent(data.image, data.text, history)
+    return result

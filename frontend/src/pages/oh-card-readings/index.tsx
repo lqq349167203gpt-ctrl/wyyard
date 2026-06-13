@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { customerApi, ohCardReadingApi, type Customer, type OhCardReading } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { CloserInput, type Closer } from "@/components/closer-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useServerPagination } from "@/hooks/use-server-pagination"
@@ -32,8 +33,7 @@ export function OhCardReadingsContent({ embedded }: { embedded?: boolean } = {})
   const [formNickname, setFormNickname] = useState("")
   const [formPurchaseCount, setFormPurchaseCount] = useState("")
   const [formAmount, setFormAmount] = useState("")
-  const [formCloserId, setFormCloserId] = useState("")
-  const [formCloserName, setFormCloserName] = useState("")
+  const [formClosers, setFormClosers] = useState<Closer[]>([])
   const [formOrganizationId, setFormOrganizationId] = useState("")
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
@@ -125,8 +125,7 @@ export function OhCardReadingsContent({ embedded }: { embedded?: boolean } = {})
     setFormNickname("")
     setFormPurchaseCount("")
     setFormAmount("")
-    setFormCloserId("")
-    setFormCloserName("")
+    setFormClosers([])
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
     setDialogOpen(true)
   }
@@ -137,8 +136,7 @@ export function OhCardReadingsContent({ embedded }: { embedded?: boolean } = {})
     setFormNickname(item.nickname)
     setFormPurchaseCount(String(item.purchase_count))
     setFormAmount(String(item.amount))
-    setFormCloserId(item.closer_id || "")
-    setFormCloserName(item.closer_name || "")
+    setFormClosers(item.closers?.length ? item.closers : (item.closer_id ? [{ id: item.closer_id, name: item.closer_name || "", amount: 0 }] : []))
     setFormOrganizationId(item.organization_id || "")
     setDialogOpen(true)
   }
@@ -152,8 +150,9 @@ export function OhCardReadingsContent({ embedded }: { embedded?: boolean } = {})
         nickname: formNickname,
         purchase_count: parseInt(formPurchaseCount) || 0,
         amount: parseFloat(formAmount) || 0,
-        closer_id: formCloserId || null,
-        closer_name: formCloserName || null,
+        closer_id: formClosers[0]?.id || null,
+        closer_name: formClosers[0]?.name || null,
+        closers: formClosers,
         organization_id: formOrganizationId || null,
       }
       if (editingCase) {
@@ -257,7 +256,7 @@ export function OhCardReadingsContent({ embedded }: { embedded?: boolean } = {})
                   <TableCell className="text-[#2b2f36]">{item.purchase_count} 次</TableCell>
                   <TableCell className="text-[#2b2f36]">¥{item.amount.toLocaleString()}</TableCell>
                   <TableCell className="text-[#2b2f36]">
-                    {item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>}
+                    {item.closers?.length ? item.closers.map(c => c.name).join(", ") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
                   </TableCell>
                   <TableCell className="text-right pr-4">
                     <div className="flex items-center justify-end gap-1">
@@ -343,16 +342,7 @@ export function OhCardReadingsContent({ embedded }: { embedded?: boolean } = {})
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
-              <CustomerSearchInput
-                customers={customers}
-                value={formCloserName || ""}
-                onChange={(v) => {
-                  const name = typeof v === "string" ? v : v[0] || ""
-                  if (!name) { setFormCloserName(""); setFormCloserId("") }
-                }}
-                onSelectItem={(c) => { setFormCloserName(c.nickname); setFormCloserId(c.id) }}
-                placeholder="搜索客户昵称"
-              />
+              <CloserInput customers={customers} value={formClosers} onChange={setFormClosers} defaultAmount={parseFloat(formAmount) || 0} />
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

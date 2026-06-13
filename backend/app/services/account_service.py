@@ -85,8 +85,10 @@ def get_account(account_id: str) -> Optional[Account]:
 
 
 def create_account(data: AccountCreate) -> Account:
-    # 验证归属人唯一性
+    # 验证归属人唯一性（跳过已删除的账号）
     for account in _accounts.values():
+        if account.is_deleted:
+            continue
         if account.owner == data.owner:
             raise ValueError("归属人已存在")
         if account.username == data.username:

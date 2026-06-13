@@ -11,10 +11,16 @@ FILENAME = "other_projects.json"
 _projects: Dict[str, OtherProject] = {}
 
 
+def _migrate_closers(item: OtherProject) -> OtherProject:
+    if not item.closers and item.closer_id:
+        item.closers = [{"id": item.closer_id, "name": item.closer_name or "", "amount": 0}]
+    return item
+
+
 def _load():
     global _projects
     data = load_data(FILENAME)
-    _projects = {k: OtherProject(**v) for k, v in data.items()}
+    _projects = {k: _migrate_closers(OtherProject(**v)) for k, v in data.items()}
 
 
 def _save(project_id: str = ""):

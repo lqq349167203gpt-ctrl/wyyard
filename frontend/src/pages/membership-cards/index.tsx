@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { customerApi, membershipCardApi, type Customer, type MembershipCard } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { CloserInput, type Closer } from "@/components/closer-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useServerPagination } from "@/hooks/use-server-pagination"
@@ -53,8 +54,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
   const [formRemainingCount, setFormRemainingCount] = useState("")
   const [formUnlimited, setFormUnlimited] = useState(false)
   const [formPrice, setFormPrice] = useState("")
-  const [formCloserId, setFormCloserId] = useState("")
-  const [formCloserName, setFormCloserName] = useState("")
+  const [formClosers, setFormClosers] = useState<Closer[]>([])
   const [formOrganizationId, setFormOrganizationId] = useState("")
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
@@ -173,8 +173,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
     setFormRemainingCount("")
     setFormUnlimited(false)
     setFormPrice("")
-    setFormCloserId("")
-    setFormCloserName("")
+    setFormClosers([])
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
     setDialogOpen(true)
   }
@@ -190,8 +189,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
     setFormRemainingCount(item.remaining_count !== null && item.remaining_count !== undefined ? String(item.remaining_count) : "")
     setFormUnlimited(item.remaining_count === null || item.remaining_count === undefined)
     setFormPrice(String(item.price))
-    setFormCloserId(item.closer_id || "")
-    setFormCloserName(item.closer_name || "")
+    setFormClosers(item.closers?.length ? item.closers : (item.closer_id ? [{ id: item.closer_id, name: item.closer_name || "", amount: 0 }] : []))
     setFormOrganizationId(item.organization_id || "")
     setDialogOpen(true)
   }
@@ -210,8 +208,9 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
         duration_type: formDurationType,
         duration_value: formDurationValue ? parseInt(formDurationValue) : null,
         remaining_count: (config.unlimited || formUnlimited) ? null : (formRemainingCount ? parseInt(formRemainingCount) : null),
-        closer_id: formCloserId || null,
-        closer_name: formCloserName || null,
+        closer_id: formClosers[0]?.id || null,
+        closer_name: formClosers[0]?.name || null,
+        closers: formClosers,
         organization_id: formOrganizationId || null,
       }
       if (editingCard) {
@@ -329,7 +328,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
                       : <span className="text-[12px] text-[#4e535a] font-light">不限</span>}
                   </TableCell>
                   <TableCell className="text-[#2b2f36]">
-                    {item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>}
+                    {item.closers?.length ? item.closers.map(c => c.name).join(", ") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
                   </TableCell>
                   <TableCell className="text-right pr-4">
                     <div className="flex items-center justify-end gap-1">
@@ -508,16 +507,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
-              <CustomerSearchInput
-                customers={customers}
-                value={formCloserName || ""}
-                onChange={(v) => {
-                  const name = typeof v === "string" ? v : v[0] || ""
-                  if (!name) { setFormCloserName(""); setFormCloserId("") }
-                }}
-                onSelectItem={(c) => { setFormCloserName(c.nickname); setFormCloserId(c.id) }}
-                placeholder="搜索客户昵称"
-              />
+              <CloserInput customers={customers} value={formClosers} onChange={setFormClosers} defaultAmount={parseFloat(formPrice) || 0} />
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

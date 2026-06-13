@@ -146,6 +146,36 @@ export const systemHelperApi = {
       }
     }
   },
+
+  parseEntry: async (message: string, history: { role: string; content: string }[] = []) => {
+    const res = await fetch("/api/system-helper/parse-entry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, history }),
+    })
+    if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+    return res.json()
+  },
+
+  executeEntry: async (action: string, data: Record<string, any> = {}) => {
+    const res = await fetch("/api/system-helper/execute-entry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, data }),
+    })
+    if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+    return res.json()
+  },
+
+  analyzeImage: async (image: string, text: string = "", history: { role: string; content: string }[] = []) => {
+    const res = await fetch("/api/system-helper/analyze-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image, text, history }),
+    })
+    if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+    return res.json()
+  },
 }
 
 
@@ -633,6 +663,7 @@ export interface GroupCase {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
   created_at: string
   updated_at: string
@@ -645,6 +676,7 @@ export interface GroupCaseCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
 }
 
@@ -725,6 +757,7 @@ export interface OhCardReading {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
   created_at: string
   updated_at: string
@@ -737,6 +770,7 @@ export interface OhCardReadingCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
 }
 
@@ -809,6 +843,7 @@ export interface EnergyKnot {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
   created_at: string
   updated_at: string
@@ -821,6 +856,7 @@ export interface EnergyKnotCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
 }
 
@@ -842,6 +878,7 @@ export interface EmotionalRelease {
   amount: number
   closer_id: string | null
   closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
   created_at: string
   updated_at: string
@@ -854,6 +891,7 @@ export interface EmotionalReleaseCreate {
   amount?: number
   closer_id?: string | null
   closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
 }
 
@@ -1044,6 +1082,7 @@ export interface InternalCourse {
   expiry_date: string | null
   closer_id: string | null
   closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
   created_at: string
   updated_at: string
@@ -1058,6 +1097,7 @@ export interface InternalCourseCreate {
   expiry_date?: string | null
   closer_id?: string | null
   closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
 }
 
@@ -1084,6 +1124,7 @@ export interface MembershipCard {
   expiry_date: string | null
   closer_id: string | null
   closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
   created_at: string
   updated_at: string
@@ -1101,6 +1142,7 @@ export interface MembershipCardCreate {
   expiry_date?: string | null
   closer_id?: string | null
   closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
 }
 
@@ -1128,6 +1170,7 @@ export interface OtherProject {
   expiry_date: string | null
   closer_id: string | null
   closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
   created_at: string
   updated_at: string
@@ -1146,6 +1189,7 @@ export interface OtherProjectCreate {
   expiry_date?: string | null
   closer_id?: string | null
   closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
 }
 

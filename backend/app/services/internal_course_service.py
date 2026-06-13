@@ -11,12 +11,18 @@ FILENAME = "internal_courses.json"
 _courses: Dict[str, InternalCourse] = {}
 
 
+def _migrate_closers(item: InternalCourse) -> InternalCourse:
+    if not item.closers and item.closer_id:
+        item.closers = [{"id": item.closer_id, "name": item.closer_name or "", "amount": 0}]
+    return item
+
+
 def _load():
     global _courses
     data = load_data(FILENAME)
     _courses = {}
     for k, v in data.items():
-        _courses[k] = InternalCourse(**v)
+        _courses[k] = _migrate_closers(InternalCourse(**v))
 
 
 def _save(item_id: str = ""):

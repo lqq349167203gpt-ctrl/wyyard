@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 
 class InternalCourseBase(BaseModel):
@@ -12,6 +12,7 @@ class InternalCourseBase(BaseModel):
     expiry_date: Optional[str] = None
     closer_id: Optional[str] = None
     closer_name: Optional[str] = None
+    closers: List[dict] = []
     organization_id: Optional[str] = None
 
 

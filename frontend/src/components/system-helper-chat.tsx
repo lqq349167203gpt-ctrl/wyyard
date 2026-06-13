@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, HelpCircle, ExternalLink, Square } from "lucide-react"
+import { Send, HelpCircle, ExternalLink, Square, Image as ImageIcon, X } from "lucide-react"
 import { systemHelperApi } from "@/lib/api"
+import { ActionCard, type ActionData } from "@/components/action-card"
 
 export interface ChatMessage {
   role: "user" | "assistant"
@@ -14,6 +15,8 @@ const EXAMPLE_QUESTIONS = [
   "会员活动在哪里？",
   "怎么安排活动？",
   "如何查看操作日志？",
+  "今天张三来参加了瑜伽课",
+  "李四买了399次卡",
 ]
 
 interface NavLink {
@@ -41,24 +44,52 @@ interface SystemHelperChatProps {
 
 export function SystemHelperChat({ messages, setMessages, sending, setSending, onNavigate, currentUser }: SystemHelperChatProps) {
   const [input, setInput] = useState("")
+  const [pendingAction, setPendingAction] = useState<ActionData | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [messages, pendingAction])
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string
+      const base64Data = base64.split(",")[1]
+      setSelectedImage(base64Data)
+      setImagePreview(base64)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const clearImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
 
   const handleSend = async (text?: string) => {
     const content = text || input.trim()
-    if (!content || sending) return
+    if ((!content && !selectedImage) || sending) return
 
-    const userMsg: ChatMessage = { role: "user", content }
+    const userMsg: ChatMessage = { role: "user", content: content || "[图片]" }
     setMessages((prev) => [...prev, userMsg])
     setInput("")
     setSending(true)
+    setPendingAction(null)
 
-    const controller = new AbortController()
-    abortRef.current = controller
+    const imageData = selectedImage
+    clearImage()
 
     try {
       const history: ChatMessage[] = messages.map((m) => ({
@@ -66,48 +97,66 @@ export function SystemHelperChat({ messages, setMessages, sending, setSending, o
         content: m.content,
       }))
 
-      const userRole = currentUser?.role
-      let permissions: string[] = []
-      try {
-        permissions = JSON.parse(localStorage.getItem("userPermissions") || "[]")
-      } catch {}
+      let result
+      if (imageData) {
+        result = await systemHelperApi.analyzeImage(imageData, content, history)
+      } else {
+        result = await systemHelperApi.parseEntry(content, history)
+      }
 
-      // 添加一个空的 assistant 消息用于流式更新
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
-
-      const stream = systemHelperApi.chat(content, history, userRole, permissions, controller.signal)
-      let fullContent = ""
-
-      for await (const chunk of stream) {
-        fullContent += chunk
-        setMessages((prev) => {
-          const newMessages = [...prev]
-          newMessages[newMessages.length - 1] = { role: "assistant", content: fullContent }
-          return newMessages
-        })
+      if (result.action === "chat") {
+        setMessages((prev) => [...prev, { role: "assistant", content: result.message || "" }])
+      } else {
+        const actionData: ActionData = {
+          action: result.action,
+          confidence: result.confidence,
+          data: result.data || {},
+          missing_required: result.missing_required || [],
+          missing_optional: result.missing_optional || [],
+          customer_candidates: result.customer_candidates || [],
+          message: result.message,
+        }
+        setMessages((prev) => [...prev, { role: "assistant", content: result.message || "" }])
+        setPendingAction(actionData)
       }
     } catch (err: any) {
-      if (err?.name !== "AbortError") {
-        setMessages((prev) => {
-          const newMessages = [...prev]
-          // 如果最后一条是空的 assistant 消息，替换它；否则新增
-          if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === "assistant" && newMessages[newMessages.length - 1].content === "") {
-            newMessages[newMessages.length - 1] = { role: "assistant", content: "抱歉，请求出错了，请重试。" }
-          } else {
-            newMessages.push({ role: "assistant", content: "抱歉，请求出错了，请重试。" })
-          }
-          return newMessages
-        })
-      }
+      setMessages((prev) => [...prev, { role: "assistant", content: "抱歉，请求出错了，请重试。" }])
     } finally {
       setSending(false)
-      abortRef.current = null
     }
   }
 
-  const handleStop = () => {
-    abortRef.current?.abort()
-    setSending(false)
+  const handleConfirm = async () => {
+    if (!pendingAction) return
+    setActionLoading(true)
+    try {
+      const result = await systemHelperApi.executeEntry(pendingAction.action, pendingAction.data)
+      if (result.success) {
+        setMessages((prev) => [...prev, { role: "assistant", content: `✅ ${result.message}` }])
+      } else {
+        setMessages((prev) => [...prev, { role: "assistant", content: `❌ ${result.message}` }])
+      }
+      setPendingAction(null)
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: "assistant", content: "❌ 录入失败，请重试。" }])
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setPendingAction(null)
+    setMessages((prev) => [...prev, { role: "assistant", content: "已取消录入。" }])
+  }
+
+  const handleSelectCustomer = (customerId: string, nickname: string) => {
+    if (!pendingAction) return
+    setPendingAction({
+      ...pendingAction,
+      data: { ...pendingAction.data, customer_id: customerId, nickname },
+      customer_candidates: undefined,
+      missing_required: (pendingAction.missing_required || []).filter(f => f !== "customer_id"),
+    })
   }
 
   return (
@@ -118,7 +167,7 @@ export function SystemHelperChat({ messages, setMessages, sending, setSending, o
           <div className="flex flex-col items-center justify-center h-full text-center">
             <HelpCircle className="h-10 w-10 text-[#8f959e] mb-3" />
             <p className="text-sm text-[#2b2f36] font-medium">茶苑助手</p>
-            <p className="text-xs text-[#8f959e] mt-1">问我任何系统操作相关的问题</p>
+            <p className="text-xs text-[#8f959e] mt-1">问我任何系统操作相关的问题，或输入要录入的信息</p>
             <div className="mt-4 space-y-2 w-full">
               {EXAMPLE_QUESTIONS.map((q) => (
                 <button
@@ -142,15 +191,11 @@ export function SystemHelperChat({ messages, setMessages, sending, setSending, o
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div className="max-w-[80%]">
-                <div
-                  className={`px-3 py-2 rounded-lg text-[13px] whitespace-pre-wrap ${
-                    msg.role === "user"
-                      ? "bg-[#3370ff] text-white"
-                      : "bg-[#f7f8fa] text-[#2b2f36]"
-                  }`}
-                >
-                  {parsed ? parsed.text : msg.content}
-                </div>
+                {parsed && parsed.text && (
+                  <div className="px-3 py-2 rounded-lg text-[13px] whitespace-pre-wrap bg-[#f7f8fa] text-[#2b2f36]">
+                    {parsed.text}
+                  </div>
+                )}
                 {parsed && parsed.links.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {parsed.links.map((link, j) => (
@@ -165,11 +210,29 @@ export function SystemHelperChat({ messages, setMessages, sending, setSending, o
                     ))}
                   </div>
                 )}
+                {!isAssistant && (
+                  <div className="px-3 py-2 rounded-lg text-[13px] whitespace-pre-wrap bg-[#3370ff] text-white">
+                    {msg.content}
+                  </div>
+                )}
               </div>
             </div>
           )
         })}
-        {sending && messages[messages.length - 1]?.content === "" && (
+
+        {pendingAction && (
+          <div className="flex justify-start">
+            <ActionCard
+              actionData={pendingAction}
+              onConfirm={handleConfirm}
+              onCancel={handleCancel}
+              onSelectCustomer={handleSelectCustomer}
+              loading={actionLoading}
+            />
+          </div>
+        )}
+
+        {sending && (
           <div className="flex justify-start">
             <div className="bg-[#f7f8fa] px-3 py-2 rounded-lg text-[13px] text-[#8f959e]">
               <span className="inline-flex gap-1">
@@ -184,25 +247,54 @@ export function SystemHelperChat({ messages, setMessages, sending, setSending, o
       </div>
 
       {/* 输入区 */}
-      <div className="border-t px-4 py-3 flex gap-2">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !sending && handleSend()}
-          placeholder="输入问题..."
-          disabled={sending}
-          className="flex-1 min-h-[64px] text-xs resize-none"
-          rows={2}
-        />
-        {sending ? (
-          <Button onClick={handleStop} size="sm" variant="outline" className="h-8 px-3">
-            <Square className="h-3.5 w-3.5 fill-current" />
-          </Button>
-        ) : (
-          <Button onClick={() => handleSend()} disabled={!input.trim()} size="sm" className="h-8 px-3">
-            <Send className="h-3.5 w-3.5" />
-          </Button>
+      <div className="border-t px-4 py-3">
+        {imagePreview && (
+          <div className="mb-2 relative inline-block">
+            <img src={imagePreview} alt="预览" className="h-20 rounded border border-[#e0e0e0]" />
+            <button
+              onClick={clearImage}
+              className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-[#f54a45] text-white rounded-full flex items-center justify-center"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
         )}
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+          </Button>
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !sending && handleSend()}
+            placeholder="输入问题、录入信息或上传图片..."
+            disabled={sending}
+            className="flex-1 min-h-[64px] text-xs resize-none"
+            rows={2}
+          />
+          {sending ? (
+            <Button onClick={() => {}} size="sm" variant="outline" className="h-8 px-3" disabled>
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </Button>
+          ) : (
+            <Button onClick={() => handleSend()} disabled={!input.trim() && !selectedImage} size="sm" className="h-8 px-3">
+              <Send className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )

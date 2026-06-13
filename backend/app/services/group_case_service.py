@@ -10,12 +10,18 @@ FILENAME = "group_cases.json"
 _cases: Dict[str, GroupCase] = {}
 
 
+def _migrate_closers(item: GroupCase) -> GroupCase:
+    if not item.closers and item.closer_id:
+        item.closers = [{"id": item.closer_id, "name": item.closer_name or "", "amount": 0}]
+    return item
+
+
 def _load():
     global _cases
     data = load_data(FILENAME)
     _cases = {}
     for k, v in data.items():
-        _cases[k] = GroupCase(**v)
+        _cases[k] = _migrate_closers(GroupCase(**v))
 
 
 def _save(case_id: str = ""):

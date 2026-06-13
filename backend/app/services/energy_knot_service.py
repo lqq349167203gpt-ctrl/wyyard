@@ -10,12 +10,18 @@ FILENAME = "energy_knots.json"
 _knots: Dict[str, EnergyKnot] = {}
 
 
+def _migrate_closers(item: EnergyKnot) -> EnergyKnot:
+    if not item.closers and item.closer_id:
+        item.closers = [{"id": item.closer_id, "name": item.closer_name or "", "amount": 0}]
+    return item
+
+
 def _load():
     global _knots
     data = load_data(FILENAME)
     _knots = {}
     for k, v in data.items():
-        _knots[k] = EnergyKnot(**v)
+        _knots[k] = _migrate_closers(EnergyKnot(**v))
 
 
 def _save(knot_id: str = ""):

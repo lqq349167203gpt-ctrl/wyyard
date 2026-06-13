@@ -335,7 +335,7 @@ def _build_payment_records(customer_id: str) -> list:
             "amount": c.price,
             "effective_date": c.effective_date,
             "expiry_date": c.expiry_date or "",
-            "closer_name": c.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in c.closers) if c.closers else (c.closer_name or ""),
             "created_at": c.effective_date,
         })
 
@@ -349,7 +349,7 @@ def _build_payment_records(customer_id: str) -> list:
             "amount": c.amount,
             "effective_date": c.created_at.strftime("%Y-%m-%d"),
             "expiry_date": "",
-            "closer_name": c.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in c.closers) if c.closers else (c.closer_name or ""),
             "created_at": c.created_at.strftime("%Y-%m-%d"),
         })
 
@@ -363,7 +363,7 @@ def _build_payment_records(customer_id: str) -> list:
             "amount": r.amount,
             "effective_date": r.created_at.strftime("%Y-%m-%d"),
             "expiry_date": "",
-            "closer_name": r.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in r.closers) if r.closers else (r.closer_name or ""),
             "created_at": r.created_at.strftime("%Y-%m-%d"),
         })
 
@@ -377,7 +377,7 @@ def _build_payment_records(customer_id: str) -> list:
             "amount": k.amount,
             "effective_date": k.created_at.strftime("%Y-%m-%d"),
             "expiry_date": "",
-            "closer_name": k.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in k.closers) if k.closers else (k.closer_name or ""),
             "created_at": k.created_at.strftime("%Y-%m-%d"),
         })
 
@@ -391,7 +391,7 @@ def _build_payment_records(customer_id: str) -> list:
             "amount": c.price,
             "effective_date": c.effective_date,
             "expiry_date": c.expiry_date or "",
-            "closer_name": "",
+            "closer_name": ", ".join(cl["name"] for cl in c.closers) if c.closers else (c.closer_name or ""),
             "created_at": c.effective_date,
         })
 
@@ -420,7 +420,7 @@ def _build_payment_records(customer_id: str) -> list:
             "amount": p.fee,
             "effective_date": p.effective_date,
             "expiry_date": p.expiry_date or "",
-            "closer_name": p.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in p.closers) if p.closers else (p.closer_name or ""),
             "created_at": created,
         })
 

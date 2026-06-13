@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 
 class EnergyKnotBase(BaseModel):
@@ -10,6 +10,7 @@ class EnergyKnotBase(BaseModel):
     amount: float = 0.0
     closer_id: Optional[str] = None
     closer_name: Optional[str] = None
+    closers: List[dict] = []
     organization_id: Optional[str] = None
 
 

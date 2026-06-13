@@ -10,12 +10,18 @@ FILENAME = "emotional_releases.json"
 _releases: Dict[str, EmotionalRelease] = {}
 
 
+def _migrate_closers(item: EmotionalRelease) -> EmotionalRelease:
+    if not item.closers and item.closer_id:
+        item.closers = [{"id": item.closer_id, "name": item.closer_name or "", "amount": 0}]
+    return item
+
+
 def _load():
     global _releases
     data = load_data(FILENAME)
     _releases = {}
     for k, v in data.items():
-        _releases[k] = EmotionalRelease(**v)
+        _releases[k] = _migrate_closers(EmotionalRelease(**v))
 
 
 def _save(release_id: str = ""):

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 
 class MembershipCardBase(BaseModel):
@@ -13,8 +13,9 @@ class MembershipCardBase(BaseModel):
     duration_value: Optional[int] = None  # 时长数值
     remaining_count: Optional[int] = None  # 剩余次数（null 表示不限次）
     expiry_date: Optional[str] = None  # 到期日期（自动计算）
-    closer_id: Optional[str] = None  # 成交人ID
-    closer_name: Optional[str] = None  # 成交人昵称
+    closer_id: Optional[str] = None  # 成交人ID（旧字段，兼容）
+    closer_name: Optional[str] = None  # 成交人昵称（旧字段，兼容）
+    closers: List[dict] = []  # 多成交人 [{"id": "xxx", "name": "张三", "amount": 100.0}]
     organization_id: Optional[str] = None
 
 

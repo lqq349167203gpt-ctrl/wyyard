@@ -10,12 +10,19 @@ FILENAME = "oh_card_readings.json"
 _readings: Dict[str, OhCardReading] = {}
 
 
+def _migrate_closers(item: OhCardReading):
+    if not item.closers and item.closer_id:
+        item.closers = [{"id": item.closer_id, "name": item.closer_name or "", "amount": 0}]
+
+
 def _load():
     global _readings
     data = load_data(FILENAME)
     _readings = {}
     for k, v in data.items():
-        _readings[k] = OhCardReading(**v)
+        reading = OhCardReading(**v)
+        _migrate_closers(reading)
+        _readings[k] = reading
 
 
 def _save(reading_id: str = ""):
