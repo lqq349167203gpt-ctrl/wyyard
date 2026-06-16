@@ -31,6 +31,8 @@ export interface CustomerSearchInputProps {
   className?: string
   /** Called when user clicks "新增用户" in no-results state */
   onNoResultsClick?: (searchText: string) => void
+  /** Called when input loses focus with current text */
+  onBlur?: (value: string) => void
 }
 
 export function CustomerSearchInput({
@@ -46,6 +48,7 @@ export function CustomerSearchInput({
   filterSelected = false,
   className = "",
   onNoResultsClick,
+  onBlur,
 }: CustomerSearchInputProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -194,8 +197,10 @@ export function CustomerSearchInput({
               onChange(v)
             }}
             onFocus={() => { calcPos(); setOpen(true) }}
+            onBlur={() => { setTimeout(() => onBlur?.(typeof value === "string" ? value : ""), 150) }}
             placeholder={placeholder}
             disabled={disabled}
+            className={className}
             autoComplete="off"
           />
           {typeof value === "string" && value && (

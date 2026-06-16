@@ -140,6 +140,24 @@ input[type="date"].date-empty::-webkit-calendar-picker-indicator {
   filter: grayscale(1);
 }
 
+/* 时间选择框图标基础样式 */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  width: 16px;
+  height: 14px;
+  padding: 0;
+}
+
+/* 时间选择框图标样式：始终浅灰 */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  width: 16px;
+  height: 14px;
+  padding: 0;
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
 /* 飞书侧边栏：去掉右侧边框 */
 [data-slot="sidebar-container"] {
   border-right: none !important;
@@ -153,4 +171,9 @@ input[type="date"].date-empty::-webkit-calendar-picker-indicator {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* 禁用触控板左右滑动前进/后退 */
+html {
+  overscroll-behavior-x: none;
 }

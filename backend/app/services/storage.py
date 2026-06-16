@@ -1,8 +1,11 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict
 
 import psycopg2
+
+logger = logging.getLogger(__name__)
 import psycopg2.extras
 import psycopg2.pool
 
@@ -105,7 +108,13 @@ def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
                 f'INSERT INTO "{table}" (id, data) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data',
                 (item_id, json.dumps(item_data, ensure_ascii=False)),
             )
+            print(f"[SAVE] {table}/{item_id}: rowcount={cur.rowcount}", flush=True)
         conn.commit()
+    except Exception as e:
+        print(f"[SAVE_ERROR] {table}/{item_id}: {e}", flush=True)
+        try: conn.rollback()
+        except: pass
+        raise
     finally:
         _put_conn(conn)
 

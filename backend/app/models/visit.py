@@ -24,6 +24,7 @@ class VisitRecordBase(BaseModel):
     activity_id: str = ""
     activity_type: str = ""
     space_id: str = ""  # 所属空间
+    is_leader: bool = False  # 是否组长
     arrived: bool = False  # 是否到店
     arrival_time: str = ""  # 实际到场时间 HH:MM
     activity_participation: list = []  # [{name, role, participated}]

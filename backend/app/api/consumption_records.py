@@ -15,6 +15,55 @@ from app.services import (
 
 router = APIRouter(prefix="/api/consumption-records", tags=["consumption-records"])
 
+
+@router.get("/daily-totals")
+def get_daily_payment_totals(date: str = Query(...)):
+    """返回指定日期各客户的成交总额 {customer_id: total_amount}"""
+    totals: dict[str, float] = {}
+
+    # 会员活动
+    for c in membership_card_service.list_cards():
+        if (c.effective_date or "") == date:
+            totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
+
+    # 觉醒游戏
+    for c in group_case_service.list_cases():
+        created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
+        if created == date:
+            totals[c.customer_id] = totals.get(c.customer_id, 0) + c.amount
+
+    # 情绪释放
+    for r in emotional_release_service.list_releases():
+        created = r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at)
+        if created == date:
+            totals[r.customer_id] = totals.get(r.customer_id, 0) + r.amount
+
+    # 能量结
+    for k in energy_knot_service.list_knots():
+        created = k.created_at.strftime("%Y-%m-%d") if hasattr(k.created_at, "strftime") else str(k.created_at)
+        if created == date:
+            totals[k.customer_id] = totals.get(k.customer_id, 0) + k.amount
+
+    # 内部课程
+    for c in internal_course_service.list_courses():
+        if (c.effective_date or "") == date:
+            totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
+
+    # OH卡梳理
+    for r in oh_card_reading_service.list_readings():
+        created = r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at)
+        if created == date:
+            totals[r.customer_id] = totals.get(r.customer_id, 0) + r.amount
+
+    # 其他项目
+    for p in other_project_service.list_projects():
+        effective = p.effective_date or (p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at))
+        if effective == date:
+            totals[p.customer_id] = totals.get(p.customer_id, 0) + p.fee
+
+    return totals
+
+
 TYPE_LABELS = {
     "membership-cards": "会员活动",
     "group-cases": "觉醒游戏",

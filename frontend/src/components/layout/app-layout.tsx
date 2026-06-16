@@ -74,7 +74,7 @@ export function AppLayout() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         <header className="flex h-11 items-center justify-between bg-white px-5 border-b-[6px] border-[#f7f8fa]">
           <SidebarTrigger />
           <div className="flex items-center gap-2">
@@ -89,7 +89,7 @@ export function AppLayout() {
             </Button>
           </div>
         </header>
-        <main className="flex-1 min-w-0 overflow-auto bg-white">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-white">
           <Outlet />
         </main>
       </SidebarInset>

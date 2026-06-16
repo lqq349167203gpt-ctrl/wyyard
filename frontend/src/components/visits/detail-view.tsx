@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { ChevronLeft, ChevronRight, Edit, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Edit, Trash2, Download } from "lucide-react"
+import * as XLSX from "xlsx-js-style"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,7 @@ import { visitApi, customerApi, accountApi, type VisitRecord, type CustomerLight
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
+import { BatchInputTable } from "./batch-input-table"
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("sv-SE")
@@ -34,9 +36,10 @@ interface DetailViewProps {
   onDataLoaded?: (visits: VisitRecord[]) => void
   spaceId?: string
   onRequireSpaces?: () => void
+  groups?: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded, spaceId, onRequireSpaces }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -64,8 +67,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   })
   const [selectedReferrerHandler, setSelectedReferrerHandler] = useState<CustomerLight | null>(null)
   const [saving, setSaving] = useState(false)
+  const [tableSavedCount, setTableSavedCount] = useState(0)
+  const [savingCount, setSavingCount] = useState(0)
   const [errorMessage, setErrorMessage] = useState("")
   const [deleteId, setDeleteId] = useState<string | null>(null)
+
   const [editVisit, setEditVisit] = useState<VisitRecord | null>(null)
   const [editDate, setEditDate] = useState("")
   const [editNeeds, setEditNeeds] = useState("")
@@ -280,6 +286,91 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
   }
 
+  const handleExport = () => {
+    const customerMap = new Map(customerList.map(c => [c.id, c]))
+    // 构建角色映射
+    const roleMap = new Map<string, string>()       // id → "组长"/"副组长"/""
+    groups.forEach(g => {
+      if (g.leader_id) roleMap.set(g.leader_id, "组长")
+      if (g.deputy_id) roleMap.set(g.deputy_id, "副组长")
+    })
+    // 未分组的用 is_leader 字段兜底
+    const rows = filteredVisits.map(v => {
+      const role = roleMap.get(v.customer_id) || (v.is_leader ? "组长" : "")
+      return {
+        "引流人": customerMap.get(v.customer_id)?.referrer || "-",
+        "客户昵称": v.nickname,
+        "预计时间": v.visit_time || "",
+        "参与次数": v.visit_count || 0,
+        "会员身份": v.member_type || "",
+        "当日需求": v.needs || "",
+        "组长情况": role || "-",
+        "组长获得的信息": "",
+        "邀约人": v.referrer_handler || "",
+      }
+    })
+    if (!rows.length) return
+    const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
+    ws['!cols'] = [
+      { wch: 10 }, // 引流人
+      { wch: 12 }, // 客户昵称
+      { wch: 10 }, // 预计时间
+      { wch: 10 }, // 参与次数
+      { wch: 12 }, // 会员身份
+      { wch: 40 }, // 当日需求
+      { wch: 10 }, // 组长情况
+      { wch: 30 }, // 组长获得的信息
+      { wch: 10 }, // 邀约人
+    ]
+    ws['!sheetPr'] = { showGridLines: false }
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+    // 按内容自动计算行高
+    const colWidths = ws['!cols']?.map(c => c.wch || 10) || []
+    ws['!rows'] = Array.from({ length: range.e.r + 1 }, (_, row) => {
+      let maxLines = 1
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
+        const cell = ws[cellRef]
+        if (!cell?.v) continue
+        const text = String(cell.v)
+        const wch = colWidths[col] || 10
+        // 估算每行能放的字符数（中文约2字符宽度）
+        let lineLen = 0, lines = 1
+        for (const ch of text) {
+          lineLen += ch.charCodeAt(0) > 127 ? 2 : 1
+          if (lineLen > wch) { lines++; lineLen = ch.charCodeAt(0) > 127 ? 2 : 1 }
+        }
+        if (lines > maxLines) maxLines = lines
+      }
+      return { hpt: Math.max(30, maxLines * 18) }
+    })
+    const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
+    const baseStyle = {
+      alignment: { vertical: "center", wrapText: true },
+      border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+    }
+    for (let row = 0; row <= range.e.r; row++) {
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
+        if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
+      }
+    }
+    // 参与次数列（第3列）内容左对齐
+    const countColStyle = { alignment: { vertical: "center", horizontal: "left", wrapText: true } }
+    for (let row = 1; row <= range.e.r; row++) {
+      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 })
+      if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...countColStyle }
+    }
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "D0D3D6" } } }
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
+      if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...headerStyle }
+    }
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "邀约到场")
+    XLSX.writeFile(wb, `邀约到场_${selectedDate}.xlsx`)
+  }
+
   return (
     <div className="w-full space-y-3">
       {/* 日期条 */}
@@ -323,114 +414,24 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       )}
 
       {/* 到场人员列表 */}
-      <div className="bg-white rounded-lg">
-        <div className="px-4 py-3 flex items-center gap-5 overflow-visible">
+      <div className="bg-white rounded-lg overflow-x-auto">
+        <div className="px-4 py-3 flex items-center justify-between overflow-visible">
           <div className="flex items-center shrink-0">
             <span className="text-xs font-medium text-[#2b2f36]">预计到场</span>
             <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.length} 人</span>
+            {savingCount > 0 ? (
+              <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
+            ) : tableSavedCount > 0 ? (
+              <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
+            ) : null}
           </div>
-          <div className="flex items-center gap-3 min-w-0 ml-5">
-            <span className="text-xs text-[#4e535a] shrink-0">邀约人员</span>
-          <Input
-            type="time"
-            value={visitTime}
-            onChange={(e) => setVisitTime(e.target.value)}
-            className="h-8 text-xs w-24 shrink-0"
-          />
-          {/* 搜索用户 */}
-          <div className="w-24">
-            <CustomerSearchInput
-              customers={customerList as any[]}
-              value={searchKeyword}
-              onChange={(v) => setSearchKeyword(v as string)}
-              onSelectItem={(customer) => {
-                setSelectedCustomer(customer)
-                setSearchKeyword(customer.nickname)
-              }}
-              placeholder="客户昵称"
-              onNoResultsClick={(text) => {
-                setCustomerForm({ nickname: text })
-                setAgeRange("")
-                setShowAddUserDialog(true)
-              }}
-            />
-          </div>
-          {/* 本次需求 */}
-          <div className="w-[400px] min-w-[400px] shrink-0">
-            <Textarea
-              value={needs}
-              onChange={(e) => setNeeds(e.target.value)}
-              placeholder="本次到场的需求是..."
-              className="h-8 text-xs min-h-[32px] resize-none"
-              rows={1}
-            />
-          </div>
-          <div className="w-24">
-            <CustomerSearchInput
-              customers={customerList as any[]}
-              value={referrerHandler}
-              onChange={(v) => setReferrerHandler(v as string)}
-              onSelectItem={(customer) => {
-                setSelectedReferrerHandler(customer)
-                setReferrerHandler(customer.nickname)
-              }}
-              placeholder="邀约人"
-            />
-          </div>
-
-          {/* 新增按钮 */}
-          <Button size="sm" className="h-8 text-xs px-6" onClick={handleAdd} disabled={saving}>
-            {saving ? "添加中..." : "新增"}
+          <Button size="sm" variant="outline" className="h-6 text-xs" onClick={handleExport}>
+            <Download className="mr-1 h-3 w-3" /> 导出
           </Button>
-          </div>
         </div>
-        {loading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : filteredVisits.length === 0 ? (
-          <p className="py-16 text-center text-xs text-[#8f959e]">当日暂无到场人员</p>
-        ) : (
-          <div className="p-2 space-y-0.5">
-            {/* 表头 */}
-            <div className="flex items-center px-3 h-[42px] text-[12px] font-normal text-[#8f959e] rounded-t-lg gap-3 bg-[#fafbfc]">
-              <span className="w-[80px] shrink-0">昵称</span>
-              <span className="flex-1 min-w-[200px]">本次需求</span>
-              <span className="w-[88px] shrink-0">会员身份</span>
-              <span className="w-[120px] shrink-0">参与活动</span>
-              <span className="w-[72px] shrink-0">剩余次数</span>
-              <span className="w-[100px] shrink-0">预计时间</span>
-              <span className="w-[64px] shrink-0">邀约人</span>
-              <span className="w-[72px] shrink-0 text-right">操作</span>
-            </div>
-            {filteredVisits.slice(0, visibleCount).map((v) => (
-              <div key={v.id} className="rounded hover:bg-[#f7f8fa]">
-                {/* 主行：固定列宽 */}
-                <div className="flex items-center px-3 py-1.5 gap-3">
-                  <span
-                    className="w-[80px] shrink-0 text-[12px] text-[#2b2f36] truncate cursor-pointer hover:text-[#3370ff]"
-                    onClick={() => onCustomerClick?.(v.customer_id)}
-                  >{v.nickname}</span>
-                  <span className="flex-1 min-w-[200px] text-[12px] text-[#8f959e] break-words">{v.needs || "-"}</span>
-                  <span className="w-[88px] shrink-0 text-[12px] text-[#8f959e] truncate">{v.member_type || "-"}</span>
-                  <span className="w-[120px] shrink-0 text-[12px] text-[#8f959e]"><span className="text-[#2b2f36]">{v.activity_count}</span> 次{v.welfare_count > 0 && <span className="text-[#8f959e]">（公益<span className="text-[#2b2f36]">{v.welfare_count}</span>次）</span>}</span>
-                  <span className="w-[72px] shrink-0 text-[12px] text-[#8f959e]">{v.remaining_count == null ? "无卡" : v.remaining_count === -1 ? "不限" : <><span className="text-[#2b2f36]">{v.remaining_count}</span> 次</>}</span>
-                  <span className="w-[100px] shrink-0 text-[12px] text-[#8f959e] whitespace-nowrap">{v.visit_time || "09:00"}</span>
-                  <span className="w-[64px] shrink-0 text-[12px] text-[#2b2f36] truncate">{v.referrer_handler || <span className="text-[#8f959e]">-</span>}</span>
-                  <div className="w-[72px] shrink-0 flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditVisit(v); setEditDate(v.visit_date); setEditNeeds(v.needs) }}>
-                      <Edit className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(v.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {visibleCount < filteredVisits.length && (
-              <div ref={sentinelRef} className="h-4" />
-            )}
-          </div>
-        )}
+        <BatchInputTable date={selectedDate} customers={customerList} spaceId={spaceId} onSaved={() => {
+          refreshCounts()
+        }} onSavedCountChange={setTableSavedCount} onSavingCountChange={setSavingCount} onCustomerClick={onCustomerClick} onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }} />
       </div>
 
       {/* 删除确认 */}

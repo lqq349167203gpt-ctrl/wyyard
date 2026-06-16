@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { BookOpen, ChevronRight, ChevronLeft, X } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
-import GroupingView from "@/components/grouping-view"
 import { Button } from "@/components/ui/button"
 
 import { Input } from "@/components/ui/input"
@@ -15,7 +14,7 @@ import {
 import { classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi, energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi, courseApi, customerApi, visitApi, dailyGroupingApi, spaceApi, membershipCardApi, type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession, type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession, type Course, type Customer, type VisitRecord, type Space, type MembershipCard } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
-import ArrivalConfirmationView from "./arrival-confirmation"
+
 import ActivityCardList from "./activity-card-list"
 import CustomerDetailView from "@/pages/healing-records/components/detail-view"
 import { SpaceDropdown } from "@/components/space-dropdown"
@@ -54,9 +53,13 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
     try { return localStorage.getItem("selected-space-id") || "" } catch { return "" }
   })
 
-  const [detailDate, setDetailDate] = useState(today)
+  const [detailDate, setDetailDate] = useState(() => {
+    const saved = localStorage.getItem("visit_selected_date")
+    return saved || today
+  })
+  useEffect(() => { localStorage.setItem("visit_selected_date", detailDate) }, [detailDate])
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
-  const [detailTab, setDetailTab] = useState<"visitors" | "activities" | "arrival_confirmation" | "grouping">(() => {
+  const [detailTab, setDetailTab] = useState<"visitors" | "activities">(() => {
     try {
       const perms: string[] = JSON.parse(localStorage.getItem("userPermissions") || "[]")
       const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
@@ -64,7 +67,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       const has = (k: string) => isSA || perms.includes(k) || perms.includes("class-records")
       if (has("class-records-visitors")) return "visitors"
       if (has("class-records-activities")) return "activities"
-      if (has("class-records-arrival")) return "arrival_confirmation"
     } catch {}
     return "visitors"
   })
@@ -78,10 +80,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
   const { permissions: cp, ready: cpReady } = useCustomerPermissions("class_records")
   const [fullVisits, setFullVisits] = useState<VisitRecord[]>([])
-  const [arrivalDialogOpen, setArrivalDialogOpen] = useState(false)
-  const [arrivalVisit, setArrivalVisit] = useState<VisitRecord | null>(null)
-  const [arrivalTime, setArrivalTime] = useState("09:00")
-  const [arrivalSaving, setArrivalSaving] = useState(false)
   const [draggingVisitorId, setDraggingVisitorId] = useState<string | null>(null)
 
   // 人员分组
@@ -434,7 +432,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
   }, [])
 
   return (
-    <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
+    <div className="px-6 pt-4 pb-6 flex flex-col min-h-0 min-w-0" style={{ height: 'calc(100vh - 48px)' }}>
 
       {/* 页面切换 */}
       {!standaloneTab && (
@@ -451,15 +449,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             {detailTab === "visitors" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
           </button>
           )}
-          <button
-            className={`relative px-1 pb-2 text-[14px] transition-colors ${
-              detailTab === "grouping" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
-            }`}
-            onClick={() => setDetailTab("grouping")}
-          >
-            人员分组
-            {detailTab === "grouping" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
-          </button>
           {hasPerm("class-records-activities") && (
           <button
             className={`relative px-1 pb-2 text-[14px] transition-colors ${
@@ -469,17 +458,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           >
             当日活动
             {detailTab === "activities" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
-          </button>
-          )}
-          {hasPerm("class-records-arrival") && (
-          <button
-            className={`relative px-1 pb-2 text-[14px] transition-colors ${
-              detailTab === "arrival_confirmation" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
-            }`}
-            onClick={() => setDetailTab("arrival_confirmation")}
-          >
-            到场确认
-            {detailTab === "arrival_confirmation" && <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />}
           </button>
           )}
         </div>
@@ -503,7 +481,7 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             {dateRange.map((d) => {
               const isSelected = d === detailDate
               const isToday = d === today
-              const isVisitorsTab = effectiveDetailTab === "visitors" || effectiveDetailTab === "arrival_confirmation" || effectiveDetailTab === "grouping"
+              const isVisitorsTab = effectiveDetailTab === "visitors"
               const dayCount = isVisitorsTab
                 ? (visitCounts[d] || 0)
                 : (selectedSpaceId
@@ -546,10 +524,10 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
       </div>
 
       {/* 内容区 */}
-      <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex flex-col flex-1 min-h-0 min-w-0">
       {effectiveDetailTab === "visitors" ? (
         /* 到场人员 - 详细视图 */
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-w-0">
           <VisitsDetailView
             externalDate={detailDate}
             onExternalDateChange={(d) => startTransition(() => setDetailDate(d))}
@@ -558,45 +536,9 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
             onDataLoaded={handleVisitsDataLoaded}
             spaceId={selectedSpaceId}
             onRequireSpaces={spaces.length === 0 ? () => setNoSpacesDialogOpen(true) : undefined}
+            groups={groups}
           />
         </div>
-      ) : effectiveDetailTab === "grouping" ? (
-      /* 人员分组页面：左栏人员列表 + 右栏分组管理 */
-      <GroupingView
-        date={detailDate}
-        dayVisits={dayVisits}
-        allCustomers={allCustomers}
-        visits={fullVisits}
-        membershipCards={membershipCards}
-        groups={groups}
-        setGroups={setGroups}
-        onSave={async (newGroups) => {
-          await dailyGroupingApi.upsert({ date: detailDate, groups: newGroups })
-          setGroups(newGroups)
-        }}
-        onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
-      />
-      ) : effectiveDetailTab === "arrival_confirmation" ? (
-      /* 到场确认页面 */
-      <div className="flex-1 flex flex-col min-h-0">
-        <ArrivalConfirmationView
-          visits={fullVisits}
-          loading={loading}
-          onMarkArrived={(visit) => {
-            setArrivalVisit(visit)
-            setArrivalTime(visit.visit_time || "09:00")
-            setArrivalDialogOpen(true)
-          }}
-          onCancelArrived={async (visit) => {
-            try {
-              await visitApi.update(visit.id, { arrived: false, arrival_time: "" } as any)
-              const visits = await visitApi.list(detailDate, undefined, selectedSpaceId)
-              setFullVisits(visits)
-              setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
-            } catch (e) { handleApiError(e) }
-          }}
-        />
-      </div>
       ) : (
       /* 当日活动页面：左栏到场人员 + 右栏活动卡片 */
       <div className="flex-1 flex min-h-0">
@@ -858,58 +800,6 @@ export default function ClassRecordsPage({ standaloneTab }: { standaloneTab?: "a
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* 到场确认弹窗 */}
-      <Dialog open={arrivalDialogOpen} onOpenChange={setArrivalDialogOpen}>
-        <DialogContent className="max-w-sm p-6">
-          <DialogHeader>
-            <DialogTitle>确认到场</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2" {...enterToNext}>
-            <div className="space-y-1.5">
-              <label className="text-[12px] text-[#8f959e]">昵称</label>
-              <Input value={arrivalVisit?.nickname || ""} disabled className="h-8 text-[13px]" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[12px] text-[#8f959e]">实际到场时间</label>
-              <Input
-                type="time"
-                value={arrivalTime}
-                onChange={(e) => setArrivalTime(e.target.value)}
-                className="h-8 text-[13px]"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" size="sm" className="h-8 text-[12px]" onClick={() => setArrivalDialogOpen(false)}>
-                取消
-              </Button>
-              <Button
-                size="sm"
-                className="h-8 text-[12px]"
-                disabled={arrivalSaving}
-                onClick={async () => {
-                  if (!arrivalVisit) return
-                  setArrivalSaving(true)
-                  try {
-                    await visitApi.update(arrivalVisit.id, { arrived: true, arrival_time: arrivalTime })
-                    // 刷新数据
-                    const visits = await visitApi.list(detailDate, undefined, selectedSpaceId)
-                    setFullVisits(visits)
-                    setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
-                    setArrivalDialogOpen(false)
-                  } catch (e) {
-                    handleApiError(e)
-                  } finally {
-                    setArrivalSaving(false)
-                  }
-                }}
-              >
-                {arrivalSaving ? "保存中..." : "确认到场"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* 客户详情弹窗 */}
       <Dialog open={customerDetailOpen} onOpenChange={(open) => { setCustomerDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>

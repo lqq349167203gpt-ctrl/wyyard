@@ -270,6 +270,8 @@ def get_date_counts(customer_ids: list[str] | None = None, start_date: str | Non
             continue
         if space_id is not None and v.space_id != space_id:
             continue
+        if not v.customer_id:
+            continue
         counts[v.visit_date] = counts.get(v.visit_date, 0) + 1
     return counts
 
@@ -319,10 +321,11 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
 
 def create_visit(data: VisitRecordCreate) -> VisitRecord:
     _invalidate_counts_cache()
-    # 检查当天是否已到场
-    for v in _visits.values():
-        if v.customer_id == data.customer_id and v.visit_date == data.visit_date and not v.is_deleted:
-            raise ValueError(f"{data.nickname} 当天已经到场")
+    # 检查当天是否已到场（customer_id 为空时跳过检查）
+    if data.customer_id:
+        for v in _visits.values():
+            if v.customer_id == data.customer_id and v.visit_date == data.visit_date and not v.is_deleted:
+                raise ValueError(f"{data.nickname} 当天已经到场")
     now = datetime.now(timezone.utc)
     record = VisitRecord(
         id=str(uuid.uuid4())[:8],
@@ -331,7 +334,12 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
         **data.model_dump(),
     )
     _visits[record.id] = record
-    _save(record.id)
+    try:
+        _save(record.id)
+        print(f"[VISIT_SAVED] {record.id}", flush=True)
+    except Exception as e:
+        print(f"[VISIT_SAVE_FAILED] {record.id}: {e}", flush=True)
+        raise
     # 计算该客户到访总次数（含本次）
     record.visit_count = count_customer_visits(record.customer_id)
     # 如果创建时即为已到店，执行会员活动扣费

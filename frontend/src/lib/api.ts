@@ -419,6 +419,7 @@ export interface VisitRecord {
   activity_id: string
   activity_type: string
   space_id: string
+  is_leader: boolean
   arrived: boolean
   arrival_time?: string
   visit_count: number
@@ -446,8 +447,11 @@ export interface VisitRecordCreate {
   activity_id?: string
   activity_type?: string
   space_id?: string
+  is_leader?: boolean
   arrived?: boolean
   arrival_time?: string
+  feedback?: string
+  healing_notes?: string
 }
 
 export interface CustomerSearchResult {
@@ -1756,4 +1760,5 @@ export const consumptionRecordsApi = {
     searchParams.set("page_size", String(pageSize))
     return request<PaginatedResponse<DeductionRecord>>(`/api/consumption-records/deductions?${searchParams.toString()}`)
   },
+  getDailyTotals: (date: string) => request<Record<string, number>>(`/api/consumption-records/daily-totals?date=${date}`),
 }

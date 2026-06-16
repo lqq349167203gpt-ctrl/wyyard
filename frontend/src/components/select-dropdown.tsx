@@ -19,6 +19,8 @@ interface SelectDropdownSingleProps {
   multi?: false
   hideCheckbox?: boolean
   hideSelectedStyle?: boolean
+  hideChevron?: boolean
+  textColor?: string
 }
 
 interface SelectDropdownMultiProps {
@@ -33,6 +35,8 @@ interface SelectDropdownMultiProps {
   multi: true
   hideCheckbox?: boolean
   hideSelectedStyle?: boolean
+  hideChevron?: boolean
+  textColor?: string
 }
 
 type SelectDropdownProps = SelectDropdownSingleProps | SelectDropdownMultiProps
@@ -51,6 +55,8 @@ export const SelectDropdown = memo(function SelectDropdown({
   multi = false,
   hideCheckbox = false,
   hideSelectedStyle = false,
+  hideChevron = false,
+  textColor,
 }: SelectDropdownProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
@@ -156,7 +162,7 @@ export const SelectDropdown = memo(function SelectDropdown({
             ))}
           </div>
         ) : (
-          <span className={`truncate ${currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : "text-[#8f959e]"}`}>
+          <span className={`truncate ${textColor || (currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : "text-[#8f959e]")}`}>
             {currentLabel || (multi ? placeholder : placeholder)}
           </span>
         )}
@@ -170,7 +176,7 @@ export const SelectDropdown = memo(function SelectDropdown({
               <X className={sm ? "h-3 w-3" : "h-3.5 w-3.5"} />
             </button>
           )}
-          <ChevronDown className={`${sm ? "h-3 w-3" : "h-3.5 w-3.5"} text-[#8f959e]`} />
+          {!hideChevron && <ChevronDown className={`${sm ? "h-3 w-3" : "h-3.5 w-3.5"} text-[#8f959e]`} />}
         </span>
       </button>
 

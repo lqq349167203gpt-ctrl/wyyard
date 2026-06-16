@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react"
-import { Plus, Trash2, Edit, Download } from "lucide-react"
-import * as XLSX from "xlsx-js-style"
-import JSZip from "jszip"
+import { Plus, Trash2, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -221,164 +219,6 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
     setDropGroupIdx(null)
   }
 
-  const handleExport = async () => {
-    // 构建客户 ID → 客户信息的映射
-    const customerMap = new Map(allCustomers.map(c => [c.id, c]))
-    // 构建客户 ID → 当日到访记录的映射
-    const visitMap = new Map(visits.filter(v => v.visit_date === date).map(v => [v.customer_id, v]))
-    // 构建客户 ID → 已到店次数的映射
-    const arrivedCountMap = new Map<string, number>()
-    visits.forEach(v => {
-      if (v.arrived) {
-        arrivedCountMap.set(v.customer_id, (arrivedCountMap.get(v.customer_id) || 0) + 1)
-      }
-    })
-    // 构建客户 ID → 会员卡类型的映射（取最新的一张卡）
-    const cardMap = new Map<string, string>()
-    membershipCards.forEach(card => {
-      if (!cardMap.has(card.customer_id)) {
-        cardMap.set(card.customer_id, card.card_type)
-      }
-    })
-    // 构建客户 ID → 角色的映射
-    const roleMap = new Map<string, string>()
-    displayGroups.forEach(group => {
-      if (group.leader_id) roleMap.set(group.leader_id, "组长")
-      if (group.deputy_id) roleMap.set(group.deputy_id, "副组长")
-    })
-
-    const rows: any[] = []
-
-    // 按分组遍历
-    displayGroups.forEach(group => {
-      const allMemberIds = [group.leader_id, group.deputy_id, ...group.member_ids].filter(Boolean)
-      const uniqueIds = [...new Set(allMemberIds)]
-      uniqueIds.forEach(id => {
-        const customer = customerMap.get(id)
-        const visit = visitMap.get(id)
-        const role = roleMap.get(id) || ""
-        rows.push({
-          "引流人": customer?.referrer || "-",
-          "客户昵称": customer?.nickname || getName(id),
-          "预计时间": visit?.visit_time || "09:00",
-          "参与次数": arrivedCountMap.get(id) || 0,
-          "会员身份": cardMap.get(id) || customer?.member_type || "",
-          "当日需求": visit?.needs || "",
-          "组长情况": role || "-",
-          "组长获得的信息": role === "组长" ? (visit?.needs || "") : "",
-          "邀约人": visit?.referrer_handler || "",
-        })
-      })
-    })
-
-    // 未分组的人员
-    const ungrouped = dayVisits.filter(v => !usedIds.has(v.id))
-    ungrouped.forEach(v => {
-      const customer = customerMap.get(v.id)
-      const visit = visitMap.get(v.id)
-      rows.push({
-        "引流人": customer?.referrer || "",
-        "客户昵称": customer?.nickname || v.nickname,
-        "预计时间": visit?.visit_time || "09:00",
-        "参与次数": arrivedCountMap.get(v.id) || 0,
-        "会员身份": cardMap.get(v.id) || customer?.member_type || "",
-        "当日需求": visit?.needs || "",
-        "组长情况": "-",
-        "组长获得的信息": "",
-        "邀约人": visit?.referrer_handler || "",
-      })
-    })
-
-    const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
-    // 设置列宽
-    ws['!cols'] = [
-      { wch: 10 }, // 引流人
-      { wch: 12 }, // 客户昵称
-      { wch: 10 }, // 预计时间
-      { wch: 10 }, // 参与次数
-      { wch: 12 }, // 会员身份
-      { wch: 40 }, // 当日需求
-      { wch: 10 }, // 组长情况
-      { wch: 30 }, // 组长获得的信息
-      { wch: 10 }, // 邀约人
-    ]
-    // 隐藏默认网格线
-    ws['!sheetPr'] = { showGridLines: false }
-    // 设置行高为30，内容垂直居中
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-    ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
-    // 设置所有单元格垂直居中 + 边框
-    const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
-    const baseStyle = {
-      alignment: { vertical: "center" },
-      border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
-    }
-    for (let row = 0; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
-        if (ws[cellRef]) {
-          ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
-        }
-      }
-    }
-    // 参与次数列（第3列）内容左对齐
-    const countColStyle = { alignment: { vertical: "center", horizontal: "left" } }
-    for (let row = 1; row <= range.e.r; row++) {
-      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 })
-      if (ws[cellRef]) {
-        ws[cellRef].s = { ...ws[cellRef].s, ...countColStyle }
-      }
-    }
-    // 设置表头字体加粗 + 灰色背景
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "D0D3D6" } } }
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
-      if (ws[cellRef]) {
-        ws[cellRef].s = { ...ws[cellRef].s, ...headerStyle }
-      }
-    }
-    // 设置组长行背景色（仅组长，不包括副组长）
-    const leaderStyle = { fill: { fgColor: { rgb: "F7F8FA" } } }
-    for (let row = 1; row <= range.e.r; row++) {
-      const roleCellRef = XLSX.utils.encode_cell({ r: row, c: 6 }) // 组长情况列
-      const roleCell = ws[roleCellRef]
-      if (roleCell && roleCell.v === "组长") {
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
-          if (ws[cellRef]) {
-            ws[cellRef].s = { ...ws[cellRef].s, ...leaderStyle }
-          }
-        }
-      }
-    }
-    // 移除 !sheetPr（xlsx-js-style 不支持，通过 JSZip 后处理实现）
-    delete ws['!sheetPr']
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "人员分组")
-    // 使用 JSZip 后处理隐藏网格线
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as unknown as ArrayBuffer
-    const zip = await JSZip.loadAsync(buf)
-    const sheetFile = zip.file("xl/worksheets/sheet1.xml")
-    if (sheetFile) {
-      let xml = await sheetFile.async("string")
-      // 在 sheetData 前插入 sheetViews 隐藏网格线
-      if (!xml.includes("sheetViews")) {
-        xml = xml.replace(
-          /<sheetData>/,
-          '<sheetViews><sheetView showGridLines="0" tabSelected="1" workbookViewId="0"/></sheetViews><sheetData>'
-        )
-      }
-      zip.file("xl/worksheets/sheet1.xml", xml)
-    }
-    const out = await zip.generateAsync({ type: "blob" })
-    const url = URL.createObjectURL(out)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `人员分组_${date}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
       {/* 左栏：人员列表 */}
@@ -423,9 +263,6 @@ export default function GroupingView({ date, dayVisits, allCustomers, visits, me
             <span className="text-[13px] font-medium text-[#2b2f36]">分组</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExport}>
-              <Download className="mr-1 h-3 w-3" /> 导出
-            </Button>
             <Button size="sm" className="h-7 text-xs bg-[#3370ff] hover:bg-[#2860e1] text-white" onClick={addGroup}>
               <Plus className="mr-1 h-3 w-3" /> 新增
             </Button>
