@@ -304,9 +304,10 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
   }, [scheduleSave])
 
   return (
-    <div className="bg-white rounded-lg overflow-x-auto scrollbar-hide">
-      <div className="min-w-[1688px]">
-        <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
+    <div className="bg-white rounded-lg">
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className="min-w-[1688px]">
+          <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
           <thead>
             <tr className="bg-[#fafbfc] text-[#8f959e]">
               <th className="w-[24px]"></th>
@@ -477,6 +478,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">

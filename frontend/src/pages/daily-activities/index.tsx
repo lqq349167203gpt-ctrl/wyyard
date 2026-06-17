@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Users, Sparkles, Heart, Zap, GraduationCap, Layers } from "lucide-react"
+import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -15,16 +15,17 @@ import {
   emotionalReleaseSessionApi,
   energyKnotSessionApi, energyKnotApi,
   internalCourseSessionApi, courseApi, customerApi, uploadApi, spaceApi,
-  activityThemeApi, ohCardReadingSessionApi, visitApi,
+  activityThemeApi, ohCardReadingSessionApi, memberIdentityApi,
   type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession,
   type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession,
   type Course, type CustomerLight, type Space,
   type InternalCourseSessionCustomerSearchResult,
   type GroupCaseCustomerSearchResult,
-  type ActivityTheme,
+  type ActivityTheme, type MemberIdentity,
 } from "@/lib/api"
 import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
+import { ActivityBatchTable } from "./activity-batch-table"
 
 // ===== Date utilities =====
 const today = new Date().toISOString().split("T")[0]
@@ -44,6 +45,7 @@ function formatDateChinese(d: string): string {
 }
 
 const ICS_COURSE_TYPES = ["疗愈师课程", "商业框架陪跑", "落地赋能班"]
+const ICS_COURSE_LABELS: Record<string, string> = { "疗愈师课程": "疗愈师", "商业框架陪跑": "陪跑", "落地赋能班": "赋能班" }
 const MAX_OWNER_VISIBLE = 50
 
 // ===== Pure helpers =====
@@ -62,20 +64,26 @@ function getRoomLabel(spaceId: string | undefined, roomId: string | undefined, s
 
 // ===== Memoized card components (extracted to avoid re-render on dropdown state changes) =====
 
-interface CardCallbacks {
+export interface CardCallbacks {
+  onCreateClass: () => void
   onEditClass: (r: ClassRecord) => void
   onDeleteClass: (id: string) => void
   onMaterialsClass: (r: ClassRecord) => void
+  onCreateGcs: () => void
   onEditGcs: (s: GroupCaseSession) => void
   onDeleteGcs: (id: string) => void
   onMaterialsGcs: (s: GroupCaseSession) => void
+  onCreateErs: () => void
   onEditErs: (s: EmotionalReleaseSession) => void
   onDeleteErs: (id: string) => void
+  onCreateEks: () => void
   onEditEks: (s: EnergyKnotSession) => void
   onDeleteEks: (id: string) => void
+  onCreateIcs: () => void
   onEditIcs: (s: InternalCourseSession) => void
   onDeleteIcs: (id: string) => void
   onMaterialsIcs: (s: InternalCourseSession) => void
+  onCreateOcr: () => void
   onEditOcr: (s: OhCardReadingSession) => void
   onDeleteOcr: (id: string) => void
   onMaterialsOcr: (s: OhCardReadingSession) => void
@@ -84,269 +92,7 @@ interface CardCallbacks {
   courseMap: Record<string, string>
 }
 
-const SalonCard = memo(({ record, teachers, spaces, courseMap, onEdit, onDelete, onMaterials }: {
-  record: ClassRecord; teachers: CustomerLight[]; spaces: Space[]; courseMap: Record<string, string>
-  onEdit: (r: ClassRecord) => void; onDelete: (id: string) => void; onMaterials: (r: ClassRecord) => void
-}) => (
-  <div key={`class-${record.id}`} className="bg-white">
-    <div className="flex">
-      <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-        {record.start_time && <span className="text-[11px] text-[#8f959e] font-light">{record.start_time}</span>}
-        {record.start_time && record.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
-        {record.end_time && <span className="text-[11px] text-[#8f959e] font-light">{record.end_time}</span>}
-      </div>
-      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8faff] text-[#3370ff]">沙龙</span>
-          {record.is_public_welfare && <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>}
-          <span className="text-[14px] font-medium text-[#2b2f36] truncate">{courseMap[record.course_id] || record.course_name}</span>
-          {getTeacherNames(record.teacher_ids, teachers).length > 0 && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{getTeacherNames(record.teacher_ids, teachers).join("、")}</span>
-          )}
-          {getRoomLabel(record.space_id, record.room_id, spaces, record.room_name, record.space_name) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(record.space_id, record.room_id, spaces, record.room_name, record.space_name)}</span>
-          )}
-          {record.activity_mode && record.activity_mode !== "线下" && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
-          )}
-        </div>
-        {record.course_description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{record.course_description}</p>}
-      </div>
-      <div className="shrink-0 grid grid-cols-3 items-center justify-items-center gap-1 px-2 py-3.5">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onMaterials(record)}>
-          <FileUp className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(record)}>
-          <Edit className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(record.id)}>
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
-    </div>
-  </div>
-))
-
-const GcsCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
-  session: GroupCaseSession; spaces: Space[]
-  onEdit: (s: GroupCaseSession) => void; onDelete: (id: string) => void; onMaterials: (s: GroupCaseSession) => void
-}) => (
-  <div key={`gcs-${session.id}`} className="bg-white">
-    <div className="flex">
-      <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-        {session.start_time && <span className="text-[11px] text-[#8f959e] font-light">{session.start_time}</span>}
-        {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
-        {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
-      </div>
-      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8f5ff] text-[#7c5cfc]">觉醒</span>
-          <span className="text-[14px] font-medium text-[#2b2f36] truncate">觉醒游戏</span>
-          <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
-          <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
-          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
-          )}
-          {session.activity_mode && session.activity_mode !== "线下" && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
-          )}
-        </div>
-        {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
-      </div>
-      <div className="shrink-0 grid grid-cols-3 items-center justify-items-center gap-1 px-2 py-3.5">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onMaterials(session)}>
-          <FileUp className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(session)}>
-          <Edit className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(session.id)}>
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
-    </div>
-  </div>
-))
-
-const ErsCard = memo(({ session, spaces, onEdit, onDelete }: {
-  session: EmotionalReleaseSession; spaces: Space[]
-  onEdit: (s: EmotionalReleaseSession) => void; onDelete: (id: string) => void
-}) => (
-  <div key={`ers-${session.id}`} className="bg-white">
-    <div className="flex">
-      <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-        {session.start_time && <span className="text-[11px] text-[#8f959e] font-light">{session.start_time}</span>}
-        {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
-        {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
-      </div>
-      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fff8f0] text-[#f59e0b]">情绪</span>
-          <span className="text-[14px] font-medium text-[#2b2f36] truncate">情绪释放</span>
-          <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
-          <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
-          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
-          )}
-          {session.activity_mode && session.activity_mode !== "线下" && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
-          )}
-        </div>
-        {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
-      </div>
-      <div className="shrink-0 grid grid-cols-2 items-center justify-items-center gap-1 px-2 py-3.5">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(session)}>
-          <Edit className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(session.id)}>
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
-    </div>
-  </div>
-))
-
-const OcrCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
-  session: OhCardReadingSession; spaces: Space[]
-  onEdit: (s: OhCardReadingSession) => void; onDelete: (id: string) => void; onMaterials: (s: OhCardReadingSession) => void
-}) => (
-  <div key={`ocr-${session.id}`} className="bg-white">
-    <div className="flex">
-      <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-        {session.start_time && <span className="text-[11px] text-[#8f959e] font-light">{session.start_time}</span>}
-        {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
-        {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
-      </div>
-      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0f7ff] text-[#2b7fff]">OH</span>
-          <span className="text-[14px] font-medium text-[#2b2f36] truncate">OH卡梳理</span>
-          <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
-          <span className="text-[14px] font-medium text-[#2b2f36]">{session.owner_name || "未分配"}</span>
-          {session.achiever_name && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">成就君：{session.achiever_name}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
-          )}
-          {session.activity_mode && session.activity_mode !== "线下" && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
-          )}
-        </div>
-        {session.description && <p className="text-[12px] text-[#8f959e] font-light leading-relaxed">{session.description}</p>}
-      </div>
-      <div className="shrink-0 grid grid-cols-3 items-center justify-items-center gap-1 px-2 py-3.5">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onMaterials(session)}>
-          <FileUp className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(session)}>
-          <Edit className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(session.id)}>
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
-    </div>
-  </div>
-))
-
-const EksCard = memo(({ session, spaces, onEdit, onDelete }: {
-  session: EnergyKnotSession; spaces: Space[]
-  onEdit: (s: EnergyKnotSession) => void; onDelete: (id: string) => void
-}) => {
-  let eksNames: string[] = []
-  let ownerDescs: { id: string; name: string; description: string; count?: number }[] = []
-  try {
-    const items = JSON.parse(session.description || "[]")
-    if (Array.isArray(items)) { ownerDescs = items; eksNames = items.map((d: any) => d.name).filter(Boolean) }
-  } catch {}
-  return (
-    <div key={`eks-${session.id}`} className="bg-white">
-      <div className="flex">
-        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-          {session.start_time && <span className="text-[11px] text-[#8f959e] font-light">{session.start_time}</span>}
-          {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
-          {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
-        </div>
-        <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fefce8] text-[#ca8a04]">能量</span>
-            <span className="text-[14px] font-medium text-[#2b2f36] truncate">能量结</span>
-            <span className="text-[14px] font-bold text-[#2b2f36] mx-0.5">·</span>
-            <span className="text-[14px] font-medium text-[#2b2f36]">{eksNames.length > 0 ? eksNames.join("、") : session.owner_name || "未分配"}</span>
-            {session.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{session.host_names.join("、")}</span>}
-            {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
-              <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
-            )}
-            {session.activity_mode && session.activity_mode !== "线下" && (
-              <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
-            )}
-          </div>
-          {ownerDescs.length > 0 && (
-            <div className="space-y-1">
-              {ownerDescs.map((d, i) => (
-                <p key={i} className="text-[12px] text-[#8f959e] font-light leading-relaxed">
-                  <span>{d.name || eksNames[i] || "未知"}</span>
-                  <span>：{d.count ?? 1}部位</span>
-                  {d.description && <span>，{d.description}</span>}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="shrink-0 grid grid-cols-2 items-center justify-items-center gap-1 px-2 py-3.5">
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(session)}>
-            <Edit className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(session.id)}>
-            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-})
-
-const IcsCard = memo(({ session, spaces, onEdit, onDelete, onMaterials }: {
-  session: InternalCourseSession; spaces: Space[]
-  onEdit: (s: InternalCourseSession) => void; onDelete: (id: string) => void; onMaterials: (s: InternalCourseSession) => void
-}) => (
-  <div key={`ics-${session.id}`} className="bg-white">
-    <div className="flex">
-      <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 px-2 py-3.5">
-        {session.start_time && <span className="text-[11px] text-[#8f959e] font-light">{session.start_time}</span>}
-        {session.start_time && session.end_time && <span className="text-[10px] text-[#c9cdd4]">~</span>}
-        {session.end_time && <span className="text-[11px] text-[#8f959e] font-light">{session.end_time}</span>}
-      </div>
-      <div className="flex-1 min-w-0 pl-[7px] pr-5 py-3.5 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f0fdf4] text-[#22c55e]">内部</span>
-          <span className="text-[14px] font-medium text-[#2b2f36] truncate">{session.course_name}</span>
-          {session.course_type && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{session.course_type}</span>}
-          {session.host_names?.length > 0 && <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">课程老师：{session.host_names.join("、")}</span>}
-          {getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name) && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">{getRoomLabel(session.space_id, session.room_id, spaces, session.room_name, session.space_name)}</span>
-          )}
-          {session.activity_mode && session.activity_mode !== "线下" && (
-            <span className="inline-block ml-1 px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">线上</span>
-          )}
-        </div>
-        {session.course_description && <p className="text-[11px] text-[#8f959e] font-light leading-relaxed">{session.course_description}</p>}
-      </div>
-      <div className="shrink-0 grid grid-cols-3 items-center justify-items-center gap-1 px-2 py-3.5">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onMaterials(session)}>
-          <FileUp className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(session)}>
-          <Edit className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDelete(session.id)}>
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
-    </div>
-  </div>
-))
+// ===== GCS Dialog (独立组件，避免父组件 state 变化导致重渲染) =====
 
 // ===== GCS Dialog (独立组件，避免父组件 state 变化导致重渲染) =====
 const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, defaultSpaceId, onClose, onSaved }: {
@@ -1606,7 +1352,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
             <span className="text-[12px] text-[#8f959e] text-right">课程类型</span>
             <SelectDropdown
               value={formCourseType}
-              options={ICS_COURSE_TYPES.map(t => ({value: t, label: t}))}
+              options={ICS_COURSE_TYPES.map(t => ({value: t, label: ICS_COURSE_LABELS[t] || t}))}
               onChange={(v) => setFormCourseType(v)}
             />
           </div>
@@ -1862,58 +1608,6 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
   </div>
 ))
 
-const ActivityCardList = memo(({ records, callbacks }: {
-  records: { type: "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"; data: any }[]
-  callbacks: CardCallbacks
-}) => {
-  const [visibleCount, setVisibleCount] = useState(15)
-  const sentinelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel || visibleCount >= records.length) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisibleCount(prev => Math.min(prev + 15, records.length))
-        }
-      },
-      { rootMargin: "200px" }
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [visibleCount, records.length])
-
-  return (
-  <div className="divide-y divide-[#e8e8e8] border-y border-[#e8e8e8]">
-    {records.slice(0, visibleCount).map((ur) => {
-      if (ur.type === "class") {
-        return <SalonCard key={`class-${(ur.data as ClassRecord).id}`} record={ur.data as ClassRecord} teachers={callbacks.teachers} spaces={callbacks.spaces} courseMap={callbacks.courseMap} onEdit={callbacks.onEditClass} onDelete={callbacks.onDeleteClass} onMaterials={callbacks.onMaterialsClass} />
-      }
-      if (ur.type === "gcs") {
-        return <GcsCard key={`gcs-${(ur.data as GroupCaseSession).id}`} session={ur.data as GroupCaseSession} spaces={callbacks.spaces} onEdit={callbacks.onEditGcs} onDelete={callbacks.onDeleteGcs} onMaterials={callbacks.onMaterialsGcs} />
-      }
-      if (ur.type === "ers") {
-        return <ErsCard key={`ers-${(ur.data as EmotionalReleaseSession).id}`} session={ur.data as EmotionalReleaseSession} spaces={callbacks.spaces} onEdit={callbacks.onEditErs} onDelete={callbacks.onDeleteErs} />
-      }
-      if (ur.type === "eks") {
-        return <EksCard key={`eks-${(ur.data as EnergyKnotSession).id}`} session={ur.data as EnergyKnotSession} spaces={callbacks.spaces} onEdit={callbacks.onEditEks} onDelete={callbacks.onDeleteEks} />
-      }
-      if (ur.type === "ics") {
-        return <IcsCard key={`ics-${(ur.data as InternalCourseSession).id}`} session={ur.data as InternalCourseSession} spaces={callbacks.spaces} onEdit={callbacks.onEditIcs} onDelete={callbacks.onDeleteIcs} onMaterials={callbacks.onMaterialsIcs} />
-      }
-      if (ur.type === "ocr") {
-        return <OcrCard key={`ocr-${(ur.data as OhCardReadingSession).id}`} session={ur.data as OhCardReadingSession} spaces={callbacks.spaces} onEdit={callbacks.onEditOcr} onDelete={callbacks.onDeleteOcr} onMaterials={callbacks.onMaterialsOcr} />
-      }
-      return null
-    })}
-    {visibleCount < records.length && (
-      <div ref={sentinelRef} className="h-4" />
-    )}
-  </div>
-  )
-})
-
 // ===== WeekThemeDialog =====
 const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onClose, onSaved }: {
   open: boolean
@@ -1933,13 +1627,13 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
 
   useEffect(() => {
     if (!spaceDropdownOpen) return
-    const h = (e: MouseEvent) => {
+    const h = (e: PointerEvent) => {
       if (spaceDropdownRef.current && !spaceDropdownRef.current.contains(e.target as Node)) {
         setSpaceDropdownOpen(false)
       }
     }
-    document.addEventListener("mousedown", h)
-    return () => document.removeEventListener("mousedown", h)
+    document.addEventListener("pointerdown", h)
+    return () => document.removeEventListener("pointerdown", h)
   }, [spaceDropdownOpen])
 
   useEffect(() => {
@@ -1996,7 +1690,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
           <div className="grid grid-cols-[80px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right font-light pt-2">所属空间</span>
             <div className="space-y-1.5">
-              <div ref={spaceDropdownRef} className="relative">
+              <div ref={spaceDropdownRef} className="relative" onPointerDown={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   className="flex items-center justify-between w-full h-8 px-2 text-[12px] rounded-md border border-input bg-transparent"
@@ -2008,7 +1702,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
                   <ChevronDown className="h-3.5 w-3.5 text-[#8f959e] shrink-0 ml-1" />
                 </button>
                 {spaceDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onPointerDown={(e) => e.stopPropagation()}>
                     {spaces.map((space) => (
                       <button
                         key={space.id}
@@ -2094,9 +1788,16 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
 export default function DailyActivitiesPage() {
   const navigate = useNavigate()
   // ===== Core state =====
-  const [detailDate, setDetailDate] = useState(today)
+  const [detailDate, setDetailDate] = useState(() => {
+    try { return localStorage.getItem("daily-activities-date") || today } catch { return today }
+  })
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
-  const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
+  const [dateRangeStart, setDateRangeStart] = useState(() => {
+    try {
+      const stored = localStorage.getItem("daily-activities-date")
+      return formatDate(addDays(stored ? new Date(stored) : new Date(), -7))
+    } catch { return formatDate(addDays(new Date(), -7)) }
+  })
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
@@ -2104,6 +1805,7 @@ export default function DailyActivitiesPage() {
   const [teachers, setTeachers] = useState<CustomerLight[]>([])
   const [calendarCounts, setCalendarCounts] = useState<Record<string, number>>({})
   const [spaces, setSpaces] = useState<Space[]>([])
+  const [memberIdentities, setMemberIdentities] = useState<MemberIdentity[]>([])
   const [noSpacesDialogOpen, setNoSpacesDialogOpen] = useState(false)
   const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
     try { return localStorage.getItem("selected-space-id") || "" } catch { return "" }
@@ -2115,7 +1817,6 @@ export default function DailyActivitiesPage() {
   const [detailEksSessions, setDetailEksSessions] = useState<EnergyKnotSession[]>([])
   const [detailIcsSessions, setDetailIcsSessions] = useState<InternalCourseSession[]>([])
   const [detailOcrSessions, setDetailOcrSessions] = useState<OhCardReadingSession[]>([])
-  const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string }[]>([])
 
   // ===== Salon dialog state (minimal - form state lives in SalonDialog) =====
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -2161,6 +1862,10 @@ export default function DailyActivitiesPage() {
   const [warningOpen, setWarningOpen] = useState(false)
   const [warningMsg, setWarningMsg] = useState("")
 
+  // ===== Save status =====
+  const [savingCount, setSavingCount] = useState(0)
+  const [savedCount, setSavedCount] = useState(0)
+
   // ===== Theme state =====
   const [themes, setThemes] = useState<ActivityTheme[]>([])
   const [themeEditWeekIndex, setThemeEditWeekIndex] = useState<number | null>(null)
@@ -2173,6 +1878,11 @@ export default function DailyActivitiesPage() {
     const d = new Date(detailDate)
     const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+  }, [detailDate])
+
+  // 持久化当前选中日期
+  useEffect(() => {
+    try { localStorage.setItem("daily-activities-date", detailDate) } catch {}
   }, [detailDate])
 
   const themeMap = useMemo(() => {
@@ -2295,48 +2005,6 @@ export default function DailyActivitiesPage() {
     })
   }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, detailOcrSessions, selectedSpaceId])
 
-  // 过滤掉已删除人员的活动记录
-  const filteredDetailRecords = useMemo(() => {
-    if (dayVisits.length === 0) return unifiedDetailRecords
-    const visitorIds = new Set(dayVisits.map(v => v.id))
-    return unifiedDetailRecords.map(ur => {
-      const d = ur.data as any
-      let changed = false
-      const patch: any = {}
-      if (d.teacher_ids?.some((id: string) => !visitorIds.has(id))) {
-        patch.teacher_ids = d.teacher_ids.filter((id: string) => visitorIds.has(id)); changed = true
-      }
-      if (d.participant_ids?.some((id: string) => !visitorIds.has(id))) {
-        patch.participant_ids = d.participant_ids.filter((id: string) => visitorIds.has(id)); changed = true
-      }
-      if (d.host_id && !visitorIds.has(d.host_id)) { patch.host_id = ""; patch.host_name = ""; changed = true }
-      if (d.achiever_id && !visitorIds.has(d.achiever_id)) { patch.achiever_id = ""; patch.achiever_name = ""; changed = true }
-      if (d.host_ids?.some((id: string) => !visitorIds.has(id))) {
-        const keepIdx = d.host_ids.map((id: string, i: number) => visitorIds.has(id) ? i : -1).filter((i: number) => i >= 0)
-        patch.host_ids = keepIdx.map((i: number) => d.host_ids[i])
-        patch.host_names = keepIdx.map((i: number) => d.host_names?.[i] || "")
-        changed = true
-      }
-      // 过滤 groups 中已删除的成员
-      if (d.groups?.length > 0) {
-        const cleanedGroups = d.groups.map((g: any) => ({
-          ...g,
-          leader_id: g.leader_id && visitorIds.has(g.leader_id) ? g.leader_id : "",
-          deputy_id: g.deputy_id && visitorIds.has(g.deputy_id) ? g.deputy_id : "",
-          member_ids: (g.member_ids || []).filter((id: string) => visitorIds.has(id)),
-        })).filter((g: any) => g.leader_id || g.deputy_id || g.member_ids.length > 0)
-        if (cleanedGroups.length !== d.groups.length || cleanedGroups.some((g: any, i: number) =>
-          g.leader_id !== d.groups[i]?.leader_id || g.deputy_id !== d.groups[i]?.deputy_id ||
-          g.member_ids.length !== d.groups[i]?.member_ids.length
-        )) {
-          patch.groups = cleanedGroups
-          changed = true
-        }
-      }
-      if (!changed) return ur
-      return { ...ur, data: { ...d, ...patch } }
-    })
-  }, [unifiedDetailRecords, dayVisits])
 
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
   const achieverCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("成就君")).sort((a, b) => (a.position_sort_orders?.["成就君"] ?? 9999) - (b.position_sort_orders?.["成就君"] ?? 9999)), [allCustomers])
@@ -2415,11 +2083,6 @@ export default function DailyActivitiesPage() {
         })
       }
 
-      // 加载当日到场人员（用于过滤已删除人员）
-      try {
-        const visits = await visitApi.list(date, undefined, selectedSpaceId || undefined)
-        setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname })))
-      } catch { setDayVisits([]) }
     } finally {
       setDetailLoading(false)
       setLoading(false)
@@ -2482,6 +2145,7 @@ export default function DailyActivitiesPage() {
         setTeachers(customers.filter(c => c.positions?.includes("课程老师")).sort((a, b) => (a.position_sort_orders?.["课程老师"] ?? 9999) - (b.position_sort_orders?.["课程老师"] ?? 9999)))
       })
       .catch(() => {})
+    memberIdentityApi.list().then(setMemberIdentities).catch(() => {})
   }
 
   useEffect(() => { load() }, [])
@@ -2493,9 +2157,6 @@ export default function DailyActivitiesPage() {
     })
     localStorage.setItem("selected-space-id", id)
   }, [])
-
-  // 新增活动类型选择下拉
-  const [addMenuOpen, setAddMenuOpen] = useState(false)
 
   // ===== Salon handlers =====
   const handleOpenCreate = (date?: string) => {
@@ -2744,27 +2405,38 @@ export default function DailyActivitiesPage() {
     return map
   }, [courses])
 
+  const getMemberName = useCallback((id: string): string => {
+    const c = allCustomers.find(c => c.id === id)
+    return c?.nickname || c?.name || ""
+  }, [allCustomers])
+
   const cardCallbacks = useMemo(() => ({
     teachers,
     spaces,
     courseMap,
+    onCreateClass: handleOpenCreate,
     onEditClass: handleOpenEdit,
     onDeleteClass: setDeleteId,
     onMaterialsClass: handleOpenMaterials,
+    onCreateGcs: handleOpenGcsCreate,
     onEditGcs: handleOpenGcsEdit,
     onDeleteGcs: setGcsDeleteId,
     onMaterialsGcs: handleOpenGcsMaterials,
+    onCreateErs: handleOpenErsCreate,
     onEditErs: handleOpenErsEdit,
     onDeleteErs: setErsDeleteId,
+    onCreateEks: handleOpenEksCreate,
     onEditEks: handleOpenEksEdit,
     onDeleteEks: setEksDeleteId,
+    onCreateIcs: handleOpenIcsCreate,
     onEditIcs: handleOpenIcsEdit,
     onDeleteIcs: setIcsDeleteId,
     onMaterialsIcs: handleOpenIcsMaterials,
+    onCreateOcr: handleOpenOcrCreate,
     onEditOcr: handleOpenOcrEdit,
     onDeleteOcr: setOcrDeleteId,
     onMaterialsOcr: handleOpenOcrMaterials,
-  } as CardCallbacks), [teachers, spaces, courseMap, handleOpenEdit, handleOpenMaterials, handleOpenGcsEdit, handleOpenGcsMaterials, handleOpenErsEdit, handleOpenEksEdit, handleOpenIcsEdit, handleOpenIcsMaterials, handleOpenOcrEdit, handleOpenOcrMaterials])
+  } as CardCallbacks), [teachers, spaces, courseMap, handleOpenCreate, handleOpenEdit, handleOpenMaterials, handleOpenGcsCreate, handleOpenGcsEdit, handleOpenGcsMaterials, handleOpenErsCreate, handleOpenErsEdit, handleOpenEksCreate, handleOpenEksEdit, handleOpenIcsCreate, handleOpenIcsEdit, handleOpenIcsMaterials, handleOpenOcrCreate, handleOpenOcrEdit, handleOpenOcrMaterials])
 
   // ===== JSX =====
   return (
@@ -2895,40 +2567,14 @@ export default function DailyActivitiesPage() {
           </table>
         </div>
 
-        {/* 新增按钮 */}
-        <div className="flex items-center justify-between relative mt-2.5">
+        {/* 当日活动标题 */}
+        <div className="flex items-center mt-2.5">
           <span className="text-[14px] font-medium text-[#2b2f36] pl-2">当日活动</span>
-          <Button size="sm" className="text-xs" onClick={() => { if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setAddMenuOpen(!addMenuOpen) }}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> 新增 <ChevronDown className="ml-1 h-3 w-3" />
-          </Button>
-          {addMenuOpen && (
-            <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] px-2 py-3 z-[100] w-[250px]">
-              <div className="grid grid-cols-3 gap-0">
-                {[
-                  { label: "沙龙活动", icon: BookOpen, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenCreate(detailDate) },
-                  { label: "觉醒游戏", icon: Sparkles, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenGcsCreate(detailDate) },
-                  { label: "情绪释放", icon: Heart, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenErsCreate(detailDate) },
-                  { label: "OH卡梳理", icon: Layers, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenOcrCreate(detailDate) },
-                  { label: "能量结", icon: Zap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenEksCreate(detailDate) },
-                  { label: "内部课程", icon: GraduationCap, color: "#3370ff", bg: "#f8faff", onClick: () => handleOpenIcsCreate(detailDate) },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    className="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-[#f7f8fa] transition-colors"
-                    onClick={() => { item.onClick(); setAddMenuOpen(false) }}
-                  >
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: item.bg }}>
-                      <item.icon className="h-4.5 w-4.5" style={{ color: item.color }} />
-                    </div>
-                    <span className="text-[11px] text-[#2b2f36]">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {addMenuOpen && (
-            <div className="fixed inset-0 z-[99]" onClick={() => setAddMenuOpen(false)} />
-          )}
+          {savingCount > 0 ? (
+            <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
+          ) : savedCount > 0 ? (
+            <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
+          ) : null}
         </div>
 
         {/* Activity cards */}
@@ -2938,13 +2584,22 @@ export default function DailyActivitiesPage() {
               <Loader2 className="h-8 w-8 text-muted-foreground mb-2 animate-spin" />
               <p className="text-sm text-muted-foreground">加载中...</p>
             </div>
-          ) : filteredDetailRecords.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">{detailDate === today ? "今天暂无记录" : `${detailDate} 暂无记录`}</p>
-            </div>
           ) : (
-            <ActivityCardList records={filteredDetailRecords} callbacks={cardCallbacks} />
+            <ActivityBatchTable
+              date={detailDate}
+              courses={courses}
+              customers={allCustomers}
+              teachers={teachers}
+              spaces={spaces}
+              spaceId={selectedSpaceId}
+              records={unifiedDetailRecords}
+              onReload={() => loadDateData(detailDate)}
+              callbacks={cardCallbacks}
+              getMemberName={getMemberName}
+              memberIdentities={memberIdentities}
+              onSavingCountChange={setSavingCount}
+              onSavedCountChange={setSavedCount}
+            />
           )}
         </div>
       </div>

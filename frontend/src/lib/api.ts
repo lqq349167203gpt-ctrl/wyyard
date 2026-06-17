@@ -721,6 +721,7 @@ export interface GroupCaseSessionCreate {
   date: string
   start_time?: string | null
   end_time?: string | null
+  name?: string
   owner_id: string
   owner_name: string
   description?: string
@@ -815,6 +816,7 @@ export interface OhCardReadingSessionCreate {
   date: string
   start_time?: string | null
   end_time?: string | null
+  name?: string
   owner_id: string
   owner_name: string
   description?: string
@@ -936,6 +938,7 @@ export interface EmotionalReleaseSessionCreate {
   date: string
   start_time?: string | null
   end_time?: string | null
+  name?: string
   owner_id: string
   owner_name: string
   description?: string
@@ -975,6 +978,7 @@ export interface EnergyKnotSession {
   end_time: string | null
   owner_id: string
   owner_name: string
+  name: string
   description: string | null
   participant_ids: string[]
   host_ids: string[]
@@ -994,6 +998,7 @@ export interface EnergyKnotSessionCreate {
   end_time?: string | null
   owner_id: string
   owner_name: string
+  name?: string
   description?: string
   participant_ids?: string[]
   host_ids?: string[]
@@ -1329,6 +1334,7 @@ export interface IdentityCondition {
 export interface MemberIdentity {
   id: string
   name: string
+  type: string
   conditions: IdentityCondition[]
   operator: "all" | "any"
   sort_order: number
@@ -1338,6 +1344,7 @@ export interface MemberIdentity {
 
 export interface MemberIdentityCreate {
   name: string
+  type?: string
   conditions: IdentityCondition[]
   operator?: "all" | "any"
   sort_order?: number

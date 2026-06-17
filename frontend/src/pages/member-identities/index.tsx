@@ -79,6 +79,7 @@ export default function MemberIdentitiesPage() {
   const [refreshing, setRefreshing] = useState(false)
 
   const [formName, setFormName] = useState("")
+  const [formType, setFormType] = useState("")
   const [formConditions, setFormConditions] = useState<IdentityCondition[]>([defaultCondition()])
   const [formOperator, setFormOperator] = useState<"all" | "any">("all")
 
@@ -96,6 +97,7 @@ export default function MemberIdentitiesPage() {
   const handleOpenCreate = () => {
     setEditingItem(null)
     setFormName("")
+    setFormType("")
     setFormConditions([defaultCondition()])
     setFormOperator("all")
     setDialogOpen(true)
@@ -104,13 +106,14 @@ export default function MemberIdentitiesPage() {
   const handleOpenEdit = (item: MemberIdentity) => {
     setEditingItem(item)
     setFormName(item.name)
+    setFormType(item.type || "")
     setFormConditions(item.conditions.length > 0 ? [...item.conditions] : [defaultCondition()])
     setFormOperator(item.operator || "all")
     setDialogOpen(true)
   }
 
   const handleSave = async () => {
-    if (!formName.trim()) return
+    if (!formName.trim() || !formType) return
     setSaving(true)
     try {
       const validConditions = formConditions.filter(c => c.type).map(c => ({
@@ -119,6 +122,7 @@ export default function MemberIdentitiesPage() {
       }))
       const data: MemberIdentityCreate = {
         name: formName.trim(),
+        type: formType,
         conditions: validConditions,
         operator: validConditions.length > 1 ? formOperator : "all",
       }
@@ -291,6 +295,7 @@ export default function MemberIdentitiesPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-12 pl-4">优先级</TableHead>
                 <TableHead>身份名称</TableHead>
+                <TableHead className="w-16">类型</TableHead>
                 <TableHead>匹配条件</TableHead>
                 <TableHead className="text-right pr-4">操作</TableHead>
               </TableRow>
@@ -320,6 +325,9 @@ export default function MemberIdentitiesPage() {
                   </TableCell>
                   <TableCell>
                     <span className="text-[13px] text-[#2b2f36] font-medium">{item.name}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-[12px] text-[#4e535a]">{item.type || "-"}</span>
                   </TableCell>
                   <TableCell>
                     {item.conditions.length > 0 ? (
@@ -373,6 +381,15 @@ export default function MemberIdentitiesPage() {
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">身份名称</span>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="输入会员身份名称" />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">类型</span>
+              <SelectDropdown
+                value={formType}
+                options={[{value: "老人", label: "老人"}, {value: "新人", label: "新人"}]}
+                placeholder="请选择类型"
+                onChange={setFormType}
+              />
             </div>
 
             <div className="space-y-2">
@@ -535,7 +552,7 @@ export default function MemberIdentitiesPage() {
 
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !formName.trim()}>
+              <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !formName.trim() || !formType}>
                 {saving ? "保存中..." : "保存"}
               </Button>
             </div>

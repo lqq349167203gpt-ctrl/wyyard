@@ -23,7 +23,8 @@ def get_daily_payment_totals(date: str = Query(...)):
 
     # 会员活动
     for c in membership_card_service.list_cards():
-        if (c.effective_date or "") == date:
+        created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
+        if created == date:
             totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
 
     # 觉醒游戏
@@ -46,7 +47,8 @@ def get_daily_payment_totals(date: str = Query(...)):
 
     # 内部课程
     for c in internal_course_service.list_courses():
-        if (c.effective_date or "") == date:
+        created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
+        if created == date:
             totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
 
     # OH卡梳理
@@ -57,8 +59,8 @@ def get_daily_payment_totals(date: str = Query(...)):
 
     # 其他项目
     for p in other_project_service.list_projects():
-        effective = p.effective_date or (p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at))
-        if effective == date:
+        created = p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at)
+        if created == date:
             totals[p.customer_id] = totals.get(p.customer_id, 0) + p.fee
 
     return totals
@@ -84,7 +86,7 @@ def list_payment_records(
 
     # 会员活动
     for c in membership_card_service.list_cards():
-        created = c.effective_date or ""
+        created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
         records.append({
             "date": created,
             "nickname": "",
@@ -148,7 +150,7 @@ def list_payment_records(
 
     # 内部课程
     for c in internal_course_service.list_courses():
-        created = c.effective_date or ""
+        created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
         records.append({
             "date": created,
             "nickname": "",
@@ -180,7 +182,7 @@ def list_payment_records(
 
     # 其他项目
     for p in other_project_service.list_projects():
-        created = p.effective_date or (p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at))
+        created = p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at)
         records.append({
             "date": created,
             "nickname": "",

@@ -21,6 +21,8 @@ interface SelectDropdownSingleProps {
   hideSelectedStyle?: boolean
   hideChevron?: boolean
   textColor?: string
+  portalContainer?: HTMLElement | null
+  dropdownWidth?: number
 }
 
 interface SelectDropdownMultiProps {
@@ -37,6 +39,8 @@ interface SelectDropdownMultiProps {
   hideSelectedStyle?: boolean
   hideChevron?: boolean
   textColor?: string
+  portalContainer?: HTMLElement | null
+  dropdownWidth?: number
 }
 
 type SelectDropdownProps = SelectDropdownSingleProps | SelectDropdownMultiProps
@@ -57,8 +61,11 @@ export const SelectDropdown = memo(function SelectDropdown({
   hideSelectedStyle = false,
   hideChevron = false,
   textColor,
+  portalContainer,
+  dropdownWidth,
 }: SelectDropdownProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<React.CSSProperties>({})
 
@@ -78,8 +85,8 @@ export const SelectDropdown = memo(function SelectDropdown({
     const s: React.CSSProperties = {
       position: "fixed",
       left: r.left,
-      width: r.width,
-      zIndex: 9999,
+      width: dropdownWidth ?? r.width,
+      zIndex: 2147483647, // 最大 z-index 值
     }
     if (below >= h || below >= above) {
       s.top = r.bottom + 4
@@ -89,7 +96,7 @@ export const SelectDropdown = memo(function SelectDropdown({
       s.maxHeight = Math.min(h, above - 8)
     }
     setPos(s)
-  }, [])
+  }, [dropdownWidth])
 
   const handleToggle = useCallback(() => {
     if (disabled) return
@@ -106,12 +113,23 @@ export const SelectDropdown = memo(function SelectDropdown({
   // 外部点击关闭
   useEffect(() => {
     if (!open) return
-    const h = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
+    const h = (e: Event) => {
+      const target = e.target as HTMLElement
+      // 点击当前下拉框自身（触发按钮或菜单项）不关闭
+      if (rootRef.current?.contains(target)) return
+      if (menuRef.current?.contains(target)) return
+      // 点击其他区域一律关闭
       close()
     }
-    const t = setTimeout(() => document.addEventListener("mousedown", h), 0)
-    return () => { clearTimeout(t); document.removeEventListener("mousedown", h) }
+    const t = setTimeout(() => {
+      document.addEventListener("mousedown", h)
+      document.addEventListener("pointerdown", h)
+    }, 0)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener("mousedown", h)
+      document.removeEventListener("pointerdown", h)
+    }
   }, [open, close])
 
   // 滚动更新位置
@@ -181,7 +199,7 @@ export const SelectDropdown = memo(function SelectDropdown({
       </button>
 
       {open && createPortal(
-        <div className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={pos}>
+        <div ref={menuRef} className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={pos}>
           {options.map((opt) => {
             const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
             return (
@@ -200,7 +218,7 @@ export const SelectDropdown = memo(function SelectDropdown({
             )
           })}
         </div>,
-        document.body
+        portalContainer || document.body
       )}
     </div>
   )

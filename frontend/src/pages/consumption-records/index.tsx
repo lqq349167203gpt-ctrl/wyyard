@@ -151,7 +151,7 @@ function PaymentTable({ records, loading }: { records: ConsumptionPaymentRecord[
     <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className="pl-4">付费日期</TableHead>
+          <TableHead className="pl-4">录入日期</TableHead>
           <TableHead>用户</TableHead>
           <TableHead>类型</TableHead>
           <TableHead>名称</TableHead>

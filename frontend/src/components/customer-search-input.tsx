@@ -33,6 +33,12 @@ export interface CustomerSearchInputProps {
   onNoResultsClick?: (searchText: string) => void
   /** Called when input loses focus with current text */
   onBlur?: (value: string) => void
+  /** Portal container for dropdown */
+  portalContainer?: HTMLElement | null
+  /** Custom right-side label per customer ID (overrides member_type) */
+  rightLabelMap?: Record<string, string>
+  /** Customer IDs whose right label should be red */
+  warnLabelIds?: string[]
 }
 
 export function CustomerSearchInput({
@@ -40,7 +46,7 @@ export function CustomerSearchInput({
   value,
   onChange,
   onSelectItem,
-  placeholder = "搜索客户昵称",
+  placeholder = "",
   multi = false,
   positionFilter,
   excludeIds = [],
@@ -49,6 +55,9 @@ export function CustomerSearchInput({
   className = "",
   onNoResultsClick,
   onBlur,
+  portalContainer,
+  rightLabelMap,
+  warnLabelIds,
 }: CustomerSearchInputProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -68,7 +77,7 @@ export function CustomerSearchInput({
       position: "fixed",
       left: r.left,
       width: r.width,
-      zIndex: 9999,
+      zIndex: 2147483647, // 最大 z-index 值
     }
     if (below >= h || below >= above) {
       s.top = r.bottom + 4
@@ -82,15 +91,15 @@ export function CustomerSearchInput({
 
   // Click outside to close
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = (e: PointerEvent) => {
       const target = e.target as Node
       if (ref.current && !ref.current.contains(target) && dropdownRef.current && !dropdownRef.current.contains(target)) {
         setOpen(false)
         setSearch("")
       }
     }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
+    document.addEventListener("pointerdown", handleClick)
+    return () => document.removeEventListener("pointerdown", handleClick)
   }, [])
 
   // Update position on scroll/resize
@@ -151,38 +160,32 @@ export function CustomerSearchInput({
   return (
     <div className="relative" ref={ref}>
       {multi ? (
-        // Multi-select: search input on top, badges below
-        <div>
-          <div
-            className={`min-h-8 w-full rounded-md border border-[#dee0e3] bg-white px-2 py-1 flex items-center ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
-            onClick={() => { if (!disabled) { calcPos(); setOpen(true) } }}
-          >
-            <input
-              ref={inputRef}
-              className="flex-1 min-w-[80px] h-6 border-none outline-none text-[12px] bg-transparent"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); calcPos(); setOpen(true) }}
-              onFocus={() => { calcPos(); setOpen(true) }}
-              placeholder={placeholder}
-              disabled={disabled}
-              autoComplete="off"
-            />
-          </div>
-          {selectedNames.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {selectedNames.map(name => (
-                <span key={name} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#f0f5ff] text-[11px] text-[#3370ff]">
-                  {name}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeItem(name) }}
-                    className="hover:text-[#e02020]"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
+        // Multi-select: badges inline with search input
+        <div
+          className={`h-7 w-full rounded-md border border-[#dee0e3] bg-white px-1.5 flex items-center gap-1 overflow-x-auto scrollbar-hide ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
+          onClick={() => { if (!disabled) { calcPos(); setOpen(true); inputRef.current?.focus() } }}
+        >
+          {selectedNames.map(name => (
+            <span key={name} className="inline-flex items-center px-1 py-0.5 rounded bg-[#f5f6f7] text-[11px] text-[#4e535a] shrink-0">
+              {name}
+            </span>
+          ))}
+          <input
+            ref={inputRef}
+            className="shrink-0 w-[60px] h-5 border-none outline-none text-[12px] bg-transparent"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); calcPos(); setOpen(true) }}
+            onFocus={() => { calcPos(); setOpen(true) }}
+            onKeyDown={(e) => {
+              if ((e.key === "Backspace" || e.key === "Delete") && search === "" && selectedNames.length > 0) {
+                e.preventDefault()
+                removeItem(selectedNames[selectedNames.length - 1])
+              }
+            }}
+            placeholder={selectedNames.length === 0 ? placeholder : ""}
+            disabled={disabled}
+            autoComplete="off"
+          />
         </div>
       ) : (
         // Single select: show input with X clear button
@@ -216,7 +219,7 @@ export function CustomerSearchInput({
 
       {/* Dropdown via portal */}
       {open && !disabled && search && createPortal(
-        <div ref={dropdownRef}>
+        <div ref={dropdownRef} onPointerDown={(e) => e.stopPropagation()}>
           {(filtered.length > 0 || onNoResultsClick) && (() => {
             const exactMatch = filtered.some(c => c.nickname.toLowerCase() === search.trim().toLowerCase())
             const showCreate = onNoResultsClick && !exactMatch
@@ -230,8 +233,8 @@ export function CustomerSearchInput({
                     onMouseDown={(e) => { e.preventDefault(); selectItem(c) }}
                   >
                     <span>{c.nickname}</span>
-                    {c.member_type && (
-                      <span className="text-[10px] text-[#8f959e] ml-auto">{c.member_type}</span>
+                    {(rightLabelMap?.[c.id] || c.member_type) && (
+                      <span className={`text-[10px] ml-auto ${warnLabelIds?.includes(c.id) ? "text-[#e02020]" : "text-[#8f959e]"}`}>{rightLabelMap?.[c.id] || c.member_type}</span>
                     )}
                   </div>
                 ))}
@@ -254,7 +257,7 @@ export function CustomerSearchInput({
             </div>
           )}
         </div>,
-        document.body
+        portalContainer || document.body
       )}
     </div>
   )

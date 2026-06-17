@@ -28,6 +28,21 @@ const TYPE_BADGE: Record<string, { label: string; bg: string; text: string }> = 
   ers:   { label: "情绪", bg: "bg-[#fff8f0]", text: "text-[#f59e0b]" },
   eks:   { label: "能量", bg: "bg-[#fefce8]", text: "text-[#ca8a04]" },
   ics:   { label: "内部", bg: "bg-[#f0fdf4]", text: "text-[#22c55e]" },
+  ocr:   { label: "OH卡", bg: "bg-[#f0f7ff]", text: "text-[#2b7fff]" },
+}
+
+const ICS_COURSE_LABELS: Record<string, string> = {
+  "疗愈师课程": "疗愈师课程", "疗愈师课程：自爱力构建": "疗愈师课程",
+  "商业框架陪跑": "商业框架陪跑", "商业框架陪跑：自觉力提升": "商业框架陪跑",
+  "落地赋能班": "落地赋能班", "落地赋能班：自洽力整合": "落地赋能班",
+}
+
+function getIcsLabel(courseType: string): string {
+  if (ICS_COURSE_LABELS[courseType]) return ICS_COURSE_LABELS[courseType]
+  if (courseType.startsWith("疗愈师")) return "疗愈师课程"
+  if (courseType.startsWith("商业框架") || courseType.startsWith("陪跑")) return "商业框架陪跑"
+  if (courseType.startsWith("落地赋能") || courseType.startsWith("赋能")) return "落地赋能班"
+  return ""
 }
 
 export default function ActivityRecordsPage() {
@@ -95,7 +110,10 @@ export default function ActivityRecordsPage() {
       list.push(r)
       map.set(r.date, list)
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
+    for (const list of map.values()) {
+      list.sort((a, b) => (a.data.start_time || "").localeCompare(b.data.start_time || ""))
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a))
   }, [records])
 
   const prevMonth = () => {
@@ -206,6 +224,7 @@ export default function ActivityRecordsPage() {
 function ActivityCard({ record, getName }: { record: UnifiedRecord; getName: (id: string) => string }) {
   const { type, data } = record
   const badge = TYPE_BADGE[type]
+  const icsCourseLabel = type === "ics" ? getIcsLabel(data.course_type || data.course_name || "") : ""
 
   // 活动名称
   let activityName = ""
@@ -217,9 +236,10 @@ function ActivityCard({ record, getName }: { record: UnifiedRecord; getName: (id
     activityName = `能量结·${names.length > 0 ? names.join("、") : data.owner_name || getName(data.owner_id) || "未分配"}`
   }
   else if (type === "ics") activityName = data.course_name || ""
+  else if (type === "ocr") activityName = `OH卡梳理·${data.owner_name || getName(data.owner_id) || "未分配"}`
 
   // 案主
-  const ownerName = (type === "gcs" || type === "ers" || type === "eks")
+  const ownerName = (type === "gcs" || type === "ers" || type === "eks" || type === "ocr")
     ? (data.owner_name || getName(data.owner_id) || "")
     : ""
 
@@ -230,11 +250,6 @@ function ActivityCard({ record, getName }: { record: UnifiedRecord; getName: (id
   } else if (type === "eks" || type === "ics") {
     teacherNames = (data.host_names || []).join("、")
   }
-
-  // 主持人
-  const hostName = (type === "gcs" || type === "ers")
-    ? (data.host_name || getName(data.host_id) || "")
-    : ""
 
   // 成就君
   const achieverName = (type === "gcs" || type === "ers")
@@ -294,6 +309,14 @@ function ActivityCard({ record, getName }: { record: UnifiedRecord; getName: (id
             </span>
           )}
           <span className="text-[13px] font-medium text-[#2b2f36]">{activityName}</span>
+          {icsCourseLabel && (
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f5f6f7] text-[#4e535a]">
+              {icsCourseLabel}
+            </span>
+          )}
+          {type === "class" && data.is_public_welfare && (
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#f8fdf8] text-[#4caf50]">公益</span>
+          )}
           {(data.room_name || data.space_name) && (
             <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-normal bg-[#fafbfc] text-[#787f88]">
               {data.space_name && data.room_name ? `${data.space_name}/${data.room_name}` : data.room_name || data.space_name}
@@ -301,7 +324,6 @@ function ActivityCard({ record, getName }: { record: UnifiedRecord; getName: (id
           )}
           {ownerName && <span className="text-[#8f959e]">案主：<span className="text-[#2b2f36]">{ownerName}</span></span>}
           {teacherNames && <span className="text-[#8f959e]">老师：<span className="text-[#2b2f36]">{teacherNames}</span></span>}
-          {hostName && <span className="text-[#8f959e]">主持人：<span className="text-[#2b2f36]">{hostName}</span></span>}
           {achieverName && <span className="text-[#8f959e]">成就君：<span className="text-[#2b2f36]">{achieverName}</span></span>}
         </div>
         {data.start_time && (

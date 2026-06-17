@@ -158,6 +158,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   filter: grayscale(1);
 }
 
+/* 隐藏时间选择框时钟图标 */
+.time-no-icon input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="time"].time-no-icon::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
 /* 飞书侧边栏：去掉右侧边框 */
 [data-slot="sidebar-container"] {
   border-right: none !important;

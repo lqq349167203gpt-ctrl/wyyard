@@ -9,6 +9,7 @@ class EnergyKnotSessionBase(BaseModel):
     end_time: Optional[str] = None  # HH:MM
     owner_id: str  # 案主
     owner_name: str
+    name: str = ""  # 活动名称
     description: Optional[str] = None  # 个案详情（JSON 格式）
     participant_ids: List[str] = []  # 参与者
     host_ids: List[str] = []  # 课程老师（多选）

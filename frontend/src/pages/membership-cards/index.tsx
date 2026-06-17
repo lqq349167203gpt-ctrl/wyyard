@@ -373,7 +373,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
                   if (!name) { setFormNickname(""); setFormCustomerId("") }
                 }}
                 onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
-                placeholder="搜索客户昵称"
+               
                 disabled={!!editingCard}
               />
             </div>

@@ -127,7 +127,7 @@ def get_remaining_count(customer_id: str) -> int:
     """计算某用户的觉醒游戏剩余次数（所有已创建的场次均计入已用）"""
     cases = group_case_service.list_cases()
     total_purchased = sum(c.purchase_count for c in cases if c.customer_id == customer_id)
-    used = sum(1 for s in _sessions.values() if s.owner_id == customer_id and not s.is_deleted)
+    used = sum(1 for s in _sessions.values() if not s.is_deleted and (s.owner_id == customer_id or getattr(s, "achiever_id", "") == customer_id))
     from app.services import project_deduction_service
     manual_deductions = project_deduction_service.get_deduction_total(customer_id, "group-cases")
     return total_purchased - used - manual_deductions

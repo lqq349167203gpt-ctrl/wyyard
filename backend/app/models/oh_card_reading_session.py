@@ -7,6 +7,7 @@ class OhCardReadingSessionBase(BaseModel):
     date: str  # YYYY-MM-DD
     start_time: Optional[str] = None  # HH:MM
     end_time: Optional[str] = None  # HH:MM
+    name: str = ""  # 活动名称
     owner_id: str  # 案主
     owner_name: str
     description: str = ""  # 个案详情

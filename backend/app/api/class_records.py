@@ -55,6 +55,7 @@ def list_unified(
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
+        oh_card_reading_session_service,
     )
 
     items = []
@@ -77,6 +78,10 @@ def list_unified(
     # Internal course sessions
     for s in internal_course_session_service.list_sessions(None, start_date, end_date):
         items.append({"type": "ics", "data": s.model_dump(mode="json") if hasattr(s, "model_dump") else s, "date": s.get("date", "") if isinstance(s, dict) else getattr(s, "date", "")})
+
+    # OH card reading sessions
+    for s in oh_card_reading_session_service.list_sessions(None, start_date, end_date):
+        items.append({"type": "ocr", "data": s.model_dump(mode="json") if hasattr(s, "model_dump") else s, "date": s.get("date", "") if isinstance(s, dict) else getattr(s, "date", "")})
 
     # 从客户数据实时填充名称
     items = _fill_names(items)
@@ -126,6 +131,9 @@ def list_unified(
                 title = f"能量结【{'丨'.join(names)}】" if names else f"能量结【{owner or '未分配'}】"
             elif i["type"] == "ics":
                 title = i["data"].get("course_name", "") if isinstance(i["data"], dict) else getattr(i["data"], "course_name", "")
+            elif i["type"] == "ocr":
+                owner = i["data"].get("owner_name", "") if isinstance(i["data"], dict) else getattr(i["data"], "owner_name", "")
+                title = f"OH卡梳理【{owner or '未分配'}】"
             if name_lower in title.lower():
                 filtered.append(i)
         items = filtered

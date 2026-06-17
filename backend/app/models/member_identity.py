@@ -14,6 +14,7 @@ class IdentityCondition(BaseModel):
 
 class MemberIdentityBase(BaseModel):
     name: str = ""
+    type: str = ""  # "老人" | "新人" | ""
     conditions: List[IdentityCondition] = []
     operator: str = "all"  # "all" | "any"
     sort_order: int = 0
@@ -25,6 +26,7 @@ class MemberIdentityCreate(MemberIdentityBase):
 
 class MemberIdentityUpdate(BaseModel):
     name: Optional[str] = None
+    type: Optional[str] = None
     conditions: Optional[List[IdentityCondition]] = None
     operator: Optional[str] = None
     sort_order: Optional[int] = None

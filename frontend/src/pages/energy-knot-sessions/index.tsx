@@ -228,7 +228,7 @@ export default function EnergyKnotSessionsPage() {
                   if (!name) { setFormOwnerId(""); setFormOwnerName("") }
                 }}
                 onSelectItem={(c) => { setFormOwnerId(c.id); setFormOwnerName(c.nickname) }}
-                placeholder="搜索客户昵称"
+               
               />
             </div>
 
@@ -255,7 +255,7 @@ export default function EnergyKnotSessionsPage() {
                     setFormHostNames([...formHostNames, c.nickname])
                   }
                 }}
-                placeholder="搜索客户昵称"
+               
                 multi
                 excludeIds={formOwnerId ? [formOwnerId] : []}
               />

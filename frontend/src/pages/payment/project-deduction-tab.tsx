@@ -243,7 +243,7 @@ export function ProjectDeductionTab() {
                   if (!name) handleClearCustomer()
                 }}
                 onSelectItem={handleSelectCustomer}
-                placeholder="搜索客户昵称"
+               
               />
             </div>
 

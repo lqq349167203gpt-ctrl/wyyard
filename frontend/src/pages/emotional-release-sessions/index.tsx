@@ -441,7 +441,7 @@ export default function EmotionalReleaseSessionsPage() {
                   if (!name) { setFormOwnerId(""); setFormOwnerName("") }
                 }}
                 onSelectItem={(c) => { setFormOwnerId(c.id); setFormOwnerName(c.nickname) }}
-                placeholder="搜索客户昵称"
+               
               />
             </div>
 
@@ -470,7 +470,7 @@ export default function EmotionalReleaseSessionsPage() {
                   if (!name) { setFormHostId(""); setFormHostName("") }
                 }}
                 onSelectItem={(c) => { setFormHostId(c.id); setFormHostName(c.nickname) }}
-                placeholder="搜索客户昵称"
+               
               />
             </div>
 

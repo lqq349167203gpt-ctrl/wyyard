@@ -432,7 +432,7 @@ export default function InternalCourseSessionsPage() {
                     setFormHostNames([...formHostNames, c.nickname])
                   }
                 }}
-                placeholder="搜索客户昵称"
+               
                 multi
               />
             </div>

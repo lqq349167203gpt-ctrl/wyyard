@@ -15,7 +15,6 @@ import {
   FileText,
   Bell,
   TrendingUp,
-  ChevronDown,
   Settings,
   Users,
   Monitor,
@@ -121,7 +120,6 @@ function MenuGroup({
         onClick={onToggle}
       >
         <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />{label}</span>
-        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
       </SidebarGroupLabel>
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
@@ -178,7 +176,6 @@ function PaymentMenuGroup({
         onClick={onToggle}
       >
         <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />付费项目</span>
-        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
       </SidebarGroupLabel>
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"

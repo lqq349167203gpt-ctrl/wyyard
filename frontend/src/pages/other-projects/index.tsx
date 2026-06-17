@@ -394,7 +394,7 @@ function OtherProjectList() {
                   if (!name) { setFormNickname(""); setFormCustomerId("") }
                 }}
                 onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
-                placeholder="搜索客户昵称"
+               
                 disabled={!!editingItem}
               />
             </div>
@@ -747,7 +747,7 @@ function DeductionTab() {
                   if (!name) handleClearCustomer()
                 }}
                 onSelectItem={handleSelectCustomer}
-                placeholder="搜索客户昵称"
+               
               />
             </div>
 

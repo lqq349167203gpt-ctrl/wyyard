@@ -1,0 +1,1034 @@
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
+import { GripVertical, Trash2, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import {
+  classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
+  energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi,
+  type Course, type CustomerLight, type Space, type MemberIdentity,
+} from "@/lib/api"
+import { CustomerSearchInput } from "@/components/customer-search-input"
+import { SelectDropdown } from "@/components/select-dropdown"
+import { CourseDropdown } from "@/components/course-dropdown"
+import { SpaceRoomDropdown } from "@/components/space-room-dropdown"
+import type { CardCallbacks } from "./index"
+
+type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"
+
+const TYPE_BADGES: Record<ActivityType, { label: string; color: string; bg: string }> = {
+  class: { label: "沙龙", color: "#8f959e", bg: "#f5f6f7" },
+  gcs: { label: "觉醒", color: "#8f959e", bg: "#f5f6f7" },
+  ers: { label: "情绪", color: "#8f959e", bg: "#f5f6f7" },
+  eks: { label: "能量", color: "#8f959e", bg: "#f5f6f7" },
+  ics: { label: "内部", color: "#8f959e", bg: "#f5f6f7" },
+  ocr: { label: "OH卡", color: "#8f959e", bg: "#f5f6f7" },
+}
+
+const TYPE_NAMES: Record<ActivityType, string> = {
+  class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "内部课程", ocr: "OH卡梳理",
+}
+
+const ICS_COURSE_LABELS: Record<string, string> = {
+  "疗愈师课程": "疗愈师", "疗愈师课程：自爱力构建": "疗愈师",
+  "商业框架陪跑": "陪跑", "商业框架陪跑：自觉力提升": "陪跑",
+  "落地赋能班": "赋能班", "落地赋能班：自洽力整合": "赋能班",
+}
+
+function getTypeBadge(type: ActivityType, courseName?: string): { label: string; color: string; bg: string } {
+  if (type === "ics" && courseName) {
+    const label = ICS_COURSE_LABELS[courseName]
+    if (label) return { ...TYPE_BADGES.ics, label }
+    if (courseName.startsWith("疗愈师")) return { ...TYPE_BADGES.ics, label: "疗愈师" }
+    if (courseName.startsWith("商业框架") || courseName.startsWith("陪跑")) return { ...TYPE_BADGES.ics, label: "陪跑" }
+    if (courseName.startsWith("落地赋能") || courseName.startsWith("赋能")) return { ...TYPE_BADGES.ics, label: "赋能班" }
+  }
+  return TYPE_BADGES[type]
+}
+
+function parseEksDescription(desc: string): { id: string; name: string; count: number } {
+  try {
+    const items = JSON.parse(desc || "[]")
+    if (Array.isArray(items) && items.length > 0) {
+      const c = items[0].count
+      return { id: items[0].id || "", name: items[0].name || "", count: (c != null && !isNaN(c)) ? Math.max(1, c) : 2 }
+    }
+  } catch {}
+  return { id: "", name: "", count: 2 }
+}
+
+function serializeEksDescription(id: string, name: string, count: number): string {
+  return JSON.stringify([{ id: id || "", name: name || "", count }])
+}
+
+const TYPE_OPTIONS = [
+  { value: "class", label: "沙龙活动" },
+  { value: "gcs", label: "觉醒游戏" },
+  { value: "ers", label: "情绪释放" },
+  { value: "ocr", label: "OH卡梳理" },
+  { value: "eks", label: "能量结" },
+  { value: "ics:疗愈师课程", label: "疗愈师课程" },
+  { value: "ics:商业框架陪跑", label: "商业框架陪跑" },
+  { value: "ics:落地赋能班", label: "落地赋能班" },
+]
+
+const ICS_COURSE_MAP: Record<string, string> = {
+  "疗愈师课程": "ics:疗愈师课程", "疗愈师课程：自爱力构建": "ics:疗愈师课程",
+  "商业框架陪跑": "ics:商业框架陪跑", "商业框架陪跑：自觉力提升": "ics:商业框架陪跑",
+  "落地赋能班": "ics:落地赋能班", "落地赋能班：自洽力整合": "ics:落地赋能班",
+}
+
+function resolveIcsCourseKey(courseName: string): string {
+  if (ICS_COURSE_MAP[courseName]) return ICS_COURSE_MAP[courseName]
+  if (courseName.startsWith("疗愈师")) return "ics:疗愈师课程"
+  if (courseName.startsWith("商业框架") || courseName.startsWith("陪跑")) return "ics:商业框架陪跑"
+  if (courseName.startsWith("落地赋能") || courseName.startsWith("赋能")) return "ics:落地赋能班"
+  return ""
+}
+
+function getTypeSelectValue(type: ActivityType, courseName: string): string {
+  if (type === "ics") return resolveIcsCourseKey(courseName)
+  return type
+}
+
+const ACTIVITY_MODE_OPTIONS = [
+  { value: "线下", label: "线下" },
+  { value: "线上", label: "线上" },
+]
+
+interface ActivityRow {
+  key: number
+  record_id: string
+  record_type: ActivityType
+  ics_course_key: string  // ics 子类型，如 "ics:商业框架陪跑"
+  start_time: string
+  end_time: string
+  name: string
+  course_id: string
+  host_ids: string[]
+  host_names: string[]
+  achiever_id: string
+  achiever_name: string
+  participant_ids: string[]
+  activity_mode: string
+  is_public_welfare: boolean
+  deduction_count: number
+  space_id: string
+  room_id: string
+  description: string
+  pendingCreate: boolean
+  raw: any
+}
+
+let nextKey = 1
+
+function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSpaceId: string, spaces: Space[]): ActivityRow {
+  const key = nextKey++
+  let hostIds: string[] = []
+  let hostNames: string[] = []
+  let achieverId = ""
+  let achieverName = ""
+  let name = ""
+
+  if (type === "class") {
+    hostIds = data.teacher_ids || []
+    name = courses.find(c => c.id === data.course_id)?.name || data.course_name || ""
+  } else if (type === "gcs" || type === "ers" || type === "ocr") {
+    if (data.host_ids?.length) {
+      hostIds = data.host_ids
+      hostNames = data.host_names || []
+    } else if (data.owner_id) {
+      hostIds = [data.owner_id]
+      hostNames = [data.owner_name || ""]
+    }
+    achieverId = data.achiever_id || ""
+    achieverName = data.achiever_name || ""
+    name = data.name || ""
+  } else if (type === "eks") {
+    hostIds = data.host_ids || []
+    hostNames = data.host_names || []
+    achieverId = data.owner_id || ""
+    achieverName = data.owner_name || ""
+    name = data.name ?? TYPE_NAMES[type]
+  } else if (type === "ics") {
+    hostIds = data.host_ids || []
+    hostNames = data.host_names || []
+    name = data.course_name || ""
+  }
+
+  let participantIds: string[] = []
+  if (type === "class") {
+    const groupIds = (data.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
+    participantIds = [...new Set([...groupIds, ...(data.participant_ids || [])])]
+  } else if (type === "gcs" || type === "ocr") {
+    participantIds = [...(data.participant_ids || []), ...(data.host_ids || []), data.host_id, data.achiever_id].filter(Boolean)
+  } else if (type === "ers") {
+    participantIds = [...(data.participant_ids || [])].filter(Boolean)
+  } else if (type === "eks") {
+    participantIds = [...(data.host_ids || [])].filter(Boolean)
+  } else if (type === "ics") {
+    participantIds = [...(data.participant_ids || [])].filter(Boolean)
+  }
+
+  const desc = (type === "class" || type === "ics") ? (data.course_description || "") : (data.description || "")
+  const sid = data.space_id || defaultSpaceId || ""
+  const rid = data.room_id || (spaces.find(s => s.id === sid)?.rooms?.[0]?.id || "")
+
+  return {
+    key, record_id: data.id, record_type: type,
+    ics_course_key: type === "ics" ? resolveIcsCourseKey(name) : "",
+    start_time: data.start_time || "", end_time: data.end_time || "",
+    name, course_id: type === "class" ? (data.course_id || "") : "",
+    host_ids: hostIds, host_names: hostNames,
+    achiever_id: achieverId, achiever_name: achieverName,
+    participant_ids: participantIds,
+    activity_mode: data.activity_mode || "线下",
+    is_public_welfare: data.is_public_welfare || false,
+    deduction_count: type === "eks" ? parseEksDescription(data.description || "").count : (data.is_public_welfare ? 0 : 1),
+    space_id: sid, room_id: rid,
+    description: desc,
+    pendingCreate: false,
+    raw: data,
+  }
+}
+
+function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Space[]): ActivityRow {
+  const key = nextKey++
+  const sid = defaultSpaceId || spaces[0]?.id || ""
+  const rid = sid ? (spaces.find(s => s.id === sid)?.rooms?.[0]?.id || "") : ""
+  return {
+    key, record_id: "", record_type: type,
+    ics_course_key: "",
+    start_time: "", end_time: "",
+    name: "", course_id: "",
+    host_ids: [], host_names: [],
+    achiever_id: "", achiever_name: "",
+    participant_ids: [],
+    activity_mode: "线下",
+    is_public_welfare: false,
+    deduction_count: 1,
+    space_id: sid, room_id: rid,
+    description: "",
+    pendingCreate: true,
+    raw: {},
+  }
+}
+
+type RowStatus = "idle" | "saving" | "saved" | "error"
+
+interface ActivityBatchTableProps {
+  date: string
+  courses: Course[]
+  customers: CustomerLight[]
+  teachers: CustomerLight[]
+  spaces: Space[]
+  spaceId?: string
+  records: { type: "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"; data: any }[]
+  onReload: () => void
+  callbacks: CardCallbacks
+  getMemberName: (id: string) => string
+  memberIdentities?: MemberIdentity[]
+  onSavingCountChange?: (count: number) => void
+  onSavedCountChange?: (count: number) => void
+}
+
+export function ActivityBatchTable({
+  date, courses, customers, teachers, spaces, spaceId,
+  records, onReload, callbacks, getMemberName, memberIdentities,
+  onSavingCountChange, onSavedCountChange,
+}: ActivityBatchTableProps) {
+  const [rows, setRows] = useState<ActivityRow[]>([])
+  const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
+  const [dragOverKey, setDragOverKey] = useState<number | null>(null)
+  const dragKeyRef = useRef<number | null>(null)
+  const eksCountEditRef = useRef<Record<string, string>>({})
+  const lastEditedEksRef = useRef<ActivityRow | null>(null)
+  const eksEditsRef = useRef<Map<string, { achiever_id: string; achiever_name: string; description: string }>>(new Map())
+  const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
+  const fetchedRemainingRef = useRef<Set<string>>(new Set())
+
+  // 报告保存状态
+  useEffect(() => {
+    const savingCount = Object.values(rowStatus).filter(s => s === "saving").length
+    onSavingCountChange?.(savingCount)
+  }, [rowStatus, onSavingCountChange])
+
+  useEffect(() => {
+    const savedCount = Object.values(rowStatus).filter(s => s === "saved").length
+    onSavedCountChange?.(savedCount)
+  }, [rowStatus, onSavedCountChange])
+
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const timersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
+  const REMAINING_APIS: Record<string, (kw: string) => Promise<any[]>> = {
+    eks: (kw) => energyKnotSessionApi.searchCustomers(kw),
+    gcs: (kw) => groupCaseSessionApi.searchCustomers(kw),
+    ers: (kw) => emotionalReleaseSessionApi.searchCustomers(kw),
+    ocr: (kw) => ohCardReadingSessionApi.searchCustomers(kw),
+  }
+
+  const fetchRemaining = useCallback(async (type: string, customerId: string) => {
+    if (!customerId) return
+    const api = REMAINING_APIS[type]
+    if (!api) return
+    try {
+      const results = await api("")
+      const map: Record<string, number> = {}
+      for (const r of results) map[r.id] = r.remaining
+      setRemainingMap(prev => ({ ...prev, [type]: { ...prev[type], ...map } }))
+    } catch {}
+  }, [])
+
+  // 从 records 加载行数据
+  const prevRecordsRef = useRef<string | null>(null)
+  useEffect(() => {
+    const sig = records.map(r => `${r.type}-${r.data.id}`).join(",")
+    if (prevRecordsRef.current !== null && sig === prevRecordsRef.current) return
+    prevRecordsRef.current = sig
+
+    const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
+    let savedOrder: string[] = []
+    try { savedOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
+
+    let items = records.map(r => {
+      const row = recordToRow(r.type, r.data, courses, spaceId || "", spaces)
+      // 恢复 eks 编辑中的案主和部位数
+      if (r.type === "eks" && r.data.id) {
+        const edit = eksEditsRef.current.get(r.data.id)
+        if (edit) {
+          row.achiever_id = edit.achiever_id
+          row.achiever_name = edit.achiever_name
+          row.description = edit.description
+        }
+      }
+      return row
+    })
+    if (savedOrder.length) {
+      const orderMap = new Map(savedOrder.map((id, i) => [id, i]))
+      items.sort((a, b) => (orderMap.get(`${a.record_type}-${a.record_id}`) ?? 999) - (orderMap.get(`${b.record_type}-${b.record_id}`) ?? 999))
+    }
+
+    // 无记录时默认一行
+    if (items.length === 0) {
+      items = [createFreshRow("class", spaceId || "", spaces)]
+    }
+
+    setRows(items)
+    const statuses: Record<number, RowStatus> = {}
+    items.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+    setRowStatus(statuses)
+  }, [records, courses, date, spaceId, spaces])
+
+  // 保存单行
+  const saveRow = useCallback(async (row: ActivityRow) => {
+    setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
+    try {
+      const type = row.record_type
+      const space = spaces.find(s => s.id === row.space_id)
+      const room = space?.rooms?.find(r => r.id === row.room_id)
+      const common = {
+        start_time: row.start_time || null,
+        end_time: row.end_time || null,
+        activity_mode: row.activity_mode,
+        space_id: row.space_id || undefined,
+        room_id: row.room_id || undefined,
+        space_name: space?.name || undefined,
+        room_name: room?.name || undefined,
+      }
+
+      if (row.pendingCreate) {
+        // 新建记录
+        const createData: any = { date, ...common }
+
+        if (type === "class") {
+          const course = courses.find(c => c.id === row.course_id)
+          createData.course_id = row.course_id || ""
+          createData.course_name = course?.name || row.name || ""
+          createData.course_description = row.description || ""
+          createData.teacher_ids = row.host_ids
+          createData.is_public_welfare = row.is_public_welfare
+        } else if (type === "gcs" || type === "ers" || type === "ocr") {
+          createData.name = row.name || ""
+          createData.owner_id = row.host_ids[0] || ""
+          createData.owner_name = row.host_names[0] || ""
+          if (row.host_ids.length > 1) {
+            createData.host_id = row.host_ids[1]
+            createData.host_name = row.host_names[1] || ""
+          }
+          createData.description = row.description || ""
+          if (row.achiever_id) {
+            createData.achiever_id = row.achiever_id
+            createData.achiever_name = row.achiever_name
+          }
+        } else if (type === "eks") {
+          createData.owner_id = row.achiever_id || row.host_ids[0] || ""
+          createData.owner_name = row.achiever_name || row.host_names[0] || ""
+          createData.name = row.name || ""
+          createData.host_ids = row.host_ids
+          createData.host_names = row.host_names
+          createData.description = row.description || ""
+        } else if (type === "ics") {
+          createData.course_type = row.ics_course_key?.replace("ics:", "") || ""
+          createData.course_name = row.name || ""
+          createData.course_description = row.description || ""
+          createData.host_ids = row.host_ids
+          createData.host_names = row.host_names
+        }
+
+        let result: any
+        if (type === "class") result = await classRecordApi.create(createData)
+        else if (type === "gcs") result = await groupCaseSessionApi.create(createData)
+        else if (type === "ers") result = await emotionalReleaseSessionApi.create(createData)
+        else if (type === "eks") result = await energyKnotSessionApi.create(createData)
+        else if (type === "ics") result = await internalCourseSessionApi.create(createData)
+        else if (type === "ocr") result = await ohCardReadingSessionApi.create(createData)
+
+        // 更新行：标记为已创建
+        setRows(prev => {
+          const next = prev.map(r => r.key === row.key ? {
+            ...r, record_id: result?.id || "", pendingCreate: false, raw: result || {},
+          } : r)
+          // 保存顺序
+          const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
+          try {
+            const order = next.map(r => `${r.record_type}-${r.record_id}`)
+            localStorage.setItem(orderKey, JSON.stringify(order))
+          } catch {}
+          return next
+        })
+      } else {
+        // 更新已有记录
+        const id = row.record_id
+        if (type === "class") {
+          const course = courses.find(c => c.id === row.course_id)
+          await classRecordApi.update(id, {
+            ...common,
+            course_id: row.course_id,
+            course_name: course?.name || row.name,
+            course_description: row.description,
+            teacher_ids: row.host_ids,
+            is_public_welfare: row.is_public_welfare,
+          })
+        } else if (type === "gcs") {
+          await groupCaseSessionApi.update(id, {
+            ...common,
+            name: row.name,
+            owner_id: row.host_ids[0] || row.raw.owner_id,
+            owner_name: row.host_names[0] || row.raw.owner_name,
+            host_id: row.host_ids[1] || undefined,
+            host_name: row.host_names[1] || undefined,
+            description: row.description,
+            achiever_id: row.achiever_id,
+            achiever_name: row.achiever_name,
+          })
+        } else if (type === "ers") {
+          await emotionalReleaseSessionApi.update(id, {
+            ...common,
+            name: row.name,
+            owner_id: row.host_ids[0] || row.raw.owner_id,
+            owner_name: row.host_names[0] || row.raw.owner_name,
+            host_id: row.host_ids[1] || undefined,
+            host_name: row.host_names[1] || undefined,
+            description: row.description,
+            achiever_id: row.achiever_id,
+            achiever_name: row.achiever_name,
+          })
+        } else if (type === "eks") {
+          await energyKnotSessionApi.update(id, {
+            ...common,
+            owner_id: row.achiever_id || "",
+            owner_name: row.achiever_name || "",
+            name: row.name || "",
+            host_ids: row.host_ids,
+            host_names: row.host_names,
+            description: row.description,
+          })
+        } else if (type === "ics") {
+          await internalCourseSessionApi.update(id, {
+            ...common,
+            course_type: row.ics_course_key?.replace("ics:", "") || "",
+            course_name: row.name,
+            course_description: row.description,
+            host_ids: row.host_ids,
+            host_names: row.host_names,
+          })
+        } else if (type === "ocr") {
+          await ohCardReadingSessionApi.update(id, {
+            ...common,
+            name: row.name,
+            owner_id: row.host_ids[0] || row.raw.owner_id,
+            owner_name: row.host_names[0] || row.raw.owner_name,
+            host_id: row.host_ids[1] || undefined,
+            host_name: row.host_names[1] || undefined,
+            description: row.description,
+            achiever_id: row.achiever_id,
+            achiever_name: row.achiever_name,
+          })
+        }
+      }
+
+      setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+      if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
+      // 保存后刷新剩余次数
+      if (["eks", "gcs", "ers", "ocr"].includes(row.record_type) && row.achiever_id) {
+        fetchRemaining(row.record_type, row.achiever_id)
+      }
+    } catch (e: any) {
+      console.error("[ACT] 保存失败:", e)
+      setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+    }
+  }, [courses, spaceId, spaces, date, fetchRemaining])
+
+  const scheduleSave = useCallback((key: number) => {
+    if (timersRef.current[key]) clearTimeout(timersRef.current[key])
+    timersRef.current[key] = setTimeout(() => {
+      const row = rowsRef.current.find(r => r.key === key)
+      if (row) saveRow(row)
+      delete timersRef.current[key]
+    }, 500)
+  }, [saveRow])
+
+  const updateRow = useCallback((key: number, field: keyof ActivityRow, value: any) => {
+    setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
+    if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
+      setRowStatus(prev => ({ ...prev, [key]: "idle" }))
+    }
+    scheduleSave(key)
+  }, [rowStatus, scheduleSave])
+
+  // 删除按钮
+  const handleDelete = useCallback((row: ActivityRow) => {
+    if (row.record_type === "class") callbacks.onDeleteClass(row.record_id)
+    else if (row.record_type === "gcs") callbacks.onDeleteGcs(row.record_id)
+    else if (row.record_type === "ers") callbacks.onDeleteErs(row.record_id)
+    else if (row.record_type === "eks") callbacks.onDeleteEks(row.record_id)
+    else if (row.record_type === "ics") callbacks.onDeleteIcs(row.record_id)
+    else if (row.record_type === "ocr") callbacks.onDeleteOcr(row.record_id)
+  }, [callbacks])
+
+  // 类型切换 → 删除旧记录 + 重置为新类型行
+  const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {
+    const row = rowsRef.current.find(r => r.key === rowKey)
+    if (!row) return
+    // 解析复合值，如 "ics:疗愈师课程"
+    const [parsedType, parsedCourse] = newType.includes(":") ? newType.split(":") : [newType, ""]
+    const type = parsedType as ActivityType
+    // 同类型且同课程 → 忽略
+    if (type === row.record_type && parsedCourse && parsedCourse === row.ics_course_key?.replace("ics:", "")) return
+
+    // 删除旧记录（如果已保存到后端）
+    if (row.record_id && !row.pendingCreate) {
+      try {
+        if (row.record_type === "class") await classRecordApi.delete(row.record_id)
+        else if (row.record_type === "gcs") await groupCaseSessionApi.delete(row.record_id)
+        else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(row.record_id)
+        else if (row.record_type === "eks") await energyKnotSessionApi.delete(row.record_id)
+        else if (row.record_type === "ics") await internalCourseSessionApi.delete(row.record_id)
+        else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(row.record_id)
+      } catch (e) {
+        console.error("[ACT] 删除旧记录失败:", e)
+      }
+    }
+
+    // 保留已有数据，只重置类型相关字段
+    const updated: ActivityRow = {
+      ...row,
+      record_type: type,
+      ics_course_key: type === "ics" ? newType : "",
+      record_id: "",
+      pendingCreate: true,
+      name: "",
+      course_id: "",
+      raw: {},
+      // 切换类型时清除案主和描述（类型间数据不通用）
+      achiever_id: "",
+      achiever_name: "",
+      description: "",
+      deduction_count: type === "eks" ? 2 : 1,
+    }
+    setRows(prev => prev.map(r => r.key === rowKey ? updated : r))
+    setRowStatus(prev => ({ ...prev, [rowKey]: "idle" }))
+    lastEditedEksRef.current = null
+    // 保存新记录
+    try { await saveRow(updated) } catch { /* saveRow handles its own errors */ }
+  }, [spaceId, spaces, saveRow])
+
+  // 拖拽排序
+  const handleDragStart = useCallback((key: number) => { dragKeyRef.current = key }, [])
+  const handleDragOver = useCallback((e: React.DragEvent, key: number) => {
+    e.preventDefault()
+    if (dragKeyRef.current !== key) setDragOverKey(key)
+  }, [])
+  const handleDragEnd = useCallback(() => { dragKeyRef.current = null; setDragOverKey(null) }, [])
+  const handleDrop = useCallback((targetKey: number) => {
+    const sourceKey = dragKeyRef.current
+    if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
+    setRows(prev => {
+      const srcIdx = prev.findIndex(r => r.key === sourceKey)
+      const tgtIdx = prev.findIndex(r => r.key === targetKey)
+      if (srcIdx === -1 || tgtIdx === -1) return prev
+      const next = [...prev]
+      const [moved] = next.splice(srcIdx, 1)
+      next.splice(tgtIdx, 0, moved)
+      const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
+      try {
+        const order = next.map(r => `${r.record_type}-${r.record_id}`)
+        localStorage.setItem(orderKey, JSON.stringify(order))
+      } catch {}
+      return next
+    })
+    dragKeyRef.current = null
+    setDragOverKey(null)
+  }, [date, spaceId])
+
+  // 获取 host 显示名称
+  const getHostDisplay = useCallback((row: ActivityRow): string[] => {
+    const pool = row.record_type === "class" ? teachers : customers
+    return row.host_ids.map(id => {
+      const c = pool.find(c => c.id === id)
+      return c?.nickname || c?.name || ""
+    }).filter(Boolean)
+  }, [teachers, customers])
+
+  const getParticipantNames = useCallback((ids: string[]): string[] => {
+    return ids.map(id => getMemberName(id))
+  }, [getMemberName])
+
+  // 会员身份类型映射：身份名称 → "老人" | "新人"
+  const identityTypeMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const identity of memberIdentities || []) {
+      if (identity.type && identity.name) {
+        map[identity.name] = identity.type
+      }
+    }
+    return map
+  }, [memberIdentities])
+
+  // 按身份类型分组参与者
+  const splitParticipants = useCallback((ids: string[]): { oldMembers: string[]; newMembers: string[] } => {
+    const oldMembers: string[] = []
+    const newMembers: string[] = []
+    for (const id of ids) {
+      const name = getMemberName(id)
+      const customer = customers.find(c => c.id === id)
+      const memberType = customer?.member_type || ""
+      const identityType = identityTypeMap[memberType]
+      if (identityType === "新人") {
+        newMembers.push(name)
+      } else {
+        oldMembers.push(name)
+      }
+    }
+    return { oldMembers, newMembers }
+  }, [getMemberName, customers, identityTypeMap])
+
+  // 预加载案主剩余次数（组件挂载后立即加载，确保首次搜索即可显示）
+  useEffect(() => {
+    const types = ["eks", "gcs", "ers", "ocr"] as const
+    for (const type of types) {
+      if (fetchedRemainingRef.current.has(type)) continue
+      fetchedRemainingRef.current.add(type)
+      const api = REMAINING_APIS[type]
+      if (!api) continue
+      ;(async () => {
+        try {
+          const results = await api("")
+          const map: Record<string, number> = {}
+          for (const r of results) map[r.id] = r.remaining
+          setRemainingMap(prev => ({ ...prev, [type]: { ...prev[type], ...map } }))
+        } catch {
+          fetchedRemainingRef.current.delete(type)
+        }
+      })()
+    }
+  }, [])
+
+  const handleCreate = async (type: string) => {
+    const fresh = createFreshRow(type as ActivityType, spaceId || "", spaces)
+    // eks 类型新建行时继承最近编辑的案主和部位数
+    if (type === "eks") {
+      const src = lastEditedEksRef.current || [...rowsRef.current].reverse().find(r => r.record_type === "eks")
+      if (src) {
+        fresh.achiever_id = src.achiever_id
+        fresh.achiever_name = src.achiever_name
+        fresh.description = src.description
+        fresh.deduction_count = parseEksDescription(src.description).count
+      }
+    }
+    setRows(prev => [...prev, fresh])
+    setRowStatus(prev => ({ ...prev, [fresh.key]: "idle" }))
+    try { await saveRow(fresh) } catch { /* saveRow handles its own errors */ }
+  }
+
+  const hasEks = rows.some(r => r.record_type === "eks")
+  const hasOwnerType = rows.some(r => r.record_type !== "class" && r.record_type !== "ics")
+
+  return (
+    <div className="bg-white rounded-lg">
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
+          <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
+          <thead>
+            <tr className="bg-[#fafbfc] text-[#8f959e]">
+              <th className="w-[24px]"></th>
+              <th className="px-1 py-2 text-left font-normal w-[122px]">时间</th>
+              <th className="px-1 py-2 text-left font-normal w-[80px]">类型</th>
+              <th className="px-1 py-2 text-left font-normal w-[140px]">活动名称</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
+              <th className="px-1 py-2 text-left font-normal w-[57px]">方式</th>
+              <th className="px-1 py-2 text-left font-normal w-[110px]">老师</th>
+              {hasOwnerType && <th className="px-1 py-2 text-left font-normal w-[100px]">案主</th>}
+              {hasOwnerType && <th className="px-1.5 py-2 text-center font-normal w-[56px]">销卡</th>}
+              <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
+              <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
+              <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const badge = getTypeBadge(row.record_type, row.record_type === "ics" ? (row.ics_course_key?.replace("ics:", "") || row.name || "") : row.name)
+              const participantNames = getParticipantNames(row.participant_ids)
+              const { oldMembers, newMembers } = splitParticipants(row.participant_ids)
+              const currentSpace = spaces.find(s => s.id === row.space_id)
+              const roomOptions = (currentSpace?.rooms || []).map(r => ({ value: r.id, label: r.name }))
+              return (
+                <tr
+                  key={row.key}
+                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""}`}
+                  onDragOver={(e) => handleDragOver(e, row.key)}
+                  onDrop={() => handleDrop(row.key)}
+                >
+                  {/* 拖动 */}
+                  <td
+                    className="px-1 py-1.5 cursor-grab active:cursor-grabbing text-center"
+                    draggable
+                    onDragStart={() => handleDragStart(row.key)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <GripVertical className="h-3.5 w-3.5 text-[#c9cdd4] mx-auto" />
+                  </td>
+
+                  {/* 时间 */}
+                  <td className="px-1 py-1.5">
+                    <div className="flex items-center h-7 rounded-md border-[0.5px] border-[#dee0e3] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
+                      <input
+                        type="time"
+                        value={row.start_time}
+                        onChange={(e) => updateRow(row.key, "start_time", e.target.value)}
+                        className={`h-full flex-1 min-w-0 bg-transparent px-1.5 outline-none border-none ${!row.start_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                      />
+                      <span className="text-[10px] text-[#c9cdd4] shrink-0 px-0.5">-</span>
+                      <input
+                        type="time"
+                        value={row.end_time}
+                        onChange={(e) => updateRow(row.key, "end_time", e.target.value)}
+                        className={`h-full flex-1 min-w-0 bg-transparent px-1.5 outline-none border-none ${!row.end_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                      />
+                    </div>
+                  </td>
+
+                  {/* 类型 */}
+                  <td className="px-1 py-1.5">
+                    <SelectDropdown
+                      size="sm"
+                      value={row.record_type === "ics" ? (row.ics_course_key || resolveIcsCourseKey(row.name) || "ics:疗愈师课程") : row.record_type}
+                      options={TYPE_OPTIONS}
+                      onChange={(v) => handleTypeChange(row.key, v)}
+                      className="[&_button]:border-[0.5px] [&_button]:h-7"
+                      hideChevron
+                      dropdownWidth={110}
+                    />
+                  </td>
+
+                  {/* 活动名称 */}
+                  <td className="px-1 py-1.5">
+                    {row.record_type === "class" ? (
+                      <CourseDropdown
+                        courses={courses}
+                        value={row.course_id}
+                        onChange={(v) => {
+                          const course = courses.find(c => c.id === v)
+                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, course_id: v, name: course?.name || "" } : r))
+                          if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
+                            setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
+                          }
+                          scheduleSave(row.key)
+                        }}
+                        placeholder=""
+                        dropdownWidth={280}
+                        className=""
+                      />
+                    ) : ["ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
+                      <Input
+                        value={row.name}
+                        onChange={(e) => updateRow(row.key, "name", e.target.value)}
+                        placeholder=""
+                        className="h-7 [&]:border-[0.5px]"
+                      />
+                    ) : (
+                      <span className="text-[#2b2f36] truncate block">{row.name || <span className="text-[#c9cdd4]">-</span>}</span>
+                    )}
+                  </td>
+
+                  {/* 公益 */}
+                  <td className="px-1 py-1.5 text-center">
+                    {row.record_type === "class" ? (
+                      <input
+                        type="checkbox"
+                        checked={row.is_public_welfare}
+                        onChange={(e) => updateRow(row.key, "is_public_welfare", e.target.checked)}
+                        className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-[#3370ff] checked:border-[#3370ff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                      />
+                    ) : (
+                      <span className="text-[#c9cdd4]">-</span>
+                    )}
+                  </td>
+
+                  {/* 活动方式 */}
+                  <td className="px-1 py-1.5">
+                    <SelectDropdown
+                      size="sm"
+                      value={row.activity_mode || "线下"}
+                      options={ACTIVITY_MODE_OPTIONS}
+                      onChange={(v) => updateRow(row.key, "activity_mode", v)}
+                      className="[&_button]:border-[0.5px] [&_button]:h-7"
+                      hideChevron
+                    />
+                  </td>
+
+                  {/* 老师/成就君 */}
+                  <td className="px-1 py-1.5">
+                    <CustomerSearchInput
+                      multi
+                      customers={row.record_type === "class" ? teachers : customers}
+                      value={getHostDisplay(row)}
+                      onChange={(v) => {
+                        const names = Array.isArray(v) ? v : v ? [v] : []
+                        const pool = row.record_type === "class" ? teachers : customers
+                        const ids = names.map(n => {
+                          const c = pool.find(c => c.nickname === n || c.name === n)
+                          return c?.id || ""
+                        }).filter(Boolean)
+                        setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_ids: ids, host_names: names } : r))
+                        if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
+                          setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
+                        }
+                        scheduleSave(row.key)
+                      }}
+                      positionFilter={row.record_type === "class" ? "课程老师" : undefined}
+                      filterSelected
+                      className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
+                    />
+                  </td>
+
+                  {/* 案主 */}
+                  {hasOwnerType && <td className="pl-1.5 pr-0 py-1.5">
+                    {(row.record_type === "gcs" || row.record_type === "ers" || row.record_type === "ocr") ? (
+                      <CustomerSearchInput
+                        customers={customers}
+                        value={row.achiever_name || ""}
+                        rightLabelMap={remainingMap[row.record_type] ? Object.fromEntries(Object.entries(remainingMap[row.record_type]).map(([id, n]) => [id, `余${n}`])) : undefined}
+                        warnLabelIds={remainingMap[row.record_type] ? Object.entries(remainingMap[row.record_type]).filter(([, n]) => n <= 0).map(([id]) => id) : undefined}
+                        onChange={(v) => {
+                          const name = typeof v === "string" ? v : v[0] || ""
+                          if (!name) {
+                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: "", achiever_name: "" } : r))
+                            scheduleSave(row.key)
+                          }
+                        }}
+                        onSelectItem={(c) => {
+                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: c.id, achiever_name: c.nickname || c.name || "" } : r))
+                          if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
+                            setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
+                          }
+                          scheduleSave(row.key)
+                          fetchRemaining(row.record_type, c.id)
+                        }}
+                        onBlur={(v) => {
+                          if (v && !customers.some(c => c.nickname === v || c.name === v)) {
+                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: "", achiever_name: "" } : r))
+                            scheduleSave(row.key)
+                          }
+                        }}
+                        placeholder=""
+                        className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
+                      />
+                    ) : row.record_type === "eks" ? (
+                      <div className="flex items-center gap-1 min-w-0">
+                        <CustomerSearchInput
+                          customers={customers}
+                          value={row.achiever_name || ""}
+                          rightLabelMap={remainingMap.eks ? Object.fromEntries(Object.entries(remainingMap.eks).map(([id, n]) => [id, `余${n}`])) : undefined}
+                          warnLabelIds={remainingMap.eks ? Object.entries(remainingMap.eks).filter(([, n]) => n <= 0).map(([id]) => id) : undefined}
+                          onChange={(v) => {
+                            const name = typeof v === "string" ? v : v[0] || ""
+                            if (!name) {
+                              setRows(prev => prev.map(r => {
+                                if (r.key !== row.key) return r
+                                const eksDesc = parseEksDescription(r.description)
+                                return { ...r, achiever_id: "", achiever_name: "", description: serializeEksDescription("", "", eksDesc.count) }
+                              }))
+                              scheduleSave(row.key)
+                            }
+                          }}
+                          onSelectItem={(c) => {
+                            const eksDesc = parseEksDescription(row.description)
+                            const newDesc = serializeEksDescription(c.id, c.nickname || c.name || "", eksDesc.count)
+                            const updated = { ...row, achiever_id: c.id, achiever_name: c.nickname || c.name || "", description: newDesc }
+                            lastEditedEksRef.current = updated
+                            if (row.record_id) eksEditsRef.current.set(row.record_id, { achiever_id: updated.achiever_id, achiever_name: updated.achiever_name, description: updated.description })
+                            setRows(prev => prev.map(r => r.key === row.key ? updated : r))
+                            if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
+                              setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
+                            }
+                            scheduleSave(row.key)
+                            fetchRemaining("eks", c.id)
+                          }}
+                          onBlur={(v) => {
+                            if (v && !customers.some(c => c.nickname === v || c.name === v)) {
+                              setRows(prev => prev.map(r => {
+                                if (r.key !== row.key) return r
+                                const eksDesc = parseEksDescription(r.description)
+                                return { ...r, achiever_id: "", achiever_name: "", description: serializeEksDescription("", "", eksDesc.count) }
+                              }))
+                              scheduleSave(row.key)
+                            }
+                          }}
+                          placeholder=""
+                          className="h-7 [&]:border-[0.5px] [&]:text-[11px] flex-1 min-w-0"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-[#c9cdd4]">-</span>
+                    )}
+                  </td>}
+
+                  {/* 销卡 */}
+                  {hasOwnerType && <td className="px-1 py-1.5 text-center">
+                    {row.record_type === "eks" ? (() => {
+                      const remaining = row.achiever_id ? remainingMap.eks?.[row.achiever_id] : undefined
+                      return (
+                        <input
+                          type="number"
+                          min={1}
+                          value={eksCountEditRef.current[`dc_${row.key}`] ?? row.deduction_count}
+                          onChange={(e) => {
+                            const raw = e.target.value
+                            eksCountEditRef.current[`dc_${row.key}`] = raw
+                            if (raw === "") {
+                              setRows(prev => prev.map(r => {
+                                if (r.key !== row.key) return r
+                                const eksDesc = parseEksDescription(r.description)
+                                const updated = { ...r, deduction_count: 0, description: serializeEksDescription(eksDesc.id, eksDesc.name, 0) }
+                                lastEditedEksRef.current = updated
+                                if (r.record_id) eksEditsRef.current.set(r.record_id, { achiever_id: r.achiever_id, achiever_name: r.achiever_name, description: updated.description })
+                                return updated
+                              }))
+                            } else {
+                              const count = Math.max(1, parseInt(raw) || 1)
+                              setRows(prev => prev.map(r => {
+                                if (r.key !== row.key) return r
+                                const eksDesc = parseEksDescription(r.description)
+                                const updated = { ...r, deduction_count: count, description: serializeEksDescription(eksDesc.id, eksDesc.name, count) }
+                                lastEditedEksRef.current = updated
+                                if (r.record_id) eksEditsRef.current.set(r.record_id, { achiever_id: r.achiever_id, achiever_name: r.achiever_name, description: updated.description })
+                                return updated
+                              }))
+                            }
+                            if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
+                              setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
+                            }
+                            scheduleSave(row.key)
+                          }}
+                          onBlur={() => {
+                            delete eksCountEditRef.current[`dc_${row.key}`]
+                            const eksDesc = parseEksDescription(row.description)
+                            let count = eksDesc.count
+                            if (count < 1) count = 1
+                            if (count !== eksDesc.count) {
+                              setRows(prev => prev.map(r => {
+                                if (r.key !== row.key) return r
+                                return { ...r, deduction_count: count, description: serializeEksDescription(eksDesc.id, eksDesc.name, count) }
+                              }))
+                              scheduleSave(row.key)
+                            }
+                          }}
+                          className="w-[34px] h-7 text-center rounded-md border-[0.5px] border-[#dee0e3] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      )
+                    })() : (row.record_type === "class" || row.record_type === "ics") ? (
+                      <span className="text-[#c9cdd4]">-</span>
+                    ) : (
+                      <input
+                        type="number"
+                        min={0}
+                        value={row.deduction_count}
+                        onChange={(e) => {
+                          const count = Math.max(0, parseInt(e.target.value) || 0)
+                          updateRow(row.key, "deduction_count", count)
+                          scheduleSave(row.key)
+                        }}
+                        className="w-[34px] h-7 text-center rounded-md border-[0.5px] border-[#dee0e3] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    )}
+                  </td>}
+
+                  {/* 活动简介 */}
+                  <td className="px-1 py-1.5">
+                    {row.record_type === "eks" ? (
+                      <span className="text-[11px] text-[#c9cdd4]">-</span>
+                    ) : (
+                      <Input
+                        value={row.description}
+                        onChange={(e) => updateRow(row.key, "description", e.target.value)}
+                        placeholder=""
+                        className="h-7 text-[12px] [&]:border-[0.5px]"
+                      />
+                    )}
+                  </td>
+
+                  {/* 老人 */}
+                  <td className="px-1 py-1.5">
+                    <span className="text-[#4e535a] truncate block">
+                      {oldMembers.length > 0 ? oldMembers.join("、") : <span className="text-[#c9cdd4]">-</span>}
+                    </span>
+                  </td>
+
+                  {/* 新人 */}
+                  <td className="px-1 py-1.5">
+                    <span className="text-[#4e535a] truncate block">
+                      {newMembers.length > 0 ? newMembers.join("、") : <span className="text-[#c9cdd4]">-</span>}
+                    </span>
+                  </td>
+
+                  {/* 操作 */}
+                  <td className="px-1 py-1.5 text-center sticky right-0 z-10 bg-white relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">
+                    <button
+                      onClick={() => handleDelete(row)}
+                      className="text-[#8f959e] hover:text-[#e02020]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
+        <button
+          onClick={() => handleCreate("class")}
+          className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          添加一行
+        </button>
+      </div>
+    </div>
+  )
+}
