@@ -110,11 +110,11 @@ def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
     # 获取旧的可扣费人员
     old_chargeable = _get_chargeable_ids(session)
 
-    # 自动过滤不在到场名单中的人员
-    if "teacher_ids" in data:
+    # 自动过滤不在到场名单中的参与者（老师不过滤）
+    if "participant_ids" in data:
         visits = visit_service.list_visits(session.date)
         visit_ids = {v.customer_id for v in visits}
-        data["teacher_ids"] = [tid for tid in data["teacher_ids"] if tid in visit_ids]
+        data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):
