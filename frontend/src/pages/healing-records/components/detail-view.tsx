@@ -299,14 +299,15 @@ export default function DetailView({
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户反馈</span>
-                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.experience || <span className="text-[#8f959e]">-</span>}{v.feedback && <span className="text-[#8f959e] font-light ml-2">疗愈师回复：{v.feedback}</span>}</p>
+                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.feedback || v.experience || <span className="text-[#8f959e]">-</span>}</p>
                         </div>
                         {(() => {
                           const hr = detail!.healing_records.find(r => r.date === v.visit_date)
+                          const record = hr?.growth_record || v.healing_notes
                           return (
                             <div className="flex items-start gap-2">
                               <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈记录</span>
-                              <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{hr?.growth_record || <span className="text-[#8f959e]">-</span>}</p>
+                              <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{record || <span className="text-[#8f959e]">-</span>}</p>
                             </div>
                           )
                         })()}

@@ -88,7 +88,7 @@ export const CourseDropdown = memo(function CourseDropdown({
             <button
               key={t}
               type="button"
-              className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-[#f7f8fa] ${
+              className={`w-full text-left px-2 py-1.5 text-[12px] hover:bg-[#f7f8fa] ${
                 t === selectedType && hoveredType === null ? "text-[#3370ff] bg-[#f0f5ff]" : "text-[#2b2f36]"
               } ${t === hoveredType ? "text-[#3370ff] bg-[#f0f5ff]" : ""}`}
               onMouseEnter={() => setHoveredType(t)}
@@ -103,13 +103,13 @@ export const CourseDropdown = memo(function CourseDropdown({
             const type = hoveredType || selectedType!
             const items = grouped.get(type) || []
             if (!items.length) {
-              return <div className="px-2 py-1.5 text-[11px] text-[#c9cdd4]">无课程</div>
+              return <div className="px-2 py-1.5 text-[12px] text-[#c9cdd4]">无课程</div>
             }
             return items.map(c => (
               <button
                 key={c.id}
                 type="button"
-                className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-[#f7f8fa] ${
+                className={`w-full text-left px-2 py-1.5 text-[12px] hover:bg-[#f7f8fa] ${
                   c.id === value && (hoveredType === null || hoveredType === selectedType) ? "text-[#3370ff] bg-[#f0f5ff]" : "text-[#2b2f36]"
                 }`}
                 onClick={() => {
@@ -132,7 +132,7 @@ export const CourseDropdown = memo(function CourseDropdown({
     <div className={`relative ${className}`} ref={ref}>
       <button
         type="button"
-        className="flex items-center justify-between w-full h-7 px-2 text-[11px] rounded-md border-[0.5px] border-[#dee0e3] bg-transparent"
+        className="flex items-center justify-between w-full h-7 px-2 text-[12px] rounded-md border-[0.5px] border-[#dee0e3] bg-transparent"
         onClick={() => setOpen(!open)}
       >
         <span className={`truncate ${displayText ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}>

@@ -312,22 +312,22 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
             <tr className="bg-[#fafbfc] text-[#8f959e]">
               <th className="w-[24px]"></th>
               <th className="px-1.5 py-2 text-center font-normal w-[36px]">到店</th>
-              <th className="pl-2 pr-[10px] py-2 text-left font-normal w-[64px]">组长</th>
-              <th className="pl-0 pr-1.5 py-2 text-left font-normal w-[76px]">时间</th>
+              <th className="pl-2 pr-[10px] py-2 text-left font-normal w-[56px]">组长</th>
+              <th className="pl-0 pr-1.5 py-2 text-left font-normal w-[56px]">时间</th>
               <th className="pl-0 pr-1.5 py-2 text-left font-normal w-[74px]">昵称</th>
               <th className="px-1.5 py-2 text-left font-normal w-[80px]">会员身份</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[60px]">剩余次数</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[56px]">剩余次数</th>
               <th className="px-1.5 py-2 text-left font-normal w-[240px]">本次需求</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">邀约人</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">客户反馈</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[220px]">今日评估</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[220px]">疗愈记录</th>
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">今日成交</th>
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">参与活动</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
               <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="[&_tr:first-child>td]:pt-[12px]">
             {rows.map((row, idx) => {
               const status = rowStatus[row.key] || "idle"
               // 找到上方最近的组长行
@@ -363,7 +363,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                       onChange={(v) => updateRow(row.key, "is_leader", v === "1")}
                       placeholder="-"
                       hideChevron
-                      className="[&_button]:border-[0.5px]"
+                      className="[&_button]:border-[0.5px] [&_button]:text-[12px]"
                       textColor={row.is_leader ? undefined : "text-[#c9cdd4]"}
                     />
                   </td>
@@ -372,13 +372,14 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                       type="time"
                       value={row.visit_time}
                       onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
-                      className={`h-7 text-[12px] w-20 rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                      className={`h-7 text-[12px] w-[58px] time-no-icon rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
                     />
                   </td>
                   <td className="pl-0 pr-1.5 py-1.5">
                     <CustomerSearchInput
                       customers={customers as any[]}
                       value={row.nickname}
+                      showClear={false}
                       onChange={(v) => {
                         const name = typeof v === "string" ? v : v[0] || ""
                         if (!name) { updateRow(row.key, "nickname", ""); updateRow(row.key, "customer_id", ""); setRows(prev => prev.map(r => r.key === row.key ? { ...r, member_type: "", remaining_count: null } : r)) }
@@ -396,10 +397,10 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                     />
                   </td>
                   <td className="px-1.5 py-1.5">
-                    <span className="text-[12px] text-[#8f959e]">{row.member_type || <span className="text-[#c9cdd4]">-</span>}</span>
+                    <span className="text-[12px] text-[#2b2f36]">{row.member_type}</span>
                   </td>
                   <td className="px-1.5 py-1.5">
-                    <span className="text-[12px] text-[#8f959e]">{row.nickname ? formatRemaining(row.remaining_count) : <span className="text-[#c9cdd4]">-</span>}</span>
+                    <span className="text-[12px] text-[#2b2f36]">{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
                   <td className="px-1.5 py-1.5">
                     <Input
@@ -412,6 +413,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                     <CustomerSearchInput
                       customers={customers as any[]}
                       value={row.referrer_handler}
+                      showClear={false}
                       onChange={(v) => updateRow(row.key, "referrer_handler", typeof v === "string" ? v : v[0] || "")}
                       onSelectItem={(c) => updateRow(row.key, "referrer_handler", c.nickname)}
                       onBlur={(v) => {
@@ -419,8 +421,8 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                           updateRow(row.key, "referrer_handler", "")
                         }
                       }}
-                      placeholder="-"
-                      className="h-7 [&]:border-[0.5px] [&::placeholder]:text-[#c9cdd4]"
+                      placeholder=""
+                      className="h-7 [&]:border-[0.5px]"
                     />
                   </td>
                   <td className="px-1.5 py-1.5">
@@ -439,23 +441,21 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                   </td>
                   <td className="px-1.5 py-1.5 text-left">
                     <span className="text-[12px] text-[#8f959e]">
-                      {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : <span className="text-[#c9cdd4]">-</span>}
+                      {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
                     </span>
                   </td>
                   <td className="px-1.5 py-1.5 text-left">
-                    {row.activities ? (
+                    {row.activities && row.customer_id ? (
                       <button
                         onClick={() => onCustomerClick?.(row.customer_id)}
                         className="text-[12px] text-[#3370ff] hover:underline"
                       >
                         {row.activities.split("、").length}场
                       </button>
-                    ) : (
-                      <span className="text-[12px] text-[#c9cdd4]">-</span>
-                    )}
+                    ) : null}
                   </td>
                   <td className="px-1.5 py-1.5">
-                    <span className="text-[12px] text-[#8f959e]">{leaderRow?.nickname || <span className="text-[#c9cdd4]">-</span>}</span>
+                    <span className="text-[12px] text-[#8f959e]">{leaderRow?.nickname || ""}</span>
                   </td>
                   <td className={`px-1.5 py-1.5 text-center sticky right-0 z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)] bg-white`}>
                     {row.customer_id && (
@@ -481,7 +481,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
         </div>
       </div>
 
-      <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
+      <div className="px-3 py-2.5 mt-1.5 border-t border-[#f0f1f2] flex items-center">
         <button
           onClick={addRow}
           className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"

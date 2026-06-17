@@ -39,6 +39,10 @@ export interface CustomerSearchInputProps {
   rightLabelMap?: Record<string, string>
   /** Customer IDs whose right label should be red */
   warnLabelIds?: string[]
+  /** Show clear X button in single-select mode (default true) */
+  showClear?: boolean
+  /** Custom dropdown width (default: match input width) */
+  dropdownWidth?: number
 }
 
 export function CustomerSearchInput({
@@ -58,6 +62,8 @@ export function CustomerSearchInput({
   portalContainer,
   rightLabelMap,
   warnLabelIds,
+  showClear = true,
+  dropdownWidth,
 }: CustomerSearchInputProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -76,7 +82,7 @@ export function CustomerSearchInput({
     const s: React.CSSProperties = {
       position: "fixed",
       left: r.left,
-      width: r.width,
+      width: dropdownWidth ?? r.width,
       zIndex: 2147483647, // 最大 z-index 值
     }
     if (below >= h || below >= above) {
@@ -87,7 +93,7 @@ export function CustomerSearchInput({
       s.maxHeight = Math.min(h, above - 8)
     }
     setPos(s)
-  }, [])
+  }, [dropdownWidth])
 
   // Click outside to close
   useEffect(() => {
@@ -201,12 +207,19 @@ export function CustomerSearchInput({
             }}
             onFocus={() => { calcPos(); setOpen(true) }}
             onBlur={() => { setTimeout(() => onBlur?.(typeof value === "string" ? value : ""), 150) }}
+            onKeyDown={(e) => {
+              if (e.key === "Backspace" && !search && typeof value === "string" && value) {
+                e.preventDefault()
+                onChange("")
+                setSearch("")
+              }
+            }}
             placeholder={placeholder}
             disabled={disabled}
             className={className}
             autoComplete="off"
           />
-          {typeof value === "string" && value && (
+          {showClear && typeof value === "string" && value && (
             <button
               className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8f959e] hover:text-[#2b2f36]"
               onClick={() => { onChange(""); setSearch("") }}

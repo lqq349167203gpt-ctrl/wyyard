@@ -163,7 +163,7 @@ export const SelectDropdown = memo(function SelectDropdown({
   return (
     <div ref={rootRef} data-dropdown className={`relative ${className}`}>
       <button type="button"
-        className={`flex items-center justify-between w-full rounded-md border border-input bg-transparent ${sm ? "h-7 px-2 text-[11px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`flex items-center justify-between w-full rounded-md border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         onMouseDown={handleToggle}
         disabled={disabled}
       >
@@ -205,7 +205,7 @@ export const SelectDropdown = memo(function SelectDropdown({
             return (
               <button key={opt.value}
                 type="button"
-                className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[11px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
+                className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
                 onMouseDown={() => select(opt.value)}
               >
                 {multi && !hideCheckbox && (

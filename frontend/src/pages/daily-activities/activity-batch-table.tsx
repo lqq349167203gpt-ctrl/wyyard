@@ -244,6 +244,7 @@ export function ActivityBatchTable({
   const eksEditsRef = useRef<Map<string, { achiever_id: string; achiever_name: string; description: string }>>(new Map())
   const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
   const fetchedRemainingRef = useRef<Set<string>>(new Set())
+  const prevAchieverRef = useRef<Record<number, string>>({})
 
   // 报告保存状态
   useEffect(() => {
@@ -470,8 +471,12 @@ export function ActivityBatchTable({
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
       if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
       // 保存后刷新剩余次数
-      if (["eks", "gcs", "ers", "ocr"].includes(row.record_type) && row.achiever_id) {
-        fetchRemaining(row.record_type, row.achiever_id)
+      if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+        const customerId = row.achiever_id || prevAchieverRef.current[row.key]
+        if (customerId) {
+          fetchRemaining(row.record_type, customerId)
+          delete prevAchieverRef.current[row.key]
+        }
       }
     } catch (e: any) {
       console.error("[ACT] 保存失败:", e)
@@ -675,11 +680,11 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal w-[122px]">时间</th>
               <th className="px-1 py-2 text-left font-normal w-[80px]">类型</th>
               <th className="px-1 py-2 text-left font-normal w-[140px]">活动名称</th>
+              {hasOwnerType && <th className="px-1 py-2 text-left font-normal w-[86px]">案主</th>}
+              {hasEks && <th className="py-2 text-center font-normal w-[40px]">销卡</th>}
               <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
               <th className="px-1 py-2 text-left font-normal w-[57px]">方式</th>
               <th className="px-1 py-2 text-left font-normal w-[110px]">老师</th>
-              {hasOwnerType && <th className="px-1 py-2 text-left font-normal w-[100px]">案主</th>}
-              {hasOwnerType && <th className="px-1.5 py-2 text-center font-normal w-[56px]">销卡</th>}
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
               <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
               <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
@@ -736,7 +741,7 @@ export function ActivityBatchTable({
                       value={row.record_type === "ics" ? (row.ics_course_key || resolveIcsCourseKey(row.name) || "ics:疗愈师课程") : row.record_type}
                       options={TYPE_OPTIONS}
                       onChange={(v) => handleTypeChange(row.key, v)}
-                      className="[&_button]:border-[0.5px] [&_button]:h-7"
+                      className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
                       hideChevron
                       dropdownWidth={110}
                     />
@@ -758,93 +763,44 @@ export function ActivityBatchTable({
                         }}
                         placeholder=""
                         dropdownWidth={280}
-                        className=""
+                        className="text-[12px]"
                       />
                     ) : ["ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
                       <Input
                         value={row.name}
                         onChange={(e) => updateRow(row.key, "name", e.target.value)}
                         placeholder=""
-                        className="h-7 [&]:border-[0.5px]"
+                        className="h-7 text-[12px] [&]:border-[0.5px]"
                       />
                     ) : (
                       <span className="text-[#2b2f36] truncate block">{row.name || <span className="text-[#c9cdd4]">-</span>}</span>
                     )}
                   </td>
 
-                  {/* 公益 */}
-                  <td className="px-1 py-1.5 text-center">
-                    {row.record_type === "class" ? (
-                      <input
-                        type="checkbox"
-                        checked={row.is_public_welfare}
-                        onChange={(e) => updateRow(row.key, "is_public_welfare", e.target.checked)}
-                        className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-[#3370ff] checked:border-[#3370ff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
-                      />
-                    ) : (
-                      <span className="text-[#c9cdd4]">-</span>
-                    )}
-                  </td>
-
-                  {/* 活动方式 */}
-                  <td className="px-1 py-1.5">
-                    <SelectDropdown
-                      size="sm"
-                      value={row.activity_mode || "线下"}
-                      options={ACTIVITY_MODE_OPTIONS}
-                      onChange={(v) => updateRow(row.key, "activity_mode", v)}
-                      className="[&_button]:border-[0.5px] [&_button]:h-7"
-                      hideChevron
-                    />
-                  </td>
-
-                  {/* 老师/成就君 */}
-                  <td className="px-1 py-1.5">
-                    <CustomerSearchInput
-                      multi
-                      customers={row.record_type === "class" ? teachers : customers}
-                      value={getHostDisplay(row)}
-                      onChange={(v) => {
-                        const names = Array.isArray(v) ? v : v ? [v] : []
-                        const pool = row.record_type === "class" ? teachers : customers
-                        const ids = names.map(n => {
-                          const c = pool.find(c => c.nickname === n || c.name === n)
-                          return c?.id || ""
-                        }).filter(Boolean)
-                        setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_ids: ids, host_names: names } : r))
-                        if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
-                          setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
-                        }
-                        scheduleSave(row.key)
-                      }}
-                      positionFilter={row.record_type === "class" ? "课程老师" : undefined}
-                      filterSelected
-                      className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
-                    />
-                  </td>
-
                   {/* 案主 */}
-                  {hasOwnerType && <td className="pl-1.5 pr-0 py-1.5">
+                  {hasOwnerType && <td className="pl-1.5 pr-0 py-1.5 w-[60px]">
                     {(row.record_type === "gcs" || row.record_type === "ers" || row.record_type === "ocr") ? (
                       <CustomerSearchInput
                         customers={customers}
                         value={row.achiever_name || ""}
+                        showClear={false}
                         rightLabelMap={remainingMap[row.record_type] ? Object.fromEntries(Object.entries(remainingMap[row.record_type]).map(([id, n]) => [id, `余${n}`])) : undefined}
                         warnLabelIds={remainingMap[row.record_type] ? Object.entries(remainingMap[row.record_type]).filter(([, n]) => n <= 0).map(([id]) => id) : undefined}
                         onChange={(v) => {
                           const name = typeof v === "string" ? v : v[0] || ""
                           if (!name) {
+                            if (row.achiever_id) prevAchieverRef.current[row.key] = row.achiever_id
                             setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: "", achiever_name: "" } : r))
                             scheduleSave(row.key)
                           }
                         }}
                         onSelectItem={(c) => {
+                          delete prevAchieverRef.current[row.key]
                           setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: c.id, achiever_name: c.nickname || c.name || "" } : r))
                           if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
                             setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
                           }
                           scheduleSave(row.key)
-                          fetchRemaining(row.record_type, c.id)
                         }}
                         onBlur={(v) => {
                           if (v && !customers.some(c => c.nickname === v || c.name === v)) {
@@ -853,18 +809,21 @@ export function ActivityBatchTable({
                           }
                         }}
                         placeholder=""
-                        className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
+                        className="h-7 w-[74px] [&]:border-[0.5px] [&]:text-[12px]"
+                        dropdownWidth={114}
                       />
                     ) : row.record_type === "eks" ? (
                       <div className="flex items-center gap-1 min-w-0">
                         <CustomerSearchInput
                           customers={customers}
                           value={row.achiever_name || ""}
+                          showClear={false}
                           rightLabelMap={remainingMap.eks ? Object.fromEntries(Object.entries(remainingMap.eks).map(([id, n]) => [id, `余${n}`])) : undefined}
                           warnLabelIds={remainingMap.eks ? Object.entries(remainingMap.eks).filter(([, n]) => n <= 0).map(([id]) => id) : undefined}
                           onChange={(v) => {
                             const name = typeof v === "string" ? v : v[0] || ""
                             if (!name) {
+                              if (row.achiever_id) prevAchieverRef.current[row.key] = row.achiever_id
                               setRows(prev => prev.map(r => {
                                 if (r.key !== row.key) return r
                                 const eksDesc = parseEksDescription(r.description)
@@ -874,6 +833,7 @@ export function ActivityBatchTable({
                             }
                           }}
                           onSelectItem={(c) => {
+                            delete prevAchieverRef.current[row.key]
                             const eksDesc = parseEksDescription(row.description)
                             const newDesc = serializeEksDescription(c.id, c.nickname || c.name || "", eksDesc.count)
                             const updated = { ...row, achiever_id: c.id, achiever_name: c.nickname || c.name || "", description: newDesc }
@@ -884,7 +844,6 @@ export function ActivityBatchTable({
                               setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
                             }
                             scheduleSave(row.key)
-                            fetchRemaining("eks", c.id)
                           }}
                           onBlur={(v) => {
                             if (v && !customers.some(c => c.nickname === v || c.name === v)) {
@@ -897,16 +856,15 @@ export function ActivityBatchTable({
                             }
                           }}
                           placeholder=""
-                          className="h-7 [&]:border-[0.5px] [&]:text-[11px] flex-1 min-w-0"
+                          className="h-7 w-[74px] [&]:border-[0.5px] [&]:text-[12px]"
+                          dropdownWidth={114}
                         />
                       </div>
-                    ) : (
-                      <span className="text-[11px] text-[#c9cdd4]">-</span>
-                    )}
+                    ) : null}
                   </td>}
 
                   {/* 销卡 */}
-                  {hasOwnerType && <td className="px-1 py-1.5 text-center">
+                  {hasEks && <td className="px-0 py-1.5 text-center">
                     {row.record_type === "eks" ? (() => {
                       const remaining = row.achiever_id ? remainingMap.eks?.[row.achiever_id] : undefined
                       return (
@@ -958,28 +916,61 @@ export function ActivityBatchTable({
                           className="w-[34px] h-7 text-center rounded-md border-[0.5px] border-[#dee0e3] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       )
-                    })() : (row.record_type === "class" || row.record_type === "ics") ? (
-                      <span className="text-[#c9cdd4]">-</span>
-                    ) : (
-                      <input
-                        type="number"
-                        min={0}
-                        value={row.deduction_count}
-                        onChange={(e) => {
-                          const count = Math.max(0, parseInt(e.target.value) || 0)
-                          updateRow(row.key, "deduction_count", count)
-                          scheduleSave(row.key)
-                        }}
-                        className="w-[34px] h-7 text-center rounded-md border-[0.5px] border-[#dee0e3] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                    )}
+                    })() : null}
                   </td>}
+
+                  {/* 公益 */}
+                  <td className="px-1 py-1.5 text-center">
+                    {row.record_type === "class" ? (
+                      <input
+                        type="checkbox"
+                        checked={row.is_public_welfare}
+                        onChange={(e) => updateRow(row.key, "is_public_welfare", e.target.checked)}
+                        className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-[#3370ff] checked:border-[#3370ff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                      />
+                    ) : null}
+                  </td>
+
+                  {/* 活动方式 */}
+                  <td className="px-1 py-1.5">
+                    <SelectDropdown
+                      size="sm"
+                      value={row.activity_mode || "线下"}
+                      options={ACTIVITY_MODE_OPTIONS}
+                      onChange={(v) => updateRow(row.key, "activity_mode", v)}
+                      className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
+                      hideChevron
+                    />
+                  </td>
+
+                  {/* 老师/成就君 */}
+                  <td className="px-1 py-1.5">
+                    <CustomerSearchInput
+                      multi
+                      customers={row.record_type === "class" ? teachers : customers}
+                      value={getHostDisplay(row)}
+                      onChange={(v) => {
+                        const names = Array.isArray(v) ? v : v ? [v] : []
+                        const pool = row.record_type === "class" ? teachers : customers
+                        const ids = names.map(n => {
+                          const c = pool.find(c => c.nickname === n || c.name === n)
+                          return c?.id || ""
+                        }).filter(Boolean)
+                        setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_ids: ids, host_names: names } : r))
+                        if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
+                          setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
+                        }
+                        scheduleSave(row.key)
+                      }}
+                      positionFilter={row.record_type === "class" ? "课程老师" : undefined}
+                      filterSelected
+                      className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
+                    />
+                  </td>
 
                   {/* 活动简介 */}
                   <td className="px-1 py-1.5">
-                    {row.record_type === "eks" ? (
-                      <span className="text-[11px] text-[#c9cdd4]">-</span>
-                    ) : (
+                    {row.record_type === "eks" ? null : (
                       <Input
                         value={row.description}
                         onChange={(e) => updateRow(row.key, "description", e.target.value)}
@@ -992,14 +983,14 @@ export function ActivityBatchTable({
                   {/* 老人 */}
                   <td className="px-1 py-1.5">
                     <span className="text-[#4e535a] truncate block">
-                      {oldMembers.length > 0 ? oldMembers.join("、") : <span className="text-[#c9cdd4]">-</span>}
+                      {oldMembers.length > 0 ? oldMembers.join("、") : null}
                     </span>
                   </td>
 
                   {/* 新人 */}
                   <td className="px-1 py-1.5">
                     <span className="text-[#4e535a] truncate block">
-                      {newMembers.length > 0 ? newMembers.join("、") : <span className="text-[#c9cdd4]">-</span>}
+                      {newMembers.length > 0 ? newMembers.join("、") : null}
                     </span>
                   </td>
 

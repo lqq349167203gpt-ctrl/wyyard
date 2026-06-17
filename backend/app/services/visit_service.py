@@ -40,6 +40,8 @@ def count_customer_visits(customer_id: str) -> int:
 
 def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> List[ActivityInfo]:
     """从5个模块收集某客户在指定日期的活动"""
+    if not customer_id:
+        return []
     from app.services import (
         class_record_service,
         group_case_session_service,
@@ -149,7 +151,8 @@ def _build_customer_activity_counts() -> dict[str, int]:
     counts: dict[str, int] = defaultdict(int)
     for cr in class_record_service.list_records():
         for cid in cr.participant_ids:
-            counts[cid] += 1
+            if cid:
+                counts[cid] += 1
     for s in group_case_session_service.list_sessions():
         for cid in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
             if cid:
