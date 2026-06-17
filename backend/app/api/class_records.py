@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/class-records", tags=["class-records"])
 
 
 def _fill_names(items: list) -> list:
-    """从客户信息实时填充 owner_name / host_name / achiever_name"""
+    """从客户信息实时填充 owner_name / host_name"""
     customers = list_customers()
     customer_map = {c.id: c for c in customers}
 
@@ -22,7 +22,7 @@ def _fill_names(items: list) -> list:
 
     for item in items:
         data = item["data"]
-        for field in ("owner_name", "host_name", "achiever_name"):
+        for field in ("owner_name", "host_name"):
             id_field = field.replace("_name", "_id")
             if id_field in data:
                 actual = get_name(data.get(id_field, ""))

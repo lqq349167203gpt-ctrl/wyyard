@@ -43,6 +43,10 @@ export default function ClassRecordsPage() {
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [customerDetailOpen, setCustomerDetailOpen] = useState(false)
+  const [activityCustomerId, setActivityCustomerId] = useState<string | null>(null)
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false)
+  const [activityList, setActivityList] = useState<{ type: string; name: string; role: string; teacher: string }[]>([])
+  const [activityNickname, setActivityNickname] = useState("")
 
   // 共享状态
   const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
@@ -144,14 +148,14 @@ export default function ClassRecordsPage() {
 
       {/* 主内容区 */}
       <div className="flex flex-col min-h-0 flex-1 gap-2">
-      <div className="bg-[#f8faff] rounded-lg px-4 py-[14px] border-b-[0.5px] border-[#e8e8e8]">
+      <div className="border-b-[0.5px] border-[#f0f1f2]">
       {/* 选中日期显示 + 操作按钮 */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <CalendarDatePicker detailDate={detailDate} onSelectDate={(d) => startTransition(() => setDetailDate(d))} />
         <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
       </div>
         {/* 日期滚动条 */}
-        <div className="flex items-center justify-between gap-1 mt-1 h-[52px]">
+        <div className="flex items-center justify-between gap-1 mt-3 mb-2 h-[52px]">
           <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
             <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
           </button>
@@ -193,6 +197,19 @@ export default function ClassRecordsPage() {
             onExternalDateChange={(d) => startTransition(() => setDetailDate(d))}
             hideDateBar
             onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
+            onActivityClick={(id) => {
+              const customer = allCustomers.find(c => c.id === id)
+              setActivityNickname(customer?.nickname || customer?.name || "")
+              setActivityCustomerId(id)
+              visitApi.list(detailDate, id, selectedSpaceId).then(visits => {
+                const acts = (visits[0]?.activities || []).map(a => ({ type: a.type, name: a.name, role: a.role, teacher: a.owner_name }))
+                setActivityList(acts)
+                setActivityDialogOpen(true)
+              }).catch(() => {
+                setActivityList([])
+                setActivityDialogOpen(true)
+              })
+            }}
             onDataLoaded={handleVisitsDataLoaded}
             spaceId={selectedSpaceId}
             onRequireSpaces={spaces.length === 0 ? () => setNoSpacesDialogOpen(true) : undefined}
@@ -225,6 +242,32 @@ export default function ClassRecordsPage() {
             onClearSelection={() => setCustomerDetailOpen(false)}
             hideSearch
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* 参与活动弹窗 */}
+      <Dialog open={activityDialogOpen} onOpenChange={(open) => { setActivityDialogOpen(open); if (!open) { setActivityCustomerId(null); setActivityList([]) } }}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <div className="px-4 py-3 border-b border-[#f0f0f0]">
+            <span className="text-[13px] font-medium text-[#2b2f36]">{activityNickname}</span>
+            <span className="text-[12px] text-[#8f959e] ml-2">参与活动</span>
+          </div>
+          <div className="px-4 py-2 max-h-[300px] overflow-y-auto">
+            {activityList.length === 0 ? (
+              <div className="py-6 text-center text-[12px] text-[#8f959e]">暂无活动</div>
+            ) : (
+              <div className="divide-y divide-[#f0f0f0]">
+                {activityList.map((a, i) => (
+                  <div key={i} className="flex items-center gap-2 py-2">
+                    <span className="text-[11px] text-[#8f959e] bg-[#f5f6f7] px-1.5 py-0.5 rounded shrink-0">{a.type}</span>
+                    <span className="text-[12px] text-[#2b2f36] shrink-0">{a.name}</span>
+                    {a.teacher && <span className="text-[11px] text-[#8f959e] bg-[#f7f8f9] px-1.5 py-0.5 rounded shrink-0">{a.teacher}</span>}
+                    <span className="text-[12px] text-[#8f959e] shrink-0 ml-auto">{a.role}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

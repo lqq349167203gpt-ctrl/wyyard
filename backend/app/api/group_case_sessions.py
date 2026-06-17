@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/group-case-sessions", tags=["group-case-sessions
 
 
 def _fill_session_names(sessions: list) -> list:
-    """从客户信息实时填充 owner_name / host_name / achiever_name"""
+    """从客户信息实时填充 owner_name / host_name"""
     customers = list_customers()
     cmap = {c.id: c for c in customers}
 
@@ -21,7 +21,7 @@ def _fill_session_names(sessions: list) -> list:
 
     for s in sessions:
         data = s.model_dump(mode="json") if hasattr(s, "model_dump") else s
-        for field in ("owner_name", "host_name", "achiever_name"):
+        for field in ("owner_name", "host_name"):
             id_field = field.replace("_name", "_id")
             actual = get_name(getattr(s, id_field, ""))
             if getattr(s, field, "") != actual:

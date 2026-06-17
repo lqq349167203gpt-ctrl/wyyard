@@ -126,12 +126,18 @@ export function CustomerSearchInput({
   const filtered = useMemo(() => {
     if (!search) return []
     const q = search.toLowerCase()
+    const seen = new Set<string>()
     return customers.filter(c => {
       if (!c.nickname) return false
       if (excludeIds.includes(c.id)) return false
       if (positionFilter && !(c.positions || []).includes(positionFilter)) return false
       if (filterSelected && selectedNames.includes(c.nickname)) return false
-      return c.nickname.toLowerCase().includes(q)
+      if (seen.has(c.nickname)) return false
+      if (c.nickname.toLowerCase().includes(q)) {
+        seen.add(c.nickname)
+        return true
+      }
+      return false
     }).sort((a, b) => {
       if (!positionFilter) return 0
       const orderA = a.position_sort_orders?.[positionFilter] ?? 9999

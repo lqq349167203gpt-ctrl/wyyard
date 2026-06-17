@@ -18,9 +18,7 @@ def _fill_ics_names(sessions: list) -> list:
         return c.nickname if c else ""
 
     for s in sessions:
-        actual_hosts = [get_name(hid) for hid in (getattr(s, "host_ids", []) or [])]
-        if getattr(s, "host_names", []) != actual_hosts:
-            setattr(s, "host_names", actual_hosts)
+        pass  # teacher_ids 的名称由前端解析，无需后端填充
     return sessions
 
 

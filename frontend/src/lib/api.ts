@@ -611,6 +611,7 @@ export interface ClassRecordCreate {
   course_name: string
   course_description?: string
   teacher_ids?: string[]
+  participant_ids?: string[]
   is_public_welfare?: boolean
   activity_mode?: string
   space_id?: string
@@ -701,12 +702,12 @@ export interface GroupCaseSession {
   date: string
   start_time: string | null
   end_time: string | null
+  name: string
   owner_id: string
   owner_name: string
   description: string
   participant_ids: string[]
-  achiever_id: string
-  achiever_name: string
+  teacher_ids: string[]
   host_id: string
   host_name: string
   materials: Material[]
@@ -728,8 +729,7 @@ export interface GroupCaseSessionCreate {
   owner_name: string
   description?: string
   participant_ids?: string[]
-  achiever_id?: string
-  achiever_name?: string
+  teacher_ids?: string[]
   host_id?: string
   host_name?: string
   space_id?: string
@@ -796,12 +796,12 @@ export interface OhCardReadingSession {
   date: string
   start_time: string | null
   end_time: string | null
+  name: string
   owner_id: string
   owner_name: string
   description: string
   participant_ids: string[]
-  achiever_id: string
-  achiever_name: string
+  teacher_ids: string[]
   host_id: string
   host_name: string
   materials: Material[]
@@ -823,8 +823,7 @@ export interface OhCardReadingSessionCreate {
   owner_name: string
   description?: string
   participant_ids?: string[]
-  achiever_id?: string
-  achiever_name?: string
+  teacher_ids?: string[]
   host_id?: string
   host_name?: string
   space_id?: string
@@ -918,12 +917,12 @@ export interface EmotionalReleaseSession {
   date: string
   start_time: string | null
   end_time: string | null
+  name: string
   owner_id: string
   owner_name: string
   description: string
   participant_ids: string[]
-  achiever_id: string
-  achiever_name: string
+  teacher_ids: string[]
   host_id: string
   host_name: string
   materials: Material[]
@@ -945,8 +944,7 @@ export interface EmotionalReleaseSessionCreate {
   owner_name: string
   description?: string
   participant_ids?: string[]
-  achiever_id?: string
-  achiever_name?: string
+  teacher_ids?: string[]
   host_id?: string
   host_name?: string
   space_id?: string
@@ -983,8 +981,9 @@ export interface EnergyKnotSession {
   name: string
   description: string | null
   participant_ids: string[]
-  host_ids: string[]
-  host_names: string[]
+  teacher_ids: string[]
+  host_id: string
+  host_name: string
   activity_mode?: string
   space_id: string
   room_id: string
@@ -1003,8 +1002,9 @@ export interface EnergyKnotSessionCreate {
   name?: string
   description?: string
   participant_ids?: string[]
-  host_ids?: string[]
-  host_names?: string[]
+  teacher_ids?: string[]
+  host_id?: string
+  host_name?: string
   space_id?: string
   room_id?: string
   room_name?: string
@@ -1037,8 +1037,9 @@ export interface InternalCourseSession {
   course_type: string
   course_name: string
   course_description: string
-  host_ids: string[]
-  host_names: string[]
+  teacher_ids: string[]
+  host_id: string
+  host_name: string
   participant_ids: string[]
   materials: Material[]
   activity_mode?: string
@@ -1057,8 +1058,9 @@ export interface InternalCourseSessionCreate {
   course_type?: string
   course_name: string
   course_description?: string
-  host_ids?: string[]
-  host_names?: string[]
+  teacher_ids?: string[]
+  host_id?: string
+  host_name?: string
   participant_ids?: string[]
   space_id?: string
   room_id?: string

@@ -19,6 +19,7 @@ def list_releases(page: int | None = Query(None, ge=1), page_size: int | None = 
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
+    items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     if page is not None:
         return paginate(items_dict, page, page_size or 10)
     return items_dict

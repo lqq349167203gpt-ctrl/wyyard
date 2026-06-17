@@ -35,8 +35,6 @@ export default function EmotionalReleaseSessionsPage() {
   const [formDate, setFormDate] = useState(today)
   const [formOwnerId, setFormOwnerId] = useState("")
   const [formOwnerName, setFormOwnerName] = useState("")
-  const [formAchieverId, setFormAchieverId] = useState("")
-  const [formAchieverName, setFormAchieverName] = useState("")
   const [formHostId, setFormHostId] = useState("")
   const [formHostName, setFormHostName] = useState("")
 
@@ -176,8 +174,6 @@ export default function EmotionalReleaseSessionsPage() {
     setFormDate(today)
     setFormOwnerId("")
     setFormOwnerName("")
-    setFormAchieverId("")
-    setFormAchieverName("")
     setFormHostId("")
     setFormHostName("")
     setDialogOpen(true)
@@ -188,8 +184,6 @@ export default function EmotionalReleaseSessionsPage() {
     setFormDate(session.date)
     setFormOwnerId(session.owner_id)
     setFormOwnerName(session.owner_name)
-    setFormAchieverId(session.achiever_id)
-    setFormAchieverName(session.achiever_name)
     setFormHostId(session.host_id)
     setFormHostName(session.host_name)
     setDialogOpen(true)
@@ -203,8 +197,6 @@ export default function EmotionalReleaseSessionsPage() {
         date: formDate,
         owner_id: formOwnerId,
         owner_name: formOwnerName,
-        achiever_id: formAchieverId,
-        achiever_name: formAchieverName,
         host_id: formHostId,
         host_name: formHostName,
       }
@@ -266,7 +258,6 @@ export default function EmotionalReleaseSessionsPage() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="pl-4">日期</TableHead>
                     <TableHead>案主</TableHead>
-                    <TableHead>成就君</TableHead>
                     <TableHead>主持人</TableHead>
                     <TableHead>参与者</TableHead>
                     <TableHead className="text-right pr-4">操作</TableHead>
@@ -281,9 +272,6 @@ export default function EmotionalReleaseSessionsPage() {
                     >
                       <TableCell className="pl-4 text-[#2b2f36]">{session.date}</TableCell>
                       <TableCell className="text-[#2b2f36] font-medium">{session.owner_name}</TableCell>
-                      <TableCell className="text-[#2b2f36]">
-                        {session.achiever_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>}
-                      </TableCell>
                       <TableCell className="text-[#2b2f36]">
                         {session.host_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>}
                       </TableCell>
@@ -350,12 +338,6 @@ export default function EmotionalReleaseSessionsPage() {
                 <span className="text-[12px] text-[#4e535a] font-light">案主</span>
                 <span className="text-[13px] text-[#2b2f36]">{selectedSession.owner_name}</span>
               </div>
-              {selectedSession.achiever_name && (
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-[#4e535a] font-light">成就君</span>
-                  <span className="text-[13px] text-[#2b2f36]">{selectedSession.achiever_name}</span>
-                </div>
-              )}
               {selectedSession.host_name && (
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] text-[#4e535a] font-light">主持人</span>
@@ -442,21 +424,6 @@ export default function EmotionalReleaseSessionsPage() {
                 }}
                 onSelectItem={(c) => { setFormOwnerId(c.id); setFormOwnerName(c.nickname) }}
                
-              />
-            </div>
-
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成就君</span>
-              <CustomerSearchInput
-                customers={allCustomers}
-                value={formAchieverName || ""}
-                onChange={(v) => {
-                  const name = typeof v === "string" ? v : v[0] || ""
-                  if (!name) { setFormAchieverId(""); setFormAchieverName("") }
-                }}
-                onSelectItem={(c) => { setFormAchieverId(c.id); setFormAchieverName(c.nickname || c.name) }}
-                placeholder="搜索成就君"
-                positionFilter="成就君"
               />
             </div>
 

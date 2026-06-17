@@ -95,9 +95,9 @@ export interface CardCallbacks {
 // ===== GCS Dialog (独立组件，避免父组件 state 变化导致重渲染) =====
 
 // ===== GCS Dialog (独立组件，避免父组件 state 变化导致重渲染) =====
-const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, defaultSpaceId, onClose, onSaved }: {
+const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
-  achieverCustomers: CustomerLight[]; session?: GroupCaseSession | null; defaultSpaceId?: string; onClose: () => void
+  session?: GroupCaseSession | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: GroupCaseSession) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -108,8 +108,6 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   const [formEndTime, setFormEndTime] = useState("10:00")
   const [formOwnerId, setFormOwnerId] = useState("")
   const [formOwnerName, setFormOwnerName] = useState("")
-  const [formAchieverId, setFormAchieverId] = useState("")
-  const [formAchieverName, setFormAchieverName] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [formActivityMode, setFormActivityMode] = useState("线下")
   const [searchKeyword, setSearchKeyword] = useState("")
@@ -128,7 +126,6 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormStartTime(session.start_time || "09:00")
         setFormEndTime(session.end_time || "10:00")
         setFormOwnerId(session.owner_id); setFormOwnerName(session.owner_name || "")
-        setFormAchieverId(session.achiever_id || ""); setFormAchieverName(session.achiever_name || "")
         setFormDescription(session.description || "")
         setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
@@ -145,7 +142,6 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormDate(date)
         setFormStartTime("09:00"); setFormEndTime("10:00")
         setFormOwnerId(""); setFormOwnerName("")
-        setFormAchieverId(""); setFormAchieverName("")
         setFormDescription("")
         setFormActivityMode("线下")
         setSearchKeyword(""); setOwnerRemaining(null)
@@ -193,7 +189,6 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
         owner_id: formOwnerId, owner_name: formOwnerName,
         description: formDescription || undefined,
-        achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
         room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
@@ -303,7 +298,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining <= 0
+                      const isDepleted = remaining !== undefined && remaining < 0
                       return (
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
@@ -327,15 +322,6 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
               )})()}
             </div>
           </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">成就君</span>
-            <SelectDropdown
-              value={formAchieverId}
-              options={achieverCustomers.filter(c => c.id !== formOwnerId).map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
-              placeholder="选择成就君"
-              onChange={(v) => { setFormAchieverId(v); setFormAchieverName(achieverCustomers.find(c => c.id === v)?.nickname || achieverCustomers.find(c => c.id === v)?.name || "") }}
-            />
-          </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
             <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
@@ -352,9 +338,9 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
 })
 
 // ===== ERS Dialog (独立组件) =====
-const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, defaultSpaceId, onClose, onSaved }: {
+const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
-  achieverCustomers: CustomerLight[]; session?: EmotionalReleaseSession | null; defaultSpaceId?: string; onClose: () => void
+  session?: EmotionalReleaseSession | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: EmotionalReleaseSession) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -365,8 +351,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   const [formEndTime, setFormEndTime] = useState("10:00")
   const [formOwnerId, setFormOwnerId] = useState("")
   const [formOwnerName, setFormOwnerName] = useState("")
-  const [formAchieverId, setFormAchieverId] = useState("")
-  const [formAchieverName, setFormAchieverName] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [formActivityMode, setFormActivityMode] = useState("线下")
   const [searchKeyword, setSearchKeyword] = useState("")
@@ -384,7 +368,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormStartTime(session.start_time || "09:00")
         setFormEndTime(session.end_time || "10:00")
         setFormOwnerId(session.owner_id); setFormOwnerName(session.owner_name || "")
-        setFormAchieverId(session.achiever_id || ""); setFormAchieverName(session.achiever_name || "")
         setFormDescription(session.description || "")
         setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
@@ -401,7 +384,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormDate(date)
         setFormStartTime("09:00"); setFormEndTime("10:00")
         setFormOwnerId(""); setFormOwnerName("")
-        setFormAchieverId(""); setFormAchieverName("")
         setFormDescription("")
         setFormActivityMode("线下")
         setSearchKeyword(""); setOwnerRemaining(null)
@@ -443,7 +425,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
         owner_id: formOwnerId, owner_name: formOwnerName,
         description: formDescription || undefined,
-        achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
         room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
@@ -561,7 +542,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining <= 0
+                      const isDepleted = remaining !== undefined && remaining < 0
                       return (
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
@@ -585,15 +566,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
               )})()}
             </div>
           </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">成就君</span>
-            <SelectDropdown
-              value={formAchieverId}
-              options={achieverCustomers.filter(c => c.id !== formOwnerId).map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
-              placeholder="选择成就君"
-              onChange={(v) => { setFormAchieverId(v); setFormAchieverName(achieverCustomers.find(c => c.id === v)?.nickname || achieverCustomers.find(c => c.id === v)?.name || "") }}
-            />
-          </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
             <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
@@ -610,9 +582,9 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
 })
 
 // ===== OCR Dialog (独立组件) =====
-const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, session, defaultSpaceId, onClose, onSaved }: {
+const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpaceId, onClose, onSaved }: {
   open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
-  achieverCustomers: CustomerLight[]; session?: OhCardReadingSession | null; defaultSpaceId?: string; onClose: () => void
+  session?: OhCardReadingSession | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: OhCardReadingSession) => void
 }) => {
   const enterToNext = useEnterToNext()
@@ -623,8 +595,6 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
   const [formEndTime, setFormEndTime] = useState("10:00")
   const [formOwnerId, setFormOwnerId] = useState("")
   const [formOwnerName, setFormOwnerName] = useState("")
-  const [formAchieverId, setFormAchieverId] = useState("")
-  const [formAchieverName, setFormAchieverName] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [formActivityMode, setFormActivityMode] = useState("线下")
   const [searchKeyword, setSearchKeyword] = useState("")
@@ -642,7 +612,6 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormStartTime(session.start_time || "09:00")
         setFormEndTime(session.end_time || "10:00")
         setFormOwnerId(session.owner_id); setFormOwnerName(session.owner_name || "")
-        setFormAchieverId(session.achiever_id || ""); setFormAchieverName(session.achiever_name || "")
         setFormDescription(session.description || "")
         setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
@@ -659,7 +628,6 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         setFormDate(date)
         setFormStartTime("09:00"); setFormEndTime("10:00")
         setFormOwnerId(""); setFormOwnerName("")
-        setFormAchieverId(""); setFormAchieverName("")
         setFormDescription("")
         setFormActivityMode("线下")
         setSearchKeyword(""); setOwnerRemaining(null)
@@ -701,7 +669,6 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
         date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
         owner_id: formOwnerId, owner_name: formOwnerName,
         description: formDescription || undefined,
-        achiever_id: formAchieverId || undefined, achiever_name: formAchieverName || undefined,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
         room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
@@ -811,7 +778,7 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining <= 0
+                      const isDepleted = remaining !== undefined && remaining < 0
                       return (
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
@@ -834,15 +801,6 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, achieverCustomers, s
                 </div>
               )})()}
             </div>
-          </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">成就君</span>
-            <SelectDropdown
-              value={formAchieverId}
-              options={achieverCustomers.filter(c => c.id !== formOwnerId).map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
-              placeholder="选择成就君"
-              onChange={(v) => { setFormAchieverId(v); setFormAchieverName(achieverCustomers.find(c => c.id === v)?.nickname || achieverCustomers.find(c => c.id === v)?.name || "") }}
-            />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
@@ -949,7 +907,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const selectOwner = (customer: CustomerLight) => {
     if (formOwnerIds.includes(customer.id)) return
     const remaining = remainingMap[customer.id]
-    if (remaining !== undefined && remaining !== -1 && remaining <= 0) {
+    if (remaining !== undefined && remaining !== -1 && remaining < 0) {
       setPendingOwner({ id: customer.id, nickname: customer.nickname, name: customer.name })
       setPurchaseDialogOpen(true)
       return
@@ -1113,7 +1071,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining <= 0
+                      const isDepleted = remaining !== undefined && remaining < 0
                       const alreadySelected = formOwnerIds.includes(c.id)
                       return (
                         <button key={c.id}
@@ -2010,12 +1968,11 @@ export default function DailyActivitiesPage() {
   const dayParticipants = useMemo(() => {
     return detailVisits
       .filter(v => !selectedSpaceId || v.space_id === selectedSpaceId)
-      .map(v => v.nickname || v.customer_id)
-      .filter(Boolean)
+      .map(v => ({ id: v.customer_id, nickname: v.nickname || v.customer_id }))
+      .filter(p => p.nickname)
   }, [detailVisits, selectedSpaceId])
 
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
-  const achieverCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("成就君")).sort((a, b) => (a.position_sort_orders?.["成就君"] ?? 9999) - (b.position_sort_orders?.["成就君"] ?? 9999)), [allCustomers])
   const eksHostCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("能量结老师")).sort((a, b) => (a.position_sort_orders?.["能量结老师"] ?? 9999) - (b.position_sort_orders?.["能量结老师"] ?? 9999)), [allCustomers])
 
   // ===== Helpers =====
@@ -2058,14 +2015,14 @@ export default function DailyActivitiesPage() {
       }
       for (const s of gcs) {
         if (s.owner_id) ids.add(s.owner_id)
-        if (s.achiever_id) ids.add(s.achiever_id)
         if (s.host_id) ids.add(s.host_id)
+        for (const t of (s.teacher_ids || [])) ids.add(t)
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
       for (const s of ers) {
         if (s.owner_id) ids.add(s.owner_id)
-        if (s.achiever_id) ids.add(s.achiever_id)
         if (s.host_id) ids.add(s.host_id)
+        for (const t of (s.teacher_ids || [])) ids.add(t)
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
       for (const s of eks) {
@@ -2076,8 +2033,8 @@ export default function DailyActivitiesPage() {
       }
       for (const s of (ocr || [])) {
         if (s.owner_id) ids.add(s.owner_id)
-        if (s.achiever_id) ids.add(s.achiever_id)
         if (s.host_id) ids.add(s.host_id)
+        for (const t of (s.teacher_ids || [])) ids.add(t)
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
 
@@ -2502,7 +2459,7 @@ export default function DailyActivitiesPage() {
         </div>
 
         {/* 周视图日历 */}
-        <div className="border border-[#e8e8e8] rounded overflow-x-auto">
+        <div className="border-[0.5px] border-[#e8e8e8] rounded overflow-x-auto mt-1">
           <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%" }}>
             <colgroup>
               <col style={{ width: "80px" }} />
@@ -2539,7 +2496,7 @@ export default function DailyActivitiesPage() {
                         <td
                           key={`date-${day.date}`}
                           className={`px-1 text-center text-[8px] cursor-pointer transition-colors ${
-                            !day.inMonth ? "bg-[#fafafa]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "bg-[#fafafa] text-[#b0b5bb]"
+                            !day.inMonth ? "bg-[#fdfdfd]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "bg-[#fdfdfd] text-[#b0b5bb]"
                           }`}
                           style={{ height: "12px" }}
                           onClick={() => day.inMonth && setDetailDate(day.date)}
@@ -2587,9 +2544,21 @@ export default function DailyActivitiesPage() {
             ) : null}
           </div>
           {dayParticipants.length > 0 && (
-            <p className="text-[11px] text-[#8f959e] pl-2 mt-0.5 truncate">
-              参与者：{dayParticipants.join("、")}
-            </p>
+            <div className="flex flex-wrap gap-1 pl-2 mt-2.5">
+              {dayParticipants.map(p => (
+                <span
+                  key={p.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: p.id, nickname: p.nickname }))
+                    e.dataTransfer.effectAllowed = "copy"
+                  }}
+                  className="inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[11px] text-[#3370ff] cursor-grab active:cursor-grabbing hover:bg-[#e0edff] transition-colors"
+                >
+                  {p.nickname}
+                </span>
+              ))}
+            </div>
           )}
         </div>
 
@@ -2652,7 +2621,6 @@ export default function DailyActivitiesPage() {
         date={detailDate}
         spaces={spaces}
         allCustomers={allCustomers}
-        achieverCustomers={achieverCustomers}
         session={gcsEditSession}
         defaultSpaceId={selectedSpaceId}
         onClose={handleGcsClose}
@@ -2665,7 +2633,6 @@ export default function DailyActivitiesPage() {
         date={detailDate}
         spaces={spaces}
         allCustomers={allCustomers}
-        achieverCustomers={achieverCustomers}
         session={ersEditSession}
         defaultSpaceId={selectedSpaceId}
         onClose={handleErsClose}
@@ -2703,7 +2670,6 @@ export default function DailyActivitiesPage() {
         date={detailDate}
         spaces={spaces}
         allCustomers={allCustomers}
-        achieverCustomers={achieverCustomers}
         session={ocrEditSession}
         defaultSpaceId={selectedSpaceId}
         onClose={handleOcrClose}

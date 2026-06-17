@@ -63,6 +63,51 @@ def get_record(record_id: str) -> Optional[ClassRecord]:
     return record
 
 
+def _get_group_member_ids(record) -> set:
+    """从 groups 和 participant_ids 中提取所有可扣费人员 ID（不含 teacher_ids）"""
+    ids = set(record.participant_ids)
+    for g in record.groups:
+        if g.leader_id:
+            ids.add(g.leader_id)
+        if g.deputy_id:
+            ids.add(g.deputy_id)
+        ids.update(g.member_ids)
+    # 排除课程老师
+    ids -= set(record.teacher_ids)
+    return ids
+
+
+def _deduct_for_record(record):
+    """为新创建的沙龙活动扣费（公益类不扣费）"""
+    if record.is_public_welfare:
+        return
+    chargeable = _get_group_member_ids(record)
+    activity_key = f"class:{record.id}"
+    for cid in chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
+
+
+def _restore_for_record(record):
+    """为删除的沙龙活动退费"""
+    if record.is_public_welfare:
+        return
+    chargeable = _get_group_member_ids(record)
+    activity_key = f"class:{record.id}"
+    for cid in chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+
+
+def _sync_deduction(record, old_chargeable, new_chargeable):
+    """同步扣费：为新增人员扣费，为移除人员退费"""
+    if record.is_public_welfare:
+        return
+    activity_key = f"class:{record.id}"
+    for cid in old_chargeable - new_chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+    for cid in new_chargeable - old_chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
+
+
 def create_record(data: ClassRecordCreate) -> ClassRecord:
     now = datetime.now(timezone.utc)
     record = ClassRecord(
@@ -73,6 +118,7 @@ def create_record(data: ClassRecordCreate) -> ClassRecord:
     )
     _records[record.id] = record
     _save(record.id)
+    _deduct_for_record(record)
     return record
 
 
@@ -80,27 +126,22 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
     record = _records.get(record_id)
     if not record:
         return None
+
+    # 获取旧的可扣费人员
+    old_chargeable = _get_group_member_ids(record)
+
     for key, value in data.items():
         if hasattr(record, key) and key not in ("id", "created_at"):
             setattr(record, key, value)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
     _save(record_id)
+
+    # 同步扣费
+    new_chargeable = _get_group_member_ids(record)
+    _sync_deduction(record, old_chargeable, new_chargeable)
+
     return record
-
-
-def _get_group_member_ids(record) -> set:
-    """从 groups 中提取所有组员 ID（不含 teacher_ids）"""
-    ids = set()
-    for g in record.groups:
-        if g.leader_id:
-            ids.add(g.leader_id)
-        if g.deputy_id:
-            ids.add(g.deputy_id)
-        ids.update(g.member_ids)
-    # 排除课程老师
-    ids -= set(record.teacher_ids)
-    return ids
 
 
 def update_participants(record_id: str, participant_ids: List[str]):
@@ -119,6 +160,7 @@ def delete_record(record_id: str) -> bool:
     record = _records.get(record_id)
     if not record:
         return False
+    _restore_for_record(record)
     record.is_deleted = True
     record.deleted_at = datetime.now(timezone.utc)
     _save(record_id)

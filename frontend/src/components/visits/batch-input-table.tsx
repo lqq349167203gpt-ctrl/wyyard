@@ -41,10 +41,12 @@ interface BatchInputTableProps {
   date: string
   customers: CustomerLight[]
   spaceId?: string
+  refreshKey?: number
   onSaved: () => void
   onSavedCountChange?: (count: number) => void
   onSavingCountChange?: (count: number) => void
   onCustomerClick?: (customerId: string) => void
+  onActivityClick?: (customerId: string) => void
   onCreateCustomer?: (nickname: string) => void
 }
 
@@ -59,11 +61,12 @@ function getRemainingCount(cards: MembershipCard[], customerId: string): number 
 
 function formatRemaining(count: number | null): string {
   if (count === null) return "-"
-  if (count === -1) return "不限"
+  if (count === -999) return "不限"
+  if (count < 0) return `${count} 次`  // -1 表示欠费1次，-2 表示欠费2次
   return `${count} 次`
 }
 
-export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onCreateCustomer }: BatchInputTableProps) {
+export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
@@ -97,7 +100,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
 
   // 加载当日已有记录（仅首次，日期或空间变化时重新加载）
   const initialLoaded = useRef(false)
-  useEffect(() => { initialLoaded.current = false }, [date, spaceId])
+  useEffect(() => { initialLoaded.current = false }, [date, spaceId, refreshKey])
   useEffect(() => {
     if (initialLoaded.current) return
     let cancelled = false
@@ -162,7 +165,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
 
     try {
       if (existingId) {
-        await visitApi.update(existingId, {
+        const result = await visitApi.update(existingId, {
           visit_time: row.visit_time || "",
           customer_id: row.customer_id,
           nickname: row.nickname,
@@ -174,7 +177,18 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
           feedback: row.feedback,
           healing_notes: row.healing_notes,
         })
+        // 更新剩余次数
+        if (result?.remaining_count !== undefined) {
+          setRows(prev => prev.map(r => r.key === row.key ? { ...r, remaining_count: result.remaining_count ?? null } : r))
+        }
       } else {
+        // 检查是否已存在该客户的到场记录
+        const existingVisit = rowsRef.current.find(r => r.key !== row.key && r.customer_id === row.customer_id && r.customer_id)
+        if (existingVisit) {
+          setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+          return
+        }
+
         const payload = {
           visit_date: date,
           visit_time: row.visit_time || "",
@@ -297,6 +311,10 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
   }, [date, spaceId])
 
   const handleCustomerSelect = useCallback((key: number, customer: any) => {
+    // 检查是否已存在该客户
+    const existingRow = rowsRef.current.find(r => r.key !== key && r.customer_id === customer.id)
+    if (existingRow) return
+
     const memberType = customer.member_type || ""
     const remaining = getRemainingCount(cardsRef.current, customer.id)
     setRows(prev => prev.map(r => r.key === key ? { ...r, nickname: customer.nickname, customer_id: customer.id, member_type: memberType, remaining_count: remaining } : r))
@@ -319,10 +337,10 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
               <th className="px-1.5 py-2 text-left font-normal w-[56px]">剩余次数</th>
               <th className="px-1.5 py-2 text-left font-normal w-[240px]">本次需求</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">邀约人</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[220px]">客户反馈</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[220px]">疗愈记录</th>
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">今日成交</th>
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">参与活动</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[220px]">客户反馈</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[220px]">疗愈记录</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
               <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
@@ -380,6 +398,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                       customers={customers as any[]}
                       value={row.nickname}
                       showClear={false}
+                      excludeIds={rows.filter(r => r.key !== row.key && r.customer_id).map(r => r.customer_id)}
                       onChange={(v) => {
                         const name = typeof v === "string" ? v : v[0] || ""
                         if (!name) { updateRow(row.key, "nickname", ""); updateRow(row.key, "customer_id", ""); setRows(prev => prev.map(r => r.key === row.key ? { ...r, member_type: "", remaining_count: null } : r)) }
@@ -400,7 +419,7 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                     <span className="text-[12px] text-[#2b2f36]">{row.member_type}</span>
                   </td>
                   <td className="px-1.5 py-1.5">
-                    <span className="text-[12px] text-[#2b2f36]">{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
+                    <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
                   <td className="px-1.5 py-1.5">
                     <Input
@@ -425,6 +444,21 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                       className="h-7 [&]:border-[0.5px]"
                     />
                   </td>
+                  <td className="px-1.5 py-1.5 text-left">
+                    <span className="text-[12px] text-[#8f959e]">
+                      {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
+                    </span>
+                  </td>
+                  <td className="px-1.5 py-1.5 text-left">
+                    {row.activities && row.customer_id ? (
+                      <button
+                        onClick={() => onActivityClick?.(row.customer_id)}
+                        className="text-[12px] text-[#3370ff] hover:underline"
+                      >
+                        {row.activities.split("、").length}场
+                      </button>
+                    ) : null}
+                  </td>
                   <td className="px-1.5 py-1.5">
                     <Input
                       value={row.feedback}
@@ -438,21 +472,6 @@ export function BatchInputTable({ date, customers, spaceId, onSaved, onSavedCoun
                       onChange={(e) => updateRow(row.key, "healing_notes", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
-                  </td>
-                  <td className="px-1.5 py-1.5 text-left">
-                    <span className="text-[12px] text-[#8f959e]">
-                      {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
-                    </span>
-                  </td>
-                  <td className="px-1.5 py-1.5 text-left">
-                    {row.activities && row.customer_id ? (
-                      <button
-                        onClick={() => onCustomerClick?.(row.customer_id)}
-                        className="text-[12px] text-[#3370ff] hover:underline"
-                      >
-                        {row.activities.split("、").length}场
-                      </button>
-                    ) : null}
                   </td>
                   <td className="px-1.5 py-1.5">
                     <span className="text-[12px] text-[#8f959e]">{leaderRow?.nickname || ""}</span>

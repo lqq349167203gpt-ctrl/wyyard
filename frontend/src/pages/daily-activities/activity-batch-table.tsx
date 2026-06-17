@@ -103,10 +103,10 @@ interface ActivityRow {
   end_time: string
   name: string
   course_id: string
+  owner_id: string
+  owner_name: string
   host_ids: string[]
   host_names: string[]
-  achiever_id: string
-  achiever_name: string
   participant_ids: string[]
   activity_mode: string
   is_public_welfare: boolean
@@ -122,35 +122,30 @@ let nextKey = 1
 
 function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSpaceId: string, spaces: Space[]): ActivityRow {
   const key = nextKey++
+  let ownerId = ""
+  let ownerName = ""
   let hostIds: string[] = []
   let hostNames: string[] = []
-  let achieverId = ""
-  let achieverName = ""
   let name = ""
 
   if (type === "class") {
     hostIds = data.teacher_ids || []
     name = courses.find(c => c.id === data.course_id)?.name || data.course_name || ""
   } else if (type === "gcs" || type === "ers" || type === "ocr") {
-    if (data.host_ids?.length) {
-      hostIds = data.host_ids
-      hostNames = data.host_names || []
-    } else if (data.owner_id) {
-      hostIds = [data.owner_id]
-      hostNames = [data.owner_name || ""]
-    }
-    achieverId = data.achiever_id || ""
-    achieverName = data.achiever_name || ""
+    ownerId = data.owner_id || ""
+    ownerName = data.owner_name || ""
+    hostIds = data.teacher_ids || data.host_ids || []
+    hostNames = data.teacher_names || data.host_names || []
     name = data.name || ""
   } else if (type === "eks") {
-    hostIds = data.host_ids || []
-    hostNames = data.host_names || []
-    achieverId = data.owner_id || ""
-    achieverName = data.owner_name || ""
+    ownerId = data.owner_id || ""
+    ownerName = data.owner_name || ""
+    hostIds = data.teacher_ids || data.host_ids || []
+    hostNames = data.teacher_names || data.host_names || []
     name = data.name ?? TYPE_NAMES[type]
   } else if (type === "ics") {
-    hostIds = data.host_ids || []
-    hostNames = data.host_names || []
+    hostIds = data.teacher_ids || data.host_ids || []
+    hostNames = data.teacher_names || data.host_names || []
     name = data.course_name || ""
   }
 
@@ -159,11 +154,11 @@ function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSp
     const groupIds = (data.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
     participantIds = [...new Set([...groupIds, ...(data.participant_ids || [])])]
   } else if (type === "gcs" || type === "ocr") {
-    participantIds = [...(data.participant_ids || []), ...(data.host_ids || []), data.host_id, data.achiever_id].filter(Boolean)
+    participantIds = [...(data.participant_ids || []), ...(data.teacher_ids || data.host_ids || [])].filter(Boolean)
   } else if (type === "ers") {
     participantIds = [...(data.participant_ids || [])].filter(Boolean)
   } else if (type === "eks") {
-    participantIds = [...(data.host_ids || [])].filter(Boolean)
+    participantIds = [...(data.participant_ids || []), ...(data.teacher_ids || data.host_ids || [])].filter(Boolean)
   } else if (type === "ics") {
     participantIds = [...(data.participant_ids || [])].filter(Boolean)
   }
@@ -177,8 +172,8 @@ function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSp
     ics_course_key: type === "ics" ? resolveIcsCourseKey(name) : "",
     start_time: data.start_time || "", end_time: data.end_time || "",
     name, course_id: type === "class" ? (data.course_id || "") : "",
+    owner_id: ownerId, owner_name: ownerName,
     host_ids: hostIds, host_names: hostNames,
-    achiever_id: achieverId, achiever_name: achieverName,
     participant_ids: participantIds,
     activity_mode: data.activity_mode || "线下",
     is_public_welfare: data.is_public_welfare || false,
@@ -199,8 +194,8 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
     ics_course_key: "",
     start_time: "", end_time: "",
     name: "", course_id: "",
+    owner_id: "", owner_name: "",
     host_ids: [], host_names: [],
-    achiever_id: "", achiever_name: "",
     participant_ids: [],
     activity_mode: "线下",
     is_public_welfare: false,
@@ -241,10 +236,10 @@ export function ActivityBatchTable({
   const dragKeyRef = useRef<number | null>(null)
   const eksCountEditRef = useRef<Record<string, string>>({})
   const lastEditedEksRef = useRef<ActivityRow | null>(null)
-  const eksEditsRef = useRef<Map<string, { achiever_id: string; achiever_name: string; description: string }>>(new Map())
+  const eksEditsRef = useRef<Map<string, { owner_id: string; owner_name: string; description: string }>>(new Map())
   const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
   const fetchedRemainingRef = useRef<Set<string>>(new Set())
-  const prevAchieverRef = useRef<Record<number, string>>({})
+  const prevOwnerRef = useRef<Record<number, string>>({})
 
   // 报告保存状态
   useEffect(() => {
@@ -297,8 +292,8 @@ export function ActivityBatchTable({
       if (r.type === "eks" && r.data.id) {
         const edit = eksEditsRef.current.get(r.data.id)
         if (edit) {
-          row.achiever_id = edit.achiever_id
-          row.achiever_name = edit.achiever_name
+          row.owner_id = edit.owner_id
+          row.owner_name = edit.owner_name
           row.description = edit.description
         }
       }
@@ -339,7 +334,7 @@ export function ActivityBatchTable({
 
       if (row.pendingCreate) {
         // 新建记录
-        const createData: any = { date, ...common }
+        const createData: any = { date, ...common, participant_ids: row.participant_ids }
 
         if (type === "class") {
           const course = courses.find(c => c.id === row.course_id)
@@ -350,30 +345,21 @@ export function ActivityBatchTable({
           createData.is_public_welfare = row.is_public_welfare
         } else if (type === "gcs" || type === "ers" || type === "ocr") {
           createData.name = row.name || ""
-          createData.owner_id = row.host_ids[0] || ""
-          createData.owner_name = row.host_names[0] || ""
-          if (row.host_ids.length > 1) {
-            createData.host_id = row.host_ids[1]
-            createData.host_name = row.host_names[1] || ""
-          }
+          createData.owner_id = row.owner_id || ""
+          createData.owner_name = row.owner_name || ""
+          createData.teacher_ids = row.host_ids
           createData.description = row.description || ""
-          if (row.achiever_id) {
-            createData.achiever_id = row.achiever_id
-            createData.achiever_name = row.achiever_name
-          }
         } else if (type === "eks") {
-          createData.owner_id = row.achiever_id || row.host_ids[0] || ""
-          createData.owner_name = row.achiever_name || row.host_names[0] || ""
+          createData.owner_id = row.owner_id || ""
+          createData.owner_name = row.owner_name || ""
           createData.name = row.name || ""
-          createData.host_ids = row.host_ids
-          createData.host_names = row.host_names
+          createData.teacher_ids = row.host_ids
           createData.description = row.description || ""
         } else if (type === "ics") {
           createData.course_type = row.ics_course_key?.replace("ics:", "") || ""
           createData.course_name = row.name || ""
           createData.course_description = row.description || ""
-          createData.host_ids = row.host_ids
-          createData.host_names = row.host_names
+          createData.teacher_ids = row.host_ids
         }
 
         let result: any
@@ -409,40 +395,37 @@ export function ActivityBatchTable({
             course_description: row.description,
             teacher_ids: row.host_ids,
             is_public_welfare: row.is_public_welfare,
+            participant_ids: row.participant_ids,
           })
         } else if (type === "gcs") {
           await groupCaseSessionApi.update(id, {
             ...common,
             name: row.name,
-            owner_id: row.host_ids[0] || row.raw.owner_id,
-            owner_name: row.host_names[0] || row.raw.owner_name,
-            host_id: row.host_ids[1] || undefined,
-            host_name: row.host_names[1] || undefined,
+            owner_id: row.owner_id || row.raw.owner_id,
+            owner_name: row.owner_name || row.raw.owner_name,
+            teacher_ids: row.host_ids,
+            participant_ids: row.participant_ids,
             description: row.description,
-            achiever_id: row.achiever_id,
-            achiever_name: row.achiever_name,
           })
         } else if (type === "ers") {
           await emotionalReleaseSessionApi.update(id, {
             ...common,
             name: row.name,
-            owner_id: row.host_ids[0] || row.raw.owner_id,
-            owner_name: row.host_names[0] || row.raw.owner_name,
-            host_id: row.host_ids[1] || undefined,
-            host_name: row.host_names[1] || undefined,
+            owner_id: row.owner_id || row.raw.owner_id,
+            owner_name: row.owner_name || row.raw.owner_name,
+            teacher_ids: row.host_ids,
             description: row.description,
-            achiever_id: row.achiever_id,
-            achiever_name: row.achiever_name,
+            participant_ids: row.participant_ids,
           })
         } else if (type === "eks") {
           await energyKnotSessionApi.update(id, {
             ...common,
-            owner_id: row.achiever_id || "",
-            owner_name: row.achiever_name || "",
+            owner_id: row.owner_id || "",
+            owner_name: row.owner_name || "",
             name: row.name || "",
-            host_ids: row.host_ids,
-            host_names: row.host_names,
+            teacher_ids: row.host_ids,
             description: row.description,
+            participant_ids: row.participant_ids,
           })
         } else if (type === "ics") {
           await internalCourseSessionApi.update(id, {
@@ -450,20 +433,18 @@ export function ActivityBatchTable({
             course_type: row.ics_course_key?.replace("ics:", "") || "",
             course_name: row.name,
             course_description: row.description,
-            host_ids: row.host_ids,
-            host_names: row.host_names,
+            teacher_ids: row.host_ids,
+            participant_ids: row.participant_ids,
           })
         } else if (type === "ocr") {
           await ohCardReadingSessionApi.update(id, {
             ...common,
             name: row.name,
-            owner_id: row.host_ids[0] || row.raw.owner_id,
-            owner_name: row.host_names[0] || row.raw.owner_name,
-            host_id: row.host_ids[1] || undefined,
-            host_name: row.host_names[1] || undefined,
+            owner_id: row.owner_id || row.raw.owner_id,
+            owner_name: row.owner_name || row.raw.owner_name,
+            teacher_ids: row.host_ids,
             description: row.description,
-            achiever_id: row.achiever_id,
-            achiever_name: row.achiever_name,
+            participant_ids: row.participant_ids,
           })
         }
       }
@@ -472,10 +453,14 @@ export function ActivityBatchTable({
       if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
       // 保存后刷新剩余次数
       if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
-        const customerId = row.achiever_id || prevAchieverRef.current[row.key]
+        const customerId = row.owner_id || prevOwnerRef.current[row.key]
         if (customerId) {
           fetchRemaining(row.record_type, customerId)
-          delete prevAchieverRef.current[row.key]
+          delete prevOwnerRef.current[row.key]
+        }
+        // 刷新所有参与者的剩余次数
+        for (const pid of row.participant_ids) {
+          fetchRemaining(row.record_type, pid)
         }
       }
     } catch (e: any) {
@@ -546,8 +531,8 @@ export function ActivityBatchTable({
       course_id: "",
       raw: {},
       // 切换类型时清除案主和描述（类型间数据不通用）
-      achiever_id: "",
-      achiever_name: "",
+      owner_id: "",
+      owner_name: "",
       description: "",
       deduction_count: type === "eks" ? 2 : 1,
     }
@@ -565,8 +550,27 @@ export function ActivityBatchTable({
     if (dragKeyRef.current !== key) setDragOverKey(key)
   }, [])
   const handleDragEnd = useCallback(() => { dragKeyRef.current = null; setDragOverKey(null) }, [])
-  const handleDrop = useCallback((targetKey: number) => {
+  const handleDrop = useCallback((targetKey: number, e?: React.DragEvent) => {
     const sourceKey = dragKeyRef.current
+    // 外部拖入（添加参与者）
+    if (sourceKey === null && e) {
+      try {
+        const data = JSON.parse(e.dataTransfer.getData("text/plain"))
+        if (data.customer_id) {
+          const targetRow = rowsRef.current.find(r => r.key === targetKey)
+          if (!targetRow) { setDragOverKey(null); return }
+          const alreadyInRow = targetRow.owner_id === data.customer_id || targetRow.host_ids.includes(data.customer_id) || targetRow.participant_ids.includes(data.customer_id)
+          if (!alreadyInRow) {
+            const newParticipantIds = [...targetRow.participant_ids, data.customer_id]
+            updateRow(targetKey, "participant_ids", newParticipantIds)
+            saveRow({ ...targetRow, participant_ids: newParticipantIds })
+          }
+        }
+      } catch {}
+      setDragOverKey(null)
+      return
+    }
+    // 内部排序
     if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
     setRows(prev => {
       const srcIdx = prev.findIndex(r => r.key === sourceKey)
@@ -584,7 +588,7 @@ export function ActivityBatchTable({
     })
     dragKeyRef.current = null
     setDragOverKey(null)
-  }, [date, spaceId])
+  }, [date, spaceId, updateRow, saveRow])
 
   // 获取 host 显示名称
   const getHostDisplay = useCallback((row: ActivityRow): string[] => {
@@ -611,18 +615,18 @@ export function ActivityBatchTable({
   }, [memberIdentities])
 
   // 按身份类型分组参与者
-  const splitParticipants = useCallback((ids: string[]): { oldMembers: string[]; newMembers: string[] } => {
-    const oldMembers: string[] = []
-    const newMembers: string[] = []
+  const splitParticipants = useCallback((ids: string[]): { oldMembers: { id: string; name: string }[]; newMembers: { id: string; name: string }[] } => {
+    const oldMembers: { id: string; name: string }[] = []
+    const newMembers: { id: string; name: string }[] = []
     for (const id of ids) {
       const name = getMemberName(id)
       const customer = customers.find(c => c.id === id)
       const memberType = customer?.member_type || ""
       const identityType = identityTypeMap[memberType]
       if (identityType === "新人") {
-        newMembers.push(name)
+        newMembers.push({ id, name })
       } else {
-        oldMembers.push(name)
+        oldMembers.push({ id, name })
       }
     }
     return { oldMembers, newMembers }
@@ -655,8 +659,8 @@ export function ActivityBatchTable({
     if (type === "eks") {
       const src = lastEditedEksRef.current || [...rowsRef.current].reverse().find(r => r.record_type === "eks")
       if (src) {
-        fresh.achiever_id = src.achiever_id
-        fresh.achiever_name = src.achiever_name
+        fresh.owner_id = src.owner_id
+        fresh.owner_name = src.owner_name
         fresh.description = src.description
         fresh.deduction_count = parseEksDescription(src.description).count
       }
@@ -673,16 +677,16 @@ export function ActivityBatchTable({
     <div className="bg-white rounded-lg">
       <div className="overflow-x-auto scrollbar-hide">
         <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
-          <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
+          <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
             <tr className="bg-[#fafbfc] text-[#8f959e]">
               <th className="w-[24px]"></th>
+              <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
               <th className="px-1 py-2 text-left font-normal w-[122px]">时间</th>
               <th className="px-1 py-2 text-left font-normal w-[80px]">类型</th>
               <th className="px-1 py-2 text-left font-normal w-[140px]">活动名称</th>
               {hasOwnerType && <th className="px-1 py-2 text-left font-normal w-[86px]">案主</th>}
               {hasEks && <th className="py-2 text-center font-normal w-[40px]">销卡</th>}
-              <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
               <th className="px-1 py-2 text-left font-normal w-[57px]">方式</th>
               <th className="px-1 py-2 text-left font-normal w-[110px]">老师</th>
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
@@ -703,11 +707,11 @@ export function ActivityBatchTable({
                   key={row.key}
                   className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""}`}
                   onDragOver={(e) => handleDragOver(e, row.key)}
-                  onDrop={() => handleDrop(row.key)}
+                  onDrop={(e) => handleDrop(row.key, e)}
                 >
                   {/* 拖动 */}
                   <td
-                    className="px-1 py-1.5 cursor-grab active:cursor-grabbing text-center"
+                    className="px-1 py-1.5 cursor-grab active:cursor-grabbing text-center align-top"
                     draggable
                     onDragStart={() => handleDragStart(row.key)}
                     onDragEnd={handleDragEnd}
@@ -715,8 +719,22 @@ export function ActivityBatchTable({
                     <GripVertical className="h-3.5 w-3.5 text-[#c9cdd4] mx-auto" />
                   </td>
 
+                  {/* 公益 */}
+                  <td className="px-1 py-1.5 text-center align-top">
+                    <div className="flex items-center justify-center h-7">
+                    {row.record_type === "class" ? (
+                      <input
+                        type="checkbox"
+                        checked={row.is_public_welfare}
+                        onChange={(e) => updateRow(row.key, "is_public_welfare", e.target.checked)}
+                        className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-[#3370ff] checked:border-[#3370ff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                      />
+                    ) : null}
+                    </div>
+                  </td>
+
                   {/* 时间 */}
-                  <td className="px-1 py-1.5">
+                  <td className="px-1 py-1.5 align-top">
                     <div className="flex items-center h-7 rounded-md border-[0.5px] border-[#dee0e3] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
                       <input
                         type="time"
@@ -735,7 +753,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 类型 */}
-                  <td className="px-1 py-1.5">
+                  <td className="px-1 py-1.5 align-top">
                     <SelectDropdown
                       size="sm"
                       value={row.record_type === "ics" ? (row.ics_course_key || resolveIcsCourseKey(row.name) || "ics:疗愈师课程") : row.record_type}
@@ -748,7 +766,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动名称 */}
-                  <td className="px-1 py-1.5">
+                  <td className="px-1 py-1.5 align-top">
                     {row.record_type === "class" ? (
                       <CourseDropdown
                         courses={courses}
@@ -778,25 +796,24 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 案主 */}
-                  {hasOwnerType && <td className="pl-1.5 pr-0 py-1.5 w-[60px]">
+                  {hasOwnerType && <td className="pl-1.5 pr-0 py-1.5 w-[60px] align-top">
                     {(row.record_type === "gcs" || row.record_type === "ers" || row.record_type === "ocr") ? (
                       <CustomerSearchInput
                         customers={customers}
-                        value={row.achiever_name || ""}
+                        value={row.owner_name || ""}
                         showClear={false}
+                        excludeIds={[...row.host_ids, ...row.participant_ids]}
                         rightLabelMap={remainingMap[row.record_type] ? Object.fromEntries(Object.entries(remainingMap[row.record_type]).map(([id, n]) => [id, `余${n}`])) : undefined}
                         warnLabelIds={remainingMap[row.record_type] ? Object.entries(remainingMap[row.record_type]).filter(([, n]) => n <= 0).map(([id]) => id) : undefined}
                         onChange={(v) => {
                           const name = typeof v === "string" ? v : v[0] || ""
                           if (!name) {
-                            if (row.achiever_id) prevAchieverRef.current[row.key] = row.achiever_id
-                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: "", achiever_name: "" } : r))
+                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, owner_id: "", owner_name: "" } : r))
                             scheduleSave(row.key)
                           }
                         }}
                         onSelectItem={(c) => {
-                          delete prevAchieverRef.current[row.key]
-                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: c.id, achiever_name: c.nickname || c.name || "" } : r))
+                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, owner_id: c.id, owner_name: c.nickname || c.name || "" } : r))
                           if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
                             setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
                           }
@@ -804,7 +821,7 @@ export function ActivityBatchTable({
                         }}
                         onBlur={(v) => {
                           if (v && !customers.some(c => c.nickname === v || c.name === v)) {
-                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, achiever_id: "", achiever_name: "" } : r))
+                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, owner_id: "", owner_name: "" } : r))
                             scheduleSave(row.key)
                           }
                         }}
@@ -816,29 +833,30 @@ export function ActivityBatchTable({
                       <div className="flex items-center gap-1 min-w-0">
                         <CustomerSearchInput
                           customers={customers}
-                          value={row.achiever_name || ""}
+                          value={row.owner_name || ""}
                           showClear={false}
+                          excludeIds={[...row.host_ids, ...row.participant_ids]}
                           rightLabelMap={remainingMap.eks ? Object.fromEntries(Object.entries(remainingMap.eks).map(([id, n]) => [id, `余${n}`])) : undefined}
                           warnLabelIds={remainingMap.eks ? Object.entries(remainingMap.eks).filter(([, n]) => n <= 0).map(([id]) => id) : undefined}
                           onChange={(v) => {
                             const name = typeof v === "string" ? v : v[0] || ""
                             if (!name) {
-                              if (row.achiever_id) prevAchieverRef.current[row.key] = row.achiever_id
+                              if (row.owner_id) prevOwnerRef.current[row.key] = row.owner_id
                               setRows(prev => prev.map(r => {
                                 if (r.key !== row.key) return r
                                 const eksDesc = parseEksDescription(r.description)
-                                return { ...r, achiever_id: "", achiever_name: "", description: serializeEksDescription("", "", eksDesc.count) }
+                                return { ...r, owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) }
                               }))
                               scheduleSave(row.key)
                             }
                           }}
                           onSelectItem={(c) => {
-                            delete prevAchieverRef.current[row.key]
+                            delete prevOwnerRef.current[row.key]
                             const eksDesc = parseEksDescription(row.description)
                             const newDesc = serializeEksDescription(c.id, c.nickname || c.name || "", eksDesc.count)
-                            const updated = { ...row, achiever_id: c.id, achiever_name: c.nickname || c.name || "", description: newDesc }
+                            const updated = { ...row, owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc }
                             lastEditedEksRef.current = updated
-                            if (row.record_id) eksEditsRef.current.set(row.record_id, { achiever_id: updated.achiever_id, achiever_name: updated.achiever_name, description: updated.description })
+                            if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: updated.owner_id, owner_name: updated.owner_name, description: updated.description })
                             setRows(prev => prev.map(r => r.key === row.key ? updated : r))
                             if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
                               setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
@@ -850,7 +868,7 @@ export function ActivityBatchTable({
                               setRows(prev => prev.map(r => {
                                 if (r.key !== row.key) return r
                                 const eksDesc = parseEksDescription(r.description)
-                                return { ...r, achiever_id: "", achiever_name: "", description: serializeEksDescription("", "", eksDesc.count) }
+                                return { ...r, owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) }
                               }))
                               scheduleSave(row.key)
                             }
@@ -864,9 +882,9 @@ export function ActivityBatchTable({
                   </td>}
 
                   {/* 销卡 */}
-                  {hasEks && <td className="px-0 py-1.5 text-center">
+                  {hasEks && <td className="px-0 py-1.5 text-center align-top">
                     {row.record_type === "eks" ? (() => {
-                      const remaining = row.achiever_id ? remainingMap.eks?.[row.achiever_id] : undefined
+                      const remaining = row.owner_id ? remainingMap.eks?.[row.owner_id] : undefined
                       return (
                         <input
                           type="number"
@@ -881,7 +899,7 @@ export function ActivityBatchTable({
                                 const eksDesc = parseEksDescription(r.description)
                                 const updated = { ...r, deduction_count: 0, description: serializeEksDescription(eksDesc.id, eksDesc.name, 0) }
                                 lastEditedEksRef.current = updated
-                                if (r.record_id) eksEditsRef.current.set(r.record_id, { achiever_id: r.achiever_id, achiever_name: r.achiever_name, description: updated.description })
+                                if (r.record_id) eksEditsRef.current.set(r.record_id, { owner_id: r.owner_id, owner_name: r.owner_name, description: updated.description })
                                 return updated
                               }))
                             } else {
@@ -891,7 +909,7 @@ export function ActivityBatchTable({
                                 const eksDesc = parseEksDescription(r.description)
                                 const updated = { ...r, deduction_count: count, description: serializeEksDescription(eksDesc.id, eksDesc.name, count) }
                                 lastEditedEksRef.current = updated
-                                if (r.record_id) eksEditsRef.current.set(r.record_id, { achiever_id: r.achiever_id, achiever_name: r.achiever_name, description: updated.description })
+                                if (r.record_id) eksEditsRef.current.set(r.record_id, { owner_id: r.owner_id, owner_name: r.owner_name, description: updated.description })
                                 return updated
                               }))
                             }
@@ -919,20 +937,8 @@ export function ActivityBatchTable({
                     })() : null}
                   </td>}
 
-                  {/* 公益 */}
-                  <td className="px-1 py-1.5 text-center">
-                    {row.record_type === "class" ? (
-                      <input
-                        type="checkbox"
-                        checked={row.is_public_welfare}
-                        onChange={(e) => updateRow(row.key, "is_public_welfare", e.target.checked)}
-                        className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-[#3370ff] checked:border-[#3370ff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
-                      />
-                    ) : null}
-                  </td>
-
                   {/* 活动方式 */}
-                  <td className="px-1 py-1.5">
+                  <td className="px-1 py-1.5 align-top">
                     <SelectDropdown
                       size="sm"
                       value={row.activity_mode || "线下"}
@@ -943,12 +949,13 @@ export function ActivityBatchTable({
                     />
                   </td>
 
-                  {/* 老师/成就君 */}
-                  <td className="px-1 py-1.5">
+                  {/* 老师 */}
+                  <td className="px-1 py-1.5 align-top">
                     <CustomerSearchInput
                       multi
                       customers={row.record_type === "class" ? teachers : customers}
                       value={getHostDisplay(row)}
+                      excludeIds={[row.owner_id, ...row.participant_ids].filter(Boolean)}
                       onChange={(v) => {
                         const names = Array.isArray(v) ? v : v ? [v] : []
                         const pool = row.record_type === "class" ? teachers : customers
@@ -969,7 +976,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动简介 */}
-                  <td className="px-1 py-1.5">
+                  <td className="px-1 py-1.5 align-top">
                     {row.record_type === "eks" ? null : (
                       <Input
                         value={row.description}
@@ -982,20 +989,48 @@ export function ActivityBatchTable({
 
                   {/* 老人 */}
                   <td className="px-1 py-1.5">
-                    <span className="text-[#4e535a] truncate block">
-                      {oldMembers.length > 0 ? oldMembers.join("、") : null}
+                    <span className="text-[#4e535a]">
+                      {oldMembers.map((m, i) => (
+                        <span key={m.id}>
+                          {i > 0 && "、"}
+                          <button
+                            onClick={() => {
+                              const newIds = row.participant_ids.filter(id => id !== m.id)
+                              updateRow(row.key, "participant_ids", newIds)
+                              saveRow({ ...row, participant_ids: newIds })
+                            }}
+                            className="hover:text-[#e02020] cursor-pointer"
+                          >
+                            {m.name}
+                          </button>
+                        </span>
+                      ))}
                     </span>
                   </td>
 
                   {/* 新人 */}
                   <td className="px-1 py-1.5">
-                    <span className="text-[#4e535a] truncate block">
-                      {newMembers.length > 0 ? newMembers.join("、") : null}
+                    <span className="text-[#4e535a]">
+                      {newMembers.map((m, i) => (
+                        <span key={m.id}>
+                          {i > 0 && "、"}
+                          <button
+                            onClick={() => {
+                              const newIds = row.participant_ids.filter(id => id !== m.id)
+                              updateRow(row.key, "participant_ids", newIds)
+                              saveRow({ ...row, participant_ids: newIds })
+                            }}
+                            className="hover:text-[#e02020] cursor-pointer"
+                          >
+                            {m.name}
+                          </button>
+                        </span>
+                      ))}
                     </span>
                   </td>
 
                   {/* 操作 */}
-                  <td className="px-1 py-1.5 text-center sticky right-0 z-10 bg-white relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">
+                  <td className="px-1 py-1.5 text-center sticky right-0 z-10 bg-white relative align-top before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">
                     <button
                       onClick={() => handleDelete(row)}
                       className="text-[#8f959e] hover:text-[#e02020]"

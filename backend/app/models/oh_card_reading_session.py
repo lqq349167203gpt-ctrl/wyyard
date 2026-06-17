@@ -12,8 +12,7 @@ class OhCardReadingSessionBase(BaseModel):
     owner_name: str
     description: str = ""  # 个案详情
     participant_ids: List[str] = []  # 参与者
-    achiever_id: str = ""  # 成就君
-    achiever_name: str = ""
+    teacher_ids: List[str] = []  # 老师
     host_id: str = ""  # 主持人
     host_name: str = ""
     materials: List[dict] = []

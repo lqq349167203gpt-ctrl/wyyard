@@ -52,12 +52,10 @@ export function useErsDialogs({
   const [formEndTime, setFormEndTime] = useState("10:00")
   const [formOwnerId, setFormOwnerId] = useState("")
   const [formOwnerName, setFormOwnerName] = useState("")
-  const [formAchieverId, setFormAchieverId] = useState("")
-  const [formAchieverName, setFormAchieverName] = useState("")
   const [formHostId, setFormHostId] = useState("")
   const [formHostName, setFormHostName] = useState("")
   const [formDescription, setFormDescription] = useState("")
-  const [searchField, setSearchField] = useState<"owner" | "achiever" | "host" | null>(null)
+  const [searchField, setSearchField] = useState<"owner" | "host" | null>(null)
   const [searchKeyword, setSearchKeyword] = useState("")
   const [searchResults, setSearchResults] = useState<EmotionalReleaseCustomerSearchResult[]>([])
   const [, setSearching] = useState(false)
@@ -107,8 +105,6 @@ export function useErsDialogs({
     setFormEndTime(session.end_time || "10:00")
     setFormOwnerId(session.owner_id)
     setFormOwnerName(session.owner_name || "")
-    setFormAchieverId(session.achiever_id || "")
-    setFormAchieverName(session.achiever_name || "")
     setFormHostId(session.host_id || "")
     setFormHostName(session.host_name || "")
     setFormDescription(session.description || "")
@@ -144,9 +140,6 @@ export function useErsDialogs({
       }
       setFormOwnerId(customer.id)
       setFormOwnerName(customer.nickname || customer.name)
-    } else if (searchField === "achiever") {
-      setFormAchieverId(customer.id)
-      setFormAchieverName(customer.nickname || customer.name)
     } else if (searchField === "host") {
       setFormHostId(customer.id)
       setFormHostName(customer.nickname || customer.name)
@@ -168,8 +161,6 @@ export function useErsDialogs({
         owner_id: formOwnerId,
         owner_name: formOwnerName,
         description: formDescription || undefined,
-        achiever_id: formAchieverId || undefined,
-        achiever_name: formAchieverName || undefined,
         host_id: formHostId || undefined,
         host_name: formHostName || undefined,
       }
@@ -398,24 +389,6 @@ export function useErsDialogs({
                   </div>
                 )}
               </div>
-            </div>
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成就君</span>
-              <select
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-[12px] text-[#2b2f36] outline-none"
-                value={formAchieverId}
-                onChange={(e) => {
-                  const id = e.target.value
-                  const c = allCustomers.find(c => c.id === id)
-                  setFormAchieverId(id)
-                  setFormAchieverName(c?.nickname || c?.name || "")
-                }}
-              >
-                <option value="">选择成就君</option>
-                {allCustomers.filter(c => c.positions?.includes("成就君")).sort((a, b) => (a.position_sort_orders?.["成就君"] ?? 9999) - (b.position_sort_orders?.["成就君"] ?? 9999)).map(c => (
-                  <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
-                ))}
-              </select>
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">个案详情</span>

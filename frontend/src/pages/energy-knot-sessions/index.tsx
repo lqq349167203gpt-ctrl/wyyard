@@ -32,8 +32,8 @@ export default function EnergyKnotSessionsPage() {
   const [formDate, setFormDate] = useState(today)
   const [formOwnerId, setFormOwnerId] = useState("")
   const [formOwnerName, setFormOwnerName] = useState("")
-  const [formHostIds, setFormHostIds] = useState<string[]>([])
-  const [formHostNames, setFormHostNames] = useState<string[]>([])
+  const [formTeacherIds, setFormTeacherIds] = useState<string[]>([])
+  const [formTeacherNames, setFormTeacherNames] = useState<string[]>([])
 
   // 客户列表
   const [customerList, setCustomerList] = useState<Customer[]>([])
@@ -87,8 +87,8 @@ export default function EnergyKnotSessionsPage() {
     setFormDate(today)
     setFormOwnerId("")
     setFormOwnerName("")
-    setFormHostIds([])
-    setFormHostNames([])
+    setFormTeacherIds([])
+    setFormTeacherNames([])
     setDialogOpen(true)
   }
 
@@ -97,8 +97,8 @@ export default function EnergyKnotSessionsPage() {
     setFormDate(session.date)
     setFormOwnerId(session.owner_id)
     setFormOwnerName(session.owner_name)
-    setFormHostIds(session.host_ids || [])
-    setFormHostNames(session.host_names || [])
+    setFormTeacherIds(session.teacher_ids || [])
+    setFormTeacherNames((session.teacher_ids || []).map(id => customerList.find(c => c.id === id)?.nickname || id))
     setDialogOpen(true)
   }
 
@@ -110,8 +110,7 @@ export default function EnergyKnotSessionsPage() {
         date: formDate,
         owner_id: formOwnerId,
         owner_name: formOwnerName,
-        host_ids: formHostIds,
-        host_names: formHostNames,
+        teacher_ids: formTeacherIds,
       }
       if (editingSession) {
         await energyKnotSessionApi.update(editingSession.id, data)
@@ -177,8 +176,8 @@ export default function EnergyKnotSessionsPage() {
                   <TableCell className="pl-4 text-[#2b2f36]">{session.date}</TableCell>
                   <TableCell className="text-[#2b2f36] font-medium">{session.owner_name}</TableCell>
                   <TableCell className="text-[#2b2f36]">
-                    {session.host_names.length > 0
-                      ? session.host_names.join("、")
+                    {session.teacher_ids.length > 0
+                      ? session.teacher_ids.map(id => customerList.find(c => c.id === id)?.nickname || id).join("、")
                       : <span className="text-[12px] text-[#4e535a] font-light">-</span>}
                   </TableCell>
                   <TableCell className="text-right pr-4">
@@ -236,26 +235,24 @@ export default function EnergyKnotSessionsPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
               <CustomerSearchInput
                 customers={customerList}
-                value={formHostNames}
+                value={formTeacherNames}
                 onChange={(v) => {
                   const names = Array.isArray(v) ? v : []
-                  // Remove hosts not in the new list
                   const newIds: string[] = []
                   const newNames: string[] = []
                   names.forEach((name: string) => {
                     const c = customerList.find(c => c.nickname === name)
                     if (c) { newIds.push(c.id); newNames.push(c.nickname) }
                   })
-                  setFormHostIds(newIds)
-                  setFormHostNames(newNames)
+                  setFormTeacherIds(newIds)
+                  setFormTeacherNames(newNames)
                 }}
                 onSelectItem={(c) => {
-                  if (!formHostIds.includes(c.id)) {
-                    setFormHostIds([...formHostIds, c.id])
-                    setFormHostNames([...formHostNames, c.nickname])
+                  if (!formTeacherIds.includes(c.id)) {
+                    setFormTeacherIds([...formTeacherIds, c.id])
+                    setFormTeacherNames([...formTeacherNames, c.nickname])
                   }
                 }}
-               
                 multi
                 excludeIds={formOwnerId ? [formOwnerId] : []}
               />

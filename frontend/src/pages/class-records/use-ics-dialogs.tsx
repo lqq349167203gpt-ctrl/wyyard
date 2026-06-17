@@ -115,8 +115,8 @@ export function useIcsDialogs({
     setFormCourseType(session.course_type || "")
     setFormCourseName(session.course_name)
     setFormDescription(session.course_description || "")
-    setFormHostId(session.host_ids?.[0] || "")
-    setFormHostName(session.host_names?.[0] || "")
+    setFormHostId(session.host_id || "")
+    setFormHostName(session.host_name || "")
     setSearchField(null)
     setSearchKeyword("")
     setSearchResults([])
@@ -135,8 +135,8 @@ export function useIcsDialogs({
         course_type: formCourseType,
         course_name: formCourseName,
         course_description: formDescription,
-        host_ids: formHostId ? [formHostId] : [],
-        host_names: formHostName ? [formHostName] : [],
+        host_id: formHostId || "",
+        host_name: formHostName || "",
       }
       if (editingRecord) {
         await internalCourseSessionApi.update(editingRecord.id, data)
@@ -388,7 +388,7 @@ export function useIcsDialogs({
                     <p className="text-[12px] text-[#b0b5bb] text-center py-4">暂无到场人员</p>
                   ) : (
                     dayVisits.map((v) => {
-                      const assigned = membersRecord.participant_ids?.includes(v.id) || (membersRecord.host_names || []).includes(v.nickname)
+                      const assigned = membersRecord.participant_ids?.includes(v.id) || membersRecord.host_id === v.id
                       return (
                         <div
                           key={v.id}
@@ -429,9 +429,9 @@ export function useIcsDialogs({
                 {/* 课程老师 */}
                 <div>
                   <span className="text-[12px] text-[#4e535a] mb-1.5 block">课程老师</span>
-                  {membersRecord.host_names?.length ? (
+                  {membersRecord.host_id ? (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] font-medium">{membersRecord.host_names[0]}</span>
+                      <span className="text-[12px] font-medium">{membersRecord.host_name || getMemberName(membersRecord.host_id)}</span>
                     </div>
                   ) : (
                     <span className="text-[12px] text-muted-foreground">暂无</span>

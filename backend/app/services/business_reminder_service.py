@@ -165,22 +165,22 @@ def _precompute_metrics(customer_ids: set) -> Dict[str, Dict[str, Any]]:
                 activity_counts[cid]["membership"] = activity_counts[cid].get("membership", 0) + 1
 
     for s in emotional_release_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
             if cid and cid in customer_ids:
                 activity_counts[cid]["emotional_release"] = activity_counts[cid].get("emotional_release", 0) + 1
 
     for s in group_case_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
             if cid and cid in customer_ids:
                 activity_counts[cid]["group_case"] = activity_counts[cid].get("group_case", 0) + 1
 
     for s in energy_knot_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id] + s.host_ids):
+        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
             if cid and cid in customer_ids:
                 activity_counts[cid]["energy_knot"] = activity_counts[cid].get("energy_knot", 0) + 1
 
     for s in internal_course_session_service.list_sessions():
-        for cid in (s.participant_ids + s.host_ids):
+        for cid in (s.participant_ids + s.teacher_ids):
             if cid and cid in customer_ids:
                 activity_counts[cid]["internal_course"] = activity_counts[cid].get("internal_course", 0) + 1
 

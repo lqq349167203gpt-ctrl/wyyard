@@ -17,19 +17,20 @@ const ALL_PAGES = [
   { key: "healing-records", label: "客户信息" },
   { key: "activity-records", label: "活动记录" },
   { key: "traffic-records", label: "引流记录" },
-  { key: "class-records-visitors", label: "邀约到场" },
-  { key: "class-records-activities", label: "当日活动" },
-  { key: "class-records-arrival", label: "到场确认" },
+  { key: "consumption-records", label: "消费记录" },
+  { key: "class-records", label: "人员安排" },
   { key: "daily-activities", label: "活动安排" },
   { key: "payment", label: "付费项目" },
   { key: "membership-cards", label: "会员活动" },
   { key: "group-cases", label: "觉醒游戏" },
   { key: "emotional-releases", label: "情绪释放" },
+  { key: "oh-card-readings", label: "OH卡梳理" },
   { key: "energy-knots", label: "能量结" },
   { key: "internal-courses", label: "内部课程" },
   { key: "other-projects", label: "其他项目" },
   { key: "agents", label: "AI 配置" },
   { key: "business-reminders", label: "业务提醒" },
+  { key: "chat-history", label: "沟通记录" },
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
   { key: "member-identities", label: "会员身份" },
@@ -38,23 +39,21 @@ const ALL_PAGES = [
   { key: "change-password", label: "密码修改" },
   { key: "courses", label: "活动配置" },
   { key: "organizations", label: "组织管理" },
-  { key: "spaces", label: "疗愈空间" },
+  { key: "spaces", label: "空间配置" },
   { key: "reminders", label: "提醒配置" },
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务数据", keys: ["business-reminders", "traffic-records", "activity-records"] },
-  { label: "疗愈活动", keys: ["healing-records", "class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
-  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
+  { label: "业务数据", keys: ["business-reminders", "traffic-records", "activity-records", "consumption-records"] },
+  { label: "疗愈活动", keys: ["healing-records", "class-records", "daily-activities"] },
+  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password"] },
-  { label: "系统配置", keys: ["agents", "system-logs", "operation-logs"] },
+  { label: "系统配置", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
 ]
 
 const CUSTOMER_FILTER_PAGES = [
-  "healing-records",
-  "class-records-visitors", "class-records-activities", "class-records-arrival",
-  "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses",
+  "healing-records", "consumption-records",
 ]
 
 export default function PositionManagementPage() {

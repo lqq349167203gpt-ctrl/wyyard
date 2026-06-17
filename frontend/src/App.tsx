@@ -39,7 +39,7 @@ import OtherProjectsPage from "@/pages/other-projects"
 import ChatHistoryPage from "@/pages/chat-history"
 import ConsumptionRecordsPage from "@/pages/consumption-records"
 
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"]
+const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
 
 const PATH_PERMISSIONS: Record<string, string> = {

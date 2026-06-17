@@ -50,6 +50,41 @@ def get_session(session_id: str) -> Optional[EmotionalReleaseSession]:
     return session
 
 
+def _get_chargeable_ids(session) -> set:
+    """需要扣费的人员：参与者 + 老师（不含案主）—— 供 visit 到店扣费使用"""
+    ids = set(session.participant_ids)
+    ids.discard(session.owner_id)
+    return ids
+
+
+def _deduct_for_session(session):
+    """为新创建的活动扣费"""
+    from app.services import membership_card_service
+    chargeable = _get_chargeable_ids(session)
+    activity_key = f"ers:{session.id}"
+    for cid in chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
+
+
+def _restore_for_session(session):
+    """为删除的活动退费"""
+    from app.services import membership_card_service
+    chargeable = _get_chargeable_ids(session)
+    activity_key = f"ers:{session.id}"
+    for cid in chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+
+
+def _sync_deduction(session, old_chargeable, new_chargeable):
+    """同步扣费：为新增人员扣费，为移除人员退费"""
+    from app.services import membership_card_service
+    activity_key = f"ers:{session.id}"
+    for cid in old_chargeable - new_chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+    for cid in new_chargeable - old_chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
+
+
 def create_session(data: EmotionalReleaseSessionCreate) -> EmotionalReleaseSession:
     now = datetime.now(timezone.utc)
     session = EmotionalReleaseSession(
@@ -60,6 +95,7 @@ def create_session(data: EmotionalReleaseSessionCreate) -> EmotionalReleaseSessi
     )
     _sessions[session.id] = session
     _save(session.id)
+    _deduct_for_session(session)
     return session
 
 
@@ -71,6 +107,9 @@ def update_session(session_id: str, data: dict):
     if not session:
         return None, []
 
+    # 获取旧的可扣费人员
+    old_chargeable = _get_chargeable_ids(session)
+
     # 自动过滤不在到场名单中的人员
     if "participant_ids" in data:
         visits = visit_service.list_visits(session.date)
@@ -80,27 +119,27 @@ def update_session(session_id: str, data: dict):
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):
             setattr(session, key, value)
+
+    # 案主不能同时是参与者
+    if session.owner_id:
+        session.participant_ids = [pid for pid in session.participant_ids if pid != session.owner_id]
+
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
     _save(session_id)
+
+    # 同步扣费
+    new_chargeable = _get_chargeable_ids(session)
+    _sync_deduction(session, old_chargeable, new_chargeable)
+
     return session, []
-
-
-def _get_chargeable_ids(session) -> set:
-    """需要扣费的人员：参与者 + 主持人（不含案主、成就君）—— 供 visit 到店扣费使用"""
-    ids = set(session.participant_ids)
-    if session.host_id:
-        ids.add(session.host_id)
-    ids.discard(session.owner_id)
-    if session.achiever_id:
-        ids.discard(session.achiever_id)
-    return ids
 
 
 def delete_session(session_id: str) -> bool:
     session = _sessions.get(session_id)
     if not session:
         return False
+    _restore_for_session(session)
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
     _save(session_id)
@@ -124,10 +163,11 @@ def search_customers(keyword: str) -> list:
 
 
 def get_remaining_count(customer_id: str) -> int:
-    """计算某用户的情绪释放剩余次数（所有已创建的场次均计入已用）"""
+    """计算某用户的情绪释放剩余次数（仅统计案主使用，成就君不限次，参与者走会员卡）"""
     releases = emotional_release_service.list_releases()
     total_purchased = sum(r.purchase_count for r in releases if r.customer_id == customer_id)
-    used = sum(1 for s in _sessions.values() if not s.is_deleted and (s.owner_id == customer_id or getattr(s, "achiever_id", "") == customer_id))
+    # 仅统计案主的使用次数
+    used = sum(1 for s in _sessions.values() if not s.is_deleted and s.owner_id == customer_id)
     from app.services import project_deduction_service
     manual_deductions = project_deduction_service.get_deduction_total(customer_id, "emotional-releases")
     return total_purchased - used - manual_deductions

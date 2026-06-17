@@ -80,6 +80,11 @@ def update_session(session_id: str, data: dict):
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):
             setattr(session, key, value)
+
+    # 案主不能同时是参与者
+    if session.owner_id:
+        session.participant_ids = [pid for pid in session.participant_ids if pid != session.owner_id]
+
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
     _save(session_id)
@@ -87,13 +92,9 @@ def update_session(session_id: str, data: dict):
 
 
 def _get_chargeable_ids(session) -> set:
-    """需要扣费的人员：参与者 + 主持人（不含案主、成就君）—— 供 visit 到店扣费使用"""
+    """需要扣费的人员：参与者 + 老师（不含案主）—— 供 visit 到店扣费使用"""
     ids = set(session.participant_ids)
-    if session.host_id:
-        ids.add(session.host_id)
     ids.discard(session.owner_id)
-    if session.achiever_id:
-        ids.discard(session.achiever_id)
     return ids
 
 
@@ -124,10 +125,11 @@ def search_customers(keyword: str) -> list:
 
 
 def get_remaining_count(customer_id: str) -> int:
-    """计算某用户的OH卡梳理剩余次数（所有已创建的场次均计入已用）"""
+    """计算某用户的OH卡梳理剩余次数（仅统计案主使用，成就君不限次，参与者走会员卡）"""
     readings = oh_card_reading_service.list_readings()
     total_purchased = sum(r.purchase_count for r in readings if r.customer_id == customer_id)
-    used = sum(1 for s in _sessions.values() if not s.is_deleted and (s.owner_id == customer_id or getattr(s, "achiever_id", "") == customer_id))
+    # 仅统计案主的使用次数
+    used = sum(1 for s in _sessions.values() if not s.is_deleted and s.owner_id == customer_id)
     from app.services import project_deduction_service
     manual_deductions = project_deduction_service.get_deduction_total(customer_id, "oh-card-readings")
     return total_purchased - used - manual_deductions

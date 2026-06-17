@@ -18,7 +18,7 @@ def _fill_ers_names(sessions: list) -> list:
         return c.nickname if c else ""
 
     for s in sessions:
-        for field in ("owner_name", "host_name", "achiever_name"):
+        for field in ("owner_name", "host_name"):
             id_field = field.replace("_name", "_id")
             actual = get_name(getattr(s, id_field, ""))
             if getattr(s, field, "") != actual:

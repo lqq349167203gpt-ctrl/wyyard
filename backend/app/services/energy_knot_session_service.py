@@ -51,6 +51,41 @@ def get_session(session_id: str) -> Optional[EnergyKnotSession]:
     return session
 
 
+def _get_chargeable_ids(session) -> set:
+    """需要扣费的人员：参与者 + 老师（不含案主）"""
+    ids = set(session.participant_ids)
+    ids.discard(session.owner_id)
+    return ids
+
+
+def _deduct_for_session(session):
+    """为新创建的活动扣费"""
+    from app.services import membership_card_service
+    chargeable = _get_chargeable_ids(session)
+    activity_key = f"eks:{session.id}"
+    for cid in chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
+
+
+def _restore_for_session(session):
+    """为删除的活动退费"""
+    from app.services import membership_card_service
+    chargeable = _get_chargeable_ids(session)
+    activity_key = f"eks:{session.id}"
+    for cid in chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+
+
+def _sync_deduction(session, old_chargeable, new_chargeable):
+    """同步扣费：为新增人员扣费，为移除人员退费"""
+    from app.services import membership_card_service
+    activity_key = f"eks:{session.id}"
+    for cid in old_chargeable - new_chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+    for cid in new_chargeable - old_chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
+
+
 def create_session(data: EnergyKnotSessionCreate) -> EnergyKnotSession:
     now = datetime.now(timezone.utc)
     session = EnergyKnotSession(
@@ -61,6 +96,7 @@ def create_session(data: EnergyKnotSessionCreate) -> EnergyKnotSession:
     )
     _sessions[session.id] = session
     _save(session.id)
+    _deduct_for_session(session)
     return session
 
 
@@ -71,18 +107,31 @@ def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
     if not session:
         return None
 
+    # 获取旧的可扣费人员
+    old_chargeable = _get_chargeable_ids(session)
+
     # 自动过滤不在到场名单中的人员
-    if "host_ids" in data:
+    if "teacher_ids" in data:
         visits = visit_service.list_visits(session.date)
         visit_ids = {v.customer_id for v in visits}
-        data["host_ids"] = [hid for hid in data["host_ids"] if hid in visit_ids]
+        data["teacher_ids"] = [tid for tid in data["teacher_ids"] if tid in visit_ids]
 
     for key, value in data.items():
         if hasattr(session, key) and key not in ("id", "created_at"):
             setattr(session, key, value)
+
+    # 案主不能同时是参与者
+    if session.owner_id:
+        session.participant_ids = [pid for pid in session.participant_ids if pid != session.owner_id]
+
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
     _save(session_id)
+
+    # 同步扣费
+    new_chargeable = _get_chargeable_ids(session)
+    _sync_deduction(session, old_chargeable, new_chargeable)
+
     return session
 
 
@@ -90,6 +139,7 @@ def delete_session(session_id: str) -> bool:
     session = _sessions.get(session_id)
     if not session:
         return False
+    _restore_for_session(session)
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
     _save(session_id)

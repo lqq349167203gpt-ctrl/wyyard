@@ -33,13 +33,14 @@ interface DetailViewProps {
   onExternalDateChange?: (date: string) => void
   hideDateBar?: boolean
   onCustomerClick?: (customerId: string) => void
+  onActivityClick?: (customerId: string) => void
   onDataLoaded?: (visits: VisitRecord[]) => void
   spaceId?: string
   onRequireSpaces?: () => void
   groups?: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -71,6 +72,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [savingCount, setSavingCount] = useState(0)
   const [errorMessage, setErrorMessage] = useState("")
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [tableRefreshKey, setTableRefreshKey] = useState(0)
 
   const [editVisit, setEditVisit] = useState<VisitRecord | null>(null)
   const [editDate, setEditDate] = useState("")
@@ -82,6 +84,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [ageRange, setAgeRange] = useState("")
   const [creatingCustomer, setCreatingCustomer] = useState(false)
   const [customerFormError, setCustomerFormError] = useState("")
+
+  // 组件挂载时刷新表格数据
+  useEffect(() => {
+    setTableRefreshKey(k => k + 1)
+  }, [])
 
   // 如果 localStorage 中没有 owner，从账号列表获取当前用户的归属人
   useEffect(() => {
@@ -208,6 +215,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
     if (!selectedCustomer) {
       if (searchKeyword.trim()) setShowConfirmNewUser(true)
+      return
+    }
+    // 检查是否已存在该客户的到场记录
+    if (visits.some(v => v.customer_id === selectedCustomer.id)) {
+      setErrorMessage("该客户今日已到场")
       return
     }
     setSaving(true)
@@ -377,7 +389,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     <div className="w-full space-y-3">
       {/* 日期条 */}
       {!hideDateBar && (
-      <div className="flex items-center gap-1 bg-white rounded-lg px-3 py-2">
+      <div className="flex items-center gap-1 px-3 py-2">
         <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
           <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
         </button>
@@ -431,9 +443,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
             <Download className="mr-1 h-3 w-3" /> 导出
           </Button>
         </div>
-        <BatchInputTable date={selectedDate} customers={customerList} spaceId={spaceId} onSaved={() => {
+        <BatchInputTable date={selectedDate} customers={customerList} spaceId={spaceId} refreshKey={tableRefreshKey} onSaved={() => {
           refreshCounts()
-        }} onSavedCountChange={setTableSavedCount} onSavingCountChange={setSavingCount} onCustomerClick={onCustomerClick} onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }} />
+        }} onSavedCountChange={setTableSavedCount} onSavingCountChange={setSavingCount} onCustomerClick={onCustomerClick} onActivityClick={onActivityClick} onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }} />
       </div>
 
       {/* 删除确认 */}

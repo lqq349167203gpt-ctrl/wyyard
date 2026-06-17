@@ -42,8 +42,8 @@ export function useEksDialogs({
   const [formEndTime, setFormEndTime] = useState("10:00")
   const [formOwnerIds, setFormOwnerIds] = useState<string[]>([])
   const [formOwnerNames, setFormOwnerNames] = useState<string[]>([])
-  const [formHostIds, setFormHostIds] = useState<string[]>([])
-  const [formHostNames, setFormHostNames] = useState<string[]>([])
+  const [formTeacherIds, setFormTeacherIds] = useState<string[]>([])
+  const [formTeacherNames, setFormTeacherNames] = useState<string[]>([])
   const [formOwnerDescriptions, setFormOwnerDescriptions] = useState<{id: string; name: string; description: string; count: number}[]>([])
   const [searchField, setSearchField] = useState<"owner" | "host" | null>(null)
   const [searchKeyword, setSearchKeyword] = useState("")
@@ -75,8 +75,9 @@ export function useEksDialogs({
     const ids = session.owner_id ? [session.owner_id] : []
     setFormOwnerIds(ids.concat(new Array(Math.max(0, names.length - ids.length)).fill("")))
     setFormOwnerNames(names)
-    setFormHostIds(session.host_ids || [])
-    setFormHostNames(session.host_names || [])
+    const teacherIds = session.teacher_ids || []
+    setFormTeacherIds(teacherIds)
+    setFormTeacherNames(teacherIds.map(id => { const c = allCustomers.find(c => c.id === id); return c?.nickname || c?.name || "" }))
     // 解析每个案主的详情，补全 id/name
     try {
       const parsed = JSON.parse(session.description || "[]")
@@ -115,7 +116,7 @@ export function useEksDialogs({
       setSearching(true)
       try {
         const results = await energyKnotSessionApi.searchCustomers(keyword)
-        setSearchResults(results.filter(r => !formOwnerIds.includes(r.id) && !formHostIds.includes(r.id)))
+        setSearchResults(results.filter(r => !formOwnerIds.includes(r.id) && !formTeacherIds.includes(r.id)))
         setRemainingMap(prev => { const next = { ...prev }; results.forEach(r => { next[r.id] = r.remaining }); return next })
         setShowDropdown(true)
       } catch { setSearchResults([]) }
@@ -137,9 +138,9 @@ export function useEksDialogs({
         setFormOwnerDescriptions([...formOwnerDescriptions, { id: customer.id, name: customer.nickname || customer.name, description: "", count: 1 }])
       }
     } else if (searchField === "host") {
-      if (!formHostIds.includes(customer.id)) {
-        setFormHostIds([...formHostIds, customer.id])
-        setFormHostNames([...formHostNames, customer.nickname || customer.name])
+      if (!formTeacherIds.includes(customer.id)) {
+        setFormTeacherIds([...formTeacherIds, customer.id])
+        setFormTeacherNames([...formTeacherNames, customer.nickname || customer.name])
       }
     }
     setSearchKeyword("")
@@ -155,8 +156,8 @@ export function useEksDialogs({
   }
 
   const handleRemoveHost = (index: number) => {
-    setFormHostIds(formHostIds.filter((_, i) => i !== index))
-    setFormHostNames(formHostNames.filter((_, i) => i !== index))
+    setFormTeacherIds(formTeacherIds.filter((_, i) => i !== index))
+    setFormTeacherNames(formTeacherNames.filter((_, i) => i !== index))
   }
 
   const handleSave = async () => {
@@ -190,8 +191,7 @@ export function useEksDialogs({
         end_time: formEndTime || null,
         owner_id: formOwnerIds[0] || "",
         owner_name: formOwnerNames.join("、"),
-        host_ids: formHostIds,
-        host_names: formHostNames,
+        teacher_ids: formTeacherIds,
         description: formOwnerDescriptions.length > 0 ? JSON.stringify(formOwnerDescriptions) : undefined,
       }
       if (editingRecord) {
@@ -243,9 +243,9 @@ export function useEksDialogs({
   }
 
   const handleDrop = async (session: EnergyKnotSession, customer: { customer_id: string }) => {
-    const ids = session.host_ids || []
+    const ids = session.teacher_ids || []
     if (ids.includes(customer.customer_id)) return
-    await energyKnotSessionApi.update(session.id, { host_ids: [...ids, customer.customer_id] } as any)
+    await energyKnotSessionApi.update(session.id, { teacher_ids: [...ids, customer.customer_id] } as any)
     onReload()
   }
 
@@ -363,10 +363,10 @@ export function useEksDialogs({
                   value=""
                   onChange={(e) => {
                     const id = e.target.value
-                    if (!id || formHostIds.includes(id)) return
+                    if (!id || formTeacherIds.includes(id)) return
                     const c = allCustomers.find(c => c.id === id)
-                    setFormHostIds([...formHostIds, id])
-                    setFormHostNames([...formHostNames, c?.nickname || c?.name || ""])
+                    setFormTeacherIds([...formTeacherIds, id])
+                    setFormTeacherNames([...formTeacherNames, c?.nickname || c?.name || ""])
                   }}
                 >
                   <option value="">选择课程老师</option>
@@ -374,9 +374,9 @@ export function useEksDialogs({
                     <option key={c.id} value={c.id}>{c.nickname || c.name}</option>
                   ))}
                 </select>
-                {formHostNames.length > 0 && (
+                {formTeacherNames.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {formHostNames.map((name, i) => (
+                    {formTeacherNames.map((name, i) => (
                       <Badge key={i} variant="secondary" className="text-[12px] font-normal gap-1 pr-1">
                         {name}
                         <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0]" onClick={() => handleRemoveHost(i)}>

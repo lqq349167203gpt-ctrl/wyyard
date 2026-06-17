@@ -328,58 +328,109 @@ export default function DetailView({
           {activeTab === "purchase" && (() => {
             const today = new Date().toLocaleDateString("sv-SE")
             const allItems = detail!.purchase_summary || []
-            const sortedItems = [...allItems].sort((a, b) => {
+            const memberItems = allItems.filter(s => s.type === "会员活动")
+            const otherItems = allItems.filter(s => s.type !== "会员活动")
+
+            // 会员卡：未过期在前，已过期在后
+            const memberSorted = [...memberItems].sort((a, b) => {
+              const aExpired = a.expiry_date && a.expiry_date < today
+              const bExpired = b.expiry_date && b.expiry_date < today
+              return (aExpired ? 1 : 0) - (bExpired ? 1 : 0)
+            })
+            const memberTotal = memberItems.reduce((sum, s) => {
+              const expired = s.expiry_date && s.expiry_date < today
+              if (expired) return sum
+              if (typeof s.remaining === "number") return sum + s.remaining
+              return sum
+            }, 0)
+            const memberHasUnlimited = memberItems.some(s => {
+              const expired = s.expiry_date && s.expiry_date < today
+              return !expired && s.remaining === "不限"
+            })
+
+            // 其他类型排序
+            const sortedOthers = [...otherItems].sort((a, b) => {
               const aExpired = a.expiry_date && a.expiry_date < today
               const bExpired = b.expiry_date && b.expiry_date < today
               const aNoCount = typeof a.remaining === "number" && a.remaining === 0
               const bNoCount = typeof b.remaining === "number" && b.remaining === 0
-              const aBad = aExpired || aNoCount ? 1 : 0
-              const bBad = bExpired || bNoCount ? 1 : 0
-              return aBad - bBad
+              return ((aExpired || aNoCount) ? 1 : 0) - ((bExpired || bNoCount) ? 1 : 0)
             })
+
             const pageSize = 5
-            const totalPages = Math.ceil(sortedItems.length / pageSize)
-            const paginatedItems = sortedItems.slice((purchasePage - 1) * pageSize, purchasePage * pageSize)
-            return sortedItems.length === 0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
+            const totalPages = Math.ceil(sortedOthers.length / pageSize)
+            const paginatedOthers = sortedOthers.slice((purchasePage - 1) * pageSize, purchasePage * pageSize)
+
+            return (
               <div>
-                <div className="divide-y divide-[#f0f0f0] border-b border-[#f0f0f0]">
-                  {paginatedItems.map((s, i) => {
-                    const expired = s.expiry_date && s.expiry_date < today
-                    const noCount = typeof s.remaining === "number" && s.remaining === 0
-                    return (
-                    <div key={i} className="flex items-center gap-2 py-3">
-                      <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">{s.type}</span>
-                      <span className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
-                        {s.type === "会员活动" ? (
-                          <span className="inline-flex items-baseline gap-2">
-                            <span>{s.name}</span>
-                            <span>{s.remaining === "不限" ? "不限次" : (typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`)}</span>
-                            <span>{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
-                          </span>
-                        ) : s.type === "内部课程" ? (
-                          <span className="inline-flex items-baseline gap-2">
-                            <span>{s.name}</span>
-                            <span>{s.effective_date || "-"}/{s.expiry_date || "-"}</span>
-                          </span>
-                        ) : s.type === "其他项目" ? (
-                          <span className="inline-flex items-baseline gap-2">
-                            <span>{s.name}</span>
-                            <span>{s.activity_mode || "线下"}</span>
-                            <span>{s.remaining === "不限" ? "不限次" : (typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`)}</span>
-                            <span>{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
-                          </span>
-                        ) : (
-                          <span>{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
-                        )}
+                {/* 会员活动 — 始终显示 */}
+                <div className="flex items-start gap-2 py-3 border-b border-[#f0f0f0]">
+                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right pt-0.5">会员活动</span>
+                  <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {memberHasUnlimited ? "不限次" : `剩余${memberTotal}次`}
                       </span>
-                      {expired && <span className="text-[12px] text-[#c4506a] bg-[#fef0f0] px-1.5 py-0.5 rounded shrink-0">已过期</span>}
-                      {noCount && !expired && <span className="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded shrink-0">无次数</span>}
                     </div>
-                  )})}
+                    {memberSorted.length > 0 && (
+                      <div className="mt-1 text-[11px] text-[#8f959e] flex flex-wrap items-center gap-y-0.5">
+                        {memberSorted.map((s, i) => {
+                          const expired = s.expiry_date && s.expiry_date < today
+                          return (
+                            <span key={i} className="inline-flex items-center">
+                              {i > 0 && <span className="mx-1.5">|</span>}
+                              <span className={expired ? "text-[#c4506a]" : ""}>
+                                {s.name}{" "}
+                                {s.remaining === "不限" ? "不限次" : `${Math.max(0, s.remaining as number)}次`}{" "}
+                                {s.effective_date && `${s.effective_date}~${s.expiry_date || "不限"}`}
+                                {expired && "（已过期）"}
+                              </span>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* 其他类型 */}
+                {sortedOthers.length > 0 ? (
+                  <div className="divide-y divide-[#f0f0f0]">
+                    {paginatedOthers.map((s, i) => {
+                      const expired = s.expiry_date && s.expiry_date < today
+                      const noCount = typeof s.remaining === "number" && s.remaining === 0
+                      return (
+                        <div key={i} className="flex items-center gap-2 py-3">
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">{s.type}</span>
+                          <span className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
+                            {s.type === "内部课程" ? (
+                              <span className="inline-flex items-baseline gap-2">
+                                <span>{s.name}</span>
+                                <span>{s.effective_date || "-"}/{s.expiry_date || "-"}</span>
+                              </span>
+                            ) : s.type === "其他项目" ? (
+                              <span className="inline-flex items-baseline gap-2">
+                                <span>{s.name}</span>
+                                <span>{s.activity_mode || "线下"}</span>
+                                <span>{s.remaining === "不限" ? "不限次" : (typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`)}</span>
+                                <span>{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
+                              </span>
+                            ) : (
+                              <span>{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
+                            )}
+                          </span>
+                          {expired && <span className="text-[12px] text-[#c4506a] bg-[#fef0f0] px-1.5 py-0.5 rounded shrink-0">已过期</span>}
+                          {noCount && !expired && <span className="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded shrink-0">无次数</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : memberItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
+                ) : null}
                 {totalPages > 1 && (
                   <div className="px-4 py-2">
-                    <PaginationBar currentPage={purchasePage} totalPages={totalPages} totalItems={sortedItems.length} startIndex={(purchasePage-1)*pageSize+1} endIndex={Math.min(purchasePage*pageSize, sortedItems.length)} onPageChange={setPurchasePage} />
+                    <PaginationBar currentPage={purchasePage} totalPages={totalPages} totalItems={sortedOthers.length} startIndex={(purchasePage-1)*pageSize+1} endIndex={Math.min(purchasePage*pageSize, sortedOthers.length)} onPageChange={setPurchasePage} />
                   </div>
                 )}
               </div>

@@ -54,7 +54,7 @@ const configItems = [
   { title: "提醒配置", icon: Bell, path: "/config/reminders", permission: "reminders" },
 ]
 
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"]
+const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"]
 
 const accountItems = [
   { title: "账号管理", icon: GraduationCap, path: "/positions/management", permission: "position-management" },
@@ -166,7 +166,7 @@ function PaymentMenuGroup({
   const hasAccess = isSuperAdmin || PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
   if (!hasAccess) return null
 
-  const showPayment = isSuperAdmin || permissions.includes("membership-cards") || permissions.includes("group-cases") || permissions.includes("emotional-releases") || permissions.includes("energy-knots") || permissions.includes("internal-courses")
+  const showPayment = isSuperAdmin || ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"].some(p => permissions.includes(p))
   const showOtherProjects = isSuperAdmin || permissions.includes("other-projects")
 
   return (

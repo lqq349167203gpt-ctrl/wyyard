@@ -50,6 +50,7 @@ def get_session(session_id: str) -> Optional[InternalCourseSession]:
     return session
 
 
+
 def create_session(data: InternalCourseSessionCreate) -> InternalCourseSession:
     now = datetime.now(timezone.utc)
     session = InternalCourseSession(
@@ -82,6 +83,7 @@ def update_session(session_id: str, data: dict) -> Optional[InternalCourseSessio
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
     _save(session_id)
+
     return session
 
 

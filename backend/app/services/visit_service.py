@@ -48,57 +48,52 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
+        oh_card_reading_session_service,
     )
     activities = []
 
     # 1. 沙龙活动 (class_records)
     for cr in class_record_service.list_records(date):
-        if customer_id in cr.participant_ids:
+        # 获取课程老师名称
+        from app.services.customer_service import get_customer
+        teacher_names = []
+        for tid in cr.teacher_ids:
+            tc = get_customer(tid)
+            if tc:
+                teacher_names.append(tc.nickname or tc.name)
+        owner_name = "、".join(teacher_names)
+
+        if customer_id in cr.teacher_ids:
+            activities.append(ActivityInfo(name=cr.course_name, role="课程老师", type="沙龙", owner_name=owner_name, is_welfare=cr.is_public_welfare))
+        elif customer_id in cr.participant_ids:
             role = ""
-            if customer_id in cr.teacher_ids:
-                role = "课程老师"
-            else:
-                for g in cr.groups:
-                    if g.leader_id == customer_id:
-                        role = "组长"
-                        break
-                    elif g.deputy_id == customer_id:
-                        role = "副组长"
-                        break
-                    elif customer_id in g.member_ids:
-                        role = "组员"
-                        break
-            # 获取课程老师名称
-            from app.services.customer_service import get_customer
-            teacher_names = []
-            for tid in cr.teacher_ids:
-                tc = get_customer(tid)
-                if tc:
-                    teacher_names.append(tc.nickname or tc.name)
-            owner_name = "、".join(teacher_names)
+            for g in cr.groups:
+                if g.leader_id == customer_id:
+                    role = "组长"
+                    break
+                elif g.deputy_id == customer_id:
+                    role = "副组长"
+                    break
+                elif customer_id in g.member_ids:
+                    role = "组员"
+                    break
             activities.append(ActivityInfo(name=cr.course_name, role=role, type="沙龙", owner_name=owner_name, is_welfare=cr.is_public_welfare))
 
     # 2. 觉醒游戏 (group_case_sessions)
     for s in group_case_session_service.list_sessions(date):
-        extra = f"成就君：{s.achiever_name}" if (customer_id == s.owner_id and s.achiever_name) else ""
         if customer_id == s.owner_id:
-            activities.append(ActivityInfo(name="觉醒游戏", role="案主", type="觉醒", owner_name=s.owner_name or "", extra_badge=extra))
+            activities.append(ActivityInfo(name="觉醒游戏", role="案主", type="觉醒", owner_name=s.owner_name or ""))
         elif customer_id == s.host_id:
             activities.append(ActivityInfo(name="觉醒游戏", role="主持人", type="觉醒", owner_name=s.owner_name or ""))
-        elif customer_id == s.achiever_id:
-            activities.append(ActivityInfo(name="觉醒游戏", role="成就君", type="觉醒", owner_name=s.owner_name or ""))
         elif customer_id in s.participant_ids:
             activities.append(ActivityInfo(name="觉醒游戏", role="参与者", type="觉醒", owner_name=s.owner_name or ""))
 
     # 3. 情绪释放 (emotional_release_sessions)
     for s in emotional_release_session_service.list_sessions(date):
-        extra = f"成就君：{s.achiever_name}" if (customer_id == s.owner_id and s.achiever_name) else ""
         if customer_id == s.owner_id:
-            activities.append(ActivityInfo(name="情绪释放", role="案主", type="情绪", owner_name=s.owner_name or "", extra_badge=extra))
+            activities.append(ActivityInfo(name="情绪释放", role="案主", type="情绪", owner_name=s.owner_name or ""))
         elif customer_id == s.host_id:
             activities.append(ActivityInfo(name="情绪释放", role="主持人", type="情绪", owner_name=s.owner_name or ""))
-        elif customer_id == s.achiever_id:
-            activities.append(ActivityInfo(name="情绪释放", role="成就君", type="情绪", owner_name=s.owner_name or ""))
         elif customer_id in s.participant_ids:
             activities.append(ActivityInfo(name="情绪释放", role="参与者", type="情绪", owner_name=s.owner_name or ""))
 
@@ -106,18 +101,28 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
     for s in energy_knot_session_service.list_sessions(date):
         if customer_id == s.owner_id:
             activities.append(ActivityInfo(name="能量结", role="案主", type="能量结", owner_name=s.owner_name or ""))
-        elif customer_id in s.host_ids:
-            activities.append(ActivityInfo(name="能量结", role="课程老师", type="能量结", owner_name=s.owner_name or ""))
+        elif customer_id in s.teacher_ids:
+            activities.append(ActivityInfo(name="能量结", role="老师", type="能量结", owner_name=s.owner_name or ""))
         elif customer_id in s.participant_ids:
             activities.append(ActivityInfo(name="能量结", role="参与者", type="能量结", owner_name=s.owner_name or ""))
 
     # 5. 内部课程 (internal_course_sessions)
     for s in internal_course_session_service.list_sessions(date):
-        host_names = "、".join(s.host_names) if s.host_names else ""
-        if customer_id in s.host_ids:
-            activities.append(ActivityInfo(name=s.course_name, role="课程老师", type="内部课", owner_name=host_names))
+        from app.services import customer_service
+        teacher_names = "、".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
+        if customer_id in s.teacher_ids:
+            activities.append(ActivityInfo(name=s.course_name, role="老师", type="内部课", owner_name=teacher_names))
         elif customer_id in s.participant_ids:
-            activities.append(ActivityInfo(name=s.course_name, role="参与者", type="内部课", owner_name=host_names))
+            activities.append(ActivityInfo(name=s.course_name, role="参与者", type="内部课", owner_name=teacher_names))
+
+    # 6. OH卡梳理 (oh_card_reading_sessions)
+    for s in oh_card_reading_session_service.list_sessions(date):
+        if customer_id == s.owner_id:
+            activities.append(ActivityInfo(name="OH卡梳理", role="案主", type="OH卡", owner_name=s.owner_name or ""))
+        elif customer_id in s.teacher_ids:
+            activities.append(ActivityInfo(name="OH卡梳理", role="老师", type="OH卡", owner_name=s.owner_name or ""))
+        elif customer_id in s.participant_ids:
+            activities.append(ActivityInfo(name="OH卡梳理", role="参与者", type="OH卡", owner_name=s.owner_name or ""))
 
     return activities
 
@@ -154,19 +159,19 @@ def _build_customer_activity_counts() -> dict[str, int]:
             if cid:
                 counts[cid] += 1
     for s in group_case_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
             if cid:
                 counts[cid] += 1
     for s in emotional_release_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
             if cid:
                 counts[cid] += 1
     for s in energy_knot_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id] + s.host_ids):
+        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
             if cid:
                 counts[cid] += 1
     for s in internal_course_session_service.list_sessions():
-        for cid in (s.participant_ids + s.host_ids):
+        for cid in (s.participant_ids + s.teacher_ids):
             if cid:
                 counts[cid] += 1
     result = dict(counts)
@@ -198,25 +203,25 @@ def _count_customer_activities_by_type(customer_id: str, activity_type: str) -> 
     if activity_type == "emotional_release":
         count = 0
         for s in emotional_release_session_service.list_sessions():
-            if customer_id in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+            if customer_id in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
                 count += 1
         return count
     if activity_type == "group_case":
         count = 0
         for s in group_case_session_service.list_sessions():
-            if customer_id in (s.participant_ids + [s.owner_id, s.host_id, s.achiever_id]):
+            if customer_id in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
                 count += 1
         return count
     if activity_type == "energy_knot":
         count = 0
         for s in energy_knot_session_service.list_sessions():
-            if customer_id in (s.participant_ids + [s.owner_id] + s.host_ids):
+            if customer_id in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
                 count += 1
         return count
     if activity_type == "internal_course":
         count = 0
         for s in internal_course_session_service.list_sessions():
-            if customer_id in (s.participant_ids + s.host_ids):
+            if customer_id in (s.participant_ids + s.teacher_ids):
                 count += 1
         return count
     return 0
@@ -279,6 +284,47 @@ def get_date_counts(customer_ids: list[str] | None = None, start_date: str | Non
     return counts
 
 
+def _count_untracked_chargeable_activities(customer_id: str) -> int:
+    """统计某客户需要扣费但尚未扣费的活动数"""
+    from app.services import membership_card_service
+    from app.services import (
+        class_record_service,
+        group_case_session_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+    )
+
+    deducted = set(membership_card_service._deductions.get(customer_id, []))
+    count = 0
+
+    # 觉醒游戏
+    for s in group_case_session_service.list_sessions():
+        if not s.is_deleted and customer_id in group_case_session_service._get_chargeable_ids(s):
+            if f"gcs:{s.id}" not in deducted:
+                count += 1
+
+    # 情绪释放
+    for s in emotional_release_session_service.list_sessions():
+        if not s.is_deleted and customer_id in emotional_release_session_service._get_chargeable_ids(s):
+            if f"ers:{s.id}" not in deducted:
+                count += 1
+
+    # 能量结
+    for s in energy_knot_session_service.list_sessions():
+        if not s.is_deleted and customer_id in energy_knot_session_service._get_chargeable_ids(s):
+            if f"eks:{s.id}" not in deducted:
+                count += 1
+
+    # 沙龙（排除公益）
+    for cr in class_record_service.list_records():
+        if not cr.is_deleted and not cr.is_public_welfare:
+            if customer_id in class_record_service._get_group_member_ids(cr):
+                if f"class:{cr.id}" not in deducted:
+                    count += 1
+
+    return count
+
+
 def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, space_id: Optional[str] = None) -> List[VisitRecord]:
     from app.services import membership_card_service
 
@@ -300,19 +346,28 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         r.activity_count = all_activity_counts.get(r.customer_id, 0)
         r.welfare_count = all_welfare_counts.get(r.customer_id, 0)
         # 会员活动剩余次数
-        cards = [c for c in membership_card_service.list_cards() if c.customer_id == r.customer_id]
-        if cards:
-            cards.sort(key=lambda c: c.created_at, reverse=True)
-            card = cards[0]
-            # 已过期的会员卡，剩余次数视为0
-            today = datetime.now().strftime("%Y-%m-%d")
-            if card.expiry_date and card.expiry_date < today:
-                r.remaining_count = 0
+        today = datetime.now().strftime("%Y-%m-%d")
+        all_cards = [c for c in membership_card_service.list_cards() if c.customer_id == r.customer_id and not c.is_deleted]
+        # 筛选有效期内的卡
+        active_cards = [c for c in all_cards if not c.expiry_date or c.expiry_date >= today]
+        # 统计尚未扣费的活动数
+        untracked = _count_untracked_chargeable_activities(r.customer_id)
+        if active_cards:
+            # 有有效卡：优先显示不限次，否则累加剩余次数
+            unlimited = [c for c in active_cards if c.remaining_count is None]
+            if unlimited:
+                r.remaining_count = -999  # 不限次
             else:
-                r.remaining_count = card.remaining_count if card.remaining_count is not None else -1
+                total = sum(c.remaining_count or 0 for c in active_cards)
+                r.remaining_count = total - untracked
         else:
-            r.remaining_count = 0
-        # 当日参与的活动（跨5个模块）
+            # 无有效卡：检查欠费（含未扣费的活动）
+            debt = membership_card_service.get_debt(r.customer_id)
+            total_debt = debt + untracked
+            if total_debt > 0:
+                r.remaining_count = -total_debt  # -1 表示欠费1次，-2 表示欠费2次
+            else:
+                r.remaining_count = 0
         # 当日参与的活动（跨5个模块），按 (customer_id, date) 缓存
         cache_key = (r.customer_id, r.visit_date)
         if cache_key not in customer_activities_cache:
@@ -384,7 +439,6 @@ def _deduct_for_arrival(visit):
         group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
-        internal_course_session_service,
     )
     cid = visit.customer_id
     date = visit.visit_date
@@ -406,17 +460,10 @@ def _deduct_for_arrival(visit):
     # 能量结
     for s in energy_knot_session_service.list_sessions():
         if s.date == date and not s.is_deleted:
-            chargeable = set(s.participant_ids) | set(s.host_ids)
+            chargeable = set(s.participant_ids)
             chargeable.discard(s.owner_id)
             if cid in chargeable:
                 membership_card_service.deduct_for_activity(cid, f"eks:{s.id}")
-
-    # 内部课程
-    for s in internal_course_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = set(s.participant_ids) | set(s.host_ids)
-            if cid in chargeable:
-                membership_card_service.deduct_for_activity(cid, f"ics:{s.id}")
 
     # 沙龙类型
     for cr in class_record_service.list_records():
@@ -472,14 +519,14 @@ def _cleanup_activity_records(customer_id: str, date: str):
     except Exception:
         logger.exception("清理沙龙记录失败 customer=%s date=%s", customer_id, date)
 
-    # 觉醒游戏：host_id, achiever_id, participant_ids
+    # 觉醒游戏：host_id, teacher_ids, participant_ids
     try:
         for s in group_case_session_service.list_sessions(date=date):
             changed = False
             if s.host_id == customer_id:
                 s.host_id = ""; s.host_name = ""; changed = True
-            if s.achiever_id == customer_id:
-                s.achiever_id = ""; s.achiever_name = ""; changed = True
+            if customer_id in s.teacher_ids:
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
@@ -488,14 +535,14 @@ def _cleanup_activity_records(customer_id: str, date: str):
     except Exception:
         logger.exception("清理觉醒游戏记录失败 customer=%s date=%s", customer_id, date)
 
-    # 情绪释放：host_id, achiever_id, participant_ids
+    # 情绪释放：host_id, teacher_ids, participant_ids
     try:
         for s in emotional_release_session_service.list_sessions(date=date):
             changed = False
             if s.host_id == customer_id:
                 s.host_id = ""; s.host_name = ""; changed = True
-            if s.achiever_id == customer_id:
-                s.achiever_id = ""; s.achiever_name = ""; changed = True
+            if customer_id in s.teacher_ids:
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
@@ -504,13 +551,12 @@ def _cleanup_activity_records(customer_id: str, date: str):
     except Exception:
         logger.exception("清理情绪释放记录失败 customer=%s date=%s", customer_id, date)
 
-    # 能量结：host_ids, participant_ids
+    # 能量结：teacher_ids, participant_ids
     try:
         for s in energy_knot_session_service.list_sessions(date=date):
             changed = False
-            if customer_id in s.host_ids:
-                s.host_ids, s.host_names = _remove_from_parallel_lists(s.host_ids, s.host_names, customer_id)
-                changed = True
+            if customer_id in s.teacher_ids:
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
@@ -519,13 +565,12 @@ def _cleanup_activity_records(customer_id: str, date: str):
     except Exception:
         logger.exception("清理能量结记录失败 customer=%s date=%s", customer_id, date)
 
-    # 内部课程：host_ids, participant_ids
+    # 内部课程：teacher_ids, participant_ids
     try:
         for s in internal_course_session_service.list_sessions(date=date):
             changed = False
-            if customer_id in s.host_ids:
-                s.host_ids, s.host_names = _remove_from_parallel_lists(s.host_ids, s.host_names, customer_id)
-                changed = True
+            if customer_id in s.teacher_ids:
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
@@ -534,14 +579,14 @@ def _cleanup_activity_records(customer_id: str, date: str):
     except Exception:
         logger.exception("清理内部课程记录失败 customer=%s date=%s", customer_id, date)
 
-    # OH卡梳理：host_id, achiever_id, participant_ids
+    # OH卡梳理：host_id, teacher_ids, participant_ids
     try:
         for s in oh_card_reading_session_service.list_sessions(date=date):
             changed = False
             if s.host_id == customer_id:
                 s.host_id = ""; s.host_name = ""; changed = True
-            if s.achiever_id == customer_id:
-                s.achiever_id = ""; s.achiever_name = ""; changed = True
+            if customer_id in s.teacher_ids:
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True

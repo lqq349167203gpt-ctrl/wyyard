@@ -19,6 +19,7 @@ def list_projects(page: int | None = Query(None, ge=1), page_size: int | None = 
     if closer_name:
         kw = closer_name.lower()
         items = [i for i in items if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
+    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     if page is not None:
         return paginate(items, page, page_size or 10)
     return items

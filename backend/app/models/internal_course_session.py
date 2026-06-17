@@ -10,8 +10,9 @@ class InternalCourseSessionBase(BaseModel):
     course_type: str = ""  # 课程类型
     course_name: str  # 课程名称
     course_description: str = ""
-    host_ids: List[str] = []  # 课程老师（多选）
-    host_names: List[str] = []
+    teacher_ids: List[str] = []  # 老师（多选）
+    host_id: str = ""  # 主持人
+    host_name: str = ""
     participant_ids: List[str] = []  # 参与者
     materials: List[dict] = []
     activity_mode: str = "线下"

@@ -216,7 +216,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": gc_name,
                 "role": "案主",
-                "host": s.host_name or s.achiever_name or "",
+                "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -226,7 +226,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": gc_name,
                 "role": "参与者",
-                "host": s.host_name or s.achiever_name or "",
+                "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -240,7 +240,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": er_name,
                 "role": "案主",
-                "host": s.host_name or s.achiever_name or "",
+                "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -250,7 +250,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": er_name,
                 "role": "参与者",
-                "host": s.host_name or s.achiever_name or "",
+                "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -265,7 +265,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": ek_name,
                 "role": "案主",
-                "host": ", ".join(s.host_names) if s.host_names else "",
+                "host": ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]),
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -275,7 +275,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": ek_name,
                 "role": "参与者",
-                "host": ", ".join(s.host_names) if s.host_names else "",
+                "host": ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]),
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -288,7 +288,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": s.course_name,
                 "role": "参与者",
-                "host": ", ".join(s.host_names) if s.host_names else "",
+                "host": ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]),
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -302,7 +302,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": ocr_name,
                 "role": "案主",
-                "host": s.host_name or s.achiever_name or "",
+                "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -312,7 +312,7 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": ocr_name,
                 "role": "参与者",
-                "host": s.host_name or s.achiever_name or "",
+                "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
             })

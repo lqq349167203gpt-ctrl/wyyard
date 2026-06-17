@@ -9,9 +9,12 @@ from app.services import customer_service
 
 FILENAME = "membership_cards.json"
 DEDUCTIONS_FILE = "membership_deductions.json"
+DEBTS_FILE = "membership_debts.json"
 _cards: Dict[str, MembershipCard] = {}
 # 追踪已扣费记录：{customer_id: [activity_key, ...]}
 _deductions: Dict[str, list] = {}
+# 追踪欠费记录：{customer_id: debt_count}
+_debts: Dict[str, int] = {}
 
 
 def _migrate_closers(item: MembershipCard) -> MembershipCard:
@@ -21,12 +24,13 @@ def _migrate_closers(item: MembershipCard) -> MembershipCard:
 
 
 def _load():
-    global _cards, _deductions
+    global _cards, _deductions, _debts
     data = load_data(FILENAME)
     _cards = {}
     for k, v in data.items():
         _cards[k] = _migrate_closers(MembershipCard(**v))
     _deductions = load_data(DEDUCTIONS_FILE) or {}
+    _debts = load_data(DEBTS_FILE) or {}
 
 
 def _save(card_id: str = ""):
@@ -41,6 +45,15 @@ def _save(card_id: str = ""):
 
 def _save_deductions():
     save_data(DEDUCTIONS_FILE, _deductions)
+
+
+def _save_debts():
+    save_data(DEBTS_FILE, _debts)
+
+
+def get_debt(customer_id: str) -> int:
+    """获取用户的欠费次数"""
+    return _debts.get(customer_id, 0)
 
 
 _load()
@@ -107,7 +120,20 @@ def create_card(data: MembershipCardCreate) -> MembershipCard:
     )
     _cards[card.id] = card
     _save(card.id)
-    _refresh_member_type(card.customer_id)
+    # 购买新卡后，扣除之前的欠费
+    customer_id = card.customer_id
+    debt = _debts.get(customer_id, 0)
+    if debt > 0 and card.remaining_count is not None:
+        deduct_amount = min(debt, card.remaining_count)
+        card.remaining_count -= deduct_amount
+        _debts[customer_id] = debt - deduct_amount
+        if _debts[customer_id] <= 0:
+            del _debts[customer_id]
+        card.updated_at = datetime.now(timezone.utc)
+        _cards[card.id] = card
+        _save(card.id)
+        _save_debts()
+    _refresh_member_type(customer_id)
     return card
 
 
@@ -144,20 +170,39 @@ def delete_card(card_id: str) -> bool:
 
 
 def _deduct_one(customer_id: str) -> bool:
-    """内部：为指定用户扣除一次会员活动剩余次数（允许负数）"""
-    candidates = [
+    """内部：为指定用户扣除一次会员活动剩余次数"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    # 筛选有效期内的卡（未过期、未删除）
+    active_cards = [
         c for c in _cards.values()
         if c.customer_id == customer_id
-        and c.remaining_count is not None
+        and not c.is_deleted
+        and (not c.expiry_date or c.expiry_date >= today)
     ]
-    if not candidates:
-        return False
-    # 优先扣有剩余的卡，都没有则扣最新的卡（允许负数）
-    positive = [c for c in candidates if c.remaining_count > 0]
-    pool = positive if positive else candidates
-    pool.sort(key=lambda c: c.created_at, reverse=True)
-    card = pool[0]
-    card.remaining_count -= 1
+    if not active_cards:
+        # 无有效卡，记录欠费
+        _debts[customer_id] = _debts.get(customer_id, 0) + 1
+        _save_debts()
+        return True
+    # 优先扣不限次的卡（remaining_count 为 None）
+    unlimited = [c for c in active_cards if c.remaining_count is None]
+    if unlimited:
+        unlimited.sort(key=lambda c: c.created_at, reverse=True)
+        return True  # 不限次卡无需扣减
+    # 其次扣有剩余次数的卡
+    positive = [c for c in active_cards if c.remaining_count is not None and c.remaining_count > 0]
+    if positive:
+        positive.sort(key=lambda c: c.remaining_count, reverse=True)  # 优先扣剩余多的
+        card = positive[0]
+        card.remaining_count -= 1
+        card.updated_at = datetime.now(timezone.utc)
+        _cards[card.id] = card
+        _save(card.id)
+        return True
+    # 都没有剩余，扣最新的卡（允许负数）
+    active_cards.sort(key=lambda c: c.created_at, reverse=True)
+    card = active_cards[0]
+    card.remaining_count = (card.remaining_count or 0) - 1
     card.updated_at = datetime.now(timezone.utc)
     _cards[card.id] = card
     _save(card.id)

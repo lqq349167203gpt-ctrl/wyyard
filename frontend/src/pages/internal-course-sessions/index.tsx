@@ -42,8 +42,8 @@ export default function InternalCourseSessionsPage() {
   const [formCourseType, setFormCourseType] = useState("")
   const [formCourseName, setFormCourseName] = useState("")
   const [formDescription, setFormDescription] = useState("")
-  const [formHostIds, setFormHostIds] = useState<string[]>([])
-  const [formHostNames, setFormHostNames] = useState<string[]>([])
+  const [formTeacherIds, setFormTeacherIds] = useState<string[]>([])
+  const [formTeacherNames, setFormTeacherNames] = useState<string[]>([])
 
   // 资料弹窗
   const [materialsDialogOpen, setMaterialsDialogOpen] = useState(false)
@@ -137,8 +137,8 @@ export default function InternalCourseSessionsPage() {
     setFormCourseType("")
     setFormCourseName("")
     setFormDescription("")
-    setFormHostIds([])
-    setFormHostNames([])
+    setFormTeacherIds([])
+    setFormTeacherNames([])
     setDialogOpen(true)
   }
 
@@ -148,8 +148,8 @@ export default function InternalCourseSessionsPage() {
     setFormCourseType(session.course_type || "")
     setFormCourseName(session.course_name)
     setFormDescription(session.course_description || "")
-    setFormHostIds(session.host_ids || [])
-    setFormHostNames(session.host_names || [])
+    setFormTeacherIds(session.teacher_ids || [])
+    setFormTeacherNames((session.teacher_ids || []).map(id => allCustomers.find(c => c.id === id)?.nickname || id))
     setDialogOpen(true)
   }
 
@@ -162,8 +162,7 @@ export default function InternalCourseSessionsPage() {
         course_type: formCourseType,
         course_name: formCourseName,
         course_description: formDescription,
-        host_ids: formHostIds,
-        host_names: formHostNames,
+        teacher_ids: formTeacherIds,
       }
       if (editingSession) {
         await internalCourseSessionApi.update(editingSession.id, data)
@@ -240,8 +239,8 @@ export default function InternalCourseSessionsPage() {
                       <TableCell className="text-[#2b2f36]">{session.course_type || <span className="text-[12px] text-[#4e535a] font-light">-</span>}</TableCell>
                       <TableCell className="text-[#2b2f36] font-medium">{session.course_name}</TableCell>
                       <TableCell className="text-[#2b2f36]">
-                        {session.host_names.length > 0
-                          ? session.host_names.join("、")
+                        {session.teacher_ids.length > 0
+                          ? session.teacher_ids.map(id => allCustomers.find(c => c.id === id)?.nickname || id).join("、")
                           : <span className="text-[12px] text-[#4e535a] font-light">-</span>}
                       </TableCell>
                       <TableCell>
@@ -306,9 +305,9 @@ export default function InternalCourseSessionsPage() {
             <div className="px-4 py-3 border-b border-[#eee]">
               <span className="text-[12px] text-[#4e535a] font-light">课程老师</span>
               <div className="flex flex-wrap gap-1 mt-1.5">
-                {selectedSession.host_names.length > 0 ? (
-                  selectedSession.host_names.map((name, i) => (
-                    <Badge key={i} variant="secondary" className="text-[11px] font-normal">{name}</Badge>
+                {selectedSession.teacher_ids.length > 0 ? (
+                  selectedSession.teacher_ids.map((id) => (
+                    <Badge key={id} variant="secondary" className="text-[11px] font-normal">{allCustomers.find(c => c.id === id)?.nickname || id}</Badge>
                   ))
                 ) : (
                   <span className="text-[12px] text-[#8f959e]">未分配</span>
@@ -414,7 +413,7 @@ export default function InternalCourseSessionsPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
               <CustomerSearchInput
                 customers={allCustomers}
-                value={formHostNames}
+                value={formTeacherNames}
                 onChange={(v) => {
                   const names = Array.isArray(v) ? v : []
                   const newIds: string[] = []
@@ -423,16 +422,15 @@ export default function InternalCourseSessionsPage() {
                     const c = allCustomers.find(c => c.nickname === name)
                     if (c) { newIds.push(c.id); newNames.push(c.nickname) }
                   })
-                  setFormHostIds(newIds)
-                  setFormHostNames(newNames)
+                  setFormTeacherIds(newIds)
+                  setFormTeacherNames(newNames)
                 }}
                 onSelectItem={(c) => {
-                  if (!formHostIds.includes(c.id)) {
-                    setFormHostIds([...formHostIds, c.id])
-                    setFormHostNames([...formHostNames, c.nickname])
+                  if (!formTeacherIds.includes(c.id)) {
+                    setFormTeacherIds([...formTeacherIds, c.id])
+                    setFormTeacherNames([...formTeacherNames, c.nickname])
                   }
                 }}
-               
                 multi
               />
             </div>

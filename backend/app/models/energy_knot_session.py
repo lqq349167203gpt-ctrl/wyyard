@@ -12,8 +12,9 @@ class EnergyKnotSessionBase(BaseModel):
     name: str = ""  # 活动名称
     description: Optional[str] = None  # 个案详情（JSON 格式）
     participant_ids: List[str] = []  # 参与者
-    host_ids: List[str] = []  # 课程老师（多选）
-    host_names: List[str] = []
+    teacher_ids: List[str] = []  # 老师（多选）
+    host_id: str = ""  # 主持人
+    host_name: str = ""
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""

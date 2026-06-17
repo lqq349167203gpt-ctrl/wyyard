@@ -21,9 +21,7 @@ def _fill_eks_names(sessions: list) -> list:
         actual_owner = get_name(getattr(s, "owner_id", ""))
         if getattr(s, "owner_name", "") != actual_owner:
             setattr(s, "owner_name", actual_owner)
-        actual_hosts = [get_name(hid) for hid in (getattr(s, "host_ids", []) or [])]
-        if getattr(s, "host_names", []) != actual_hosts:
-            setattr(s, "host_names", actual_hosts)
+        # teacher_ids 的名称由前端解析，无需后端填充
     return sessions
 
 
