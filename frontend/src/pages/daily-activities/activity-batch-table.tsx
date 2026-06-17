@@ -96,6 +96,7 @@ const TEACHER_POSITION_MAP: Record<string, string> = {
   ocr: "成就君",
   ers: "成就君",
   eks: "能量结老师",
+  ics: "课程老师",
 }
 
 const ACTIVITY_MODE_OPTIONS = [
