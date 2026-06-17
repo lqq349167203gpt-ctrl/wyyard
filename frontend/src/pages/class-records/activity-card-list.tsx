@@ -140,7 +140,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <div className="flex-1 min-w-0">
                                   <div className="text-[12px] text-[#4e535a] leading-relaxed">
                                 {(() => {
-                                  const allIds = new Set((record.participant_ids || []).filter((id: string) => id) as string[])
+                                  const allIds = new Set((record.participant_ids || []).filter((id: string) => id && !(record.teacher_ids || []).includes(id)) as string[])
                                   const getRoles = (id: string): string[] => {
                                     const roles: string[] = []
                                     for (const g of dailyGroups) {
@@ -296,7 +296,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
-                                const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id))
+                                const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id && !(s.teacher_ids || []).includes(id)))
                                 const getRoles = (id: string): string[] => {
                                   const roles: string[] = []
                                   if (id === s.host_id) roles.push("主持人")
@@ -360,7 +360,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             <div className="bg-gray-50 rounded p-[1px] flex-1">
                               <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
                                 {(() => {
-                                  const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id))
+                                  const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id && !(s.teacher_ids || []).includes(id)))
                                   const getRoles = (id: string): string[] => {
                                     const roles: string[] = []
                                     if (id === s.host_id) roles.push("主持人")
@@ -453,7 +453,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
-                                const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id))
+                                const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && !(s.teacher_ids || []).includes(id)))
                                 const getRoles = (id: string): string[] => {
                                   const roles: string[] = []
                                   if (id === s.host_id) roles.push("主持人")
@@ -515,7 +515,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             <div className="bg-gray-50 rounded p-[1px] flex-1">
                               <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
                                 {(() => {
-                                  const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id))
+                                  const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && !(s.teacher_ids || []).includes(id)))
                                   const getRoles = (id: string): string[] => {
                                     const roles: string[] = []
                                     if (id === s.host_id) roles.push("主持人")
@@ -832,7 +832,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                                 <div className="flex-1 min-w-0">
                               <div className="text-[12px] text-[#4e535a] leading-relaxed">
                               {(() => {
-                                const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id))
+                                const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id && !(s.teacher_ids || []).includes(id)))
                                 const getRoles = (id: string): string[] => {
                                   const roles: string[] = []
                                   if (id === s.host_id) roles.push("主持人")
@@ -896,7 +896,7 @@ const ActivityCardList = memo((props: ActivityCardListProps) => {
                             <div className="bg-gray-50 rounded p-[1px] flex-1">
                               <div className="text-[12px] text-[#4e535a] bg-white rounded px-2 py-1.5 h-full">
                                 {(() => {
-                                  const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id))
+                                  const allIds = new Set([s.host_id, ...(s.participant_ids || [])].filter((id: string) => id && id !== s.owner_id && id !== s.achiever_id && !(s.teacher_ids || []).includes(id)))
                                   const getRoles = (id: string): string[] => {
                                     const roles: string[] = []
                                     if (id === s.host_id) roles.push("主持人")

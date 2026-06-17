@@ -462,7 +462,7 @@ export function useIcsDialogs({
                   </div>
                   {(membersRecord.participant_ids || []).length > 0 && (
                     <div className="flex flex-wrap gap-1 ml-[42px]">
-                      {membersRecord.participant_ids.map((id) => (
+                      {(membersRecord.participant_ids || []).filter(id => !(membersRecord.teacher_ids || []).includes(id)).map((id) => (
                         <Badge key={id} variant="secondary" className="text-[12px] font-normal gap-1 pr-1">
                           {getMemberName(id)}
                           <button className="h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-[#e0e0e0]" onClick={() => handleRemoveParticipant(id)}>

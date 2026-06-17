@@ -599,7 +599,7 @@ export function useOcrDialogs({
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {(membersRecord.participant_ids || []).map((id) => (
+                        {(membersRecord.participant_ids || []).filter(id => !(membersRecord.teacher_ids || []).includes(id)).map((id) => (
                           <Badge key={id} variant="secondary" className="text-[12px] font-normal gap-1">
                             {getMemberName(id)}
                             <button className="ml-0.5 hover:text-destructive" onClick={() => handleRemoveParticipant(id)}>
