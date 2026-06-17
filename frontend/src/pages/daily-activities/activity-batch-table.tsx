@@ -334,7 +334,7 @@ export function ActivityBatchTable({
 
       if (row.pendingCreate) {
         // 新建记录
-        const createData: any = { date, ...common, participant_ids: row.participant_ids }
+        const createData: any = { date, ...common, participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)) }
 
         if (type === "class") {
           const course = courses.find(c => c.id === row.course_id)
@@ -404,7 +404,7 @@ export function ActivityBatchTable({
             owner_id: row.owner_id || row.raw.owner_id,
             owner_name: row.owner_name || row.raw.owner_name,
             teacher_ids: row.host_ids,
-            participant_ids: row.participant_ids,
+            participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)),
             description: row.description,
           })
         } else if (type === "ers") {
@@ -425,7 +425,7 @@ export function ActivityBatchTable({
             name: row.name || "",
             teacher_ids: row.host_ids,
             description: row.description,
-            participant_ids: row.participant_ids,
+            participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)),
           })
         } else if (type === "ics") {
           await internalCourseSessionApi.update(id, {
@@ -444,7 +444,7 @@ export function ActivityBatchTable({
             owner_name: row.owner_name || row.raw.owner_name,
             teacher_ids: row.host_ids,
             description: row.description,
-            participant_ids: row.participant_ids,
+            participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)),
           })
         }
       }
