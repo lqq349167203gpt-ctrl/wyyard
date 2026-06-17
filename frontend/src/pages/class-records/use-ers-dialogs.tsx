@@ -295,7 +295,7 @@ export function useErsDialogs({
       setMemberHostSearching(true)
       try {
         const results = await emotionalReleaseSessionApi.searchCustomers(keyword)
-        setMemberHostSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && !(membersRecord?.participant_ids || []).includes(r.id)))
+        setMemberHostSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && !(membersRecord?.participant_ids || []).includes(r.id) && (r.positions || []).includes("成就君")))
         setMemberHostShowDropdown(true)
       } catch { setMemberHostSearchResults([]) }
       finally { setMemberHostSearching(false) }

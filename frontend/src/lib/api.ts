@@ -745,6 +745,7 @@ export interface GroupCaseCustomerSearchResult {
   name: string
   member_type: string
   remaining: number
+  positions?: string[]
 }
 
 export const groupCaseSessionApi = {
@@ -963,6 +964,7 @@ export interface EmotionalReleaseCustomerSearchResult {
   name: string
   member_type: string
   remaining: number
+  positions?: string[]
 }
 
 export const emotionalReleaseSessionApi = {

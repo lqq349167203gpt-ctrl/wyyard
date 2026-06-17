@@ -89,6 +89,15 @@ function getTypeSelectValue(type: ActivityType, courseName: string): string {
   return type
 }
 
+// 每种活动类型对应的老师身份
+const TEACHER_POSITION_MAP: Record<string, string> = {
+  class: "课程老师",
+  gcs: "成就君",
+  ocr: "成就君",
+  ers: "成就君",
+  eks: "能量结老师",
+}
+
 const ACTIVITY_MODE_OPTIONS = [
   { value: "线下", label: "线下" },
   { value: "线上", label: "线上" },
@@ -953,14 +962,13 @@ export function ActivityBatchTable({
                   <td className="px-1 py-1.5 align-top">
                     <CustomerSearchInput
                       multi
-                      customers={row.record_type === "class" ? teachers : customers}
+                      customers={customers}
                       value={getHostDisplay(row)}
                       excludeIds={[row.owner_id, ...row.participant_ids].filter(Boolean)}
                       onChange={(v) => {
                         const names = Array.isArray(v) ? v : v ? [v] : []
-                        const pool = row.record_type === "class" ? teachers : customers
                         const ids = names.map(n => {
-                          const c = pool.find(c => c.nickname === n || c.name === n)
+                          const c = customers.find(c => c.nickname === n || c.name === n)
                           return c?.id || ""
                         }).filter(Boolean)
                         setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_ids: ids, host_names: names } : r))
@@ -969,7 +977,7 @@ export function ActivityBatchTable({
                         }
                         scheduleSave(row.key)
                       }}
-                      positionFilter={row.record_type === "class" ? "课程老师" : undefined}
+                      positionFilter={TEACHER_POSITION_MAP[row.record_type]}
                       filterSelected
                       className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
                     />

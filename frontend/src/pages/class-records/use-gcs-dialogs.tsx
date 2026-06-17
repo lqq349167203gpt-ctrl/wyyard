@@ -284,7 +284,7 @@ export function useGcsDialogs({
     memberHostSearchTimeoutRef.current = window.setTimeout(async () => {
       try {
         const results = await groupCaseSessionApi.searchCustomers(keyword)
-        setMemberHostSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && !(membersRecord?.participant_ids || []).includes(r.id) && !(membersRecord?.teacher_ids || []).includes(r.id)))
+        setMemberHostSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && !(membersRecord?.participant_ids || []).includes(r.id) && !(membersRecord?.teacher_ids || []).includes(r.id) && (r.positions || []).includes("成就君")))
         setMemberHostShowDropdown(true)
       } catch { setMemberHostSearchResults([]) }
     }, 300)

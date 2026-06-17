@@ -158,6 +158,7 @@ def search_customers(keyword: str) -> list:
                 "name": c.name,
                 "member_type": c.member_type,
                 "remaining": get_remaining_count(c.id),
+                "positions": [p.value if hasattr(p, 'value') else p for p in (c.positions or [])],
             })
     return results
 
