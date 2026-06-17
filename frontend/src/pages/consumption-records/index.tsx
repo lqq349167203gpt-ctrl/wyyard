@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react"
-import { Search, X } from "lucide-react"
+import { X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -13,13 +13,13 @@ export default function ConsumptionRecordsPage() {
   const [activeTab, setActiveTab] = useState<"payment" | "deduction">("payment")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
-  const filtersRef = useRef({ dateFrom, dateTo })
+  const dateFromRef = useRef("")
+  const dateToRef = useRef("")
   const tabRef = useRef(activeTab)
 
   const fetchPayments = useCallback(async (page: number, pageSize: number) => {
-    const f = filtersRef.current
     return consumptionRecordsApi.listPayments(
-      { date_from: f.dateFrom || undefined, date_to: f.dateTo || undefined },
+      { date_from: dateFromRef.current || undefined, date_to: dateToRef.current || undefined },
       page, pageSize,
     )
   }, [])
@@ -27,9 +27,8 @@ export default function ConsumptionRecordsPage() {
   const payments = useServerPagination<ConsumptionPaymentRecord>(fetchPayments, { pageSize: PAGE_SIZE })
 
   const fetchDeductions = useCallback(async (page: number, pageSize: number) => {
-    const f = filtersRef.current
     return consumptionRecordsApi.listDeductions(
-      { date_from: f.dateFrom || undefined, date_to: f.dateTo || undefined },
+      { date_from: dateFromRef.current || undefined, date_to: dateToRef.current || undefined },
       page, pageSize,
     )
   }, [])
@@ -39,22 +38,23 @@ export default function ConsumptionRecordsPage() {
   const switchTab = (newTab: "payment" | "deduction") => {
     setActiveTab(newTab)
     tabRef.current = newTab
-    filtersRef.current = { dateFrom, dateTo }
     if (newTab === "payment") payments.goToPage(1)
     else deductions.goToPage(1)
   }
 
-  const handleSearch = () => {
-    filtersRef.current = { dateFrom, dateTo }
-    if (activeTab === "payment") payments.goToPage(1)
+  const handleDateChange = (field: "from" | "to", value: string) => {
+    if (field === "from") { dateFromRef.current = value; setDateFrom(value) }
+    else { dateToRef.current = value; setDateTo(value) }
+    if (tabRef.current === "payment") payments.goToPage(1)
     else deductions.goToPage(1)
   }
 
   const handleClear = () => {
+    dateFromRef.current = ""
+    dateToRef.current = ""
     setDateFrom("")
     setDateTo("")
-    filtersRef.current = { dateFrom: "", dateTo: "" }
-    if (activeTab === "payment") payments.goToPage(1)
+    if (tabRef.current === "payment") payments.goToPage(1)
     else deductions.goToPage(1)
   }
 
@@ -92,24 +92,17 @@ export default function ConsumptionRecordsPage() {
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => handleDateChange("from", e.target.value)}
             className={`h-full px-2 text-[12px] border-none outline-none bg-transparent ${!dateFrom ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
           <span className="text-[12px] text-[#8f959e] px-1">~</span>
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => handleDateChange("to", e.target.value)}
             className={`h-full px-2 text-[12px] border-none outline-none bg-transparent ${!dateTo ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
-        <button
-          onClick={handleSearch}
-          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
-        >
-          <Search className="h-3.5 w-3.5" />
-          查询
-        </button>
         <button
           onClick={handleClear}
           className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
@@ -151,7 +144,7 @@ function PaymentTable({ records, loading }: { records: ConsumptionPaymentRecord[
     <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className="pl-4">录入日期</TableHead>
+          <TableHead className="pl-4">成交日期</TableHead>
           <TableHead>用户</TableHead>
           <TableHead>类型</TableHead>
           <TableHead>名称</TableHead>
@@ -165,7 +158,7 @@ function PaymentTable({ records, loading }: { records: ConsumptionPaymentRecord[
       <TableBody>
         {records.map((r, i) => (
           <TableRow key={i}>
-            <TableCell className="pl-4 text-[#2b2f36]">{r.date}</TableCell>
+            <TableCell className="pl-4 text-[#8f959e]">{r.date || "-"}</TableCell>
             <TableCell className="text-[#2b2f36]">{r.nickname}</TableCell>
             <TableCell className="text-[#2b2f36]">{r.type}</TableCell>
             <TableCell className="text-[#2b2f36]">{r.name}</TableCell>
@@ -203,7 +196,7 @@ function DeductionTable({ records, loading }: { records: DeductionRecord[]; load
       <TableBody>
         {records.map((r, i) => (
           <TableRow key={i}>
-            <TableCell className="pl-4 text-[#2b2f36]">{r.date}</TableCell>
+            <TableCell className="pl-4 text-[#8f959e]">{r.date || "-"}</TableCell>
             <TableCell className="text-[#2b2f36]">{r.nickname}</TableCell>
             <TableCell className="text-[#2b2f36]">{r.type}</TableCell>
             <TableCell className="text-[#2b2f36]">{r.name}</TableCell>

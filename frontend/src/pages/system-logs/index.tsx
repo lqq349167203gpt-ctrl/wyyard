@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react"
-import { Search, X } from "lucide-react"
+import { X } from "lucide-react"
 import { systemLogApi } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import type { SystemLog } from "@/lib/api"
@@ -53,8 +53,13 @@ export default function SystemLogsPage() {
     goToPage, startIndex, endIndex, loading,
   } = useServerPagination<SystemLog>(fetchLogs, { pageSize: PAGE_SIZE })
 
-  const handleSearch = () => {
-    filtersRef.current = { operatorFilter, methodFilter, dateFrom, dateTo }
+  const handleFilterChange = (field: string, value: string) => {
+    switch (field) {
+      case "operator": setOperatorFilter(value); filtersRef.current.operatorFilter = value; break
+      case "method": setMethodFilter(value); filtersRef.current.methodFilter = value; break
+      case "from": setDateFrom(value); filtersRef.current.dateFrom = value; break
+      case "to": setDateTo(value); filtersRef.current.dateTo = value; break
+    }
     goToPage(1)
   }
 
@@ -131,7 +136,7 @@ export default function SystemLogsPage() {
           <input
             type="text"
             value={operatorFilter}
-            onChange={(e) => setOperatorFilter(e.target.value)}
+            onChange={(e) => handleFilterChange("operator", e.target.value)}
             placeholder="输入用户名"
             className="h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] placeholder:text-[#c0c4cc]"
           />
@@ -142,7 +147,7 @@ export default function SystemLogsPage() {
             value={methodFilter}
             options={[{value: "", label: "全部"}, {value: "POST", label: "新增"}, {value: "PUT", label: "更新"}, {value: "DELETE", label: "删除"}]}
             placeholder="全部"
-            onChange={(v) => setMethodFilter(v)}
+            onChange={(v) => handleFilterChange("method", v)}
             className="w-28"
           />
         </div>
@@ -151,7 +156,7 @@ export default function SystemLogsPage() {
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => handleFilterChange("from", e.target.value)}
             className={`h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] ${!dateFrom ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
@@ -160,17 +165,10 @@ export default function SystemLogsPage() {
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => handleFilterChange("to", e.target.value)}
             className={`h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] ${!dateTo ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
-        <button
-          onClick={handleSearch}
-          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
-        >
-          <Search className="h-3.5 w-3.5" />
-          查询
-        </button>
         <button
           onClick={handleClear}
           className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"

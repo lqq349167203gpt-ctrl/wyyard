@@ -18,6 +18,7 @@ class OtherProjectBase(BaseModel):
     closer_name: Optional[str] = None  # 成交人昵称（旧字段，兼容）
     closers: List[dict] = []  # 多成交人 [{"id": "xxx", "name": "张三", "amount": 100.0}]
     organization_id: Optional[str] = None
+    deal_date: Optional[str] = None
 
 
 class OtherProjectCreate(OtherProjectBase):

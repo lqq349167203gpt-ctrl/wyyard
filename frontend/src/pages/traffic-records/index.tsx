@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from "react"
-import { TrendingUp, Search, X } from "lucide-react"
+import { TrendingUp, X } from "lucide-react"
 import { SelectDropdown } from "@/components/select-dropdown"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -42,11 +42,6 @@ export default function TrafficRecordsPage() {
   const [filterSource, setFilterSource] = useState("")
   const [filterStartDate, setFilterStartDate] = useState("")
   const [filterEndDate, setFilterEndDate] = useState("")
-  // 已应用的筛选
-  const [appliedReferrer, setAppliedReferrer] = useState("")
-  const [appliedSource, setAppliedSource] = useState("")
-  const [appliedStartDate, setAppliedStartDate] = useState("")
-  const [appliedEndDate, setAppliedEndDate] = useState("")
 
   useEffect(() => {
     let cancelled = false
@@ -72,38 +67,27 @@ export default function TrafficRecordsPage() {
     return () => { cancelled = true }
   }, [])
 
-  const handleSearch = () => {
-    setAppliedReferrer(filterReferrer)
-    setAppliedSource(filterSource)
-    setAppliedStartDate(filterStartDate)
-    setAppliedEndDate(filterEndDate)
-  }
-
   const handleClear = () => {
     setFilterReferrer("")
     setFilterSource("")
     setFilterStartDate("")
     setFilterEndDate("")
-    setAppliedReferrer("")
-    setAppliedSource("")
-    setAppliedStartDate("")
-    setAppliedEndDate("")
   }
 
   const customers = useMemo(() => allCustomers.filter((c) => {
-    if (appliedReferrer && c.referrer !== appliedReferrer) return false
-    if (appliedSource === "__none__" && c.traffic_source) return false
-    if (appliedSource && appliedSource !== "__none__" && c.traffic_source !== appliedSource) return false
-    if (appliedStartDate) {
+    if (filterReferrer && c.referrer !== filterReferrer) return false
+    if (filterSource === "__none__" && c.traffic_source) return false
+    if (filterSource && filterSource !== "__none__" && c.traffic_source !== filterSource) return false
+    if (filterStartDate) {
       const d = (c.created_at || "").split("T")[0]
-      if (d < appliedStartDate) return false
+      if (d < filterStartDate) return false
     }
-    if (appliedEndDate) {
+    if (filterEndDate) {
       const d = (c.created_at || "").split("T")[0]
-      if (d > appliedEndDate) return false
+      if (d > filterEndDate) return false
     }
     return true
-  }), [allCustomers, appliedReferrer, appliedSource, appliedStartDate, appliedEndDate])
+  }), [allCustomers, filterReferrer, filterSource, filterStartDate, filterEndDate])
 
   const referrers = useMemo(() => [...new Set(allCustomers.map(c => c.referrer).filter(Boolean))].sort(), [allCustomers])
 
@@ -149,13 +133,6 @@ export default function TrafficRecordsPage() {
             className={`h-full px-2 text-[12px] border-none outline-none bg-transparent ${!filterEndDate ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
-        <button
-          onClick={handleSearch}
-          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
-        >
-          <Search className="h-3.5 w-3.5" />
-          查询
-        </button>
         <button
           onClick={handleClear}
           className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"

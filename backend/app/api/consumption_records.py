@@ -24,43 +24,43 @@ def get_daily_payment_totals(date: str = Query(...)):
     # 会员活动
     for c in membership_card_service.list_cards():
         created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
-        if created == date:
+        if c.deal_date == date:
             totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
 
     # 觉醒游戏
     for c in group_case_service.list_cases():
         created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
-        if created == date:
+        if c.deal_date == date:
             totals[c.customer_id] = totals.get(c.customer_id, 0) + c.amount
 
     # 情绪释放
     for r in emotional_release_service.list_releases():
         created = r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at)
-        if created == date:
+        if r.deal_date == date:
             totals[r.customer_id] = totals.get(r.customer_id, 0) + r.amount
 
     # 能量结
     for k in energy_knot_service.list_knots():
         created = k.created_at.strftime("%Y-%m-%d") if hasattr(k.created_at, "strftime") else str(k.created_at)
-        if created == date:
+        if k.deal_date == date:
             totals[k.customer_id] = totals.get(k.customer_id, 0) + k.amount
 
     # 内部课程
     for c in internal_course_service.list_courses():
         created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
-        if created == date:
+        if c.deal_date == date:
             totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
 
     # OH卡梳理
     for r in oh_card_reading_service.list_readings():
         created = r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at)
-        if created == date:
+        if r.deal_date == date:
             totals[r.customer_id] = totals.get(r.customer_id, 0) + r.amount
 
     # 其他项目
     for p in other_project_service.list_projects():
         created = p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at)
-        if created == date:
+        if p.deal_date == date:
             totals[p.customer_id] = totals.get(p.customer_id, 0) + p.fee
 
     return totals
@@ -88,7 +88,7 @@ def list_payment_records(
     for c in membership_card_service.list_cards():
         created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
         records.append({
-            "date": created,
+            "date": c.deal_date or "",
             "nickname": "",
             "type": "会员活动",
             "name": c.card_type,
@@ -104,7 +104,7 @@ def list_payment_records(
     for c in group_case_service.list_cases():
         created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
         records.append({
-            "date": created,
+            "date": c.deal_date or "",
             "nickname": "",
             "type": "觉醒游戏",
             "name": "觉醒游戏",
@@ -120,7 +120,7 @@ def list_payment_records(
     for r in emotional_release_service.list_releases():
         created = r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at)
         records.append({
-            "date": created,
+            "date": r.deal_date or "",
             "nickname": "",
             "type": "情绪释放",
             "name": "情绪释放",
@@ -136,7 +136,7 @@ def list_payment_records(
     for k in energy_knot_service.list_knots():
         created = k.created_at.strftime("%Y-%m-%d") if hasattr(k.created_at, "strftime") else str(k.created_at)
         records.append({
-            "date": created,
+            "date": k.deal_date or "",
             "nickname": "",
             "type": "能量结",
             "name": "能量结",
@@ -152,7 +152,7 @@ def list_payment_records(
     for c in internal_course_service.list_courses():
         created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
         records.append({
-            "date": created,
+            "date": c.deal_date or "",
             "nickname": "",
             "type": "内部课程",
             "name": c.course_type,
@@ -168,7 +168,7 @@ def list_payment_records(
     for r in oh_card_reading_service.list_readings():
         created = r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at)
         records.append({
-            "date": created,
+            "date": r.deal_date or "",
             "nickname": "",
             "type": "OH卡梳理",
             "name": "OH卡梳理",
@@ -184,7 +184,7 @@ def list_payment_records(
     for p in other_project_service.list_projects():
         created = p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at)
         records.append({
-            "date": created,
+            "date": p.deal_date or "",
             "nickname": "",
             "type": "其他项目",
             "name": p.project_name,

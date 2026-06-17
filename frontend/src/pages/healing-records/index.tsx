@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Search, X } from "lucide-react"
+import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -38,10 +38,6 @@ export default function HealingRecordsPage() {
   const [searchIdentity, setSearchIdentity] = useState("")
   const [searchReferrer, setSearchReferrer] = useState("")
   const [searchReferrerHandler, setSearchReferrerHandler] = useState("")
-  const [appliedNickname, setAppliedNickname] = useState("")
-  const [appliedIdentity, setAppliedIdentity] = useState("")
-  const [appliedReferrer, setAppliedReferrer] = useState("")
-  const [appliedReferrerHandler, setAppliedReferrerHandler] = useState("")
   const [filterKey, setFilterKey] = useState(0)
 
   useEffect(() => {
@@ -53,23 +49,11 @@ export default function HealingRecordsPage() {
     [...new Set(customers.map(c => c.member_type).filter(Boolean))].sort()
   , [customers])
 
-  const handleSearch = () => {
-    setAppliedNickname(searchNickname)
-    setAppliedIdentity(searchIdentity)
-    setAppliedReferrer(searchReferrer)
-    setAppliedReferrerHandler(searchReferrerHandler)
-    setFilterKey(k => k + 1)
-  }
-
   const handleClear = () => {
     setSearchNickname("")
     setSearchIdentity("")
     setSearchReferrer("")
     setSearchReferrerHandler("")
-    setAppliedNickname("")
-    setAppliedIdentity("")
-    setAppliedReferrer("")
-    setAppliedReferrerHandler("")
     setFilterKey(k => k + 1)
   }
 
@@ -173,7 +157,7 @@ export default function HealingRecordsPage() {
           <CustomerSearchInput
             customers={customers}
             value={searchNickname}
-            onChange={(v) => setSearchNickname(typeof v === "string" ? v : "")}
+            onChange={(v) => { setSearchNickname(typeof v === "string" ? v : ""); setFilterKey(k => k + 1) }}
             placeholder="搜索昵称"
             filterSelected={false}
           />
@@ -183,13 +167,13 @@ export default function HealingRecordsPage() {
           value={searchIdentity}
           options={[{value: "", label: "全部身份"}, ...identities.map(id => ({value: id, label: id}))]}
           placeholder="全部身份"
-          onChange={(v) => setSearchIdentity(v)}
+          onChange={(v) => { setSearchIdentity(v); setFilterKey(k => k + 1) }}
         />
         <div className="w-44">
           <CustomerSearchInput
             customers={customers}
             value={searchReferrer}
-            onChange={(v) => setSearchReferrer(typeof v === "string" ? v : "")}
+            onChange={(v) => { setSearchReferrer(typeof v === "string" ? v : ""); setFilterKey(k => k + 1) }}
             placeholder="搜索引流人"
             filterSelected={false}
           />
@@ -198,18 +182,11 @@ export default function HealingRecordsPage() {
           <CustomerSearchInput
             customers={customers}
             value={searchReferrerHandler}
-            onChange={(v) => setSearchReferrerHandler(typeof v === "string" ? v : "")}
+            onChange={(v) => { setSearchReferrerHandler(typeof v === "string" ? v : ""); setFilterKey(k => k + 1) }}
             placeholder="搜索承接人"
             filterSelected={false}
           />
         </div>
-        <button
-          onClick={handleSearch}
-          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
-        >
-          <Search className="h-3.5 w-3.5" />
-          查询
-        </button>
         <button
           onClick={handleClear}
           className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
@@ -228,10 +205,10 @@ export default function HealingRecordsPage() {
         onSelectCustomer={handleSelectCustomer}
         onDeleteCustomer={handleDeleteCustomer}
         onEditCustomer={handleEditCustomer}
-        filterNickname={appliedNickname}
-        filterIdentity={appliedIdentity}
-        filterReferrer={appliedReferrer}
-        filterReferrerHandler={appliedReferrerHandler}
+        filterNickname={searchNickname}
+        filterIdentity={searchIdentity}
+        filterReferrer={searchReferrer}
+        filterReferrerHandler={searchReferrerHandler}
       />
 
       {/* 客户详情弹窗 */}

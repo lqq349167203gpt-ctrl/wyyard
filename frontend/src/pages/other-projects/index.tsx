@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, Package, Search, X, CreditCard } from "lucide-react"
+import { Plus, Trash2, Edit, Package, X, CreditCard } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -90,6 +90,7 @@ function OtherProjectList() {
   const [formUnlimited, setFormUnlimited] = useState(false)
   const [formClosers, setFormClosers] = useState<Closer[]>([])
   const [formOrganizationId, setFormOrganizationId] = useState("")
+  const [formDealDate, setFormDealDate] = useState(today)
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
@@ -156,9 +157,9 @@ function OtherProjectList() {
     })
   }, [permReady])
 
-  const handleSearch = () => {
-    appliedNicknameRef.current = searchNickname
-    appliedCloserNameRef.current = searchCloserName
+  const handleFilterChange = (field: "nickname" | "closer", value: string) => {
+    if (field === "nickname") { setSearchNickname(value); appliedNicknameRef.current = value }
+    else { setSearchCloserName(value); appliedCloserNameRef.current = value }
     setFilterKey(k => k + 1)
     refresh()
   }
@@ -188,6 +189,7 @@ function OtherProjectList() {
     setFormUnlimited(false)
     setFormClosers([])
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
+    setFormDealDate(today)
     setDialogOpen(true)
   }
 
@@ -205,6 +207,7 @@ function OtherProjectList() {
     setFormUnlimited(item.remaining_count === null)
     setFormClosers(item.closers?.length ? item.closers : (item.closer_id ? [{ id: item.closer_id, name: item.closer_name || "", amount: 0 }] : []))
     setFormOrganizationId(item.organization_id || "")
+    setFormDealDate(item.deal_date || "")
     setDialogOpen(true)
   }
 
@@ -226,6 +229,7 @@ function OtherProjectList() {
         closer_name: formClosers[0]?.name || null,
         closers: formClosers,
         organization_id: formOrganizationId || null,
+        deal_date: formDealDate || null,
       }
       if (editingItem) {
         await otherProjectApi.update(editingItem.id, data)
@@ -256,7 +260,7 @@ function OtherProjectList() {
           <CustomerSearchInput
             customers={customers}
             value={searchNickname}
-            onChange={(v) => setSearchNickname(typeof v === "string" ? v : "")}
+            onChange={(v) => handleFilterChange("nickname", typeof v === "string" ? v : "")}
             placeholder="搜索用户"
             filterSelected={false}
           />
@@ -265,14 +269,11 @@ function OtherProjectList() {
           <CustomerSearchInput
             customers={customers}
             value={searchCloserName}
-            onChange={(v) => setSearchCloserName(typeof v === "string" ? v : "")}
+            onChange={(v) => handleFilterChange("closer", typeof v === "string" ? v : "")}
             placeholder="搜索成交人"
             filterSelected={false}
           />
         </div>
-        <button onClick={handleSearch} className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1">
-          <Search className="h-3.5 w-3.5" /> 查询
-        </button>
         <button onClick={handleClearSearch} className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1">
           <X className="h-3.5 w-3.5" /> 清空
         </button>
@@ -305,7 +306,7 @@ function OtherProjectList() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">录入日期</TableHead>
+                <TableHead className="pl-4">成交日期</TableHead>
                 <TableHead>用户</TableHead>
                 <TableHead>项目名称</TableHead>
                 <TableHead>费用</TableHead>
@@ -320,7 +321,7 @@ function OtherProjectList() {
             <TableBody>
               {paginatedItems.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="pl-4 text-[#2b2f36]">{item.created_at.split("T")[0]}</TableCell>
+                  <TableCell className="pl-4 text-[#2b2f36]">{item.deal_date || "-"}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.nickname}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-[11px] font-normal">
@@ -371,6 +372,12 @@ function OtherProjectList() {
             <DialogTitle className="text-base">{editingItem ? "编辑项目" : "新增项目"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4" {...enterToNext}>
+            {/* 成交日期 */}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交日期</span>
+              <Input type="date" value={formDealDate} onChange={(e) => setFormDealDate(e.target.value)} />
+            </div>
+
             {/* 项目名称 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">项目名称</span>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react"
-import { Search, X, User, Bot } from "lucide-react"
+import { X, User, Bot } from "lucide-react"
 import { chatHistoryApi, accountApi, type ChatRecord, type Account } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useServerPagination } from "@/hooks/use-server-pagination"
@@ -30,10 +30,12 @@ export default function ChatHistoryPage() {
     goToPage, startIndex, endIndex, loading,
   } = useServerPagination<ChatRecord>(fetchRecords, { pageSize: PAGE_SIZE })
 
-  const handleSearch = () => {
-    filtersRef.current = { userFilter, dateFrom, dateTo, keyword }
-    if (accounts.length === 0) {
-      accountApi.list().then(setAccounts).catch(() => {})
+  const handleFilterChange = (field: string, value: string) => {
+    switch (field) {
+      case "user": setUserFilter(value); filtersRef.current.userFilter = value; break
+      case "from": setDateFrom(value); filtersRef.current.dateFrom = value; break
+      case "to": setDateTo(value); filtersRef.current.dateTo = value; break
+      case "keyword": setKeyword(value); filtersRef.current.keyword = value; break
     }
     goToPage(1)
   }
@@ -101,7 +103,7 @@ export default function ChatHistoryPage() {
               ...accounts.map(a => ({ value: a.id, label: a.owner || a.username })),
             ]}
             placeholder="全部"
-            onChange={(v) => setUserFilter(v)}
+            onChange={(v) => handleFilterChange("user", v)}
             className="w-36"
           />
         </div>
@@ -110,7 +112,7 @@ export default function ChatHistoryPage() {
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => handleFilterChange("from", e.target.value)}
             className={`h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] ${!dateFrom ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
@@ -119,7 +121,7 @@ export default function ChatHistoryPage() {
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => handleFilterChange("to", e.target.value)}
             className={`h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] ${!dateTo ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
@@ -127,19 +129,11 @@ export default function ChatHistoryPage() {
           <label className="text-[12px] text-[#8f959e]">关键词</label>
           <input
             value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
+            onChange={(e) => handleFilterChange("keyword", e.target.value)}
             placeholder="搜索内容..."
             className="h-8 w-40 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff]"
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
         </div>
-        <button
-          onClick={handleSearch}
-          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
-        >
-          <Search className="h-3.5 w-3.5" />
-          查询
-        </button>
         <button
           onClick={handleClear}
           className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"

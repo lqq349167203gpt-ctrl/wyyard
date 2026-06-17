@@ -672,6 +672,7 @@ export interface GroupCase {
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
+  deal_date: string | null
   created_at: string
   updated_at: string
 }
@@ -766,6 +767,7 @@ export interface OhCardReading {
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
+  deal_date: string | null
   created_at: string
   updated_at: string
 }
@@ -852,6 +854,7 @@ export interface EnergyKnot {
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
+  deal_date: string | null
   created_at: string
   updated_at: string
 }
@@ -887,6 +890,7 @@ export interface EmotionalRelease {
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
+  deal_date: string | null
   created_at: string
   updated_at: string
 }
@@ -1097,6 +1101,7 @@ export interface InternalCourse {
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
+  deal_date: string | null
   created_at: string
   updated_at: string
 }
@@ -1139,6 +1144,7 @@ export interface MembershipCard {
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
+  deal_date: string | null
   created_at: string
   updated_at: string
 }
@@ -1185,6 +1191,7 @@ export interface OtherProject {
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   organization_id: string | null
+  deal_date: string | null
   created_at: string
   updated_at: string
 }

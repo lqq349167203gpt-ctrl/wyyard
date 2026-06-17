@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react"
-import { Search, X } from "lucide-react"
+import { X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { operationLogApi, accountApi, customerApi, organizationApi, positionPermissionApi, positionCustomerPermissionApi, memberIdentityApi } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -205,8 +205,14 @@ export default function OperationLogsPage() {
     return id
   }
 
-  const handleSearch = () => {
-    filtersRef.current = { operatorFilter, methodFilter, sectionFilter, dateFrom, dateTo }
+  const handleFilterChange = (field: string, value: string) => {
+    switch (field) {
+      case "operator": setOperatorFilter(value); filtersRef.current.operatorFilter = value; break
+      case "method": setMethodFilter(value); filtersRef.current.methodFilter = value; break
+      case "section": setSectionFilter(value); filtersRef.current.sectionFilter = value; break
+      case "from": setDateFrom(value); filtersRef.current.dateFrom = value; break
+      case "to": setDateTo(value); filtersRef.current.dateTo = value; break
+    }
     goToPage(1)
   }
 
@@ -431,7 +437,7 @@ export default function OperationLogsPage() {
             value={operatorFilter}
             options={[{value: "", label: "全部"}, ...[...new Set(accounts.map(a => a.owner))].sort().map(o => ({value: o, label: o}))]}
             placeholder="全部"
-            onChange={(v) => setOperatorFilter(v)}
+            onChange={(v) => handleFilterChange("operator", v)}
             className="w-36"
           />
         </div>
@@ -441,7 +447,7 @@ export default function OperationLogsPage() {
             value={methodFilter}
             options={[{value: "", label: "全部"}, {value: "POST", label: "新增"}, {value: "UPDATE", label: "更新"}, {value: "DELETE", label: "删除"}]}
             placeholder="全部"
-            onChange={(v) => setMethodFilter(v)}
+            onChange={(v) => handleFilterChange("method", v)}
             className="w-28"
           />
         </div>
@@ -451,7 +457,7 @@ export default function OperationLogsPage() {
             value={sectionFilter}
             options={[{value: "", label: "全部"}, ...SECTION_OPTIONS.map(s => ({value: s, label: s}))]}
             placeholder="全部"
-            onChange={(v) => setSectionFilter(v)}
+            onChange={(v) => handleFilterChange("section", v)}
             className="w-28"
           />
         </div>
@@ -460,7 +466,7 @@ export default function OperationLogsPage() {
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => handleFilterChange("from", e.target.value)}
             className={`h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] ${!dateFrom ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
@@ -469,17 +475,10 @@ export default function OperationLogsPage() {
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => handleFilterChange("to", e.target.value)}
             className={`h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] ${!dateTo ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
           />
         </div>
-        <button
-          onClick={handleSearch}
-          className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1] flex items-center gap-1"
-        >
-          <Search className="h-3.5 w-3.5" />
-          查询
-        </button>
         <button
           onClick={handleClear}
           className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"

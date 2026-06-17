@@ -14,6 +14,7 @@ class InternalCourseBase(BaseModel):
     closer_name: Optional[str] = None
     closers: List[dict] = []
     organization_id: Optional[str] = None
+    deal_date: Optional[str] = None
 
 
 class InternalCourseCreate(InternalCourseBase):

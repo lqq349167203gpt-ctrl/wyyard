@@ -337,8 +337,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-left font-normal w-[56px]">剩余次数</th>
               <th className="px-1.5 py-2 text-left font-normal w-[240px]">本次需求</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">邀约人</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[60px]">今日成交</th>
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">参与活动</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[60px]">今日成交</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">客户反馈</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">疗愈记录</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
@@ -445,11 +445,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     />
                   </td>
                   <td className="px-1.5 py-1.5 text-left">
-                    <span className="text-[12px] text-[#8f959e]">
-                      {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
-                    </span>
-                  </td>
-                  <td className="px-1.5 py-1.5 text-left">
                     {row.activities && row.customer_id ? (
                       <button
                         onClick={() => onActivityClick?.(row.customer_id)}
@@ -458,6 +453,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                         {row.activities.split("、").length}场
                       </button>
                     ) : null}
+                  </td>
+                  <td className="px-1.5 py-1.5 text-left">
+                    <span className="text-[12px] text-[#8f959e]">
+                      {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
+                    </span>
                   </td>
                   <td className="px-1.5 py-1.5">
                     <Input
