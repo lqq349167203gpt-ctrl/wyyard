@@ -154,11 +154,11 @@ function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSp
     const groupIds = (data.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
     participantIds = [...new Set([...groupIds, ...(data.participant_ids || [])])]
   } else if (type === "gcs" || type === "ocr") {
-    participantIds = [...(data.participant_ids || []), ...(data.teacher_ids || data.host_ids || [])].filter(Boolean)
+    participantIds = [...(data.participant_ids || [])].filter(Boolean)
   } else if (type === "ers") {
     participantIds = [...(data.participant_ids || [])].filter(Boolean)
   } else if (type === "eks") {
-    participantIds = [...(data.participant_ids || []), ...(data.teacher_ids || data.host_ids || [])].filter(Boolean)
+    participantIds = [...(data.participant_ids || [])].filter(Boolean)
   } else if (type === "ics") {
     participantIds = [...(data.participant_ids || [])].filter(Boolean)
   }
@@ -334,7 +334,7 @@ export function ActivityBatchTable({
 
       if (row.pendingCreate) {
         // 新建记录
-        const createData: any = { date, ...common, participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)) }
+        const createData: any = { date, ...common, participant_ids: row.participant_ids }
 
         if (type === "class") {
           const course = courses.find(c => c.id === row.course_id)
@@ -404,7 +404,7 @@ export function ActivityBatchTable({
             owner_id: row.owner_id || row.raw.owner_id,
             owner_name: row.owner_name || row.raw.owner_name,
             teacher_ids: row.host_ids,
-            participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)),
+            participant_ids: row.participant_ids,
             description: row.description,
           })
         } else if (type === "ers") {
@@ -425,7 +425,7 @@ export function ActivityBatchTable({
             name: row.name || "",
             teacher_ids: row.host_ids,
             description: row.description,
-            participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)),
+            participant_ids: row.participant_ids,
           })
         } else if (type === "ics") {
           await internalCourseSessionApi.update(id, {
@@ -444,7 +444,7 @@ export function ActivityBatchTable({
             owner_name: row.owner_name || row.raw.owner_name,
             teacher_ids: row.host_ids,
             description: row.description,
-            participant_ids: row.participant_ids.filter(id => !(row.host_ids || []).includes(id)),
+            participant_ids: row.participant_ids,
           })
         }
       }
