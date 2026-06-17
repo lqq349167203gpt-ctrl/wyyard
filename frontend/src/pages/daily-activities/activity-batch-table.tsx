@@ -539,10 +539,12 @@ export function ActivityBatchTable({
       name: "",
       course_id: "",
       raw: {},
-      // 切换类型时清除案主和描述（类型间数据不通用）
+      // 切换类型时清除案主、描述和老师（类型间数据不通用）
       owner_id: "",
       owner_name: "",
       description: "",
+      host_ids: [],
+      host_names: [],
       deduction_count: type === "eks" ? 2 : 1,
     }
     setRows(prev => prev.map(r => r.key === rowKey ? updated : r))
