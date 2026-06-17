@@ -247,7 +247,7 @@ export function useGcsDialogs({
     memberSearchTimeoutRef.current = window.setTimeout(async () => {
       try {
         const results = await groupCaseSessionApi.searchCustomers(keyword)
-        setMemberSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && r.id !== membersRecord?.host_id && !(membersRecord?.participant_ids || []).includes(r.id)))
+        setMemberSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && r.id !== membersRecord?.host_id && !(membersRecord?.participant_ids || []).includes(r.id) && !(membersRecord?.teacher_ids || []).includes(r.id)))
         setMemberShowDropdown(true)
       } catch { setMemberSearchResults([]) }
     }, 300)
@@ -284,7 +284,7 @@ export function useGcsDialogs({
     memberHostSearchTimeoutRef.current = window.setTimeout(async () => {
       try {
         const results = await groupCaseSessionApi.searchCustomers(keyword)
-        setMemberHostSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && !(membersRecord?.participant_ids || []).includes(r.id)))
+        setMemberHostSearchResults(results.filter(r => r.id !== membersRecord?.owner_id && !(membersRecord?.participant_ids || []).includes(r.id) && !(membersRecord?.teacher_ids || []).includes(r.id)))
         setMemberHostShowDropdown(true)
       } catch { setMemberHostSearchResults([]) }
     }, 300)
@@ -314,7 +314,7 @@ export function useGcsDialogs({
 
   const handleDrop = async (session: GroupCaseSession, customer: { customer_id: string }) => {
     const ids = session.participant_ids || []
-    if (ids.includes(customer.customer_id) || customer.customer_id === session.host_id) return
+    if (ids.includes(customer.customer_id) || customer.customer_id === session.host_id || (session.teacher_ids || []).includes(customer.customer_id)) return
     await groupCaseSessionApi.update(session.id, { participant_ids: [...ids, customer.customer_id] } as any)
     onReload()
   }
@@ -488,7 +488,7 @@ export function useGcsDialogs({
                     <p className="text-[12px] text-[#b0b5bb] text-center py-4">暂无到场人员</p>
                   ) : (
                     dayVisits.map((v) => {
-                      const assigned = membersRecord.participant_ids?.includes(v.id) || membersRecord.host_id === v.id || membersRecord.owner_id === v.id
+                      const assigned = membersRecord.participant_ids?.includes(v.id) || membersRecord.host_id === v.id || membersRecord.owner_id === v.id || (membersRecord.teacher_ids || []).includes(v.id)
                       return (
                         <div
                           key={v.id}

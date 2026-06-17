@@ -358,7 +358,7 @@ export default function GroupCaseSessionsPage() {
                   onChange={() => {}}
                   onSelectItem={(c) => handleAddParticipant(c)}
                   placeholder="搜索用户添加..."
-                  excludeIds={[...(selectedSession?.owner_id ? [selectedSession.owner_id] : []), ...(selectedSession?.host_id ? [selectedSession.host_id] : []), ...(selectedSession?.participant_ids || [])]}
+                  excludeIds={[...(selectedSession?.owner_id ? [selectedSession.owner_id] : []), ...(selectedSession?.host_id ? [selectedSession.host_id] : []), ...(selectedSession?.participant_ids || []), ...(selectedSession?.teacher_ids || [])]}
                 />
               </div>
 
