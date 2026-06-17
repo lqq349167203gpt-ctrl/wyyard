@@ -111,6 +111,7 @@ async def list_customers_light():
             "traffic_source_detail": c.traffic_source_detail or "",
             "referrer": c.referrer or "",
             "position_sort_orders": c.position_sort_orders or {},
+            "space_id": c.space_id or "",
         }
         for c in customers
     ]
@@ -128,6 +129,7 @@ async def batch_customers(data: BatchRequest):
             "name": c.name or "",
             "member_type": c.member_type or "",
             "positions": c.positions or [],
+            "space_id": c.space_id or "",
         }
         for c in customers
         if c.id in id_set

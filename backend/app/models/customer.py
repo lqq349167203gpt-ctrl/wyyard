@@ -61,6 +61,7 @@ class CustomerBase(BaseModel):
     traffic_source_detail: str = ""
     tracking_plan: str = ""
     position_sort_orders: Dict[str, int] = {}
+    space_id: str = ""
 
 
 class CustomerCreate(CustomerBase):
@@ -94,6 +95,7 @@ class CustomerUpdate(BaseModel):
     traffic_source_detail: Optional[str] = None
     tracking_plan: Optional[str] = None
     position_sort_orders: Optional[Dict[str, int]] = None
+    space_id: Optional[str] = None
 
 
 class Customer(CustomerBase):

@@ -241,6 +241,7 @@ export interface Customer {
   traffic_source_detail: string
   tracking_plan: string
   position_sort_orders: Record<string, number>
+  space_id: string
   created_at: string
   updated_at: string
 }
@@ -258,6 +259,7 @@ export interface CustomerLight {
   traffic_source: string
   traffic_source_detail: string
   referrer: string
+  space_id: string
 }
 
 let _customerLightCache: CustomerLight[] | null = null

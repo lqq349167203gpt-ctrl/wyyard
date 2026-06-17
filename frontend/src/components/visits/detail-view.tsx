@@ -273,6 +273,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       if (ageRange) {
         data.age = data.age ? `${data.age} (${ageRange})` : ageRange
       }
+      // 新增客户时自动设置当前空间
+      try { data.space_id = localStorage.getItem("selected-space-id") || "" } catch {}
       const created = await customerApi.create(data)
       setShowAddUserDialog(false)
       setSelectedCustomer(created)

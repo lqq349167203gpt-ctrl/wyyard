@@ -1817,6 +1817,7 @@ export default function DailyActivitiesPage() {
   const [detailEksSessions, setDetailEksSessions] = useState<EnergyKnotSession[]>([])
   const [detailIcsSessions, setDetailIcsSessions] = useState<InternalCourseSession[]>([])
   const [detailOcrSessions, setDetailOcrSessions] = useState<OhCardReadingSession[]>([])
+  const [detailVisits, setDetailVisits] = useState<any[]>([])
 
   // ===== Salon dialog state (minimal - form state lives in SalonDialog) =====
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -2005,6 +2006,13 @@ export default function DailyActivitiesPage() {
     })
   }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, detailOcrSessions, selectedSpaceId])
 
+  // 当日所有参与者（从到场记录读取，按空间过滤）
+  const dayParticipants = useMemo(() => {
+    return detailVisits
+      .filter(v => !selectedSpaceId || v.space_id === selectedSpaceId)
+      .map(v => v.nickname || v.customer_id)
+      .filter(Boolean)
+  }, [detailVisits, selectedSpaceId])
 
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
   const achieverCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("成就君")).sort((a, b) => (a.position_sort_orders?.["成就君"] ?? 9999) - (b.position_sort_orders?.["成就君"] ?? 9999)), [allCustomers])
@@ -2035,6 +2043,7 @@ export default function DailyActivitiesPage() {
       setDetailEksSessions(eks)
       setDetailIcsSessions(ics)
       setDetailOcrSessions(ocr || [])
+      setDetailVisits(dashboard.visits || [])
       setCalendarCounts(dashboard.calendar_counts)
 
       // Collect unique customer IDs from all records
@@ -2494,7 +2503,7 @@ export default function DailyActivitiesPage() {
 
         {/* 周视图日历 */}
         <div className="border border-[#e8e8e8] rounded overflow-x-auto">
-          <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%", minWidth: "600px" }}>
+          <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%" }}>
             <colgroup>
               <col style={{ width: "80px" }} />
               {Array.from({ length: 7 }, (_, i) => <col key={i} style={{ width: `${(100 - 13.33) / 7}%` }} />)}
@@ -2529,13 +2538,13 @@ export default function DailyActivitiesPage() {
                       return (
                         <td
                           key={`date-${day.date}`}
-                          className={`px-1 text-center text-[10px] cursor-pointer transition-colors ${
+                          className={`px-1 text-center text-[8px] cursor-pointer transition-colors ${
                             !day.inMonth ? "bg-[#fafafa]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "bg-[#fafafa] text-[#b0b5bb]"
                           }`}
-                          style={{ height: "20px" }}
+                          style={{ height: "12px" }}
                           onClick={() => day.inMonth && setDetailDate(day.date)}
                         >
-                          {day.inMonth ? <div className="relative w-full h-full flex flex-col items-center justify-center"><span className={`${(calendarCounts[day.date] || 0) > 0 ? "text-[#2b2f36]" : "text-[#b0b5bb]"}`}>{dayNum}</span>{(calendarCounts[day.date] || 0) > 0 && <span className="w-2 h-px bg-[#dde8ff] mt-px" />}</div> : ""}
+                          {day.inMonth ? <div className="relative w-full h-full flex flex-col items-center justify-center"><span className={`${(calendarCounts[day.date] || 0) > 0 ? "text-[#2b2f36]" : "text-[#b0b5bb]"}`}>{dayNum}</span></div> : ""}
                         </td>
                       )
                     })}
@@ -2568,13 +2577,20 @@ export default function DailyActivitiesPage() {
         </div>
 
         {/* 当日活动标题 */}
-        <div className="flex items-center mt-2.5">
-          <span className="text-[14px] font-medium text-[#2b2f36] pl-2">当日活动</span>
-          {savingCount > 0 ? (
-            <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
-          ) : savedCount > 0 ? (
-            <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
-          ) : null}
+        <div className="mt-2.5">
+          <div className="flex items-center">
+            <span className="text-[14px] font-medium text-[#2b2f36] pl-2">{detailDate.split("-")[1].replace(/^0/, "")}月{detailDate.split("-")[2].replace(/^0/, "")}日活动</span>
+            {savingCount > 0 ? (
+              <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
+            ) : savedCount > 0 ? (
+              <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
+            ) : null}
+          </div>
+          {dayParticipants.length > 0 && (
+            <p className="text-[11px] text-[#8f959e] pl-2 mt-0.5 truncate">
+              参与者：{dayParticipants.join("、")}
+            </p>
+          )}
         </div>
 
         {/* Activity cards */}
