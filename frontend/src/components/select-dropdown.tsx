@@ -106,11 +106,10 @@ export const SelectDropdown = memo(function SelectDropdown({
 
   const calcSubMenuPos = useCallback((optEl: HTMLElement, opt: Option) => {
     const r = optEl.getBoundingClientRect()
-    const menuWidth = dropdownWidth ?? 110
+    const menuEl = menuRef.current
+    const menuRect = menuEl?.getBoundingClientRect()
     const subMenuWidth = 120
     const h = 200
-    const spaceRight = window.innerWidth - r.right - menuWidth - 8
-    const spaceLeft = r.left - 8
 
     const s: React.CSSProperties = {
       position: "fixed",
@@ -118,16 +117,21 @@ export const SelectDropdown = memo(function SelectDropdown({
       width: subMenuWidth,
     }
 
-    // 优先显示在右侧，空间不够则显示在左侧
-    if (spaceRight >= subMenuWidth) {
-      s.left = r.right + menuWidth + 4
-    } else if (spaceLeft >= subMenuWidth) {
-      s.left = r.left - subMenuWidth - 4
-    } else {
-      s.left = r.right + menuWidth + 4
+    // 二级菜单紧挨着一级菜单右侧
+    if (menuRect) {
+      const spaceRight = window.innerWidth - menuRect.right - 8
+      const spaceLeft = menuRect.left - 8
+
+      if (spaceRight >= subMenuWidth) {
+        s.left = menuRect.right + 4
+      } else if (spaceLeft >= subMenuWidth) {
+        s.left = menuRect.left - subMenuWidth - 4
+      } else {
+        s.left = menuRect.right + 4
+      }
     }
 
-    // 垂直位置与父菜单项对齐
+    // 垂直位置与悬停的菜单项对齐
     const below = window.innerHeight - r.top
     const above = r.bottom
     if (below >= h || below >= above) {
@@ -139,7 +143,7 @@ export const SelectDropdown = memo(function SelectDropdown({
     }
 
     setSubMenuPos(s)
-  }, [dropdownWidth])
+  }, [])
 
   const handleToggle = useCallback(() => {
     if (disabled) return
