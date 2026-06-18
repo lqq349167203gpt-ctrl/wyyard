@@ -46,7 +46,6 @@ const courseItems = [
 ]
 
 const configItems = [
-  { title: "活动配置", icon: BookText, path: "/positions/courses", permission: "courses" },
   { title: "会员身份", icon: ShieldCheck, path: "/config/member-identities", permission: "member-identities" },
   { title: "疗愈老师", icon: Heart, path: "/healing-identities", permission: "healing-identities" },
   { title: "组织管理", icon: Users, path: "/organizations", permission: "organizations" },

@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { organizationApi, customerApi, type Organization, type Customer } from "@/lib/api"
+import { organizationApi, customerApi, courseTypeApi, type Organization, type Customer, type CourseType } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 
 export default function OrganizationsPage() {
@@ -36,6 +36,17 @@ export default function OrganizationsPage() {
   const [deleteMemberInput, setDeleteMemberInput] = useState("")
   const [deleteMemberError, setDeleteMemberError] = useState("")
 
+  // 活动类型 tab
+  const [activeTab, setActiveTab] = useState<"members" | "activities">("members")
+  const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
+  const [actDialogOpen, setActDialogOpen] = useState(false)
+  const [actEditingType, setActEditingType] = useState<string | null>(null)
+  const [actFormName, setActFormName] = useState("")
+  const [actFormError, setActFormError] = useState("")
+  const [actDeleteDialogOpen, setActDeleteDialogOpen] = useState(false)
+  const [actDeletingType, setActDeletingType] = useState<string | null>(null)
+  const [actBlockedOpen, setActBlockedOpen] = useState(false)
+
   const loadData = useCallback(async () => {
     try {
       const orgs = await organizationApi.list().catch((e) => { console.error("加载组织失败:", e); return [] as Organization[] })
@@ -47,6 +58,10 @@ export default function OrganizationsPage() {
     try {
       const custs = await customerApi.list().catch((e) => { console.error("加载客户失败:", e); return [] as Customer[] })
       setCustomers(custs)
+    } catch {}
+    try {
+      const types = await courseTypeApi.list().catch(() => [] as CourseType[])
+      setCourseTypes(types)
     } catch {}
     setLoading(false)
   }, [activeOrgId])
@@ -219,6 +234,74 @@ export default function OrganizationsPage() {
     setDeleteMemberDialogOpen(true)
   }
 
+  // 活动类型 CRUD
+  const orgCourseTypes = activeOrgId ? courseTypes.filter(t => t.organization_id === activeOrgId) : []
+
+  const handleOpenActCreate = () => {
+    setActEditingType(null)
+    setActFormName("")
+    setActFormError("")
+    setActDialogOpen(true)
+  }
+
+  const handleOpenActEdit = (type: CourseType) => {
+    setActEditingType(type.name)
+    setActFormName(type.name)
+    setActFormError("")
+    setActDialogOpen(true)
+  }
+
+  const handleSaveAct = async () => {
+    if (!actFormName.trim() || !activeOrgId) return
+    setActFormError("")
+    try {
+      if (actEditingType) {
+        if (actFormName.trim() !== actEditingType) {
+          await courseTypeApi.rename(actEditingType, actFormName.trim())
+        }
+        await courseTypeApi.update(actFormName.trim(), { organization_id: activeOrgId })
+      } else {
+        await courseTypeApi.create(actFormName.trim(), activeOrgId)
+      }
+      setActDialogOpen(false)
+      const types = await courseTypeApi.list().catch(() => [] as CourseType[])
+      setCourseTypes(types)
+    } catch (e: any) {
+      setActFormError(e?.message || "保存失败")
+    }
+  }
+
+  const handleDeleteAct = async () => {
+    if (!actDeletingType) return
+    try {
+      await courseTypeApi.delete(actDeletingType)
+      setActDeleteDialogOpen(false)
+      setActDeletingType(null)
+      const types = await courseTypeApi.list().catch(() => [] as CourseType[])
+      setCourseTypes(types)
+    } catch {
+      setActDeleteDialogOpen(false)
+      setActBlockedOpen(true)
+    }
+  }
+
+  const handleMoveActType = async (typeName: string, direction: "up" | "down") => {
+    const names = courseTypes.map(t => t.name)
+    const idx = names.indexOf(typeName)
+    if (idx < 0) return
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= names.length) return
+    const reordered = [...names]
+    const tmp = reordered[idx]
+    reordered[idx] = reordered[targetIdx]
+    reordered[targetIdx] = tmp
+    try {
+      await courseTypeApi.reorder(reordered)
+      const types = await courseTypeApi.list().catch(() => [] as CourseType[])
+      setCourseTypes(types)
+    } catch {}
+  }
+
   const handleConfirmDeleteMember = async () => {
     if (!activeOrg || !deletingMember) return
     if (deleteMemberInput !== deletingMember.nickname) {
@@ -326,17 +409,37 @@ export default function OrganizationsPage() {
           </div>
         </div>
 
-        {/* 右侧：成员列表 */}
+        {/* 右侧面板 */}
         <div className="flex-1 bg-white rounded-lg flex flex-col min-w-0">
+          {/* Tab 切换 + 操作按钮 */}
           <div className="flex items-center justify-between px-4 h-[45px] border-b border-[#f0f0f0] shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] font-medium text-[#2b2f36]">成员列表</span>
-              {activeOrg && (
-                <span className="text-[11px] text-[#8f959e]">{members.length} 人</span>
+            <div className="flex items-center gap-1">
+              <button
+                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "members" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
+                onClick={() => setActiveTab("members")}
+              >
+                成员列表
+              </button>
+              <button
+                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "activities" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
+                onClick={() => setActiveTab("activities")}
+              >
+                活动列表
+              </button>
+              {activeOrg && activeTab === "members" && (
+                <span className="text-[11px] text-[#8f959e] ml-1">{members.length} 人</span>
+              )}
+              {activeOrg && activeTab === "activities" && (
+                <span className="text-[11px] text-[#8f959e] ml-1">{orgCourseTypes.length} 个</span>
               )}
             </div>
-            {activeOrg && (
+            {activeOrg && activeTab === "members" && (
               <Button size="sm" className="h-7 text-xs" onClick={() => { setMemberName(""); setMemberAddOpen(true) }}>
+                <Plus className="mr-1 h-3 w-3" /> 新增
+              </Button>
+            )}
+            {activeOrg && activeTab === "activities" && (
+              <Button size="sm" className="h-7 text-xs" onClick={handleOpenActCreate}>
                 <Plus className="mr-1 h-3 w-3" /> 新增
               </Button>
             )}
@@ -350,86 +453,128 @@ export default function OrganizationsPage() {
                 <p className="text-sm text-muted-foreground">请从左侧选择组织</p>
                 <p className="text-xs text-muted-foreground mt-1">或点击"+"按钮新增组织</p>
               </div>
-            ) : members.length === 0 && memberDisplayNames.filter(n => n.startsWith("[已删除:")).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="rounded-full bg-muted p-3 mb-3">
-                  <Users className="h-6 w-6 text-muted-foreground" />
+            ) : activeTab === "members" ? (
+              /* 成员列表 */
+              members.length === 0 && memberDisplayNames.filter(n => n.startsWith("[已删除:")).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="rounded-full bg-muted p-3 mb-3">
+                    <Users className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">暂无成员</p>
+                  <p className="text-xs text-muted-foreground mt-1">点击上方"新增"按钮添加</p>
                 </div>
-                <p className="text-sm text-muted-foreground">暂无成员</p>
-                <p className="text-xs text-muted-foreground mt-1">点击上方"新增"按钮添加</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs font-medium w-[40px] text-center">排序</TableHead>
-                    <TableHead className="text-xs font-medium pl-4">昵称</TableHead>
-                    <TableHead className="text-xs font-medium">姓名</TableHead>
-                    <TableHead className="text-xs font-medium">会员类型</TableHead>
-                    <TableHead className="text-xs font-medium">到场次数</TableHead>
-                    <TableHead className="text-xs text-right pr-4">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {members.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="px-0">
-                        <div className="flex flex-col items-center gap-0.5">
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "up") }}>
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "down") }}>
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs pl-4">{member.nickname}</TableCell>
-                      <TableCell className="text-xs">{member.name || "-"}</TableCell>
-                      <TableCell className="text-xs">{member.member_type || "-"}</TableCell>
-                      <TableCell className="text-xs">{member.visit_count || 0}</TableCell>
-                      <TableCell className="text-right pr-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => handleRemoveMember(member.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </TableCell>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-xs font-medium w-[40px] text-center">排序</TableHead>
+                      <TableHead className="text-xs font-medium pl-4">昵称</TableHead>
+                      <TableHead className="text-xs font-medium">姓名</TableHead>
+                      <TableHead className="text-xs font-medium">会员类型</TableHead>
+                      <TableHead className="text-xs font-medium">到场次数</TableHead>
+                      <TableHead className="text-xs text-right pr-4">操作</TableHead>
                     </TableRow>
-                  ))}
-                  {/* 显示已删除的成员 */}
-                  {memberDisplayNames
-                    .filter(n => n.startsWith("[已删除:"))
-                    .map((name, idx) => (
-                      <TableRow key={`deleted-${idx}`} className="opacity-50">
-                        <TableCell />
-                        <TableCell className="text-xs pl-4">{name}</TableCell>
-                        <TableCell className="text-xs">-</TableCell>
-                        <TableCell className="text-xs">-</TableCell>
-                        <TableCell className="text-xs">-</TableCell>
+                  </TableHeader>
+                  <TableBody>
+                    {members.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell className="px-0">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "up") }}>
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "down") }}>
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs pl-4">{member.nickname}</TableCell>
+                        <TableCell className="text-xs">{member.name || "-"}</TableCell>
+                        <TableCell className="text-xs">{member.member_type || "-"}</TableCell>
+                        <TableCell className="text-xs">{member.visit_count || 0}</TableCell>
                         <TableCell className="text-right pr-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => {
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleRemoveMember(member.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {memberDisplayNames
+                      .filter(n => n.startsWith("[已删除:"))
+                      .map((name, idx) => (
+                        <TableRow key={`deleted-${idx}`} className="opacity-50">
+                          <TableCell />
+                          <TableCell className="text-xs pl-4">{name}</TableCell>
+                          <TableCell className="text-xs">-</TableCell>
+                          <TableCell className="text-xs">-</TableCell>
+                          <TableCell className="text-xs">-</TableCell>
+                          <TableCell className="text-right pr-4">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
                               const prefix = name.slice(6, -1)
                               if (activeOrg) {
                                 const found = activeOrg.member_ids.find(id => id.startsWith(prefix))
                                 if (found) handleRemoveMember(found)
                               }
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
+                            }}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    }
+                  </TableBody>
+                </Table>
+              )
+            ) : (
+              /* 活动列表 */
+              orgCourseTypes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="rounded-full bg-muted p-3 mb-3">
+                    <Building2 className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">暂无活动类型</p>
+                  <p className="text-xs text-muted-foreground mt-1">点击上方"新增"按钮添加</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[40px] pl-4"></TableHead>
+                      <TableHead className="text-xs font-medium">类型名称</TableHead>
+                      <TableHead className="text-xs text-right pr-4">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orgCourseTypes.map((type) => (
+                      <TableRow key={type.name} className="group">
+                        <TableCell className="pl-4">
+                          <div className="flex flex-col items-center gap-0">
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={() => handleMoveActType(type.name, "up")}>
+                              <ArrowUp className="h-3 w-3" />
+                            </button>
+                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={() => handleMoveActType(type.name, "down")}>
+                              <ArrowDown className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenActEdit(type)}>
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setActDeletingType(type.name); setActDeleteDialogOpen(true) }}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  }
-                </TableBody>
-              </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+              )
             )}
           </div>
         </div>
@@ -540,6 +685,54 @@ export default function OrganizationsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 新增/编辑活动类型弹窗 */}
+      <Dialog open={actDialogOpen} onOpenChange={setActDialogOpen}>
+        <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{actEditingType ? "编辑活动类型" : "新增活动类型"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">类型名称</span>
+              <div>
+                <Input value={actFormName} onChange={(e) => { setActFormName(e.target.value); setActFormError("") }} placeholder="如：冥想、瑜伽、疗愈" />
+                {actFormError && <p className="text-xs text-destructive mt-1">{actFormError}</p>}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setActDialogOpen(false)}>取消</Button>
+              <Button size="sm" onClick={handleSaveAct} disabled={!actFormName.trim()}>保存</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除活动类型确认弹窗 */}
+      <AlertDialog open={actDeleteDialogOpen} onOpenChange={setActDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除活动类型</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除类型「{actDeletingType}」吗？</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <Button variant="destructive" size="sm" onClick={handleDeleteAct}>删除</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={actBlockedOpen} onOpenChange={setActBlockedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>无法删除</AlertDialogTitle>
+            <AlertDialogDescription>该活动类型存在具体活动，无法删除</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>知道了</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
