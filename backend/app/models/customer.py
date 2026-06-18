@@ -41,6 +41,7 @@ class CustomerBase(BaseModel):
     phone: str = ""
     wechat: str = ""
     age: str = ""
+    service_teacher: str = ""  # 服务老师
     referrer: str = ""
     referrer_handler: str = ""
     member_type: str = ""
@@ -76,6 +77,7 @@ class CustomerUpdate(BaseModel):
     phone: Optional[str] = None
     wechat: Optional[str] = None
     age: Optional[str] = None
+    service_teacher: Optional[str] = None  # 服务老师
     referrer: Optional[str] = None
     referrer_handler: Optional[str] = None
     member_type: Optional[str] = None

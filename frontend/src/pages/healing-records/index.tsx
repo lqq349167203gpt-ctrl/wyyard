@@ -264,6 +264,17 @@ export default function HealingRecordsPage() {
                 />
               </div>
 
+              <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">服务老师</span>
+              <div>
+                <CustomerSearchInput
+                  customers={customers}
+                  value={form.service_teacher || ""}
+                  onChange={(v) => setForm({ ...form, service_teacher: typeof v === "string" ? v : v[0] || "" })}
+                  placeholder="请搜索"
+                  excludeIds={form.id ? [form.id] : []}
+                  filterSelected={false}
+                />
+              </div>
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">引流人</span>
               <div>
                 <CustomerSearchInput
