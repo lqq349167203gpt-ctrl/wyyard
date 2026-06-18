@@ -348,7 +348,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">跟进记录</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">组长反馈</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[52px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
           <tbody className="[&_tr:first-child>td]:pt-[12px]">
