@@ -123,11 +123,11 @@ export const SelectDropdown = memo(function SelectDropdown({
       const spaceLeft = menuRect.left - 8
 
       if (spaceRight >= subMenuWidth) {
-        s.left = menuRect.right + 4
+        s.left = menuRect.right - 1
       } else if (spaceLeft >= subMenuWidth) {
-        s.left = menuRect.left - subMenuWidth - 4
+        s.left = menuRect.left - subMenuWidth + 1
       } else {
-        s.left = menuRect.right + 4
+        s.left = menuRect.right - 1
       }
     }
 
