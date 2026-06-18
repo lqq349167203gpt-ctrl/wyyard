@@ -92,6 +92,7 @@ class CustomerUpdate(BaseModel):
     basic_info: Optional[str] = None
     assessment: Optional[str] = None
     tags: Optional[str] = None
+    other_info: Optional[str] = None  # 其他信息
     traffic_source: Optional[str] = None
     traffic_source_detail: Optional[str] = None
     tracking_plan: Optional[str] = None
