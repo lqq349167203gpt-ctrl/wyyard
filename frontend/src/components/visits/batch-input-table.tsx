@@ -396,7 +396,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       type="time"
                       value={row.visit_time}
                       onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
-                      className={`h-7 text-[12px] w-[64px] time-no-icon rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                      className={`h-7 text-[12px] w-[56px] time-no-icon rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
                     />
                   </td>
                   <td className="pl-0 pr-1.5 py-1.5">
