@@ -268,8 +268,8 @@ export function EmotionalReleasesContent({ embedded }: { embedded?: boolean } = 
                   <TableCell className="pl-4 text-[#2b2f36]">{item.deal_date || "-"}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.nickname}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.purchase_count} 次</TableCell>
-                  <TableCell className="text-[#2b2f36]">¥{item.amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-[#2b2f36]">
+                  <TableCell className="text-[#2b2f36] tabular-nums">¥{item.amount.toLocaleString()}</TableCell>
+                  <TableCell className="text-[#2b2f36] tabular-nums">
                     {item.closers?.length ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
                   </TableCell>
                   <TableCell className="text-right pr-4">
