@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { X, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -22,16 +22,6 @@ export function CloserInput({ customers, value, onChange, disabled, defaultAmoun
   const [searchValue, setSearchValue] = useState("")
 
   const selectedIds = value.map(c => c.id)
-
-  // 第一个成交人的金额跟随 defaultAmount
-  useEffect(() => {
-    if (value.length > 0 && defaultAmount !== undefined) {
-      const first = value[0]
-      if (first.amount !== defaultAmount) {
-        onChange([{ ...first, amount: defaultAmount }, ...value.slice(1)])
-      }
-    }
-  }, [defaultAmount])
 
   const handleSelect = useCallback((customer: Customer) => {
     if (value.some(c => c.id === customer.id)) return
