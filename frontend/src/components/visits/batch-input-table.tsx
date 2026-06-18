@@ -22,13 +22,14 @@ interface Row {
   arrived: boolean
   feedback: string
   healing_notes: string
+  group_leader_feedback: string
   activities: string
 }
 
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, feedback: "", healing_notes: "", activities: "" }
+  return { key: nextKey++, visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, feedback: "", healing_notes: "", group_leader_feedback: "", activities: "" }
 }
 
 function initRows(): Row[] {
@@ -142,6 +143,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           arrived: v.arrived,
           feedback: v.feedback || "",
           healing_notes: v.healing_notes || "",
+          group_leader_feedback: v.group_leader_feedback || "",
           activities: (v.activities || []).map(a => `${a.name}${a.role ? `(${a.role})` : ""}`).join("、"),
         })
         ids[key] = v.id
@@ -176,6 +178,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           arrival_time: row.arrived ? row.visit_time : "",
           feedback: row.feedback,
           healing_notes: row.healing_notes,
+          group_leader_feedback: row.group_leader_feedback,
         })
         // 更新剩余次数
         if (result?.remaining_count !== undefined) {
@@ -201,6 +204,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           arrival_time: row.arrived ? row.visit_time : "",
           feedback: row.feedback,
           healing_notes: row.healing_notes,
+          group_leader_feedback: row.group_leader_feedback,
           space_id: spaceId || undefined,
         }
         console.log("[BATCH] 创建行:", payload)
@@ -340,7 +344,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">参与活动</th>
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">今日成交</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">客户反馈</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[220px]">疗愈记录</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[220px]">本次信息</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[220px]">组长反馈</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
               <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
@@ -470,6 +475,13 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <Input
                       value={row.healing_notes}
                       onChange={(e) => updateRow(row.key, "healing_notes", e.target.value)}
+                      className="h-7 text-[12px] [&]:border-[0.5px]"
+                    />
+                  </td>
+                  <td className="px-1.5 py-1.5">
+                    <Input
+                      value={row.group_leader_feedback}
+                      onChange={(e) => updateRow(row.key, "group_leader_feedback", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
                   </td>

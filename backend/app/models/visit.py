@@ -30,7 +30,8 @@ class VisitRecordBase(BaseModel):
     activity_participation: list = []  # [{name, role, participated}]
     experience: str = ""  # 活动参与体验
     feedback: str = ""  # 客户反馈
-    healing_notes: str = ""  # 疗愈记录
+    healing_notes: str = ""  # 本次信息
+    group_leader_feedback: str = ""  # 组长反馈
 
 
 class VisitRecordCreate(VisitRecordBase):

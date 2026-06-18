@@ -246,7 +246,7 @@ export default function ArrivalConfirmationView({
 
             {/* 疗愈记录 + 详情 */}
             <div className="flex items-start gap-2">
-              <span className="text-[12px] text-[#8f959e] shrink-0 w-14 mt-0.5">疗愈记录</span>
+              <span className="text-[12px] text-[#8f959e] shrink-0 w-14 mt-0.5">本次信息</span>
               <div className="text-[12px] text-[#2b2f36] leading-relaxed min-w-0 flex-1">
                 {hrMap[v.id]?.growth_record ? (
                   <>
@@ -306,7 +306,7 @@ export default function ArrivalConfirmationView({
       <Dialog open={!!editVisit} onOpenChange={(open) => !open && setEditVisit(null)}>
         <DialogContent className="max-w-md p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-4 border-b border-[#f0f0f0]">
-            <DialogTitle className="text-base">疗愈记录 - {editVisit?.nickname}</DialogTitle>
+            <DialogTitle className="text-base">本次信息 - {editVisit?.nickname}</DialogTitle>
           </DialogHeader>
           <div className="px-5 py-4">
             <div className="flex items-start gap-2">
@@ -314,7 +314,7 @@ export default function ArrivalConfirmationView({
               <textarea
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
-                placeholder="输入疗愈记录..."
+                placeholder="输入本次信息..."
                 rows={3}
                 className="flex-1 rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
               />

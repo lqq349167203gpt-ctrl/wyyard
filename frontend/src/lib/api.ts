@@ -432,6 +432,7 @@ export interface VisitRecord {
   activity_participation: { name: string; role: string; participated: boolean }[]
   experience: string
   feedback: string
+  group_leader_feedback: string
   healing_notes: string
   created_at: string
   updated_at: string
@@ -453,6 +454,7 @@ export interface VisitRecordCreate {
   arrived?: boolean
   arrival_time?: string
   feedback?: string
+  group_leader_feedback?: string
   healing_notes?: string
 }
 
@@ -485,7 +487,7 @@ export const visitApi = {
   },
   get: (id: string) => request<VisitRecord>(`/api/visits/${id}`),
   create: (data: VisitRecordCreate) => request<VisitRecord>("/api/visits", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<VisitRecordCreate> & { activity_participation?: { name: string; role: string; participated: boolean }[]; experience?: string; feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<VisitRecordCreate> & { activity_participation?: { name: string; role: string; participated: boolean }[]; experience?: string; feedback?: string; group_leader_feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/visits/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/visits/search-customers?q=${encodeURIComponent(keyword)}`),
   counts: (params?: { customerIds?: string; startDate?: string; endDate?: string; memberTypes?: string; spaceId?: string }) => {

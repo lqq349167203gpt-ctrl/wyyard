@@ -85,7 +85,7 @@ export default function HealingRecordForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg p-0 gap-0">
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
-          <DialogTitle className="text-base">{record ? "编辑疗愈记录" : "新增疗愈记录"}</DialogTitle>
+          <DialogTitle className="text-base">{record ? "编辑本次信息" : "新增本次信息"}</DialogTitle>
         </DialogHeader>
         <div className="px-6 py-5 space-y-4">
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
