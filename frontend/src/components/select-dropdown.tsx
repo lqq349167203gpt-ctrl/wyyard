@@ -122,11 +122,11 @@ export const SelectDropdown = memo(function SelectDropdown({
       const spaceLeft = menuRect.left - 8
 
       if (spaceRight >= subMenuWidth) {
-        s.left = menuRect.right - 1
+        s.left = menuRect.right - 0.5
       } else if (spaceLeft >= subMenuWidth) {
-        s.left = menuRect.left - subMenuWidth + 1
+        s.left = menuRect.left - subMenuWidth + 0.5
       } else {
-        s.left = menuRect.right - 1
+        s.left = menuRect.right - 0.5
       }
 
       // 垂直位置与一级菜单顶部对齐
