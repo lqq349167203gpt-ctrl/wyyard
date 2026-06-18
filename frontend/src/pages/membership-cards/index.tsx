@@ -248,7 +248,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
 
   // 判断表单各区块是否显示
   const showDuration = formCardType && !CARD_TYPES[formCardType]?.unlimited && !CARD_TYPES[formCardType]?.defaultCount && !CARD_TYPES[formCardType]?.duration
-  const showCount = formCardType && !CARD_TYPES[formCardType]?.unlimited
+  const showCount = formCardType && !CARD_TYPES[formCardType]?.unlimited && !CARD_TYPES[formCardType]?.duration
   const showDurationInfo = formCardType && CARD_TYPES[formCardType]?.duration  // 显示有效期信息（月卡/3月卡/半年卡/年卡/30次卡）
 
   const content = (
