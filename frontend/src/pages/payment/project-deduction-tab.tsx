@@ -13,7 +13,7 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 const PROJECT_TYPE_OPTIONS = [
-  { value: "membership-cards", label: "会员活动" },
+  { value: "membership-cards", label: "会员卡" },
   { value: "group-cases", label: "觉醒游戏" },
   { value: "emotional-releases", label: "情绪释放" },
   { value: "oh-card-readings", label: "OH卡梳理" },
@@ -21,7 +21,7 @@ const PROJECT_TYPE_OPTIONS = [
 ]
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
-  "membership-cards": "会员活动",
+  "membership-cards": "会员卡",
   "group-cases": "觉醒游戏",
   "emotional-releases": "情绪释放",
   "oh-card-readings": "OH卡梳理",
@@ -262,7 +262,7 @@ export function ProjectDeductionTab() {
               )}
             </div>
 
-            {/* 会员活动卡类型子选项 */}
+            {/* 会员卡卡类型子选项 */}
             {projectType === "membership-cards" && (
               <div className="grid grid-cols-[70px_1fr] items-start gap-2">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">卡类型</span>

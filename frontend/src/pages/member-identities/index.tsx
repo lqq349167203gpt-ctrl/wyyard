@@ -19,7 +19,7 @@ import { ActivityConfigContent } from "@/pages/activity-config"
 
 const CARD_TYPES = ["次卡", "体验会员", "常规通卡", "半年卡", "年卡"]
 const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
-const PAYMENT_CATEGORIES = ["会员活动", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "内部课程", "其他项目"]
+const PAYMENT_CATEGORIES = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "内部课程", "其他项目"]
 
 const TYPE_LABELS: Record<string, string> = {
   arrival: "到店情况",
@@ -33,7 +33,7 @@ const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", 
 const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "其他项目"]
 
 function getPaymentCategories(c: IdentityCondition): string[] {
-  if (c.type === "card") return ["会员活动"]
+  if (c.type === "card") return ["会员卡"]
   if (c.type === "course") return ["内部课程"]
   return c.payment_categories || []
 }
@@ -49,8 +49,8 @@ function conditionSummary(c: IdentityCondition): string {
     const categories = getPaymentCategories(c)
     const parts: string[] = []
     for (const cat of categories) {
-      if (cat === "会员活动" || cat === "内部课程") {
-        const prefix = cat === "会员活动" ? "持有" : "购买"
+      if (cat === "会员卡" || cat === "内部课程") {
+        const prefix = cat === "会员卡" ? "持有" : "购买"
         const subItems = c.items.length > 0 ? c.items.join("、") : "任意"
         const validity = c.validity === "active" ? "有效" : "含过期"
         parts.push(`${prefix}${validity}：${subItems}`)
@@ -475,10 +475,10 @@ export default function MemberIdentitiesPage() {
                             />
                           </div>
 
-                          {/* 会员活动子项 */}
-                          {getPaymentCategories(cond).includes("会员活动") && (
+                          {/* 会员卡子项 */}
+                          {getPaymentCategories(cond).includes("会员卡") && (
                             <div className="flex items-start gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right pt-1.5">会员活动</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right pt-1.5">会员卡</span>
                               <div className="flex flex-wrap gap-1.5">
                                 {CARD_TYPES.map((item) => (
                                   <label
@@ -530,8 +530,8 @@ export default function MemberIdentitiesPage() {
                             </div>
                           )}
 
-                          {/* 有效期（会员活动或内部课程选中时显示） */}
-                          {getPaymentCategories(cond).some((cat: string) => cat === "会员活动" || cat === "内部课程") && (
+                          {/* 有效期（会员卡或内部课程选中时显示） */}
+                          {getPaymentCategories(cond).some((cat: string) => cat === "会员卡" || cat === "内部课程") && (
                             <div className="flex items-center gap-2">
                               <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">有效期</span>
                               <SelectDropdown

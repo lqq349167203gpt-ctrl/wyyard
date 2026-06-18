@@ -5,6 +5,7 @@ import { ChevronDown, X, ChevronRight } from "lucide-react"
 interface Option {
   value: string
   label: string
+  rightLabel?: string  // 右侧标签，用于左对齐名称右对齐价格
   children?: Option[]  // 子选项，用于级联菜单
 }
 
@@ -237,7 +238,7 @@ export const SelectDropdown = memo(function SelectDropdown({
   // 查找当前值的标签（可能在子选项中）
   const findLabel = (opts: Option[], val: string): string | undefined => {
     for (const opt of opts) {
-      if (opt.value === val) return opt.label
+      if (opt.value === val) return opt.rightLabel ? `${opt.label} ${opt.rightLabel}` : opt.label
       if (opt.children) {
         const found = findLabel(opt.children, val)
         if (found) return found
@@ -305,7 +306,14 @@ export const SelectDropdown = memo(function SelectDropdown({
                       {isSelected && <span className="text-white text-[10px] leading-4 text-center block">✓</span>}
                     </span>
                   )}
-                  <span className="flex-1 truncate">{opt.label}</span>
+                  {opt.rightLabel ? (
+                    <>
+                      <span className="truncate">{opt.label}</span>
+                      <span className="text-[#8f959e] ml-2 shrink-0">{opt.rightLabel}</span>
+                    </>
+                  ) : (
+                    <span className="flex-1 truncate">{opt.label}</span>
+                  )}
                   {hasChildren && <ChevronRight className="h-3 w-3 text-[#8f959e] ml-1 shrink-0" />}
                 </div>
               )

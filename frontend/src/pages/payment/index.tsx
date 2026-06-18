@@ -9,7 +9,7 @@ import { OhCardReadingsContent } from "@/pages/oh-card-readings"
 import { ProjectDeductionTab } from "./project-deduction-tab"
 
 const PAYMENT_TABS = [
-  { key: "membership-cards", label: "会员活动", icon: CreditCard, component: MembershipCardContent, permission: "membership-cards" },
+  { key: "membership-cards", label: "会员卡", icon: CreditCard, component: MembershipCardContent, permission: "membership-cards" },
   { key: "group-cases", label: "觉醒游戏", icon: Wallet, component: GroupCasesContent, permission: "group-cases" },
   { key: "emotional-releases", label: "情绪释放", icon: Heart, component: EmotionalReleasesContent, permission: "emotional-releases" },
   { key: "oh-card-readings", label: "OH卡梳理", icon: Layers, component: OhCardReadingsContent, permission: "oh-card-readings" },

@@ -328,8 +328,8 @@ export default function DetailView({
           {activeTab === "purchase" && (() => {
             const today = new Date().toLocaleDateString("sv-SE")
             const allItems = detail!.purchase_summary || []
-            const memberItems = allItems.filter(s => s.type === "会员活动")
-            const otherItems = allItems.filter(s => s.type !== "会员活动")
+            const memberItems = allItems.filter(s => s.type === "会员卡")
+            const otherItems = allItems.filter(s => s.type !== "会员卡")
 
             // 会员卡：未过期在前，已过期在后
             const memberSorted = [...memberItems].sort((a, b) => {
@@ -363,9 +363,9 @@ export default function DetailView({
 
             return (
               <div>
-                {/* 会员活动 — 始终显示 */}
+                {/* 会员卡 — 始终显示 */}
                 <div className="flex items-start gap-2 py-3 border-b border-[#f0f0f0]">
-                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right pt-0.5">会员活动</span>
+                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right pt-0.5">会员卡</span>
                   <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">
@@ -462,7 +462,7 @@ export default function DetailView({
                       <TableCell className="py-1 text-[12px]">{r.quantity}</TableCell>
                       <TableCell className="py-1 text-[12px]">¥{r.amount.toLocaleString()}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.effective_date || "-"}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员活动" ? "不限" : "-")}</TableCell>
+                      <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员卡" ? "不限" : "-")}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.closer_name || "-"}</TableCell>
                     </TableRow>
                   ))}

@@ -12,7 +12,7 @@ export interface ChatMessage {
 
 const EXAMPLE_QUESTIONS = [
   "怎么添加客户？",
-  "会员活动在哪里？",
+  "会员卡在哪里？",
   "怎么安排活动？",
   "如何查看操作日志？",
   "今天张三来参加了瑜伽课",

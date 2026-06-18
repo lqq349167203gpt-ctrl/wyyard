@@ -51,7 +51,7 @@ export default function EmotionalReleaseSessionsPage() {
   const [purchaseAmount, setPurchaseAmount] = useState("")
   const [purchaseSaving, setPurchaseSaving] = useState(false)
 
-  // 会员活动余额不足警告弹窗
+  // 会员卡余额不足警告弹窗
   const [warningOpen, setWarningOpen] = useState(false)
   const [warningMsg, setWarningMsg] = useState("")
   const handleApiError = (error: any) => {
@@ -539,7 +539,7 @@ export default function EmotionalReleaseSessionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 会员活动余额不足警告 */}
+      {/* 会员卡余额不足警告 */}
       <AlertDialog open={warningOpen} onOpenChange={setWarningOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

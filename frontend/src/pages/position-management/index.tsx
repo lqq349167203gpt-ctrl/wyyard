@@ -21,7 +21,7 @@ const ALL_PAGES = [
   { key: "class-records", label: "人员安排" },
   { key: "daily-activities", label: "活动安排" },
   { key: "payment", label: "付费项目" },
-  { key: "membership-cards", label: "会员活动" },
+  { key: "membership-cards", label: "会员卡" },
   { key: "group-cases", label: "觉醒游戏" },
   { key: "emotional-releases", label: "情绪释放" },
   { key: "oh-card-readings", label: "OH卡梳理" },

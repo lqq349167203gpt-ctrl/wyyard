@@ -285,7 +285,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
       {/* 统计 */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground mt-[6px]">
-          <span>会员活动次数，含沙龙活动（非公益）、觉醒游戏旁观位、情绪释放旁观位。</span>
+          <span>会员卡次数，含沙龙活动（非公益）、觉醒游戏旁观位、情绪释放旁观位。</span>
           {totalItems > 0 && (
             <span>共 {totalItems} 条记录</span>
           )}
@@ -299,7 +299,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
         ) : paginatedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <CreditCard className="h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">暂无会员活动记录</p>
+            <p className="text-sm text-muted-foreground">暂无会员卡记录</p>
             <p className="text-xs text-muted-foreground mt-1">点击上方"新增"按钮添加</p>
           </div>
         ) : (
@@ -308,7 +308,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4">成交日期</TableHead>
                 <TableHead>用户</TableHead>
-                <TableHead>会员活动类型</TableHead>
+                <TableHead>会员卡类型</TableHead>
                 <TableHead>价格</TableHead>
                 <TableHead>生效日期</TableHead>
                 <TableHead>到期日期</TableHead>
@@ -369,7 +369,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">{editingCard ? "编辑会员活动" : "新增会员活动"}</DialogTitle>
+            <DialogTitle className="text-base">{editingCard ? "编辑会员卡" : "新增会员卡"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4" {...enterToNext}>
             {/* 成交日期 */}
@@ -400,13 +400,13 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
               <Input type="date" value={formEffectiveDate} onChange={(e) => setFormEffectiveDate(e.target.value)} className="h-8 text-xs" />
             </div>
 
-            {/* 会员活动类型 */}
+            {/* 会员卡类型 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">会员活动</span>
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">会员卡</span>
               <SelectDropdown
                 value={formCardType}
-                options={Object.entries(CARD_TYPES).map(([type, config]) => ({ value: type, label: `${type} ¥${config.price.toLocaleString()}` }))}
-                placeholder="请选择会员活动"
+                options={Object.entries(CARD_TYPES).map(([type, config]) => ({ value: type, label: type, rightLabel: `¥${config.price.toLocaleString()}` }))}
+                placeholder="请选择会员卡"
                 onChange={(v) => handleSelectCardType(v)}
               />
             </div>
@@ -579,7 +579,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
   )
 
   if (embedded) return content
-  return <div className="px-6 pt-12 pb-6 space-y-3"><h1 className="text-lg font-semibold">会员活动</h1>{content}</div>
+  return <div className="px-6 pt-12 pb-6 space-y-3"><h1 className="text-lg font-semibold">会员卡</h1>{content}</div>
 }
 
 export default function MembershipCardsPage() {

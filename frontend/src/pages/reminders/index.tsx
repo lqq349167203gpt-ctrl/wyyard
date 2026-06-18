@@ -23,7 +23,7 @@ const CONDITION_TYPE_OPTIONS = [
 ]
 
 const ACTIVITY_TYPE_OPTIONS = [
-  { value: "membership", label: "会员活动" },
+  { value: "membership", label: "会员卡" },
   { value: "emotional_release", label: "情绪释放" },
   { value: "group_case", label: "觉醒游戏" },
   { value: "energy_knot", label: "能量结" },
