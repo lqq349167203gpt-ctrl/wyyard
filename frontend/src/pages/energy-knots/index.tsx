@@ -351,6 +351,9 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
               <div>
                 <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={parseFloat(formAmount) || 0} />
                 {closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}
+                {formClosers.length > 0 && formClosers.reduce((sum, c) => sum + c.amount, 0) !== parseFloat(formAmount || "0") && (
+                  <span className="text-[11px] text-[#f54a45] mt-0.5 block">成交人总金额与付费金额不一致</span>
+                )}
               </div>
             </div>
 
@@ -394,10 +397,7 @@ export function EnergyKnotsContent({ embedded }: { embedded?: boolean } = {}) {
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">成交人</span>
               <span className="text-[12px] text-[#2b2f36] pt-0.5">{formClosers.length > 0 ? formClosers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : "-"}</span>
-              {formClosers.length > 0 && formClosers.reduce((sum, c) => sum + c.amount, 0) !== parseFloat(formAmount || "0") && (
-                <span className="text-[11px] text-[#f54a45] mt-0.5 block">成交人总金额与付费金额不一致</span>
-              )}
-            </div>
+                          </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setConfirmOpen(false)}>修改</Button>
               <Button size="sm" onClick={handleConfirmSave} disabled={saving}>
