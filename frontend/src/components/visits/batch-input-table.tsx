@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Plus, Trash2, FileText, GripVertical, ClipboardEdit } from "lucide-react"
+import { Plus, Trash2, FileText, GripVertical, Edit } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -502,7 +502,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                           onClick={() => onCustomerEdit?.(row.customer_id)}
                           className="text-[#8f959e] hover:text-[#3370ff] mr-1"
                         >
-                          <ClipboardEdit className="h-3.5 w-3.5" />
+                          <Edit className="h-3.5 w-3.5" />
                         </button>
                       </>
                     )}
