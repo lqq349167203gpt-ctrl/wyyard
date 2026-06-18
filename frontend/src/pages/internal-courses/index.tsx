@@ -280,12 +280,12 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
                       {item.course_type.split("：")[0]}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-[#2b2f36]">¥{item.price.toLocaleString()}</TableCell>
+                  <TableCell className="text-[#2b2f36] font-price">¥{item.price.toLocaleString()}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.effective_date}</TableCell>
                   <TableCell className="text-[#2b2f36]">
                     {item.expiry_date || <span className="text-[12px] text-[#4e535a] font-light">-</span>}
                   </TableCell>
-                  <TableCell className="text-[#2b2f36]">
+                  <TableCell className="text-[#2b2f36] font-price">
                     {item.closers?.length ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
                   </TableCell>
                   <TableCell className="text-right pr-4">
