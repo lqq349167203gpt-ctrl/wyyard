@@ -105,7 +105,6 @@ export const SelectDropdown = memo(function SelectDropdown({
   }, [dropdownWidth])
 
   const calcSubMenuPos = useCallback((optEl: HTMLElement, opt: Option) => {
-    const r = optEl.getBoundingClientRect()
     const menuEl = menuRef.current
     const menuRect = menuEl?.getBoundingClientRect()
     const subMenuWidth = 120
@@ -117,7 +116,7 @@ export const SelectDropdown = memo(function SelectDropdown({
       width: subMenuWidth,
     }
 
-    // 二级菜单紧挨着一级菜单右侧
+    // 二级菜单紧挨着一级菜单右侧，垂直位置与一级菜单顶部对齐
     if (menuRect) {
       const spaceRight = window.innerWidth - menuRect.right - 8
       const spaceLeft = menuRect.left - 8
@@ -129,17 +128,17 @@ export const SelectDropdown = memo(function SelectDropdown({
       } else {
         s.left = menuRect.right - 1
       }
-    }
 
-    // 垂直位置与悬停的菜单项对齐
-    const below = window.innerHeight - r.top
-    const above = r.bottom
-    if (below >= h || below >= above) {
-      s.top = r.top
-      s.maxHeight = Math.min(h, below - 8)
-    } else {
-      s.bottom = window.innerHeight - r.bottom
-      s.maxHeight = Math.min(h, above - 8)
+      // 垂直位置与一级菜单顶部对齐
+      const below = window.innerHeight - menuRect.top
+      const above = menuRect.bottom
+      if (below >= h || below >= above) {
+        s.top = menuRect.top
+        s.maxHeight = Math.min(h, below - 8)
+      } else {
+        s.bottom = window.innerHeight - menuRect.bottom
+        s.maxHeight = Math.min(h, above - 8)
+      }
     }
 
     setSubMenuPos(s)
@@ -314,7 +313,7 @@ export const SelectDropdown = memo(function SelectDropdown({
           </div>
           {hoveredOption?.children && hoveredOption.children.length > 0 && (
             <div ref={subMenuRef}
-              className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto"
+              className="bg-white rounded-r-md border border-l-0 border-[#e8e8e8] overflow-y-auto"
               style={subMenuPos}
               onMouseEnter={handleSubMenuMouseEnter}
               onMouseLeave={handleSubMenuMouseLeave}
