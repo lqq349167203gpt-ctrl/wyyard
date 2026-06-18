@@ -44,6 +44,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
   const [formEffectiveDate, setFormEffectiveDate] = useState(today)
   const [formClosers, setFormClosers] = useState<Closer[]>([])
   const [formOrganizationId, setFormOrganizationId] = useState("")
+  const [formAmount, setFormAmount] = useState<number>(0)
   const [formDealDate, setFormDealDate] = useState(today)
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
@@ -134,6 +135,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
     setFormCustomerId("")
     setFormNickname("")
     setFormCourseType("")
+    setFormAmount(0)
     setFormEffectiveDate(today)
     setFormClosers([])
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
@@ -146,6 +148,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
     setFormCustomerId(item.customer_id)
     setFormNickname(item.nickname)
     setFormCourseType(item.course_type)
+    setFormAmount(item.price)
     setFormEffectiveDate(item.effective_date)
     setFormClosers(item.closers?.length ? item.closers : (item.closer_id ? [{ id: item.closer_id, name: item.closer_name || "", amount: 0 }] : []))
     setFormOrganizationId(item.organization_id || "")
@@ -162,7 +165,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
         customer_id: formCustomerId,
         nickname: formNickname,
         course_type: formCourseType,
-        price: config.price,
+        price: formAmount,
         effective_date: formEffectiveDate,
         closer_id: formClosers[0]?.id || null,
         closer_name: formClosers[0]?.name || null,
@@ -345,7 +348,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
                         ? "border-[#3370ff] bg-[#f0f5ff]"
                         : "border-[#e0e0e0] hover:border-[#c0c0c0]"
                     }`}
-                    onClick={() => setFormCourseType(type)}
+                    onClick={() => { setFormCourseType(type); setFormAmount(COURSE_TYPES[type].price) }}
                   >
                     <div className={`text-[12px] font-medium ${formCourseType === type ? "text-[#3370ff]" : "text-[#2b2f36]"}`}>{type}</div>
                     <div className="text-[11px] text-[#8f959e] mt-0.5">{config.desc} · ¥{config.price.toLocaleString()}/{config.duration}</div>
@@ -354,7 +357,19 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
               </div>
             </div>
 
-            {/* 成交人搜索 */}
+            {/* 付费金额 */}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
+              <Input
+                type="number"
+                value={formAmount || ""}
+                onChange={(e) => setFormAmount(Number(e.target.value) || 0)}
+                placeholder="输入金额"
+                className="h-8 text-xs"
+              />
+            </div>
+
+            {/* 所属组织 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">所属组织</span>
               <SelectDropdown
@@ -372,7 +387,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
 
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button size="sm" onClick={handleSave} disabled={saving || !formCustomerId || !formCourseType}>
+              <Button size="sm" onClick={handleSave} disabled={saving || !formCustomerId || !formCourseType || !formAmount}>
                 {saving ? "保存中..." : "保存"}
               </Button>
             </div>
