@@ -1088,7 +1088,7 @@ export function ActivityBatchTable({
         </div>
       </div>
 
-      <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center mt-1.5">
+      <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
         <button
           onClick={() => handleCreate("class", courseTypes.length > 0 ? courseTypes[0].name : "")}
           className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"
