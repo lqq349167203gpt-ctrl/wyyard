@@ -220,6 +220,7 @@ function OtherProjectList() {
       return
     }
     setCloserError(false)
+    if (formClosers.length > 0 && formClosers.reduce((sum, c) => sum + c.amount, 0) !== (parseFloat(formFee) || 0)) return
     setConfirmOpen(true)
   }
 

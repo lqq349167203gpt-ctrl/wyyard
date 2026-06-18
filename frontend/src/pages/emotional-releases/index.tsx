@@ -153,6 +153,7 @@ export function EmotionalReleasesContent({ embedded }: { embedded?: boolean } = 
       return
     }
     setCloserError(false)
+    if (formClosers.length > 0 && formClosers.reduce((sum, c) => sum + c.amount, 0) !== (parseFloat(formAmount) || 0)) return
     setConfirmOpen(true)
   }
 

@@ -208,6 +208,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
       return
     }
     setCloserError(false)
+    if (formClosers.length > 0 && formClosers.reduce((sum, c) => sum + c.amount, 0) !== (parseFloat(formPrice) || 0)) return
     setConfirmOpen(true)
   }
 
