@@ -235,12 +235,7 @@ export default function OrganizationsPage() {
   }
 
   // 活动类型 CRUD
-  const isAllOrg = activeOrgId === "__all__"
-  const orgCourseTypes = isAllOrg
-    ? courseTypes.filter(t => !t.organization_id)
-    : activeOrgId
-      ? courseTypes.filter(t => t.organization_id === activeOrgId)
-      : []
+  const orgCourseTypes = activeOrgId ? courseTypes.filter(t => t.organization_id === activeOrgId) : []
 
   const handleOpenActCreate = () => {
     setActEditingType(null)
@@ -257,17 +252,16 @@ export default function OrganizationsPage() {
   }
 
   const handleSaveAct = async () => {
-    if (!actFormName.trim()) return
-    const orgId = isAllOrg ? "" : (activeOrgId || "")
+    if (!actFormName.trim() || !activeOrgId) return
     setActFormError("")
     try {
       if (actEditingType) {
         if (actFormName.trim() !== actEditingType) {
           await courseTypeApi.rename(actEditingType, actFormName.trim())
         }
-        await courseTypeApi.update(actFormName.trim(), { organization_id: orgId })
+        await courseTypeApi.update(actFormName.trim(), { organization_id: activeOrgId })
       } else {
-        await courseTypeApi.create(actFormName.trim(), orgId)
+        await courseTypeApi.create(actFormName.trim(), activeOrgId)
       }
       setActDialogOpen(false)
       const types = await courseTypeApi.list().catch(() => [] as CourseType[])
@@ -351,28 +345,9 @@ export default function OrganizationsPage() {
           <div className="flex-1 overflow-y-auto py-1">
             {loading ? (
               <div className="py-8 text-center text-xs text-muted-foreground">加载中...</div>
+            ) : organizations.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">暂无组织</div>
             ) : (
-              <>
-                {/* 全部 - 未分配组织的活动类型 */}
-                <div
-                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
-                    isAllOrg
-                      ? "bg-[#f0f5ff] text-[#3370ff]"
-                      : "text-[#2b2f36] hover:bg-[#f7f8fa]"
-                  }`}
-                  onClick={() => { setActiveOrgId("__all__"); setActiveTab("activities") }}
-                >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Building2 className={`h-4 w-4 shrink-0 ${isAllOrg ? "text-[#3370ff]" : "text-[#8f959e]"}`} />
-                    <span className="text-[13px] truncate">全部</span>
-                  </div>
-                  <span className={`text-[11px] ${isAllOrg ? "text-[#3370ff]/70" : "text-[#8f959e]"}`}>
-                    {courseTypes.filter(t => !t.organization_id).length}
-                  </span>
-                </div>
-                {organizations.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-muted-foreground">暂无组织</div>
-                ) : (
               sortedOrganizations.map((org) => {
                 const isActive = activeOrgId === org.id
                 const count = getMemberNicknames(org).length
@@ -430,8 +405,6 @@ export default function OrganizationsPage() {
                   </div>
                 )
               })
-                )}
-              </>
             )}
           </div>
         </div>
@@ -441,14 +414,12 @@ export default function OrganizationsPage() {
           {/* Tab 切换 + 操作按钮 */}
           <div className="flex items-center justify-between px-4 h-[45px] border-b border-[#f0f0f0] shrink-0">
             <div className="flex items-center gap-1">
-              {!isAllOrg && (
-                <button
-                  className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "members" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
-                  onClick={() => setActiveTab("members")}
-                >
-                  成员列表
-                </button>
-              )}
+              <button
+                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "members" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
+                onClick={() => setActiveTab("members")}
+              >
+                成员列表
+              </button>
               <button
                 className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "activities" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
                 onClick={() => setActiveTab("activities")}
