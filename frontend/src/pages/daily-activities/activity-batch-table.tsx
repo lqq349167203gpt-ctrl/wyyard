@@ -734,7 +734,7 @@ export function ActivityBatchTable({
 
   return (
     <div className="bg-white rounded-lg">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" style={{ scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
         <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
