@@ -339,7 +339,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="pl-0 pr-1.5 py-2 text-left font-normal w-[56px]">时间</th>
               <th className="pl-0 pr-1.5 py-2 text-left font-normal w-[74px]">昵称</th>
               <th className="px-1.5 py-2 text-left font-normal w-[80px]">会员身份</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[56px]">剩余次数</th>
+              <th className="px-1.5 py-2 text-left font-normal w-[64px]">剩余次数</th>
               <th className="px-1.5 py-2 text-left font-normal w-[240px]">本次需求</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">邀约人</th>
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">参与活动</th>
