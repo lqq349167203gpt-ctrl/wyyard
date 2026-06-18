@@ -90,7 +90,11 @@ function resolveIcsCourseKey(courseName: string): string {
 
 function getTypeSelectValue(type: ActivityType, courseName: string, classCourseType?: string): string {
   if (type === "ics") return resolveIcsCourseKey(courseName)
-  if (type === "class" && classCourseType) return `class:${classCourseType}`
+  if (type === "class") {
+    if (classCourseType) return `class:${classCourseType}`
+    // 如果没有指定课程类型，返回 "class"（用于显示默认值）
+    return "class"
+  }
   return type
 }
 
@@ -268,10 +272,9 @@ export function ActivityBatchTable({
 
   // 动态构建类型选项
   const typeOptions = useMemo(() => {
-    const classSubTypes = courseTypes.map(t => ({ value: `class:${t.name}`, label: t.name, group: "class" }))
+    const classChildren = courseTypes.map(t => ({ value: `class:${t.name}`, label: t.name }))
     return [
-      { value: "class", label: "沙龙活动", group: "class", isGroupHeader: true },
-      ...classSubTypes,
+      { value: "class", label: "沙龙活动", children: classChildren },
       { value: "gcs", label: "觉醒游戏" },
       { value: "ers", label: "情绪释放" },
       { value: "ocr", label: "OH卡梳理" },

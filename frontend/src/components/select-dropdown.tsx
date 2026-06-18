@@ -1,12 +1,11 @@
 import { memo, useRef, useCallback, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { ChevronDown, X } from "lucide-react"
+import { ChevronDown, X, ChevronRight } from "lucide-react"
 
 interface Option {
   value: string
   label: string
-  group?: string  // 分组标识，用于缩进显示
-  isGroupHeader?: boolean  // 是否是分组标题
+  children?: Option[]  // 子选项，用于级联菜单
 }
 
 interface SelectDropdownSingleProps {
@@ -68,11 +67,16 @@ export const SelectDropdown = memo(function SelectDropdown({
 }: SelectDropdownProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const subMenuRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<React.CSSProperties>({})
+  const [hoveredOption, setHoveredOption] = useState<Option | null>(null)
+  const [subMenuPos, setSubMenuPos] = useState<React.CSSProperties>({})
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const close = useCallback(() => {
     setOpen(false)
+    setHoveredOption(null)
     activeClose = null
   }, [])
 
@@ -88,7 +92,7 @@ export const SelectDropdown = memo(function SelectDropdown({
       position: "fixed",
       left: r.left,
       width: dropdownWidth ?? r.width,
-      zIndex: 2147483647, // 最大 z-index 值
+      zIndex: 2147483647,
     }
     if (below >= h || below >= above) {
       s.top = r.bottom + 4
@@ -98,6 +102,43 @@ export const SelectDropdown = memo(function SelectDropdown({
       s.maxHeight = Math.min(h, above - 8)
     }
     setPos(s)
+  }, [dropdownWidth])
+
+  const calcSubMenuPos = useCallback((optEl: HTMLElement, opt: Option) => {
+    const r = optEl.getBoundingClientRect()
+    const menuWidth = dropdownWidth ?? 110
+    const subMenuWidth = 120
+    const h = 200
+    const spaceRight = window.innerWidth - r.right - menuWidth - 8
+    const spaceLeft = r.left - 8
+
+    const s: React.CSSProperties = {
+      position: "fixed",
+      zIndex: 2147483647,
+      width: subMenuWidth,
+    }
+
+    // 优先显示在右侧，空间不够则显示在左侧
+    if (spaceRight >= subMenuWidth) {
+      s.left = r.right + menuWidth + 4
+    } else if (spaceLeft >= subMenuWidth) {
+      s.left = r.left - subMenuWidth - 4
+    } else {
+      s.left = r.right + menuWidth + 4
+    }
+
+    // 垂直位置与父菜单项对齐
+    const below = window.innerHeight - r.top
+    const above = r.bottom
+    if (below >= h || below >= above) {
+      s.top = r.top
+      s.maxHeight = Math.min(h, below - 8)
+    } else {
+      s.bottom = window.innerHeight - r.bottom
+      s.maxHeight = Math.min(h, above - 8)
+    }
+
+    setSubMenuPos(s)
   }, [dropdownWidth])
 
   const handleToggle = useCallback(() => {
@@ -117,10 +158,9 @@ export const SelectDropdown = memo(function SelectDropdown({
     if (!open) return
     const h = (e: Event) => {
       const target = e.target as HTMLElement
-      // 点击当前下拉框自身（触发按钮或菜单项）不关闭
       if (rootRef.current?.contains(target)) return
       if (menuRef.current?.contains(target)) return
-      // 点击其他区域一律关闭
+      if (subMenuRef.current?.contains(target)) return
       close()
     }
     const t = setTimeout(() => {
@@ -156,10 +196,53 @@ export const SelectDropdown = memo(function SelectDropdown({
     }
   }, [multi, value, onChange, close])
 
+  const handleMouseEnter = useCallback((opt: Option, e: React.MouseEvent) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+    if (opt.children && opt.children.length > 0) {
+      setHoveredOption(opt)
+      calcSubMenuPos(e.currentTarget as HTMLElement, opt)
+    } else {
+      setHoveredOption(null)
+    }
+  }, [calcSubMenuPos])
+
+  const handleMouseLeave = useCallback(() => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredOption(null)
+    }, 150)
+  }, [])
+
+  const handleSubMenuMouseEnter = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+  }, [])
+
+  const handleSubMenuMouseLeave = useCallback(() => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredOption(null)
+    }, 150)
+  }, [])
+
   const currentLabels = multi && Array.isArray(value)
     ? value.map(v => options.find(o => o.value === v)?.label).filter(Boolean)
     : []
-  const currentLabel = multi ? "" : options.find(o => o.value === (value as string))?.label
+  // 查找当前值的标签（可能在子选项中）
+  const findLabel = (opts: Option[], val: string): string | undefined => {
+    for (const opt of opts) {
+      if (opt.value === val) return opt.label
+      if (opt.children) {
+        const found = findLabel(opt.children, val)
+        if (found) return found
+      }
+    }
+    return undefined
+  }
+  const currentLabel = multi ? "" : findLabel(options, value as string)
   const sm = size === "sm"
 
   return (
@@ -201,26 +284,57 @@ export const SelectDropdown = memo(function SelectDropdown({
       </button>
 
       {open && createPortal(
-        <div ref={menuRef} className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={pos}>
-          {options.map((opt) => {
-            const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
-            const isIndented = opt.group && !opt.isGroupHeader
-            return (
-              <button key={opt.value}
-                type="button"
-                className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""} ${isIndented ? "pl-6 text-[#4e535a]" : ""} ${opt.isGroupHeader ? "font-medium text-[#2b2f36] cursor-default" : ""}`}
-                onMouseDown={opt.isGroupHeader ? undefined : () => select(opt.value)}
-              >
-                {multi && !hideCheckbox && !opt.isGroupHeader && (
-                  <span className={`inline-block w-4 h-4 mr-2 rounded border align-middle ${isSelected ? "bg-[#3370ff] border-[#3370ff]" : "border-[#d0d3d6]"}`}>
-                    {isSelected && <span className="text-white text-[10px] leading-4 text-center block">✓</span>}
-                  </span>
-                )}
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>,
+        <>
+          <div ref={menuRef} className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={pos}>
+            {options.map((opt) => {
+              const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
+              const hasChildren = opt.children && opt.children.length > 0
+              const isHovered = hoveredOption?.value === opt.value
+              return (
+                <div key={opt.value}
+                  className={`flex items-center justify-between w-full text-left truncate ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""} ${isHovered ? "bg-[#f7f8fa]" : "hover:bg-[#f7f8fa]"} cursor-pointer`}
+                  onMouseDown={hasChildren ? undefined : () => select(opt.value)}
+                  onMouseEnter={(e) => handleMouseEnter(opt, e)}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  {multi && !hideCheckbox && (
+                    <span className={`inline-block w-4 h-4 mr-2 rounded border align-middle ${isSelected ? "bg-[#3370ff] border-[#3370ff]" : "border-[#d0d3d6]"}`}>
+                      {isSelected && <span className="text-white text-[10px] leading-4 text-center block">✓</span>}
+                    </span>
+                  )}
+                  <span className="flex-1 truncate">{opt.label}</span>
+                  {hasChildren && <ChevronRight className="h-3 w-3 text-[#8f959e] ml-1 shrink-0" />}
+                </div>
+              )
+            })}
+          </div>
+          {hoveredOption?.children && hoveredOption.children.length > 0 && (
+            <div ref={subMenuRef}
+              className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto"
+              style={subMenuPos}
+              onMouseEnter={handleSubMenuMouseEnter}
+              onMouseLeave={handleSubMenuMouseLeave}
+            >
+              {hoveredOption.children.map((child) => {
+                const isSelected = multi && Array.isArray(value) ? value.includes(child.value) : false
+                return (
+                  <button key={child.value}
+                    type="button"
+                    className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
+                    onMouseDown={() => select(child.value)}
+                  >
+                    {multi && !hideCheckbox && (
+                      <span className={`inline-block w-4 h-4 mr-2 rounded border align-middle ${isSelected ? "bg-[#3370ff] border-[#3370ff]" : "border-[#d0d3d6]"}`}>
+                        {isSelected && <span className="text-white text-[10px] leading-4 text-center block">✓</span>}
+                      </span>
+                    )}
+                    {child.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </>,
         portalContainer || document.body
       )}
     </div>
