@@ -16,6 +16,7 @@ backend/uploads/
 node_modules/
 dist/
 .vite/
+.next/
 
 # 通用
 .DS_Store
