@@ -5,6 +5,8 @@ import { ChevronDown, X } from "lucide-react"
 interface Option {
   value: string
   label: string
+  group?: string  // 分组标识，用于缩进显示
+  isGroupHeader?: boolean  // 是否是分组标题
 }
 
 interface SelectDropdownSingleProps {
@@ -202,13 +204,14 @@ export const SelectDropdown = memo(function SelectDropdown({
         <div ref={menuRef} className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={pos}>
           {options.map((opt) => {
             const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
+            const isIndented = opt.group && !opt.isGroupHeader
             return (
               <button key={opt.value}
                 type="button"
-                className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
-                onMouseDown={() => select(opt.value)}
+                className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""} ${isIndented ? "pl-6 text-[#4e535a]" : ""} ${opt.isGroupHeader ? "font-medium text-[#2b2f36] cursor-default" : ""}`}
+                onMouseDown={opt.isGroupHeader ? undefined : () => select(opt.value)}
               >
-                {multi && !hideCheckbox && (
+                {multi && !hideCheckbox && !opt.isGroupHeader && (
                   <span className={`inline-block w-4 h-4 mr-2 rounded border align-middle ${isSelected ? "bg-[#3370ff] border-[#3370ff]" : "border-[#d0d3d6]"}`}>
                     {isSelected && <span className="text-white text-[10px] leading-4 text-center block">✓</span>}
                   </span>
