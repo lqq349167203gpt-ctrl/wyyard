@@ -521,7 +521,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         </div>
       </div>
 
-      <div className="px-3 py-2.5 mt-1.5 border-t border-[#f0f1f2] flex items-center">
+      <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
         <button
           onClick={addRow}
           className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"
