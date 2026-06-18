@@ -1191,6 +1191,7 @@ export interface OtherProject {
   id: string
   customer_id: string
   nickname: string
+  category: string | null
   project_name: string
   fee: number
   activity_mode: string
@@ -1211,9 +1212,10 @@ export interface OtherProject {
 export interface OtherProjectCreate {
   customer_id: string
   nickname: string
+  category?: string | null
   project_name: string
   fee: number
-  activity_mode: string
+  activity_mode?: string
   effective_date: string
   duration_type?: string | null
   duration_value?: number | null

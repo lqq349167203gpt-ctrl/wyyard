@@ -36,10 +36,13 @@ export default function ClassRecordsPage() {
   })
 
   const [detailDate, setDetailDate] = useState(() => {
-    const saved = localStorage.getItem("visit_selected_date")
+    const saved = localStorage.getItem("shared-selected-date") || localStorage.getItem("visit_selected_date")
     return saved || today
   })
-  useEffect(() => { localStorage.setItem("visit_selected_date", detailDate) }, [detailDate])
+  useEffect(() => {
+    localStorage.setItem("shared-selected-date", detailDate)
+    localStorage.setItem("visit_selected_date", detailDate)
+  }, [detailDate])
   const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [customerDetailOpen, setCustomerDetailOpen] = useState(false)

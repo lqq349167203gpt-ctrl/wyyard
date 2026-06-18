@@ -60,6 +60,17 @@ def list_courses() -> List[InternalCourse]:
     return [v for v in _courses.values() if not v.is_deleted]
 
 
+def has_active_course(customer_id: str) -> bool:
+    """判断用户是否有有效期内的内部课程"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    for c in _courses.values():
+        if c.is_deleted or c.customer_id != customer_id:
+            continue
+        if c.effective_date and c.expiry_date and c.effective_date <= today <= c.expiry_date:
+            return True
+    return False
+
+
 def get_course(course_id: str) -> Optional[InternalCourse]:
     course = _courses.get(course_id)
     if course and course.is_deleted:

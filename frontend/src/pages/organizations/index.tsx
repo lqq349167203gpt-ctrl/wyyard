@@ -78,7 +78,14 @@ export default function OrganizationsPage() {
 
   const activeOrg = organizations.find(o => o.id === activeOrgId) || null
 
-  const sortedOrganizations = [...organizations].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+  const FIXED_ORG_NAME = "无忧茶苑"
+
+  const sortedOrganizations = [...organizations].sort((a, b) => {
+    // 无忧茶苑始终置顶
+    if (a.name === FIXED_ORG_NAME) return -1
+    if (b.name === FIXED_ORG_NAME) return 1
+    return (a.sort_order ?? 9999) - (b.sort_order ?? 9999)
+  })
 
   const handleMoveOrg = async (org: Organization, direction: "up" | "down") => {
     const idx = sortedOrganizations.findIndex(o => o.id === org.id)
@@ -161,6 +168,7 @@ export default function OrganizationsPage() {
   }
 
   const handleOpenEdit = (org: Organization) => {
+    if (org.name === FIXED_ORG_NAME) return
     setEditingOrg(org)
     setOrgName(org.name)
     setNameError("")
@@ -210,7 +218,7 @@ export default function OrganizationsPage() {
   }
 
   const handleDeleteOrg = async () => {
-    if (!deletingOrg) return
+    if (!deletingOrg || deletingOrg.name === FIXED_ORG_NAME) return
     try {
       await organizationApi.delete(deletingOrg.id)
       if (activeOrgId === deletingOrg.id) {
@@ -362,42 +370,48 @@ export default function OrganizationsPage() {
                     onClick={() => setActiveOrgId(org.id)}
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "up") }}>
-                          <ArrowUp className="h-3 w-3" />
-                        </button>
-                        <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "down") }}>
-                          <ArrowDown className="h-3 w-3" />
-                        </button>
-                      </div>
+                      {org.name !== FIXED_ORG_NAME && (
+                        <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "up") }}>
+                            <ArrowUp className="h-3 w-3" />
+                          </button>
+                          <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "down") }}>
+                            <ArrowDown className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
                       <Building2 className={`h-4 w-4 shrink-0 ${isActive ? "text-[#3370ff]" : "text-[#8f959e]"}`} />
                       <span className="text-[13px] truncate">{org.name}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleOpenEdit(org)
-                        }}
-                      >
-                        <Edit className="h-3 w-3 text-[#8f959e]" />
-                      </button>
-                      <button
-                        className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (org.member_ids.length > 0) {
-                            setErrorMessage("删除失败，该组织中存在成员")
-                            setErrorDialogOpen(true)
-                            return
-                          }
-                          setDeletingOrg(org)
-                          setDeleteDialogOpen(true)
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3 text-[#8f959e]" />
-                      </button>
+                      {org.name !== FIXED_ORG_NAME && (
+                        <>
+                          <button
+                            className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenEdit(org)
+                            }}
+                          >
+                            <Edit className="h-3 w-3 text-[#8f959e]" />
+                          </button>
+                          <button
+                            className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (org.member_ids.length > 0) {
+                                setErrorMessage("删除失败，该组织中存在成员")
+                                setErrorDialogOpen(true)
+                                return
+                              }
+                              setDeletingOrg(org)
+                              setDeleteDialogOpen(true)
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 text-[#8f959e]" />
+                          </button>
+                        </>
+                      )}
                       <span className={`text-[11px] ${isActive ? "text-[#3370ff]/70" : "text-[#8f959e]"}`}>
                         {count}
                       </span>

@@ -34,11 +34,10 @@ import RemindersPage from "@/pages/reminders"
 import BusinessRemindersPage from "@/pages/business-reminders"
 import TrafficRecordsPage from "@/pages/traffic-records"
 import ActivityRecordsPage from "@/pages/activity-records"
-import OtherProjectsPage from "@/pages/other-projects"
 import ChatHistoryPage from "@/pages/chat-history"
 import ConsumptionRecordsPage from "@/pages/consumption-records"
 
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"]
+const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
 
 const PATH_PERMISSIONS: Record<string, string> = {
@@ -68,7 +67,6 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/config/reminders": "reminders",
   "/business-reminders": "business-reminders",
   "/traffic-records": "traffic-records",
-  "/other-projects": "other-projects",
   "/chat-history": "chat-history",
   "/consumption-records": "consumption-records",
 }
@@ -148,7 +146,7 @@ function App() {
               <Route path="/courses/class-records" element={<ClassRecordsPage />} />
               <Route path="/courses/daily-activities" element={<DailyActivitiesPage />} />
               <Route path="/payment" element={<PaymentPage />} />
-              <Route path="/other-projects" element={<OtherProjectsPage />} />
+              <Route path="/other-projects" element={<Navigate to="/payment" replace />} />
               <Route path="/courses/group-case-sessions" element={<GroupCaseSessionsPage />} />
               <Route path="/courses/emotional-release-sessions" element={<EmotionalReleaseSessionsPage />} />
               <Route path="/courses/energy-knot-sessions" element={<EnergyKnotSessionsPage />} />

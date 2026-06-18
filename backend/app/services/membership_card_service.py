@@ -199,7 +199,10 @@ def _deduct_one(customer_id: str) -> bool:
         _cards[card.id] = card
         _save(card.id)
         return True
-    # 都没有剩余，扣最新的卡（允许负数）
+    # 都没有剩余：有内部课程有效期时不扣（归零即停），否则允许负数
+    from app.services import internal_course_service
+    if internal_course_service.has_active_course(customer_id):
+        return False
     active_cards.sort(key=lambda c: c.created_at, reverse=True)
     card = active_cards[0]
     card.remaining_count = (card.remaining_count or 0) - 1

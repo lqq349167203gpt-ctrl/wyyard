@@ -1834,12 +1834,12 @@ export default function DailyActivitiesPage() {
   const navigate = useNavigate()
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(() => {
-    try { return localStorage.getItem("daily-activities-date") || today } catch { return today }
+    try { return localStorage.getItem("shared-selected-date") || localStorage.getItem("daily-activities-date") || today } catch { return today }
   })
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [dateRangeStart, setDateRangeStart] = useState(() => {
     try {
-      const stored = localStorage.getItem("daily-activities-date")
+      const stored = localStorage.getItem("shared-selected-date") || localStorage.getItem("daily-activities-date")
       return formatDate(addDays(stored ? new Date(stored) : new Date(), -7))
     } catch { return formatDate(addDays(new Date(), -7)) }
   })
@@ -2066,7 +2066,10 @@ export default function DailyActivitiesPage() {
 
   // 持久化当前选中日期
   useEffect(() => {
-    try { localStorage.setItem("daily-activities-date", detailDate) } catch {}
+    try {
+      localStorage.setItem("shared-selected-date", detailDate)
+      localStorage.setItem("daily-activities-date", detailDate)
+    } catch {}
   }, [detailDate])
 
   const themeMap = useMemo(() => {

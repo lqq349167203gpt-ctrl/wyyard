@@ -51,6 +51,9 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         oh_card_reading_session_service,
     )
     activities = []
+    visit = next((v for v in _visits.values()
+                  if v.customer_id == customer_id and v.visit_date == date and not v.is_deleted), None)
+    is_leader = visit is not None and visit.is_leader
 
     # 1. 沙龙活动 (class_records)
     for cr in class_record_service.list_records(date):
@@ -66,17 +69,7 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         if customer_id in cr.teacher_ids:
             activities.append(ActivityInfo(name=cr.course_name, role="课程老师", type="沙龙", owner_name=owner_name, is_welfare=cr.is_public_welfare))
         elif customer_id in cr.participant_ids:
-            role = ""
-            for g in cr.groups:
-                if g.leader_id == customer_id:
-                    role = "组长"
-                    break
-                elif g.deputy_id == customer_id:
-                    role = "副组长"
-                    break
-                elif customer_id in g.member_ids:
-                    role = "组员"
-                    break
+            role = "组长" if is_leader else "参与者"
             activities.append(ActivityInfo(name=cr.course_name, role=role, type="沙龙", owner_name=owner_name, is_welfare=cr.is_public_welfare))
 
     # 2. 觉醒游戏 (group_case_sessions)
@@ -86,7 +79,7 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         elif customer_id == s.host_id:
             activities.append(ActivityInfo(name="觉醒游戏", role="主持人", type="觉醒", owner_name=s.owner_name or ""))
         elif customer_id in s.participant_ids:
-            activities.append(ActivityInfo(name="觉醒游戏", role="参与者", type="觉醒", owner_name=s.owner_name or ""))
+            activities.append(ActivityInfo(name="觉醒游戏", role="组长" if is_leader else "参与者", type="觉醒", owner_name=s.owner_name or ""))
 
     # 3. 情绪释放 (emotional_release_sessions)
     for s in emotional_release_session_service.list_sessions(date):
@@ -95,7 +88,7 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         elif customer_id == s.host_id:
             activities.append(ActivityInfo(name="情绪释放", role="主持人", type="情绪", owner_name=s.owner_name or ""))
         elif customer_id in s.participant_ids:
-            activities.append(ActivityInfo(name="情绪释放", role="参与者", type="情绪", owner_name=s.owner_name or ""))
+            activities.append(ActivityInfo(name="情绪释放", role="组长" if is_leader else "参与者", type="情绪", owner_name=s.owner_name or ""))
 
     # 4. 能量结 (energy_knot_sessions)
     for s in energy_knot_session_service.list_sessions(date):
@@ -104,7 +97,7 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         elif customer_id in s.teacher_ids:
             activities.append(ActivityInfo(name="能量结", role="老师", type="能量结", owner_name=s.owner_name or ""))
         elif customer_id in s.participant_ids:
-            activities.append(ActivityInfo(name="能量结", role="参与者", type="能量结", owner_name=s.owner_name or ""))
+            activities.append(ActivityInfo(name="能量结", role="组长" if is_leader else "参与者", type="能量结", owner_name=s.owner_name or ""))
 
     # 5. 内部课程 (internal_course_sessions)
     for s in internal_course_session_service.list_sessions(date):
@@ -113,7 +106,7 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         if customer_id in s.teacher_ids:
             activities.append(ActivityInfo(name=s.course_name, role="老师", type="内部课", owner_name=teacher_names))
         elif customer_id in s.participant_ids:
-            activities.append(ActivityInfo(name=s.course_name, role="参与者", type="内部课", owner_name=teacher_names))
+            activities.append(ActivityInfo(name=s.course_name, role="组长" if is_leader else "参与者", type="内部课", owner_name=teacher_names))
 
     # 6. OH卡梳理 (oh_card_reading_sessions)
     for s in oh_card_reading_session_service.list_sessions(date):
@@ -122,7 +115,7 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
         elif customer_id in s.teacher_ids:
             activities.append(ActivityInfo(name="OH卡梳理", role="老师", type="OH卡", owner_name=s.owner_name or ""))
         elif customer_id in s.participant_ids:
-            activities.append(ActivityInfo(name="OH卡梳理", role="参与者", type="OH卡", owner_name=s.owner_name or ""))
+            activities.append(ActivityInfo(name="OH卡梳理", role="组长" if is_leader else "参与者", type="OH卡", owner_name=s.owner_name or ""))
 
     return activities
 

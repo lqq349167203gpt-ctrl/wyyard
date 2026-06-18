@@ -6,6 +6,7 @@ from typing import List, Optional
 class OtherProjectBase(BaseModel):
     customer_id: str
     nickname: str
+    category: Optional[str] = None  # 二级类目
     project_name: str  # 项目名称
     fee: float = 0  # 费用
     activity_mode: str = "线下"  # 线上 / 线下
