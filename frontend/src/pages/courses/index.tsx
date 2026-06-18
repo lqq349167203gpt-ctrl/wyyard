@@ -137,7 +137,6 @@ export default function CoursesPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[40px] pl-4"></TableHead>
                   <TableHead>类型名称</TableHead>
-                  <TableHead>所属组织</TableHead>
                   <TableHead className="text-right pr-4 w-[80px]">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -146,10 +145,10 @@ export default function CoursesPage() {
                   <TableRow key={type.name} className="hover:bg-transparent">
                     <TableCell className="pl-4"></TableCell>
                     <TableCell>
-                      <span className="text-[13px] text-[#646a73]">{type.name}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-[13px] text-[#8f959e]">{getOrgName(type.organization_id) || "-"}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[13px] text-[#646a73]">{type.name}</span>
+                        <span className="text-[12px] text-[#8f959e]">{getOrgName(type.organization_id) || "-"}</span>
+                      </div>
                     </TableCell>
                     <TableCell></TableCell>
                   </TableRow>
@@ -167,10 +166,10 @@ export default function CoursesPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-[13px] text-[#8f959e]">{getOrgName(type.organization_id) || "-"}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
+                        <span className="text-[12px] text-[#8f959e]">{getOrgName(type.organization_id) || "-"}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1">
