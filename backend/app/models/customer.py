@@ -57,6 +57,7 @@ class CustomerBase(BaseModel):
     basic_info: str = ""
     assessment: str = ""
     tags: str = ""
+    other_info: str = ""  # 其他信息
     traffic_source: str = ""
     traffic_source_detail: str = ""
     tracking_plan: str = ""

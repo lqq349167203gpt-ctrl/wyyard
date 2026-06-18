@@ -46,6 +46,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
   const [formOrganizationId, setFormOrganizationId] = useState("")
   const [formAmount, setFormAmount] = useState<number>(0)
   const [formDealDate, setFormDealDate] = useState(today)
+  const [closerError, setCloserError] = useState(false)
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
@@ -158,6 +159,11 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
 
   const handleSave = async () => {
     if (!formCustomerId || !formCourseType) return
+    if (!editingItem && formClosers.length === 0) {
+      setCloserError(true)
+      return
+    }
+    setCloserError(false)
     setSaving(true)
     try {
       const config = COURSE_TYPES[formCourseType]
@@ -382,7 +388,10 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
-              <CloserInput customers={customers} value={formClosers} onChange={setFormClosers} defaultAmount={formAmount || 0} />
+              <div>
+                <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={formAmount || 0} />
+                {closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

@@ -353,6 +353,10 @@ export default function HealingRecordsPage() {
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">到访目的</span>
                 <Textarea value={form.tags || ""} onChange={(e) => setForm({ ...form, tags: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
               </div>
+              <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">其他信息</span>
+                <Textarea value={form.other_info || ""} onChange={(e) => setForm({ ...form, other_info: e.target.value })} rows={1} className="resize-none min-h-0" placeholder="请输入" />
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-[#f0f0f0]">

@@ -8,6 +8,9 @@ from app.services import (
     group_case_service,
     emotional_release_service,
     energy_knot_service,
+    internal_course_service,
+    oh_card_reading_service,
+    other_project_service,
 )
 from app.services.visit_service import count_customer_visits
 from app.services.chat_parser import parse_chat_log, generate_tags
@@ -36,6 +39,15 @@ def _fill_total_payment(customer_id: str) -> int:
     for k in energy_knot_service.list_knots():
         if k.customer_id == customer_id:
             total += k.amount
+    for c in internal_course_service.list_courses():
+        if c.customer_id == customer_id:
+            total += c.price
+    for r in oh_card_reading_service.list_readings():
+        if r.customer_id == customer_id:
+            total += r.amount
+    for p in other_project_service.list_projects():
+        if p.customer_id == customer_id:
+            total += p.fee
     return total
 
 
