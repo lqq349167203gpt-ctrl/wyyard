@@ -47,6 +47,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
   const [formAmount, setFormAmount] = useState<number>(0)
   const [formDealDate, setFormDealDate] = useState(today)
   const [closerError, setCloserError] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
@@ -157,16 +158,19 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
     setDialogOpen(true)
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!formCustomerId || !formCourseType) return
     if (!editingItem && formClosers.length === 0) {
       setCloserError(true)
       return
     }
     setCloserError(false)
+    setConfirmOpen(true)
+  }
+
+  const handleConfirmSave = async () => {
     setSaving(true)
     try {
-      const config = COURSE_TYPES[formCourseType]
       const data = {
         customer_id: formCustomerId,
         nickname: formNickname,
@@ -184,6 +188,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
       } else {
         await internalCourseApi.create(data)
       }
+      setConfirmOpen(false)
       setDialogOpen(false)
       refresh()
     } catch (error) {
@@ -398,6 +403,51 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>
               <Button size="sm" onClick={handleSave} disabled={saving || !formCustomerId || !formCourseType || !formAmount}>
                 {saving ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 二次确认弹窗 */}
+      <Dialog open={confirmOpen} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm p-0 gap-0" showCloseButton={false}>
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">{editingItem ? "确认编辑" : "确认新增"}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4">
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">成交日期</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">{formDealDate || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">用户</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">{formNickname || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">生效日期</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">{formEffectiveDate || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">课程类型</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">{formCourseType || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">付费金额</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">¥{(formAmount || 0).toLocaleString()}</span>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">所属组织</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">{organizations.find(o => o.id === formOrganizationId)?.name || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">成交人</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">{formClosers.length > 0 ? formClosers.map(c => c.name).join(", ") : "-"}</span>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setConfirmOpen(false)}>修改</Button>
+              <Button size="sm" onClick={handleConfirmSave} disabled={saving}>
+                {saving ? "保存中..." : "确认"}
               </Button>
             </div>
           </div>
