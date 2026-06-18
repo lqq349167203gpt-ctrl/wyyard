@@ -580,7 +580,7 @@ export function ActivityBatchTable({
       class_course_type: type === "class" ? parsedCourse : "",
       record_id: "",
       pendingCreate: true,
-      name: type === "class" ? parsedCourse : "",
+      name: parsedCourse || TYPE_NAMES[type] || "",
       course_id: "",
       raw: {},
       // 切换类型时清除案主、描述和老师（类型间数据不通用）
