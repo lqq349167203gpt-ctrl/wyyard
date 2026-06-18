@@ -206,7 +206,7 @@ export default function DetailView({
         <div className="px-4 pt-2.5 flex gap-0 border-b border-[#f0f0f0] shrink-0">
           {[
             { key: "activities" as const, label: "活动记录" },
-            { key: "healing" as const, label: "本次信息" },
+            { key: "healing" as const, label: "跟进记录" },
             { key: "purchase" as const, label: "剩余次数" },
             { key: "payment" as const, label: "交易记录" },
           ].map(tab => (
@@ -306,7 +306,7 @@ export default function DetailView({
                           const record = hr?.growth_record || v.healing_notes
                           return (
                             <div className="flex items-start gap-2">
-                              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">本次信息</span>
+                              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">跟进记录</span>
                               <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{record || <span className="text-[#8f959e]">-</span>}</p>
                             </div>
                           )
@@ -544,7 +544,7 @@ function RecordForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[480px] max-w-[90vw] p-0 gap-0">
         <div className="px-5 py-3 border-b border-[#f0f0f0]">
-          <h3 className="text-[12px] font-normal">{rec ? "编辑" : "新增"}本次信息</h3>
+          <h3 className="text-[12px] font-normal">{rec ? "编辑" : "新增"}跟进记录</h3>
         </div>
         <div className="px-5 py-4 space-y-3" {...enterToNext}>
           <div className="grid grid-cols-[56px_1fr] items-center gap-2">
