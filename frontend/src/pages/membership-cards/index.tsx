@@ -22,10 +22,11 @@ import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
-const CARD_TYPES: Record<string, { price: number; defaultCount?: number; unlimited?: boolean }> = {
+const CARD_TYPES: Record<string, { price: number; defaultCount?: number; unlimited?: boolean; needDurationOrCount?: boolean }> = {
   "次卡": { price: 198, defaultCount: 1 },
   "体验会员": { price: 398, defaultCount: 4 },
-  "常规通卡": { price: 3999 },
+  "月卡": { price: 1999, needDurationOrCount: true },
+  "三月卡": { price: 3999, needDurationOrCount: true },
   "半年卡": { price: 7999 },
   "年卡": { price: 12800, unlimited: true },
 }
@@ -58,6 +59,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
   const [formOrganizationId, setFormOrganizationId] = useState("")
   const [formDealDate, setFormDealDate] = useState(today)
   const [closerError, setCloserError] = useState(false)
+  const [durationOrCountError, setDurationOrCountError] = useState(false)
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
@@ -205,6 +207,19 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
       return
     }
     setCloserError(false)
+
+    // 月卡和三月卡需要时长或次数至少填一项
+    const config = CARD_TYPES[formCardType]
+    if (config?.needDurationOrCount) {
+      const hasDuration = formDurationValue && parseInt(formDurationValue) > 0
+      const hasCount = formUnlimited || (formRemainingCount && parseInt(formRemainingCount) > 0)
+      if (!hasDuration && !hasCount) {
+        setDurationOrCountError(true)
+        return
+      }
+    }
+    setDurationOrCountError(false)
+
     setSaving(true)
     try {
       const config = CARD_TYPES[formCardType]
@@ -433,33 +448,35 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
               </div>
             )}
 
-            {/* 时长输入（常规通卡/半年卡） */}
+            {/* 时长输入（月卡/三月卡/半年卡） */}
             {showDuration && (
               <div className="grid grid-cols-[70px_1fr] items-start gap-2">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时长</span>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    value={formDurationValue}
-                    onChange={(e) => setFormDurationValue(e.target.value)}
-                    placeholder="输入时长"
-                    className="h-8 text-xs flex-1"
-                    min="1"
-                  />
-                  <div className="flex gap-1">
-                    {DURATION_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.type}
-                        className={`px-3 h-8 rounded border text-[12px] transition-colors ${
-                          formDurationType === opt.type
-                            ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]"
-                            : "border-[#e0e0e0] text-[#4e535a] hover:border-[#c0c0c0]"
-                        }`}
-                        onClick={() => setFormDurationType(opt.type)}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                <div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={formDurationValue}
+                      onChange={(e) => { setFormDurationValue(e.target.value); if (durationOrCountError) setDurationOrCountError(false) }}
+                      placeholder="输入时长"
+                      className="h-8 text-xs flex-1"
+                      min="1"
+                    />
+                    <div className="flex gap-1">
+                      {DURATION_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.type}
+                          className={`px-3 h-8 rounded border text-[12px] transition-colors ${
+                            formDurationType === opt.type
+                              ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]"
+                              : "border-[#e0e0e0] text-[#4e535a] hover:border-[#c0c0c0]"
+                          }`}
+                          onClick={() => setFormDurationType(opt.type)}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -469,32 +486,36 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
             {showCount && (
               <div className="grid grid-cols-[70px_1fr] items-start gap-2">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">次数</span>
-                <div className="flex gap-2">
-                  {!formUnlimited && (
-                    <Input
-                      type="number"
-                      value={formRemainingCount}
-                      onChange={(e) => setFormRemainingCount(e.target.value)}
-                      placeholder={CARD_TYPES[formCardType]?.defaultCount ? `${CARD_TYPES[formCardType].defaultCount} 次（默认）` : "输入次数（可选）"}
-                      className="h-8 text-xs flex-1"
-                      min="0"
-                    />
-                  )}
-                  {!CARD_TYPES[formCardType]?.defaultCount && (
-                    <button
-                      className={`px-3 h-8 rounded border text-[12px] whitespace-nowrap transition-colors ${
-                        formUnlimited
-                          ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]"
-                          : "border-[#e0e0e0] text-[#4e535a] hover:border-[#c0c0c0]"
-                      }`}
-                      onClick={() => {
-                        setFormUnlimited(!formUnlimited)
-                        if (!formUnlimited) setFormRemainingCount("")
-                      }}
-                    >
-                      不限
-                    </button>
-                  )}
+                <div>
+                  <div className="flex gap-2">
+                    {!formUnlimited && (
+                      <Input
+                        type="number"
+                        value={formRemainingCount}
+                        onChange={(e) => { setFormRemainingCount(e.target.value); if (durationOrCountError) setDurationOrCountError(false) }}
+                        placeholder={CARD_TYPES[formCardType]?.defaultCount ? `${CARD_TYPES[formCardType].defaultCount} 次（默认）` : "输入次数（可选）"}
+                        className="h-8 text-xs flex-1"
+                        min="0"
+                      />
+                    )}
+                    {!CARD_TYPES[formCardType]?.defaultCount && (
+                      <button
+                        className={`px-3 h-8 rounded border text-[12px] whitespace-nowrap transition-colors ${
+                          formUnlimited
+                            ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]"
+                            : "border-[#e0e0e0] text-[#4e535a] hover:border-[#c0c0c0]"
+                        }`}
+                        onClick={() => {
+                          setFormUnlimited(!formUnlimited)
+                          if (!formUnlimited) setFormRemainingCount("")
+                          if (durationOrCountError) setDurationOrCountError(false)
+                        }}
+                      >
+                        不限
+                      </button>
+                    )}
+                  </div>
+                  {durationOrCountError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">时长和次数至少填写一项</span>}
                 </div>
               </div>
             )}
