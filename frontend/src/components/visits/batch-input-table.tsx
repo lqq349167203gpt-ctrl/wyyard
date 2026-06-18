@@ -335,8 +335,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
             <tr className="bg-[#fafbfc] text-[#8f959e]">
               <th className="w-[24px]"></th>
               <th className="px-1.5 py-2 text-center font-normal w-[36px]">到店</th>
-              <th className="pl-2 pr-[10px] py-2 text-left font-normal w-[60px]">组长</th>
-              <th className="pl-0 pr-2.5 py-2 text-left font-normal w-[56px]">时间</th>
+              <th className="pl-2 pr-[10px] py-2 text-left font-normal w-[64px]">组长</th>
+              <th className="pl-0 pr-2.5 py-2 text-left font-normal w-[62px]">时间</th>
               <th className="pl-0 pr-1.5 py-2 text-left font-normal w-[74px]">昵称</th>
               <th className="px-1.5 py-2 text-left font-normal w-[80px]">会员身份</th>
               <th className="px-1.5 py-2 text-left font-normal w-[64px]">剩余次数</th>
@@ -379,7 +379,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-[#3370ff] checked:border-[#3370ff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
                     />
                   </td>
-                  <td className="pl-2 pr-[10px] py-1.5 w-[60px]">
+                  <td className="pl-2 pr-[10px] py-1.5 w-[64px]">
                     <SelectDropdown
                       size="sm"
                       value={row.is_leader ? "1" : "0"}
@@ -396,7 +396,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       type="time"
                       value={row.visit_time}
                       onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
-                      className={`h-7 text-[12px] w-[58px] time-no-icon rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                      className={`h-7 text-[12px] w-[64px] time-no-icon rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
                     />
                   </td>
                   <td className="pl-0 pr-1.5 py-1.5">
