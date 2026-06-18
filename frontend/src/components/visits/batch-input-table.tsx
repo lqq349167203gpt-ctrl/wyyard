@@ -328,7 +328,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   return (
     <div className="bg-white rounded-lg">
-      <div className="overflow-x-auto scrollbar-hide">
+      <div className="overflow-x-auto" style={{ scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
         <div className="min-w-[1688px]">
           <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
           <thead>
