@@ -16,6 +16,7 @@ class ClassRecordBase(BaseModel):
     end_time: Optional[str] = None  # HH:MM
     course_id: str
     course_name: str
+    course_type: str = ""  # 活动类型（如：读书会、颂钵等）
     course_description: str = ""
     teacher_ids: List[str] = []
     participant_ids: List[str] = []
@@ -35,6 +36,7 @@ class ClassRecordCreate(BaseModel):
     end_time: Optional[str] = None
     course_id: str
     course_name: str
+    course_type: str = ""  # 活动类型（如：读书会、颂钵等）
     course_description: str = ""
     teacher_ids: List[str] = []
     participant_ids: List[str] = []

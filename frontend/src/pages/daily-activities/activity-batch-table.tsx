@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input"
 import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi,
-  type Course, type CustomerLight, type Space, type MemberIdentity,
+  courseTypeApi,
+  type Course, type CustomerLight, type Space, type MemberIdentity, type CourseType,
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -33,7 +34,10 @@ const ICS_COURSE_LABELS: Record<string, string> = {
   "落地赋能班": "赋能班", "落地赋能班：自洽力整合": "赋能班",
 }
 
-function getTypeBadge(type: ActivityType, courseName?: string): { label: string; color: string; bg: string } {
+function getTypeBadge(type: ActivityType, courseName?: string, classCourseType?: string): { label: string; color: string; bg: string } {
+  if (type === "class" && classCourseType) {
+    return { ...TYPE_BADGES.class, label: classCourseType.length > 3 ? classCourseType.slice(0, 3) : classCourseType }
+  }
   if (type === "ics" && courseName) {
     const label = ICS_COURSE_LABELS[courseName]
     if (label) return { ...TYPE_BADGES.ics, label }
@@ -84,8 +88,9 @@ function resolveIcsCourseKey(courseName: string): string {
   return ""
 }
 
-function getTypeSelectValue(type: ActivityType, courseName: string): string {
+function getTypeSelectValue(type: ActivityType, courseName: string, classCourseType?: string): string {
   if (type === "ics") return resolveIcsCourseKey(courseName)
+  if (type === "class" && classCourseType) return `class:${classCourseType}`
   return type
 }
 
@@ -109,6 +114,7 @@ interface ActivityRow {
   record_id: string
   record_type: ActivityType
   ics_course_key: string  // ics 子类型，如 "ics:商业框架陪跑"
+  class_course_type: string  // class 子类型，如 "读书会"
   start_time: string
   end_time: string
   name: string
@@ -137,10 +143,12 @@ function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSp
   let hostIds: string[] = []
   let hostNames: string[] = []
   let name = ""
+  let classCourseType = ""
 
   if (type === "class") {
     hostIds = data.teacher_ids || []
     name = courses.find(c => c.id === data.course_id)?.name || data.course_name || ""
+    classCourseType = data.course_type || ""
   } else if (type === "gcs" || type === "ers" || type === "ocr") {
     ownerId = data.owner_id || ""
     ownerName = data.owner_name || ""
@@ -180,6 +188,7 @@ function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSp
   return {
     key, record_id: data.id, record_type: type,
     ics_course_key: type === "ics" ? resolveIcsCourseKey(name) : "",
+    class_course_type: type === "class" ? classCourseType : "",
     start_time: data.start_time || "", end_time: data.end_time || "",
     name, course_id: type === "class" ? (data.course_id || "") : "",
     owner_id: ownerId, owner_name: ownerName,
@@ -201,7 +210,7 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
   const rid = sid ? (spaces.find(s => s.id === sid)?.rooms?.[0]?.id || "") : ""
   return {
     key, record_id: "", record_type: type,
-    ics_course_key: "",
+    ics_course_key: "", class_course_type: "",
     start_time: "", end_time: "",
     name: "", course_id: "",
     owner_id: "", owner_name: "",
@@ -250,6 +259,28 @@ export function ActivityBatchTable({
   const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
   const fetchedRemainingRef = useRef<Set<string>>(new Set())
   const prevOwnerRef = useRef<Record<number, string>>({})
+  const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
+
+  // 加载活动类型（沙龙子类型）
+  useEffect(() => {
+    courseTypeApi.list().then(setCourseTypes).catch(() => {})
+  }, [])
+
+  // 动态构建类型选项
+  const typeOptions = useMemo(() => {
+    const classSubTypes = courseTypes.map(t => ({ value: `class:${t.name}`, label: t.name }))
+    return [
+      ...classSubTypes,
+      { value: "class", label: "沙龙活动" },
+      { value: "gcs", label: "觉醒游戏" },
+      { value: "ers", label: "情绪释放" },
+      { value: "ocr", label: "OH卡梳理" },
+      { value: "eks", label: "能量结" },
+      { value: "ics:疗愈师课程", label: "疗愈师课程" },
+      { value: "ics:商业框架陪跑", label: "商业框架陪跑" },
+      { value: "ics:落地赋能班", label: "落地赋能班" },
+    ]
+  }, [courseTypes])
 
   // 报告保存状态
   useEffect(() => {
@@ -316,14 +347,20 @@ export function ActivityBatchTable({
 
     // 无记录时默认一行
     if (items.length === 0) {
-      items = [createFreshRow("class", spaceId || "", spaces)]
+      const defaultCourseType = courseTypes.length > 0 ? courseTypes[0].name : ""
+      const fresh = createFreshRow("class", spaceId || "", spaces)
+      if (defaultCourseType) {
+        fresh.class_course_type = defaultCourseType
+        fresh.name = defaultCourseType
+      }
+      items = [fresh]
     }
 
     setRows(items)
     const statuses: Record<number, RowStatus> = {}
     items.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
     setRowStatus(statuses)
-  }, [records, courses, date, spaceId, spaces])
+  }, [records, courses, date, spaceId, spaces, courseTypes])
 
   // 保存单行
   const saveRow = useCallback(async (row: ActivityRow) => {
@@ -350,6 +387,7 @@ export function ActivityBatchTable({
           const course = courses.find(c => c.id === row.course_id)
           createData.course_id = row.course_id || ""
           createData.course_name = course?.name || row.name || ""
+          createData.course_type = row.class_course_type || ""
           createData.course_description = row.description || ""
           createData.teacher_ids = row.host_ids
           createData.is_public_welfare = row.is_public_welfare
@@ -402,6 +440,7 @@ export function ActivityBatchTable({
             ...common,
             course_id: row.course_id,
             course_name: course?.name || row.name,
+            course_type: row.class_course_type || "",
             course_description: row.description,
             teacher_ids: row.host_ids,
             is_public_welfare: row.is_public_welfare,
@@ -535,9 +574,10 @@ export function ActivityBatchTable({
       ...row,
       record_type: type,
       ics_course_key: type === "ics" ? newType : "",
+      class_course_type: type === "class" ? parsedCourse : "",
       record_id: "",
       pendingCreate: true,
-      name: "",
+      name: type === "class" ? parsedCourse : "",
       course_id: "",
       raw: {},
       // 切换类型时清除案主、描述和老师（类型间数据不通用）
@@ -665,8 +705,12 @@ export function ActivityBatchTable({
     }
   }, [])
 
-  const handleCreate = async (type: string) => {
+  const handleCreate = async (type: string, classCourseType?: string) => {
     const fresh = createFreshRow(type as ActivityType, spaceId || "", spaces)
+    if (classCourseType) {
+      fresh.class_course_type = classCourseType
+      fresh.name = classCourseType
+    }
     // eks 类型新建行时继承最近编辑的案主和部位数
     if (type === "eks") {
       const src = lastEditedEksRef.current || [...rowsRef.current].reverse().find(r => r.record_type === "eks")
@@ -709,7 +753,7 @@ export function ActivityBatchTable({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const badge = getTypeBadge(row.record_type, row.record_type === "ics" ? (row.ics_course_key?.replace("ics:", "") || row.name || "") : row.name)
+              const badge = getTypeBadge(row.record_type, row.record_type === "ics" ? (row.ics_course_key?.replace("ics:", "") || row.name || "") : row.name, row.class_course_type)
               const participantNames = getParticipantNames(row.participant_ids)
               const { oldMembers, newMembers } = splitParticipants(row.participant_ids)
               const currentSpace = spaces.find(s => s.id === row.space_id)
@@ -768,8 +812,8 @@ export function ActivityBatchTable({
                   <td className="px-1 py-1.5 align-top">
                     <SelectDropdown
                       size="sm"
-                      value={row.record_type === "ics" ? (row.ics_course_key || resolveIcsCourseKey(row.name) || "ics:疗愈师课程") : row.record_type}
-                      options={TYPE_OPTIONS}
+                      value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
+                      options={typeOptions}
                       onChange={(v) => handleTypeChange(row.key, v)}
                       className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
                       hideChevron
@@ -1059,7 +1103,7 @@ export function ActivityBatchTable({
 
       <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
         <button
-          onClick={() => handleCreate("class")}
+          onClick={() => handleCreate("class", courseTypes.length > 0 ? courseTypes[0].name : "")}
           className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"
         >
           <Plus className="h-3.5 w-3.5" />

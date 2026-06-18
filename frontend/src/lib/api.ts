@@ -596,6 +596,7 @@ export interface ClassRecord {
   end_time: string | null
   course_id: string
   course_name: string
+  course_type: string  // 活动类型（如：读书会、颂钵等）
   course_description: string
   teacher_ids: string[]
   participant_ids: string[]
@@ -617,6 +618,7 @@ export interface ClassRecordCreate {
   end_time?: string | null
   course_id: string
   course_name: string
+  course_type?: string  // 活动类型（如：读书会、颂钵等）
   course_description?: string
   teacher_ids?: string[]
   participant_ids?: string[]
