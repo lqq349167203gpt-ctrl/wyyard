@@ -157,7 +157,7 @@ export default function CoursesPage() {
                 {courseTypes.filter(t => t.name !== "未分类").map((type) => (
                   <TableRow key={type.name} className="group">
                     <TableCell className="pl-4">
-                      <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex flex-col items-center gap-0">
                         <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={() => handleMoveType(type.name, "up")}>
                           <ArrowUp className="h-3 w-3" />
                         </button>
@@ -167,7 +167,7 @@ export default function CoursesPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-[13px] text-[#2b2f36] font-medium">{type.name}</span>
+                      <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
                     </TableCell>
                     <TableCell>
                       <span className="text-[13px] text-[#8f959e]">{getOrgName(type.organization_id) || "-"}</span>
