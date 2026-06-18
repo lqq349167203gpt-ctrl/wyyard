@@ -764,7 +764,7 @@ export function ActivityBatchTable({
                 >
                   {/* 拖动 */}
                   <td
-                    className="px-1 py-0 cursor-grab active:cursor-grabbing text-center align-top"
+                    className="px-1 py-1 cursor-grab active:cursor-grabbing text-center align-top"
                     draggable
                     onDragStart={() => handleDragStart(row.key)}
                     onDragEnd={handleDragEnd}
@@ -773,7 +773,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 公益 */}
-                  <td className="px-1 py-0 text-center align-top">
+                  <td className="px-1 py-1 text-center align-top">
                     <div className="flex items-center justify-center h-7">
                     {row.record_type === "class" ? (
                       <input
@@ -787,7 +787,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 时间 */}
-                  <td className="px-1 py-0 align-top">
+                  <td className="px-1 py-1 align-top">
                     <div className="flex items-center h-7 rounded-md border-[0.5px] border-[#dee0e3] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
                       <input
                         type="time"
@@ -806,7 +806,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 类型 */}
-                  <td className="px-1 py-0 align-top">
+                  <td className="px-1 py-1 align-top">
                     <SelectDropdown
                       size="sm"
                       value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
@@ -819,7 +819,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动名称 */}
-                  <td className="px-1 py-0 align-top">
+                  <td className="px-1 py-1 align-top">
                     {["class", "ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
                       <Input
                         value={row.name}
@@ -833,7 +833,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 案主 */}
-                  {hasOwnerType && <td className="pl-1.5 pr-0 py-0 w-[60px] align-top">
+                  {hasOwnerType && <td className="pl-1.5 pr-0 py-1 w-[60px] align-top">
                     {(row.record_type === "gcs" || row.record_type === "ers" || row.record_type === "ocr") ? (
                       <CustomerSearchInput
                         customers={customers}
@@ -919,7 +919,7 @@ export function ActivityBatchTable({
                   </td>}
 
                   {/* 销卡 */}
-                  {hasEks && <td className="px-0 py-0 text-center align-top">
+                  {hasEks && <td className="px-0 py-1 text-center align-top">
                     {row.record_type === "eks" ? (() => {
                       const remaining = row.owner_id ? remainingMap.eks?.[row.owner_id] : undefined
                       return (
@@ -975,7 +975,7 @@ export function ActivityBatchTable({
                   </td>}
 
                   {/* 活动方式 */}
-                  <td className="px-1 py-0 align-top">
+                  <td className="px-1 py-1 align-top">
                     <SelectDropdown
                       size="sm"
                       value={row.activity_mode || "线下"}
@@ -987,7 +987,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 老师 */}
-                  <td className="px-1 py-0 align-top">
+                  <td className="px-1 py-1 align-top">
                     <CustomerSearchInput
                       multi
                       customers={customers}
@@ -1012,7 +1012,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动简介 */}
-                  <td className="px-1 py-0 align-top">
+                  <td className="px-1 py-1 align-top">
                     {row.record_type === "eks" ? null : (
                       <Input
                         value={row.description}
@@ -1024,7 +1024,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 老人 */}
-                  <td className="px-1 py-0">
+                  <td className="px-1 py-1">
                     <span className="text-[#4e535a]">
                       {oldMembers.map((m, i) => (
                         <span key={m.id}>
@@ -1045,7 +1045,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 新人 */}
-                  <td className="px-1 py-0">
+                  <td className="px-1 py-1">
                     <span className="text-[#4e535a]">
                       {newMembers.map((m, i) => (
                         <span key={m.id}>
@@ -1066,7 +1066,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 操作 */}
-                  <td className="px-1 py-0 text-center sticky right-0 z-10 bg-white relative align-top before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">
+                  <td className="px-1 py-1 text-center sticky right-0 z-10 bg-white relative align-top before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">
                     <button
                       onClick={() => handleDelete(row)}
                       className="text-[#8f959e] hover:text-[#e02020]"
