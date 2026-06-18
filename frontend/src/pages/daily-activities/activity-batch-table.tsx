@@ -826,23 +826,7 @@ export function ActivityBatchTable({
 
                   {/* 活动名称 */}
                   <td className="px-1 py-1.5 align-top">
-                    {row.record_type === "class" ? (
-                      <CourseDropdown
-                        courses={courses}
-                        value={row.course_id}
-                        onChange={(v) => {
-                          const course = courses.find(c => c.id === v)
-                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, course_id: v, name: course?.name || "" } : r))
-                          if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
-                            setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
-                          }
-                          scheduleSave(row.key)
-                        }}
-                        placeholder=""
-                        dropdownWidth={280}
-                        className="text-[12px]"
-                      />
-                    ) : ["ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
+                    {["class", "ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
                       <Input
                         value={row.name}
                         onChange={(e) => updateRow(row.key, "name", e.target.value)}
