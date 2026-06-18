@@ -442,7 +442,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">成交人</span>
-              <span className="text-[12px] text-[#2b2f36] pt-0.5">{formClosers.length > 0 ? formClosers.map(c => c.name).join(", ") : "-"}</span>
+              <span className="text-[12px] text-[#2b2f36] pt-0.5">{formClosers.length > 0 ? formClosers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : "-"}</span>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setConfirmOpen(false)}>修改</Button>
