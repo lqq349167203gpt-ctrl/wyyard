@@ -33,6 +33,7 @@ interface DetailViewProps {
   onExternalDateChange?: (date: string) => void
   hideDateBar?: boolean
   onCustomerClick?: (customerId: string) => void
+  onCustomerEdit?: (customerId: string) => void
   onActivityClick?: (customerId: string) => void
   onDataLoaded?: (visits: VisitRecord[]) => void
   spaceId?: string
@@ -40,7 +41,7 @@ interface DetailViewProps {
   groups?: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onCustomerEdit, onActivityClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -445,7 +446,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         </div>
         <BatchInputTable date={selectedDate} customers={customerList} spaceId={spaceId} refreshKey={tableRefreshKey} onSaved={() => {
           refreshCounts()
-        }} onSavedCountChange={setTableSavedCount} onSavingCountChange={setSavingCount} onCustomerClick={onCustomerClick} onActivityClick={onActivityClick} onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }} />
+        }} onSavedCountChange={setTableSavedCount} onSavingCountChange={setSavingCount} onCustomerClick={onCustomerClick} onCustomerEdit={onCustomerEdit} onActivityClick={onActivityClick} onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }} />
       </div>
 
       {/* 删除确认 */}

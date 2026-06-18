@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Plus, Trash2, FileText, GripVertical } from "lucide-react"
+import { Plus, Trash2, FileText, GripVertical, Pencil } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -47,6 +47,7 @@ interface BatchInputTableProps {
   onSavedCountChange?: (count: number) => void
   onSavingCountChange?: (count: number) => void
   onCustomerClick?: (customerId: string) => void
+  onCustomerEdit?: (customerId: string) => void
   onActivityClick?: (customerId: string) => void
   onCreateCustomer?: (nickname: string) => void
 }
@@ -67,7 +68,7 @@ function formatRemaining(count: number | null): string {
   return `${count} 次`
 }
 
-export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer }: BatchInputTableProps) {
+export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onCustomerEdit, onActivityClick, onCreateCustomer }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
@@ -490,12 +491,20 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   </td>
                   <td className={`px-1.5 py-1.5 text-center sticky right-0 z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)] bg-white`}>
                     {row.customer_id && (
-                      <button
-                        onClick={() => onCustomerClick?.(row.customer_id)}
-                        className="text-[#8f959e] hover:text-[#3370ff] mr-1"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => onCustomerClick?.(row.customer_id)}
+                          className="text-[#8f959e] hover:text-[#3370ff] mr-1"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onCustomerEdit?.(row.customer_id)}
+                          className="text-[#8f959e] hover:text-[#3370ff] mr-1"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => setDeleteKey(row.key)}
