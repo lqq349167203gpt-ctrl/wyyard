@@ -382,7 +382,7 @@ export function InternalCoursesContent({ embedded }: { embedded?: boolean } = {}
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
-              <CloserInput customers={customers} value={formClosers} onChange={setFormClosers} defaultAmount={formCourseType ? (COURSE_TYPES[formCourseType]?.price || 0) : 0} />
+              <CloserInput customers={customers} value={formClosers} onChange={setFormClosers} defaultAmount={formAmount || 0} />
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">
