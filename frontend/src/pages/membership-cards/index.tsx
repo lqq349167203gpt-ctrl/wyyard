@@ -57,6 +57,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
   const [formClosers, setFormClosers] = useState<Closer[]>([])
   const [formOrganizationId, setFormOrganizationId] = useState("")
   const [formDealDate, setFormDealDate] = useState(today)
+  const [closerError, setCloserError] = useState(false)
   const { organizations, hasAnyOrganization } = useOrganizations()
   const navigate = useNavigate()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
@@ -199,6 +200,11 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
 
   const handleSave = async () => {
     if (!formCustomerId || !formCardType) return
+    if (!editingCard && formClosers.length === 0) {
+      setCloserError(true)
+      return
+    }
+    setCloserError(false)
     setSaving(true)
     try {
       const config = CARD_TYPES[formCardType]
@@ -514,7 +520,10 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
-              <CloserInput customers={customers} value={formClosers} onChange={setFormClosers} defaultAmount={parseFloat(formPrice) || 0} />
+              <div>
+                <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={parseFloat(formPrice) || 0} />
+                {closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

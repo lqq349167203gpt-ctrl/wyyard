@@ -351,7 +351,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-center font-normal w-[68px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
-          <tbody className="[&_tr:first-child>td]:pt-[12px]">
+          <tbody className="[&_tr:first-child>td]:pt-[12px] [&_tr:last-child>td]:pb-[6px]">
             {rows.map((row, idx) => {
               const status = rowStatus[row.key] || "idle"
               // 找到上方最近的组长行
