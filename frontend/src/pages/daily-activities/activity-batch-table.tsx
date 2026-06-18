@@ -572,7 +572,7 @@ export function ActivityBatchTable({
       }
     }
 
-    // 保留已有数据，只重置类型相关字段
+    // 保留已有数据，只更新活动名称和类型相关字段
     const updated: ActivityRow = {
       ...row,
       record_type: type,
@@ -583,12 +583,6 @@ export function ActivityBatchTable({
       name: parsedCourse || TYPE_NAMES[type] || "",
       course_id: "",
       raw: {},
-      // 切换类型时清除案主、描述和老师（类型间数据不通用）
-      owner_id: "",
-      owner_name: "",
-      description: "",
-      host_ids: [],
-      host_names: [],
       deduction_count: type === "eks" ? 2 : 1,
     }
     setRows(prev => prev.map(r => r.key === rowKey ? updated : r))
