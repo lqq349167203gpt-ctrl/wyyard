@@ -288,7 +288,7 @@ export const SelectDropdown = memo(function SelectDropdown({
 
       {open && createPortal(
         <>
-          <div ref={menuRef} className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={pos}>
+          <div ref={menuRef} className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
             {options.map((opt) => {
               const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
               const hasChildren = opt.children && opt.children.length > 0
@@ -314,7 +314,7 @@ export const SelectDropdown = memo(function SelectDropdown({
           {hoveredOption?.children && hoveredOption.children.length > 0 && (
             <div ref={subMenuRef}
               className="bg-white rounded-r-md border border-l-0 border-[#e8e8e8] overflow-y-auto"
-              style={subMenuPos}
+              style={{ ...subMenuPos, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}
               onMouseEnter={handleSubMenuMouseEnter}
               onMouseLeave={handleSubMenuMouseLeave}
             >
