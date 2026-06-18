@@ -140,12 +140,6 @@ input[type="date"].date-empty::-webkit-calendar-picker-indicator {
   filter: grayscale(1);
 }
 
-/* 金额数字字体 */
-.font-price {
-  font-family: 'Noto Sans SC', sans-serif;
-  font-variant-numeric: tabular-nums;
-}
-
 /* 时间选择框图标基础样式 */
 input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
