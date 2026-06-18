@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { Plus, Trash2, FileText, GripVertical, Edit } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -32,6 +33,22 @@ function emptyRow(): Row {
   return { key: nextKey++, visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, feedback: "", healing_notes: "", group_leader_feedback: "", activities: "" }
 }
 
+export interface VisitChangedCell {
+  rowKey: number
+  fields: string[]
+}
+
+export interface VisitHistoryEntry {
+  id?: string
+  timestamp: number
+  action: string
+  userName: string
+  ip?: string
+  rows: Row[]
+  changedKeys?: number[]
+  changedCells?: VisitChangedCell[]
+}
+
 function initRows(): Row[] {
   return Array.from({ length: 1 }, () => emptyRow())
 }
@@ -50,6 +67,15 @@ interface BatchInputTableProps {
   onCustomerEdit?: (customerId: string) => void
   onActivityClick?: (customerId: string) => void
   onCreateCustomer?: (nickname: string) => void
+  onUndoRedoChange?: (canUndo: boolean, canRedo: boolean, undo: () => void, redo: () => void, history: VisitHistoryEntry[]) => void
+  onRestoreRef?: (restore: (entry: VisitHistoryEntry) => void) => void
+  onCaptureRef?: (capture: () => VisitHistoryEntry) => void
+  onHistoryPushed?: (entry: VisitHistoryEntry) => void
+  previewRows?: Row[]
+  previewChangedKeys?: number[]
+  previewChangedCells?: VisitChangedCell[]
+  locked?: boolean
+  onClosePreview?: () => void
 }
 
 function getRemainingCount(cards: MembershipCard[], customerId: string): number | null {
@@ -68,7 +94,7 @@ function formatRemaining(count: number | null): string {
   return `${count} 次`
 }
 
-export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onCustomerEdit, onActivityClick, onCreateCustomer }: BatchInputTableProps) {
+export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onCustomerEdit, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
@@ -77,6 +103,145 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
   const cardsRef = useRef<MembershipCard[]>([])
+
+  // 撤回/重做历史栈
+  const [undoStack, setUndoStack] = useState<VisitHistoryEntry[]>([])
+  const [redoStack, setRedoStack] = useState<VisitHistoryEntry[]>([])
+
+  const getUserName = useCallback(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      return user.owner || user.nickname || user.username || "未知"
+    } catch { return "未知" }
+  }, [])
+
+  // 编辑防抖：同一行同一字段连续输入只记录一次
+  const editTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingEditRef = useRef<{ action: string; changedKeys: number[]; description?: string; changedCells: VisitChangedCell[] } | null>(null)
+
+  const flushEdit = useCallback(() => {
+    const pending = pendingEditRef.current
+    if (!pending) return
+    pendingEditRef.current = null
+    const entry: VisitHistoryEntry = {
+      timestamp: Date.now(),
+      action: pending.description || pending.action,
+      userName: getUserName(),
+      rows: rowsRef.current.map(r => ({ ...r })),
+      changedKeys: pending.changedKeys,
+      changedCells: pending.changedCells,
+    }
+    setUndoStack(prev => [...prev, entry])
+    setRedoStack([])
+    onHistoryPushed?.(entry)
+  }, [getUserName, onHistoryPushed])
+
+  const pushHistory = useCallback((action: string, changedKeys?: number[], description?: string, overrideRows?: Row[], changedCells?: VisitChangedCell[]) => {
+    const entry: VisitHistoryEntry = {
+      timestamp: Date.now(),
+      action: description || action,
+      userName: getUserName(),
+      rows: overrideRows || rowsRef.current.map(r => ({ ...r })),
+      changedKeys,
+      changedCells,
+    }
+    setUndoStack(prev => [...prev, entry])
+    setRedoStack([])
+    onHistoryPushed?.(entry)
+  }, [getUserName, onHistoryPushed])
+
+  // 编辑专用：500ms 防抖，连续输入合并为一条
+  const pushEditHistory = useCallback((action: string, changedKeys?: number[], description?: string, changedCells?: VisitChangedCell[]) => {
+    pendingEditRef.current = { action, changedKeys: changedKeys || [], description, changedCells: changedCells || [] }
+    if (editTimerRef.current) clearTimeout(editTimerRef.current)
+    editTimerRef.current = setTimeout(flushEdit, 500)
+  }, [flushEdit])
+
+  const undo = useCallback(() => {
+    if (editTimerRef.current) { clearTimeout(editTimerRef.current); flushEdit() }
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev
+      const entry = prev[prev.length - 1]
+      const currentEntry: VisitHistoryEntry = {
+        timestamp: Date.now(), action: "撤回", userName: getUserName(),
+        rows: rowsRef.current.map(r => ({ ...r }))
+      }
+      setRedoStack(r => [...r, currentEntry])
+      setRows(entry.rows.map(r => ({ ...r })))
+      return prev.slice(0, -1)
+    })
+  }, [getUserName])
+
+  const redo = useCallback(() => {
+    if (editTimerRef.current) { clearTimeout(editTimerRef.current); flushEdit() }
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev
+      const entry = prev[prev.length - 1]
+      const currentEntry: VisitHistoryEntry = {
+        timestamp: Date.now(), action: "重做", userName: getUserName(),
+        rows: rowsRef.current.map(r => ({ ...r }))
+      }
+      setUndoStack(u => [...u, currentEntry])
+      setRows(entry.rows.map(r => ({ ...r })))
+      return prev.slice(0, -1)
+    })
+  }, [getUserName])
+
+  // 通知父组件撤回/重做状态变化
+  useEffect(() => {
+    onUndoRedoChange?.(undoStack.length > 0, redoStack.length > 0, undo, redo, undoStack)
+  }, [undoStack, redoStack, undo, redo, onUndoRedoChange])
+
+  // 恢复历史版本
+  const restoreFromHistory = useCallback((entry: VisitHistoryEntry) => {
+    pushHistory("恢复了历史版本")
+    setRows(entry.rows.map(r => ({ ...r })))
+  }, [pushHistory])
+
+  useEffect(() => {
+    onRestoreRef?.(restoreFromHistory)
+  }, [restoreFromHistory, onRestoreRef])
+
+  // 快照当前状态
+  const captureCurrentState = useCallback(() => {
+    const entry: VisitHistoryEntry = {
+      timestamp: Date.now(), action: "打开历史面板", userName: getUserName(),
+      rows: rowsRef.current.map(r => ({ ...r }))
+    }
+    return entry
+  }, [getUserName])
+
+  useEffect(() => {
+    onCaptureRef?.(captureCurrentState)
+  }, [captureCurrentState, onCaptureRef])
+
+  // 预览模式：使用预览数据
+  const isPreview = !!previewRows
+  const isLocked = locked || isPreview
+  const displayRows = previewRows || rows
+  const displayChangedKeys = previewChangedKeys || []
+  const changedCellMap = useMemo(() => {
+    const map = new Map<number, Set<string>>()
+    if (previewChangedCells) {
+      for (const cc of previewChangedCells) {
+        map.set(cc.rowKey, new Set(cc.fields))
+      }
+    }
+    return map
+  }, [previewChangedCells])
+  const isCellChanged = useCallback((rowKey: number, field: string) => {
+    return changedCellMap.get(rowKey)?.has(field) ?? false
+  }, [changedCellMap])
+
+  // 组件卸载时刷入待记录的编辑历史
+  useEffect(() => {
+    return () => {
+      if (editTimerRef.current) {
+        clearTimeout(editTimerRef.current)
+        flushEdit()
+      }
+    }
+  }, [flushEdit])
 
   useEffect(() => { onSavedCountChange?.(savedCount) }, [savedCount])
 
@@ -246,14 +411,17 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   }, [saveRow])
 
   const updateRow = useCallback((key: number, field: keyof Row, value: any) => {
+    pushEditHistory(`编辑了${field}`, [key], undefined, [{ rowKey: key, fields: [field as string] }])
     setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
     if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
       setRowStatus(prev => ({ ...prev, [key]: "idle" }))
     }
     scheduleSave(key)
-  }, [rowStatus, scheduleSave])
+  }, [rowStatus, scheduleSave, pushEditHistory])
 
   const removeRow = useCallback(async (key: number) => {
+    const row = rowsRef.current.find(r => r.key === key)
+    pushHistory("删除了人员", [key], `删除了「${row?.nickname || "未命名"}」`, undefined, [{ rowKey: key, fields: ["__deleted"] }])
     if (timersRef.current[key]) { clearTimeout(timersRef.current[key]); delete timersRef.current[key] }
     const visitId = savedVisitIds.current[key]
     if (visitId) {
@@ -275,9 +443,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const addRow = useCallback(async () => {
     const row = emptyRow()
     console.log("[BATCH] addRow, key:", row.key)
+    const allFields = Object.keys(row).filter(k => k !== "key") as string[]
+    pushHistory("新增了人员", undefined, undefined, undefined, [{ rowKey: row.key, fields: allFields }])
     setRows(prev => [...prev, row])
     try { await saveRow(row) } catch { /* saveRow handles its own errors */ }
-  }, [saveRow])
+  }, [saveRow, pushHistory])
 
   const handleDragStart = useCallback((key: number) => {
     dragKeyRef.current = key
@@ -296,6 +466,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const handleDrop = useCallback((targetKey: number) => {
     const sourceKey = dragKeyRef.current
     if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
+    pushHistory("调整了人员顺序")
     setRows(prev => {
       const srcIdx = prev.findIndex(r => r.key === sourceKey)
       const tgtIdx = prev.findIndex(r => r.key === targetKey)
@@ -327,7 +498,29 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   }, [scheduleSave])
 
   return (
-    <div className="bg-white rounded-lg">
+    <div className={`bg-white rounded-lg relative ${isLocked ? "visit-table-locked" : ""}`}>
+      {isLocked && (
+        <style>{`
+          .visit-table-locked input,
+          .visit-table-locked select,
+          .visit-table-locked textarea,
+          .visit-table-locked button,
+          .visit-table-locked [role="combobox"],
+          .visit-table-locked [data-dropdown] {
+            pointer-events: none !important;
+            opacity: 0.6;
+          }
+          .visit-table-locked [draggable="true"] {
+            pointer-events: none !important;
+          }
+        `}</style>
+      )}
+      {isPreview && (
+        <div className="px-4 py-2 bg-[#f0f4ff] border-b border-[#d0e0ff] flex items-center justify-between">
+          <span className="text-[12px] text-[#3370ff]">正在预览历史版本 — 当前表格已锁定</span>
+          <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={onClosePreview}>返回编辑</Button>
+        </div>
+      )}
       <div className="overflow-x-auto" style={{ scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
         <div className="min-w-[1688px]">
           <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
@@ -352,14 +545,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
             </tr>
           </thead>
           <tbody className="[&_tr:first-child>td]:pt-[12px] [&_tr:last-child>td]:pb-[6px]">
-            {rows.map((row, idx) => {
+            {displayRows.map((row, idx) => {
               const status = rowStatus[row.key] || "idle"
               // 找到上方最近的组长行
-              const leaderRow = row.is_leader ? null : rows.slice(0, idx).reverse().find(r => r.is_leader)
+              const leaderRow = row.is_leader ? null : displayRows.slice(0, idx).reverse().find(r => r.is_leader)
+              const isChanged = displayChangedKeys.includes(row.key)
               return (
                 <tr
                   key={row.key}
-                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""}`}
+                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""} ${isChanged ? "bg-[#fff8e6]" : ""}`}
                   onDragOver={(e) => handleDragOver(e, row.key)}
                   onDrop={() => handleDrop(row.key)}
                 >
@@ -371,7 +565,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   >
                     <GripVertical className="h-3.5 w-3.5 text-[#c9cdd4] mx-auto" />
                   </td>
-                  <td className="px-1.5 py-1.5 text-center">
+                  <td className={`px-1.5 py-1.5 text-center ${isCellChanged(row.key, "arrived") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <input
                       type="checkbox"
                       checked={row.arrived}
@@ -379,7 +573,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-[#3370ff] checked:border-[#3370ff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
                     />
                   </td>
-                  <td className="pl-2 pr-[10px] py-1.5 w-[64px]">
+                  <td className={`pl-2 pr-[10px] py-1.5 w-[64px] ${isCellChanged(row.key, "is_leader") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <SelectDropdown
                       size="sm"
                       value={row.is_leader ? "1" : "0"}
@@ -391,7 +585,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       textColor={row.is_leader ? undefined : "text-[#c9cdd4]"}
                     />
                   </td>
-                  <td className="pl-0 pr-2.5 py-1.5">
+                  <td className={`pl-0 pr-2.5 py-1.5 ${isCellChanged(row.key, "visit_time") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <input
                       type="time"
                       value={row.visit_time}
@@ -399,7 +593,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       className={`h-7 text-[12px] w-[56px] time-no-icon rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
                     />
                   </td>
-                  <td className="pl-0 pr-1.5 py-1.5">
+                  <td className={`pl-0 pr-1.5 py-1.5 ${isCellChanged(row.key, "nickname") || isCellChanged(row.key, "customer_id") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <CustomerSearchInput
                       customers={customers as any[]}
                       value={row.nickname}
@@ -427,14 +621,14 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className="px-1.5 py-1.5">
                     <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
-                  <td className="px-1.5 py-1.5">
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <Input
                       value={row.needs}
                       onChange={(e) => updateRow(row.key, "needs", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
                   </td>
-                  <td className="px-1.5 py-1.5">
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "referrer_handler") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <CustomerSearchInput
                       customers={customers as any[]}
                       value={row.referrer_handler}
@@ -465,21 +659,21 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
                     </span>
                   </td>
-                  <td className="px-1.5 py-1.5">
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <Input
                       value={row.feedback}
                       onChange={(e) => updateRow(row.key, "feedback", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
                   </td>
-                  <td className="px-1.5 py-1.5">
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <Input
                       value={row.healing_notes}
                       onChange={(e) => updateRow(row.key, "healing_notes", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
                   </td>
-                  <td className="px-1.5 py-1.5">
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "group_leader_feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <Input
                       value={row.group_leader_feedback}
                       onChange={(e) => updateRow(row.key, "group_leader_feedback", e.target.value)}

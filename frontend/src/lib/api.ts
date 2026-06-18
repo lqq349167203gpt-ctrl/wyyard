@@ -1792,3 +1792,68 @@ export const consumptionRecordsApi = {
   },
   getDailyTotals: (date: string) => request<Record<string, number>>(`/api/consumption-records/daily-totals?date=${date}`),
 }
+
+export interface ChangedCell {
+  rowKey: number
+  fields: string[]
+}
+
+export interface ActivityHistoryRecord {
+  id: string
+  date: string
+  space_id: string
+  action: string
+  user_name: string
+  ip: string
+  rows_snapshot: any[]
+  changed_keys: number[]
+  changed_cells: ChangedCell[]
+  created_at: string
+}
+
+export interface VisitChangedCell {
+  rowKey: number
+  fields: string[]
+}
+
+export interface VisitHistoryRecord {
+  id: string
+  date: string
+  space_id: string
+  action: string
+  user_name: string
+  ip: string
+  rows_snapshot: any[]
+  changed_keys: number[]
+  changed_cells: VisitChangedCell[]
+  created_at: string
+}
+
+export const visitHistoryApi = {
+  list: (date: string, spaceId?: string) => {
+    const params = new URLSearchParams({ date })
+    if (spaceId) params.set("space_id", spaceId)
+    return request<VisitHistoryRecord[]>(`/api/visit-history?${params.toString()}`)
+  },
+  create: (data: { date: string; space_id?: string; action: string; user_name: string; ip?: string; rows_snapshot: any[]; changed_keys: number[]; changed_cells: VisitChangedCell[] }) =>
+    request<VisitHistoryRecord>("/api/visit-history", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/api/visit-history/${id}`, { method: "DELETE" }),
+}
+
+export const activityHistoryApi = {
+  list: (date: string, spaceId: string) => {
+    const params = new URLSearchParams({ date, space_id: spaceId })
+    return request<ActivityHistoryRecord[]>(`/api/activity-history?${params.toString()}`)
+  },
+  create: (data: { date: string; space_id: string; action: string; user_name: string; ip?: string; rows_snapshot: any[]; changed_keys: number[]; changed_cells: ChangedCell[] }) =>
+    request<ActivityHistoryRecord>("/api/activity-history", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/api/activity-history/${id}`, { method: "DELETE" }),
+}

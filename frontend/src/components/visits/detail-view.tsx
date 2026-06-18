@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { ChevronLeft, ChevronRight, Edit, Trash2, Download } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown, Edit, Trash2, Download, Clock, Undo2, Redo2 } from "lucide-react"
 import * as XLSX from "xlsx-js-style"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,11 +12,96 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { visitApi, customerApi, accountApi, type VisitRecord, type CustomerLight, type CustomerCreate } from "@/lib/api"
+import { visitApi, customerApi, accountApi, visitHistoryApi, type VisitRecord, type CustomerLight, type CustomerCreate, type VisitHistoryRecord } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
-import { BatchInputTable } from "./batch-input-table"
+import { BatchInputTable, type VisitHistoryEntry, type VisitChangedCell } from "./batch-input-table"
+
+// ===== 三级手风琴组件（天→小时→条目）=====
+type VisitHourGroup = { hour: string; entries: VisitHistoryEntry[] }
+type VisitDayGroup = { date: string; label: string; hours: VisitHourGroup[] }
+
+function VisitHistoryDayGroup({ day, defaultExpanded, previewEntry, onSelectEntry }: {
+  day: VisitDayGroup
+  defaultExpanded: boolean
+  previewEntry: VisitHistoryEntry | null
+  onSelectEntry: (entry: VisitHistoryEntry) => void
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const [expandedHours, setExpandedHours] = useState<Set<string>>(() => {
+    if (day.hours.length > 0) return new Set([day.hours[day.hours.length - 1].hour])
+    return new Set()
+  })
+
+  const toggleHour = (hour: string) => {
+    setExpandedHours(prev => {
+      const next = new Set(prev)
+      if (next.has(hour)) next.delete(hour)
+      else next.add(hour)
+      return next
+    })
+  }
+
+  return (
+    <div className="mb-1">
+      <button
+        className="w-full flex items-center gap-2 px-2 py-2 rounded hover:bg-[#f7f8fa] text-left"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <ChevronDown className={`h-3.5 w-3.5 text-[#8f959e] shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} />
+        <span className="text-[13px] font-medium text-[#2b2f36]">{day.label}</span>
+        <span className="text-[11px] text-[#b0b5bb] ml-auto">{day.hours.reduce((s, h) => s + h.entries.length, 0)}条</span>
+      </button>
+      {expanded && (
+        <div className="ml-2">
+          {day.hours.map(hour => (
+            <div key={hour.hour}>
+              <button
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#f7f8fa] text-left"
+                onClick={() => toggleHour(hour.hour)}
+              >
+                <ChevronDown className={`h-3 w-3 text-[#b0b5bb] shrink-0 transition-transform ${expandedHours.has(hour.hour) ? "" : "-rotate-90"}`} />
+                <span className="text-[12px] text-[#8f959e]">{hour.hour}:00</span>
+                <span className="text-[11px] text-[#b0b5bb] ml-auto">{hour.entries.length}条</span>
+              </button>
+              {expandedHours.has(hour.hour) && (
+                <div className="ml-3">
+                  {hour.entries.map((entry, ei) => {
+                    const isFirstOfHour = ei === 0
+                    const t = new Date(entry.timestamp)
+                    const time = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`
+                    const isSelected = previewEntry === entry
+                    return (
+                      <button
+                        key={entry.id || entry.timestamp}
+                        className={`w-full flex items-center gap-2 px-2 py-2 rounded text-left transition-colors ${
+                          isSelected ? "bg-[#f0f5ff] border border-[#3370ff]" : "hover:bg-[#f7f8fa]"
+                        }`}
+                        onClick={() => onSelectEntry(entry)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-[#b0b5bb]">{time}</span>
+                            {isFirstOfHour && hour.entries.length > 1 && (
+                              <span className="text-[10px] text-[#3370ff] bg-[#f0f5ff] px-1 rounded">最近更新</span>
+                            )}
+                            <span className="text-[12px] text-[#2b2f36] truncate">{entry.action}</span>
+                          </div>
+                          <div className="text-[11px] text-[#8f959e] mt-0.5">{entry.userName}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("sv-SE")
@@ -85,6 +170,164 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [ageRange, setAgeRange] = useState("")
   const [creatingCustomer, setCreatingCustomer] = useState(false)
   const [customerFormError, setCustomerFormError] = useState("")
+
+  // 撤回/重做/历史记录
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+  const undoRef = useRef<() => void>(() => {})
+  const redoRef = useRef<() => void>(() => {})
+  const restoreRef = useRef<((entry: VisitHistoryEntry) => void) | null>(null)
+  const captureRef = useRef<(() => VisitHistoryEntry) | null>(null)
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
+  const [historyEntries, setHistoryEntries] = useState<VisitHistoryEntry[]>([])
+  const [cloudHistory, setCloudHistory] = useState<VisitHistoryEntry[]>([])
+  const [previewEntry, setPreviewEntry] = useState<VisitHistoryEntry | null>(null)
+  const [previewRows, setPreviewRows] = useState<any[] | undefined>(undefined)
+  const [previewChangedKeys, setPreviewChangedKeys] = useState<number[]>([])
+
+  const handleUndoRedoChange = useCallback((cu: boolean, cr: boolean, u: () => void, r: () => void, history: VisitHistoryEntry[]) => {
+    setCanUndo(cu); setCanRedo(cr)
+    undoRef.current = u; redoRef.current = r
+    setHistoryEntries(history)
+  }, [])
+
+  const undo = useCallback(() => { undoRef.current(); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]) }, [])
+  const redo = useCallback(() => { redoRef.current(); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]) }, [])
+
+  // 快捷键
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); if (canUndo) undo() }
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) { e.preventDefault(); if (canRedo) redo() }
+      if ((e.ctrlKey || e.metaKey) && e.key === "y") { e.preventDefault(); if (canRedo) redo() }
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [canUndo, canRedo, undo, redo])
+
+  // 预览历史版本
+  const handleSelectHistoryEntry = useCallback((entry: VisitHistoryEntry) => {
+    setPreviewEntry(entry)
+    setPreviewRows(entry.rows.map(r => ({ ...r })))
+    setPreviewChangedKeys(entry.changedKeys || [])
+  }, [])
+
+  const cloudSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestEntryRef = useRef<VisitHistoryEntry | null>(null)
+
+  const flushCloudSave = useCallback(() => {
+    const entry = latestEntryRef.current
+    if (!entry) return
+    latestEntryRef.current = null
+    visitHistoryApi.create({
+      date: selectedDate,
+      space_id: spaceId || "",
+      action: entry.action,
+      user_name: entry.userName,
+      rows_snapshot: entry.rows,
+      changed_keys: entry.changedKeys || [],
+      changed_cells: (entry.changedCells || []).map(cc => ({ rowKey: cc.rowKey, fields: cc.fields })),
+    }).catch(() => {})
+  }, [selectedDate, spaceId])
+
+  const handleHistoryPushed = useCallback((entry: VisitHistoryEntry) => {
+    setHistoryEntries(prev => [...prev, entry])
+    latestEntryRef.current = entry
+    if (cloudSaveTimerRef.current) clearTimeout(cloudSaveTimerRef.current)
+    cloudSaveTimerRef.current = setTimeout(flushCloudSave, 500)
+  }, [flushCloudSave])
+
+  // 组件卸载或日期/空间切换时，刷入待保存的云端记录
+  useEffect(() => {
+    return () => {
+      if (cloudSaveTimerRef.current) {
+        clearTimeout(cloudSaveTimerRef.current)
+        flushCloudSave()
+      }
+    }
+  }, [flushCloudSave])
+
+  // 从云端加载历史记录
+  useEffect(() => {
+    visitHistoryApi.list(selectedDate, spaceId || undefined)
+      .then(records => {
+        const entries: VisitHistoryEntry[] = records.map(r => ({
+          id: r.id,
+          timestamp: new Date(r.created_at).getTime(),
+          action: r.action,
+          userName: r.user_name,
+          rows: r.rows_snapshot,
+          changedKeys: r.changed_keys,
+          changedCells: r.changed_cells,
+        }))
+        setCloudHistory(entries)
+      })
+      .catch(() => {})
+  }, [selectedDate, spaceId])
+
+  // 合并本地 + 云端历史（按行数据内容去重）
+  const mergedHistory = useMemo(() => {
+    const all = [...historyEntries, ...cloudHistory]
+    all.sort((a, b) => b.timestamp - a.timestamp)
+    const result: VisitHistoryEntry[] = []
+    let prevRowsKey = ""
+    for (const entry of all) {
+      const rowsKey = JSON.stringify(entry.rows)
+      if (rowsKey === prevRowsKey) {
+        const last = result[result.length - 1]
+        if (last.action === "当前状态" && entry.action !== "当前状态") {
+          result[result.length - 1] = entry
+        }
+        continue
+      }
+      prevRowsKey = rowsKey
+      result.push(entry)
+    }
+    return result.filter((e, i) => e.action !== "当前状态" || i === 0)
+  }, [historyEntries, cloudHistory])
+
+  // 动态计算当前条目与上一条的差异
+  const computedChangedCells = useMemo(() => {
+    if (!previewEntry) return undefined
+    const idx = mergedHistory.indexOf(previewEntry)
+    if (idx < 0 || idx >= mergedHistory.length - 1) return previewEntry.changedCells
+    const prevEntry = mergedHistory[idx + 1]
+    const diffCells: { rowKey: number; fields: string[] }[] = []
+    const IGNORED_KEYS = new Set(["key"])
+    const prevMap = new Map<string, any>()
+    for (const r of prevEntry.rows) {
+      const id = r.customer_id || `__key_${r.key}`
+      prevMap.set(id, r)
+    }
+    const matchedPrevIds = new Set<string>()
+    for (const curRow of previewEntry.rows) {
+      const id = curRow.customer_id || `__key_${curRow.key}`
+      const prevRow = prevMap.get(id)
+      matchedPrevIds.add(id)
+      if (!prevRow) {
+        diffCells.push({ rowKey: curRow.key, fields: Object.keys(curRow).filter(k => !IGNORED_KEYS.has(k)) })
+        continue
+      }
+      const changedFields: string[] = []
+      const cur = curRow as any
+      const prev = prevRow as any
+      for (const k of Object.keys(cur)) {
+        if (IGNORED_KEYS.has(k)) continue
+        if (JSON.stringify(cur[k]) !== JSON.stringify(prev[k])) {
+          changedFields.push(k)
+        }
+      }
+      if (changedFields.length > 0) {
+        diffCells.push({ rowKey: curRow.key, fields: changedFields })
+      }
+    }
+    for (const [id, prevRow] of prevMap) {
+      if (!matchedPrevIds.has(id)) {
+        diffCells.push({ rowKey: prevRow.key, fields: ["__deleted"] })
+      }
+    }
+    return diffCells
+  }, [previewEntry, mergedHistory])
 
   // 组件挂载时刷新表格数据
   useEffect(() => {
@@ -387,7 +630,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   }
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-3 transition-[padding] duration-200" style={{ paddingRight: historyPanelOpen ? 320 : 0 }}>
       {/* 日期条 */}
       {!hideDateBar && (
       <div className="flex items-center gap-1 px-3 py-2">
@@ -440,14 +683,117 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
             ) : null}
           </div>
-          <Button size="sm" variant="outline" className="h-6 text-xs" onClick={handleExport}>
-            <Download className="mr-1 h-3 w-3" /> 导出
-          </Button>
+          <div className="flex items-center gap-1">
+            {/* 历史记录/撤回/重做按钮 */}
+            <button
+              onClick={() => {
+                if (previewEntry) { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }
+                else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
+              }}
+              className={`h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] ${historyPanelOpen ? "bg-[#f0f0f0]" : ""}`}
+              title="历史记录"
+            >
+              <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
+            </button>
+            <button
+              onClick={undo}
+              disabled={!canUndo || !!previewEntry}
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
+              title="撤回 (Ctrl+Z)"
+            >
+              <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+            </button>
+            <button
+              onClick={redo}
+              disabled={!canRedo || !!previewEntry}
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
+              title="重做 (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+            </button>
+            <Button size="sm" variant="outline" className="h-6 text-xs" onClick={handleExport}>
+              <Download className="mr-1 h-3 w-3" /> 导出
+            </Button>
+          </div>
         </div>
-        <BatchInputTable date={selectedDate} customers={customerList} spaceId={spaceId} refreshKey={tableRefreshKey} onSaved={() => {
-          refreshCounts()
-        }} onSavedCountChange={setTableSavedCount} onSavingCountChange={setSavingCount} onCustomerClick={onCustomerClick} onCustomerEdit={onCustomerEdit} onActivityClick={onActivityClick} onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }} />
+        <BatchInputTable
+          date={selectedDate}
+          customers={customerList}
+          spaceId={spaceId}
+          refreshKey={tableRefreshKey}
+          onSaved={() => refreshCounts()}
+          onSavedCountChange={setTableSavedCount}
+          onSavingCountChange={setSavingCount}
+          onCustomerClick={onCustomerClick}
+          onCustomerEdit={onCustomerEdit}
+          onActivityClick={onActivityClick}
+          onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }}
+          onUndoRedoChange={handleUndoRedoChange}
+          onRestoreRef={(fn) => { restoreRef.current = fn }}
+          onCaptureRef={(fn) => { captureRef.current = fn }}
+          onHistoryPushed={handleHistoryPushed}
+          previewRows={previewRows}
+          previewChangedKeys={previewChangedKeys}
+          previewChangedCells={computedChangedCells}
+          locked={!!previewEntry}
+          onClosePreview={() => { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}
+        />
       </div>
+
+      {/* 历史记录面板 */}
+      {historyPanelOpen && (
+        <div className="fixed top-0 right-0 h-screen w-80 bg-white border-l border-[#e8e8e8] shadow-lg z-50 flex flex-col">
+          <div className="px-4 py-3 border-b border-[#f0f1f2] flex items-center justify-between shrink-0">
+            <span className="text-[13px] font-medium text-[#2b2f36]">历史记录</span>
+            <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => { setHistoryPanelOpen(false); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]) }}>
+              <span className="text-[#8f959e] text-[16px]">×</span>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {mergedHistory.length === 0 ? (
+              <div className="text-[12px] text-[#8f959e] text-center py-8">暂无历史记录</div>
+            ) : (
+              (() => {
+                const todayStr = new Date().toISOString().split("T")[0]
+                const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0]
+                const dayMap = new Map<string, VisitDayGroup>()
+                for (const entry of mergedHistory) {
+                  const d = new Date(entry.timestamp)
+                  const dateKey = d.toISOString().split("T")[0]
+                  const hourKey = String(d.getHours()).padStart(2, "0")
+                  if (!dayMap.has(dateKey)) {
+                    const label = dateKey === todayStr ? "今天" : dateKey === yesterdayStr ? "昨天" : `${parseInt(dateKey.split("-")[1])}月${parseInt(dateKey.split("-")[2])}日`
+                    dayMap.set(dateKey, { date: dateKey, label, hours: [] })
+                  }
+                  const dayGroup = dayMap.get(dateKey)!
+                  let hourGroup = dayGroup.hours.find(h => h.hour === hourKey)
+                  if (!hourGroup) {
+                    hourGroup = { hour: hourKey, entries: [] }
+                    dayGroup.hours.push(hourGroup)
+                  }
+                  hourGroup.entries.push(entry)
+                }
+                const days = Array.from(dayMap.values())
+                return days.map((day, di) => (
+                  <VisitHistoryDayGroup
+                    key={day.date}
+                    day={day}
+                    defaultExpanded={di === 0}
+                    previewEntry={previewEntry}
+                    onSelectEntry={handleSelectHistoryEntry}
+                  />
+                ))
+              })()
+            )}
+          </div>
+          {previewEntry && (
+            <div className="border-t border-[#f0f1f2] p-3 shrink-0 flex gap-2">
+              <Button size="sm" variant="outline" className="flex-1 h-8 text-[12px]" onClick={() => { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>返回编辑</Button>
+              <Button size="sm" className="flex-1 h-8 text-[12px]" onClick={() => { restoreRef.current?.(previewEntry); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>恢复此版本</Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 删除确认 */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

@@ -232,6 +232,22 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
 
 type RowStatus = "idle" | "saving" | "saved" | "error"
 
+export interface ChangedCell {
+  rowKey: number
+  fields: string[]
+}
+
+export interface HistoryEntry {
+  id?: string
+  timestamp: number
+  action: string
+  userName: string
+  ip?: string
+  rows: ActivityRow[]
+  changedKeys?: number[]
+  changedCells?: ChangedCell[]
+}
+
 interface ActivityBatchTableProps {
   date: string
   courses: Course[]
@@ -246,12 +262,22 @@ interface ActivityBatchTableProps {
   memberIdentities?: MemberIdentity[]
   onSavingCountChange?: (count: number) => void
   onSavedCountChange?: (count: number) => void
+  onUndoRedoChange?: (canUndo: boolean, canRedo: boolean, undo: () => void, redo: () => void, history: HistoryEntry[]) => void
+  onRestoreRef?: (restore: (entry: HistoryEntry) => void) => void
+  onCaptureRef?: (capture: () => void) => void
+  onHistoryPushed?: (entry: HistoryEntry) => void
+  previewRows?: ActivityRow[]
+  previewChangedKeys?: number[]
+  previewChangedCells?: ChangedCell[]
+  locked?: boolean
+  onClosePreview?: () => void
 }
 
 export function ActivityBatchTable({
   date, courses, customers, teachers, spaces, spaceId,
   records, onReload, callbacks, getMemberName, memberIdentities,
-  onSavingCountChange, onSavedCountChange,
+  onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed,
+  previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview,
 }: ActivityBatchTableProps) {
   const [rows, setRows] = useState<ActivityRow[]>([])
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
@@ -264,6 +290,127 @@ export function ActivityBatchTable({
   const fetchedRemainingRef = useRef<Set<string>>(new Set())
   const prevOwnerRef = useRef<Record<number, string>>({})
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
+
+  // 客户端 IP（挂载时获取一次）
+  const ipRef = useRef<string>("")
+  useEffect(() => {
+    fetch("https://api.ipify.org?format=json")
+      .then(r => r.json())
+      .then(data => { ipRef.current = data.ip || "" })
+      .catch(() => {})
+  }, [])
+
+  // 撤回/重做历史栈
+  const [undoStack, setUndoStack] = useState<HistoryEntry[]>([])
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([])
+  const historyPushedRef = useRef(false)
+  const saveRowRef = useRef<(row: ActivityRow) => Promise<void>>(() => Promise.resolve())
+
+  const getUserName = useCallback(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      return user.owner || user.nickname || user.username || "未知"
+    } catch { return "未知" }
+  }, [])
+
+  const pushHistory = useCallback((action: string, changedKeys?: number[], description?: string, overrideRows?: ActivityRow[], changedCells?: ChangedCell[]) => {
+    const entry: HistoryEntry = {
+      timestamp: Date.now(),
+      action: description || action,
+      userName: getUserName(),
+      ip: ipRef.current || undefined,
+      rows: overrideRows || rowsRef.current.map(r => ({ ...r })),
+      changedKeys,
+      changedCells,
+    }
+    setUndoStack(prev => [...prev, entry])
+    setRedoStack([])
+    historyPushedRef.current = true
+    onHistoryPushed?.(entry)
+  }, [getUserName, onHistoryPushed])
+
+  const undo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev
+      const entry = prev[prev.length - 1]
+      const currentEntry: HistoryEntry = {
+        timestamp: Date.now(), action: "撤回", userName: getUserName(),
+        rows: rowsRef.current.map(r => ({ ...r }))
+      }
+      setRedoStack(r => [...r, currentEntry])
+      setRows(entry.rows)
+      const statuses: Record<number, RowStatus> = {}
+      entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+      setRowStatus(statuses)
+      entry.rows.forEach(row => { if (row.record_id && !row.pendingCreate) saveRowRef.current(row) })
+      return prev.slice(0, -1)
+    })
+  }, [getUserName])
+
+  const redo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev
+      const entry = prev[prev.length - 1]
+      const currentEntry: HistoryEntry = {
+        timestamp: Date.now(), action: "重做", userName: getUserName(),
+        rows: rowsRef.current.map(r => ({ ...r }))
+      }
+      setUndoStack(u => [...u, currentEntry])
+      setRows(entry.rows)
+      const statuses: Record<number, RowStatus> = {}
+      entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+      setRowStatus(statuses)
+      entry.rows.forEach(row => { if (row.record_id && !row.pendingCreate) saveRowRef.current(row) })
+      return prev.slice(0, -1)
+    })
+  }, [getUserName])
+
+  // 通知父组件撤回/重做状态和历史记录
+  useEffect(() => {
+    onUndoRedoChange?.(undoStack.length > 0, redoStack.length > 0, undo, redo, undoStack)
+  }, [undoStack, redoStack, undo, redo, onUndoRedoChange])
+
+  // 恢复历史版本函数
+  const restoreFromHistory = useCallback((entry: HistoryEntry) => {
+    pushHistory("恢复了历史版本")
+    setRows(entry.rows)
+    const statuses: Record<number, RowStatus> = {}
+    entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+    setRowStatus(statuses)
+    entry.rows.forEach(row => { if (row.record_id && !row.pendingCreate) saveRowRef.current(row) })
+  }, [pushHistory])
+
+  // 捕获当前状态到历史记录（打开历史面板时调用）
+  const captureCurrentState = useCallback(() => {
+    const currentRows = rowsRef.current
+    if (currentRows.length === 0) return
+    let newEntry: HistoryEntry | null = null
+    setUndoStack(prev => {
+      if (prev.length > 0) {
+        const last = prev[prev.length - 1]
+        const isSame = last.rows.length === currentRows.length &&
+          last.rows.every((r, i) => JSON.stringify(r) === JSON.stringify(currentRows[i]))
+        if (isSame) return prev
+      }
+      newEntry = {
+        timestamp: Date.now(),
+        action: "当前状态",
+        userName: getUserName(),
+        rows: currentRows.map(r => ({ ...r })),
+      }
+      return [...prev, newEntry]
+    })
+    if (newEntry) onHistoryPushed?.(newEntry)
+  }, [getUserName, onHistoryPushed])
+
+  // 暴露函数给父组件
+  useEffect(() => {
+    onRestoreRef?.(restoreFromHistory)
+  }, [restoreFromHistory, onRestoreRef])
+
+  useEffect(() => {
+    onCaptureRef?.(captureCurrentState)
+  }, [captureCurrentState, onCaptureRef])
 
   // 加载活动类型（沙龙子类型）
   useEffect(() => {
@@ -502,6 +649,7 @@ export function ActivityBatchTable({
       }
 
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+      historyPushedRef.current = false
       if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
       // 保存后刷新剩余次数
       if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
@@ -521,6 +669,9 @@ export function ActivityBatchTable({
     }
   }, [courses, spaceId, spaces, date, fetchRemaining])
 
+  // 同步 saveRow 到 ref，供 undo/redo 使用
+  useEffect(() => { saveRowRef.current = saveRow }, [saveRow])
+
   const scheduleSave = useCallback((key: number) => {
     if (timersRef.current[key]) clearTimeout(timersRef.current[key])
     timersRef.current[key] = setTimeout(() => {
@@ -530,23 +681,57 @@ export function ActivityBatchTable({
     }, 500)
   }, [saveRow])
 
+  const FIELD_LABELS: Record<string, string> = {
+    name: "名称", start_time: "时间", end_time: "时间",
+    activity_mode: "活动方式", description: "简介",
+    is_public_welfare: "公益", participant_ids: "参与人",
+    host_ids: "老师", host_names: "老师",
+    owner_id: "案主", owner_name: "案主",
+    space_id: "空间", room_id: "空间",
+    deduction_count: "部位数",
+  }
+
   const updateRow = useCallback((key: number, field: keyof ActivityRow, value: any) => {
-    setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
+    // 首次编辑时记录历史
     if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
+      if (!historyPushedRef.current) {
+        const row = rowsRef.current.find(r => r.key === key)
+        const rowName = row?.name || ""
+        const label = FIELD_LABELS[field as string] || "活动"
+        let desc = `编辑了「${rowName}」的${label}`
+        // 名称编辑显示新旧值
+        if (field === "name" && row) {
+          const oldName = row.name || ""
+          const newName = String(value || "")
+          if (oldName && newName && oldName !== newName) {
+            desc = `将「${oldName}」改为「${newName}」`
+          }
+        }
+        // 传入编辑后的行快照
+        const postRows = rowsRef.current.map(r => r.key === key ? { ...r, [field]: value } : { ...r })
+        pushHistory("编辑了活动", [key], desc, postRows, [{ rowKey: key, fields: [field as string] }])
+      }
       setRowStatus(prev => ({ ...prev, [key]: "idle" }))
     }
+    setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
     scheduleSave(key)
-  }, [rowStatus, scheduleSave])
+  }, [rowStatus, scheduleSave, pushHistory])
 
   // 删除按钮
   const handleDelete = useCallback((row: ActivityRow) => {
+    // 先推历史（快照为删除后的状态：从 rowsRef 中移除该行）
+    const postRows = rowsRef.current.filter(r => r.key !== row.key).map(r => ({ ...r }))
+    rowsRef.current = postRows
+    pushHistory("删除了活动", [row.key], `删除了「${row.name || "未命名活动"}」`, postRows, [{ rowKey: row.key, fields: ["__deleted"] }])
+    // 再更新 React state
+    setRows(postRows)
     if (row.record_type === "class") callbacks.onDeleteClass(row.record_id)
     else if (row.record_type === "gcs") callbacks.onDeleteGcs(row.record_id)
     else if (row.record_type === "ers") callbacks.onDeleteErs(row.record_id)
     else if (row.record_type === "eks") callbacks.onDeleteEks(row.record_id)
     else if (row.record_type === "ics") callbacks.onDeleteIcs(row.record_id)
     else if (row.record_type === "ocr") callbacks.onDeleteOcr(row.record_id)
-  }, [callbacks])
+  }, [callbacks, pushHistory])
 
   // 类型切换 → 删除旧记录 + 重置为新类型行
   const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {
@@ -554,7 +739,24 @@ export function ActivityBatchTable({
     if (!row) return
     // 解析复合值，如 "ics:疗愈师课程"
     const [parsedType, parsedCourse] = newType.includes(":") ? newType.split(":") : [newType, ""]
+    const oldName = row.name || "未命名活动"
+    const newTypeName = parsedCourse || TYPE_NAMES[parsedType as ActivityType] || parsedType
     const type = parsedType as ActivityType
+    // 构造切换后的行，用于历史快照
+    const switchedRow: ActivityRow = {
+      ...row,
+      record_type: type,
+      ics_course_key: type === "ics" ? newType : "",
+      class_course_type: type === "class" ? parsedCourse : "",
+      record_id: "",
+      pendingCreate: true,
+      name: parsedCourse || TYPE_NAMES[type] || "",
+      course_id: "",
+      raw: {},
+      deduction_count: type === "eks" ? 2 : 1,
+    }
+    const postRows = rowsRef.current.map(r => r.key === rowKey ? switchedRow : { ...r })
+    pushHistory("切换了类型", [rowKey], `将「${oldName}」切换为${newTypeName}`, postRows, [{ rowKey, fields: ["record_type", "name"] }])
     // 同类型且同课程 → 忽略
     if (type === row.record_type && parsedCourse && parsedCourse === row.ics_course_key?.replace("ics:", "")) return
 
@@ -590,7 +792,7 @@ export function ActivityBatchTable({
     lastEditedEksRef.current = null
     // 保存新记录
     try { await saveRow(updated) } catch { /* saveRow handles its own errors */ }
-  }, [spaceId, spaces, saveRow])
+  }, [spaceId, spaces, saveRow, pushHistory])
 
   // 拖拽排序
   const handleDragStart = useCallback((key: number) => { dragKeyRef.current = key }, [])
@@ -621,6 +823,7 @@ export function ActivityBatchTable({
     }
     // 内部排序
     if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
+    pushHistory("调整了排序")
     setRows(prev => {
       const srcIdx = prev.findIndex(r => r.key === sourceKey)
       const tgtIdx = prev.findIndex(r => r.key === targetKey)
@@ -637,7 +840,7 @@ export function ActivityBatchTable({
     })
     dragKeyRef.current = null
     setDragOverKey(null)
-  }, [date, spaceId, updateRow, saveRow])
+  }, [date, spaceId, updateRow, saveRow, pushHistory])
 
   // 获取 host 显示名称
   const getHostDisplay = useCallback((row: ActivityRow): string[] => {
@@ -704,6 +907,9 @@ export function ActivityBatchTable({
 
   const handleCreate = async (type: string, classCourseType?: string) => {
     const fresh = createFreshRow(type as ActivityType, spaceId || "", spaces)
+    const newName = classCourseType || fresh.name || TYPE_NAMES[type as ActivityType] || "活动"
+    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "space_id"]
+    pushHistory("新增了活动", undefined, `新增了「${newName}」`, undefined, [{ rowKey: fresh.key, fields: allFields }])
     if (classCourseType) {
       fresh.class_course_type = classCourseType
       fresh.name = classCourseType
@@ -726,8 +932,48 @@ export function ActivityBatchTable({
   const hasEks = rows.some(r => r.record_type === "eks")
   const hasOwnerType = rows.some(r => r.record_type !== "class" && r.record_type !== "ics")
 
+  // 预览模式：使用预览行数据
+  const isPreview = !!previewRows
+  const isLocked = locked || isPreview
+  const displayRows = previewRows || rows
+  const changedKeySet = new Set(previewChangedKeys || [])
+  // 单元格级别的变更标记：rowKey -> Set<fieldName>
+  const changedCellMap = useMemo(() => {
+    const map = new Map<number, Set<string>>()
+    if (previewChangedCells) {
+      for (const cc of previewChangedCells) {
+        map.set(cc.rowKey, new Set(cc.fields))
+      }
+    }
+    return map
+  }, [previewChangedCells])
+  const isCellChanged = useCallback((rowKey: number, field: string) => {
+    return changedCellMap.get(rowKey)?.has(field) ?? false
+  }, [changedCellMap])
+
   return (
-    <div className="bg-white rounded-lg">
+    <div className={`bg-white rounded-lg relative ${isLocked ? "activity-table-locked" : ""}`}>
+      {isPreview && (
+        <div className="px-3 py-2 bg-[#f5eeff] border-b border-[#e0d0f5]">
+          <span className="text-[12px] text-[#7c3aed]">正在预览历史版本</span>
+        </div>
+      )}
+      {isLocked && (
+        <style>{`
+          .activity-table-locked input,
+          .activity-table-locked select,
+          .activity-table-locked textarea,
+          .activity-table-locked button,
+          .activity-table-locked [role="combobox"],
+          .activity-table-locked [data-dropdown] {
+            pointer-events: none !important;
+            opacity: 0.6;
+          }
+          .activity-table-locked [draggable="true"] {
+            pointer-events: none !important;
+          }
+        `}</style>
+      )}
       <div className="overflow-x-auto" style={{ scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
         <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
@@ -749,7 +995,10 @@ export function ActivityBatchTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {displayRows.map((row) => {
+              const isChanged = changedKeySet.has(row.key)
+              const rowChangedFields = changedCellMap.get(row.key)
+              const hasCellChanges = !!rowChangedFields && rowChangedFields.size > 0
               const badge = getTypeBadge(row.record_type, row.record_type === "ics" ? (row.ics_course_key?.replace("ics:", "") || row.name || "") : row.name, row.class_course_type)
               const participantNames = getParticipantNames(row.participant_ids)
               const { oldMembers, newMembers } = splitParticipants(row.participant_ids)
@@ -758,7 +1007,7 @@ export function ActivityBatchTable({
               return (
                 <tr
                   key={row.key}
-                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""}`}
+                  className={`${isChanged && !hasCellChanges ? "bg-[#f5eeff]" : "hover:bg-[#fafbfc]"} ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""}`}
                   onDragOver={(e) => handleDragOver(e, row.key)}
                   onDrop={(e) => handleDrop(row.key, e)}
                 >
@@ -773,7 +1022,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 公益 */}
-                  <td className="px-1 py-0.5 text-center align-top">
+                  <td className={`px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "is_public_welfare") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <div className="flex items-center justify-center h-7">
                     {row.record_type === "class" ? (
                       <input
@@ -787,7 +1036,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 时间 */}
-                  <td className="px-1 py-0.5 align-top">
+                  <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "start_time") || isCellChanged(row.key, "end_time") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <div className="flex items-center h-7 rounded-md border-[0.5px] border-[#dee0e3] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
                       <input
                         type="time"
@@ -806,7 +1055,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 类型 */}
-                  <td className="px-1 py-0.5 align-top">
+                  <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "record_type") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <SelectDropdown
                       size="sm"
                       value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
@@ -819,7 +1068,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动名称 */}
-                  <td className="px-1 py-0.5 align-top">
+                  <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "name") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {["class", "ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
                       <Input
                         value={row.name}
@@ -833,7 +1082,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 案主 */}
-                  {hasOwnerType && <td className="pl-1.5 pr-0 py-0.5 w-[60px] align-top">
+                  {hasOwnerType && <td className={`pl-1.5 pr-0 py-0.5 w-[60px] align-top ${isCellChanged(row.key, "owner_name") || isCellChanged(row.key, "owner_id") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {(row.record_type === "gcs" || row.record_type === "ers" || row.record_type === "ocr") ? (
                       <CustomerSearchInput
                         customers={customers}
@@ -919,7 +1168,7 @@ export function ActivityBatchTable({
                   </td>}
 
                   {/* 销卡 */}
-                  {hasEks && <td className="px-0 py-0.5 text-center align-top">
+                  {hasEks && <td className={`px-0 py-0.5 text-center align-top ${isCellChanged(row.key, "deduction_count") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {row.record_type === "eks" ? (() => {
                       const remaining = row.owner_id ? remainingMap.eks?.[row.owner_id] : undefined
                       return (
@@ -975,7 +1224,7 @@ export function ActivityBatchTable({
                   </td>}
 
                   {/* 活动方式 */}
-                  <td className="px-1 py-0.5 align-top">
+                  <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "activity_mode") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <SelectDropdown
                       size="sm"
                       value={row.activity_mode || "线下"}
@@ -987,7 +1236,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 老师 */}
-                  <td className="px-1 py-0.5 align-top">
+                  <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "host_names") || isCellChanged(row.key, "host_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <CustomerSearchInput
                       multi
                       customers={customers}
@@ -1012,7 +1261,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动简介 */}
-                  <td className="px-1 py-0.5 align-top">
+                  <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {row.record_type === "eks" ? null : (
                       <Input
                         value={row.description}
@@ -1024,7 +1273,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 老人 */}
-                  <td className="px-1 py-0.5">
+                  <td className={`px-1 py-0.5 ${isCellChanged(row.key, "participant_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <span className="text-[#4e535a]">
                       {oldMembers.map((m, i) => (
                         <span key={m.id}>
@@ -1045,7 +1294,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 新人 */}
-                  <td className="px-1 py-0.5">
+                  <td className={`px-1 py-0.5 ${isCellChanged(row.key, "participant_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <span className="text-[#4e535a]">
                       {newMembers.map((m, i) => (
                         <span key={m.id}>
@@ -1082,15 +1331,17 @@ export function ActivityBatchTable({
         </div>
       </div>
 
-      <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
-        <button
-          onClick={() => handleCreate("class", courseTypes.length > 0 ? courseTypes[0].name : "")}
-          className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          添加一行
-        </button>
-      </div>
+      {!isPreview && (
+        <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
+          <button
+            onClick={() => handleCreate("class", courseTypes.length > 0 ? courseTypes[0].name : "")}
+            className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            添加一行
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -298,6 +298,10 @@ export default function DetailView({
                           <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.needs || <span className="text-[#8f959e]">-</span>}</p>
                         </div>
                         <div className="flex items-start gap-2">
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">组长反馈</span>
+                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.group_leader_feedback || <span className="text-[#8f959e]">-</span>}</p>
+                        </div>
+                        <div className="flex items-start gap-2">
                           <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户反馈</span>
                           <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.feedback || v.experience || <span className="text-[#8f959e]">-</span>}</p>
                         </div>

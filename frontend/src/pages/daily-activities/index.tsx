@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers } from "lucide-react"
+import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -25,7 +25,8 @@ import {
 } from "@/lib/api"
 import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
-import { ActivityBatchTable } from "./activity-batch-table"
+import { ActivityBatchTable, type HistoryEntry } from "./activity-batch-table"
+import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
 
 // ===== Date utilities =====
 const today = new Date().toISOString().split("T")[0]
@@ -1037,11 +1038,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                 {formOwnerNames.map((name, i) => (
                   <span key={i} className="inline-flex items-center gap-1 bg-[#f0f1f2] text-[#2b2f36] text-[11px] px-1.5 py-0.5 rounded">
                     {name}
-                    <button className="h-3 w-3 flex items-center justify-center text-[#8f959e] hover:text-[#f54a45]" onClick={() => {
-                      setFormOwnerIds(formOwnerIds.filter((_, j) => j !== i))
-                      setFormOwnerNames(formOwnerNames.filter((_, j) => j !== i))
-                      setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i))
-                    }}><X className="h-2.5 w-2.5" /></button>
+                    <span className="inline-flex items-center justify-center w-4 h-4 cursor-pointer text-[#8f959e] hover:text-[#f54a45] hover:bg-[#e5e6e8] rounded-sm" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setFormOwnerIds(formOwnerIds.filter((_, j) => j !== i)); setFormOwnerNames(formOwnerNames.filter((_, j) => j !== i)); setFormOwnerDescriptions(formOwnerDescriptions.filter((_, j) => j !== i)) }}><X className="h-2.5 w-2.5" /></span>
                   </span>
                 ))}
                 <input
@@ -1743,6 +1740,96 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
   )
 })
 
+// ===== HistoryDayGroup 三级手风琴组件 =====
+type HourGroup = { hour: string; entries: HistoryEntry[] }
+type DayGroup = { date: string; label: string; hours: HourGroup[] }
+
+function HistoryDayGroup({ day, defaultExpanded, previewEntry, onSelectEntry }: {
+  day: DayGroup
+  defaultExpanded: boolean
+  previewEntry: HistoryEntry | null
+  onSelectEntry: (entry: HistoryEntry) => void
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const [expandedHours, setExpandedHours] = useState<Set<string>>(() => {
+    // 默认展开最后一个小时
+    if (day.hours.length > 0) return new Set([day.hours[day.hours.length - 1].hour])
+    return new Set()
+  })
+
+  const toggleHour = (hour: string) => {
+    setExpandedHours(prev => {
+      const next = new Set(prev)
+      if (next.has(hour)) next.delete(hour)
+      else next.add(hour)
+      return next
+    })
+  }
+
+  return (
+    <div className="mb-1">
+      {/* 一级：天 */}
+      <button
+        className="w-full flex items-center gap-2 px-2 py-2 rounded hover:bg-[#f7f8fa] text-left"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <ChevronDown className={`h-3.5 w-3.5 text-[#8f959e] shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} />
+        <span className="text-[13px] font-medium text-[#2b2f36]">{day.label}</span>
+        <span className="text-[11px] text-[#b0b5bb] ml-auto">{day.hours.reduce((s, h) => s + h.entries.length, 0)}条</span>
+      </button>
+      {expanded && (
+        <div className="ml-2">
+          {day.hours.map(hour => (
+            <div key={hour.hour}>
+              {/* 二级：小时 */}
+              <button
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#f7f8fa] text-left"
+                onClick={() => toggleHour(hour.hour)}
+              >
+                <ChevronDown className={`h-3 w-3 text-[#b0b5bb] shrink-0 transition-transform ${expandedHours.has(hour.hour) ? "" : "-rotate-90"}`} />
+                <span className="text-[12px] text-[#8f959e]">{hour.hour}:00</span>
+                <span className="text-[11px] text-[#b0b5bb] ml-auto">{hour.entries.length}条</span>
+              </button>
+              {expandedHours.has(hour.hour) && (
+                <div className="ml-3">
+                  {hour.entries.map((entry, ei) => {
+                    const isFirstOfHour = ei === 0
+                    const t = new Date(entry.timestamp)
+                    const time = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`
+                    const isSelected = previewEntry === entry
+                    return (
+                      <button
+                        key={entry.id || entry.timestamp}
+                        className={`w-full flex items-center gap-2 px-2 py-2 rounded text-left transition-colors ${
+                          isSelected ? "bg-[#f0f5ff] border border-[#3370ff]" : "hover:bg-[#f7f8fa]"
+                        }`}
+                        onClick={() => onSelectEntry(entry)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-[#b0b5bb]">{time}</span>
+                            {isFirstOfHour && hour.entries.length > 1 && (
+                              <span className="text-[10px] text-[#3370ff] bg-[#f0f5ff] px-1 rounded">最近更新</span>
+                            )}
+                            <span className="text-[12px] text-[#2b2f36] truncate">{entry.action}</span>
+                          </div>
+                          <div className="text-[11px] text-[#8f959e] mt-0.5">
+                            {entry.userName}{entry.ip ? ` · ${entry.ip}` : ""}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DailyActivitiesPage() {
   const navigate = useNavigate()
   // ===== Core state =====
@@ -1824,6 +1911,144 @@ export default function DailyActivitiesPage() {
   // ===== Save status =====
   const [savingCount, setSavingCount] = useState(0)
   const [savedCount, setSavedCount] = useState(0)
+
+  // ===== Undo/Redo state =====
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+  const undoRef = useRef<() => void>(() => {})
+  const redoRef = useRef<() => void>(() => {})
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
+  const [cloudHistory, setCloudHistory] = useState<HistoryEntry[]>([])
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
+  const [previewEntry, setPreviewEntry] = useState<HistoryEntry | null>(null)
+  const restoreRef = useRef<((entry: HistoryEntry) => void) | null>(null)
+  const captureRef = useRef<(() => void) | null>(null)
+
+  const handleUndoRedoChange = useCallback((cu: boolean, cr: boolean, u: () => void, r: () => void, history: HistoryEntry[]) => {
+    setCanUndo(cu); setCanRedo(cr)
+    undoRef.current = u; redoRef.current = r
+    setHistoryEntries(history)
+  }, [])
+
+  const undo = useCallback(() => { undoRef.current(); setPreviewEntry(null) }, [])
+  const redo = useCallback(() => { redoRef.current(); setPreviewEntry(null) }, [])
+
+  // 键盘快捷键 Ctrl+Z / Ctrl+Shift+Z
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [undo, redo])
+
+  // 从云端加载历史记录
+  useEffect(() => {
+    if (!selectedSpaceId) { setCloudHistory([]); return }
+    activityHistoryApi.list(detailDate, selectedSpaceId)
+      .then(records => {
+        const entries: HistoryEntry[] = records.map(r => ({
+          id: r.id,
+          timestamp: new Date(r.created_at).getTime(),
+          action: r.action,
+          userName: r.user_name,
+          ip: r.ip || undefined,
+          rows: r.rows_snapshot,
+          changedKeys: r.changed_keys,
+          changedCells: r.changed_cells,
+        }))
+        setCloudHistory(entries)
+      })
+      .catch(() => {})
+  }, [detailDate, selectedSpaceId])
+
+  // 合并本地 + 云端历史（按行数据内容去重）
+  const mergedHistory = useMemo(() => {
+    const all = [...historyEntries, ...cloudHistory]
+    all.sort((a, b) => b.timestamp - a.timestamp)
+    // 按行数据去重：相同 rows 只保留一条，优先保留有描述操作的条目
+    const result: HistoryEntry[] = []
+    let prevRowsKey = ""
+    for (const entry of all) {
+      const rowsKey = JSON.stringify(entry.rows)
+      if (rowsKey === prevRowsKey) {
+        // rows 相同时，优先保留有操作描述的条目（非"当前状态"）
+        const last = result[result.length - 1]
+        if (last.action === "当前状态" && entry.action !== "当前状态") {
+          result[result.length - 1] = entry
+        }
+        continue
+      }
+      prevRowsKey = rowsKey
+      result.push(entry)
+    }
+    // 移除多余的"当前状态"条目（只在第一条时保留）
+    return result.filter((e, i) => e.action !== "当前状态" || i === 0)
+  }, [historyEntries, cloudHistory])
+
+  // 动态计算当前条目与上一条的差异
+  const previewChangedCells = useMemo(() => {
+    if (!previewEntry) return undefined
+    const idx = mergedHistory.indexOf(previewEntry)
+    if (idx < 0 || idx >= mergedHistory.length - 1) return undefined
+    const prevEntry = mergedHistory[idx + 1]
+    const diffCells: { rowKey: number; fields: string[] }[] = []
+    const IGNORED_KEYS = new Set(["key", "raw", "pendingCreate", "course_id", "ics_course_key", "class_course_type"])
+    // 用 record_id 匹配行（key 是本地自增 ID，刷新后会变）
+    const prevMap = new Map<string, any>()
+    for (const r of prevEntry.rows) {
+      const id = r.record_id || `__key_${r.key}`
+      prevMap.set(id, r)
+    }
+    const matchedPrevIds = new Set<string>()
+    for (const curRow of previewEntry.rows) {
+      const id = curRow.record_id || `__key_${curRow.key}`
+      const prevRow = prevMap.get(id)
+      matchedPrevIds.add(id)
+      if (!prevRow) {
+        diffCells.push({ rowKey: curRow.key, fields: Object.keys(curRow).filter(k => !IGNORED_KEYS.has(k)) })
+        continue
+      }
+      const changedFields: string[] = []
+      for (const k of Object.keys(curRow)) {
+        if (IGNORED_KEYS.has(k)) continue
+        if (JSON.stringify((curRow as any)[k]) !== JSON.stringify((prevRow as any)[k])) {
+          changedFields.push(k)
+        }
+      }
+      if (changedFields.length > 0) diffCells.push({ rowKey: curRow.key, fields: changedFields })
+    }
+    // 检查被删除的行
+    for (const prevRow of prevEntry.rows) {
+      const id = prevRow.record_id || `__key_${prevRow.key}`
+      if (!matchedPrevIds.has(id)) {
+        const curMatch = previewEntry.rows.find(r => (r.record_id || `__key_${r.key}`) === id)
+        if (curMatch) {
+          diffCells.push({ rowKey: curMatch.key, fields: ["__deleted"] })
+        }
+      }
+    }
+    return diffCells.length > 0 ? diffCells : undefined
+  }, [previewEntry, mergedHistory])
+
+  // 推送历史到云端
+  const handleHistoryPushed = useCallback((entry: HistoryEntry) => {
+    if (!selectedSpaceId) return
+    activityHistoryApi.create({
+      date: detailDate,
+      space_id: selectedSpaceId,
+      action: entry.action,
+      user_name: entry.userName,
+      ip: entry.ip,
+      rows_snapshot: entry.rows,
+      changed_keys: entry.changedKeys || [],
+      changed_cells: entry.changedCells || [],
+    }).catch(() => {})
+  }, [detailDate, selectedSpaceId])
 
   // ===== Theme state =====
   const [themes, setThemes] = useState<ActivityTheme[]>([])
@@ -2406,8 +2631,8 @@ export default function DailyActivitiesPage() {
 
   // ===== JSX =====
   return (
-    <div className="px-6 pt-4 pb-6 flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)' }}>
-      <div className="flex flex-col min-h-0 flex-1 gap-2">
+    <div className="flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)', paddingRight: historyPanelOpen ? 320 : 0 }}>
+      <div className="flex flex-col min-h-0 flex-1 gap-2 px-6 pt-4 pb-6 overflow-x-auto">
         {/* 月份导航 + 空间 */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0 relative">
@@ -2535,13 +2760,44 @@ export default function DailyActivitiesPage() {
 
         {/* 当日活动标题 */}
         <div className="mt-2.5">
-          <div className="flex items-center">
-            <span className="text-[14px] font-medium text-[#2b2f36] pl-2">{detailDate.split("-")[1].replace(/^0/, "")}月{detailDate.split("-")[2].replace(/^0/, "")}日活动</span>
-            {savingCount > 0 ? (
-              <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
-            ) : savedCount > 0 ? (
-              <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
-            ) : null}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-[14px] font-medium text-[#2b2f36] pl-2">{detailDate.split("-")[1].replace(/^0/, "")}月{detailDate.split("-")[2].replace(/^0/, "")}日活动</span>
+              {savingCount > 0 ? (
+                <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
+              ) : savedCount > 0 ? (
+                <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
+              ) : null}
+            </div>
+            {/* 历史记录/撤回/重做按钮 */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  if (previewEntry) { setPreviewEntry(null); setHistoryPanelOpen(false) }
+                  else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
+                }}
+                className={`h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] ${historyPanelOpen ? "bg-[#f0f0f0]" : ""}`}
+                title="历史记录"
+              >
+                <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
+              </button>
+              <button
+                onClick={undo}
+                disabled={!canUndo || !!previewEntry}
+                className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
+                title="撤回 (Ctrl+Z)"
+              >
+                <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+              </button>
+              <button
+                onClick={redo}
+                disabled={!canRedo || !!previewEntry}
+                className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
+                title="重做 (Ctrl+Shift+Z)"
+              >
+                <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+              </button>
+            </div>
           </div>
           {dayParticipants.length > 0 && (
             <div className="flex flex-wrap gap-1 pl-2 mt-2.5">
@@ -2584,10 +2840,105 @@ export default function DailyActivitiesPage() {
               memberIdentities={memberIdentities}
               onSavingCountChange={setSavingCount}
               onSavedCountChange={setSavedCount}
+              onUndoRedoChange={handleUndoRedoChange}
+              onRestoreRef={(fn) => { restoreRef.current = fn }}
+              onCaptureRef={(fn) => { captureRef.current = fn }}
+              onHistoryPushed={handleHistoryPushed}
+              previewRows={previewEntry?.rows}
+              previewChangedKeys={previewEntry?.changedKeys}
+              previewChangedCells={previewChangedCells}
+              locked={!!previewEntry}
+              onClosePreview={() => setPreviewEntry(null)}
             />
           )}
         </div>
       </div>
+
+      {/* ===== 历史记录面板（固定右侧） ===== */}
+      {historyPanelOpen && (
+        <div className="fixed top-0 right-0 h-screen w-80 bg-white border-l border-[#e8e8e8] shadow-lg z-50 flex flex-col">
+          <div className="px-4 py-3 border-b border-[#f0f1f2] flex items-center justify-between shrink-0">
+            <span className="text-[13px] font-medium text-[#2b2f36]">历史记录</span>
+            <button
+              onClick={() => { setPreviewEntry(null); setHistoryPanelOpen(false) }}
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]"
+            >
+              <X className="h-4 w-4 text-[#8f959e]" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {mergedHistory.length === 0 ? (
+              <div className="text-center text-[12px] text-[#8f959e] py-8">暂无历史记录</div>
+            ) : (
+              (() => {
+                const todayStr = new Date().toISOString().split("T")[0]
+                const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0]
+
+                // 三级分组：天 → 小时 → 条目
+                type HourGroup = { hour: string; entries: HistoryEntry[] }
+                type DayGroup = { date: string; label: string; hours: HourGroup[] }
+                const dayMap = new Map<string, DayGroup>()
+
+                for (const entry of mergedHistory) {
+                  const d = new Date(entry.timestamp)
+                  const dateKey = d.toISOString().split("T")[0]
+                  const hourKey = String(d.getHours()).padStart(2, "0")
+
+                  if (!dayMap.has(dateKey)) {
+                    const label = dateKey === todayStr ? "今天" : dateKey === yesterdayStr ? "昨天" : `${parseInt(dateKey.split("-")[1])}月${parseInt(dateKey.split("-")[2])}日`
+                    dayMap.set(dateKey, { date: dateKey, label, hours: [] })
+                  }
+                  const dayGroup = dayMap.get(dateKey)!
+
+                  let hourGroup = dayGroup.hours.find(h => h.hour === hourKey)
+                  if (!hourGroup) {
+                    hourGroup = { hour: hourKey, entries: [] }
+                    dayGroup.hours.push(hourGroup)
+                  }
+                  hourGroup.entries.push(entry)
+                }
+
+                const days = Array.from(dayMap.values())
+
+                return days.map((day, di) => (
+                  <HistoryDayGroup
+                    key={day.date}
+                    day={day}
+                    defaultExpanded={di === 0}
+                    previewEntry={previewEntry}
+                    onSelectEntry={setPreviewEntry}
+                  />
+                ))
+              })()
+            )}
+          </div>
+          {previewEntry && (
+            <div className="border-t border-[#f0f1f2] p-3 shrink-0 flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8 text-[12px]"
+                onClick={() => { setPreviewEntry(null); setHistoryPanelOpen(false) }}
+              >
+                返回编辑
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 h-8 text-[12px]"
+                onClick={() => {
+                  if (restoreRef.current && previewEntry) {
+                    restoreRef.current(previewEntry)
+                  }
+                  setPreviewEntry(null)
+                  setHistoryPanelOpen(false)
+                }}
+              >
+                恢复此版本
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ===== Theme Edit Dialog ===== */}
       {themeEditWeekIndex !== null && themeWeeks[themeEditWeekIndex] && (

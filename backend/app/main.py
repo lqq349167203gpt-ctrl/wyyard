@@ -47,6 +47,8 @@ from app.api.system_helper import router as system_helper_router
 from app.api.system_helper_config import router as system_helper_config_router
 from app.api.chat_history import router as chat_history_router
 from app.api.consumption_records import router as consumption_records_router
+from app.api.activity_history import router as activity_history_router
+from app.api.visit_history import router as visit_history_router
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
@@ -103,6 +105,8 @@ app.include_router(system_helper_router)
 app.include_router(system_helper_config_router)
 app.include_router(chat_history_router)
 app.include_router(consumption_records_router)
+app.include_router(activity_history_router)
+app.include_router(visit_history_router)
 
 
 @app.get("/api/health")
