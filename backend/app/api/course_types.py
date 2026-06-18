@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 from app.services import course_type_service
 
 router = APIRouter(prefix="/api/course-types", tags=["course-types"])
@@ -7,10 +8,15 @@ router = APIRouter(prefix="/api/course-types", tags=["course-types"])
 
 class CourseTypeCreate(BaseModel):
     name: str
+    organization_id: Optional[str] = ""
 
 
 class CourseTypeRename(BaseModel):
     new_name: str
+
+
+class CourseTypeUpdate(BaseModel):
+    organization_id: Optional[str] = None
 
 
 @router.get("")
@@ -22,10 +28,17 @@ def list_types():
 def create_type(data: CourseTypeCreate):
     if not data.name.strip():
         raise HTTPException(status_code=400, detail="类型名称不能为空")
-    return {"name": course_type_service.create_course_type(data.name.strip())}
+    return course_type_service.create_course_type(data.name.strip(), data.organization_id or "")
 
 
 @router.patch("/{name}")
+def update_type(name: str, data: CourseTypeUpdate):
+    if not course_type_service.update_course_type(name, data.organization_id):
+        raise HTTPException(status_code=404, detail="类型不存在")
+    return {"message": "更新成功"}
+
+
+@router.put("/{name}/rename")
 def rename_type(name: str, data: CourseTypeRename):
     if not data.new_name.strip():
         raise HTTPException(status_code=400, detail="类型名称不能为空")

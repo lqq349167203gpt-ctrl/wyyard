@@ -533,12 +533,18 @@ export const courseApi = {
 }
 
 // Course Types
+export interface CourseType {
+  name: string
+  organization_id: string
+}
+
 export const courseTypeApi = {
-  list: () => request<string[]>("/api/course-types"),
-  create: (name: string) => request<{ name: string }>("/api/course-types", { method: "POST", body: JSON.stringify({ name }) }),
-  rename: (oldName: string, newName: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(oldName)}`, { method: "PATCH", body: JSON.stringify({ new_name: newName }) }),
+  list: () => request<CourseType[]>("/api/course-types"),
+  create: (name: string, organization_id?: string) => request<CourseType>("/api/course-types", { method: "POST", body: JSON.stringify({ name, organization_id: organization_id || "" }) }),
+  update: (name: string, data: { organization_id?: string }) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "PATCH", body: JSON.stringify(data) }),
+  rename: (oldName: string, newName: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(oldName)}/rename`, { method: "PUT", body: JSON.stringify({ new_name: newName }) }),
   delete: (name: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "DELETE" }),
-  reorder: (names: string[]) => request<string[]>("/api/course-types", { method: "PATCH", body: JSON.stringify({ names }) }),
+  reorder: (names: string[]) => request<CourseType[]>("/api/course-types", { method: "PATCH", body: JSON.stringify({ names }) }),
 }
 
 // Organization (共创组织)
