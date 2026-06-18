@@ -402,23 +402,13 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
 
             {/* 会员活动类型 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-1.5">会员活动</span>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(CARD_TYPES).map(([type, config]) => (
-                  <button
-                    key={type}
-                    className={`px-3 py-2 rounded border text-left transition-colors ${
-                      formCardType === type
-                        ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]"
-                        : "border-[#e0e0e0] hover:border-[#c0c0c0] text-[#2b2f36]"
-                    }`}
-                    onClick={() => handleSelectCardType(type)}
-                  >
-                    <div className="text-[12px] font-medium">{type}</div>
-                    <div className="text-[11px] text-[#8f959e] mt-0.5">¥{config.price.toLocaleString()}</div>
-                  </button>
-                ))}
-              </div>
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">会员活动</span>
+              <SelectDropdown
+                value={formCardType}
+                options={Object.entries(CARD_TYPES).map(([type, config]) => ({ value: type, label: `${type} ¥${config.price.toLocaleString()}` }))}
+                placeholder="请选择会员活动"
+                onChange={(v) => handleSelectCardType(v)}
+              />
             </div>
 
             {/* 费用金额 */}
