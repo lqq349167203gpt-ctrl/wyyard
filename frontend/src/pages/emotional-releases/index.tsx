@@ -270,7 +270,7 @@ export function EmotionalReleasesContent({ embedded }: { embedded?: boolean } = 
                   <TableCell className="text-[#2b2f36]">{item.purchase_count} 次</TableCell>
                   <TableCell className="text-[#2b2f36]">¥{item.amount.toLocaleString()}</TableCell>
                   <TableCell className="text-[#2b2f36]">
-                    {item.closers?.length ? item.closers.map(c => c.name).join(", ") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
+                    {item.closers?.length ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
                   </TableCell>
                   <TableCell className="text-right pr-4">
                     <div className="flex items-center justify-end gap-1">
