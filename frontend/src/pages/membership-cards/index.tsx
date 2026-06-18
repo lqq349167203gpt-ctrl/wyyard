@@ -334,7 +334,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
                       {item.card_type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-[#2b2f36] tabular-nums">¥{item.price.toLocaleString()}</TableCell>
+                  <TableCell className="text-[#2b2f36]">¥{item.price.toLocaleString()}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.effective_date}</TableCell>
                   <TableCell className="text-[#2b2f36]">
                     {item.expiry_date || <span className="text-[12px] text-[#4e535a] font-light">-</span>}
@@ -344,7 +344,7 @@ export function MembershipCardContent({ embedded }: { embedded?: boolean } = {})
                       ? `${item.remaining_count} 次`
                       : <span className="text-[12px] text-[#4e535a] font-light">不限</span>}
                   </TableCell>
-                  <TableCell className="text-[#2b2f36] tabular-nums">
+                  <TableCell className="text-[#2b2f36]">
                     {item.closers?.length ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
                   </TableCell>
                   <TableCell className="text-right pr-4">

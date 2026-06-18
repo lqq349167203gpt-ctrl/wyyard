@@ -341,7 +341,7 @@ function OtherProjectList() {
                       {item.project_name}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-[#2b2f36] tabular-nums">¥{item.fee.toLocaleString()}</TableCell>
+                  <TableCell className="text-[#2b2f36]">¥{item.fee.toLocaleString()}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.activity_mode}</TableCell>
                   <TableCell className="text-[#2b2f36]">{item.effective_date}</TableCell>
                   <TableCell className="text-[#2b2f36]">
@@ -350,7 +350,7 @@ function OtherProjectList() {
                   <TableCell className="text-[#2b2f36]">
                     {item.remaining_count === null ? "不限" : item.remaining_count !== undefined ? `${item.remaining_count} 次` : "-"}
                   </TableCell>
-                  <TableCell className="text-[#2b2f36] tabular-nums">
+                  <TableCell className="text-[#2b2f36]">
                     {item.closers?.length ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : (item.closer_name || <span className="text-[12px] text-[#4e535a] font-light">-</span>)}
                   </TableCell>
                   <TableCell className="text-right pr-4">
