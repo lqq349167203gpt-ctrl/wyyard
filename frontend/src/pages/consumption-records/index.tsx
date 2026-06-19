@@ -152,6 +152,7 @@ function PaymentTable({ records, loading }: { records: ConsumptionPaymentRecord[
           <TableHead className="text-right">金额</TableHead>
           <TableHead>生效日期</TableHead>
           <TableHead>到期日期</TableHead>
+          <TableHead>状态</TableHead>
           <TableHead className="pr-4">成交人</TableHead>
         </TableRow>
       </TableHeader>
@@ -166,6 +167,15 @@ function PaymentTable({ records, loading }: { records: ConsumptionPaymentRecord[
             <TableCell className="text-right text-[#2b2f36]">{r.amount}</TableCell>
             <TableCell className="text-[#8f959e]">{r.effective_date || "-"}</TableCell>
             <TableCell className="text-[#8f959e]">{r.expiry_date || "-"}</TableCell>
+            <TableCell className="text-[12px]">
+              {(() => {
+                const today = new Date().toISOString().slice(0,10)
+                if (r.effective_date && r.effective_date > today) return <span className="text-[#8f959e]">未开始</span>
+                if (r.expiry_date && r.expiry_date < today) return <span className="text-[#c4506a]">已过期</span>
+                if (r.effective_date || r.expiry_date) return <span className="text-[#3370ff]">生效中</span>
+                return <span className="text-[#8f959e]">-</span>
+              })()}
+            </TableCell>
             <TableCell className="pr-4 text-[#2b2f36]">{r.closer_name || "-"}</TableCell>
           </TableRow>
         ))}

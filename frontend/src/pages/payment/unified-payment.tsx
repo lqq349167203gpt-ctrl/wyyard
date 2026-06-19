@@ -1045,6 +1045,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                   <TableHead>购买次数</TableHead>
                   <TableHead>生效日期</TableHead>
                   <TableHead>到期日期</TableHead>
+                  <TableHead>状态</TableHead>
                   <TableHead>成交人</TableHead>
                   <TableHead className="text-right pr-4">操作</TableHead>
                 </TableRow>
@@ -1074,6 +1075,15 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">{item.effective_date || "-"}</TableCell>
                     <TableCell className="text-[#2b2f36]">{item.expiry_date || "-"}</TableCell>
+                    <TableCell className="text-[12px]">
+                      {(() => {
+                        const today = new Date().toISOString().slice(0,10)
+                        if (item.effective_date && item.effective_date > today) return <span className="text-[#8f959e]">未开始</span>
+                        if (item.expiry_date && item.expiry_date < today) return <span className="text-[#c4506a]">已过期</span>
+                        if (item.effective_date || item.expiry_date) return <span className="text-[#3370ff]">生效中</span>
+                        return <span className="text-[#8f959e]">-</span>
+                      })()}
+                    </TableCell>
                     <TableCell className="text-[#2b2f36]">
                       {item.closers?.length
                         ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、")
