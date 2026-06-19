@@ -223,12 +223,11 @@ export function ProjectDeductionTab() {
     if (deductions.length === 0) return
     const wb = XLSX.utils.book_new()
     // 疗愈项目类型（合并到一个 sheet）
-    const HEALING_TYPES = ["group-cases", "emotional-releases", "oh-card-readings"]
-    // 分组：会员卡 / 疗愈项目 / 能量结 / 其他项目
+    const HEALING_TYPES = ["group-cases", "emotional-releases", "oh-card-readings", "energy-knots"]
+    // 分组：会员卡 / 疗愈项目 / 其他项目
     const grouped: Record<string, ProjectDeduction[]> = {
       "membership-cards": [],
       "healing": [],
-      "energy-knots": [],
       "other-projects": [],
     }
     for (const d of deductions) {
@@ -272,7 +271,7 @@ export function ProjectDeductionTab() {
       applySheetStyle(ws, [{ wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }])
       XLSX.utils.book_append_sheet(wb, ws, "会员卡")
     }
-    // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理）
+    // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理/能量结）
     if (grouped["healing"].length > 0) {
       const rows = grouped["healing"].map(d => ({
         "昵称": d.nickname, "项目类型": PROJECT_TYPE_LABELS[d.project_type] || d.project_type,
@@ -282,16 +281,6 @@ export function ProjectDeductionTab() {
       const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
       applySheetStyle(ws, [{ wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }])
       XLSX.utils.book_append_sheet(wb, ws, "疗愈项目")
-    }
-    // 能量结 sheet
-    if (grouped["energy-knots"].length > 0) {
-      const rows = grouped["energy-knots"].map(d => ({
-        "昵称": d.nickname, "项目名称": d.project_name, "销卡次数": d.count,
-        "销卡日期": d.deduction_date, "该卡剩余": d.remaining_after, "操作人": d.operator_name || "-",
-      }))
-      const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
-      applySheetStyle(ws, [{ wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }])
-      XLSX.utils.book_append_sheet(wb, ws, "能量结")
     }
     // 其他项目 sheet
     if (grouped["other-projects"].length > 0) {
@@ -345,8 +334,8 @@ export function ProjectDeductionTab() {
       }
     }
 
-    // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理）
-    const HEALING_OPTIONS = PROJECT_TYPE_OPTIONS.filter(o => ["group-cases", "emotional-releases", "oh-card-readings"].includes(o.value))
+    // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理/能量结）
+    const HEALING_OPTIONS = PROJECT_TYPE_OPTIONS.filter(o => ["group-cases", "emotional-releases", "oh-card-readings", "energy-knots"].includes(o.value))
     const wsHealing = wb.addWorksheet("疗愈项目")
     wsHealing.columns = [
       { header: "昵称", key: "nickname", width: 12 },
@@ -365,17 +354,6 @@ export function ProjectDeductionTab() {
         showErrorMessage: true, errorTitle: "无效输入", error: "请从下拉列表中选择项目类型",
       }
     }
-
-    // 能量结 sheet
-    const wsEk = wb.addWorksheet("能量结")
-    wsEk.columns = [
-      { header: "昵称", key: "nickname", width: 12 },
-      { header: "项目名称", key: "project_name", width: 16 },
-      { header: "销卡次数", key: "count", width: 10 },
-    ]
-    wsEk.addRow({ nickname: "张三", project_name: "（填写具体项目名称）", count: 1 })
-    wsEk.getRow(1).eachCell(headerStyle)
-    wsEk.getRow(2).eachCell(exampleStyle)
 
     // 其他项目 sheet
     const wsOther = wb.addWorksheet("其他项目")
