@@ -477,9 +477,24 @@ export default function DetailView({
                   <TableHead className="!h-7 text-[12px]">金额</TableHead>
                   <TableHead className="!h-7 text-[12px]">生效日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">到期日期</TableHead>
+                  <TableHead className="!h-7 text-[12px]">状态</TableHead>
                   <TableHead className="!h-7 text-[12px]">成交人</TableHead>
                 </TableRow></TableHeader><TableBody>
-                  {paginatedRecords.map((r,i)=>(
+                  {paginatedRecords.map((r,i)=>{
+                    const today = new Date().toISOString().slice(0,10)
+                    let status = "-"
+                    let statusClass = "text-[#8f959e]"
+                    if (r.effective_date && r.effective_date > today) {
+                      status = "未开始"
+                      statusClass = "text-[#8f959e]"
+                    } else if (r.expiry_date && r.expiry_date < today) {
+                      status = "已过期"
+                      statusClass = "text-[#c4506a]"
+                    } else if (r.effective_date || r.expiry_date) {
+                      status = "生效中"
+                      statusClass = "text-[#34c724]"
+                    }
+                    return (
                     <TableRow key={i} className="!h-9">
                       <TableCell className="pl-4 py-1 text-[12px]">{r.type}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.name || "-"}</TableCell>
@@ -487,9 +502,11 @@ export default function DetailView({
                       <TableCell className="py-1 text-[12px]">¥{r.amount.toLocaleString()}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.effective_date || "-"}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员卡" ? "不限" : "-")}</TableCell>
+                      <TableCell className={`py-1 text-[12px] ${statusClass}`}>{status}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.closer_name || "-"}</TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody></Table>
                 {totalPages > 1 && (
                   <div className="px-4 py-2">
