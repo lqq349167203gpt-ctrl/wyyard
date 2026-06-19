@@ -128,7 +128,7 @@ export default function DetailView({
   const c = detail.customer
   const arrivedRecords = (detail?.visit_records || []).filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
   const firstVisit = arrivedRecords.length > 0 ? arrivedRecords[0].visit_date : "-"
-  const createdDate = c.created_at ? c.created_at.slice(0, 10) : "-"
+
 
   return (
     <div className={hideSearch ? "p-2 h-[calc(75vh+50px)] flex flex-col" : "space-y-2 h-[calc(100vh-130px)] flex flex-col"}>
@@ -152,7 +152,7 @@ export default function DetailView({
         <div className="flex-1 min-w-0 border-r border-[#f0f0f0]">
           <div className="px-4 pt-3 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">联系方式</span></div>
           <div className="px-4 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
-            {[["年龄",c.age],["电话",c.phone],["微信",c.wechat],["创建日期",createdDate]].map(([l,v])=>(
+            {[["年龄",c.age],["电话",c.phone],["微信",c.wechat]].map(([l,v])=>(
               <div key={l} className="flex items-baseline gap-2">
                 <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
                 <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>

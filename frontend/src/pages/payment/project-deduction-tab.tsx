@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
-import { CreditCard, Pencil, Trash2 } from "lucide-react"
+import { CreditCard, Download, Pencil, Trash2 } from "lucide-react"
+import * as XLSX from "xlsx-js-style"
+import ExcelJS from "exceljs"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -216,6 +218,107 @@ export function ProjectDeductionTab() {
     }
   }
 
+  // 导出销卡记录
+  const handleExport = () => {
+    if (deductions.length === 0) return
+    const rows = deductions.map(d => ({
+      "昵称": d.nickname,
+      "项目类型": PROJECT_TYPE_LABELS[d.project_type] || d.project_type,
+      "项目名称": d.project_name,
+      "销卡次数": d.count,
+      "销卡日期": d.deduction_date,
+      "该卡剩余": d.remaining_after,
+      "操作人": d.operator_name || "-",
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
+    ws['!cols'] = [
+      { wch: 12 }, // 昵称
+      { wch: 12 }, // 项目类型
+      { wch: 16 }, // 项目名称
+      { wch: 10 }, // 销卡次数
+      { wch: 12 }, // 销卡日期
+      { wch: 10 }, // 该卡剩余
+      { wch: 10 }, // 操作人
+    ]
+    ws['!sheetPr'] = { showGridLines: false }
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+    ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
+    const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
+    const baseStyle = {
+      alignment: { vertical: "center", wrapText: true },
+      border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+    }
+    for (let row = 0; row <= range.e.r; row++) {
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
+        if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
+      }
+    }
+    // 表头样式
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
+      if (ws[cellRef]) ws[cellRef].s = {
+        ...ws[cellRef].s,
+        font: { bold: true, sz: 11 },
+        fill: { fgColor: { rgb: "F5F6F7" } },
+      }
+    }
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "销卡记录")
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+    XLSX.writeFile(wb, `销卡记录_${today}.xlsx`)
+  }
+
+  // 下载导入模板
+  const handleDownloadTemplate = async () => {
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet("销卡记录")
+    ws.columns = [
+      { header: "昵称", key: "nickname", width: 12 },
+      { header: "项目类型", key: "project_type", width: 12 },
+      { header: "项目名称", key: "project_name", width: 16 },
+      { header: "销卡次数", key: "count", width: 10 },
+    ]
+    // 示例数据
+    ws.addRow({ nickname: "张三", project_type: "会员卡", project_name: "次卡", count: 1 })
+    // 表头样式
+    ws.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, size: 11 }
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F6F7" } }
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFC0C4CC" } },
+        bottom: { style: "thin", color: { argb: "FFC0C4CC" } },
+        left: { style: "thin", color: { argb: "FFC0C4CC" } },
+        right: { style: "thin", color: { argb: "FFC0C4CC" } },
+      }
+      cell.alignment = { vertical: "middle", horizontal: "center" }
+    })
+    // 示例行样式
+    ws.getRow(2).eachCell(cell => {
+      cell.font = { color: { argb: "FFB0B0B0" } }
+    })
+    // 项目类型下拉验证
+    const projectTypeList = PROJECT_TYPE_OPTIONS.map(o => o.label).join(",")
+    for (let r = 2; r <= 1000; r++) {
+      ws.getCell(r, 2).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`"${projectTypeList}"`],
+        showErrorMessage: true,
+        errorTitle: "无效输入",
+        error: "请从下拉列表中选择项目类型",
+      }
+    }
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "销卡导入模板.xlsx"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
       {/* 销卡按钮 */}
@@ -223,9 +326,17 @@ export function ProjectDeductionTab() {
         <p className="text-xs text-muted-foreground">
           {deductions.length > 0 && <span>共 {deductions.length} 条记录</span>}
         </p>
-        <Button size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(true)}>
-          <CreditCard className="mr-1 h-3.5 w-3.5" /> 销卡
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleDownloadTemplate}>
+            <Download className="mr-1 h-3.5 w-3.5" /> 下载模板
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExport} disabled={deductions.length === 0}>
+            <Download className="mr-1 h-3.5 w-3.5" /> 导出
+          </Button>
+          <Button size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(true)}>
+            <CreditCard className="mr-1 h-3.5 w-3.5" /> 销卡
+          </Button>
+        </div>
       </div>
 
       {/* 扣次记录表格 */}
