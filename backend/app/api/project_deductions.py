@@ -44,3 +44,20 @@ def delete_deduction(deduction_id: str):
 @router.get("/available-items")
 def get_available_items(customer_id: str, project_type: str):
     return project_deduction_service.get_available_items(customer_id, project_type)
+
+
+class AutoDeductRequest(BaseModel):
+    nickname: str
+    project_type: str
+    count: int = 1
+    operator_name: str = ""
+
+
+@router.post("/auto")
+def auto_deduct(data: AutoDeductRequest):
+    try:
+        return project_deduction_service.auto_deduct(
+            data.nickname, data.project_type, data.count, data.operator_name
+        ).model_dump(mode="json")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

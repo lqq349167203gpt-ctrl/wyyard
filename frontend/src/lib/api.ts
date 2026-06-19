@@ -1282,6 +1282,8 @@ export const projectDeductionApi = {
     request<{ id: string; name: string; remaining_count: number; detail?: string; card_type?: string; expiry_date?: string }[]>(
       `/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`
     ),
+  autoDeduct: (data: { nickname: string; project_type: string; count: number; operator_name?: string }) =>
+    request<ProjectDeduction>("/api/project-deductions/auto", { method: "POST", body: JSON.stringify(data) }),
 }
 
 // Space

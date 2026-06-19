@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react"
-import { CreditCard, Download, Pencil, Trash2 } from "lucide-react"
+import { CreditCard, Download, Pencil, Trash2, Upload } from "lucide-react"
 import * as XLSX from "xlsx-js-style"
 import ExcelJS from "exceljs"
 import {
@@ -77,6 +77,11 @@ export function ProjectDeductionTab() {
   // 删除确认
   const [deleteTarget, setDeleteTarget] = useState<ProjectDeduction | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // 导入
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null)
 
   const currentUserName = (() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}").owner || "" } catch { return "" }
@@ -319,20 +324,11 @@ export function ProjectDeductionTab() {
     const wsMc = wb.addWorksheet("会员卡")
     wsMc.columns = [
       { header: "昵称", key: "nickname", width: 12 },
-      { header: "项目名称", key: "project_name", width: 16 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
-    wsMc.addRow({ nickname: "张三", project_name: "次卡", count: 1 })
+    wsMc.addRow({ nickname: "张三", count: 1 })
     wsMc.getRow(1).eachCell(headerStyle)
     wsMc.getRow(2).eachCell(exampleStyle)
-    const cardTypeList = CARD_TYPE_OPTIONS.map(o => o.label).join(",")
-    for (let r = 2; r <= 1000; r++) {
-      wsMc.getCell(r, 2).dataValidation = {
-        type: "list", allowBlank: true,
-        formulae: [`"${cardTypeList}"`],
-        showErrorMessage: true, errorTitle: "无效输入", error: "请从下拉列表中选择卡类型",
-      }
-    }
 
     // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理/能量结）
     const HEALING_OPTIONS = PROJECT_TYPE_OPTIONS.filter(o => ["group-cases", "emotional-releases", "oh-card-readings", "energy-knots"].includes(o.value))
@@ -340,10 +336,9 @@ export function ProjectDeductionTab() {
     wsHealing.columns = [
       { header: "昵称", key: "nickname", width: 12 },
       { header: "项目类型", key: "project_type", width: 12 },
-      { header: "项目名称", key: "project_name", width: 16 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
-    wsHealing.addRow({ nickname: "张三", project_type: "觉醒游戏", project_name: "（填写具体项目名称）", count: 1 })
+    wsHealing.addRow({ nickname: "张三", project_type: "觉醒游戏", count: 1 })
     wsHealing.getRow(1).eachCell(headerStyle)
     wsHealing.getRow(2).eachCell(exampleStyle)
     const healingTypeList = HEALING_OPTIONS.map(o => o.label).join(",")
@@ -359,10 +354,9 @@ export function ProjectDeductionTab() {
     const wsOther = wb.addWorksheet("其他项目")
     wsOther.columns = [
       { header: "昵称", key: "nickname", width: 12 },
-      { header: "项目名称", key: "project_name", width: 16 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
-    wsOther.addRow({ nickname: "张三", project_name: "（填写具体项目名称）", count: 1 })
+    wsOther.addRow({ nickname: "张三", count: 1 })
     wsOther.getRow(1).eachCell(headerStyle)
     wsOther.getRow(2).eachCell(exampleStyle)
 
@@ -376,6 +370,99 @@ export function ProjectDeductionTab() {
     URL.revokeObjectURL(url)
   }
 
+  // 导入 Excel（自动按最早到期销卡）
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ""
+    setImporting(true)
+    setImportResult(null)
+
+    // sheet 名 → project_type
+    const SHEET_TYPE_MAP: Record<string, string> = {
+      "会员卡": "membership-cards",
+      "疗愈项目": "__healing__",
+      "其他项目": "other-projects",
+    }
+    const HEALING_LABEL_MAP: Record<string, string> = {
+      "觉醒游戏": "group-cases",
+      "情绪释放": "emotional-releases",
+      "OH卡梳理": "oh-card-readings",
+      "能量结": "energy-knots",
+    }
+
+    try {
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data, { type: "array" })
+      let success = 0
+      let failed = 0
+      const errors: string[] = []
+
+      for (const sheetName of wb.SheetNames) {
+        const mappedType = SHEET_TYPE_MAP[sheetName]
+        if (!mappedType) continue
+
+        const ws = wb.Sheets[sheetName]
+        const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 })
+        if (rows.length < 2) continue
+
+        const headers = rows[0] as string[]
+        const dataRows = rows.slice(1).filter(r => r.some(cell => cell))
+        const get = (row: any[], col: string) => {
+          const idx = headers.indexOf(col)
+          return idx >= 0 ? String(row[idx] ?? "").trim() : ""
+        }
+
+        for (let i = 0; i < dataRows.length; i++) {
+          const row = dataRows[i]
+          const rowNum = i + 2
+          const nickname = get(row, "昵称")
+          const countStr = get(row, "销卡次数")
+          const count = parseInt(countStr) || 1
+
+          if (!nickname) {
+            failed++
+            errors.push(`[${sheetName}] 第${rowNum}行：昵称为空`)
+            continue
+          }
+
+          if (mappedType === "__healing__") {
+            // 疗愈项目：需要项目类型列
+            const typeLabel = get(row, "项目类型")
+            const projectType = HEALING_LABEL_MAP[typeLabel]
+            if (!projectType) {
+              failed++
+              errors.push(`[${sheetName}] 第${rowNum}行：项目类型"${typeLabel}"无效`)
+              continue
+            }
+            try {
+              await projectDeductionApi.autoDeduct({ nickname, project_type: projectType, count, operator_name: currentUserName })
+              success++
+            } catch (err: any) {
+              failed++
+              errors.push(`[${sheetName}] 第${rowNum}行 ${nickname}：${err.message || "销卡失败"}`)
+            }
+          } else {
+            try {
+              await projectDeductionApi.autoDeduct({ nickname, project_type: mappedType, count, operator_name: currentUserName })
+              success++
+            } catch (err: any) {
+              failed++
+              errors.push(`[${sheetName}] 第${rowNum}行 ${nickname}：${err.message || "销卡失败"}`)
+            }
+          }
+        }
+      }
+
+      setImportResult({ success, failed, errors })
+      if (success > 0) refreshDeductions()
+    } catch (err: any) {
+      setImportResult({ success: 0, failed: 0, errors: [`文件解析失败：${err.message}`] })
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <>
       {/* 销卡按钮 */}
@@ -387,6 +474,10 @@ export function ProjectDeductionTab() {
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleDownloadTemplate}>
             <Download className="mr-1 h-3.5 w-3.5" /> 下载模板
           </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            <Upload className="mr-1 h-3.5 w-3.5" /> 导入
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExport} disabled={deductions.length === 0}>
             <Download className="mr-1 h-3.5 w-3.5" /> 导出
           </Button>
@@ -608,6 +699,26 @@ export function ProjectDeductionTab() {
             <AlertDialogAction onClick={handleDelete} disabled={deleting}>
               {deleting ? "删除中..." : "删除"}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 导入结果 */}
+      <AlertDialog open={!!importResult} onOpenChange={(open) => { if (!open) setImportResult(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>导入完成</AlertDialogTitle>
+            <AlertDialogDescription>
+              成功 {importResult?.success} 条{importResult && importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {importResult && importResult.errors.length > 0 && (
+            <div className="max-h-40 overflow-y-auto text-xs text-[#8f959e] space-y-0.5 px-1">
+              {importResult.errors.map((err, i) => <div key={i}>{err}</div>)}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setImportResult(null)}>确定</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

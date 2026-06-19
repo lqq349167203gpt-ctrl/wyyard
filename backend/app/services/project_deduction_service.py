@@ -144,6 +144,43 @@ def get_available_items(customer_id: str, project_type: str) -> list:
     return []
 
 
+def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name: str = "") -> ProjectDeduction:
+    """按昵称自动销卡：找到最早到期的可用项目并扣减（仅用于 Excel 导入）"""
+    customers = customer_service.list_customers()
+    customer = next((c for c in customers if c.nickname == nickname), None)
+    if not customer:
+        raise ValueError(f"用户"{nickname}"不存在")
+
+    items = get_available_items(customer.id, project_type)
+    if not items:
+        type_labels = {
+            "membership-cards": "会员卡",
+            "group-cases": "觉醒游戏",
+            "emotional-releases": "情绪释放",
+            "oh-card-readings": "OH卡梳理",
+            "energy-knots": "能量结",
+            "other-projects": "其他项目",
+        }
+        raise ValueError(f"用户"{nickname}"没有可用的{type_labels.get(project_type, project_type)}")
+
+    # 优先选最早到期的（会员卡、其他项目有 expiry_date）
+    items_with_expiry = [i for i in items if i.get("expiry_date")]
+    if items_with_expiry:
+        items_with_expiry.sort(key=lambda i: i["expiry_date"])
+        target = items_with_expiry[0]
+    else:
+        target = items[0]
+
+    data = ProjectDeductionCreate(
+        customer_id=customer.id,
+        project_type=project_type,
+        project_id=target["id"],
+        count=count,
+        operator_name=operator_name,
+    )
+    return create_deduction(data)
+
+
 def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
     customer = customer_service.get_customer(data.customer_id)
     if not customer:
