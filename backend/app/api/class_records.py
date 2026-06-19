@@ -49,6 +49,7 @@ def list_unified(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
     space_id: str | None = Query(None),
+    teacher_id: str | None = Query(None),
 ):
     from app.services import (
         group_case_session_service,
@@ -144,6 +145,15 @@ def list_unified(
         items = [i for i in items if i["date"] <= end_date]
     if space_id:
         items = [i for i in items if (i["data"].get("space_id", "") if isinstance(i["data"], dict) else getattr(i["data"], "space_id", "")) == space_id]
+
+    if teacher_id:
+        filtered = []
+        for i in items:
+            d = i["data"]
+            tids = d.get("teacher_ids", []) if isinstance(d, dict) else getattr(d, "teacher_ids", [])
+            if teacher_id in tids:
+                filtered.append(i)
+        items = filtered
 
     # Sort by date desc, then start_time desc
     def sort_key(item):

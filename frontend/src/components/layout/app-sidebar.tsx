@@ -37,6 +37,7 @@ const businessItems = [
   { title: "引流记录", icon: TrendingUp, path: "/traffic-records", permission: "traffic-records" },
   { title: "活动记录", icon: CalendarCheck, path: "/activity-records", permission: "activity-records" },
   { title: "消费记录", icon: CreditCard, path: "/consumption-records", permission: "consumption-records" },
+  { title: "上课记录", icon: BookText, path: "/class-attendance", permission: "class-attendance" },
 ]
 
 const courseItems = [

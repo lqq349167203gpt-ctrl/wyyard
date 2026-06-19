@@ -127,8 +127,9 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
     if not record:
         return None
 
-    # 获取旧的可扣费人员
+    # 获取旧状态
     old_chargeable = _get_group_member_ids(record)
+    old_is_public_welfare = record.is_public_welfare
 
     for key, value in data.items():
         if hasattr(record, key) and key not in ("id", "created_at"):
@@ -137,9 +138,23 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
     _records[record_id] = record
     _save(record_id)
 
-    # 同步扣费
-    new_chargeable = _get_group_member_ids(record)
-    _sync_deduction(record, old_chargeable, new_chargeable)
+    # 公益状态变更：非公益→公益 退费，公益→非公益 扣费
+    new_is_public_welfare = record.is_public_welfare
+    if old_is_public_welfare != new_is_public_welfare:
+        activity_key = f"class:{record.id}"
+        if new_is_public_welfare:
+            # 非公益→公益：退费
+            for cid in old_chargeable:
+                membership_card_service.restore_for_activity(cid, activity_key)
+        else:
+            # 公益→非公益：扣费
+            new_chargeable = _get_group_member_ids(record)
+            for cid in new_chargeable:
+                membership_card_service.deduct_for_activity(cid, activity_key)
+    else:
+        # 同步扣费（人员变更）
+        new_chargeable = _get_group_member_ids(record)
+        _sync_deduction(record, old_chargeable, new_chargeable)
 
     return record
 

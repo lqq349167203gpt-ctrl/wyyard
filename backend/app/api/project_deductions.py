@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 from app.services import project_deduction_service
 from app.models.project_deduction import ProjectDeductionCreate
 
@@ -14,6 +15,28 @@ def list_deductions(customer_id: str | None = Query(None)):
 def create_deduction(data: ProjectDeductionCreate):
     try:
         return project_deduction_service.create_deduction(data).model_dump(mode="json")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class DeductionUpdate(BaseModel):
+    count: int
+    operator_name: str = ""
+
+
+@router.patch("/{deduction_id}")
+def update_deduction(deduction_id: str, data: DeductionUpdate):
+    try:
+        return project_deduction_service.update_deduction(deduction_id, data.count, data.operator_name).model_dump(mode="json")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{deduction_id}")
+def delete_deduction(deduction_id: str):
+    try:
+        project_deduction_service.delete_deduction(deduction_id)
+        return {"ok": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

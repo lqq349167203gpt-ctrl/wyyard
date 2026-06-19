@@ -401,6 +401,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
       case "internal_course":
         setFormCourseType(item.course_type || "")
         setFormCourseAmount(item.price)
+        setFormEffectiveDate(item.effective_date || "")
         break
       case "other":
         setFormCategory(item.category || "")

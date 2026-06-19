@@ -634,13 +634,14 @@ export interface ClassRecordCreate {
 export const classRecordApi = {
   list: (date?: string) => request<ClassRecord[]>(`/api/class-records${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<ClassRecord>>(`/api/class-records?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
-  listUnified: (page: number, pageSize: number, params?: { type?: string; name?: string; start_date?: string; end_date?: string; space_id?: string }) => {
+  listUnified: (page: number, pageSize: number, params?: { type?: string; name?: string; start_date?: string; end_date?: string; space_id?: string; teacher_id?: string }) => {
     const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (params?.type) qs.set("type", params.type)
     if (params?.name) qs.set("name", params.name)
     if (params?.start_date) qs.set("start_date", params.start_date)
     if (params?.end_date) qs.set("end_date", params.end_date)
     if (params?.space_id) qs.set("space_id", params.space_id)
+    if (params?.teacher_id) qs.set("teacher_id", params.teacher_id)
     return request<PaginatedResponse<UnifiedRecord>>(`/api/class-records/unified?${qs.toString()}`)
   },
   create: (data: ClassRecordCreate) => request<ClassRecord>("/api/class-records", { method: "POST", body: JSON.stringify(data) }),
@@ -1264,14 +1265,19 @@ export interface ProjectDeduction {
   count: number
   deduction_date: string
   remaining_after: number
+  operator_name: string
   created_at: string
 }
 
 export const projectDeductionApi = {
   list: (customerId?: string) =>
     request<ProjectDeduction[]>(`/api/project-deductions${customerId ? `?customer_id=${customerId}` : ""}`),
-  create: (data: { customer_id: string; project_type: string; project_id: string; count: number }) =>
+  create: (data: { customer_id: string; project_type: string; project_id: string; count: number; operator_name?: string }) =>
     request<ProjectDeduction>("/api/project-deductions", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: { count: number; operator_name?: string }) =>
+    request<ProjectDeduction>(`/api/project-deductions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/api/project-deductions/${id}`, { method: "DELETE" }),
   getAvailableItems: (customerId: string, projectType: string) =>
     request<{ id: string; name: string; remaining_count: number; detail?: string; card_type?: string; expiry_date?: string }[]>(
       `/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`

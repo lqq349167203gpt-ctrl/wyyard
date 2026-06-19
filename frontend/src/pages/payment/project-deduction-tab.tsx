@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react"
-import { CreditCard } from "lucide-react"
+import { CreditCard, Pencil, Trash2 } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { customerApi, projectDeductionApi, type Customer, type ProjectDeduction } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -18,6 +22,7 @@ const PROJECT_TYPE_OPTIONS = [
   { value: "emotional-releases", label: "情绪释放" },
   { value: "oh-card-readings", label: "OH卡梳理" },
   { value: "energy-knots", label: "能量结" },
+  { value: "other-projects", label: "其他项目" },
 ]
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
@@ -26,12 +31,15 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "emotional-releases": "情绪释放",
   "oh-card-readings": "OH卡梳理",
   "energy-knots": "能量结",
+  "other-projects": "其他项目",
 }
 
 const CARD_TYPE_OPTIONS = [
   { value: "次卡", label: "次卡" },
   { value: "体验会员", label: "体验会员" },
-  { value: "常规通卡", label: "常规通卡" },
+  { value: "月卡", label: "月卡" },
+  { value: "3月卡", label: "3月卡" },
+  { value: "30次卡", label: "30次卡" },
   { value: "半年卡", label: "半年卡" },
   { value: "年卡", label: "年卡" },
 ]
@@ -58,6 +66,19 @@ export function ProjectDeductionTab() {
   const [deductCount, setDeductCount] = useState("1")
   const [deducting, setDeducting] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
+
+  // 编辑弹窗
+  const [editTarget, setEditTarget] = useState<ProjectDeduction | null>(null)
+  const [editCount, setEditCount] = useState("1")
+  const [editing, setEditing] = useState(false)
+
+  // 删除确认
+  const [deleteTarget, setDeleteTarget] = useState<ProjectDeduction | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const currentUserName = (() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}").owner || "" } catch { return "" }
+  })()
 
   // 加载客户列表
   useEffect(() => {
@@ -146,6 +167,7 @@ export function ProjectDeductionTab() {
         project_type: projectType,
         project_id: selectedItemId,
         count: parseInt(deductCount) || 1,
+        operator_name: currentUserName,
       })
       setDialogOpen(false)
       setCustomerId("")
@@ -160,6 +182,37 @@ export function ProjectDeductionTab() {
       alert(error?.message || "销卡失败")
     } finally {
       setDeducting(false)
+    }
+  }
+
+  const handleEdit = async () => {
+    if (!editTarget || editing) return
+    setEditing(true)
+    try {
+      await projectDeductionApi.update(editTarget.id, {
+        count: parseInt(editCount) || 1,
+        operator_name: currentUserName,
+      })
+      setEditTarget(null)
+      refreshDeductions()
+    } catch (error: any) {
+      alert(error?.message || "修改失败")
+    } finally {
+      setEditing(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    try {
+      await projectDeductionApi.delete(deleteTarget.id)
+      setDeleteTarget(null)
+      refreshDeductions()
+    } catch (error: any) {
+      alert(error?.message || "删除失败")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -194,7 +247,9 @@ export function ProjectDeductionTab() {
                 <TableHead>项目名称</TableHead>
                 <TableHead>销卡次数</TableHead>
                 <TableHead>销卡日期</TableHead>
-                <TableHead>剩余次数</TableHead>
+                <TableHead>该卡剩余</TableHead>
+                <TableHead>操作人</TableHead>
+                <TableHead className="w-20">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -211,6 +266,17 @@ export function ProjectDeductionTab() {
                   <TableCell className="text-[#2b2f36]">{d.deduction_date}</TableCell>
                   <TableCell className="text-[#2b2f36]">
                     {d.remaining_after < 0 ? <span className="text-[#c4506a]">{d.remaining_after} 次</span> : `${d.remaining_after} 次`}
+                  </TableCell>
+                  <TableCell className="text-[#8f959e]">{d.operator_name || "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <button className="p-1 hover:bg-[#f0f1f2] rounded" onClick={() => { setEditTarget(d); setEditCount(String(d.count)) }}>
+                        <Pencil className="h-3.5 w-3.5 text-[#8f959e]" />
+                      </button>
+                      <button className="p-1 hover:bg-[#fef0f0] rounded" onClick={() => setDeleteTarget(d)}>
+                        <Trash2 className="h-3.5 w-3.5 text-[#c4506a]" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -329,6 +395,54 @@ export function ProjectDeductionTab() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 编辑弹窗 */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null) }}>
+        <DialogContent className="max-w-xs p-0 gap-0" initialFocus={false}>
+          <DialogHeader className="px-5 pt-4 pb-3 border-b">
+            <DialogTitle className="text-[13px]">修改销卡次数</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 py-4 space-y-3">
+            <div className="text-[12px] text-[#8f959e]">
+              {editTarget?.nickname} — {editTarget?.project_name}
+            </div>
+            <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">次数</span>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={editCount}
+                onChange={(e) => setEditCount(e.target.value.replace(/[^0-9]/g, ""))}
+                className="h-8 text-[12px]"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setEditTarget(null)}>取消</Button>
+              <Button size="sm" onClick={handleEdit} disabled={editing || !editCount}>
+                {editing ? "保存中..." : "保存"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除 {deleteTarget?.nickname} 的「{deleteTarget?.project_name}」销卡记录吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+              {deleting ? "删除中..." : "删除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

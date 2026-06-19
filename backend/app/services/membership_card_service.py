@@ -186,7 +186,7 @@ def _deduct_one(customer_id: str) -> bool:
             return False
         _debts[customer_id] = _debts.get(customer_id, 0) + 1
         _save_debts()
-        return True
+        return False  # 仅记录欠费，未实际扣卡
     # 优先扣不限次的卡（remaining_count 为 None）
     unlimited = [c for c in active_cards if c.remaining_count is None]
     if unlimited:

@@ -37,6 +37,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/traffic-records": "无忧 - 引流记录",
   "/chat-history": "无忧 - 沟通记录",
   "/consumption-records": "无忧 - 消费记录",
+  "/class-attendance": "无忧 - 上课记录",
 }
 
 export function AppLayout() {
