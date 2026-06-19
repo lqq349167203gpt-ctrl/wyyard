@@ -134,18 +134,61 @@ export default function DetailView({
     <div className={hideSearch ? "p-2 h-[calc(75vh+50px)] flex flex-col" : "space-y-2 h-[calc(100vh-130px)] flex flex-col"}>
       {!hideSearch && bar}
 
-      {/* 基本信息 */}
-      <div className="bg-white rounded-lg shrink-0">
-        <div className="px-4 py-3 border-b"><h3 className="text-[12px] font-medium text-[#2b2f36]">基本信息</h3></div>
-        <div className="px-4 pt-4 pb-3 grid grid-cols-3 gap-y-3 gap-x-6">
-          {[["昵称",c.nickname],["姓名",c.name],["年龄",c.age],["会员身份",c.member_type],["电话",c.phone],["微信",c.wechat],["创建日期",createdDate],["初次到访",firstVisit],["到店次数",String(c.visit_count)]].map(([l,v])=>(
-            <div key={l} className="flex items-baseline gap-2">
-              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
-              <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
+      {/* 顶部标签行 — 核心指标一目了然 */}
+      <div className="bg-white rounded-lg shrink-0 px-4 py-3 flex items-center gap-3 flex-wrap">
+        <span className="text-[14px] font-medium text-[#2b2f36]">{c.nickname || "-"}</span>
+        {c.name && <span className="text-[12px] text-[#8f959e]">{c.name}</span>}
+        {c.member_type && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f1f2] text-[#646a73]">{c.member_type}</span>
+        )}
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f5ff] text-[#3370ff]">到店 {c.visit_count} 次</span>
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f5ff] text-[#3370ff]">消费 ¥{detail!.payment_records.reduce((sum, g) => sum + g.amount, 0).toLocaleString()}</span>
+        <span className="text-[11px] text-[#8f959e] ml-auto">首次到访 {firstVisit}</span>
+      </div>
+
+      {/* 双栏详情 */}
+      <div className="bg-white rounded-lg shrink-0 flex">
+        {/* 左栏：联系方式 + 来源信息 */}
+        <div className="flex-1 min-w-0 border-r border-[#f0f0f0]">
+          <div className="px-4 pt-3 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">联系方式</span></div>
+          <div className="px-4 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
+            {[["年龄",c.age],["电话",c.phone],["微信",c.wechat],["创建日期",createdDate]].map(([l,v])=>(
+              <div key={l} className="flex items-baseline gap-2">
+                <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
+                <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-[#f0f0f0]" />
+          <div className="px-4 pt-2 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">来源信息</span></div>
+          <div className="px-4 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
+            {[["引流人",c.referrer||"-"],["承接人",c.referrer_handler||"-"],["流量来源",c.traffic_source||"-"]].map(([l,v])=>(
+              <div key={l} className="flex items-baseline gap-2">
+                <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
+                <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{c.traffic_source === "朋友圈" ? "所属人" : c.traffic_source === "好友推荐" ? "好友昵称" : "流量链接"}</span>
+              {c.traffic_source_detail ? (
+                <>
+                  <span className="text-[12px] text-[#2b2f36] truncate max-w-[200px]">{c.traffic_source_detail}</span>
+                  <button
+                    className="shrink-0 text-[#8f959e] hover:text-[#4e535a]"
+                    onClick={() => { navigator.clipboard.writeText(c.traffic_source_detail); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                  {copied && <span className="text-[11px] text-[#8f959e]">已复制</span>}
+                </>
+              ) : (
+                <span className="text-[12px] text-[#2b2f36]">-</span>
+              )}
             </div>
-          ))}
-          <div className="flex items-baseline gap-2">
-            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈老师</span>
+          </div>
+          <div className="border-t border-[#f0f0f0]" />
+          <div className="px-4 pt-2 pb-3">
+            <span className="text-[11px] text-[#8f959e] font-medium mr-2">疗愈老师</span>
             <span className="text-[12px] text-[#2b2f36]">
               {(c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).length === 0
                 ? "-"
@@ -155,46 +198,23 @@ export default function DetailView({
               }
             </span>
           </div>
-          {[["消费总额",`¥${detail!.payment_records.reduce((sum, g) => sum + g.amount, 0).toLocaleString()}`],["引流人",c.referrer||"-"],["承接人",c.referrer_handler||"-"],["流量来源",c.traffic_source||"-"]].map(([l,v])=>(
-            <div key={l} className="flex items-baseline gap-2">
-              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
-              <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{c.traffic_source === "朋友圈" ? "所属人" : c.traffic_source === "好友推荐" ? "好友昵称" : "流量链接"}</span>
-            {c.traffic_source_detail ? (
-              <>
-                <span className="text-[12px] text-[#2b2f36] truncate max-w-[200px]">{c.traffic_source_detail}</span>
-                <button
-                  className="shrink-0 text-[#8f959e] hover:text-[#4e535a]"
-                  onClick={() => { navigator.clipboard.writeText(c.traffic_source_detail); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
-                {copied && <span className="text-[11px] text-[#8f959e]">已复制</span>}
-              </>
-            ) : (
-              <span className="text-[12px] text-[#2b2f36]">-</span>
-            )}
-          </div>
         </div>
-      </div>
 
-      {/* 工作情况 / 创伤经历 / 当下卡点 / 到访目的 */}
-      <div className="border-t border-[#f0f0f0]" />
-      <div className="bg-white rounded-lg shrink-0">
-        <div className="p-4 space-y-3">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">工作情况</span>
+        {/* 右栏：背景信息 */}
+        <div className="flex-1 min-w-0">
+          <div className="px-4 pt-3 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">工作情况</span></div>
+          <div className="px-4 pb-2">
             <span className="text-[12px] text-[#4e535a] whitespace-pre-wrap">
               {c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "-")}
             </span>
           </div>
           {[["创伤经历",c.basic_info],["当下卡点",c.assessment],["到访目的",c.tags]].map(([l,v])=>(
-            <div key={l} className="flex items-baseline gap-2">
-              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
-              <span className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v||"-"}</span>
+            <div key={l}>
+              <div className="border-t border-[#f0f0f0]" />
+              <div className="px-4 pt-2 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">{l}</span></div>
+              <div className="px-4 pb-2">
+                <span className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v||"-"}</span>
+              </div>
             </div>
           ))}
         </div>
