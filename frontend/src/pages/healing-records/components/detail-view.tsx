@@ -208,7 +208,7 @@ export default function DetailView({
               {c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "-")}
             </span>
           </div>
-          {[["创伤经历",c.basic_info],["当下卡点",c.assessment],["到访目的",c.tags]].map(([l,v])=>(
+          {[["创伤经历",c.basic_info],["当下卡点",c.assessment],["到访目的",c.tags],["其他信息",c.other_info]].map(([l,v])=>(
             <div key={l}>
               <div className="border-t border-[#f0f0f0]" />
               <div className="px-4 pt-2 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">{l}</span></div>

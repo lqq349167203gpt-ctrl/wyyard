@@ -237,6 +237,7 @@ export interface Customer {
   basic_info: string
   assessment: string
   tags: string
+  other_info: string
   traffic_source: string
   traffic_source_detail: string
   tracking_plan: string
