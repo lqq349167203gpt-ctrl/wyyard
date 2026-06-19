@@ -149,7 +149,7 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name:
     customers = customer_service.list_customers()
     customer = next((c for c in customers if c.nickname == nickname), None)
     if not customer:
-        raise ValueError(f"用户"{nickname}"不存在")
+        raise ValueError(f'用户"{nickname}"不存在')
 
     items = get_available_items(customer.id, project_type)
     if not items:
@@ -161,7 +161,7 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name:
             "energy-knots": "能量结",
             "other-projects": "其他项目",
         }
-        raise ValueError(f"用户"{nickname}"没有可用的{type_labels.get(project_type, project_type)}")
+        raise ValueError(f'用户"{nickname}"没有可用的{type_labels.get(project_type, project_type)}')
 
     # 按名称筛选：会员卡按 card_type，其他项目按 name（项目名称）
     if name_filter:
@@ -170,7 +170,7 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name:
         elif project_type == "other-projects":
             items = [i for i in items if i.get("name") == name_filter]
         if not items:
-            raise ValueError(f"用户"{nickname}"没有匹配的"{name_filter}"")
+            raise ValueError(f'用户"{nickname}"没有匹配的"{name_filter}"')
 
     # 优先选最早到期的（会员卡、其他项目有 expiry_date）
     items_with_expiry = [i for i in items if i.get("expiry_date")]
