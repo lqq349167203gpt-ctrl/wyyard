@@ -14,40 +14,50 @@ import type { Position, Account } from "@/lib/api"
 import { AccountsContent } from "@/pages/accounts"
 
 const ALL_PAGES = [
-  { key: "healing-records", label: "客户信息" },
-  { key: "activity-records", label: "活动记录" },
+  // 业务数据
+  { key: "business-reminders", label: "业务提醒" },
   { key: "traffic-records", label: "引流记录" },
+  { key: "activity-records", label: "活动记录" },
   { key: "consumption-records", label: "消费记录" },
+  { key: "class-attendance", label: "上课记录" },
+  // 疗愈活动
+  { key: "healing-records", label: "客户信息" },
   { key: "class-records", label: "人员安排" },
   { key: "daily-activities", label: "活动安排" },
+  // 付费项目
   { key: "payment", label: "付费项目" },
   { key: "membership-cards", label: "会员卡" },
   { key: "group-cases", label: "觉醒游戏" },
+  { key: "group-case-sessions", label: "觉醒游戏场次" },
   { key: "emotional-releases", label: "情绪释放" },
+  { key: "emotional-release-sessions", label: "情绪释放场次" },
   { key: "oh-card-readings", label: "OH卡梳理" },
   { key: "energy-knots", label: "能量结" },
+  { key: "energy-knot-sessions", label: "能量结场次" },
   { key: "internal-courses", label: "内部课程" },
+  { key: "internal-course-sessions", label: "内部课程场次" },
   { key: "other-projects", label: "其他项目" },
-  { key: "agents", label: "AI 配置" },
-  { key: "business-reminders", label: "业务提醒" },
-  { key: "chat-history", label: "沟通记录" },
-  { key: "system-logs", label: "系统日志" },
-  { key: "operation-logs", label: "操作日志" },
+  // 信息配置
   { key: "member-identities", label: "会员身份" },
   { key: "healing-identities", label: "疗愈老师" },
-  { key: "position-management", label: "账号管理" },
-  { key: "change-password", label: "密码修改" },
-  { key: "courses", label: "活动配置" },
   { key: "organizations", label: "组织管理" },
   { key: "spaces", label: "空间配置" },
   { key: "reminders", label: "提醒配置" },
+  // 账号管理
+  { key: "position-management", label: "账号管理" },
+  { key: "change-password", label: "密码修改" },
+  // 系统配置
+  { key: "agents", label: "AI 配置" },
+  { key: "chat-history", label: "沟通记录" },
+  { key: "system-logs", label: "系统日志" },
+  { key: "operation-logs", label: "操作日志" },
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务数据", keys: ["business-reminders", "traffic-records", "activity-records", "consumption-records"] },
+  { label: "业务数据", keys: ["business-reminders", "traffic-records", "activity-records", "consumption-records", "class-attendance"] },
   { label: "疗愈活动", keys: ["healing-records", "class-records", "daily-activities"] },
-  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects"] },
-  { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
+  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "group-case-sessions", "emotional-releases", "emotional-release-sessions", "oh-card-readings", "energy-knots", "energy-knot-sessions", "internal-courses", "internal-course-sessions", "other-projects"] },
+  { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password"] },
   { label: "系统配置", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
 ]

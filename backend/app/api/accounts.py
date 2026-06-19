@@ -40,13 +40,23 @@ async def create_account(data: AccountCreate):
 
 
 ALL_PAGE_KEYS = [
-    "healing-records", "activity-records", "traffic-records",
-    "class-records-visitors", "class-records-activities", "class-records-arrival",
-    "daily-activities", "payment", "membership-cards", "group-cases",
-    "emotional-releases", "energy-knots", "internal-courses", "other-projects",
-    "agents", "business-reminders", "system-logs", "operation-logs", "chat-history", "consumption-records",
-    "member-identities", "healing-identities", "position-management",
-    "courses", "organizations", "spaces", "reminders",
+    # 业务数据
+    "business-reminders", "traffic-records", "activity-records",
+    "consumption-records", "class-attendance",
+    # 疗愈活动
+    "healing-records", "class-records-visitors", "class-records-activities",
+    "class-records-arrival", "class-records", "daily-activities",
+    # 付费项目
+    "payment", "membership-cards", "group-cases", "group-case-sessions",
+    "emotional-releases", "emotional-release-sessions", "oh-card-readings",
+    "energy-knots", "energy-knot-sessions", "internal-courses",
+    "internal-course-sessions", "other-projects",
+    # 信息配置
+    "member-identities", "healing-identities", "organizations", "spaces", "reminders",
+    # 账号管理
+    "position-management", "change-password",
+    # 系统配置
+    "agents", "chat-history", "system-logs", "operation-logs",
 ]
 
 
