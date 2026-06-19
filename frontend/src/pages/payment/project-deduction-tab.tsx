@@ -223,83 +223,6 @@ export function ProjectDeductionTab() {
     }
   }
 
-  // 导出销卡记录
-  const handleExport = () => {
-    if (deductions.length === 0) return
-    const wb = XLSX.utils.book_new()
-    // 疗愈项目类型（合并到一个 sheet）
-    const HEALING_TYPES = ["group-cases", "emotional-releases", "oh-card-readings", "energy-knots"]
-    // 分组：会员卡 / 疗愈项目 / 其他项目
-    const grouped: Record<string, ProjectDeduction[]> = {
-      "membership-cards": [],
-      "healing": [],
-      "other-projects": [],
-    }
-    for (const d of deductions) {
-      if (HEALING_TYPES.includes(d.project_type)) grouped["healing"].push(d)
-      else if (grouped[d.project_type]) grouped[d.project_type].push(d)
-      else grouped["other-projects"].push(d)
-    }
-    const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
-    const baseStyle = {
-      font: { sz: 11, color: { rgb: "000000" } },
-      alignment: { vertical: "center", wrapText: true },
-      border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
-    }
-    const headerExtra = {
-      font: { bold: true, sz: 11, color: { rgb: "000000" } },
-      fill: { fgColor: { rgb: "F5F6F7" } },
-    }
-    const applySheetStyle = (ws: XLSX.WorkSheet, cols: { wch: number }[]) => {
-      ws['!sheetPr'] = { showGridLines: false }
-      ws['!cols'] = cols
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-      ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
-      for (let row = 0; row <= range.e.r; row++) {
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
-          if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
-        }
-      }
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
-        if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...headerExtra }
-      }
-    }
-    // 会员卡 sheet
-    if (grouped["membership-cards"].length > 0) {
-      const rows = grouped["membership-cards"].map(d => ({
-        "昵称": d.nickname, "项目名称": d.project_name, "销卡次数": d.count,
-        "销卡日期": d.deduction_date, "该卡剩余": d.remaining_after, "操作人": d.operator_name || "-",
-      }))
-      const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
-      applySheetStyle(ws, [{ wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }])
-      XLSX.utils.book_append_sheet(wb, ws, "会员卡")
-    }
-    // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理/能量结）
-    if (grouped["healing"].length > 0) {
-      const rows = grouped["healing"].map(d => ({
-        "昵称": d.nickname, "项目类型": PROJECT_TYPE_LABELS[d.project_type] || d.project_type,
-        "项目名称": d.project_name, "销卡次数": d.count,
-        "销卡日期": d.deduction_date, "该卡剩余": d.remaining_after, "操作人": d.operator_name || "-",
-      }))
-      const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
-      applySheetStyle(ws, [{ wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }])
-      XLSX.utils.book_append_sheet(wb, ws, "疗愈项目")
-    }
-    // 其他项目 sheet
-    if (grouped["other-projects"].length > 0) {
-      const rows = grouped["other-projects"].map(d => ({
-        "昵称": d.nickname, "项目名称": d.project_name, "销卡次数": d.count,
-        "销卡日期": d.deduction_date, "该卡剩余": d.remaining_after, "操作人": d.operator_name || "-",
-      }))
-      const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
-      applySheetStyle(ws, [{ wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }])
-      XLSX.utils.book_append_sheet(wb, ws, "其他项目")
-    }
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "")
-    XLSX.writeFile(wb, `销卡记录_${today}.xlsx`)
-  }
 
   // 下载导入模板
   const handleDownloadTemplate = async () => {
@@ -570,9 +493,6 @@ export function ProjectDeductionTab() {
             <Upload className="mr-1 h-3.5 w-3.5" /> 导入
           </Button>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExport} disabled={deductions.length === 0}>
-            <Download className="mr-1 h-3.5 w-3.5" /> 导出
-          </Button>
           <Button size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(true)}>
             <CreditCard className="mr-1 h-3.5 w-3.5" /> 销卡
           </Button>
