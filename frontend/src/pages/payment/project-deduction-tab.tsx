@@ -321,26 +321,23 @@ export function ProjectDeductionTab() {
     }
 
     const HINT_TEXT = "将自动根据同类型的项目中，在有效期内扣除最早的次数"
-    const hintStyle = (cell: ExcelJS.Cell, colCount: number) => {
-      cell.value = HINT_TEXT
-      cell.font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
-      cell.alignment = { vertical: "middle", horizontal: "left" }
+    const addHintRow = (ws: ExcelJS.Worksheet, colCount: number) => {
+      const row = ws.addRow([HINT_TEXT])
+      ws.mergeCells(1, 1, 1, colCount)
+      row.getCell(1).font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
+      row.getCell(1).alignment = { vertical: "middle", horizontal: "left" }
     }
 
     // 会员卡 sheet
     const wsMc = wb.addWorksheet("会员卡")
-    wsMc.columns = [
-      { header: "昵称", key: "nickname", width: 12 },
-      { header: "卡类型", key: "card_type", width: 12 },
-      { header: "销卡次数", key: "count", width: 10 },
-    ]
-    wsMc.spliceRows(1, 0, [HINT_TEXT])
-    wsMc.mergeCells(1, 1, 1, 3)
-    wsMc.getCell(1, 1).font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
-    wsMc.getCell(1, 1).alignment = { vertical: "middle", horizontal: "left" }
-    wsMc.getRow(2).eachCell(headerStyle)
-    wsMc.addRow({ nickname: "张三", card_type: "体验会员", count: 1 })
-    wsMc.getRow(3).eachCell(exampleStyle)
+    wsMc.getColumn(1).width = 12
+    wsMc.getColumn(2).width = 12
+    wsMc.getColumn(3).width = 10
+    addHintRow(wsMc, 3)
+    const mcHeader = wsMc.addRow(["昵称", "卡类型", "销卡次数"])
+    mcHeader.eachCell(headerStyle)
+    const mcExample = wsMc.addRow(["张三", "体验会员", 1])
+    mcExample.eachCell(exampleStyle)
     const cardTypeList = CARD_TYPE_OPTIONS.map(o => o.label).join(",")
     for (let r = 3; r <= 1000; r++) {
       wsMc.getCell(r, 2).dataValidation = {
@@ -353,18 +350,14 @@ export function ProjectDeductionTab() {
     // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理/能量结）
     const HEALING_OPTIONS = PROJECT_TYPE_OPTIONS.filter(o => ["group-cases", "emotional-releases", "oh-card-readings", "energy-knots"].includes(o.value))
     const wsHealing = wb.addWorksheet("疗愈项目")
-    wsHealing.columns = [
-      { header: "昵称", key: "nickname", width: 12 },
-      { header: "项目类型", key: "project_type", width: 12 },
-      { header: "销卡次数", key: "count", width: 10 },
-    ]
-    wsHealing.spliceRows(1, 0, [HINT_TEXT])
-    wsHealing.mergeCells(1, 1, 1, 3)
-    wsHealing.getCell(1, 1).font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
-    wsHealing.getCell(1, 1).alignment = { vertical: "middle", horizontal: "left" }
-    wsHealing.getRow(2).eachCell(headerStyle)
-    wsHealing.addRow({ nickname: "张三", project_type: "觉醒游戏", count: 1 })
-    wsHealing.getRow(3).eachCell(exampleStyle)
+    wsHealing.getColumn(1).width = 12
+    wsHealing.getColumn(2).width = 12
+    wsHealing.getColumn(3).width = 10
+    addHintRow(wsHealing, 3)
+    const healingHeader = wsHealing.addRow(["昵称", "项目类型", "销卡次数"])
+    healingHeader.eachCell(headerStyle)
+    const healingExample = wsHealing.addRow(["张三", "觉醒游戏", 1])
+    healingExample.eachCell(exampleStyle)
     const healingTypeList = HEALING_OPTIONS.map(o => o.label).join(",")
     for (let r = 3; r <= 1000; r++) {
       wsHealing.getCell(r, 2).dataValidation = {
@@ -376,18 +369,14 @@ export function ProjectDeductionTab() {
 
     // 其他项目 sheet
     const wsOther = wb.addWorksheet("其他项目")
-    wsOther.columns = [
-      { header: "昵称", key: "nickname", width: 12 },
-      { header: "项目名称", key: "project_name", width: 16 },
-      { header: "销卡次数", key: "count", width: 10 },
-    ]
-    wsOther.spliceRows(1, 0, [HINT_TEXT])
-    wsOther.mergeCells(1, 1, 1, 3)
-    wsOther.getCell(1, 1).font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
-    wsOther.getCell(1, 1).alignment = { vertical: "middle", horizontal: "left" }
-    wsOther.getRow(2).eachCell(headerStyle)
-    wsOther.addRow({ nickname: "张三", project_name: "（填写具体项目名称）", count: 1 })
-    wsOther.getRow(3).eachCell(exampleStyle)
+    wsOther.getColumn(1).width = 12
+    wsOther.getColumn(2).width = 16
+    wsOther.getColumn(3).width = 10
+    addHintRow(wsOther, 3)
+    const otherHeader = wsOther.addRow(["昵称", "项目名称", "销卡次数"])
+    otherHeader.eachCell(headerStyle)
+    const otherExample = wsOther.addRow(["张三", "（填写具体项目名称）", 1])
+    otherExample.eachCell(exampleStyle)
 
     const buffer = await wb.xlsx.writeBuffer()
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
