@@ -221,50 +221,61 @@ export function ProjectDeductionTab() {
   // 导出销卡记录
   const handleExport = () => {
     if (deductions.length === 0) return
-    const rows = deductions.map(d => ({
-      "昵称": d.nickname,
-      "项目类型": PROJECT_TYPE_LABELS[d.project_type] || d.project_type,
-      "项目名称": d.project_name,
-      "销卡次数": d.count,
-      "销卡日期": d.deduction_date,
-      "该卡剩余": d.remaining_after,
-      "操作人": d.operator_name || "-",
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
-    ws['!cols'] = [
-      { wch: 12 }, // 昵称
-      { wch: 12 }, // 项目类型
-      { wch: 16 }, // 项目名称
-      { wch: 10 }, // 销卡次数
-      { wch: 12 }, // 销卡日期
-      { wch: 10 }, // 该卡剩余
-      { wch: 10 }, // 操作人
-    ]
-    ws['!sheetPr'] = { showGridLines: false }
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-    ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
-    const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
-    const baseStyle = {
-      alignment: { vertical: "center", wrapText: true },
-      border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
-    }
-    for (let row = 0; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
-        if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
-      }
-    }
-    // 表头样式
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
-      if (ws[cellRef]) ws[cellRef].s = {
-        ...ws[cellRef].s,
-        font: { bold: true, sz: 11 },
-        fill: { fgColor: { rgb: "F5F6F7" } },
-      }
-    }
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "销卡记录")
+    // 按项目类型分组
+    const grouped: Record<string, ProjectDeduction[]> = {}
+    for (const d of deductions) {
+      const key = d.project_type
+      if (!grouped[key]) grouped[key] = []
+      grouped[key].push(d)
+    }
+    const applySheetStyle = (ws: XLSX.WorkSheet) => {
+      ws['!sheetPr'] = { showGridLines: false }
+      ws['!cols'] = [
+        { wch: 12 }, // 昵称
+        { wch: 12 }, // 项目类型
+        { wch: 16 }, // 项目名称
+        { wch: 10 }, // 销卡次数
+        { wch: 12 }, // 销卡日期
+        { wch: 10 }, // 该卡剩余
+        { wch: 10 }, // 操作人
+      ]
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+      ws['!rows'] = Array.from({ length: range.e.r + 1 }, () => ({ hpt: 30 }))
+      const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
+      const baseStyle = {
+        alignment: { vertical: "center", wrapText: true },
+        border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+      }
+      for (let row = 0; row <= range.e.r; row++) {
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
+          if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
+        }
+      }
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
+        if (ws[cellRef]) ws[cellRef].s = {
+          ...ws[cellRef].s,
+          font: { bold: true, sz: 11 },
+          fill: { fgColor: { rgb: "F5F6F7" } },
+        }
+      }
+    }
+    for (const [type, items] of Object.entries(grouped)) {
+      const rows = items.map(d => ({
+        "昵称": d.nickname,
+        "项目类型": PROJECT_TYPE_LABELS[d.project_type] || d.project_type,
+        "项目名称": d.project_name,
+        "销卡次数": d.count,
+        "销卡日期": d.deduction_date,
+        "该卡剩余": d.remaining_after,
+        "操作人": d.operator_name || "-",
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
+      applySheetStyle(ws)
+      XLSX.utils.book_append_sheet(wb, ws, PROJECT_TYPE_LABELS[type] || type)
+    }
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, "")
     XLSX.writeFile(wb, `销卡记录_${today}.xlsx`)
   }
@@ -272,43 +283,55 @@ export function ProjectDeductionTab() {
   // 下载导入模板
   const handleDownloadTemplate = async () => {
     const wb = new ExcelJS.Workbook()
-    const ws = wb.addWorksheet("销卡记录")
-    ws.columns = [
+    const headerBorder: Partial<ExcelJS.Borders> = {
+      top: { style: "thin", color: { argb: "FFC0C4CC" } },
+      bottom: { style: "thin", color: { argb: "FFC0C4CC" } },
+      left: { style: "thin", color: { argb: "FFC0C4CC" } },
+      right: { style: "thin", color: { argb: "FFC0C4CC" } },
+    }
+    const headerStyle = (cell: ExcelJS.Cell) => {
+      cell.font = { bold: true, size: 11 }
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F6F7" } }
+      cell.border = headerBorder
+      cell.alignment = { vertical: "middle", horizontal: "center" }
+    }
+    const exampleStyle = (cell: ExcelJS.Cell) => {
+      cell.font = { color: { argb: "FFB0B0B0" } }
+    }
+
+    // 会员卡 sheet
+    const wsMc = wb.addWorksheet("会员卡")
+    wsMc.columns = [
       { header: "昵称", key: "nickname", width: 12 },
-      { header: "项目类型", key: "project_type", width: 12 },
       { header: "项目名称", key: "project_name", width: 16 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
-    // 示例数据
-    ws.addRow({ nickname: "张三", project_type: "会员卡", project_name: "次卡", count: 1 })
-    // 表头样式
-    ws.getRow(1).eachCell(cell => {
-      cell.font = { bold: true, size: 11 }
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F6F7" } }
-      cell.border = {
-        top: { style: "thin", color: { argb: "FFC0C4CC" } },
-        bottom: { style: "thin", color: { argb: "FFC0C4CC" } },
-        left: { style: "thin", color: { argb: "FFC0C4CC" } },
-        right: { style: "thin", color: { argb: "FFC0C4CC" } },
-      }
-      cell.alignment = { vertical: "middle", horizontal: "center" }
-    })
-    // 示例行样式
-    ws.getRow(2).eachCell(cell => {
-      cell.font = { color: { argb: "FFB0B0B0" } }
-    })
-    // 项目类型下拉验证
-    const projectTypeList = PROJECT_TYPE_OPTIONS.map(o => o.label).join(",")
+    wsMc.addRow({ nickname: "张三", project_name: "次卡", count: 1 })
+    wsMc.getRow(1).eachCell(headerStyle)
+    wsMc.getRow(2).eachCell(exampleStyle)
+    const cardTypeList = CARD_TYPE_OPTIONS.map(o => o.label).join(",")
     for (let r = 2; r <= 1000; r++) {
-      ws.getCell(r, 2).dataValidation = {
-        type: "list",
-        allowBlank: true,
-        formulae: [`"${projectTypeList}"`],
-        showErrorMessage: true,
-        errorTitle: "无效输入",
-        error: "请从下拉列表中选择项目类型",
+      wsMc.getCell(r, 2).dataValidation = {
+        type: "list", allowBlank: true,
+        formulae: [`"${cardTypeList}"`],
+        showErrorMessage: true, errorTitle: "无效输入", error: "请从下拉列表中选择卡类型",
       }
     }
+
+    // 其他类型 sheet（觉醒游戏/情绪释放/OH卡梳理/能量结/其他项目）
+    const otherTypes = PROJECT_TYPE_OPTIONS.filter(o => o.value !== "membership-cards")
+    for (const opt of otherTypes) {
+      const ws = wb.addWorksheet(opt.label)
+      ws.columns = [
+        { header: "昵称", key: "nickname", width: 12 },
+        { header: "项目名称", key: "project_name", width: 16 },
+        { header: "销卡次数", key: "count", width: 10 },
+      ]
+      ws.addRow({ nickname: "张三", project_name: "（填写具体项目名称）", count: 1 })
+      ws.getRow(1).eachCell(headerStyle)
+      ws.getRow(2).eachCell(exampleStyle)
+    }
+
     const buffer = await wb.xlsx.writeBuffer()
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
     const url = URL.createObjectURL(blob)
