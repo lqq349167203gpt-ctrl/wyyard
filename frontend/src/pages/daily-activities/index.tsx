@@ -2812,7 +2812,7 @@ export default function DailyActivitiesPage() {
                     e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: p.id, nickname: p.nickname }))
                     e.dataTransfer.effectAllowed = "copy"
                   }}
-                  className="inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[11px] text-[#3370ff] cursor-grab active:cursor-grabbing hover:bg-[#e0edff] transition-colors"
+                  className="inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[12px] text-[#3370ff] cursor-grab active:cursor-grabbing hover:bg-[#e0edff] transition-colors"
                 >
                   {p.nickname}
                 </span>
