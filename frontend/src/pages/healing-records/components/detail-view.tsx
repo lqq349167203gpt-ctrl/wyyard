@@ -388,8 +388,8 @@ export default function DetailView({
             return (
               <div>
                 {/* 会员卡 — 始终显示 */}
-                <div className="flex items-start gap-2 py-3 border-b border-[#f0f0f0]">
-                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right pt-0.5">会员卡</span>
+                <div className="flex items-center gap-2 py-3 border-b border-[#f0f0f0]">
+                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">会员卡</span>
                   <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
                     <span>
                       {memberHasUnlimited ? "不限次" : `剩余${memberTotal}次`}
