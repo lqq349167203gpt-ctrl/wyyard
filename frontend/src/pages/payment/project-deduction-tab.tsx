@@ -324,11 +324,20 @@ export function ProjectDeductionTab() {
     const wsMc = wb.addWorksheet("会员卡")
     wsMc.columns = [
       { header: "昵称", key: "nickname", width: 12 },
+      { header: "卡类型", key: "card_type", width: 12 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
-    wsMc.addRow({ nickname: "张三", count: 1 })
+    wsMc.addRow({ nickname: "张三", card_type: "体验会员", count: 1 })
     wsMc.getRow(1).eachCell(headerStyle)
     wsMc.getRow(2).eachCell(exampleStyle)
+    const cardTypeList = CARD_TYPE_OPTIONS.map(o => o.label).join(",")
+    for (let r = 2; r <= 1000; r++) {
+      wsMc.getCell(r, 2).dataValidation = {
+        type: "list", allowBlank: true,
+        formulae: [`"${cardTypeList}"`],
+        showErrorMessage: true, errorTitle: "无效输入", error: "请从下拉列表中选择卡类型",
+      }
+    }
 
     // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡梳理/能量结）
     const HEALING_OPTIONS = PROJECT_TYPE_OPTIONS.filter(o => ["group-cases", "emotional-releases", "oh-card-readings", "energy-knots"].includes(o.value))
@@ -354,9 +363,10 @@ export function ProjectDeductionTab() {
     const wsOther = wb.addWorksheet("其他项目")
     wsOther.columns = [
       { header: "昵称", key: "nickname", width: 12 },
+      { header: "项目名称", key: "project_name", width: 16 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
-    wsOther.addRow({ nickname: "张三", count: 1 })
+    wsOther.addRow({ nickname: "张三", project_name: "（填写具体项目名称）", count: 1 })
     wsOther.getRow(1).eachCell(headerStyle)
     wsOther.getRow(2).eachCell(exampleStyle)
 
@@ -443,8 +453,25 @@ export function ProjectDeductionTab() {
               errors.push(`[${sheetName}] 第${rowNum}行 ${nickname}：${err.message || "销卡失败"}`)
             }
           } else {
+            // 会员卡按卡类型筛选，其他项目按项目名称筛选
+            let nameFilter = ""
+            if (mappedType === "membership-cards") {
+              nameFilter = get(row, "卡类型")
+              if (!nameFilter) {
+                failed++
+                errors.push(`[${sheetName}] 第${rowNum}行：卡类型为空`)
+                continue
+              }
+            } else if (mappedType === "other-projects") {
+              nameFilter = get(row, "项目名称")
+              if (!nameFilter) {
+                failed++
+                errors.push(`[${sheetName}] 第${rowNum}行：项目名称为空`)
+                continue
+              }
+            }
             try {
-              await projectDeductionApi.autoDeduct({ nickname, project_type: mappedType, count, operator_name: currentUserName })
+              await projectDeductionApi.autoDeduct({ nickname, project_type: mappedType, count, operator_name: currentUserName, name_filter: nameFilter })
               success++
             } catch (err: any) {
               failed++

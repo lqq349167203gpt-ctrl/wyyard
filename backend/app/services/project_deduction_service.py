@@ -144,7 +144,7 @@ def get_available_items(customer_id: str, project_type: str) -> list:
     return []
 
 
-def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name: str = "") -> ProjectDeduction:
+def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name: str = "", name_filter: str = "") -> ProjectDeduction:
     """按昵称自动销卡：找到最早到期的可用项目并扣减（仅用于 Excel 导入）"""
     customers = customer_service.list_customers()
     customer = next((c for c in customers if c.nickname == nickname), None)
@@ -162,6 +162,15 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name:
             "other-projects": "其他项目",
         }
         raise ValueError(f"用户"{nickname}"没有可用的{type_labels.get(project_type, project_type)}")
+
+    # 按名称筛选：会员卡按 card_type，其他项目按 name（项目名称）
+    if name_filter:
+        if project_type == "membership-cards":
+            items = [i for i in items if i.get("card_type") == name_filter]
+        elif project_type == "other-projects":
+            items = [i for i in items if i.get("name") == name_filter]
+        if not items:
+            raise ValueError(f"用户"{nickname}"没有匹配的"{name_filter}"")
 
     # 优先选最早到期的（会员卡、其他项目有 expiry_date）
     items_with_expiry = [i for i in items if i.get("expiry_date")]

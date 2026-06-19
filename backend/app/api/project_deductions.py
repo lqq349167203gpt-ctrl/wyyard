@@ -51,13 +51,14 @@ class AutoDeductRequest(BaseModel):
     project_type: str
     count: int = 1
     operator_name: str = ""
+    name_filter: str = ""
 
 
 @router.post("/auto")
 def auto_deduct(data: AutoDeductRequest):
     try:
         return project_deduction_service.auto_deduct(
-            data.nickname, data.project_type, data.count, data.operator_name
+            data.nickname, data.project_type, data.count, data.operator_name, data.name_filter
         ).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
