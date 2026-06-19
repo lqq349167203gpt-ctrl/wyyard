@@ -391,29 +391,22 @@ export default function DetailView({
                 <div className="flex items-start gap-2 py-3 border-b border-[#f0f0f0]">
                   <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right pt-0.5">会员卡</span>
                   <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">
-                        {memberHasUnlimited ? "不限次" : `剩余${memberTotal}次`}
-                      </span>
-                    </div>
-                    {memberSorted.length > 0 && (
-                      <div className="mt-1 text-[11px] text-[#8f959e] flex flex-wrap items-center gap-y-0.5">
-                        {memberSorted.map((s, i) => {
-                          const expired = s.expiry_date && s.expiry_date < today
-                          return (
-                            <span key={i} className="inline-flex items-center">
-                              {i > 0 && <span className="mx-1.5">|</span>}
-                              <span className={expired ? "text-[#c4506a]" : ""}>
-                                {s.name}{" "}
-                                {s.remaining === "不限" ? "不限次" : `${Math.max(0, s.remaining as number)}次`}{" "}
-                                {s.effective_date && `${s.effective_date}~${s.expiry_date || "不限"}`}
-                                {expired && "（已过期）"}
-                              </span>
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )}
+                    <span>
+                      {memberHasUnlimited ? "不限次" : `剩余${memberTotal}次`}
+                    </span>
+                    {memberSorted.length > 0 && memberSorted.map((s, i) => {
+                      const expired = s.expiry_date && s.expiry_date < today
+                      return (
+                        <span key={i} className="ml-3 text-[11px] text-[#8f959e]">
+                          <span className={expired ? "text-[#c4506a]" : ""}>
+                            {s.name}
+                            {" "}{s.remaining === "不限" ? "不限次" : `${Math.max(0, s.remaining as number)}次`}
+                            {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
+                            {expired && "（已过期）"}
+                          </span>
+                        </span>
+                      )
+                    })}
                   </div>
                 </div>
 
