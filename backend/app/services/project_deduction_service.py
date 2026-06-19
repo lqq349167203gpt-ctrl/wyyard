@@ -63,6 +63,8 @@ def get_available_items(customer_id: str, project_type: str) -> list:
                 continue
             if c.remaining_count <= 0:
                 continue
+            if c.effective_date and c.effective_date > today:
+                continue
             if c.expiry_date and c.expiry_date < today:
                 continue
             available.append({
@@ -129,6 +131,8 @@ def get_available_items(customer_id: str, project_type: str) -> list:
         items = [p for p in projects if p.customer_id == customer_id and not p.is_deleted and p.remaining_count is not None and p.remaining_count > 0]
         available = []
         for p in items:
+            if p.effective_date and p.effective_date > today:
+                continue
             if p.expiry_date and p.expiry_date < today:
                 continue
             available.append({

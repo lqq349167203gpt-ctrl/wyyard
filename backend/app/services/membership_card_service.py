@@ -172,15 +172,25 @@ def delete_card(card_id: str) -> bool:
 def _deduct_one(customer_id: str) -> bool:
     """内部：为指定用户扣除一次会员活动剩余次数"""
     today = datetime.now().strftime("%Y-%m-%d")
-    # 筛选有效期内的卡（未过期、未删除）
+    # 筛选有效期内的卡（已生效、未过期、未删除）
     active_cards = [
         c for c in _cards.values()
         if c.customer_id == customer_id
         and not c.is_deleted
+        and (not c.effective_date or c.effective_date <= today)
         and (not c.expiry_date or c.expiry_date >= today)
     ]
     if not active_cards:
-        # 无有效卡：有内部课程有效期时不扣（归零即停），否则记录欠费
+        # 检查是否有未生效的卡
+        pending_cards = [
+            c for c in _cards.values()
+            if c.customer_id == customer_id
+            and not c.is_deleted
+            and c.effective_date and c.effective_date > today
+        ]
+        if pending_cards:
+            return False  # 有未生效的卡，不记录欠费，等生效后再扣
+        # 无任何有效卡：有内部课程有效期时不扣（归零即停），否则记录欠费
         from app.services import internal_course_service
         if internal_course_service.has_active_course(customer_id):
             return False

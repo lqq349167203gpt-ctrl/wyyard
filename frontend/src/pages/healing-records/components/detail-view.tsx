@@ -363,13 +363,15 @@ export default function DetailView({
             })
             const memberTotal = memberItems.reduce((sum, s) => {
               const expired = s.expiry_date && s.expiry_date < today
-              if (expired) return sum
+              const notStarted = s.effective_date && s.effective_date > today
+              if (expired || notStarted) return sum
               if (typeof s.remaining === "number") return sum + s.remaining
               return sum
             }, 0)
             const memberHasUnlimited = memberItems.some(s => {
               const expired = s.expiry_date && s.expiry_date < today
-              return !expired && s.remaining === "不限"
+              const notStarted = s.effective_date && s.effective_date > today
+              return !expired && !notStarted && s.remaining === "不限"
             })
 
             // 其他类型排序
