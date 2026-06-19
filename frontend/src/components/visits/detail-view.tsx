@@ -682,9 +682,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
             ) : tableSavedCount > 0 ? (
               <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
             ) : null}
-            <Button size="sm" variant="outline" className="h-6 text-xs ml-2" onClick={handleExport}>
-              <Download className="mr-1 h-3 w-3" /> 导出
-            </Button>
+            <button className="h-[22px] text-[11px] text-[#8f959e] hover:text-[#4e535a] ml-[18px] flex items-center gap-1 border-[0.5px] border-[#d0d3d6] rounded px-2" onClick={handleExport}>
+              <Download className="h-3 w-3" /> 导出
+            </button>
           </div>
           <div className="flex items-center gap-1">
             {/* 历史记录/撤回/重做按钮 */}

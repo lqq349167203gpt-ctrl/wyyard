@@ -182,7 +182,7 @@ export default function ArrivalConfirmationView({
                 {v.arrived ? `${v.arrival_time || v.visit_time || "09:00"}到场` : "--:--到场"}
               </span>
               <span className="text-[12px] text-[#8f959e] ml-3">
-                {v.needs || "-"}
+                {v.needs || <span className="text-[#d0d3d6]">-</span>}
               </span>
             </div>
 
@@ -216,9 +216,9 @@ export default function ArrivalConfirmationView({
               </div>
             </div>
 
-            {/* 客户反馈 */}
+            {/* 客户收获 */}
             <div className="flex items-start gap-2">
-              <span className="text-[12px] text-[#8f959e] shrink-0 w-14 mt-0.5">客户反馈</span>
+              <span className="text-[12px] text-[#8f959e] shrink-0 w-14 mt-0.5">客户收获</span>
               <div className="text-[12px] text-[#2b2f36] leading-relaxed min-w-0 flex-1">
                 {v.experience ? (
                   <>
@@ -246,7 +246,7 @@ export default function ArrivalConfirmationView({
 
             {/* 疗愈记录 + 详情 */}
             <div className="flex items-start gap-2">
-              <span className="text-[12px] text-[#8f959e] shrink-0 w-14 mt-0.5">跟进记录</span>
+              <span className="text-[12px] text-[#8f959e] shrink-0 w-14 mt-0.5">跟进点</span>
               <div className="text-[12px] text-[#2b2f36] leading-relaxed min-w-0 flex-1">
                 {hrMap[v.id]?.growth_record ? (
                   <>
@@ -306,7 +306,7 @@ export default function ArrivalConfirmationView({
       <Dialog open={!!editVisit} onOpenChange={(open) => !open && setEditVisit(null)}>
         <DialogContent className="max-w-md p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-4 border-b border-[#f0f0f0]">
-            <DialogTitle className="text-base">跟进记录 - {editVisit?.nickname}</DialogTitle>
+            <DialogTitle className="text-base">跟进点 - {editVisit?.nickname}</DialogTitle>
           </DialogHeader>
           <div className="px-5 py-4">
             <div className="flex items-start gap-2">
@@ -314,7 +314,7 @@ export default function ArrivalConfirmationView({
               <textarea
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
-                placeholder="输入跟进记录..."
+                placeholder="输入跟进点..."
                 rows={3}
                 className="flex-1 rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
               />
@@ -329,19 +329,19 @@ export default function ArrivalConfirmationView({
         </DialogContent>
       </Dialog>
 
-      {/* 客户反馈编辑弹窗 */}
+      {/* 客户收获编辑弹窗 */}
       <Dialog open={!!editExpVisit} onOpenChange={(open) => !open && setEditExpVisit(null)}>
         <DialogContent className="max-w-md p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-4 border-b border-[#f0f0f0]">
-            <DialogTitle className="text-base">客户反馈 - {editExpVisit?.nickname}</DialogTitle>
+            <DialogTitle className="text-base">客户收获 - {editExpVisit?.nickname}</DialogTitle>
           </DialogHeader>
           <div className="px-5 py-4 space-y-3">
             <div className="flex items-start gap-2">
-              <label className="text-[12px] text-[#8f959e] pt-2 w-[60px] text-right shrink-0">客户反馈</label>
+              <label className="text-[12px] text-[#8f959e] pt-2 w-[60px] text-right shrink-0">客户收获</label>
               <textarea
                 value={editExpText}
                 onChange={(e) => setEditExpText(e.target.value)}
-                placeholder="输入客户反馈..."
+                placeholder="输入客户收获..."
                 rows={3}
                 className="flex-1 rounded-[4px] border border-[#e8eaed] px-3 py-2.5 text-[12px] text-[#2b2f36] placeholder:text-[#b0b5bb] resize-none focus:outline-none focus:ring-1 focus:ring-[#3370ff] focus:border-[#3370ff]"
               />

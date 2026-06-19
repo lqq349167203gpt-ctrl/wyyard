@@ -48,6 +48,7 @@ export default function DetailView({
   const [purchasePage, setPurchasePage] = useState(1)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set())
 
   useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
   // 客户到店日期集合（用于标记未参加活动）
@@ -127,45 +128,54 @@ export default function DetailView({
 
   const c = detail.customer
   const arrivedRecords = (detail?.visit_records || []).filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
-  const firstVisit = arrivedRecords.length > 0 ? arrivedRecords[0].visit_date : "-"
+  const firstVisit = arrivedRecords.length > 0 ? arrivedRecords[0].visit_date : ""
 
 
   return (
-    <div className={hideSearch ? "p-2 h-[calc(75vh+50px)] flex flex-col" : "space-y-2 h-[calc(100vh-130px)] flex flex-col"}>
+    <div className={hideSearch ? "p-2 h-[calc(75vh+110px)] flex flex-col" : "space-y-2 h-[calc(100vh-70px)] flex flex-col"}>
       {!hideSearch && bar}
 
       {/* 顶部标签行 — 核心指标一目了然 */}
-      <div className="bg-white rounded-lg shrink-0 px-4 py-3 flex items-center gap-3 flex-wrap">
-        <span className="text-[14px] font-medium text-[#2b2f36]">{c.nickname || "-"}</span>
+      <div className="bg-white rounded-lg shrink-0 px-[26px] pt-[32px] pb-3 flex items-center gap-3 flex-wrap">
+        <span className="text-[16px] font-medium text-[#2b2f36]">{c.nickname || <span className="text-[#d0d3d6]">-</span>}</span>
         {c.name && <span className="text-[12px] text-[#8f959e]">{c.name}</span>}
         {c.member_type && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f1f2] text-[#646a73]">{c.member_type}</span>
         )}
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f5ff] text-[#3370ff]">到店 {c.visit_count} 次</span>
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f5ff] text-[#3370ff]">消费 ¥{detail!.payment_records.reduce((sum, g) => sum + g.amount, 0).toLocaleString()}</span>
-        <span className="text-[11px] text-[#8f959e] ml-auto">首次到访 {firstVisit}</span>
+        <span className="text-[11px] text-[#8f959e]">首次到访 {firstVisit || <span className="text-[#d0d3d6]">-</span>}</span>
       </div>
 
       {/* 双栏详情 */}
-      <div className="bg-white rounded-lg shrink-0 flex">
+      <div className="bg-white rounded-lg shrink-0 flex px-[10px] mt-[10px]">
         {/* 左栏：联系方式 + 来源信息 */}
-        <div className="flex-1 min-w-0 border-r border-[#f0f0f0]">
-          <div className="px-4 pt-3 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">联系方式</span></div>
-          <div className="px-4 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="px-4 pt-3 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
             {[["年龄",c.age],["电话",c.phone],["微信",c.wechat]].map(([l,v])=>(
               <div key={l} className="flex items-baseline gap-2">
                 <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
-                <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
+                <span className="text-[12px] text-[#2b2f36]">{v || <span className="text-[#d0d3d6]">-</span>}</span>
               </div>
             ))}
+            <div className="flex items-baseline gap-2">
+              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈老师</span>
+              <span className="text-[12px] text-[#2b2f36]">
+                {(c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).length === 0
+                  ? <span className="text-[#d0d3d6]">-</span>
+                  : (c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).map((p,i)=>(
+                      <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] bg-[#f0f1f2] text-[#646a73] mr-1">{p}</span>
+                    ))
+                }
+              </span>
+            </div>
           </div>
-          <div className="border-t border-[#f0f0f0]" />
-          <div className="px-4 pt-2 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">来源信息</span></div>
-          <div className="px-4 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
-            {[["引流人",c.referrer||"-"],["承接人",c.referrer_handler||"-"],["流量来源",c.traffic_source||"-"]].map(([l,v])=>(
+          <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />
+          <div className="px-4 pt-2 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
+            {[["引流人",c.referrer],["承接人",c.referrer_handler],["流量来源",c.traffic_source]].map(([l,v])=>(
               <div key={l} className="flex items-baseline gap-2">
                 <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
-                <span className="text-[12px] text-[#2b2f36]">{v||"-"}</span>
+                <span className="text-[12px] text-[#2b2f36]">{v || <span className="text-[#d0d3d6]">-</span>}</span>
               </div>
             ))}
             <div className="flex items-center gap-2">
@@ -182,38 +192,40 @@ export default function DetailView({
                   {copied && <span className="text-[11px] text-[#8f959e]">已复制</span>}
                 </>
               ) : (
-                <span className="text-[12px] text-[#2b2f36]">-</span>
+                <span className="text-[12px] text-[#d0d3d6]">-</span>
               )}
             </div>
           </div>
-          <div className="border-t border-[#f0f0f0]" />
-          <div className="px-4 pt-2 pb-3">
-            <span className="text-[11px] text-[#8f959e] font-medium mr-2">疗愈老师</span>
-            <span className="text-[12px] text-[#2b2f36]">
-              {(c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).length === 0
-                ? "-"
-                : (c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).map((p,i)=>(
-                    <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] bg-[#f0f1f2] text-[#646a73] mr-1">{p}</span>
-                  ))
-              }
+          <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />
+          <div className="px-4 pt-2 pb-3 flex items-baseline gap-2">
+            <span className="text-[12px] text-[#8f959e] font-normal shrink-0 w-[56px] text-right tracking-widest">其他信息</span>
+            <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has("其他信息") ? "" : "line-clamp-2 pr-10 h-[36px] overflow-hidden"}`}>
+              {c.other_info || <span className="text-[#d0d3d6]">-</span>}
+              {c.other_info && c.other_info.length > 80 && (
+                <button className="absolute bottom-0 right-0 text-[12px] text-[#8f959e] hover:text-[#4e535a] bg-white pl-1" onClick={() => setExpandedFields(prev => { const n = new Set(prev); n.has("其他信息") ? n.delete("其他信息") : n.add("其他信息"); return n })}>
+                  {expandedFields.has("其他信息") ? "收起" : "展开"}
+                </button>
+              )}
             </span>
           </div>
         </div>
 
         {/* 右栏：背景信息 */}
-        <div className="flex-1 min-w-0">
-          <div className="px-4 pt-3 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">工作情况</span></div>
-          <div className="px-4 pb-2">
-            <span className="text-[12px] text-[#4e535a] whitespace-pre-wrap">
-              {c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "-")}
-            </span>
-          </div>
-          {[["创伤经历",c.basic_info],["当下卡点",c.assessment],["到访目的",c.tags],["其他信息",c.other_info]].map(([l,v])=>(
+        <div className="flex-1 min-w-0 flex flex-col relative">
+          <div className="absolute left-0 top-[10px] bottom-[10px] w-px bg-[#f0f0f0]" />
+          {[["到访目的",c.tags||""],["创伤经历",c.basic_info||""],["当下卡点",c.assessment||""],["工作情况",c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "")]].map(([l,v], i) => (
             <div key={l}>
-              <div className="border-t border-[#f0f0f0]" />
-              <div className="px-4 pt-2 pb-1"><span className="text-[11px] text-[#8f959e] font-medium">{l}</span></div>
-              <div className="px-4 pb-2">
-                <span className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v||"-"}</span>
+              {i > 0 && <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />}
+              <div className="px-4 py-2 flex items-baseline gap-2">
+                <span className="text-[12px] text-[#8f959e] font-normal shrink-0">{l}</span>
+                <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has(l as string) ? "" : "line-clamp-2 pr-10 h-[36px] overflow-hidden"}`}>
+                  {v || <span className="text-[#d0d3d6]">-</span>}
+                  {v && (v as string).length > 80 && (
+                    <button className="absolute bottom-0 right-0 text-[12px] text-[#8f959e] hover:text-[#4e535a] bg-white pl-1" onClick={() => setExpandedFields(prev => { const n = new Set(prev); n.has(l as string) ? n.delete(l as string) : n.add(l as string); return n })}>
+                      {expandedFields.has(l as string) ? "收起" : "展开"}
+                    </button>
+                  )}
+                </span>
               </div>
             </div>
           ))}
@@ -221,12 +233,12 @@ export default function DetailView({
       </div>
 
       {/* 记录标签页 */}
-      <div className="bg-white rounded-lg -mt-2.5 flex-1 min-h-0 flex flex-col">
+      <div className="bg-white rounded-lg -mt-2.5 flex-1 min-h-0 flex flex-col px-[10px]">
         {/* 标签页按钮 */}
-        <div className="px-4 pt-2.5 flex gap-0 border-b border-[#f0f0f0] shrink-0">
+        <div className="px-4 pt-2.5 flex gap-0 border-b-[0.5px] border-[#f0f0f0] shrink-0">
           {[
+            { key: "healing" as const, label: "跟进点" },
             { key: "activities" as const, label: "活动记录" },
-            { key: "healing" as const, label: "跟进记录" },
             { key: "purchase" as const, label: "剩余次数" },
             { key: "payment" as const, label: "交易记录" },
           ].map(tab => (
@@ -252,45 +264,6 @@ export default function DetailView({
 
         {/* 标签页内容 */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-[10px] pb-4">
-          {/* 活动记录 */}
-          {activeTab === "activities" && (() => {
-            const activities = detail!.activities || []
-            const pageSize = 5
-            const totalPages = Math.ceil(activities.length / pageSize)
-            const paginatedActivities = activities.slice((activitiesPage - 1) * pageSize, activitiesPage * pageSize)
-            return activities.length===0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
-              <div>
-                <Table className="border-b border-[#f0f0f0]"><TableHeader className="[&_tr]:!h-8">
-                  <TableRow className="hover:bg-transparent !h-8">
-                  <TableHead className="pl-4 !h-7 text-[12px]">日期</TableHead><TableHead className="!h-7 text-[12px]">活动名称</TableHead><TableHead className="!h-7 text-[12px]">角色</TableHead><TableHead className="!h-7 text-[12px]">课程老师</TableHead>
-                </TableRow></TableHeader><TableBody>
-                  {paginatedActivities.map((a, i) => {
-                    const notArrived = !arrivedDates.has(a.date)
-                    return (
-                      <TableRow key={i} className="!h-9">
-                        <TableCell className="pl-4 py-1 text-[12px]">
-                          {a.date}
-                          {notArrived && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded ml-1.5 text-[10px]">未参加</span>}
-                        </TableCell>
-                        <TableCell className="py-1 text-[12px]">
-                          {a.is_public_welfare && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded mr-1.5 text-[10px]">公益</span>}
-                          {a.name || "-"}
-                        </TableCell>
-                        <TableCell className="py-1 text-[12px]">{a.role}</TableCell>
-                        <TableCell className="py-1 text-[12px]">{a.host || "-"}</TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody></Table>
-                {totalPages > 1 && (
-                  <div className="px-4 py-2">
-                    <PaginationBar currentPage={activitiesPage} totalPages={totalPages} totalItems={activities.length} startIndex={(activitiesPage-1)*pageSize+1} endIndex={Math.min(activitiesPage*pageSize, activities.length)} onPageChange={setActivitiesPage} />
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-
           {/* 疗愈记录 — 到店记录 */}
           {activeTab === "healing" && (() => {
             const visitRecords = (detail!.visit_records || []).sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.arrival_time || "").localeCompare(a.arrival_time || ""))
@@ -321,20 +294,20 @@ export default function DetailView({
                           <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">组长反馈</span>
                           <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.group_leader_feedback || <span className="text-[#8f959e]">-</span>}</p>
                         </div>
-                        <div className="flex items-start gap-2">
-                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户反馈</span>
-                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.feedback || v.experience || <span className="text-[#8f959e]">-</span>}</p>
-                        </div>
                         {(() => {
                           const hr = detail!.healing_records.find(r => r.date === v.visit_date)
                           const record = hr?.growth_record || v.healing_notes
                           return (
                             <div className="flex items-start gap-2">
-                              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">跟进记录</span>
+                              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">跟进点</span>
                               <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{record || <span className="text-[#8f959e]">-</span>}</p>
                             </div>
                           )
                         })()}
+                        <div className="flex items-start gap-2">
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户收获</span>
+                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.feedback || v.experience || <span className="text-[#8f959e]">-</span>}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -342,6 +315,45 @@ export default function DetailView({
                 {totalPages > 1 && (
                   <div className="mt-1.5 pt-1.5">
                     <PaginationBar currentPage={healingPage} totalPages={totalPages} totalItems={visitRecords.length} startIndex={(healingPage-1)*pageSize+1} endIndex={Math.min(healingPage*pageSize, visitRecords.length)} onPageChange={setHealingPage} />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* 活动记录 */}
+          {activeTab === "activities" && (() => {
+            const activities = detail!.activities || []
+            const pageSize = 5
+            const totalPages = Math.ceil(activities.length / pageSize)
+            const paginatedActivities = activities.slice((activitiesPage - 1) * pageSize, activitiesPage * pageSize)
+            return activities.length===0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
+              <div>
+                <Table className="border-b border-[#f0f0f0]"><TableHeader className="[&_tr]:!h-8">
+                  <TableRow className="hover:bg-transparent !h-8">
+                  <TableHead className="pl-4 !h-7 text-[12px]">日期</TableHead><TableHead className="!h-7 text-[12px]">活动名称</TableHead><TableHead className="!h-7 text-[12px]">角色</TableHead><TableHead className="!h-7 text-[12px]">课程老师</TableHead>
+                </TableRow></TableHeader><TableBody>
+                  {paginatedActivities.map((a, i) => {
+                    const notArrived = !arrivedDates.has(a.date)
+                    return (
+                      <TableRow key={i} className="!h-9">
+                        <TableCell className="pl-4 py-1 text-[12px]">
+                          {a.date}
+                          {notArrived && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded ml-1.5 text-[10px]">未参加</span>}
+                        </TableCell>
+                        <TableCell className="py-1 text-[12px]">
+                          {a.is_public_welfare && <span className="text-[#8f959e] bg-[#f0f0f0] px-1 py-0.5 rounded mr-1.5 text-[10px]">公益</span>}
+                          {a.name || <span className="text-[#d0d3d6]">-</span>}
+                        </TableCell>
+                        <TableCell className="py-1 text-[12px]">{a.role}</TableCell>
+                        <TableCell className="py-1 text-[12px]">{a.host || <span className="text-[#d0d3d6]">-</span>}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody></Table>
+                {totalPages > 1 && (
+                  <div className="px-4 py-2">
+                    <PaginationBar currentPage={activitiesPage} totalPages={totalPages} totalItems={activities.length} startIndex={(activitiesPage-1)*pageSize+1} endIndex={Math.min(activitiesPage*pageSize, activities.length)} onPageChange={setActivitiesPage} />
                   </div>
                 )}
               </div>
@@ -427,14 +439,14 @@ export default function DetailView({
                             {s.type === "内部课程" ? (
                               <span className="inline-flex items-baseline gap-2">
                                 <span>{s.name}</span>
-                                <span>{s.effective_date || "-"}/{s.expiry_date || "-"}</span>
+                                <span>{s.effective_date || <span className="text-[#d0d3d6]">-</span>}/{s.expiry_date || <span className="text-[#d0d3d6]">-</span>}</span>
                               </span>
                             ) : s.type === "其他项目" ? (
                               <span className="inline-flex items-baseline gap-2">
                                 <span>{s.name}</span>
                                 <span>{s.activity_mode || "线下"}</span>
                                 <span>{s.remaining === "不限" ? "不限次" : (typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`)}</span>
-                                <span>{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
+                                <span>{s.effective_date || <span className="text-[#d0d3d6]">-</span>}~{s.expiry_date || "不限"}</span>
                               </span>
                             ) : (
                               <span>{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
@@ -479,8 +491,8 @@ export default function DetailView({
                 </TableRow></TableHeader><TableBody>
                   {paginatedRecords.map((r,i)=>{
                     const today = new Date().toISOString().slice(0,10)
-                    let status = "-"
-                    let statusClass = "text-[#8f959e]"
+                    let status: React.ReactNode = <span className="text-[#d0d3d6]">-</span>
+                    let statusClass = ""
                     if (r.effective_date && r.effective_date > today) {
                       status = "未开始"
                       statusClass = "text-[#8f959e]"
@@ -494,13 +506,13 @@ export default function DetailView({
                     return (
                     <TableRow key={i} className="!h-9">
                       <TableCell className="pl-4 py-1 text-[12px]">{r.type}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.name || "-"}</TableCell>
+                      <TableCell className="py-1 text-[12px]">{r.name || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.quantity}</TableCell>
                       <TableCell className="py-1 text-[12px]">¥{r.amount.toLocaleString()}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.effective_date || "-"}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员卡" ? "不限" : "-")}</TableCell>
+                      <TableCell className="py-1 text-[12px]">{r.effective_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
+                      <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员卡" ? "不限" : <span className="text-[#d0d3d6]">-</span>)}</TableCell>
                       <TableCell className={`py-1 text-[12px] ${statusClass}`}>{status}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.closer_name || "-"}</TableCell>
+                      <TableCell className="py-1 text-[12px]">{r.closer_name || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                     </TableRow>
                     )
                   })}
@@ -619,7 +631,7 @@ function RecordForm({
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">
+        <div className="flex justify-end gap-2 px-5 py-3 border-t-[0.5px] border-[#f0f0f0]">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>取消</Button>
           <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存"}</Button>
         </div>
