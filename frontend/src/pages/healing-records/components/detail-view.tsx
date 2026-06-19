@@ -492,7 +492,7 @@ export default function DetailView({
                       statusClass = "text-[#c4506a]"
                     } else if (r.effective_date || r.expiry_date) {
                       status = "生效中"
-                      statusClass = "text-[#34c724]"
+                      statusClass = "text-[#3370ff]"
                     }
                     return (
                     <TableRow key={i} className="!h-9">
