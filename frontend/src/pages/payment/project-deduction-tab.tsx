@@ -440,9 +440,11 @@ export function ProjectDeductionTab() {
       let failed = 0
       const errors: string[] = []
 
+      let processedSheets = 0
       for (const sheetName of wb.SheetNames) {
         const mappedType = SHEET_TYPE_MAP[sheetName]
         if (!mappedType) continue
+        processedSheets++
 
         const ws = wb.Sheets[sheetName]
         const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 })
@@ -538,6 +540,10 @@ export function ProjectDeductionTab() {
             }
           }
         }
+      }
+
+      if (processedSheets === 0) {
+        errors.push(`未找到有效的 sheet（需要：${Object.keys(SHEET_TYPE_MAP).join("、")}），当前文件 sheet：${wb.SheetNames.join("、")}`)
       }
 
       setImportResult({ success, failed, errors })
@@ -795,11 +801,12 @@ export function ProjectDeductionTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>导入完成</AlertDialogTitle>
             <AlertDialogDescription>
-              成功 {importResult?.success} 条{importResult && importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ""}
+              成功 <span className="text-[#34c724] font-medium">{importResult?.success}</span> 条
+              {importResult && importResult.failed > 0 && <>, 失败 <span className="text-[#c4506a] font-medium">{importResult.failed}</span> 条</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {importResult && importResult.errors.length > 0 && (
-            <div className="max-h-40 overflow-y-auto text-xs text-[#8f959e] space-y-0.5 px-1">
+            <div className="max-h-40 overflow-y-auto text-xs text-[#c4506a] space-y-0.5 px-1">
               {importResult.errors.map((err, i) => <div key={i}>{err}</div>)}
             </div>
           )}
