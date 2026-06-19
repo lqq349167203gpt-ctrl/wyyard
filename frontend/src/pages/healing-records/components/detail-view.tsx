@@ -396,13 +396,15 @@ export default function DetailView({
                     </span>
                     {memberSorted.length > 0 && memberSorted.map((s, i) => {
                       const expired = s.expiry_date && s.expiry_date < today
+                      const notStarted = s.effective_date && s.effective_date > today
                       return (
                         <span key={i} className="ml-3 text-[11px] text-[#8f959e]">
-                          <span className={expired ? "text-[#c4506a]" : ""}>
+                          <span className={expired ? "text-[#c4506a]" : notStarted ? "text-[#8f959e]" : ""}>
                             {s.name}
                             {" "}{s.remaining === "不限" ? "不限次" : `${Math.max(0, s.remaining as number)}次`}
                             {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
                             {expired && "（已过期）"}
+                            {notStarted && "（未生效）"}
                           </span>
                         </span>
                       )
