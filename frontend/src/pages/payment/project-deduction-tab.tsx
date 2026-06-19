@@ -320,6 +320,13 @@ export function ProjectDeductionTab() {
       cell.font = { color: { argb: "FF999999" } }
     }
 
+    const HINT_TEXT = "将自动根据同类型的项目中，在有效期内扣除最早的次数"
+    const hintStyle = (cell: ExcelJS.Cell, colCount: number) => {
+      cell.value = HINT_TEXT
+      cell.font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
+      cell.alignment = { vertical: "middle", horizontal: "left" }
+    }
+
     // 会员卡 sheet
     const wsMc = wb.addWorksheet("会员卡")
     wsMc.columns = [
@@ -327,11 +334,15 @@ export function ProjectDeductionTab() {
       { header: "卡类型", key: "card_type", width: 12 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
+    wsMc.spliceRows(1, 0, [HINT_TEXT])
+    wsMc.mergeCells(1, 1, 1, 3)
+    wsMc.getCell(1, 1).font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
+    wsMc.getCell(1, 1).alignment = { vertical: "middle", horizontal: "left" }
+    wsMc.getRow(2).eachCell(headerStyle)
     wsMc.addRow({ nickname: "张三", card_type: "体验会员", count: 1 })
-    wsMc.getRow(1).eachCell(headerStyle)
-    wsMc.getRow(2).eachCell(exampleStyle)
+    wsMc.getRow(3).eachCell(exampleStyle)
     const cardTypeList = CARD_TYPE_OPTIONS.map(o => o.label).join(",")
-    for (let r = 2; r <= 1000; r++) {
+    for (let r = 3; r <= 1000; r++) {
       wsMc.getCell(r, 2).dataValidation = {
         type: "list", allowBlank: true,
         formulae: [`"${cardTypeList}"`],
@@ -347,11 +358,15 @@ export function ProjectDeductionTab() {
       { header: "项目类型", key: "project_type", width: 12 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
+    wsHealing.spliceRows(1, 0, [HINT_TEXT])
+    wsHealing.mergeCells(1, 1, 1, 3)
+    wsHealing.getCell(1, 1).font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
+    wsHealing.getCell(1, 1).alignment = { vertical: "middle", horizontal: "left" }
+    wsHealing.getRow(2).eachCell(headerStyle)
     wsHealing.addRow({ nickname: "张三", project_type: "觉醒游戏", count: 1 })
-    wsHealing.getRow(1).eachCell(headerStyle)
-    wsHealing.getRow(2).eachCell(exampleStyle)
+    wsHealing.getRow(3).eachCell(exampleStyle)
     const healingTypeList = HEALING_OPTIONS.map(o => o.label).join(",")
-    for (let r = 2; r <= 1000; r++) {
+    for (let r = 3; r <= 1000; r++) {
       wsHealing.getCell(r, 2).dataValidation = {
         type: "list", allowBlank: true,
         formulae: [`"${healingTypeList}"`],
@@ -366,9 +381,13 @@ export function ProjectDeductionTab() {
       { header: "项目名称", key: "project_name", width: 16 },
       { header: "销卡次数", key: "count", width: 10 },
     ]
+    wsOther.spliceRows(1, 0, [HINT_TEXT])
+    wsOther.mergeCells(1, 1, 1, 3)
+    wsOther.getCell(1, 1).font = { size: 10, color: { argb: "FF8F959E" }, italic: true }
+    wsOther.getCell(1, 1).alignment = { vertical: "middle", horizontal: "left" }
+    wsOther.getRow(2).eachCell(headerStyle)
     wsOther.addRow({ nickname: "张三", project_name: "（填写具体项目名称）", count: 1 })
-    wsOther.getRow(1).eachCell(headerStyle)
-    wsOther.getRow(2).eachCell(exampleStyle)
+    wsOther.getRow(3).eachCell(exampleStyle)
 
     const buffer = await wb.xlsx.writeBuffer()
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
@@ -401,6 +420,30 @@ export function ProjectDeductionTab() {
       "能量结": "energy-knots",
     }
 
+    // 可用项目缓存：key = "customerId|projectType|nameFilter"
+    const availableCache = new Map<string, { remaining: number; label: string }>()
+    const getAvailable = async (nickname: string, projectType: string, nameFilter: string = "") => {
+      const customer = customers.find(c => c.nickname === nickname)
+      if (!customer) return null
+      const cacheKey = `${customer.id}|${projectType}|${nameFilter}`
+      if (availableCache.has(cacheKey)) return availableCache.get(cacheKey)!
+      try {
+        const items = await projectDeductionApi.getAvailableItems(customer.id, projectType)
+        let filtered = items
+        if (nameFilter) {
+          if (projectType === "membership-cards") filtered = items.filter(i => i.card_type === nameFilter)
+          else if (projectType === "other-projects") filtered = items.filter(i => i.name === nameFilter)
+        }
+        const remaining = filtered.reduce((sum, i) => sum + (i.remaining_count || 0), 0)
+        const label = nameFilter || PROJECT_TYPE_LABELS[projectType] || projectType
+        const result = { remaining, label }
+        availableCache.set(cacheKey, result)
+        return result
+      } catch {
+        return null
+      }
+    }
+
     try {
       const data = await file.arrayBuffer()
       const wb = XLSX.read(data, { type: "array" })
@@ -416,8 +459,11 @@ export function ProjectDeductionTab() {
         const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 })
         if (rows.length < 2) continue
 
-        const headers = rows[0] as string[]
-        const dataRows = rows.slice(1).filter(r => r.some(cell => cell))
+        // 跳过提示文字行（第一行不是表头时）
+        const firstRow = rows[0] as any[]
+        const headerIdx = firstRow.some((cell: any) => ["昵称", "卡类型", "项目类型", "项目名称", "销卡次数"].includes(String(cell || "").trim())) ? 0 : 1
+        const headers = rows[headerIdx] as string[]
+        const dataRows = rows.slice(headerIdx + 1).filter(r => r.some(cell => cell))
         const get = (row: any[], col: string) => {
           const idx = headers.indexOf(col)
           return idx >= 0 ? String(row[idx] ?? "").trim() : ""
@@ -425,7 +471,7 @@ export function ProjectDeductionTab() {
 
         for (let i = 0; i < dataRows.length; i++) {
           const row = dataRows[i]
-          const rowNum = i + 2
+          const rowNum = headerIdx + 2 + i
           const nickname = get(row, "昵称")
           const countStr = get(row, "销卡次数")
           const count = parseInt(countStr) || 1
@@ -443,6 +489,18 @@ export function ProjectDeductionTab() {
             if (!projectType) {
               failed++
               errors.push(`[${sheetName}] 第${rowNum}行：项目类型"${typeLabel}"无效`)
+              continue
+            }
+            // 校验次数是否超出
+            const avail = await getAvailable(nickname, projectType)
+            if (!avail) {
+              failed++
+              errors.push(`[${sheetName}] 第${rowNum}行：用户"${nickname}"不存在`)
+              continue
+            }
+            if (count > avail.remaining) {
+              failed++
+              errors.push(`[${sheetName}] 第${rowNum}行 ${nickname}：销卡次数 ${count} 超出可用 ${avail.remaining} 次（${typeLabel}）`)
               continue
             }
             try {
@@ -469,6 +527,18 @@ export function ProjectDeductionTab() {
                 errors.push(`[${sheetName}] 第${rowNum}行：项目名称为空`)
                 continue
               }
+            }
+            // 校验次数是否超出
+            const avail = await getAvailable(nickname, mappedType, nameFilter)
+            if (!avail) {
+              failed++
+              errors.push(`[${sheetName}] 第${rowNum}行：用户"${nickname}"不存在`)
+              continue
+            }
+            if (count > avail.remaining) {
+              failed++
+              errors.push(`[${sheetName}] 第${rowNum}行 ${nickname}：销卡次数 ${count} 超出可用 ${avail.remaining} 次（${avail.label}）`)
+              continue
             }
             try {
               await projectDeductionApi.autoDeduct({ nickname, project_type: mappedType, count, operator_name: currentUserName, name_filter: nameFilter })
