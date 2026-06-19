@@ -287,6 +287,10 @@ def _count_untracked_chargeable_activities(customer_id: str) -> int:
         energy_knot_session_service,
     )
 
+    from app.services import internal_course_service
+    if internal_course_service.has_active_course(customer_id):
+        return 0
+
     deducted = set(membership_card_service._deductions.get(customer_id, []))
     count = 0
 
@@ -354,13 +358,17 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
                 total = sum(c.remaining_count or 0 for c in active_cards)
                 r.remaining_count = total - untracked
         else:
-            # 无有效卡：检查欠费（含未扣费的活动）
-            debt = membership_card_service.get_debt(r.customer_id)
-            total_debt = debt + untracked
-            if total_debt > 0:
-                r.remaining_count = -total_debt  # -1 表示欠费1次，-2 表示欠费2次
-            else:
+            # 无有效卡：有内部课程时归零即停，否则检查欠费
+            from app.services import internal_course_service
+            if internal_course_service.has_active_course(r.customer_id):
                 r.remaining_count = 0
+            else:
+                debt = membership_card_service.get_debt(r.customer_id)
+                total_debt = debt + untracked
+                if total_debt > 0:
+                    r.remaining_count = -total_debt  # -1 表示欠费1次，-2 表示欠费2次
+                else:
+                    r.remaining_count = 0
         # 当日参与的活动（跨5个模块），按 (customer_id, date) 缓存
         cache_key = (r.customer_id, r.visit_date)
         if cache_key not in customer_activities_cache:

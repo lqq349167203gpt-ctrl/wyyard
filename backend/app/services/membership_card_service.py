@@ -180,7 +180,10 @@ def _deduct_one(customer_id: str) -> bool:
         and (not c.expiry_date or c.expiry_date >= today)
     ]
     if not active_cards:
-        # 无有效卡，记录欠费
+        # 无有效卡：有内部课程有效期时不扣（归零即停），否则记录欠费
+        from app.services import internal_course_service
+        if internal_course_service.has_active_course(customer_id):
+            return False
         _debts[customer_id] = _debts.get(customer_id, 0) + 1
         _save_debts()
         return True

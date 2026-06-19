@@ -56,7 +56,7 @@ const MEMBERSHIP_CARD_TYPES: Record<string, { price: number; defaultCount?: numb
 const COURSE_TYPES: Record<string, { price: number; duration: string; desc: string }> = {
   "疗愈师课程：自爱力构建": { price: 20000, duration: "1 年", desc: "线上课程 · 48节精品课" },
   "商业框架陪跑：自觉力提升": { price: 36800, duration: "3 个月", desc: "线下深度学习" },
-  "落地赋能班：自洽力整合": { price: 58000, duration: "1 年", desc: "线下实战落地" },
+  "落地赋能班：自洽力整合": { price: 58000, duration: "2 年", desc: "线下实战落地" },
 }
 
 const DURATION_OPTIONS = [

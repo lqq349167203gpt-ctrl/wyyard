@@ -43,7 +43,7 @@ def _calc_expiry(effective_date: str, course_type: str) -> Optional[str]:
     durations = {
         "疗愈师课程：自爱力构建": 12,  # 1年
         "商业框架陪跑：自觉力提升": 3,   # 3个月
-        "落地赋能班：自洽力整合": 12,    # 1年
+        "落地赋能班：自洽力整合": 24,    # 2年
     }
     months = durations.get(course_type)
     if not months:
