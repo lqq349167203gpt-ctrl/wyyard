@@ -68,8 +68,6 @@ const systemItems = [
   { title: "操作日志", icon: ClipboardList, path: "/operation-logs", permission: "operation-logs" },
 ]
 
-const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
-
 function getPermissions(): string[] {
   try {
     return JSON.parse(localStorage.getItem("userPermissions") || "[]")
@@ -105,21 +103,18 @@ function MenuGroup({
 
   const filteredItems = items.filter(item => {
     if (!item.permission || isSuperAdmin) return true
-    if (permissions.includes(item.permission)) return true
-    if (item.permission === "class-records" && CLASS_RECORDS_PERMISSIONS.some(p => permissions.includes(p))) return true
-    if (item.permission === "daily-activities" && permissions.includes("class-records-activities")) return true
-    return false
+    return permissions.includes(item.permission)
   })
 
   if (filteredItems.length === 0) return null
 
   return (
-    <SidebarGroup className="px-3 py-0">
+    <SidebarGroup className="px-2 py-0">
       <SidebarGroupLabel
         className="h-10 text-[13px] font-normal tracking-[0.1em] text-[#4e535a] px-2 mb-0 uppercase cursor-pointer select-none flex items-center justify-between hover:text-[#2b2f36] transition-colors"
         onClick={onToggle}
       >
-        <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />{label}</span>
+        <span className="flex items-center gap-1.5 pl-4"><Icon className="h-3.5 w-3.5" />{label}</span>
       </SidebarGroupLabel>
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
@@ -135,9 +130,9 @@ function MenuGroup({
                     <SidebarMenuButton
                       render={<Link to={item.path} />}
                       isActive={isActive}
-                      className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
+                      className="h-10 text-[13px] tracking-[0.1em] px-3 rounded-[2px] transition-none font-normal text-[#4e535a]"
                     >
-                      <span className="pl-[18px]">{item.title}</span>
+                      <span className="flex items-center gap-1.5 pl-[18px]"><item.icon className="h-3.5 w-3.5" />{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )
@@ -166,15 +161,13 @@ function PaymentMenuGroup({
   const hasAccess = isSuperAdmin || PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
   if (!hasAccess) return null
 
-  const showPayment = isSuperAdmin || ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"].some(p => permissions.includes(p))
-
   return (
-    <SidebarGroup className="px-3 py-0">
+    <SidebarGroup className="px-2 py-0">
       <SidebarGroupLabel
         className="h-10 text-[13px] font-normal tracking-[0.1em] text-[#4e535a] px-2 mb-0 uppercase cursor-pointer select-none flex items-center justify-between hover:text-[#2b2f36] transition-colors"
         onClick={onToggle}
       >
-        <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />付费项目</span>
+        <span className="flex items-center gap-1.5 pl-4"><Icon className="h-3.5 w-3.5" />付费</span>
       </SidebarGroupLabel>
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
@@ -183,17 +176,15 @@ function PaymentMenuGroup({
         <div className="overflow-hidden min-h-0">
           <SidebarGroupContent className="mt-0.5">
             <SidebarMenu className="gap-1">
-              {showPayment && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    render={<Link to="/payment" />}
-                    isActive={location.pathname === "/payment"}
-                    className="h-10 text-[13px] tracking-[0.1em] px-2.5 rounded-md transition-none font-normal text-[#4e535a]"
-                  >
-                    <span className="pl-[18px]">付费项目</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<Link to="/payment" />}
+                  isActive={location.pathname === "/payment"}
+                  className="h-10 text-[13px] tracking-[0.1em] px-3 rounded-[2px] transition-none font-normal text-[#4e535a]"
+                >
+                  <span className="pl-[34px]">付费项目</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </div>
@@ -236,7 +227,7 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar style={{ "--sidebar-accent": "#f0f1f2", "--sidebar-accent-foreground": "#3370ff" } as React.CSSProperties}>
+    <Sidebar style={{ "--sidebar-accent": "#f6f7f9", "--sidebar-accent-foreground": "#3370ff" } as React.CSSProperties}>
       <SidebarHeader className="px-5 pt-4 pb-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-[11px] font-semibold text-primary-foreground">
@@ -246,12 +237,12 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="mt-5">
-        <MenuGroup label="业务数据" icon={Briefcase} items={businessItems} isOpen={openGroups["业务数据"]} onToggle={() => toggle("业务数据")} />
-        <MenuGroup label="疗愈活动" icon={Calendar} items={courseItems} isOpen={openGroups["疗愈活动"]} onToggle={() => toggle("疗愈活动")} />
+        <MenuGroup label="业务" icon={Briefcase} items={businessItems} isOpen={openGroups["业务数据"]} onToggle={() => toggle("业务数据")} />
+        <MenuGroup label="疗愈" icon={Calendar} items={courseItems} isOpen={openGroups["疗愈活动"]} onToggle={() => toggle("疗愈活动")} />
         <PaymentMenuGroup icon={CreditCard} isOpen={openGroups["付费项目"]} onToggle={() => toggle("付费项目")} />
-        <MenuGroup label="信息配置" icon={Settings} items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
-        <MenuGroup label="账号管理" icon={Users} items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
-        <MenuGroup label="系统配置" icon={Monitor} items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />
+        <MenuGroup label="信息" icon={Settings} items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
+        <MenuGroup label="账号" icon={Users} items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
+        <MenuGroup label="系统" icon={Monitor} items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />
       </SidebarContent>
     </Sidebar>
   )

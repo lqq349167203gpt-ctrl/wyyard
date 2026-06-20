@@ -978,7 +978,7 @@ export function ActivityBatchTable({
         <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
-            <tr className="bg-[#f5f6f7] text-[#8f959e]">
+            <tr className="bg-[#f5f7fa] text-[#8f959e]">
               <th className="w-[24px]"></th>
               <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
               <th className="px-1 py-2 text-left font-normal w-[122px]">时间</th>
@@ -991,7 +991,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
               <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
               <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f5f6f7] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f5f7fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
           <tbody>

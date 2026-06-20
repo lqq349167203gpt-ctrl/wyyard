@@ -14,13 +14,18 @@ _permissions: Dict[str, Dict[str, List[str]]] = {"customers": {}, "class_records
 def _load():
     global _permissions
     for section, filename in FILENAMES.items():
-        _permissions[section] = load_data(filename) or {}
+        raw = load_data(filename) or {}
+        # 兼容旧格式：如果 raw 包含 section key（如 {"customers": {...}}），取内层
+        if section in raw and isinstance(raw[section], dict):
+            _permissions[section] = raw[section]
+        else:
+            _permissions[section] = raw
 
 
 def _save(section: str, item_id: str = ""):
     if item_id:
         item = _permissions[section].get(item_id)
-        if item:
+        if item is not None:
             save_item(FILENAMES[section], item_id, item)
     else:
         save_data(FILENAMES[section], _permissions[section])

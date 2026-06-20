@@ -75,7 +75,7 @@ export function AppLayout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="min-w-0">
-        <header className="flex h-11 items-center justify-between bg-white px-5 border-b-[6px] border-[#f7f8fa]">
+        <header className="flex h-11 items-center justify-between bg-white px-5 border-b-2 border-[#f0f1f2]">
           <SidebarTrigger />
           <div className="flex items-center gap-2">
             {ownerName && (

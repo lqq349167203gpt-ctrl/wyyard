@@ -201,7 +201,9 @@ export default function PositionManagementPage() {
       await positionPermissionApi.setFull(
         selectedPosition.name,
         formPermissions,
-        [], [], [],
+        formPagePermissions["healing-records"] || [],
+        formPagePermissions["class-attendance"] || [],
+        formPagePermissions["consumption-records"] || [],
         formPagePermissions
       )
       setSaveResult({ success: true, message: "权限保存成功" })

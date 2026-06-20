@@ -2053,6 +2053,9 @@ export default function DailyActivitiesPage() {
   // ===== Theme state =====
   const [themes, setThemes] = useState<ActivityTheme[]>([])
   const [themeEditWeekIndex, setThemeEditWeekIndex] = useState<number | null>(null)
+  const [calendarVisible, setCalendarVisible] = useState(() => {
+    try { return localStorage.getItem("daily-calendar-visible") !== "false" } catch { return true }
+  })
 
   const themeMonthStart = useMemo(() => {
     const d = new Date(detailDate)
@@ -2684,10 +2687,26 @@ export default function DailyActivitiesPage() {
             </button>
             <div className="ml-1.5"><SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} /></div>
           </div>
+          <div className="flex-1" />
+          <button
+            className="flex items-center gap-1 text-[11px] text-[#8f959e] hover:text-[#4e535a] cursor-pointer px-1 py-0.5"
+            onClick={() => { const next = !calendarVisible; setCalendarVisible(next); try { localStorage.setItem("daily-calendar-visible", String(next)) } catch {} }}
+          >
+            <span style={{
+              display: "inline-block",
+              width: 0,
+              height: 0,
+              borderLeft: "4px solid transparent",
+              borderRight: "4px solid transparent",
+              borderTop: calendarVisible ? "5px solid #8f959e" : "none",
+              borderBottom: calendarVisible ? "none" : "5px solid #8f959e",
+            }} />
+            {calendarVisible ? "隐藏" : "展开"}
+          </button>
         </div>
 
         {/* 周视图日历 */}
-        <div className="border-[3px] border-[#f5f5f5] rounded-[2px] overflow-x-auto mt-1">
+        {calendarVisible && <div className="border-[3px] border-[#f5f5f5] rounded-[2px] overflow-x-auto">
           <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%" }}>
             <colgroup>
               <col style={{ width: "80px" }} />
@@ -2759,9 +2778,7 @@ export default function DailyActivitiesPage() {
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* 当日活动标题 */}
+        </div>}
         <div className="mt-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center">

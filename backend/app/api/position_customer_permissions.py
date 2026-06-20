@@ -34,12 +34,9 @@ def get_for_position(section: str, position: str):
 
 @router.put("/batch")
 def set_permissions_batch(data: CustomerPermissionBatchUpdate):
-    if data.customers:
-        position_customer_permission_service.set_customer_permissions("customers", data.position, data.customers)
-    if data.class_records:
-        position_customer_permission_service.set_customer_permissions("class_records", data.position, data.class_records)
-    if data.payment:
-        position_customer_permission_service.set_customer_permissions("payment", data.position, data.payment)
+    position_customer_permission_service.set_customer_permissions("customers", data.position, data.customers)
+    position_customer_permission_service.set_customer_permissions("class_records", data.position, data.class_records)
+    position_customer_permission_service.set_customer_permissions("payment", data.position, data.payment)
     return {"message": "已保存"}
 
 
