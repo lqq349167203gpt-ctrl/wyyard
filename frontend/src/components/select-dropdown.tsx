@@ -252,7 +252,7 @@ export const SelectDropdown = memo(function SelectDropdown({
   return (
     <div ref={rootRef} data-dropdown className={`relative ${className}`}>
       <button type="button"
-        className={`flex items-center justify-between w-full rounded-md border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`flex items-center justify-between w-full rounded-[2px] border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         onMouseDown={handleToggle}
         disabled={disabled}
       >
@@ -289,7 +289,7 @@ export const SelectDropdown = memo(function SelectDropdown({
 
       {open && createPortal(
         <>
-          <div ref={menuRef} className="bg-white rounded-md border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
+          <div ref={menuRef} className="bg-white rounded-[2px] border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
             {options.map((opt) => {
               const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
               const hasChildren = opt.children && opt.children.length > 0

@@ -1541,7 +1541,7 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
         return (
           <button
             key={d}
-            className={`shrink-0 flex flex-col items-center justify-center w-10 h-12 rounded-md transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center w-10 h-12 rounded-[2px] transition-colors ${
               isSelected ? "bg-[#3370ff] text-white" : isToday ? "bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
             }`}
             onClick={() => onSelectDate(d)}
@@ -2687,14 +2687,14 @@ export default function DailyActivitiesPage() {
         </div>
 
         {/* 周视图日历 */}
-        <div className="border-[0.5px] border-[#e8e8e8] rounded overflow-x-auto mt-1">
+        <div className="border-[3px] border-[#f5f5f5] rounded-[2px] overflow-x-auto mt-1">
           <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%" }}>
             <colgroup>
               <col style={{ width: "80px" }} />
               {Array.from({ length: 7 }, (_, i) => <col key={i} style={{ width: `${(100 - 13.33) / 7}%` }} />)}
             </colgroup>
             <thead>
-              <tr className="bg-[#f8faff]">
+              <tr className="bg-[#f5f6f7]">
                 <th className="px-2 py-1.5 text-center text-[12px] text-[#8f959e] font-normal" style={{ borderRight: "0.5px solid #f0f0f0" }}>周主题</th>
                 {["一", "二", "三", "四", "五", "六", "日"].map(d => (
                   <th key={d} className="px-1 py-1.5 text-center text-[11px] text-[#8f959e] font-normal">{d}</th>

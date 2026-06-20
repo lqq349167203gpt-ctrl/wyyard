@@ -421,7 +421,7 @@ export function ActivityBatchTable({
   const typeOptions = useMemo(() => {
     const classChildren = courseTypes.map(t => ({ value: `class:${t.name}`, label: t.name }))
     return [
-      { value: "class", label: "沙龙活动", children: classChildren },
+      { value: "class", label: "读书会", children: classChildren },
       { value: "gcs", label: "觉醒游戏" },
       { value: "ers", label: "情绪释放" },
       { value: "ocr", label: "OH卡梳理" },
@@ -497,7 +497,7 @@ export function ActivityBatchTable({
 
     // 无记录时默认一行
     if (items.length === 0) {
-      const defaultCourseType = courseTypes.length > 0 ? courseTypes[0].name : ""
+      const defaultCourseType = courseTypes.find(ct => ct.name === "读书会")?.name || courseTypes[0]?.name || ""
       const fresh = createFreshRow("class", spaceId || "", spaces)
       if (defaultCourseType) {
         fresh.class_course_type = defaultCourseType
@@ -952,7 +952,7 @@ export function ActivityBatchTable({
   }, [changedCellMap])
 
   return (
-    <div className={`bg-white rounded-lg relative ${isLocked ? "activity-table-locked" : ""}`}>
+    <div className={`bg-white rounded-[2px] relative ${isLocked ? "activity-table-locked" : ""}`}>
       {isPreview && (
         <div className="px-3 py-2 bg-[#f5eeff] border-b border-[#e0d0f5]">
           <span className="text-[12px] text-[#7c3aed]">正在预览历史版本</span>
@@ -978,7 +978,7 @@ export function ActivityBatchTable({
         <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
-            <tr className="bg-[#fafbfc] text-[#8f959e]">
+            <tr className="bg-[#f5f6f7] text-[#8f959e]">
               <th className="w-[24px]"></th>
               <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
               <th className="px-1 py-2 text-left font-normal w-[122px]">时间</th>
@@ -991,7 +991,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
               <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
               <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f5f6f7] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -1029,7 +1029,7 @@ export function ActivityBatchTable({
                         type="checkbox"
                         checked={row.is_public_welfare}
                         onChange={(e) => updateRow(row.key, "is_public_welfare", e.target.checked)}
-                        className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-white checked:border-[#d0d3d6] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Crect%20x%3D%223.5%22%20y%3D%223.5%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23a0a5ab%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                        className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#e8eaed] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Crect%20x%3D%223.5%22%20y%3D%223.5%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23a0a5ab%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
                       />
                     ) : null}
                     </div>
@@ -1037,7 +1037,7 @@ export function ActivityBatchTable({
 
                   {/* 时间 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "start_time") || isCellChanged(row.key, "end_time") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <div className="flex items-center h-7 rounded-md border-[0.5px] border-[#dee0e3] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
+                    <div className="flex items-center h-7 rounded-[2px] border-[0.5px] border-[#e8eaed] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
                       <input
                         type="time"
                         value={row.start_time}
@@ -1217,7 +1217,7 @@ export function ActivityBatchTable({
                               scheduleSave(row.key)
                             }
                           }}
-                          className="w-[34px] h-7 text-center rounded-md border-[0.5px] border-[#dee0e3] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="w-[34px] h-7 text-center rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       )
                     })() : null}

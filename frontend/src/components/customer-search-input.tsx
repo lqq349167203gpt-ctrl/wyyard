@@ -174,7 +174,7 @@ export function CustomerSearchInput({
       {multi ? (
         // Multi-select: badges inline with search input
         <div
-          className={`h-7 w-full rounded-md border border-[#dee0e3] bg-white px-1.5 flex items-center gap-1 overflow-x-auto scrollbar-hide ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
+          className={`h-7 w-full rounded-[2px] border border-[#e8eaed] bg-white px-1.5 flex items-center gap-1 overflow-x-auto scrollbar-hide ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
           onClick={() => { if (!disabled) { calcPos(); setOpen(true); inputRef.current?.focus() } }}
         >
           {selectedNames.map(name => (
@@ -244,7 +244,7 @@ export function CustomerSearchInput({
             const showCreate = onNoResultsClick && !exactMatch
             if (filtered.length === 0 && !showCreate) return null
             return (
-              <div className="bg-white rounded-md border border-[#dee0e3] shadow-lg overflow-y-auto" style={pos}>
+              <div className="bg-white rounded-[2px] border border-[#e8eaed] shadow-lg overflow-y-auto" style={pos}>
                 {filtered.slice(0, MAX_VISIBLE).map(c => (
                   <div
                     key={c.id}
@@ -271,7 +271,7 @@ export function CustomerSearchInput({
 
           {/* No results without onNoResultsClick */}
           {filtered.length === 0 && !onNoResultsClick && (
-            <div className="bg-white rounded-md border border-[#dee0e3] shadow-lg px-3 py-2 text-[12px] text-[#8f959e]" style={pos}>
+            <div className="bg-white rounded-[2px] border border-[#e8eaed] shadow-lg px-3 py-2 text-[12px] text-[#8f959e]" style={pos}>
               无匹配结果
             </div>
           )}

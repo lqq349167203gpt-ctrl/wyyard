@@ -525,7 +525,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         <div className="min-w-[1688px]">
           <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
           <thead>
-            <tr className="bg-[#fafbfc] text-[#8f959e]">
+            <tr className="bg-[#f5f6f7] text-[#8f959e]">
               <th className="w-[24px]"></th>
               <th className="px-1.5 py-2 text-center font-normal w-[36px]">到店</th>
               <th className="pl-2 pr-[10px] py-2 text-left font-normal w-[64px]">组长</th>
@@ -541,7 +541,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">跟进点</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">组长反馈</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[68px] sticky right-0 bg-[#fafbfc] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[68px] sticky right-0 bg-[#f5f6f7] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
           <tbody className="[&_tr:first-child>td]:pt-[12px] [&_tr:last-child>td]:pb-[6px]">
@@ -570,7 +570,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       type="checkbox"
                       checked={row.arrived}
                       onChange={(e) => updateRow(row.key, "arrived", e.target.checked)}
-                      className="h-3.5 w-3.5 appearance-none border border-[#d0d3d6] rounded-[3px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                      className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
                     />
                   </td>
                   <td className={`pl-2 pr-[10px] py-1.5 w-[64px] ${isCellChanged(row.key, "is_leader") ? "bg-[#f5eeff] rounded" : ""}`}>
@@ -590,7 +590,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       type="time"
                       value={row.visit_time}
                       onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
-                      className={`h-7 text-[12px] w-[56px] time-no-icon rounded-md border-[0.5px] border-[#dee0e3] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                      className={`h-7 text-[12px] w-[56px] time-no-icon rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
                     />
                   </td>
                   <td className={`pl-0 pr-1.5 py-1.5 ${isCellChanged(row.key, "nickname") || isCellChanged(row.key, "customer_id") ? "bg-[#f5eeff] rounded" : ""}`}>
