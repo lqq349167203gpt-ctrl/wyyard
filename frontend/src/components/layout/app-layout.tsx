@@ -20,10 +20,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/payment/emotional-releases": "无忧 - 情绪释放",
   "/payment/energy-knots": "无忧 - 能量结",
   "/payment/internal-courses": "无忧 - 内部课程",
-  "/courses/group-case-sessions": "无忧 - 觉醒游戏场次",
-  "/courses/emotional-release-sessions": "无忧 - 情绪释放场次",
-  "/courses/energy-knot-sessions": "无忧 - 能量结场次",
-  "/courses/internal-course-sessions": "无忧 - 内部课程场次",
   "/agents": "无忧 - AI配置",
 
 

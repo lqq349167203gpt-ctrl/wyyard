@@ -47,10 +47,9 @@ ALL_PAGE_KEYS = [
     "healing-records", "class-records-visitors", "class-records-activities",
     "class-records-arrival", "class-records", "daily-activities",
     # 付费项目
-    "payment", "membership-cards", "group-cases", "group-case-sessions",
-    "emotional-releases", "emotional-release-sessions", "oh-card-readings",
-    "energy-knots", "energy-knot-sessions", "internal-courses",
-    "internal-course-sessions", "other-projects",
+    "payment", "membership-cards", "group-cases",
+    "emotional-releases", "oh-card-readings",
+    "energy-knots", "internal-courses", "other-projects",
     # 信息配置
     "member-identities", "healing-identities", "organizations", "spaces", "reminders",
     # 账号管理

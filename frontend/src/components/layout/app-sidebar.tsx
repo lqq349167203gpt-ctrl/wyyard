@@ -54,7 +54,7 @@ const configItems = [
   { title: "提醒配置", icon: Bell, path: "/config/reminders", permission: "reminders" },
 ]
 
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"]
+const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
 
 const accountItems = [
   { title: "账号管理", icon: GraduationCap, path: "/positions/management", permission: "position-management" },

@@ -18,10 +18,6 @@ import OrganizationsPage from "@/pages/organizations"
 import ClassRecordsPage from "@/pages/class-records"
 import DailyActivitiesPage from "@/pages/daily-activities"
 import PaymentPage from "@/pages/payment"
-import GroupCaseSessionsPage from "@/pages/group-case-sessions"
-import EmotionalReleaseSessionsPage from "@/pages/emotional-release-sessions"
-import EnergyKnotSessionsPage from "@/pages/energy-knot-sessions"
-import InternalCourseSessionsPage from "@/pages/internal-course-sessions"
 import MemberIdentitiesPage from "@/pages/member-identities"
 import HealingRecordsPage from "@/pages/healing-records"
 
@@ -38,7 +34,7 @@ import ChatHistoryPage from "@/pages/chat-history"
 import ConsumptionRecordsPage from "@/pages/consumption-records"
 import ClassAttendancePage from "@/pages/class-attendance"
 
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions", "internal-course-sessions"]
+const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
 
 const PATH_PERMISSIONS: Record<string, string> = {
@@ -49,10 +45,6 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/courses/class-records": "class-records",
   "/courses/daily-activities": "class-records-activities",
   "/payment": "payment",
-  "/courses/group-case-sessions": "group-case-sessions",
-  "/courses/emotional-release-sessions": "emotional-release-sessions",
-  "/courses/energy-knot-sessions": "energy-knot-sessions",
-  "/courses/internal-course-sessions": "internal-course-sessions",
   "/agents": "agents",
 
 
@@ -149,10 +141,6 @@ function App() {
               <Route path="/courses/daily-activities" element={<DailyActivitiesPage />} />
               <Route path="/payment" element={<PaymentPage />} />
               <Route path="/other-projects" element={<Navigate to="/payment" replace />} />
-              <Route path="/courses/group-case-sessions" element={<GroupCaseSessionsPage />} />
-              <Route path="/courses/emotional-release-sessions" element={<EmotionalReleaseSessionsPage />} />
-              <Route path="/courses/energy-knot-sessions" element={<EnergyKnotSessionsPage />} />
-              <Route path="/courses/internal-course-sessions" element={<InternalCourseSessionsPage />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id/chat" element={<ChatPage />} />
 

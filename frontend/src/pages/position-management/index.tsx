@@ -28,14 +28,10 @@ const ALL_PAGES = [
   { key: "payment", label: "付费项目" },
   { key: "membership-cards", label: "会员卡" },
   { key: "group-cases", label: "觉醒游戏" },
-  { key: "group-case-sessions", label: "觉醒游戏场次" },
   { key: "emotional-releases", label: "情绪释放" },
-  { key: "emotional-release-sessions", label: "情绪释放场次" },
   { key: "oh-card-readings", label: "OH卡梳理" },
   { key: "energy-knots", label: "能量结" },
-  { key: "energy-knot-sessions", label: "能量结场次" },
   { key: "internal-courses", label: "内部课程" },
-  { key: "internal-course-sessions", label: "内部课程场次" },
   { key: "other-projects", label: "其他项目" },
   // 信息配置
   { key: "member-identities", label: "会员身份" },
@@ -56,7 +52,7 @@ const ALL_PAGES = [
 const PERMISSION_GROUPS = [
   { label: "业务数据", keys: ["business-reminders", "traffic-records", "activity-records", "consumption-records", "class-attendance"] },
   { label: "疗愈活动", keys: ["healing-records", "class-records", "daily-activities"] },
-  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "group-case-sessions", "emotional-releases", "emotional-release-sessions", "oh-card-readings", "energy-knots", "energy-knot-sessions", "internal-courses", "internal-course-sessions", "other-projects"] },
+  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password"] },
   { label: "系统配置", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
