@@ -15,6 +15,7 @@ interface SelectDropdownSingleProps {
   placeholder?: string
   onChange: (value: string) => void
   className?: string
+  rounded?: string
   size?: "default" | "sm"
   disabled?: boolean
   clearable?: boolean
@@ -33,6 +34,7 @@ interface SelectDropdownMultiProps {
   placeholder?: string
   onChange: (value: string[]) => void
   className?: string
+  rounded?: string
   size?: "default" | "sm"
   disabled?: boolean
   clearable?: boolean
@@ -55,6 +57,7 @@ export const SelectDropdown = memo(function SelectDropdown({
   placeholder = "请选择",
   onChange,
   className = "",
+  rounded = "[4px]",
   size = "default",
   disabled = false,
   clearable = false,
@@ -248,11 +251,13 @@ export const SelectDropdown = memo(function SelectDropdown({
   }
   const currentLabel = multi ? "" : findLabel(options, value as string)
   const sm = size === "sm"
+  const radiusValue = rounded.startsWith("[") ? rounded.slice(1, -1) : rounded
 
   return (
     <div ref={rootRef} data-dropdown className={`relative ${className}`}>
       <button type="button"
-        className={`flex items-center justify-between w-full rounded-[2px] border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        style={{ borderRadius: radiusValue }}
+        className={`flex items-center justify-between w-full border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         onMouseDown={handleToggle}
         disabled={disabled}
       >
@@ -289,7 +294,7 @@ export const SelectDropdown = memo(function SelectDropdown({
 
       {open && createPortal(
         <>
-          <div ref={menuRef} className="bg-white rounded-[2px] border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
+          <div ref={menuRef} className="bg-white border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, borderRadius: radiusValue, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
             {options.map((opt) => {
               const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
               const hasChildren = opt.children && opt.children.length > 0

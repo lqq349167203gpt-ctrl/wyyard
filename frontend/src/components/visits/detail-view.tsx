@@ -831,11 +831,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-xs text-[#4e535a] font-light text-right tracking-widest">昵称</span>
-              <Input value={editVisit?.nickname || ""} disabled className="h-8 text-xs" />
+              <Input rounded="[2px]" value={editVisit?.nickname || ""} disabled className="h-8 text-xs" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-xs text-[#4e535a] font-light text-right tracking-widest">日期</span>
-              <Input type="date" value={editDate} disabled className="h-8 text-xs" />
+              <Input rounded="[2px]" type="date" value={editDate} disabled className="h-8 text-xs" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-xs text-[#4e535a] font-light text-right tracking-widest pt-2">需求</span>
@@ -875,31 +875,31 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
             <div className="grid grid-cols-[70px_1fr_70px_1fr] items-start gap-x-3 gap-y-3">
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">昵称</span>
               <div>
-                <Input value={customerForm.nickname || ""} onChange={(e) => { setCustomerForm({ ...customerForm, nickname: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
+                <Input rounded="[2px]" value={customerForm.nickname || ""} onChange={(e) => { setCustomerForm({ ...customerForm, nickname: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
                 {customerFormError && customerFormError.includes("昵称") && <p className="text-[11px] text-[#f54a45] mt-1">{customerFormError}</p>}
               </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">姓名</span>
-              <Input value={customerForm.name || ""} onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })} placeholder="请输入" />
+              <Input rounded="[2px]" value={customerForm.name || ""} onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })} placeholder="请输入" />
 
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">性别</span>
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 value={customerForm.gender || ""}
                 options={[{value: "男", label: "男"}, {value: "女", label: "女"}]}
                 placeholder="请选择"
                 onChange={(v) => setCustomerForm({ ...customerForm, gender: v })}
               />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">电话</span>
-              <Input value={customerForm.phone || ""} onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })} placeholder="请输入" />
+              <Input rounded="[2px]" value={customerForm.phone || ""} onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })} placeholder="请输入" />
 
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">微信</span>
               <div>
-                <Input value={customerForm.wechat || ""} onChange={(e) => { setCustomerForm({ ...customerForm, wechat: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
+                <Input rounded="[2px]" value={customerForm.wechat || ""} onChange={(e) => { setCustomerForm({ ...customerForm, wechat: e.target.value }); setCustomerFormError("") }} placeholder="请输入" />
                 {customerFormError && customerFormError.includes("微信") && <p className="text-[11px] text-[#f54a45] mt-1">{customerFormError}</p>}
               </div>
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">年龄</span>
               <div className="grid grid-cols-2 gap-2">
-                <Input value={customerForm.age || ""} onChange={(e) => { const v = e.target.value; const n = parseInt(v); let range = ""; if (n >= 60) range = "60+"; else if (n >= 51) range = "51~60"; else if (n >= 41) range = "41~50"; else if (n >= 31) range = "31~40"; else if (n >= 18) range = "18~30"; setCustomerForm({ ...customerForm, age: v }); setAgeRange(range); }} placeholder="具体年龄" />
-                <SelectDropdown
+                <Input rounded="[2px]" value={customerForm.age || ""} onChange={(e) => { const v = e.target.value; const n = parseInt(v); let range = ""; if (n >= 60) range = "60+"; else if (n >= 51) range = "51~60"; else if (n >= 41) range = "41~50"; else if (n >= 31) range = "31~40"; else if (n >= 18) range = "18~30"; setCustomerForm({ ...customerForm, age: v }); setAgeRange(range); }} placeholder="具体年龄" />
+                <SelectDropdown rounded="[2px]"
                   value={ageRange}
                   options={["18~30", "31~40", "41~50", "51~60", "60+"].map(v => ({value: v, label: v}))}
                   placeholder="年龄段"
@@ -908,7 +908,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               </div>
 
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">引流人</span>
-              <CustomerSearchInput
+              <CustomerSearchInput rounded="2px"
                 customers={customerList as any[]}
                 value={customerForm.referrer || ""}
                 onChange={(v) => setCustomerForm({ ...customerForm, referrer: typeof v === "string" ? v : v[0] || "" })}
@@ -916,7 +916,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 filterSelected={false}
               />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">承接人</span>
-              <CustomerSearchInput
+              <CustomerSearchInput rounded="2px"
                 customers={customerList as any[]}
                 value={customerForm.referrer_handler || ""}
                 onChange={(v) => setCustomerForm({ ...customerForm, referrer_handler: typeof v === "string" ? v : v[0] || "" })}
@@ -925,7 +925,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">流量来源</span>
               <div className="flex items-center gap-2">
-                <SelectDropdown
+                <SelectDropdown rounded="[2px]"
                   className={["小红书", "抖音", "公众号", "视频号"].includes(customerForm.traffic_source || "") ? "w-[calc(50%-3px)] min-w-0" : ["好友推荐", "朋友圈"].includes(customerForm.traffic_source || "") ? "flex-1 min-w-0" : "w-full"}
                   value={customerForm.traffic_source || ""}
                   options={["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐"].map(v => ({value: v, label: v}))}
@@ -933,11 +933,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                   onChange={(v) => setCustomerForm({ ...customerForm, traffic_source: v, traffic_source_detail: "" })}
                 />
                 {["小红书", "抖音", "公众号", "视频号"].includes(customerForm.traffic_source || "") && (
-                  <Input value={customerForm.traffic_source_detail || ""} onChange={(e) => setCustomerForm({ ...customerForm, traffic_source_detail: e.target.value })} placeholder="内容链接" className="h-8 flex-1 text-[12px]" />
+                  <Input rounded="[2px]" value={customerForm.traffic_source_detail || ""} onChange={(e) => setCustomerForm({ ...customerForm, traffic_source_detail: e.target.value })} placeholder="内容链接" className="h-8 flex-1 text-[12px]" />
                 )}
                 {(customerForm.traffic_source || "") === "好友推荐" && (
                   <div className="flex-1 min-w-0">
-                    <CustomerSearchInput
+                    <CustomerSearchInput rounded="2px"
                       customers={customerList as any[]}
                       value={customerForm.traffic_source_detail || ""}
                       onChange={(v) => setCustomerForm({ ...customerForm, traffic_source_detail: typeof v === "string" ? v : v[0] || "" })}
@@ -948,7 +948,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 )}
                 {(customerForm.traffic_source || "") === "朋友圈" && (
                   <div className="flex-1 min-w-0">
-                    <CustomerSearchInput
+                    <CustomerSearchInput rounded="2px"
                       customers={customerList as any[]}
                       value={customerForm.traffic_source_detail || ""}
                       onChange={(v) => setCustomerForm({ ...customerForm, traffic_source_detail: typeof v === "string" ? v : v[0] || "" })}
@@ -966,14 +966,14 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
                 <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">工作情况</span>
                 <div className="flex gap-2">
-                  <SelectDropdown
+                  <SelectDropdown rounded="[2px]"
                     value={customerForm.work_status || ""}
                     options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }]}
                     placeholder="是否在职"
                     onChange={(v) => setCustomerForm({ ...customerForm, work_status: v })}
                     className="w-[100px]"
                   />
-                  <Input value={customerForm.work_description || ""} onChange={(e) => setCustomerForm({ ...customerForm, work_description: e.target.value })} placeholder="描述工作内容..." className="flex-1" />
+                  <Input rounded="[2px]" value={customerForm.work_description || ""} onChange={(e) => setCustomerForm({ ...customerForm, work_description: e.target.value })} placeholder="描述工作内容..." className="flex-1" />
                 </div>
               </div>
               <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">

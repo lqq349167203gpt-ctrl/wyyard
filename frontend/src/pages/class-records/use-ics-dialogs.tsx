@@ -259,19 +259,20 @@ export function useIcsDialogs({
           <div className="px-6 py-5 space-y-4" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
-              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+              <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
               <div className="flex items-center gap-2">
-                <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
                 <span className="text-[12px] text-[#4e535a]">至</span>
-                <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
               </div>
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程类型</span>
               <SelectDropdown
+                rounded="[2px]"
                 value={formCourseType}
                 options={[{value: "", label: "选择类型"}, ...ICS_COURSE_TYPES.map(t => ({value: t, label: t}))]}
                 placeholder="选择类型"
@@ -280,13 +281,14 @@ export function useIcsDialogs({
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程名称</span>
-              <Input value={formCourseName} onChange={(e) => setFormCourseName(e.target.value)} placeholder="输入课程名称" className="h-8 text-xs" />
+              <Input rounded="[2px]" value={formCourseName} onChange={(e) => setFormCourseName(e.target.value)} placeholder="输入课程名称" className="h-8 text-xs" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程老师</span>
               <div className="relative" ref={dropdownRef}>
                 {searchField === "host" ? (
                   <Input
+                    rounded="[2px]"
                     value={searchKeyword}
                     onChange={(e) => handleSearch(e.target.value)}
                     placeholder="搜索课程老师..."
@@ -444,6 +446,7 @@ export function useIcsDialogs({
                     <span className="text-[12px] text-[#4e535a] shrink-0">参与者</span>
                     <div className="flex-1 relative" ref={memberDropdownRef}>
                       <Input
+                        rounded="[2px]"
                         value={memberSearchKeyword}
                         onChange={(e) => handleMemberSearch(e.target.value)}
                         placeholder="搜索添加参与者"

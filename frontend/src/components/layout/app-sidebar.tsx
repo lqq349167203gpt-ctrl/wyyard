@@ -32,17 +32,17 @@ import {
 
 const businessItems = [
   { title: "提醒", icon: IconBellRingingFilled, path: "/business-reminders", permission: "business-reminders" },
-  { title: "数据记录", icon: IconChartAreaFilled, path: "/data-records", permission: "data-records" },
+  { title: "数据记录", icon: IconChartAreaFilled, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
 ]
 
 const courseItems = [
-  { title: "客户信息", icon: IconUserFilled, path: "/healing-records", permission: "healing-records" },
+  { title: "客户资料", icon: IconUserFilled, path: "/healing-records", permission: "healing-records" },
   { title: "邀约", icon: IconCalendarEventFilled, path: "/courses/class-records", permission: "class-records" },
   { title: "课表", icon: IconCalendarFilled, path: "/courses/daily-activities", permission: "daily-activities" },
 ]
 
 const configItems = [
-  { title: "会员身份", icon: IconShieldCheckFilled, path: "/config/member-identities", permission: "member-identities" },
+  { title: "会员身份", icon: IconShieldCheckFilled, path: "/config/member-identities", permission: "member-identities", clearTab: "tab_member-identities" },
   { title: "疗愈老师", icon: IconSparklesFilled, path: "/healing-identities", permission: "healing-identities" },
   { title: "组织管理", icon: IconUserFilled, path: "/organizations", permission: "organizations" },
   { title: "空间配置", icon: IconSettingsFilled, path: "/courses/spaces", permission: "spaces" },
@@ -52,7 +52,7 @@ const configItems = [
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
 
 const accountItems = [
-  { title: "账号管理", icon: IconUserFilled, path: "/positions/management", permission: "position-management" },
+  { title: "账号管理", icon: IconUserFilled, path: "/positions/management", permission: "position-management", clearTab: "tab_position-management" },
   { title: "密码修改", icon: IconLockFilled, path: "/change-password", permission: "change-password" },
 ]
 
@@ -122,7 +122,7 @@ function MenuGroup({
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      render={<Link to={item.path} />}
+                      render={<Link to={item.path} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
                       isActive={isActive}
                       className={`h-[34px] text-[13px] pl-[22px] pr-5 rounded-none transition-none font-normal border-l-2 gap-2.5 ${isActive ? "border-[#3370ff] text-black" : "border-transparent text-[#4e535a]"}`}
                     >
@@ -174,7 +174,7 @@ function FixedGroup({
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
-                  render={<Link to={item.path} />}
+                  render={<Link to={item.path} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
                   isActive={isActive}
                   className={`h-[34px] text-[13px] pl-[22px] pr-5 rounded-none transition-none font-normal border-l-2 gap-2.5 ${isActive ? "border-[#3370ff] text-black" : "border-transparent text-[#4e535a]"}`}
                 >
@@ -233,7 +233,7 @@ export function AppSidebar() {
       <SidebarContent className="mt-5">
         <FixedGroup label="数据" items={businessItems} />
         <FixedGroup label="业务" items={courseItems} />
-        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCardFilled }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
+        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCardFilled, clearTab: "tab_payment" }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />

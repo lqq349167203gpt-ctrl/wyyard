@@ -264,14 +264,14 @@ export function useEksDialogs({
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
-              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+              <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
               <div className="flex items-center gap-2">
-                <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
                 <span className="text-[12px] text-[#4e535a]">至</span>
-                <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
               </div>
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
@@ -280,6 +280,7 @@ export function useEksDialogs({
                 <div className="relative">
                   {searchField === "owner" ? (
                     <Input
+                      rounded="[2px]"
                       value={searchKeyword}
                       onChange={(e) => handleSearch(e.target.value)}
                       placeholder="搜索添加案主..."
@@ -320,6 +321,7 @@ export function useEksDialogs({
                               </button>
                             </div>
                             <Input
+                              rounded="[2px]"
                               value={formOwnerDescriptions[i]?.description || ""}
                               onChange={(e) => {
                                 const updated = [...formOwnerDescriptions]
@@ -332,6 +334,7 @@ export function useEksDialogs({
                             <div className="flex items-center gap-1 shrink-0">
                               <span className="text-[11px] text-[#8f959e]">次数</span>
                               <Input
+                                rounded="[2px]"
                                 type="number"
                                 min={1}
                                 value={formOwnerDescriptions[i]?.count ?? 1}
@@ -411,11 +414,11 @@ export function useEksDialogs({
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">购买次数</span>
-              <Input type="number" value={purchaseCount} onChange={(e) => setPurchaseCount(e.target.value)} placeholder="输入次数" className="h-8 text-xs" />
+              <Input rounded="[2px]" type="number" value={purchaseCount} onChange={(e) => setPurchaseCount(e.target.value)} placeholder="输入次数" className="h-8 text-xs" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
-              <Input type="number" value={purchaseAmount} onChange={(e) => setPurchaseAmount(e.target.value)} placeholder="输入金额" className="h-8 text-xs" />
+              <Input rounded="[2px]" type="number" value={purchaseAmount} onChange={(e) => setPurchaseAmount(e.target.value)} placeholder="输入金额" className="h-8 text-xs" />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => { setPurchaseDialogOpen(false); setPendingOwner(null) }}>取消</Button>

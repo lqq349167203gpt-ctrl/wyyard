@@ -201,7 +201,7 @@ export default function ArrivalConfirmationView({
                       {a.is_welfare && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f0f1f2] text-[#8f959e]">公益</span>
                       )}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${confirmed ? "bg-[#f0f5ff] text-[#2b5fd9]" : "bg-[#f5f6f7] text-[#4e535a]"}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${confirmed ? "bg-[#f0f5ff] text-[#2b5fd9]" : "bg-[#f5f6f8] text-[#4e535a]"}`}>
                         {a.name}
                         {a.owner_name ? ` ${a.owner_name}` : ""}
                       </span>
@@ -282,7 +282,7 @@ export default function ArrivalConfirmationView({
                   </button>
                 ) : (
                   <button
-                    className="text-[11px] px-3 py-1 rounded-lg border border-[#d0d5dd] text-[#8f959e] hover:bg-[#f5f6f7] transition-colors cursor-pointer"
+                    className="text-[11px] px-3 py-1 rounded-lg border border-[#d0d5dd] text-[#8f959e] hover:bg-[#f5f6f8] transition-colors cursor-pointer"
                     onClick={() => onMarkArrived(v)}
                   >
                     未到店

@@ -346,14 +346,14 @@ export function useErsDialogs({
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
-              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+              <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
               <div className="flex items-center gap-2">
-                <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
                 <span className="text-[12px] text-[#4e535a]">至</span>
-                <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
               </div>
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
@@ -361,6 +361,7 @@ export function useErsDialogs({
               <div className="relative" ref={dropdownRef}>
                 {searchField === "owner" ? (
                   <Input
+                    rounded="[2px]"
                     value={searchKeyword}
                     onChange={(e) => handleSearch(e.target.value)}
                     placeholder="搜索案主..."
@@ -422,11 +423,11 @@ export function useErsDialogs({
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">购买次数</span>
-              <Input type="number" value={purchaseCount} onChange={(e) => setPurchaseCount(e.target.value)} placeholder="输入次数" className="h-8 text-xs" />
+              <Input rounded="[2px]" type="number" value={purchaseCount} onChange={(e) => setPurchaseCount(e.target.value)} placeholder="输入次数" className="h-8 text-xs" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
-              <Input type="number" value={purchaseAmount} onChange={(e) => setPurchaseAmount(e.target.value)} placeholder="输入金额" className="h-8 text-xs" />
+              <Input rounded="[2px]" type="number" value={purchaseAmount} onChange={(e) => setPurchaseAmount(e.target.value)} placeholder="输入金额" className="h-8 text-xs" />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => { setPurchaseDialogOpen(false); setPendingOwner(null) }}>取消</Button>
@@ -558,6 +559,7 @@ export function useErsDialogs({
                       ) : (
                         <div className="flex-1 relative" ref={memberHostDropdownRef}>
                           <Input
+                            rounded="[2px]"
                             value={memberHostSearchKeyword}
                             onChange={(e) => handleMemberHostSearch(e.target.value)}
                             placeholder="选择主持人"
@@ -588,6 +590,7 @@ export function useErsDialogs({
                         <span className="text-[12px] text-[#4e535a] shrink-0">参与者</span>
                         <div className="flex-1 relative min-w-0" ref={memberDropdownRef}>
                         <Input
+                          rounded="[2px]"
                           value={memberSearchKeyword}
                           onChange={(e) => handleMemberSearch(e.target.value)}
                           placeholder="搜索添加组员"

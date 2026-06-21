@@ -14,13 +14,13 @@ import type { Position, Account } from "@/lib/api"
 import { AccountsContent } from "@/pages/accounts"
 
 const ALL_PAGES = [
-  // 业务数据
-  { key: "business-reminders", label: "业务提醒" },
+  // 数据
+  { key: "business-reminders", label: "提醒" },
   { key: "data-records", label: "数据记录" },
-  // 疗愈活动
-  { key: "healing-records", label: "客户信息" },
-  { key: "class-records", label: "人员安排" },
-  { key: "daily-activities", label: "活动安排" },
+  // 业务
+  { key: "healing-records", label: "客户资料" },
+  { key: "class-records", label: "邀约" },
+  { key: "daily-activities", label: "课表" },
   // 付费项目
   { key: "payment", label: "付费项目" },
   { key: "membership-cards", label: "会员卡" },
@@ -47,8 +47,8 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务数据", keys: ["business-reminders", "data-records"] },
-  { label: "疗愈活动", keys: ["healing-records", "class-records", "daily-activities"] },
+  { label: "数据", keys: ["business-reminders", "data-records"] },
+  { label: "业务", keys: ["healing-records", "class-records", "daily-activities"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password"] },

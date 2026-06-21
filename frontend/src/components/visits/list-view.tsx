@@ -59,7 +59,7 @@ export default function ListView({ onCustomerClick }: { onCustomerClick?: (custo
       <div className="px-4 py-3 border-b border-[#f0f0f0] flex items-end gap-3 flex-wrap">
         <div className="flex flex-col gap-1">
           <label className="text-[12px] text-[#8f959e]">昵称</label>
-          <Input
+          <Input rounded="[2px]"
             placeholder="搜索昵称"
             value={filterNickname}
             onChange={(e) => setFilterNickname(e.target.value)}
@@ -80,7 +80,7 @@ export default function ListView({ onCustomerClick }: { onCustomerClick?: (custo
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[12px] text-[#8f959e]">开始日期</label>
-          <Input
+          <Input rounded="[2px]"
             type="date"
             value={filterStartDate}
             onChange={(e) => setFilterStartDate(e.target.value)}
@@ -89,7 +89,7 @@ export default function ListView({ onCustomerClick }: { onCustomerClick?: (custo
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[12px] text-[#8f959e]">结束日期</label>
-          <Input
+          <Input rounded="[2px]"
             type="date"
             value={filterEndDate}
             onChange={(e) => setFilterEndDate(e.target.value)}

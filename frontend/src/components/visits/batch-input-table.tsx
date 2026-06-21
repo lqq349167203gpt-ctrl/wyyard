@@ -525,7 +525,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         <div className="min-w-[1688px]">
           <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
           <thead>
-            <tr className="bg-[#f5f6f7] text-[#8f959e]">
+            <tr className="bg-[#f7f8fa] text-[#8f959e]">
               <th className="w-[24px]"></th>
               <th className="px-1.5 py-2 text-center font-normal w-[36px]">到店</th>
               <th className="pl-2 pr-[10px] py-2 text-left font-normal w-[64px]">组长</th>
@@ -541,7 +541,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">跟进点</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">组长反馈</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[68px] sticky right-0 bg-[#f5f6f7] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[68px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
           <tbody className="[&_tr:first-child>td]:pt-[12px] [&_tr:last-child>td]:pb-[6px]">
@@ -574,7 +574,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     />
                   </td>
                   <td className={`pl-2 pr-[10px] py-1.5 w-[64px] ${isCellChanged(row.key, "is_leader") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <SelectDropdown
+                    <SelectDropdown rounded="[2px]"
                       size="sm"
                       value={row.is_leader ? "1" : "0"}
                       options={[{ value: "0", label: "-" }, { value: "1", label: "组长" }]}
@@ -594,7 +594,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     />
                   </td>
                   <td className={`pl-0 pr-1.5 py-1.5 ${isCellChanged(row.key, "nickname") || isCellChanged(row.key, "customer_id") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <CustomerSearchInput
+                    <CustomerSearchInput rounded="2px"
                       customers={customers as any[]}
                       value={row.nickname}
                       showClear={false}
@@ -622,14 +622,14 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input
+                    <Input rounded="[2px]"
                       value={row.needs}
                       onChange={(e) => updateRow(row.key, "needs", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "referrer_handler") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <CustomerSearchInput
+                    <CustomerSearchInput rounded="2px"
                       customers={customers as any[]}
                       value={row.referrer_handler}
                       showClear={false}
@@ -660,21 +660,21 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     </span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input
+                    <Input rounded="[2px]"
                       value={row.feedback}
                       onChange={(e) => updateRow(row.key, "feedback", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input
+                    <Input rounded="[2px]"
                       value={row.healing_notes}
                       onChange={(e) => updateRow(row.key, "healing_notes", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"
                     />
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "group_leader_feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input
+                    <Input rounded="[2px]"
                       value={row.group_leader_feedback}
                       onChange={(e) => updateRow(row.key, "group_leader_feedback", e.target.value)}
                       className="h-7 text-[12px] [&]:border-[0.5px]"

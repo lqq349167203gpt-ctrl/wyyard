@@ -217,27 +217,27 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
-            <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
+            <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">时间</span>
             <div className="flex items-center gap-2">
-              <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
               <span className="text-[12px] text-[#8f959e]">至</span>
-              <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={spaceId}
                 options={spaces.map(s => ({value: s.id, label: s.name}))}
                 placeholder="选择空间"
                 onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
               />
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={roomId}
                 options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
@@ -249,7 +249,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formActivityMode}
               options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
               onChange={setFormActivityMode}
@@ -259,7 +259,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
             <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
             <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
               <div className="relative">
-                <Input
+                <Input rounded="[2px]"
                   value={formOwnerId ? formOwnerName : searchKeyword}
                   onChange={(e) => {
                     setSearchKeyword(e.target.value)
@@ -453,7 +453,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formActivityMode}
               options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
               onChange={setFormActivityMode}
@@ -461,27 +461,27 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
-            <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
+            <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">时间</span>
             <div className="flex items-center gap-2">
-              <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
               <span className="text-[12px] text-[#8f959e]">至</span>
-              <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={spaceId}
                 options={spaces.map(s => ({value: s.id, label: s.name}))}
                 placeholder="选择空间"
                 onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
               />
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={roomId}
                 options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
@@ -493,7 +493,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formActivityMode}
               options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
               onChange={setFormActivityMode}
@@ -503,7 +503,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
             <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
             <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
               <div className="relative">
-                <Input
+                <Input rounded="[2px]"
                   value={formOwnerId ? formOwnerName : searchKeyword}
                   onChange={(e) => {
                     setSearchKeyword(e.target.value)
@@ -697,27 +697,27 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
-            <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
+            <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">时间</span>
             <div className="flex items-center gap-2">
-              <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
               <span className="text-[12px] text-[#8f959e]">至</span>
-              <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={spaceId}
                 options={spaces.map(s => ({value: s.id, label: s.name}))}
                 placeholder="选择空间"
                 onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
               />
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={roomId}
                 options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
@@ -729,7 +729,7 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formActivityMode}
               options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
               onChange={setFormActivityMode}
@@ -739,7 +739,7 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
             <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
             <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
               <div className="relative">
-                <Input
+                <Input rounded="[2px]"
                   value={formOwnerId ? formOwnerName : searchKeyword}
                   onChange={(e) => {
                     setSearchKeyword(e.target.value)
@@ -993,27 +993,27 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
-            <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
+            <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">时间</span>
             <div className="flex items-center gap-2">
-              <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
               <span className="text-[12px] text-[#8f959e]">至</span>
-              <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={spaceId}
                 options={spaces.map(s => ({value: s.id, label: s.name}))}
                 placeholder="选择空间"
                 onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
               />
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={roomId}
                 options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
@@ -1025,7 +1025,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formActivityMode}
               options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
               onChange={setFormActivityMode}
@@ -1102,7 +1102,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                         <span className="text-[11px] shrink-0">{name}</span>
                         <div className="flex items-center gap-1 shrink-0">
                           <span className="text-[11px] text-[#8f959e]">部位数</span>
-                          <Input
+                          <Input rounded="[2px]"
                             type="number"
                             min={1}
                             value={formOwnerDescriptions[i]?.count ?? 1}
@@ -1115,7 +1115,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                             className="w-[30px] h-7 text-[11px] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </div>
-                        <Input
+                        <Input rounded="[2px]"
                           placeholder="情况介绍..."
                           value={formOwnerDescriptions[i]?.description || ""}
                           onChange={(e) => {
@@ -1137,7 +1137,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
           )}
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right pt-2">能量结老师</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formHostIds}
               options={hostCustomers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
               placeholder="选择能量结老师"
@@ -1170,11 +1170,11 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-3">
               <span className="text-[12px] text-[#8f959e] text-right">购买次数</span>
-              <Input type="number" value={purchaseCount} onChange={(e) => setPurchaseCount(e.target.value)} className="h-8 text-[12px]" min="1" />
+              <Input rounded="[2px]" type="number" value={purchaseCount} onChange={(e) => setPurchaseCount(e.target.value)} className="h-8 text-[12px]" min="1" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-3">
               <span className="text-[12px] text-[#8f959e] text-right">金额</span>
-              <Input type="number" value={purchaseAmount} onChange={(e) => setPurchaseAmount(e.target.value)} className="h-8 text-[12px]" placeholder="可选" />
+              <Input rounded="[2px]" type="number" value={purchaseAmount} onChange={(e) => setPurchaseAmount(e.target.value)} className="h-8 text-[12px]" placeholder="可选" />
             </div>
           </div>
           <div className="flex justify-end gap-2 px-6 pb-5 pt-2">
@@ -1273,27 +1273,27 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
-            <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
+            <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">时间</span>
             <div className="flex items-center gap-2">
-              <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
               <span className="text-[12px] text-[#8f959e]">至</span>
-              <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={spaceId}
                 options={spaces.map(s => ({value: s.id, label: s.name}))}
                 placeholder="选择空间"
                 onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
               />
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={roomId}
                 options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
@@ -1305,7 +1305,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程类型</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formCourseType}
               options={ICS_COURSE_TYPES.map(t => ({value: t, label: ICS_COURSE_LABELS[t] || t}))}
               onChange={(v) => setFormCourseType(v)}
@@ -1313,11 +1313,11 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程名称</span>
-            <Input value={formCourseName} onChange={(e) => setFormCourseName(e.target.value)} className="h-8 text-[12px]" placeholder="输入课程名称" />
+            <Input rounded="[2px]" value={formCourseName} onChange={(e) => setFormCourseName(e.target.value)} className="h-8 text-[12px]" placeholder="输入课程名称" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formActivityMode}
               options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
               onChange={setFormActivityMode}
@@ -1325,7 +1325,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程老师</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formHostId}
               options={teachers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
               placeholder="选择老师"
@@ -1443,27 +1443,27 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">日期</span>
-            <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
+            <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">时间</span>
             <div className="flex items-center gap-2">
-              <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
               <span className="text-[12px] text-[#8f959e]">至</span>
-              <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
+              <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
             </div>
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">空间</span>
             <div className="flex items-center gap-2">
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={spaceId}
                 options={spaces.map(s => ({value: s.id, label: s.name}))}
                 placeholder="选择空间"
                 onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
               />
-              <SelectDropdown
+              <SelectDropdown rounded="[2px]"
                 className="w-[122px]"
                 value={roomId}
                 options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
@@ -1475,7 +1475,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">课程</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formCourseId}
               options={courses.map(c => ({value: c.id, label: c.name}))}
               placeholder="选择课程"
@@ -1484,7 +1484,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formActivityMode}
               options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
               onChange={setFormActivityMode}
@@ -1492,7 +1492,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
           </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right pt-2">老师</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formTeacherIds}
               options={teachers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
               placeholder="选择老师"
@@ -1504,7 +1504,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right">公益</span>
-            <SelectDropdown
+            <SelectDropdown rounded="[2px]"
               value={formIsPublicWelfare ? "true" : "false"}
               options={[{value: "false", label: "否"}, {value: "true", label: "是"}]}
               onChange={(v) => setFormIsPublicWelfare(v === "true")}
@@ -1705,7 +1705,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
           </div>
           <div className="grid grid-cols-[80px_1fr] items-center gap-3">
             <span className="text-[12px] text-[#8f959e] text-right font-light">周主题</span>
-            <Input
+            <Input rounded="[2px]"
               value={weekTheme}
               onChange={(e) => setWeekTheme(e.target.value)}
               placeholder="输入本周主题"
@@ -1720,7 +1720,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
                   <span className="text-[12px] text-[#8f959e] text-right font-light">
                     {day.date.split("-").slice(1).join("/")} 周{day.weekday}
                   </span>
-                  <Input
+                  <Input rounded="[2px]"
                     value={dayThemes[day.date] || ""}
                     onChange={(e) => setDayThemes(prev => ({ ...prev, [day.date]: e.target.value }))}
                     placeholder="输入每日主题"
@@ -2706,14 +2706,14 @@ export default function DailyActivitiesPage() {
         </div>
 
         {/* 周视图日历 */}
-        {calendarVisible && <div className="border-[3px] border-[#f5f5f5] rounded-[2px] overflow-x-auto">
+        {calendarVisible && <div className="border-[3px] border-[#f7f8fa] rounded-[2px] overflow-x-auto">
           <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%" }}>
             <colgroup>
               <col style={{ width: "80px" }} />
               {Array.from({ length: 7 }, (_, i) => <col key={i} style={{ width: `${(100 - 13.33) / 7}%` }} />)}
             </colgroup>
             <thead>
-              <tr className="bg-[#f5f6f7]">
+              <tr className="bg-[#f7f8fa]">
                 <th className="px-2 py-1.5 text-center text-[12px] text-[#8f959e] font-normal" style={{ borderRight: "0.5px solid #f0f0f0" }}>周主题</th>
                 {["一", "二", "三", "四", "五", "六", "日"].map(d => (
                   <th key={d} className="px-1 py-1.5 text-center text-[11px] text-[#8f959e] font-normal">{d}</th>
@@ -2742,10 +2742,10 @@ export default function DailyActivitiesPage() {
                       return (
                         <td
                           key={`date-${day.date}`}
-                          className={`px-1 text-center text-[8px] cursor-pointer transition-colors ${
+                          className={`px-1 text-center text-[10px] cursor-pointer transition-colors ${
                             !day.inMonth ? "bg-[#fdfdfd]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "bg-[#fdfdfd] text-[#b0b5bb]"
                           }`}
-                          style={{ height: "12px" }}
+                          style={{ height: "14px" }}
                           onClick={() => day.inMonth && setDetailDate(day.date)}
                         >
                           {day.inMonth ? <div className="relative w-full h-full flex flex-col items-center justify-center"><span className={`${(calendarCounts[day.date] || 0) > 0 ? "text-[#2b2f36]" : "text-[#b0b5bb]"}`}>{dayNum}</span></div> : ""}
@@ -2765,7 +2765,7 @@ export default function DailyActivitiesPage() {
                           className={`px-1 text-center text-[12px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap ${
                             !day.inMonth ? "" : ""
                           }`}
-                          style={{ height: "30px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
+                          style={{ height: "20px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
                           onClick={() => day.inMonth && setDetailDate(day.date)}
                         >
                           {day.inMonth ? (dayTheme || "") : ""}

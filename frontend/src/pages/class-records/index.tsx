@@ -263,7 +263,7 @@ export default function ClassRecordsPage() {
               <div className="divide-y divide-[#f0f0f0]">
                 {activityList.map((a, i) => (
                   <div key={i} className="flex items-center gap-2 py-2">
-                    <span className="text-[11px] text-[#8f959e] bg-[#f5f6f7] px-1.5 py-0.5 rounded shrink-0">{a.type}</span>
+                    <span className="text-[11px] text-[#8f959e] bg-[#f5f6f8] px-1.5 py-0.5 rounded shrink-0">{a.type}</span>
                     <span className="text-[12px] text-[#2b2f36] shrink-0">{a.name}</span>
                     {a.teacher && <span className="text-[11px] text-[#8f959e] bg-[#f7f8f9] px-1.5 py-0.5 rounded shrink-0">{a.teacher}</span>}
                     <span className="text-[12px] text-[#8f959e] shrink-0 ml-auto">{a.role}</span>

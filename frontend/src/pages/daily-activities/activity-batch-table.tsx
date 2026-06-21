@@ -978,7 +978,7 @@ export function ActivityBatchTable({
         <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
-            <tr className="bg-[#f5f7fa] text-[#8f959e]">
+            <tr className="bg-[#f7f8fa] text-[#8f959e]">
               <th className="w-[24px]"></th>
               <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
               <th className="px-1 py-2 text-left font-normal w-[122px]">时间</th>
@@ -991,7 +991,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
               <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
               <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f5f7fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -1056,7 +1056,7 @@ export function ActivityBatchTable({
 
                   {/* 类型 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "record_type") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <SelectDropdown
+                    <SelectDropdown rounded="[2px]"
                       size="sm"
                       value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
                       options={typeOptions}
@@ -1070,7 +1070,7 @@ export function ActivityBatchTable({
                   {/* 活动名称 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "name") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {["class", "ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
-                      <Input
+                      <Input rounded="[2px]"
                         value={row.name}
                         onChange={(e) => updateRow(row.key, "name", e.target.value)}
                         placeholder=""
@@ -1084,7 +1084,7 @@ export function ActivityBatchTable({
                   {/* 案主 */}
                   {hasOwnerType && <td className={`pl-1.5 pr-0 py-0.5 w-[60px] align-top ${isCellChanged(row.key, "owner_name") || isCellChanged(row.key, "owner_id") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {(row.record_type === "gcs" || row.record_type === "ers" || row.record_type === "ocr") ? (
-                      <CustomerSearchInput
+                      <CustomerSearchInput rounded="2px"
                         customers={customers}
                         value={row.owner_name || ""}
                         showClear={false}
@@ -1117,7 +1117,7 @@ export function ActivityBatchTable({
                       />
                     ) : row.record_type === "eks" ? (
                       <div className="flex items-center gap-1 min-w-0">
-                        <CustomerSearchInput
+                        <CustomerSearchInput rounded="2px"
                           customers={customers}
                           value={row.owner_name || ""}
                           showClear={false}
@@ -1225,7 +1225,7 @@ export function ActivityBatchTable({
 
                   {/* 活动方式 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "activity_mode") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <SelectDropdown
+                    <SelectDropdown rounded="[2px]"
                       size="sm"
                       value={row.activity_mode || "线下"}
                       options={ACTIVITY_MODE_OPTIONS}
@@ -1237,7 +1237,7 @@ export function ActivityBatchTable({
 
                   {/* 老师 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "host_names") || isCellChanged(row.key, "host_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <CustomerSearchInput
+                    <CustomerSearchInput rounded="2px"
                       multi
                       customers={customers}
                       value={getHostDisplay(row)}
@@ -1263,7 +1263,7 @@ export function ActivityBatchTable({
                   {/* 活动简介 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {row.record_type === "eks" ? null : (
-                      <Input
+                      <Input rounded="[2px]"
                         value={row.description}
                         onChange={(e) => updateRow(row.key, "description", e.target.value)}
                         placeholder=""

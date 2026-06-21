@@ -374,15 +374,15 @@ export function useClassRecordDialogs({
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">日期</span>
-              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+              <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
             </div>
 
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时间段</span>
               <div className="flex items-center gap-2">
-                <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-xs flex-1" />
                 <span className="text-[12px] text-[#4e535a]">至</span>
-                <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
+                <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-xs flex-1" />
               </div>
             </div>
 
@@ -461,6 +461,7 @@ export function useClassRecordDialogs({
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">是否公益</span>
               <div className="relative">
                 <SelectDropdown
+                  rounded="[2px]"
                   value={formIsPublicWelfare ? "1" : "0"}
                   options={[{value: "0", label: "否"}, {value: "1", label: "是"}]}
                   onChange={(v) => setFormIsPublicWelfare(v === "1")}
@@ -612,6 +613,7 @@ export function useClassRecordDialogs({
                       <div className="px-3 py-2 border-b border-[#f0f0f0] flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Input
+                            rounded="[2px]"
                             value={group.name}
                             onChange={(e) => handleGroupNameChange(gi, e.target.value)}
                             onBlur={() => handleSaveGroupName(gi)}
@@ -636,6 +638,7 @@ export function useClassRecordDialogs({
                           ) : (
                             <div className="flex-1 relative">
                               <Input
+                                rounded="[2px]"
                                 value={groupSearchTarget?.groupIndex === gi && groupSearchTarget.role === "leader" ? groupSearchKeyword : ""}
                                 onChange={(e) => handleGroupSearch(e.target.value, gi, "leader")}
                                 placeholder="选择组长"
@@ -667,6 +670,7 @@ export function useClassRecordDialogs({
                           ) : (
                             <div className="flex-1 relative">
                               <Input
+                                rounded="[2px]"
                                 value={groupSearchTarget?.groupIndex === gi && groupSearchTarget.role === "deputy" ? groupSearchKeyword : ""}
                                 onChange={(e) => handleGroupSearch(e.target.value, gi, "deputy")}
                                 placeholder="选择副组长"
@@ -691,6 +695,7 @@ export function useClassRecordDialogs({
                             <span className="text-[12px] text-[#4e535a] shrink-0 w-10">组员</span>
                             <div className="flex-1 relative">
                               <Input
+                                rounded="[2px]"
                                 value={groupSearchTarget?.groupIndex === gi && groupSearchTarget.role === "member" ? groupSearchKeyword : ""}
                                 onChange={(e) => handleGroupSearch(e.target.value, gi, "member")}
                                 placeholder="搜索添加组员"

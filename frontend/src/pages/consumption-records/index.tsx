@@ -87,8 +87,8 @@ export function ConsumptionRecordsContent({ embedded }: { embedded?: boolean }) 
       </div>
 
       {/* 搜索栏 */}
-      <div className="flex items-end gap-3 flex-wrap">
-        <div className="flex items-center h-8 rounded-md border border-input overflow-hidden">
+      <div className="flex items-end gap-3 flex-wrap mt-5">
+        <div className="flex items-center h-8 rounded-[4px] border border-input overflow-hidden">
           <input
             type="date"
             value={dateFrom}
@@ -105,7 +105,7 @@ export function ConsumptionRecordsContent({ embedded }: { embedded?: boolean }) 
         </div>
         <button
           onClick={handleClear}
-          className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
+          className="h-8 px-4 rounded-[4px] border border-input text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
         >
           <X className="h-3.5 w-3.5" />
           清空
@@ -113,11 +113,13 @@ export function ConsumptionRecordsContent({ embedded }: { embedded?: boolean }) 
       </div>
 
       {/* 表格 */}
+      <div className="-mt-2">
       {activeTab === "payment" ? (
         <PaymentTable records={payments.paginatedItems} loading={payments.loading} />
       ) : (
         <DeductionTable records={deductions.paginatedItems} loading={deductions.loading} />
       )}
+      </div>
 
       {/* 分页 */}
       <PaginationBar
