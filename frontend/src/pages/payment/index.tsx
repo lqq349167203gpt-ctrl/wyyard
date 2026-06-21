@@ -8,7 +8,14 @@ const TABS = [
 ]
 
 export default function PaymentPage() {
-  const [activeTab, setActiveTab] = useState("unified")
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem("tab_payment") || "unified" } catch { return "unified" }
+  })
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key)
+    try { localStorage.setItem("tab_payment", key) } catch {}
+  }
 
   return (
     <div className="px-6 pt-4 pb-6 space-y-3">
@@ -24,7 +31,7 @@ export default function PaymentPage() {
                   ? "text-[#3370ff]"
                   : "text-[#2b2f36] hover:text-[#4e535a]"
               }`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
             >
               {tab.label}
               {activeTab === tab.key && (

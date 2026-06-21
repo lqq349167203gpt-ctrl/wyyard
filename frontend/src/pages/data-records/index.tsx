@@ -12,7 +12,14 @@ const TABS = [
 ]
 
 export default function DataRecordsPage() {
-  const [activeTab, setActiveTab] = useState("traffic")
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem("tab_data-records") || "traffic" } catch { return "traffic" }
+  })
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key)
+    try { localStorage.setItem("tab_data-records", key) } catch {}
+  }
 
   return (
     <div className="px-6 pt-4 pb-6 space-y-3">
@@ -26,7 +33,7 @@ export default function DataRecordsPage() {
                   ? "text-[#3370ff]"
                   : "text-[#2b2f36] hover:text-[#4e535a]"
               }`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
             >
               {tab.label}
               {activeTab === tab.key && (

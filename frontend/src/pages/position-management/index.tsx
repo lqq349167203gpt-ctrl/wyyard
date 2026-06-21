@@ -60,7 +60,17 @@ const CUSTOMER_FILTER_PAGES = [
 ]
 
 export default function PositionManagementPage() {
-  const [activeTab, setActiveTab] = useState("accounts")
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem("tab_position-management") || "accounts" } catch { return "accounts" }
+  })
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key)
+    try { localStorage.setItem("tab_position-management", key) } catch {}
+    if (key === "roles" && !selectedPositionId && positions.length > 0) {
+      setSelectedPositionId(positions[0].id)
+    }
+  }
   const [positions, setPositions] = useState<Position[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [permissions, setPermissions] = useState<Record<string, string[]>>({})
@@ -69,7 +79,9 @@ export default function PositionManagementPage() {
   const [loading, setLoading] = useState(true)
 
   // 左侧选中
-  const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null)
+  const [selectedPositionId, setSelectedPositionId] = useState<string | null>(() => {
+    try { return localStorage.getItem("selectedPositionId") || null } catch { return null }
+  })
   // 权限 Tab 切换
   const [permTab, setPermTab] = useState<"page" | "customer">("page")
 
@@ -114,6 +126,13 @@ export default function PositionManagementPage() {
   }
 
   useEffect(() => { loadData() }, [])
+
+  // 持久化选中角色
+  useEffect(() => {
+    if (selectedPositionId) {
+      try { localStorage.setItem("selectedPositionId", selectedPositionId) } catch {}
+    }
+  }, [selectedPositionId])
 
   // 选中角色变化时，加载权限到 form 状态
   useEffect(() => {
@@ -242,7 +261,7 @@ export default function PositionManagementPage() {
                   ? "text-[#3370ff]"
                   : "text-[#2b2f36] hover:text-[#4e535a]"
               }`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
             >
               {tab.label}
               {activeTab === tab.key && (

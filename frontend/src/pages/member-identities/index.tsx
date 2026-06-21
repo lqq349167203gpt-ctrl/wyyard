@@ -69,7 +69,14 @@ function defaultCondition(): IdentityCondition {
 
 export default function MemberIdentitiesPage() {
   const enterToNext = useEnterToNext()
-  const [activeTab, setActiveTab] = useState("identities")
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem("tab_member-identities") || "identities" } catch { return "identities" }
+  })
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key)
+    try { localStorage.setItem("tab_member-identities", key) } catch {}
+  }
   const [identities, setIdentities] = useState<MemberIdentity[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -243,7 +250,7 @@ export default function MemberIdentitiesPage() {
                   ? "text-[#3370ff]"
                   : "text-[#2b2f36] hover:text-[#4e535a]"
               }`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
             >
               {tab.label}
               {activeTab === tab.key && (
