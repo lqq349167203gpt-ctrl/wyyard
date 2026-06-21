@@ -28,7 +28,7 @@ const TYPE_LABELS: Record<string, string> = {
   ocr: "OH卡梳理",
 }
 
-export default function ClassAttendancePage() {
+export function ClassAttendanceContent({ embedded }: { embedded?: boolean }) {
   // 筛选
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -101,7 +101,7 @@ export default function ClassAttendancePage() {
   const hasFilters = startDate || endDate || activityType || teacherId
 
   return (
-    <div className="px-6 pt-4 pb-6 space-y-3">
+    <div className={embedded ? "space-y-3" : "px-6 pt-4 pb-6 space-y-3"}>
       {/* 筛选栏 */}
       <div className="bg-white rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
         <div className="w-[160px]">
@@ -190,4 +190,8 @@ export default function ClassAttendancePage() {
       </div>
     </div>
   )
+}
+
+export default function ClassAttendancePage() {
+  return <ClassAttendanceContent />
 }

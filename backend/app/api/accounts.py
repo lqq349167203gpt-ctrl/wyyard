@@ -41,8 +41,7 @@ async def create_account(data: AccountCreate):
 
 ALL_PAGE_KEYS = [
     # 业务数据
-    "business-reminders", "traffic-records", "activity-records",
-    "consumption-records", "class-attendance",
+    "business-reminders", "data-records",
     # 疗愈活动
     "healing-records", "class-records-visitors", "class-records-activities",
     "class-records-arrival", "class-records", "daily-activities",

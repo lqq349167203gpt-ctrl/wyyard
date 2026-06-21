@@ -16,10 +16,7 @@ import { AccountsContent } from "@/pages/accounts"
 const ALL_PAGES = [
   // 业务数据
   { key: "business-reminders", label: "业务提醒" },
-  { key: "traffic-records", label: "引流记录" },
-  { key: "activity-records", label: "活动记录" },
-  { key: "consumption-records", label: "消费记录" },
-  { key: "class-attendance", label: "上课记录" },
+  { key: "data-records", label: "数据记录" },
   // 疗愈活动
   { key: "healing-records", label: "客户信息" },
   { key: "class-records", label: "人员安排" },
@@ -50,7 +47,7 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "业务数据", keys: ["business-reminders", "traffic-records", "activity-records", "consumption-records", "class-attendance"] },
+  { label: "业务数据", keys: ["business-reminders", "data-records"] },
   { label: "疗愈活动", keys: ["healing-records", "class-records", "daily-activities"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },

@@ -32,7 +32,7 @@ function getDetailLabel(source: string) {
   return ""
 }
 
-export default function TrafficRecordsPage() {
+export function TrafficRecordsContent({ embedded }: { embedded?: boolean }) {
   const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
   const [loading, setLoading] = useState(true)
   const retryRef = useRef(0)
@@ -96,11 +96,13 @@ export default function TrafficRecordsPage() {
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(customers)
 
   return (
-    <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-lg font-semibold">引流记录</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">共 {customers.length} 条引流记录</p>
-      </div>
+    <div className={embedded ? "space-y-5" : "p-6 space-y-5"}>
+      {!embedded && (
+        <div>
+          <h1 className="text-lg font-semibold">引流记录</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">共 {customers.length} 条引流记录</p>
+        </div>
+      )}
 
       {/* 搜索栏 */}
       <div className="flex items-end gap-3 flex-wrap">
@@ -209,4 +211,8 @@ export default function TrafficRecordsPage() {
       )}
     </div>
   )
+}
+
+export default function TrafficRecordsPage() {
+  return <TrafficRecordsContent />
 }

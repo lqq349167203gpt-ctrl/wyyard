@@ -45,7 +45,7 @@ function getIcsLabel(courseType: string): string {
   return ""
 }
 
-export default function ActivityRecordsPage() {
+export function ActivityRecordsContent({ embedded }: { embedded?: boolean }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -132,7 +132,7 @@ export default function ActivityRecordsPage() {
   }
 
   return (
-    <div className="px-6 pt-4 pb-6 space-y-4">
+    <div className={embedded ? "space-y-4" : "px-6 pt-4 pb-6 space-y-4"}>
       {/* 月份导航 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -350,4 +350,8 @@ function ActivityCard({ record, getName }: { record: UnifiedRecord; getName: (id
       )}
     </div>
   )
+}
+
+export default function ActivityRecordsPage() {
+  return <ActivityRecordsContent />
 }

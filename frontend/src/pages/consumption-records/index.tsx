@@ -9,7 +9,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 
 const PAGE_SIZE = 20
 
-export default function ConsumptionRecordsPage() {
+export function ConsumptionRecordsContent({ embedded }: { embedded?: boolean }) {
   const [activeTab, setActiveTab] = useState<"payment" | "deduction">("payment")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
@@ -61,7 +61,7 @@ export default function ConsumptionRecordsPage() {
   const current = activeTab === "payment" ? payments : deductions
 
   return (
-    <div className="px-6 pt-4 pb-6 space-y-3">
+    <div className={embedded ? "space-y-3" : "px-6 pt-4 pb-6 space-y-3"}>
       {/* Tab 切换 */}
       <div className="flex items-center border-b border-[#e8e8e8] -mx-6 px-6 min-h-[39px]">
         <div className="flex items-center gap-6">
@@ -216,4 +216,8 @@ function DeductionTable({ records, loading }: { records: DeductionRecord[]; load
       </TableBody>
     </Table>
   )
+}
+
+export default function ConsumptionRecordsPage() {
+  return <ConsumptionRecordsContent />
 }

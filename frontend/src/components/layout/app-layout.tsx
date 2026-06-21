@@ -30,10 +30,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/courses/spaces": "无忧 - 疗愈空间",
   "/healing-identities": "无忧 - 疗愈老师",
   "/operation-logs": "无忧 - 操作日志",
-  "/traffic-records": "无忧 - 引流记录",
+  "/data-records": "无忧 - 数据记录",
   "/chat-history": "无忧 - 沟通记录",
-  "/consumption-records": "无忧 - 消费记录",
-  "/class-attendance": "无忧 - 上课记录",
 }
 
 export function AppLayout() {
@@ -78,7 +76,7 @@ export function AppLayout() {
               <span className="text-xs text-[#8f959e]">{ownerName}</span>
             )}
             <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e] font-normal" onClick={() => setHelperOpen(true)}>
-              茶苑助手
+              助手
             </Button>
             <Button variant="ghost" size="sm" className="h-8 text-xs text-[#8f959e] font-normal" onClick={handleLogout}>
               <LogOut className="h-3.5 w-3.5 mr-1.5" /> 退出登录
@@ -94,7 +92,7 @@ export function AppLayout() {
         <SheetContent side="right" className="p-0 sm:max-w-sm" showCloseButton={false}>
           <SheetHeader className="px-4 py-3 border-b flex flex-row items-center justify-between space-y-0">
             <SheetTitle className="text-sm">
-              茶苑助手
+              助手
             </SheetTitle>
             <Button variant="ghost" size="icon-sm" onClick={() => setHelperOpen(false)} className="h-6 w-6">
               <span className="text-xs text-[#8f959e]">✕</span>
