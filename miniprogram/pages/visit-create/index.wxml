@@ -1,0 +1,76 @@
+<view class="container">
+  <!-- 时间地点 -->
+  <view class="form-card">
+    <view class="form-card-title">时间地点</view>
+    <view class="form-item" wx:if="{{spaces.length > 0}}">
+      <text class="form-label">空间</text>
+      <picker class="form-picker" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <view class="picker-display">{{spaces[spaceIndex].name || '选择空间'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">日期</text>
+      <picker class="form-picker" mode="date" value="{{date}}" bindchange="onDateChange">
+        <view class="picker-display">{{date}}</view>
+      </picker>
+    </view>
+    <view class="form-item last">
+      <text class="form-label">时间</text>
+      <picker class="form-picker" mode="time" value="{{time}}" bindchange="onTimeChange">
+        <view class="picker-display">{{time}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 基本信息 -->
+  <view class="form-card">
+    <view class="form-card-title">基本信息</view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="customer">
+      <text class="form-label">客户</text>
+      <view class="picker-value-wrap">
+        <text class="{{customerName ? '' : 'placeholder'}}">{{customerName || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{customerName}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
+    </view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="referrerHandler">
+      <text class="form-label">邀约人</text>
+      <view class="picker-value-wrap">
+        <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{referrerHandler}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
+      </view>
+    </view>
+    <view class="form-item">
+      <text class="form-label">组长</text>
+      <switch checked="{{isLeader}}" bindchange="onLeaderChange" color="#3370ff" />
+    </view>
+    <view class="form-item column last">
+      <text class="form-label" style="margin-bottom: 16rpx;">本次需求</text>
+      <textarea class="form-textarea" style="min-height: 180rpx;height:180rpx;" placeholder="描述客户需求" placeholder-class="form-textarea-placeholder" value="{{needs}}" bindinput="onNeedsInput" />
+    </view>
+  </view>
+
+  <!-- 搜索选择弹窗 -->
+  <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
+  <view class="picker-popup" wx:if="{{showPicker}}">
+    <view class="picker-header">
+      <text class="picker-title">选择{{pickerTitle}}</text>
+      <text class="picker-close" bindtap="onPickerClose">关闭</text>
+    </view>
+    <view class="picker-search">
+      <input class="picker-search-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+    </view>
+    <scroll-view class="picker-list" scroll-y>
+      <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
+        <text class="picker-item-name">{{item.nickname}}</text>
+        <text class="picker-item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
+      </view>
+      <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
+        <text>无匹配用户</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
+    提交
+  </button>
+</view>

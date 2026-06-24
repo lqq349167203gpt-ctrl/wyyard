@@ -1,0 +1,44 @@
+.container {
+  padding: 24rpx 32rpx;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.info-row {
+  display: flex;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 28rpx;
+  color: #8f959e;
+  width: 140rpx;
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-size: 28rpx;
+  color: #1f2329;
+  flex: 1;
+}
+
+.submit-btn {
+  margin-top: 48rpx;
+  width: 100%;
+}
+
+/* 每组最后一个输入框去掉下划线 */
+.form-item.last {
+  border-bottom: none;
+}
+
+/* 调整 switch 高度与其他输入框一致 */
+.form-item switch {
+  transform: scale(0.7);
+  margin-right: -10rpx;
+}

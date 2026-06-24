@@ -1,0 +1,43 @@
+<view class="picker">
+  <!-- 已选中客户 -->
+  <view class="selected" wx:if="{{value}}">
+    <text class="selected-name">{{value.nickname}}</text>
+    <text class="selected-type" wx:if="{{value.member_type}}">{{value.member_type}}</text>
+    <text class="selected-count" wx:if="{{value.visit_count}}">第{{value.visit_count}}次</text>
+    <view class="clear-btn" bindtap="onClear">✕</view>
+  </view>
+
+  <!-- 搜索输入 -->
+  <view class="search-box" wx:if="{{!value}}">
+    <input
+      class="search-input"
+      placeholder="搜索客户昵称"
+      value="{{keyword}}"
+      bindinput="onInput"
+      bindfocus="onFocus"
+      bindblur="onBlur"
+      confirm-type="search"
+    />
+  </view>
+
+  <!-- 搜索结果下拉 -->
+  <view class="dropdown" wx:if="{{showDropdown && (results.length > 0 || searching)}}">
+    <view class="dropdown-loading" wx:if="{{searching}}">
+      <text>搜索中...</text>
+    </view>
+    <view
+      wx:for="{{results}}"
+      wx:key="id"
+      class="dropdown-item"
+      bindtap="onSelect"
+      data-customer="{{item}}"
+    >
+      <text class="item-name">{{item.nickname}}</text>
+      <text class="item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
+      <text class="item-count" wx:if="{{item.visit_count}}">{{item.visit_count}}次</text>
+    </view>
+    <view class="dropdown-empty" wx:if="{{!searching && results.length === 0}}">
+      <text>无匹配结果</text>
+    </view>
+  </view>
+</view>

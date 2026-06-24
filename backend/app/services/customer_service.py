@@ -41,6 +41,14 @@ def get_customer(customer_id: str) -> Optional[Customer]:
     return customer
 
 
+def get_by_phone(phone: str) -> Optional[Customer]:
+    """按手机号查找客户"""
+    for customer in _customers.values():
+        if customer.phone == phone and not customer.is_deleted:
+            return customer
+    return None
+
+
 def create_customer(data: CustomerCreate) -> Customer:
     # 检查昵称和微信号唯一性
     for c in _customers.values():

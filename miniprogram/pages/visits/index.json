@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "邀约",
+  "usingComponents": {
+    "visit-card": "/components/visit-card/index"
+  },
+  "enablePullDownRefresh": true
+}

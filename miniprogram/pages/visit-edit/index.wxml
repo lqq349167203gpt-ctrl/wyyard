@@ -1,0 +1,66 @@
+<view class="container" wx:if="{{!loading}}">
+  <!-- 基本信息（只读） -->
+  <view class="form-card">
+    <view class="form-card-title">基本信息</view>
+    <view class="info-row">
+      <text class="info-label">昵称</text>
+      <text class="info-value">{{visit.nickname}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">身份</text>
+      <text class="info-value">{{visit.member_type || '-'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">时间</text>
+      <text class="info-value">{{visit.visit_time}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">到访次数</text>
+      <text class="info-value">第{{visit.visit_count || 0}}次</text>
+    </view>
+  </view>
+
+  <!-- 到场确认 -->
+  <view class="form-card">
+    <view class="form-card-title">到场确认</view>
+    <view class="form-item {{arrived ? '' : 'last'}}">
+      <text class="form-label">已到场</text>
+      <switch checked="{{arrived}}" bindchange="onArrivedChange" color="#3370ff" />
+    </view>
+    <view class="form-item last" wx:if="{{arrived}}">
+      <text class="form-label">到达时间</text>
+      <picker mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
+        <text class="form-input">{{arrivalTime || '选择时间'}}</text>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 编辑字段 -->
+  <view class="form-card">
+    <view class="form-card-title">记录</view>
+    <view class="form-item column">
+      <text class="form-label" style="margin-bottom: 16rpx;">本次需求</text>
+      <textarea class="form-textarea" value="{{needs}}" bindinput="onNeedsInput" placeholder="客户需求" placeholder-class="form-textarea-placeholder" />
+    </view>
+    <view class="form-item column">
+      <text class="form-label" style="margin-bottom: 16rpx;">客户体验</text>
+      <textarea class="form-textarea" value="{{feedback}}" bindinput="onFeedbackInput" placeholder="客户体验反馈" placeholder-class="form-textarea-placeholder" />
+    </view>
+    <view class="form-item column">
+      <text class="form-label" style="margin-bottom: 16rpx;">跟进记录</text>
+      <textarea class="form-textarea" value="{{healingNotes}}" bindinput="onHealingNotesInput" placeholder="跟进记录" placeholder-class="form-textarea-placeholder" />
+    </view>
+    <view class="form-item column last">
+      <text class="form-label" style="margin-bottom: 16rpx;">组长反馈</text>
+      <textarea class="form-textarea" value="{{groupLeaderFeedback}}" bindinput="onGroupLeaderFeedbackInput" placeholder="组长反馈" placeholder-class="form-textarea-placeholder" />
+    </view>
+  </view>
+
+  <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
+    保存
+  </button>
+</view>
+
+<view class="loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>

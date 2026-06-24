@@ -143,6 +143,22 @@ def login(username: str, password: str) -> Optional[Account]:
     return None
 
 
+def get_by_owner(owner: str) -> Optional[Account]:
+    """按归属人查找账号"""
+    for account in _accounts.values():
+        if account.owner == owner and not account.is_deleted and account.enabled:
+            return account
+    return None
+
+
+def get_by_username(username: str) -> Optional[Account]:
+    """按用户名查找账号"""
+    for account in _accounts.values():
+        if account.username == username and not account.is_deleted:
+            return account
+    return None
+
+
 def change_password(account_id: str, old_password: str, new_password: str) -> bool:
     account = _accounts.get(account_id)
     if not account:

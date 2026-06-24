@@ -6,7 +6,7 @@ from typing import Optional, List, Dict
 logger = logging.getLogger(__name__)
 
 from app.models.visit import VisitRecord, VisitRecordCreate, CustomerSearchResult, ActivityInfo
-from app.services.customer_service import list_customers
+from app.services.customer_service import list_customers, get_customer
 from app.services.storage import load_data, save_data, save_item, delete_item
 
 FILENAME = "visits.json"
@@ -36,6 +36,12 @@ def count_customer_visits(customer_id: str) -> int:
     """统计某个客户的到访天数（同一天只算一次，仅计已到店）"""
     dates = {v.visit_date for v in _visits.values() if v.customer_id == customer_id and v.arrived}
     return len(dates)
+
+
+def get_last_visit_date(customer_id: str) -> str:
+    """获取客户最近一次到店日期"""
+    dates = [v.visit_date for v in _visits.values() if v.customer_id == customer_id and v.arrived]
+    return max(dates) if dates else ""
 
 
 def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> List[ActivityInfo]:
@@ -340,6 +346,10 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
 
     for r in records:
         r.visit_count = count_customer_visits(r.customer_id)
+        if not r.member_type:
+            customer = get_customer(r.customer_id)
+            if customer:
+                r.member_type = customer.member_type or ""
         r.activity_count = all_activity_counts.get(r.customer_id, 0)
         r.welfare_count = all_welfare_counts.get(r.customer_id, 0)
         # 会员活动剩余次数

@@ -323,8 +323,8 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         "eks_sessions": records_eks,
         "ics_sessions": records_ics,
         "ocr_sessions": records_ocr,
-        "visits": visit_service.list_visits(date),
-        "visit_counts": visit_service.get_date_counts(start_date=start_date, end_date=end_date),
+        "visits": visit_service.list_visits(date, space_id=space_id if space_id else None),
+        "visit_counts": visit_service.get_date_counts(start_date=start_date, end_date=end_date, space_id=space_id if space_id else None),
         "calendar_counts": dict(cal_counts),
         "groupings": daily_grouping_service.get_grouping(date) or {"date": date, "groups": []},
     }

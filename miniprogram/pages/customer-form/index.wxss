@@ -1,0 +1,154 @@
+.container {
+  padding: 24rpx 32rpx;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.form-label.required::before {
+  content: '*';
+  color: #f54a45;
+  margin-right: 4rpx;
+}
+
+.placeholder {
+  color: #b0b5bb;
+}
+
+.picker-display.placeholder {
+  color: #b0b5bb;
+}
+
+.form-picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-display {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2329;
+}
+
+.submit-btn {
+  margin-top: 48rpx;
+  width: 100%;
+}
+
+/* 搜索选择 */
+.picker-value-wrap {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-clear {
+  font-size: 30rpx;
+  color: #b0b5bb;
+  padding: 8rpx 16rpx;
+  flex-shrink: 0;
+}
+
+/* 弹窗 */
+.picker-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.picker-popup {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.picker-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.picker-close {
+  font-size: 28rpx;
+  color: #8f959e;
+  padding: 8rpx;
+}
+
+.picker-search {
+  padding: 16rpx 32rpx;
+}
+
+.picker-search-input {
+  height: 72rpx;
+  background-color: #f2f3f5;
+  border-radius: 36rpx;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+}
+
+.picker-list {
+  flex: 1;
+  max-height: 60vh;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f5f6f7;
+}
+
+.picker-item:active {
+  background-color: #f7f8fa;
+}
+
+.picker-item-name {
+  font-size: 30rpx;
+  color: #1f2329;
+}
+
+.picker-item-type {
+  font-size: 24rpx;
+  color: #8f959e;
+  background-color: #f0f1f2;
+  padding: 4rpx 12rpx;
+  border-radius: 4rpx;
+}
+
+.form-textarea.short {
+  min-height: 120rpx;
+  height: 120rpx;
+}
+
+.picker-empty {
+  display: flex;
+  justify-content: center;
+  padding: 80rpx 0;
+  color: #b0b5bb;
+  font-size: 28rpx;
+}
+
+/* 每组最后一个输入框去掉下划线 */
+.form-item.last {
+  border-bottom: none;
+}

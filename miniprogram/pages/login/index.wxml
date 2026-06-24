@@ -1,0 +1,55 @@
+<view class="page">
+  <!-- 底图 -->
+  <image class="bg-image" src="/images/3.png" mode="aspectFill" />
+  <view class="bg-mask"></view>
+
+  <!-- 蓝色头部 -->
+  <view class="header">
+    <view class="header-row">
+      <view class="logo-icon">
+        <text class="logo-w">W</text>
+      </view>
+      <text class="logo-text">无忧茶苑管理端</text>
+    </view>
+  </view>
+
+  <!-- 登录卡 -->
+  <view class="login-card">
+    <block wx:if="{{!devMode}}">
+      <button
+        class="phone-btn"
+        style="width: 550rpx;"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onGetPhoneNumber"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+      >
+        本机号一键登录
+      </button>
+      <button class="sms-btn" style="width: 550rpx;" bindtap="onSmsLogin">
+        输入手机号登录
+      </button>
+    </block>
+
+    <block wx:if="{{devMode}}">
+      <text class="dev-title">选择账号登录</text>
+      <picker mode="selector" range="{{devAccounts}}" range-key="label" value="{{devIndex}}" bindchange="onDevAccountChange">
+        <view class="dev-picker">
+          <text>{{devAccounts[devIndex].label}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+      <button class="dev-btn" bindtap="onDevLogin" loading="{{loading}}" disabled="{{loading}}">
+        登录
+      </button>
+    </block>
+
+    <view class="error-msg" wx:if="{{error}}">
+      <text>{{error}}</text>
+    </view>
+  </view>
+
+  <view class="dev-toggle" bindtap="onToggleDev">
+    <text class="dev-toggle-text">{{devMode ? '返回微信登录' : '开发模式'}}</text>
+  </view>
+</view>

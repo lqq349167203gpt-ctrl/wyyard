@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import ListView from "./components/list-view"
 import DetailView from "./components/detail-view"
-import { customerApi, type Customer, type CustomerCreate, type CustomerLight } from "@/lib/api"
+import { customerApi, memberIdentityApi, type Customer, type CustomerCreate, type CustomerLight } from "@/lib/api"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "",
@@ -32,6 +32,7 @@ export default function HealingRecordsPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; nickname: string } | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [customers, setCustomers] = useState<CustomerLight[]>([])
+  const [identityNames, setIdentityNames] = useState<string[]>([])
 
   // 搜索状态
   const [searchNickname, setSearchNickname] = useState("")
@@ -43,11 +44,8 @@ export default function HealingRecordsPage() {
   useEffect(() => {
     customerApi.clearLightCache()
     customerApi.light().then(setCustomers).catch(() => {})
+    memberIdentityApi.list().then(list => setIdentityNames(list.map(i => i.name).reverse())).catch(() => {})
   }, [])
-
-  const identities = useMemo(() =>
-    [...new Set(customers.map(c => c.member_type).filter(Boolean))].sort()
-  , [customers])
 
   const handleClear = () => {
     setSearchNickname("")
@@ -165,7 +163,7 @@ export default function HealingRecordsPage() {
         <SelectDropdown
           className="w-36"
           value={searchIdentity}
-          options={[{value: "", label: "全部身份"}, ...identities.map(id => ({value: id, label: id}))]}
+          options={[{value: "", label: "全部身份"}, ...identityNames.map(id => ({value: id, label: id}))]}
           placeholder="全部身份"
           onChange={(v) => { setSearchIdentity(v); setFilterKey(k => k + 1) }}
         />

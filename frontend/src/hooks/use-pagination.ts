@@ -24,10 +24,6 @@ export function usePagination<T>(
   const totalItems = items.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [items])
-
   const clampedPage = Math.min(currentPage, totalPages)
 
   const paginatedItems = useMemo(() => {

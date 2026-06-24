@@ -1,0 +1,87 @@
+.page {
+  min-height: 100vh;
+  background-color: #f7f8fa;
+}
+
+/* 日期选择 */
+.date-bar {
+  background-color: #ffffff;
+  padding: 24rpx 32rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  position: relative;
+  z-index: 10;
+}
+
+.date-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.date-text {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.date-arrow {
+  font-size: 32rpx;
+  color: #b0b5bb;
+  margin-left: 12rpx;
+}
+
+/* 活动列表 */
+.activity-list {
+  padding: 20rpx 32rpx;
+}
+
+.activity-card {
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  display: flex;
+  overflow: hidden;
+}
+
+.card-left-bar {
+  width: 6rpx;
+  flex-shrink: 0;
+}
+
+.card-body {
+  flex: 1;
+  padding: 24rpx 28rpx;
+  min-width: 0;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.card-time {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
+.card-name {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+  margin-bottom: 12rpx;
+}
+
+.card-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.info-item {
+  font-size: 24rpx;
+  color: #8f959e;
+}

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "今日活动",
+  "usingComponents": {
+    "activity-badge": "/components/activity-badge/index"
+  },
+  "enablePullDownRefresh": true
+}

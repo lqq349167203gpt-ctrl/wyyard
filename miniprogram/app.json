@@ -1,0 +1,46 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/visits/index",
+    "pages/visit-create/index",
+    "pages/visit-edit/index",
+    "pages/visit-detail/index",
+    "pages/activities/index",
+    "pages/customers/index",
+    "pages/customer-form/index",
+    "pages/customer-profile/index",
+    "pages/me/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "无忧茶苑",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f7f8fa"
+  },
+  "tabBar": {
+    "color": "#8f959e",
+    "selectedColor": "#3370ff",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/customers/index",
+        "text": "客户"
+      },
+      {
+        "pagePath": "pages/visits/index",
+        "text": "邀约"
+      },
+      {
+        "pagePath": "pages/activities/index",
+        "text": "活动"
+      },
+      {
+        "pagePath": "pages/me/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

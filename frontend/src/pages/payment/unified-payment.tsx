@@ -311,8 +311,18 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     } else if (config.unlimited) {
       setFormRemainingCount("")
       setFormUnlimited(true)
-      setFormDurationType("month")
-      setFormDurationValue("12")
+      let durType = "month"
+      let durValue = "12"
+      if (config.duration) {
+        const m = config.duration.match(/(\d+)\s*(个月|月)/)
+        if (m) { durValue = m[1] }
+        else {
+          const d = config.duration.match(/(\d+)\s*年/)
+          if (d) { durValue = String(parseInt(d[1]) * 12) }
+        }
+      }
+      setFormDurationType(durType)
+      setFormDurationValue(durValue)
     } else {
       setFormRemainingCount("")
       setFormUnlimited(false)

@@ -68,9 +68,9 @@ def _calc_expiry(effective_date: str, duration_type: Optional[str], duration_val
     except ValueError:
         return None
     if duration_type == "day":
-        end = start + timedelta(days=duration_value)
+        end = start + timedelta(days=duration_value) - timedelta(days=1)
     elif duration_type == "month":
-        end = start + relativedelta(months=duration_value)
+        end = start + relativedelta(months=duration_value) - timedelta(days=1)
     else:
         return None
     return end.strftime("%Y-%m-%d")

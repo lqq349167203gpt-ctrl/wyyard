@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
 
+    # 微信小程序
+    wechat_appid: str = ""
+    wechat_secret: str = ""
+
     # 数据库
     database_url: str = "postgresql://wyyard:FYSTHXQTXQQ3@localhost:5432/wyyard"
 

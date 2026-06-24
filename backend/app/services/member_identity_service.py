@@ -114,7 +114,8 @@ def _get_payment_categories(condition: IdentityCondition) -> list:
         return ["会员活动"]
     if condition.type == "course":
         return ["内部课程"]
-    return condition.payment_categories or []
+    cats = condition.payment_categories or []
+    return ["会员活动" if c == "会员卡" else c for c in cats]
 
 
 def _check_condition(condition, customer_id: str,

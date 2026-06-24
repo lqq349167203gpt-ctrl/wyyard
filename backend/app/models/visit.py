@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime
 from typing import Optional, List
 
@@ -32,6 +32,16 @@ class VisitRecordBase(BaseModel):
     feedback: str = ""  # 客户反馈
     healing_notes: str = ""  # 跟进记录
     group_leader_feedback: str = ""  # 组长反馈
+
+    @field_validator(
+        "visit_time", "member_type", "needs", "referrer_handler",
+        "activity_id", "activity_type", "space_id", "arrival_time",
+        "experience", "feedback", "healing_notes", "group_leader_feedback",
+        mode="before",
+    )
+    @classmethod
+    def none_to_empty_str(cls, v):
+        return v if v is not None else ""
 
 
 class VisitRecordCreate(VisitRecordBase):

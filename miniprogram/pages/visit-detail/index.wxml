@@ -1,0 +1,74 @@
+<view class="container" wx:if="{{!loading && visit}}">
+  <!-- 客户信息卡 -->
+  <view class="profile-card">
+    <view class="profile-header">
+      <text class="nickname" bindtap="onProfileTap">{{visit.nickname}}</text>
+      <text class="member-type" wx:if="{{visit.member_type}}">{{visit.member_type}}</text>
+    </view>
+    <view class="profile-stats">
+      <view class="stat-item">
+        <text class="stat-value">{{visit.visit_count || 0}}</text>
+        <text class="stat-label">到访次数</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{visit.activity_count || 0}}</text>
+        <text class="stat-label">活动次数</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{visit.remaining_count === -999 ? '不限' : (visit.remaining_count || 0)}}</text>
+        <text class="stat-label">剩余次数</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 到场确认 -->
+  <view class="section">
+    <button class="arrival-btn {{visit.arrived ? 'arrived-btn' : ''}}" bindtap="onArrivalToggle">
+      {{visit.arrived ? '已到场' : '确认到场'}}
+    </button>
+    <text class="arrival-time" wx:if="{{visit.arrived && visit.arrival_time}}">
+      到达时间: {{visit.arrival_time}}
+    </text>
+  </view>
+
+  <!-- 今日活动 -->
+  <view class="section" wx:if="{{visit.activities && visit.activities.length > 0}}">
+    <text class="section-title">今日活动</text>
+    <view class="activity-list">
+      <view class="activity-item" wx:for="{{visit.activities}}" wx:key="name">
+        <text class="activity-name">{{item.name}}</text>
+        <text class="activity-role" wx:if="{{item.role}}">{{item.role}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 需求 & 反馈 -->
+  <view class="section" wx:if="{{visit.needs}}">
+    <text class="section-title">本次需求</text>
+    <text class="section-content">{{visit.needs}}</text>
+  </view>
+
+  <view class="section" wx:if="{{visit.feedback}}">
+    <text class="section-title">客户体验</text>
+    <text class="section-content">{{visit.feedback}}</text>
+  </view>
+
+  <view class="section" wx:if="{{visit.healing_notes}}">
+    <text class="section-title">跟进记录</text>
+    <text class="section-content">{{visit.healing_notes}}</text>
+  </view>
+
+  <view class="section" wx:if="{{visit.group_leader_feedback}}">
+    <text class="section-title">组长反馈</text>
+    <text class="section-content">{{visit.group_leader_feedback}}</text>
+  </view>
+
+  <!-- 编辑按钮 -->
+  <view class="bottom-bar">
+    <button class="edit-btn" bindtap="onEditTap">编辑记录</button>
+  </view>
+</view>
+
+<view class="loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>

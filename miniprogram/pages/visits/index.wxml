@@ -1,0 +1,64 @@
+<view class="page">
+  <!-- 日期选择器 -->
+  <scroll-view scroll-x class="date-strip" scroll-left="{{scrollLeft}}">
+    <view class="date-items">
+      <view
+        wx:for="{{weekDates}}"
+        wx:key="date"
+        class="date-item {{item.date === currentDate ? 'active' : ''}} {{item.isToday ? 'today' : ''}}"
+        bindtap="onDateTap"
+        data-date="{{item.date}}"
+      >
+        <text class="date-weekday">{{item.weekday}}</text>
+        <text class="date-day">{{item.day}}</text>
+        <text class="date-count" wx:if="{{item.count > 0}}">{{item.count}}人</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 筛选栏 -->
+  <view class="filter-bar">
+    <picker mode="date" value="{{currentDate}}" bindchange="onDateChange">
+      <view class="date-picker">
+        <text class="date-label">{{currentDateShort}}</text>
+      </view>
+    </picker>
+    <picker mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+      <view class="space-picker">
+        <text class="space-label">{{currentSpaceName}}</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 访客列表 -->
+  <view class="visit-list" wx:if="{{!loading && visits.length > 0}}">
+    <visit-card
+      wx:for="{{visits}}"
+      wx:key="id"
+      visit="{{item}}"
+      bindtap="onVisitTap"
+      data-visit="{{item}}"
+      bind:edit="onEditTap"
+      bind:delete="onDeleteTap"
+      bind:profile="onProfileTap"
+      bind:arrival="onArrivalTap"
+    />
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && visits.length === 0}}">
+    <text class="empty-icon">📋</text>
+    <text class="empty-text">暂无邀约记录</text>
+    <text class="empty-hint">点击右下角 + 添加</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 浮动添加按钮 -->
+  <view class="fab" bindtap="onAddTap">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

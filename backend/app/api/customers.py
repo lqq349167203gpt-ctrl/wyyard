@@ -12,7 +12,7 @@ from app.services import (
     oh_card_reading_service,
     other_project_service,
 )
-from app.services.visit_service import count_customer_visits
+from app.services.visit_service import count_customer_visits, get_last_visit_date
 from app.services.chat_parser import parse_chat_log, generate_tags
 from app.services.excel_parser import parse_excel
 from app.utils.pagination import paginate
@@ -52,10 +52,11 @@ def _fill_total_payment(customer_id: str) -> int:
 
 
 def _fill_visit_count(customer):
-    """填充历史到场次数和消费总额"""
+    """填充历史到场次数、消费总额、最近到店日期"""
     data = customer.model_dump(mode="json")
     data["visit_count"] = count_customer_visits(customer.id)
     data["total_payment"] = _fill_total_payment(customer.id)
+    data["last_visit_date"] = get_last_visit_date(customer.id)
     return data
 
 

@@ -1,0 +1,199 @@
+.card {
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+.card-main {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10rpx;
+}
+
+.name-area {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.nickname {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.member-type {
+  font-size: 22rpx;
+  color: #8f959e;
+  background-color: #f0f1f2;
+  padding: 4rpx 14rpx;
+  border-radius: 6rpx;
+}
+
+.row-bottom {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.remaining {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
+.arrival-badge {
+  font-size: 24rpx;
+  color: #8f959e;
+  border: 1rpx solid #d0d3d6;
+  border-radius: 8rpx;
+  padding: 6rpx 20rpx;
+  margin-right: auto;
+}
+
+.arrival-badge.arrived {
+  color: #3370ff;
+  border-color: #3370ff;
+}
+
+.card-arrow {
+  font-size: 36rpx;
+  color: #d0d3d6;
+  margin-left: 12rpx;
+  flex-shrink: 0;
+}
+
+.card-footer {
+  border-top: 1rpx solid #f0f1f2;
+  padding: 16rpx 32rpx;
+}
+
+.activity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.activity-tag {
+  font-size: 22rpx;
+  color: #4e535a;
+  background-color: #f5f6f7;
+  padding: 6rpx 14rpx;
+  border-radius: 6rpx;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 14rpx 32rpx;
+  border-top: 1rpx solid #f0f1f2;
+}
+
+.action-btn {
+  font-size: 24rpx;
+  padding: 6rpx 12rpx;
+}
+
+.action-divider {
+  width: 1rpx;
+  height: 24rpx;
+  background-color: #e8eaed;
+  margin: 0 8rpx;
+}
+
+.edit-btn {
+  color: #4e535a;
+}
+
+.delete-btn {
+  color: #8f959e;
+}
+
+/* 到场时间弹窗 */
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog-box {
+  width: 560rpx;
+  background-color: #ffffff;
+  border-radius: 24rpx;
+  overflow: hidden;
+}
+
+.dialog-title {
+  font-size: 32rpx;
+  font-weight: 500;
+  color: #1f2329;
+  text-align: center;
+  padding: 40rpx 0 24rpx;
+}
+
+.dialog-body {
+  padding: 0 40rpx 32rpx;
+}
+
+.dialog-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+}
+
+.dialog-label {
+  font-size: 28rpx;
+  color: #4e535a;
+}
+
+.time-picker {
+  font-size: 28rpx;
+  color: #1f2329;
+  background-color: #f2f3f5;
+  padding: 12rpx 24rpx;
+  border-radius: 8rpx;
+}
+
+.dialog-footer {
+  display: flex;
+  border-top: 1rpx solid #f0f1f2;
+}
+
+.dialog-btn {
+  flex: 1;
+  text-align: center;
+  padding: 28rpx 0;
+  font-size: 30rpx;
+}
+
+.dialog-btn.cancel {
+  color: #8f959e;
+  border-right: 1rpx solid #f0f1f2;
+}
+
+.dialog-btn.confirm {
+  color: #3370ff;
+  font-weight: 500;
+}

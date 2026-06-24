@@ -17,7 +17,7 @@ import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { ActivityConfigContent } from "@/pages/activity-config"
 
-const CARD_TYPES = ["次卡", "体验会员", "常规通卡", "半年卡", "年卡"]
+const CARD_TYPES = ["次卡", "体验会员", "月卡", "3月卡", "30次卡", "半年卡", "年卡"]
 const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
 const PAYMENT_CATEGORIES = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "内部课程", "其他项目"]
 
@@ -175,10 +175,10 @@ export default function MemberIdentitiesPage() {
     const temp = reordered[index]
     reordered[index] = reordered[index - 1]
     reordered[index - 1] = temp
+    setIdentities(reordered)
     try {
       await memberIdentityApi.reorder(reordered.map(item => item.id))
-      load()
-    } catch {}
+    } catch { load() }
   }
 
   const handleMoveDown = async (index: number) => {
@@ -187,10 +187,10 @@ export default function MemberIdentitiesPage() {
     const temp = reordered[index]
     reordered[index] = reordered[index + 1]
     reordered[index + 1] = temp
+    setIdentities(reordered)
     try {
       await memberIdentityApi.reorder(reordered.map(item => item.id))
-      load()
-    } catch {}
+    } catch { load() }
   }
 
   const addCondition = () => {

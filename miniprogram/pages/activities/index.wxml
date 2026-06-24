@@ -1,0 +1,41 @@
+<view class="page">
+  <!-- 日期选择 -->
+  <view class="date-bar">
+    <picker mode="date" value="{{date}}" bindchange="onDateChange">
+      <view class="date-picker">
+        <text class="date-text">{{date}}</text>
+        <text class="date-arrow">›</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 活动列表 -->
+  <view class="activity-list" wx:if="{{!loading && records.length > 0}}">
+    <view class="activity-card" wx:for="{{records}}" wx:key="id">
+      <view class="card-left-bar" style="background-color: {{item.color}};"></view>
+      <view class="card-body">
+        <view class="card-header">
+          <activity-badge name="{{item.type}}" type="{{item.type}}" />
+          <text class="card-time" wx:if="{{item.time}}">{{item.time}}</text>
+        </view>
+        <text class="card-name">{{item.name}}</text>
+        <view class="card-info">
+          <text class="info-item" wx:if="{{item.teacher}}">{{item.teacher}}</text>
+          <text class="info-item" wx:if="{{item.participants > 0}}">{{item.participants}}人参与</text>
+          <text class="info-item" wx:if="{{item.space}}">{{item.space}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && records.length === 0}}">
+    <text class="empty-icon">📅</text>
+    <text class="empty-text">当日暂无活动安排</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+</view>

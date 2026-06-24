@@ -1,0 +1,60 @@
+<view class="card" bindtap="onCardTap">
+  <view class="card-main">
+    <view class="card-info">
+      <view class="row-top">
+        <view class="name-area">
+          <text class="nickname">{{visit.nickname}}</text>
+          <text class="member-type" wx:if="{{visit.member_type}}">{{visit.member_type}}</text>
+        </view>
+      </view>
+      <view class="row-bottom">
+        <text class="remaining">{{remainingText}}</text>
+      </view>
+    </view>
+    <view class="card-arrow">›</view>
+  </view>
+
+  <view class="card-footer" wx:if="{{visit.activities && visit.activities.length > 0}}">
+    <view class="activity-tags">
+      <text class="activity-tag" wx:for="{{visit.activities}}" wx:key="name" wx:for-item="act">
+        {{act.name}}
+      </text>
+    </view>
+  </view>
+
+  <view class="card-actions">
+    <view class="arrival-badge {{visit.arrived ? 'arrived' : ''}}" catchtap="{{visit.arrived ? 'onCancelArrival' : 'onArrivalTap'}}">
+      <text>{{visit.arrived ? '已到场' : '未到场'}}</text>
+    </view>
+    <view class="action-btn" catchtap="onProfileTap">
+      <text>资料</text>
+    </view>
+    <view class="action-divider"></view>
+    <view class="action-btn edit-btn" catchtap="onEditTap">
+      <text>编辑</text>
+    </view>
+    <view class="action-divider"></view>
+    <view class="action-btn delete-btn" catchtap="onDeleteTap">
+      <text>删除</text>
+    </view>
+  </view>
+</view>
+
+<!-- 到场时间弹窗 -->
+<view class="dialog-mask" wx:if="{{showArrivalDialog}}" catchtap="onCloseArrivalDialog">
+  <view class="dialog-box" catchtap>
+    <view class="dialog-title">确认到场</view>
+    <view class="dialog-body">
+      <view class="dialog-field">
+        <text class="dialog-label">到场时间</text>
+        <picker mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
+          <view class="time-picker">{{arrivalTime}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="dialog-footer">
+      <view class="dialog-btn cancel" catchtap="onCloseArrivalDialog">取消</view>
+      <view class="dialog-btn confirm" catchtap="onConfirmArrival">确认</view>
+    </view>
+  </view>
+</view>

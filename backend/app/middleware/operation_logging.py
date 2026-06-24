@@ -131,6 +131,7 @@ SKIP_PATHS = [
     "/api/operation-logs",  # 操作日志自身是只读 API，不记录自身操作
     "/api/system-logs",  # 系统日志自身是只读 API，不记录自身操作
     "/api/system-helper",  # 茶苑助手对话不记录操作日志
+    "/api/wechat",  # 微信登录不记录操作日志
 ]
 
 FIELD_NAMES = {
