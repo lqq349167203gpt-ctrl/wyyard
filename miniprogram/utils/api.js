@@ -7,10 +7,11 @@ const BASE_URL = 'http://localhost:8000'
 function request(path, options = {}) {
   return new Promise((resolve, reject) => {
     const token = wx.getStorageSync('auth_token')
-    wx.request({
+    const req = wx.request({
       url: `${BASE_URL}${path}`,
       method: options.method || 'GET',
       data: options.data,
+      timeout: 30000,
       header: {
         'Content-Type': 'application/json',
         'Authorization': token ? `Bearer ${token}` : '',
@@ -51,6 +52,12 @@ const visitApi = {
     if (spaceId) params.push(`space_id=${spaceId}`)
     return request(`/api/visits${params.length ? '?' + params.join('&') : ''}`)
   },
+  listLight: (date, spaceId) => {
+    const params = []
+    if (date) params.push(`date=${date}`)
+    if (spaceId) params.push(`space_id=${spaceId}`)
+    return request(`/api/visits/light${params.length ? '?' + params.join('&') : ''}`)
+  },
   get: (id) => request(`/api/visits/${id}`),
   create: (data) => request('/api/visits', { method: 'POST', data }),
   update: (id, data) => request(`/api/visits/${id}`, { method: 'PATCH', data }),
@@ -72,6 +79,12 @@ const classRecordApi = {
     if (spaceId) params.push(`space_id=${spaceId}`)
     return request(`/api/class-records/dashboard?${params.join('&')}`)
   },
+}
+
+// 分组 API
+const dailyGroupingApi = {
+  get: (date) => request(`/api/daily-groupings?date=${date}`),
+  upsert: (data) => request('/api/daily-groupings', { method: 'PUT', data }),
 }
 
 // 客户 API
@@ -115,4 +128,5 @@ module.exports = {
   spaceApi,
   memberIdentityApi,
   authApi,
+  dailyGroupingApi,
 }

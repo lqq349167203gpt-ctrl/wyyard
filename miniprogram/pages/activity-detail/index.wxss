@@ -1,0 +1,19 @@
+.container {
+  padding: 24rpx 32rpx;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.form-value {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2329;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+}

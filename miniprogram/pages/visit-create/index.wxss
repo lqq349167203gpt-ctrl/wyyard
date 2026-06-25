@@ -8,6 +8,11 @@
   color: #b0b5bb;
 }
 
+/* textarea 行去掉下划线 */
+.form-item.column {
+  border-bottom: none;
+}
+
 .form-picker {
   flex: 1;
   min-width: 0;
@@ -143,6 +148,18 @@
 
 /* 调整 switch 高度与其他输入框一致 */
 .form-item switch {
-  transform: scale(0.7);
+  transform: scale(0.75);
+  transform-origin: left center;
   margin-right: -10rpx;
+}
+
+.form-item.switch-row {
+  padding-top: 14rpx;
+  padding-bottom: 14rpx;
+}
+
+/* 记录区域紧凑间距 */
+.form-item.textarea-row {
+  padding-top: 8rpx;
+  padding-bottom: 8rpx;
 }

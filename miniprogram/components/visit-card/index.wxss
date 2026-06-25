@@ -6,10 +6,42 @@
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
+.card.editing {
+  background-color: #f8f9fa;
+}
+
 .card-main {
   display: flex;
   align-items: center;
   padding: 28rpx 32rpx;
+}
+
+.move-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.move-btn {
+  width: 48rpx;
+  height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f2f3f5;
+  border-radius: 8rpx;
+}
+
+.move-btn text {
+  font-size: 20rpx;
+  color: #4e535a;
+  line-height: 1;
+}
+
+.move-btn.disabled {
+  opacity: 0.3;
 }
 
 .card-info {
@@ -36,18 +68,30 @@
   color: #1f2329;
 }
 
-.member-type {
+.leader-tag {
+  font-size: 22rpx;
+  color: #3370ff;
+}
+
+.member-tag {
   font-size: 22rpx;
   color: #8f959e;
-  background-color: #f0f1f2;
-  padding: 4rpx 14rpx;
-  border-radius: 6rpx;
 }
 
 .row-bottom {
   display: flex;
   align-items: center;
-  gap: 20rpx;
+  gap: 12rpx;
+}
+
+.info-text {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
+.info-sep {
+  font-size: 22rpx;
+  color: #d0d3d6;
 }
 
 .remaining {
@@ -74,25 +118,6 @@
   color: #d0d3d6;
   margin-left: 12rpx;
   flex-shrink: 0;
-}
-
-.card-footer {
-  border-top: 1rpx solid #f0f1f2;
-  padding: 16rpx 32rpx;
-}
-
-.activity-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8rpx;
-}
-
-.activity-tag {
-  font-size: 22rpx;
-  color: #4e535a;
-  background-color: #f5f6f7;
-  padding: 6rpx 14rpx;
-  border-radius: 6rpx;
 }
 
 .card-actions {

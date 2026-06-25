@@ -552,8 +552,14 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       if (g.leader_id) roleMap.set(g.leader_id, "组长")
       if (g.deputy_id) roleMap.set(g.deputy_id, "副组长")
     })
+    // 按表格保存的顺序排序
+    const orderKey = `visit_order_${selectedDate}_${spaceId || ""}`
+    let savedOrder: string[] = []
+    try { savedOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
+    const orderMap = new Map(savedOrder.map((id, i) => [id, i]))
+    const sorted = [...filteredVisits].sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999))
     // 未分组的用 is_leader 字段兜底
-    const rows = filteredVisits.map(v => {
+    const rows = sorted.map(v => {
       const role = roleMap.get(v.customer_id) || (v.is_leader ? "组长" : "")
       return {
         "引流人": customerMap.get(v.customer_id)?.referrer || "-",

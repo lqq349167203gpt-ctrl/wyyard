@@ -1,24 +1,44 @@
-const { classRecordApi } = require('../../utils/api')
-const { formatDate } = require('../../utils/util')
+const { classRecordApi, spaceApi } = require('../../utils/api')
+const { formatDate, getWeekDates } = require('../../utils/util')
 
-const TYPE_COLORS = {
-  '课表': '#4a90d9',
-  '读书会': '#8b72c7',
+// 标签颜色（level-1 标签 + 活动类型）
+const BADGE_COLORS = {
+  '沙龙': '#3370ff',
+  '觉醒': '#7c5cfc',
   '情绪释放': '#d97070',
   '能量结': '#d9944a',
   '内部课程': '#5ba88a',
   'OH卡': '#c772a0',
-  '沙龙': '#bfa060',
+  '读书会': '#3370ff',
+  '呼吸禅茶': '#5ba88a',
+  'AB情景剧': '#d9944a',
+  '沙盘疗愈': '#8b72c7',
+  '身体课': '#d97070',
+  '颂钵': '#c772a0',
+  '艺术疗愈': '#bfa060',
+  '疗愈行业分享会': '#4a90d9',
 }
 
 Page({
   data: {
-    date: formatDate(new Date()),
+    currentDate: formatDate(new Date()),
+    currentDateShort: '',
+    weekDates: [],
+    spaces: [],
+    spaceIndex: 0,
+    spaceId: '',
+    currentSpaceName: '',
     records: [],
     loading: true,
+    scrollLeft: 0,
   },
 
-  onLoad() {
+  async onLoad() {
+    this.setData({
+      weekDates: getWeekDates(new Date()),
+      currentDateShort: this.formatDateShort(new Date()),
+    })
+    await this.loadSpaces()
     this.loadData()
   },
 
@@ -30,105 +50,132 @@ Page({
     this.loadData().then(() => wx.stopPullDownRefresh())
   },
 
+  async loadSpaces() {
+    try {
+      const spaces = await spaceApi.list()
+      if (spaces.length === 0) return
+
+      const savedIndex = wx.getStorageSync('activity_space_index') || 0
+      const spaceIndex = Math.min(savedIndex, spaces.length - 1)
+      const space = spaces[spaceIndex]
+
+      this.setData({
+        spaces,
+        spaceIndex,
+        spaceId: space?.id || '',
+        currentSpaceName: space?.name || '',
+      })
+    } catch (e) {
+      console.error('加载空间失败:', e)
+    }
+  },
+
   async loadData() {
     this.setData({ loading: true })
     try {
-      const dashboard = await classRecordApi.dashboard(this.data.date)
-      // 合并所有活动类型到一个列表
+      const dashboard = await classRecordApi.dashboard(this.data.currentDate, this.data.spaceId || undefined)
       const records = []
 
-      // 课表
+      // 课程活动 — badge: course_type(有则显示) 或 沙龙(兜底), name: course_name
       if (dashboard.class_records) {
         dashboard.class_records.forEach(r => {
+          const badge = r.course_type || '沙龙'
           records.push({
             id: r.id,
-            name: r.course_name,
-            type: '课表',
-            color: TYPE_COLORS['课表'],
+            badge,
+            name: r.course_name || '',
+            color: BADGE_COLORS[badge] || BADGE_COLORS['沙龙'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
+            source: 'class_record',
           })
         })
       }
 
-      // 读书会
-      if (dashboard.group_case_sessions) {
-        dashboard.group_case_sessions.forEach(r => {
+      // 觉醒游戏 — level-1: 觉醒, level-2: owner_name
+      if (dashboard.gcs_sessions) {
+        dashboard.gcs_sessions.forEach(r => {
+          const owner = r.owner_name || ''
           records.push({
             id: r.id,
-            name: r.name || '读书会',
-            type: '读书会',
-            color: TYPE_COLORS['读书会'],
+            badge: '觉醒',
+            name: owner ? `觉醒游戏·${owner}` : '觉醒游戏',
+            color: BADGE_COLORS['觉醒'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || '',
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
+            source: 'group_case',
           })
         })
       }
 
       // 情绪释放
-      if (dashboard.emotional_release_sessions) {
-        dashboard.emotional_release_sessions.forEach(r => {
+      if (dashboard.ers_sessions) {
+        dashboard.ers_sessions.forEach(r => {
           records.push({
             id: r.id,
-            name: r.name || '情绪释放',
-            type: '情绪释放',
-            color: TYPE_COLORS['情绪释放'],
+            badge: '情绪释放',
+            name: r.name || '',
+            color: BADGE_COLORS['情绪释放'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || '',
             participants: 0,
             space: r.space_name || '',
+            source: 'emotional_release',
           })
         })
       }
 
       // 能量结
-      if (dashboard.energy_knot_sessions) {
-        dashboard.energy_knot_sessions.forEach(r => {
+      if (dashboard.eks_sessions) {
+        dashboard.eks_sessions.forEach(r => {
           records.push({
             id: r.id,
-            name: r.name || '能量结',
-            type: '能量结',
-            color: TYPE_COLORS['能量结'],
+            badge: '能量结',
+            name: r.name || '',
+            color: BADGE_COLORS['能量结'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
+            source: 'energy_knot',
           })
         })
       }
 
       // 内部课程
-      if (dashboard.internal_course_sessions) {
-        dashboard.internal_course_sessions.forEach(r => {
+      if (dashboard.ics_sessions) {
+        dashboard.ics_sessions.forEach(r => {
           records.push({
             id: r.id,
-            name: r.course_name || '内部课程',
-            type: '内部课程',
-            color: TYPE_COLORS['内部课程'],
+            badge: '内部课程',
+            name: r.course_name || '',
+            color: BADGE_COLORS['内部课程'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || '',
             participants: r.participant_ids?.length || 0,
             space: '',
+            source: 'internal_course',
           })
         })
       }
 
       // OH卡
-      if (dashboard.oh_card_reading_sessions) {
-        dashboard.oh_card_reading_sessions.forEach(r => {
+      if (dashboard.ocr_sessions) {
+        dashboard.ocr_sessions.forEach(r => {
           records.push({
             id: r.id,
-            name: r.name || 'OH卡',
-            type: 'OH卡',
-            color: TYPE_COLORS['OH卡'],
+            badge: 'OH卡',
+            name: r.name || '',
+            color: BADGE_COLORS['OH卡'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || '',
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
+            source: 'oh_card',
           })
         })
       }
@@ -136,15 +183,60 @@ Page({
       // 按时间排序
       records.sort((a, b) => (a.time || '').localeCompare(b.time || ''))
 
-      this.setData({ records, loading: false })
+      // 更新日历周的活动场数
+      const calCounts = dashboard.calendar_counts || {}
+      const weekDates = this.data.weekDates.map(d => ({
+        ...d,
+        count: calCounts[d.date] || 0,
+      }))
+
+      this.setData({ records, weekDates, loading: false })
     } catch (e) {
       console.error('加载活动失败:', e)
       this.setData({ loading: false })
     }
   },
 
+  formatDateShort(date) {
+    const d = new Date(date)
+    const month = d.getMonth() + 1
+    const day = d.getDate()
+    return `${month}月${day}日`
+  },
+
+  onDateTap(e) {
+    const date = e.currentTarget.dataset.date
+    this.setData({
+      currentDate: date,
+      currentDateShort: this.formatDateShort(date),
+    })
+    this.loadData()
+  },
+
   onDateChange(e) {
-    this.setData({ date: e.detail.value })
+    const date = e.detail.value
+    this.setData({
+      currentDate: date,
+      currentDateShort: this.formatDateShort(date),
+    })
+    this.loadData()
+  },
+
+  onActivityTap(e) {
+    const record = e.currentTarget.dataset.record
+    getApp().globalData._selectedActivity = record
+    wx.navigateTo({ url: '/pages/activity-detail/index' })
+  },
+
+  onSpaceChange(e) {
+    const index = e.detail.value
+    const space = this.data.spaces[index]
+    this.setData({
+      spaceIndex: index,
+      spaceId: space?.id || '',
+      currentSpaceName: space?.name || '',
+    })
+    wx.setStorageSync('activity_space_index', index)
     this.loadData()
   },
 })

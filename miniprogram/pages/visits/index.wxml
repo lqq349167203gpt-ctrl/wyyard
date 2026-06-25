@@ -28,6 +28,9 @@
         <text class="space-label">{{currentSpaceName}}</text>
       </view>
     </picker>
+    <view class="edit-toggle {{editMode ? 'active' : ''}}" bindtap="onToggleEditMode">
+      <text>{{editMode ? '完成' : '排序'}}</text>
+    </view>
   </view>
 
   <!-- 访客列表 -->
@@ -36,12 +39,18 @@
       wx:for="{{visits}}"
       wx:key="id"
       visit="{{item}}"
+      leader-name="{{leaderMap[item.customer_id] || ''}}"
+      edit-mode="{{editMode}}"
+      can-move-up="{{index > 0}}"
+      can-move-down="{{index < visits.length - 1}}"
       bindtap="onVisitTap"
       data-visit="{{item}}"
-      bind:edit="onEditTap"
+
       bind:delete="onDeleteTap"
       bind:profile="onProfileTap"
       bind:arrival="onArrivalTap"
+      bind:moveup="onMoveUp"
+      bind:movedown="onMoveDown"
     />
   </view>
 
@@ -58,7 +67,7 @@
   </view>
 
   <!-- 浮动添加按钮 -->
-  <view class="fab" bindtap="onAddTap">
+  <view class="fab" wx:if="{{!editMode}}" bindtap="onAddTap">
     <text class="fab-icon">+</text>
   </view>
 </view>

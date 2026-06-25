@@ -1,29 +1,55 @@
 <view class="page">
-  <!-- 日期选择 -->
-  <view class="date-bar">
-    <picker mode="date" value="{{date}}" bindchange="onDateChange">
+  <!-- 日期选择器 -->
+  <scroll-view scroll-x class="date-strip" scroll-left="{{scrollLeft}}">
+    <view class="date-items">
+      <view
+        wx:for="{{weekDates}}"
+        wx:key="date"
+        class="date-item {{item.date === currentDate ? 'active' : ''}} {{item.isToday ? 'today' : ''}}"
+        bindtap="onDateTap"
+        data-date="{{item.date}}"
+      >
+        <text class="date-weekday">{{item.weekday}}</text>
+        <text class="date-day">{{item.day}}</text>
+        <text class="date-count" wx:if="{{item.count > 0}}">{{item.count}}场</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 筛选栏 -->
+  <view class="filter-bar">
+    <picker mode="date" value="{{currentDate}}" bindchange="onDateChange">
       <view class="date-picker">
-        <text class="date-text">{{date}}</text>
-        <text class="date-arrow">›</text>
+        <text class="date-label">{{currentDateShort}}</text>
+      </view>
+    </picker>
+    <picker mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+      <view class="space-picker">
+        <text class="space-label">{{currentSpaceName}}</text>
       </view>
     </picker>
   </view>
 
   <!-- 活动列表 -->
   <view class="activity-list" wx:if="{{!loading && records.length > 0}}">
-    <view class="activity-card" wx:for="{{records}}" wx:key="id">
+    <view class="activity-card" wx:for="{{records}}" wx:key="id" bindtap="onActivityTap" data-record="{{item}}">
       <view class="card-left-bar" style="background-color: {{item.color}};"></view>
       <view class="card-body">
         <view class="card-header">
-          <activity-badge name="{{item.type}}" type="{{item.type}}" />
+          <view class="card-title">
+            <view class="badge" style="background-color: {{item.color}}20; color: {{item.color}};">
+              <text>{{item.badge}}</text>
+            </view>
+            <text class="card-name" wx:if="{{item.name}}">{{item.name}}</text>
+          </view>
           <text class="card-time" wx:if="{{item.time}}">{{item.time}}</text>
         </view>
-        <text class="card-name">{{item.name}}</text>
         <view class="card-info">
           <text class="info-item" wx:if="{{item.teacher}}">{{item.teacher}}</text>
           <text class="info-item" wx:if="{{item.participants > 0}}">{{item.participants}}人参与</text>
           <text class="info-item" wx:if="{{item.space}}">{{item.space}}</text>
         </view>
+        <view class="card-arrow">›</view>
       </view>
     </view>
   </view>

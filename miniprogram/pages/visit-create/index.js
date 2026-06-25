@@ -8,11 +8,16 @@ Page({
     customerId: '',
     customerName: '',
     needs: '',
+    feedback: '',
+    healingNotes: '',
+    groupLeaderFeedback: '',
     referrerHandler: '',
     referrerHandlerId: '',
     spaces: [],
     spaceIndex: 0,
     isLeader: false,
+    arrived: false,
+    arrivalTime: '',
     saving: false,
     // 搜索选择弹窗
     allCustomers: [],
@@ -65,8 +70,33 @@ Page({
     this.setData({ isLeader: e.detail.value })
   },
 
+  onArrivedChange(e) {
+    const arrived = e.detail.value
+    const arrivalTime = arrived ? (() => {
+      const now = new Date()
+      return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    })() : ''
+    this.setData({ arrived, arrivalTime })
+  },
+
+  onArrivalTimeChange(e) {
+    this.setData({ arrivalTime: e.detail.value })
+  },
+
   onNeedsInput(e) {
     this.setData({ needs: e.detail.value })
+  },
+
+  onFeedbackInput(e) {
+    this.setData({ feedback: e.detail.value })
+  },
+
+  onHealingNotesInput(e) {
+    this.setData({ healingNotes: e.detail.value })
+  },
+
+  onGroupLeaderFeedbackInput(e) {
+    this.setData({ groupLeaderFeedback: e.detail.value })
   },
 
   // 搜索选择弹窗
@@ -130,9 +160,14 @@ Page({
         customer_id: this.data.customerId,
         nickname: this.data.customerName,
         needs: this.data.needs,
+        feedback: this.data.feedback,
+        healing_notes: this.data.healingNotes,
+        group_leader_feedback: this.data.groupLeaderFeedback,
         referrer_handler: this.data.referrerHandler,
         space_id: space?.id || '',
         is_leader: this.data.isLeader,
+        arrived: this.data.arrived,
+        arrival_time: this.data.arrivalTime || null,
       })
       wx.showToast({ title: '已添加' })
       wx.navigateBack()

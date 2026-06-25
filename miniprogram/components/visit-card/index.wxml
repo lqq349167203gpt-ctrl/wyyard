@@ -1,37 +1,37 @@
-<view class="card" bindtap="onCardTap">
+<view class="card {{editMode ? 'editing' : ''}}" bindtap="onCardTap" bindlongpress="onCardLongPress">
   <view class="card-main">
+    <!-- 编辑模式：上下移动按钮 -->
+    <view class="move-btns" wx:if="{{editMode}}">
+      <view class="move-btn {{canMoveUp ? '' : 'disabled'}}" catchtap="onMoveUp">
+        <text>▲</text>
+      </view>
+      <view class="move-btn {{canMoveDown ? '' : 'disabled'}}" catchtap="onMoveDown">
+        <text>▼</text>
+      </view>
+    </view>
     <view class="card-info">
       <view class="row-top">
         <view class="name-area">
           <text class="nickname">{{visit.nickname}}</text>
-          <text class="member-type" wx:if="{{visit.member_type}}">{{visit.member_type}}</text>
+          <text class="leader-tag" wx:if="{{visit.is_leader}}">组长</text>
+          <text class="member-tag" wx:if="{{leaderName}}">{{leaderName}}组员</text>
         </view>
       </view>
       <view class="row-bottom">
+        <text class="info-text" wx:if="{{visit.member_type}}">{{visit.member_type}}</text>
+        <text class="info-sep" wx:if="{{visit.member_type && remainingText}}">|</text>
         <text class="remaining">{{remainingText}}</text>
       </view>
     </view>
-    <view class="card-arrow">›</view>
+    <view class="card-arrow" wx:if="{{!editMode}}">›</view>
   </view>
 
-  <view class="card-footer" wx:if="{{visit.activities && visit.activities.length > 0}}">
-    <view class="activity-tags">
-      <text class="activity-tag" wx:for="{{visit.activities}}" wx:key="name" wx:for-item="act">
-        {{act.name}}
-      </text>
-    </view>
-  </view>
-
-  <view class="card-actions">
+  <view class="card-actions" wx:if="{{!editMode}}">
     <view class="arrival-badge {{visit.arrived ? 'arrived' : ''}}" catchtap="{{visit.arrived ? 'onCancelArrival' : 'onArrivalTap'}}">
       <text>{{visit.arrived ? '已到场' : '未到场'}}</text>
     </view>
     <view class="action-btn" catchtap="onProfileTap">
       <text>资料</text>
-    </view>
-    <view class="action-divider"></view>
-    <view class="action-btn edit-btn" catchtap="onEditTap">
-      <text>编辑</text>
     </view>
     <view class="action-divider"></view>
     <view class="action-btn delete-btn" catchtap="onDeleteTap">

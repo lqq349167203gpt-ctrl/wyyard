@@ -421,7 +421,7 @@ export function ActivityBatchTable({
   const typeOptions = useMemo(() => {
     const classChildren = courseTypes.map(t => ({ value: `class:${t.name}`, label: t.name }))
     return [
-      { value: "class", label: "读书会", children: classChildren },
+      { value: "class", label: "沙龙活动", children: classChildren },
       { value: "gcs", label: "觉醒游戏" },
       { value: "ers", label: "情绪释放" },
       { value: "ocr", label: "OH卡梳理" },

@@ -1,6 +1,10 @@
 Component({
   properties: {
     visit: { type: Object, value: {} },
+    leaderName: { type: String, value: '' },
+    editMode: { type: Boolean, value: false },
+    canMoveUp: { type: Boolean, value: false },
+    canMoveDown: { type: Boolean, value: false },
   },
 
   data: {
@@ -12,7 +16,6 @@ Component({
   observers: {
     'visit': function (visit) {
       if (!visit) return
-      // 剩余次数
       const count = visit.remaining_count
       let remainingText = '-'
       if (count === -999) {
@@ -26,7 +29,20 @@ Component({
 
   methods: {
     onCardTap() {
+      if (this.data.editMode) return
       this.triggerEvent('tap', { visit: this.data.visit })
+    },
+
+    onCardLongPress() {
+      this.triggerEvent('longpress', { visit: this.data.visit })
+    },
+
+    onMoveUp() {
+      this.triggerEvent('moveup', { visit: this.data.visit })
+    },
+
+    onMoveDown() {
+      this.triggerEvent('movedown', { visit: this.data.visit })
     },
 
     onEditTap(e) {

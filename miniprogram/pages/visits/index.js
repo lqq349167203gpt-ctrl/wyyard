@@ -1,4 +1,4 @@
-const { classRecordApi, visitApi, spaceApi } = require('../../utils/api')
+const { visitApi, spaceApi } = require('../../utils/api')
 const { formatDate, getWeekDates } = require('../../utils/util')
 
 Page({
@@ -14,6 +14,8 @@ Page({
     currentSpaceName: '',
     loading: true,
     scrollLeft: 0,
+    leaderMap: {},
+    editMode: false,
   },
 
   async onLoad() {
@@ -39,7 +41,6 @@ Page({
       const spaces = await spaceApi.list()
       if (spaces.length === 0) return
 
-      // 读取上次选择的空间索引，默认选择第一个空间
       const savedIndex = wx.getStorageSync('visit_space_index') || 0
       const spaceIndex = Math.min(savedIndex, spaces.length - 1)
       const space = spaces[spaceIndex]
@@ -56,10 +57,12 @@ Page({
   },
 
   async loadData() {
+    if (this._loading) return
+    this._loading = true
     this.setData({ loading: true })
     try {
-      const [dashboard, counts] = await Promise.all([
-        classRecordApi.dashboard(this.data.currentDate, this.data.spaceId || undefined),
+      const [visits, counts] = await Promise.all([
+        visitApi.listLight(this.data.currentDate, this.data.spaceId || undefined),
         visitApi.counts({
           start_date: this.data.weekDates[0]?.date,
           end_date: this.data.weekDates[6]?.date,
@@ -67,18 +70,64 @@ Page({
         }),
       ])
 
+      const sorted = this.applySavedOrder(visits || [])
+      const leaderMap = this.buildLeaderMap(sorted)
+
       this.setData({
-        visits: dashboard.visits || [],
+        visits: sorted,
         visitCounts: counts || {},
+        leaderMap,
         loading: false,
       })
 
-      // 更新周视图上的计数
       this.updateWeekCounts(counts || {})
     } catch (e) {
       console.error('加载数据失败:', e)
       this.setData({ loading: false })
+    } finally {
+      this._loading = false
     }
+  },
+
+  // ---- 排序存储 ----
+
+  _orderKey() {
+    return `visit_order_${this.data.currentDate}_${this.data.spaceId || ''}`
+  },
+
+  applySavedOrder(visits) {
+    let savedOrder = []
+    try { savedOrder = JSON.parse(wx.getStorageSync(this._orderKey()) || '[]') } catch {}
+    if (!savedOrder.length) {
+      wx.setStorageSync(this._orderKey(), JSON.stringify(visits.map(v => v.id)))
+      return visits
+    }
+    const orderMap = new Map(savedOrder.map((id, i) => [id, i]))
+    const sorted = [...visits].sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999))
+    const merged = sorted.map(v => v.id)
+    wx.setStorageSync(this._orderKey(), JSON.stringify(merged))
+    return sorted
+  },
+
+  saveOrder() {
+    const order = this.data.visits.map(v => v.id)
+    wx.setStorageSync(this._orderKey(), JSON.stringify(order))
+  },
+
+  // ---- 组长映射（is_leader + 列表顺序）----
+
+  buildLeaderMap(visits) {
+    const leaderMap = {}
+    let currentLeader = ''
+    for (const v of visits) {
+      if (v.is_leader) {
+        currentLeader = v.nickname
+        leaderMap[v.customer_id] = '' // 组长自己不显示
+      } else if (currentLeader) {
+        leaderMap[v.customer_id] = currentLeader
+      }
+    }
+    return leaderMap
   },
 
   updateWeekCounts(counts) {
@@ -96,11 +145,42 @@ Page({
     return `${month}月${day}日`
   },
 
+  // ---- 编辑模式 ----
+
+  onToggleEditMode() {
+    this.setData({ editMode: !this.data.editMode })
+  },
+
+  onMoveUp(e) {
+    const visit = e.detail.visit
+    const visits = [...this.data.visits]
+    const idx = visits.findIndex(v => v.id === visit.id)
+    if (idx <= 0) return
+    [visits[idx - 1], visits[idx]] = [visits[idx], visits[idx - 1]]
+    const leaderMap = this.buildLeaderMap(visits)
+    this.setData({ visits, leaderMap })
+    this.saveOrder()
+  },
+
+  onMoveDown(e) {
+    const visit = e.detail.visit
+    const visits = [...this.data.visits]
+    const idx = visits.findIndex(v => v.id === visit.id)
+    if (idx < 0 || idx >= visits.length - 1) return
+    [visits[idx], visits[idx + 1]] = [visits[idx + 1], visits[idx]]
+    const leaderMap = this.buildLeaderMap(visits)
+    this.setData({ visits, leaderMap })
+    this.saveOrder()
+  },
+
+  // ---- 导航 ----
+
   onDateTap(e) {
     const date = e.currentTarget.dataset.date
     this.setData({
       currentDate: date,
       currentDateShort: this.formatDateShort(date),
+      editMode: false,
     })
     this.loadData()
   },
@@ -110,6 +190,7 @@ Page({
     this.setData({
       currentDate: date,
       currentDateShort: this.formatDateShort(date),
+      editMode: false,
     })
     this.loadData()
   },
@@ -121,8 +202,8 @@ Page({
       spaceIndex: index,
       spaceId: space?.id || '',
       currentSpaceName: space?.name || '',
+      editMode: false,
     })
-    // 保存选择的空间索引
     wx.setStorageSync('visit_space_index', index)
     this.loadData()
   },
@@ -132,14 +213,11 @@ Page({
   },
 
   onVisitTap(e) {
-    const visit = e.currentTarget.dataset.visit
-    wx.navigateTo({ url: `/pages/visit-detail/index?id=${visit.id}` })
-  },
-
-  onEditTap(e) {
+    if (this.data.editMode) return
     const visit = e.currentTarget.dataset.visit
     wx.navigateTo({ url: `/pages/visit-edit/index?id=${visit.id}` })
   },
+
 
   onProfileTap(e) {
     const visit = e.detail.visit

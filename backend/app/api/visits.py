@@ -32,6 +32,20 @@ async def list_visits(
     return items
 
 
+@router.get("/light")
+async def list_visits_light(
+    date: str = None,
+    space_id: str = None,
+):
+    """轻量版列表，不计算活动详情，适用于主页快速加载"""
+    try:
+        return visit_service.list_visits_light(date, space_id)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/counts")
 async def get_visit_counts(
     customer_ids: str | None = Query(None),
