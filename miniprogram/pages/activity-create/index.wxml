@@ -2,13 +2,25 @@
   <!-- 时间地点 -->
   <view class="form-card">
     <view class="form-card-title">时间地点</view>
+    <view class="form-item" wx:if="{{spaces.length > 0}}">
+      <text class="form-label">空间</text>
+      <picker class="form-picker" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <view class="picker-display">{{spaces[spaceIndex].name || '选择空间'}}</view>
+      </picker>
+    </view>
+    <view class="form-item" wx:if="{{rooms.length > 0}}">
+      <text class="form-label">房间</text>
+      <picker class="form-picker" mode="selector" range="{{rooms}}" range-key="name" value="{{roomIndex}}" bindchange="onRoomChange" disabled="{{rooms.length === 0}}">
+        <view class="picker-display {{rooms.length === 0 ? 'placeholder' : ''}}">{{rooms[roomIndex].name || '无房间'}}</view>
+      </picker>
+    </view>
     <view class="form-item">
       <text class="form-label">日期</text>
       <picker class="form-picker" mode="date" value="{{date}}" bindchange="onDateChange">
         <view class="picker-display">{{date}}</view>
       </picker>
     </view>
-    <view class="form-item">
+    <view class="form-item last">
       <text class="form-label">时间</text>
       <view class="time-range">
         <picker class="form-picker" mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
@@ -19,18 +31,6 @@
           <view class="picker-display">{{endTime}}</view>
         </picker>
       </view>
-    </view>
-    <view class="form-item" wx:if="{{spaces.length > 0}}">
-      <text class="form-label">空间</text>
-      <picker class="form-picker" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-        <view class="picker-display">{{spaces[spaceIndex].name || '选择空间'}}</view>
-      </picker>
-    </view>
-    <view class="form-item last" wx:if="{{rooms.length > 0}}">
-      <text class="form-label">房间</text>
-      <picker class="form-picker" mode="selector" range="{{rooms}}" range-key="name" value="{{roomIndex}}" bindchange="onRoomChange" disabled="{{rooms.length === 0}}">
-        <view class="picker-display {{rooms.length === 0 ? 'placeholder' : ''}}">{{rooms[roomIndex].name || '无房间'}}</view>
-      </picker>
     </view>
   </view>
 
