@@ -4,25 +4,35 @@
     <view class="form-card-title">基本信息</view>
     <view class="form-item">
       <text class="form-label">类型</text>
-      <view class="badge" style="background-color: {{record.color}}20; color: {{record.color}};">{{record.badge}}</view>
-      <text class="form-value" wx:if="{{record.name}}" style="margin-left: 12rpx;">{{record.name}}</text>
+      <view class="value-wrap">
+        <view class="badge" style="background-color: {{record.color}}20; color: {{record.color}};">{{record.badge}}</view>
+      </view>
+    </view>
+    <view class="form-item" wx:if="{{record.name}}">
+      <text class="form-label">名称</text>
+      <text class="form-value">{{record.name}}</text>
     </view>
     <view class="form-item">
       <text class="form-label">时间</text>
       <text class="form-value">{{record.time || '-'}}</text>
     </view>
-    <view class="form-item">
-      <text class="form-label">老师</text>
-      <text class="form-value">{{record.teacher || '-'}}</text>
+    <view class="form-item" wx:if="{{record.teacher}}">
+      <text class="form-label">{{record.source === 'group_case' || record.source === 'emotional_release' || record.source === 'oh_card' ? '主持人' : '老师'}}</text>
+      <text class="form-value">{{record.teacher}}</text>
     </view>
-    <view class="form-item">
+    <view class="form-item" wx:if="{{record.space}}">
+      <text class="form-label">空间</text>
+      <text class="form-value">{{record.space}}</text>
+    </view>
+    <view class="form-item last">
       <text class="form-label">参与人数</text>
       <text class="form-value">{{record.participants || 0}}人</text>
     </view>
-    <view class="form-item last">
-      <text class="form-label">空间</text>
-      <text class="form-value">{{record.space || '-'}}</text>
-    </view>
+  </view>
+
+  <!-- 操作 -->
+  <view class="actions">
+    <button class="btn-danger" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删除</button>
   </view>
 </view>
 

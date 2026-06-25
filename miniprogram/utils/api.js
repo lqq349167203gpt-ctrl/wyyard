@@ -97,26 +97,36 @@ const courseTypeApi = {
 // 觉醒游戏 API
 const groupCaseSessionApi = {
   create: (data) => request('/api/group-case-sessions', { method: 'POST', data }),
+  update: (id, data) => request(`/api/group-case-sessions/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/group-case-sessions/${id}`, { method: 'DELETE' }),
 }
 
 // 情绪释放 API
 const emotionalReleaseSessionApi = {
   create: (data) => request('/api/emotional-release-sessions', { method: 'POST', data }),
+  update: (id, data) => request(`/api/emotional-release-sessions/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/emotional-release-sessions/${id}`, { method: 'DELETE' }),
 }
 
 // 能量结 API
 const energyKnotSessionApi = {
   create: (data) => request('/api/energy-knot-sessions', { method: 'POST', data }),
+  update: (id, data) => request(`/api/energy-knot-sessions/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/energy-knot-sessions/${id}`, { method: 'DELETE' }),
 }
 
 // 内部课程 API
 const internalCourseSessionApi = {
   create: (data) => request('/api/internal-course-sessions', { method: 'POST', data }),
+  update: (id, data) => request(`/api/internal-course-sessions/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/internal-course-sessions/${id}`, { method: 'DELETE' }),
 }
 
 // OH卡 API
 const ohCardReadingSessionApi = {
   create: (data) => request('/api/oh-card-reading-sessions', { method: 'POST', data }),
+  update: (id, data) => request(`/api/oh-card-reading-sessions/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/oh-card-reading-sessions/${id}`, { method: 'DELETE' }),
 }
 
 // 分组 API
