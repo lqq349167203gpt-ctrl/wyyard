@@ -94,6 +94,31 @@ const courseTypeApi = {
   list: () => request('/api/course-types'),
 }
 
+// 觉醒游戏 API
+const groupCaseSessionApi = {
+  create: (data) => request('/api/group-case-sessions', { method: 'POST', data }),
+}
+
+// 情绪释放 API
+const emotionalReleaseSessionApi = {
+  create: (data) => request('/api/emotional-release-sessions', { method: 'POST', data }),
+}
+
+// 能量结 API
+const energyKnotSessionApi = {
+  create: (data) => request('/api/energy-knot-sessions', { method: 'POST', data }),
+}
+
+// 内部课程 API
+const internalCourseSessionApi = {
+  create: (data) => request('/api/internal-course-sessions', { method: 'POST', data }),
+}
+
+// OH卡 API
+const ohCardReadingSessionApi = {
+  create: (data) => request('/api/oh-card-reading-sessions', { method: 'POST', data }),
+}
+
 // 分组 API
 const dailyGroupingApi = {
   get: (date) => request(`/api/daily-groupings?date=${date}`),
@@ -144,4 +169,9 @@ module.exports = {
   dailyGroupingApi,
   courseApi,
   courseTypeApi,
+  groupCaseSessionApi,
+  emotionalReleaseSessionApi,
+  energyKnotSessionApi,
+  internalCourseSessionApi,
+  ohCardReadingSessionApi,
 }

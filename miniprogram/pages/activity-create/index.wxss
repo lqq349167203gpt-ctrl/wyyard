@@ -166,6 +166,15 @@
   font-size: 28rpx;
 }
 
+/* input */
+.form-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: #1f2329;
+  text-align: right;
+}
+
 /* 每组最后一个输入框去掉下划线 */
 .form-item.last {
   border-bottom: none;

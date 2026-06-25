@@ -37,28 +37,65 @@
   <!-- 基本信息 -->
   <view class="form-card">
     <view class="form-card-title">基本信息</view>
+
+    <!-- 活动类型 -->
     <view class="form-item">
+      <text class="form-label">类型</text>
+      <picker class="form-picker" mode="selector" range="{{activityTypes}}" range-key="label" value="{{typeIndex}}" bindchange="onTypeChange">
+        <view class="picker-display">{{activityTypes[typeIndex].label}}</view>
+      </picker>
+    </view>
+
+    <!-- 沙龙: 课程 -->
+    <view class="form-item" wx:if="{{activityType === 'class'}}">
       <text class="form-label">课程</text>
       <picker class="form-picker" mode="selector" range="{{courses}}" range-key="name" value="{{courseIndex}}" bindchange="onCourseChange">
         <view class="picker-display {{courseIndex < 0 ? 'placeholder' : ''}}">{{courseIndex >= 0 ? courses[courseIndex].name : '选择课程'}}</view>
       </picker>
     </view>
-    <view class="form-item">
+
+    <!-- 沙龙/内部课程: 活动方式 -->
+    <view class="form-item" wx:if="{{activityType === 'class' || activityType === 'ics'}}">
       <text class="form-label">活动方式</text>
       <picker class="form-picker" mode="selector" range="{{activityModes}}" value="{{activityModeIndex}}" bindchange="onActivityModeChange">
         <view class="picker-display">{{activityModes[activityModeIndex]}}</view>
       </picker>
     </view>
-    <view class="form-item" bindtap="onTeacherPickerOpen">
+
+    <!-- 沙龙: 公益 -->
+    <view class="form-item switch-row" wx:if="{{activityType === 'class'}}">
+      <text class="form-label">公益</text>
+      <switch checked="{{isPublicWelfare}}" bindchange="onPublicWelfareChange" color="#3370ff" />
+    </view>
+
+    <!-- 觉醒游戏/情绪释放/OH卡: 案主 -->
+    <view class="form-item" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr' || activityType === 'eks'}}" bindtap="onOwnerPickerOpen">
+      <text class="form-label">案主</text>
+      <view class="picker-value-wrap">
+        <text class="{{ownerName ? '' : 'placeholder'}}">{{ownerName || '选择案主'}}</text>
+        <text class="picker-clear" wx:if="{{ownerId}}" catchtap="onOwnerClear">x</text>
+      </view>
+    </view>
+
+    <!-- 觉醒游戏/情绪释放/OH卡/内部课程: 主持人/老师 -->
+    <view class="form-item" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr'}}" bindtap="onTeacherPickerOpen">
+      <text class="form-label">主持人</text>
+      <view class="picker-value-wrap">
+        <text class="{{teacherNames.length > 0 ? '' : 'placeholder'}}">{{teacherNames.length > 0 ? teacherNames.join('、') : '选择主持人'}}</text>
+        <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
+      </view>
+    </view>
+    <view class="form-item" wx:if="{{activityType === 'class' || activityType === 'eks' || activityType === 'ics'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
         <text class="{{teacherNames.length > 0 ? '' : 'placeholder'}}">{{teacherNames.length > 0 ? teacherNames.join('、') : '选择老师'}}</text>
         <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
       </view>
     </view>
-    <view class="form-item switch-row last">
-      <text class="form-label">公益</text>
-      <switch checked="{{isPublicWelfare}}" bindchange="onPublicWelfareChange" color="#3370ff" />
+
+    <view class="form-item last">
+      <text class="form-label">名称</text>
+      <input class="form-input" placeholder="活动名称（可选）" value="{{activityName}}" bindinput="onNameInput" />
     </view>
   </view>
 
@@ -70,28 +107,28 @@
     </view>
   </view>
 
-  <!-- 老师搜索弹窗 -->
-  <view class="picker-mask" wx:if="{{showTeacherPicker}}" bindtap="onTeacherPickerClose"></view>
-  <view class="picker-popup" wx:if="{{showTeacherPicker}}">
+  <!-- 搜索弹窗（老师/案主共用） -->
+  <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
+  <view class="picker-popup" wx:if="{{showPicker}}">
     <view class="picker-header">
-      <text class="picker-title">选择老师</text>
-      <text class="picker-close" bindtap="onTeacherPickerClose">关闭</text>
+      <text class="picker-title">选择{{pickerTitle}}</text>
+      <text class="picker-close" bindtap="onPickerClose">关闭</text>
     </view>
     <view class="picker-search">
-      <input class="picker-search-input" placeholder="搜索老师" value="{{teacherKeyword}}" bindinput="onTeacherSearch" focus="{{showTeacherPicker}}" />
+      <input class="picker-search-input" placeholder="搜索" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
     <scroll-view class="picker-list" scroll-y>
-      <view class="picker-item {{item.selected ? 'selected' : ''}}" wx:for="{{teacherList}}" wx:key="id" bindtap="onTeacherSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
+      <view class="picker-item {{item._selected ? 'selected' : ''}}" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
         <text class="picker-item-name">{{item.nickname}}</text>
-        <text class="picker-item-check" wx:if="{{item.selected}}">✓</text>
+        <text class="picker-item-check" wx:if="{{item._selected}}">✓</text>
       </view>
-      <view class="picker-empty" wx:if="{{teacherList.length === 0}}">
-        <text>无匹配老师</text>
+      <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
+        <text>无匹配结果</text>
       </view>
     </scroll-view>
   </view>
 
-  <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving || courseIndex < 0}}">
+  <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
     提交
   </button>
 </view>
