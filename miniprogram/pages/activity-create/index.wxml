@@ -54,6 +54,12 @@
       </picker>
     </view>
 
+    <!-- 名称（紧随课程下方） -->
+    <view class="form-item">
+      <text class="form-label">名称</text>
+      <input class="form-input" placeholder="活动名称（可选）" value="{{activityName}}" bindinput="onNameInput" />
+    </view>
+
     <!-- 沙龙/内部课程: 活动方式 -->
     <view class="form-item" wx:if="{{activityType === 'class' || activityType === 'ics'}}">
       <text class="form-label">活动方式</text>
@@ -77,25 +83,20 @@
       </view>
     </view>
 
-    <!-- 觉醒游戏/情绪释放/OH卡/内部课程: 主持人/老师 -->
-    <view class="form-item" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr'}}" bindtap="onTeacherPickerOpen">
+    <!-- 觉醒游戏/情绪释放/OH卡: 主持人 -->
+    <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">主持人</text>
       <view class="picker-value-wrap">
         <text class="{{teacherNames.length > 0 ? '' : 'placeholder'}}">{{teacherNames.length > 0 ? teacherNames.join('、') : '选择主持人'}}</text>
         <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
       </view>
     </view>
-    <view class="form-item" wx:if="{{activityType === 'class' || activityType === 'eks' || activityType === 'ics'}}" bindtap="onTeacherPickerOpen">
+    <view class="form-item last" wx:if="{{activityType === 'class' || activityType === 'eks' || activityType === 'ics'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
         <text class="{{teacherNames.length > 0 ? '' : 'placeholder'}}">{{teacherNames.length > 0 ? teacherNames.join('、') : '选择老师'}}</text>
         <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
       </view>
-    </view>
-
-    <view class="form-item last">
-      <text class="form-label">名称</text>
-      <input class="form-input" placeholder="活动名称（可选）" value="{{activityName}}" bindinput="onNameInput" />
     </view>
   </view>
 
