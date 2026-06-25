@@ -46,7 +46,7 @@
         </view>
         <view class="card-info">
           <text class="info-item" wx:if="{{item.teacher}}">{{item.teacher}}</text>
-          <text class="info-item" wx:if="{{item.participants > 0}}">{{item.participants}}人参与</text>
+          <text class="info-item" wx:if="{{item.participants > 0}}">参与{{item.participants}}人</text>
           <text class="info-item" wx:if="{{item.space}}">{{item.space}}</text>
         </view>
         <view class="card-arrow">›</view>
