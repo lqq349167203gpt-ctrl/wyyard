@@ -50,7 +50,7 @@ def _calc_expiry(effective_date: str, course_type: str) -> Optional[str]:
         return None
     try:
         start = datetime.strptime(effective_date, "%Y-%m-%d")
-        end = start + relativedelta(months=months)
+        end = start + relativedelta(months=months) - relativedelta(days=1)
         return end.strftime("%Y-%m-%d")
     except ValueError:
         return None
