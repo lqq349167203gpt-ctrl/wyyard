@@ -77,7 +77,16 @@ Page({
     const app = getApp()
     const raw = app.globalData._selectedActivity
     const source = app.globalData._selectedActivitySource
-    if (!raw || !raw.id || !source) return
+    if (!raw || !raw.id || !source) {
+      console.warn('activity-detail: no raw data')
+      return
+    }
+
+    console.log('activity-detail raw:', JSON.stringify({
+      id: raw.id, date: raw.date, start_time: raw.start_time, end_time: raw.end_time,
+      course_id: raw.course_id, course_name: raw.course_name,
+      owner_id: raw.owner_id, host_id: raw.host_id, teacher_ids: raw.teacher_ids,
+    }))
 
     const activityType = SOURCE_TO_TYPE[source]
     const typeLabel = TYPE_LABELS[activityType] || ''
@@ -86,7 +95,6 @@ Page({
     this._recordId = raw.id
     this._source = source
 
-    // 先设置基础字段
     const initData = {
       activityType,
       typeLabel,
@@ -94,8 +102,8 @@ Page({
       _recordId: raw.id,
       _source: source,
       date: raw.date || '',
-      startTime: raw.start_time || '',
-      endTime: raw.end_time || '',
+      startTime: raw.start_time || '09:00',
+      endTime: raw.end_time || '10:00',
       activityName: raw.name || raw.course_name || '',
       description: raw.description || raw.course_description || '',
       ownerId: raw.owner_id || '',
@@ -105,20 +113,17 @@ Page({
       activityModeIndex: (raw.activity_mode === '线上') ? 1 : 0,
     }
 
-    // 主持人/老师：class 从 teacher_ids 解析，其他用 host_id/host_name
+    // 主持人/老师：class/ics 从 teacher_ids 解析，其他用 host_id
     if (source !== 'class_record' && source !== 'internal_course') {
       initData.teacherIds = raw.host_id ? [raw.host_id] : []
     }
 
     this.setData(initData)
 
-    await Promise.all([
-      this.loadSpaces(raw.space_id, raw.room_id),
-      this.loadCourses(),
-      this.loadCustomers(),
-    ])
-
-    // 解析老师名称
+    // 加载空间/课程/客户，然后解析老师名称
+    await this.loadSpaces(raw.space_id, raw.room_id)
+    await this.loadCourses(raw.course_id)
+    await this.loadCustomers()
     this.resolveTeacherNames()
   },
 
@@ -149,16 +154,13 @@ Page({
     }
   },
 
-  async loadCourses() {
+  async loadCourses(courseId) {
     try {
       const courses = await courseApi.list()
-      // 根据已有 course_id 定位索引
-      const app = getApp()
-      const raw = app.globalData._selectedActivity
-      const courseId = raw?.course_id || ''
       const courseIndex = courseId
         ? Math.max(-1, courses.findIndex(c => c.id === courseId))
         : -1
+      console.log('loadCourses: courseId=', courseId, 'courseIndex=', courseIndex, 'total=', courses.length)
       this.setData({ courses, courseIndex })
     } catch (e) {
       console.error('加载课程失败:', e)
