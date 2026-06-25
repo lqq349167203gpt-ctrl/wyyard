@@ -224,6 +224,10 @@ Page({
 
   onActivityTap(e) {
     const record = e.currentTarget.dataset.record
+    if (!record || !record.id) {
+      console.warn('onActivityTap: no record', record)
+      return
+    }
     getApp().globalData._selectedActivity = record
     wx.navigateTo({ url: '/pages/activity-detail/index' })
   },

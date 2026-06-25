@@ -4,6 +4,7 @@ App({
     currentUser: null,
     permissions: [],
     devMode: true, // 开发模式，跳过登录检查
+    _selectedActivity: null,
   },
 
   onLaunch() {
