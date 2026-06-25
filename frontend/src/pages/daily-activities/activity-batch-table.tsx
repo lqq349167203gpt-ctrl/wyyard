@@ -719,19 +719,14 @@ export function ActivityBatchTable({
 
   // 删除按钮
   const handleDelete = useCallback((row: ActivityRow) => {
-    // 先推历史（快照为删除后的状态：从 rowsRef 中移除该行）
-    const postRows = rowsRef.current.filter(r => r.key !== row.key).map(r => ({ ...r }))
-    rowsRef.current = postRows
-    pushHistory("删除了活动", [row.key], `删除了「${row.name || "未命名活动"}」`, postRows, [{ rowKey: row.key, fields: ["__deleted"] }])
-    // 再更新 React state
-    setRows(postRows)
+    // 不在确认前移除行，等父组件确认后由 loadDateData 同步
     if (row.record_type === "class") callbacks.onDeleteClass(row.record_id)
     else if (row.record_type === "gcs") callbacks.onDeleteGcs(row.record_id)
     else if (row.record_type === "ers") callbacks.onDeleteErs(row.record_id)
     else if (row.record_type === "eks") callbacks.onDeleteEks(row.record_id)
     else if (row.record_type === "ics") callbacks.onDeleteIcs(row.record_id)
     else if (row.record_type === "ocr") callbacks.onDeleteOcr(row.record_id)
-  }, [callbacks, pushHistory])
+  }, [callbacks])
 
   // 类型切换 → 删除旧记录 + 重置为新类型行
   const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {

@@ -79,6 +79,19 @@ const classRecordApi = {
     if (spaceId) params.push(`space_id=${spaceId}`)
     return request(`/api/class-records/dashboard?${params.join('&')}`)
   },
+  create: (data) => request('/api/class-records', { method: 'POST', data }),
+  update: (id, data) => request(`/api/class-records/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/class-records/${id}`, { method: 'DELETE' }),
+}
+
+// 课程 API
+const courseApi = {
+  list: () => request('/api/courses'),
+}
+
+// 课程类型 API
+const courseTypeApi = {
+  list: () => request('/api/course-types'),
 }
 
 // 分组 API
@@ -129,4 +142,6 @@ module.exports = {
   memberIdentityApi,
   authApi,
   dailyGroupingApi,
+  courseApi,
+  courseTypeApi,
 }

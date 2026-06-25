@@ -7,6 +7,7 @@
     "pages/visit-detail/index",
     "pages/activities/index",
     "pages/activity-detail/index",
+    "pages/activity-create/index",
     "pages/customers/index",
     "pages/customer-form/index",
     "pages/customer-profile/index",
@@ -34,7 +35,7 @@
       },
       {
         "pagePath": "pages/activities/index",
-        "text": "活动"
+        "text": "课表"
       },
       {
         "pagePath": "pages/me/index",

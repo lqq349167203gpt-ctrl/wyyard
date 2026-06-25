@@ -92,6 +92,24 @@
   color: #8f959e;
 }
 
+.create-btn {
+  margin-left: auto;
+  width: 52rpx;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8rpx;
+  background-color: #3370ff;
+}
+
+.create-btn-text {
+  font-size: 32rpx;
+  color: #ffffff;
+  font-weight: 300;
+  line-height: 1;
+}
+
 /* 活动列表 */
 .activity-list {
   padding: 20rpx 32rpx;

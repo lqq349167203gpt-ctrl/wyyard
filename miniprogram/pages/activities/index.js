@@ -239,4 +239,10 @@ Page({
     wx.setStorageSync('activity_space_index', index)
     this.loadData()
   },
+
+  onCreateTap() {
+    const date = this.data.currentDate
+    const spaceId = this.data.spaceId
+    wx.navigateTo({ url: `/pages/activity-create/index?date=${date}&spaceId=${spaceId}` })
+  },
 })

@@ -1,0 +1,97 @@
+<view class="container">
+  <!-- 时间地点 -->
+  <view class="form-card">
+    <view class="form-card-title">时间地点</view>
+    <view class="form-item">
+      <text class="form-label">日期</text>
+      <picker class="form-picker" mode="date" value="{{date}}" bindchange="onDateChange">
+        <view class="picker-display">{{date}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">时间</text>
+      <view class="time-range">
+        <picker class="form-picker" mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
+          <view class="picker-display">{{startTime}}</view>
+        </picker>
+        <text class="time-sep">至</text>
+        <picker class="form-picker" mode="time" value="{{endTime}}" bindchange="onEndTimeChange">
+          <view class="picker-display">{{endTime}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="form-item" wx:if="{{spaces.length > 0}}">
+      <text class="form-label">空间</text>
+      <picker class="form-picker" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <view class="picker-display">{{spaces[spaceIndex].name || '选择空间'}}</view>
+      </picker>
+    </view>
+    <view class="form-item last" wx:if="{{rooms.length > 0}}">
+      <text class="form-label">房间</text>
+      <picker class="form-picker" mode="selector" range="{{rooms}}" range-key="name" value="{{roomIndex}}" bindchange="onRoomChange" disabled="{{rooms.length === 0}}">
+        <view class="picker-display {{rooms.length === 0 ? 'placeholder' : ''}}">{{rooms[roomIndex].name || '无房间'}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 基本信息 -->
+  <view class="form-card">
+    <view class="form-card-title">基本信息</view>
+    <view class="form-item">
+      <text class="form-label">课程</text>
+      <picker class="form-picker" mode="selector" range="{{courses}}" range-key="name" value="{{courseIndex}}" bindchange="onCourseChange">
+        <view class="picker-display {{courseIndex < 0 ? 'placeholder' : ''}}">{{courseIndex >= 0 ? courses[courseIndex].name : '选择课程'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">活动方式</text>
+      <picker class="form-picker" mode="selector" range="{{activityModes}}" value="{{activityModeIndex}}" bindchange="onActivityModeChange">
+        <view class="picker-display">{{activityModes[activityModeIndex]}}</view>
+      </picker>
+    </view>
+    <view class="form-item" bindtap="onTeacherPickerOpen">
+      <text class="form-label">老师</text>
+      <view class="picker-value-wrap">
+        <text class="{{teacherNames.length > 0 ? '' : 'placeholder'}}">{{teacherNames.length > 0 ? teacherNames.join('、') : '选择老师'}}</text>
+        <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
+      </view>
+    </view>
+    <view class="form-item switch-row last">
+      <text class="form-label">公益</text>
+      <switch checked="{{isPublicWelfare}}" bindchange="onPublicWelfareChange" color="#3370ff" />
+    </view>
+  </view>
+
+  <!-- 描述 -->
+  <view class="form-card">
+    <view class="form-card-title">描述</view>
+    <view class="form-item column last">
+      <textarea class="form-textarea" style="height: 160rpx;" placeholder="输入活动简介..." placeholder-class="form-textarea-placeholder" value="{{description}}" bindinput="onDescriptionInput" />
+    </view>
+  </view>
+
+  <!-- 老师搜索弹窗 -->
+  <view class="picker-mask" wx:if="{{showTeacherPicker}}" bindtap="onTeacherPickerClose"></view>
+  <view class="picker-popup" wx:if="{{showTeacherPicker}}">
+    <view class="picker-header">
+      <text class="picker-title">选择老师</text>
+      <text class="picker-close" bindtap="onTeacherPickerClose">关闭</text>
+    </view>
+    <view class="picker-search">
+      <input class="picker-search-input" placeholder="搜索老师" value="{{teacherKeyword}}" bindinput="onTeacherSearch" focus="{{showTeacherPicker}}" />
+    </view>
+    <scroll-view class="picker-list" scroll-y>
+      <view class="picker-item {{item.selected ? 'selected' : ''}}" wx:for="{{teacherList}}" wx:key="id" bindtap="onTeacherSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
+        <text class="picker-item-name">{{item.nickname}}</text>
+        <text class="picker-item-check" wx:if="{{item.selected}}">✓</text>
+      </view>
+      <view class="picker-empty" wx:if="{{teacherList.length === 0}}">
+        <text>无匹配老师</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving || courseIndex < 0}}">
+    提交
+  </button>
+</view>

@@ -28,6 +28,9 @@
         <text class="space-label">{{currentSpaceName}}</text>
       </view>
     </picker>
+    <view class="create-btn" bindtap="onCreateTap">
+      <text class="create-btn-text">+</text>
+    </view>
   </view>
 
   <!-- 活动列表 -->

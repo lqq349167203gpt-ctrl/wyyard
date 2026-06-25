@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "今日活动",
+  "navigationBarTitleText": "课表",
   "usingComponents": {
     "activity-badge": "/components/activity-badge/index"
   },
