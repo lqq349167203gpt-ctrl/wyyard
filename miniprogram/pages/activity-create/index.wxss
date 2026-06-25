@@ -12,8 +12,14 @@
 .time-range {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex: 1;
   min-width: 0;
+}
+
+.time-range .form-picker {
+  flex: none;
+  width: auto;
 }
 
 .time-sep {
