@@ -4,11 +4,46 @@
   min-height: 100vh;
 }
 
-.form-value {
+.placeholder {
+  color: #b0b5bb;
+}
+
+/* 时间范围 */
+.time-range {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+
+.time-range .form-picker {
+  flex: none;
+  width: auto;
+}
+
+.time-sep {
+  font-size: 26rpx;
+  color: #8f959e;
+  margin: 0 12rpx;
+  flex-shrink: 0;
+}
+
+/* picker */
+.form-picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-display {
   flex: 1;
   font-size: 28rpx;
   color: #1f2329;
   text-align: right;
+}
+
+.picker-display.placeholder {
+  color: #b0b5bb;
 }
 
 .value-wrap {
@@ -18,15 +53,163 @@
 }
 
 .badge {
-  display: inline-block;
-  padding: 4rpx 16rpx;
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 12rpx;
   border-radius: 6rpx;
   font-size: 22rpx;
   font-weight: 500;
 }
 
+.picker-value-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-clear {
+  font-size: 30rpx;
+  color: #b0b5bb;
+  padding: 8rpx 16rpx;
+  flex-shrink: 0;
+}
+
+/* textarea */
+.form-item.column {
+  border-bottom: none;
+}
+
+/* switch */
+.form-item switch {
+  transform: scale(0.75);
+  transform-origin: left center;
+  margin-right: -10rpx;
+}
+
+.form-item.switch-row {
+  padding-top: 14rpx;
+  padding-bottom: 14rpx;
+}
+
+/* input */
+.form-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: #1f2329;
+  text-align: right;
+}
+
+/* 弹窗 */
+.picker-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.picker-popup {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.picker-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.picker-close {
+  font-size: 28rpx;
+  color: #8f959e;
+  padding: 8rpx;
+}
+
+.picker-search {
+  padding: 16rpx 32rpx;
+}
+
+.picker-search-input {
+  height: 72rpx;
+  background-color: #f2f3f5;
+  border-radius: 12rpx;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+}
+
+.picker-list {
+  flex: 1;
+  max-height: 60vh;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f5f6f7;
+}
+
+.picker-item:active {
+  background-color: #f7f8fa;
+}
+
+.picker-item.selected {
+  background-color: #f0f5ff;
+}
+
+.picker-item-name {
+  font-size: 30rpx;
+  color: #1f2329;
+}
+
+.picker-item-check {
+  font-size: 28rpx;
+  color: #3370ff;
+  font-weight: 500;
+}
+
+.picker-empty {
+  display: flex;
+  justify-content: center;
+  padding: 80rpx 0;
+  color: #b0b5bb;
+  font-size: 28rpx;
+}
+
+/* 每组最后一个输入框去掉下划线 */
+.form-item.last {
+  border-bottom: none;
+}
+
+/* 操作按钮 */
 .actions {
   margin-top: 48rpx;
+}
+
+.submit-btn {
+  width: 100%;
 }
 
 .btn-danger {
@@ -38,6 +221,7 @@
   background-color: #e34d59;
   border-radius: 12rpx;
   border: none;
+  margin-top: 24rpx;
 }
 
 .btn-danger[disabled] {

@@ -76,10 +76,14 @@ Page({
       const dashboard = await classRecordApi.dashboard(this.data.currentDate, this.data.spaceId || undefined)
       const records = []
 
+      // 原始数据存储（供详情编辑用）
+      this._rawMap = {}
+
       // 课程活动 — badge: course_type(有则显示) 或 沙龙(兜底), name: course_name
       if (dashboard.class_records) {
         dashboard.class_records.forEach(r => {
           const badge = r.course_type || '沙龙'
+          this._rawMap[`class_record_${r.id}`] = r
           records.push({
             id: r.id,
             badge,
@@ -94,10 +98,11 @@ Page({
         })
       }
 
-      // 觉醒游戏 — level-1: 觉醒, level-2: owner_name
+      // 觉醒游戏
       if (dashboard.gcs_sessions) {
         dashboard.gcs_sessions.forEach(r => {
           const owner = r.owner_name || ''
+          this._rawMap[`group_case_${r.id}`] = r
           records.push({
             id: r.id,
             badge: '觉醒',
@@ -115,6 +120,7 @@ Page({
       // 情绪释放
       if (dashboard.ers_sessions) {
         dashboard.ers_sessions.forEach(r => {
+          this._rawMap[`emotional_release_${r.id}`] = r
           records.push({
             id: r.id,
             badge: '情绪释放',
@@ -132,6 +138,7 @@ Page({
       // 能量结
       if (dashboard.eks_sessions) {
         dashboard.eks_sessions.forEach(r => {
+          this._rawMap[`energy_knot_${r.id}`] = r
           records.push({
             id: r.id,
             badge: '能量结',
@@ -149,6 +156,7 @@ Page({
       // 内部课程
       if (dashboard.ics_sessions) {
         dashboard.ics_sessions.forEach(r => {
+          this._rawMap[`internal_course_${r.id}`] = r
           records.push({
             id: r.id,
             badge: '内部课程',
@@ -157,7 +165,7 @@ Page({
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || '',
             participants: r.participant_ids?.length || 0,
-            space: '',
+            space: r.space_name || '',
             source: 'internal_course',
           })
         })
@@ -166,6 +174,7 @@ Page({
       // OH卡
       if (dashboard.ocr_sessions) {
         dashboard.ocr_sessions.forEach(r => {
+          this._rawMap[`oh_card_${r.id}`] = r
           records.push({
             id: r.id,
             badge: 'OH卡',
@@ -224,11 +233,10 @@ Page({
 
   onActivityTap(e) {
     const record = e.currentTarget.dataset.record
-    if (!record || !record.id) {
-      console.warn('onActivityTap: no record', record)
-      return
-    }
-    getApp().globalData._selectedActivity = record
+    if (!record || !record.id) return
+    const raw = this._rawMap[`${record.source}_${record.id}`]
+    getApp().globalData._selectedActivity = raw || record
+    getApp().globalData._selectedActivitySource = record.source
     wx.navigateTo({ url: '/pages/activity-detail/index' })
   },
 
