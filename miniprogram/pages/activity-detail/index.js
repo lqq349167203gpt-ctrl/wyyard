@@ -89,8 +89,8 @@ Page({
     }))
 
     const activityType = SOURCE_TO_TYPE[source]
-    const typeLabel = TYPE_LABELS[activityType] || ''
-    const typeColor = BADGE_COLORS[typeLabel] || '#3370ff'
+    const typeLabel = raw.course_type || TYPE_LABELS[activityType] || ''
+    const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
 
     this._recordId = raw.id
     this._source = source
