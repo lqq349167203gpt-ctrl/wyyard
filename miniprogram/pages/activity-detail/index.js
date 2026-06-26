@@ -38,9 +38,20 @@ const API_MAP = {
   ocr: ohCardReadingSessionApi,
 }
 
+const ACTIVITY_TYPES = [
+  { value: 'class', label: '沙龙活动' },
+  { value: 'gcs', label: '觉醒游戏' },
+  { value: 'ers', label: '情绪释放' },
+  { value: 'eks', label: '能量结' },
+  { value: 'ics', label: '内部课程' },
+  { value: 'ocr', label: 'OH卡' },
+]
+
 Page({
   data: {
     activityType: '',
+    typeIndex: 0,
+    activityTypes: ACTIVITY_TYPES,
     typeLabel: '',
     typeColor: '',
     date: '',
@@ -89,14 +100,17 @@ Page({
     }))
 
     const activityType = SOURCE_TO_TYPE[source]
+    const typeIndex = ACTIVITY_TYPES.findIndex(t => t.value === activityType)
     const typeLabel = raw.course_type || TYPE_LABELS[activityType] || ''
     const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
 
     this._recordId = raw.id
     this._source = source
+    this._originalType = activityType
 
     const initData = {
       activityType,
+      typeIndex: typeIndex >= 0 ? typeIndex : 0,
       typeLabel,
       typeColor,
       _recordId: raw.id,
@@ -197,6 +211,26 @@ Page({
 
   onActivityModeChange(e) {
     this.setData({ activityModeIndex: e.detail.value })
+  },
+
+  onTypeChange(e) {
+    const typeIndex = e.detail.value
+    const activityType = ACTIVITY_TYPES[typeIndex].value
+    const typeLabel = TYPE_LABELS[activityType] || ''
+    const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
+    this.setData({
+      typeIndex,
+      activityType,
+      typeLabel,
+      typeColor,
+      courseIndex: -1,
+      ownerId: '',
+      ownerName: '',
+      teacherIds: [],
+      teacherNames: [],
+      isPublicWelfare: false,
+      activityModeIndex: 0,
+    })
   },
 
   onPublicWelfareChange(e) {
@@ -333,7 +367,7 @@ Page({
         payload = {
           ...baseFields,
           course_id: course.id,
-          course_name: course.name,
+          course_name: this.data.activityName || course.name,
           course_type: course.type || '',
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
@@ -380,7 +414,15 @@ Page({
 
     this.setData({ saving: true })
     try {
-      await api.update(this._recordId, payload)
+      const typeChanged = activityType !== this._originalType
+      if (typeChanged) {
+        // 类型变更：删除旧记录，创建新记录
+        const oldApi = API_MAP[this._originalType]
+        if (oldApi) await oldApi.delete(this._recordId)
+        await api.create(payload)
+      } else {
+        await api.update(this._recordId, payload)
+      }
       wx.showToast({ title: '已保存' })
       const pages = getCurrentPages()
       const prevPage = pages[pages.length - 2]
@@ -402,7 +444,7 @@ Page({
       confirmColor: '#e34d59',
       success: async (res) => {
         if (!res.confirm) return
-        const api = API_MAP[this.data.activityType]
+        const api = API_MAP[this._originalType]
         if (!api) return
         this.setData({ deleting: true })
         try {

@@ -38,12 +38,12 @@
   <view class="form-card">
     <view class="form-card-title">基本信息</view>
 
-    <!-- 类型（只读） -->
+    <!-- 类型 -->
     <view class="form-item">
       <text class="form-label">类型</text>
-      <view class="value-wrap">
-        <view class="badge" style="background-color: {{typeColor}}20; color: {{typeColor}};">{{typeLabel}}</view>
-      </view>
+      <picker class="form-picker" mode="selector" range="{{activityTypes}}" range-key="label" value="{{typeIndex}}" bindchange="onTypeChange">
+        <view class="picker-display">{{activityTypes[typeIndex].label}}</view>
+      </picker>
     </view>
 
     <!-- 沙龙: 课程 -->
