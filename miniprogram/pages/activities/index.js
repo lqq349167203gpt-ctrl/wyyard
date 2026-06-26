@@ -103,10 +103,11 @@ Page({
         dashboard.gcs_sessions.forEach(r => {
           const owner = r.owner_name || ''
           this._rawMap[`group_case_${r.id}`] = r
+          const defaultName = owner ? `觉醒游戏·${owner}` : '觉醒游戏'
           records.push({
             id: r.id,
             badge: '觉醒',
-            name: owner ? `觉醒游戏·${owner}` : '觉醒游戏',
+            name: r.name || defaultName,
             color: BADGE_COLORS['觉醒'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || '',
