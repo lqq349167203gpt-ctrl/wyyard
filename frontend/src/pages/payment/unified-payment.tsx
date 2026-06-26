@@ -973,7 +973,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "会员卡", value: formCardType || "-" })
       rows.push({ label: "费用金额", value: `¥${parseFloat(formPrice || "0").toLocaleString()}` })
-      if (mcShowDurationInfo) rows.push({ label: "有效期", value: `${MEMBERSHIP_CARD_TYPES[formCardType]?.duration}，${MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited ? "次数不限" : `${MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次`}` })
+      if (mcShowDurationInfo) rows.push({ label: "有效期", value: `${formDurationValue || MEMBERSHIP_CARD_TYPES[formCardType]?.duration} 个月，${MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited ? "次数不限" : `${MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次`}` })
     } else if (formType === "internal_course") {
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "课程类型", value: formCourseType || "-" })
@@ -1153,10 +1153,26 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
             <DialogTitle className="text-base">{dialogTitle}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4 max-h-[calc(65vh+120px)] overflow-y-auto" {...enterToNext}>
+            {/* 成交日期 + 所属组织（顶部） */}
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交日期</span>
+              <Input type="date" value={formDealDate} onChange={(e) => setFormDealDate(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">所属组织</span>
+              <SelectDropdown
+                value={formOrganizationId}
+                options={organizations.map(o => ({ value: o.id, label: o.name }))}
+                placeholder="选择组织"
+                onChange={setFormOrganizationId}
+              />
+            </div>
+            <div className="border-b border-[#ebedf0] ml-[19px] -mt-[2px]" style={{ borderBottomWidth: "0.5px" }} />
+
             {/* 项目类型选择（新增时） */}
             {!editingItem && (
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">项目类型</span>
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2 -mt-[2px]">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目类型</span>
                 <SelectDropdown
                   value={formType}
                   options={(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
@@ -1169,16 +1185,40 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
               </div>
             )}
 
-            {/* 成交日期 */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交日期</span>
-              <Input type="date" value={formDealDate} onChange={(e) => setFormDealDate(e.target.value)} />
-            </div>
+            {/* 会员卡类型 */}
+            {formType === "membership_card" && (
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">会员卡</span>
+                <SelectDropdown
+                  value={formCardType}
+                  options={Object.entries(MEMBERSHIP_CARD_TYPES).map(([type, config]) => ({ value: type, label: type, rightLabel: `¥${config.price.toLocaleString()}` }))}
+                  placeholder="请选择会员卡"
+                  onChange={(v) => handleSelectCardType(v)}
+                />
+              </div>
+            )}
+
+            {/* 课程类型（内部课程） */}
+            {formType === "internal_course" && (
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">课程类型</span>
+                <SelectDropdown
+                  value={formCourseType}
+                  options={Object.entries(COURSE_TYPES).map(([type, config]) => ({
+                    value: type,
+                    label: `${type.split("：")[0]}（${config.duration}）`,
+                    rightLabel: `¥${config.price.toLocaleString()}`,
+                  }))}
+                  placeholder="请选择课程"
+                  onChange={(v) => { setFormCourseType(v); setFormCourseAmount(COURSE_TYPES[v]?.price || 0) }}
+                />
+              </div>
+            )}
 
             {/* 用户（其他项目时显示在项目名称后面） */}
             {formType !== "other" && (
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">用户</span>
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">用户</span>
                 <CustomerSearchInput
                   customers={customers}
                   value={formNickname || ""}
@@ -1196,28 +1236,19 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
             {/* ===== 会员卡专属字段 ===== */}
             {formType === "membership_card" && (
               <>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">生效日期</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formEffectiveDate} onChange={(e) => setFormEffectiveDate(e.target.value)} className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">会员卡</span>
-                  <SelectDropdown
-                    value={formCardType}
-                    options={Object.entries(MEMBERSHIP_CARD_TYPES).map(([type, config]) => ({ value: type, label: type, rightLabel: `¥${config.price.toLocaleString()}` }))}
-                    placeholder="请选择会员卡"
-                    onChange={(v) => handleSelectCardType(v)}
-                  />
-                </div>
                 {formCardType && (
-                  <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">费用金额</span>
+                  <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">费用金额</span>
                     <Input type="text" inputMode="decimal" value={formPrice} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={MEMBERSHIP_CARD_TYPES[formCardType] ? `${MEMBERSHIP_CARD_TYPES[formCardType].price}` : ""} className="h-8 text-xs" />
                   </div>
                 )}
                 {mcShowDuration && (
-                  <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时长</span>
+                  <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">时长</span>
                     <div>
                       <div className="flex gap-2">
                         <Input type="number" value={formDurationValue} onChange={(e) => setFormDurationValue(e.target.value)} placeholder="输入时长" className="h-8 text-xs flex-1" min="1" />
@@ -1231,8 +1262,8 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                   </div>
                 )}
                 {mcShowCount && (
-                  <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">次数</span>
+                  <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">次数</span>
                     <div>
                       <div className="flex gap-2">
                         {!formUnlimited && (
@@ -1246,9 +1277,18 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                   </div>
                 )}
                 {mcShowDurationInfo && (
-                  <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">有效期</span>
-                    <Input value={`${MEMBERSHIP_CARD_TYPES[formCardType]?.duration}，${MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited ? "次数不限" : `${MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次`}`} disabled className="h-8 text-xs" />
+                  <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">有效期</span>
+                    <div className="flex gap-2 items-center">
+                      <Input type="number" value={formDurationValue} onChange={(e) => setFormDurationValue(e.target.value)} className="h-8 text-xs w-[50px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" min="1" />
+                      <span className="text-[12px] text-[#8f959e]">个月，</span>
+                      {!MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited && (
+                        <span className="text-[12px] text-[#8f959e]">{MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次</span>
+                      )}
+                      {MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited && (
+                        <span className="text-[12px] text-[#8f959e]">次数不限</span>
+                      )}
+                    </div>
                   </div>
                 )}
               </>
@@ -1257,12 +1297,12 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
             {/* ===== 觉醒/情绪/OH/能量专属字段 ===== */}
             {(formType === "group_case" || formType === "emotional_release" || formType === "oh_card_reading" || formType === "energy_knot") && (
               <>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">购买次数</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">购买次数</span>
                   <Input type="number" value={formPurchaseCount} onChange={(e) => setFormPurchaseCount(e.target.value)} placeholder="0" min="0" className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} placeholder="0" min="0" step="0.01" className="h-8 text-xs" />
                 </div>
               </>
@@ -1271,25 +1311,12 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
             {/* ===== 内部课程专属字段 ===== */}
             {formType === "internal_course" && (
               <>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">生效日期</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formEffectiveDate} onChange={(e) => setFormEffectiveDate(e.target.value)} className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">课程类型</span>
-                  <SelectDropdown
-                    value={formCourseType}
-                    options={Object.entries(COURSE_TYPES).map(([type, config]) => ({
-                      value: type,
-                      label: `${type.split("：")[0]}（${config.duration}）`,
-                      rightLabel: `¥${config.price.toLocaleString()}`,
-                    }))}
-                    placeholder="请选择课程"
-                    onChange={(v) => { setFormCourseType(v); setFormCourseAmount(COURSE_TYPES[v]?.price || 0) }}
-                  />
-                </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">付费金额</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formCourseAmount || ""} onChange={(e) => setFormCourseAmount(Number(e.target.value) || 0)} placeholder="输入金额" className="h-8 text-xs" />
                 </div>
               </>
@@ -1298,12 +1325,12 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
             {/* ===== 其他项目专属字段 ===== */}
             {formType === "other" && (
               <>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">项目名称</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目名称</span>
                   <Input type="text" value={formProjectName} onChange={(e) => setFormProjectName(e.target.value)} placeholder="输入项目名称" className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">用户</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">用户</span>
                   <CustomerSearchInput
                     customers={customers}
                     value={formNickname || ""}
@@ -1316,16 +1343,16 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                     placeholder="搜索昵称"
                   />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">费用</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">费用</span>
                   <Input type="number" value={formFee} onChange={(e) => setFormFee(e.target.value)} placeholder="0" className="h-8 text-xs" min="0" step="0.01" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">生效日期</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formOtherEffectiveDate} onChange={(e) => setFormOtherEffectiveDate(e.target.value)} className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">时长</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">时长</span>
                   <div className="flex gap-2">
                     <Input type="number" value={formOtherDurationValue} onChange={(e) => setFormOtherDurationValue(e.target.value)} placeholder="输入时长" className="h-8 text-xs flex-1" min="1" />
                     <div className="flex gap-1">
@@ -1335,8 +1362,8 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">次数</span>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">次数</span>
                   <div className="flex gap-2">
                     {!formOtherUnlimited && (
                       <Input type="number" value={formOtherRemainingCount} onChange={(e) => setFormOtherRemainingCount(e.target.value)} placeholder="输入次数（可选）" className="h-8 text-xs flex-1" min="0" />
@@ -1347,18 +1374,9 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
               </>
             )}
 
-            {/* ===== 公共字段：所属组织 + 成交人 ===== */}
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">所属组织</span>
-              <SelectDropdown
-                value={formOrganizationId}
-                options={organizations.map(o => ({ value: o.id, label: o.name }))}
-                placeholder="选择组织"
-                onChange={setFormOrganizationId}
-              />
-            </div>
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">成交人</span>
+            {/* ===== 公共字段：成交人 ===== */}
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交人</span>
               <div>
                 <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={getFormAmount()} />
                 {closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}

@@ -297,10 +297,33 @@ def update_deduction(deduction_id: str, count: int, operator_name: str = "") -> 
 
 
 def delete_deduction(deduction_id: str) -> None:
-    """软删除销卡记录"""
+    """软删除销卡记录，并恢复对应项目的剩余次数"""
     deduction = _deductions.get(deduction_id)
     if not deduction or deduction.is_deleted:
         raise ValueError("记录不存在")
+
+    # 会员卡和其他项目直接操作 remaining_count，需要恢复
+    if deduction.project_type == "membership-cards":
+        from app.services import membership_card_service
+        card = membership_card_service.get_card(deduction.project_id)
+        if card and card.remaining_count is not None:
+            card.remaining_count += deduction.count
+            card.updated_at = datetime.now(timezone.utc)
+            membership_card_service._cards[card.id] = card
+            membership_card_service._save(card.id)
+
+    elif deduction.project_type == "other-projects":
+        from app.services import other_project_service
+        project = other_project_service.get_project(deduction.project_id)
+        if project and project.remaining_count is not None:
+            project.remaining_count += deduction.count
+            project.updated_at = datetime.now(timezone.utc)
+            other_project_service._projects[project.id] = project
+            save_item(other_project_service.FILENAME, project.id, project.model_dump(mode="json"))
+
+    # 觉醒/情绪释放/OH卡/能量结：剩余次数由 get_deduction_total 计算，
+    # 软删除后自动排除，无需额外处理
+
     deduction.is_deleted = True
     _deductions[deduction_id] = deduction
     _save(deduction_id)

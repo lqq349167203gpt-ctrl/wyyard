@@ -2,13 +2,17 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from app.services import project_deduction_service
 from app.models.project_deduction import ProjectDeductionCreate
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/project-deductions", tags=["project-deductions"])
 
 
 @router.get("")
-def list_deductions(customer_id: str | None = Query(None)):
-    return [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id)]
+def list_deductions(customer_id: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+    items = [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id)]
+    if page is not None:
+        return paginate(items, page, page_size or 10)
+    return items
 
 
 @router.post("")

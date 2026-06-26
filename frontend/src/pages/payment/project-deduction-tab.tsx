@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { CreditCard, Download, Pencil, Trash2, Upload } from "lucide-react"
+import { useServerPagination } from "@/hooks/use-server-pagination"
+import { PaginationBar } from "@/components/pagination-bar"
 import * as XLSX from "xlsx-js-style"
 import ExcelJS from "exceljs"
 import {
@@ -53,9 +55,14 @@ export function ProjectDeductionTab() {
   const cpRef = useRef(cp)
   cpRef.current = cp
 
-  // 扣次记录
-  const [deductions, setDeductions] = useState<ProjectDeduction[]>([])
-  const [deductionsLoading, setDeductionsLoading] = useState(true)
+  // 扣次记录（分页）
+  const fetchDeductions = useCallback(async (page: number, pageSize: number) => {
+    return projectDeductionApi.listPaginated(page, pageSize)
+  }, [])
+  const {
+    paginatedItems: deductions, currentPage, totalPages, totalItems,
+    goToPage, startIndex, endIndex, loading: deductionsLoading, refresh: refreshDeductions,
+  } = useServerPagination<ProjectDeduction>(fetchDeductions)
 
   // 弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -104,21 +111,7 @@ export function ProjectDeductionTab() {
     }).catch(() => {})
   }, [permReady])
 
-  // 加载扣次记录
-  const refreshDeductions = useCallback(async () => {
-    setDeductionsLoading(true)
-    try {
-      const data = await projectDeductionApi.list()
-      setDeductions(data)
-    } catch {
-      setDeductions([])
-    }
-    setDeductionsLoading(false)
-  }, [])
-
-  useEffect(() => {
-    refreshDeductions()
-  }, [refreshDeductions])
+  // 扣次记录加载由 useServerPagination hook 自动处理
 
   // 选中用户后加载可销卡项目
   const handleSelectCustomer = useCallback(async (c: Customer) => {
@@ -483,7 +476,7 @@ export function ProjectDeductionTab() {
       {/* 销卡按钮 */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {deductions.length > 0 && <span>共 {deductions.length} 条记录</span>}
+          {totalItems > 0 && <span>共 {totalItems} 条记录</span>}
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleDownloadTemplate}>
@@ -503,7 +496,7 @@ export function ProjectDeductionTab() {
       <div className="bg-white rounded-lg">
         {deductionsLoading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : deductions.length === 0 ? (
+        ) : totalItems === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <CreditCard className="h-8 w-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground">暂无销卡记录</p>
@@ -555,6 +548,16 @@ export function ProjectDeductionTab() {
           </Table>
         )}
       </div>
+      {totalItems > 0 && (
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          onPageChange={goToPage}
+        />
+      )}
 
       {/* 销卡弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={(open) => {
