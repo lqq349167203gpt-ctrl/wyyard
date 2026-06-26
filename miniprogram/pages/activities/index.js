@@ -79,7 +79,7 @@ Page({
       // 原始数据存储（供详情编辑用）
       this._rawMap = {}
 
-      // 课程活动 — badge: course_type(有则显示) 或 沙龙(兜底), name: course_name
+      // 课程活动 — badge: course_type(有则显示) 或 沙龙(兜底), name: activity_name || course_name
       if (dashboard.class_records) {
         dashboard.class_records.forEach(r => {
           const badge = r.course_type || '沙龙'
@@ -87,7 +87,7 @@ Page({
           records.push({
             id: r.id,
             badge,
-            name: r.course_name || '',
+            name: r.activity_name || r.course_name || '',
             color: BADGE_COLORS[badge] || BADGE_COLORS['沙龙'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),

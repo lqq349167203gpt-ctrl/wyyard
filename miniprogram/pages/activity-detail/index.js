@@ -118,7 +118,7 @@ Page({
       date: raw.date || '',
       startTime: raw.start_time || '09:00',
       endTime: raw.end_time || '10:00',
-      activityName: raw.name || raw.course_name || '',
+      activityName: raw.activity_name || raw.name || raw.course_name || '',
       description: raw.description || raw.course_description || '',
       ownerId: raw.owner_id || '',
       ownerName: raw.owner_name || '',
@@ -367,7 +367,8 @@ Page({
         payload = {
           ...baseFields,
           course_id: course.id,
-          course_name: this.data.activityName || course.name,
+          course_name: course.name,
+          activity_name: this.data.activityName || '',
           course_type: course.type || '',
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,

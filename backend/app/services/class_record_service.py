@@ -40,7 +40,8 @@ def _fill_course_name(records: List[ClassRecord]) -> List[ClassRecord]:
     course_map = _build_course_map()
     for r in records:
         if r.course_id and r.course_id in course_map:
-            r.course_name = course_map[r.course_id]["name"]
+            if not r.activity_name:
+                r.course_name = course_map[r.course_id]["name"]
             if not r.course_type:
                 r.course_type = course_map[r.course_id]["type"]
     return records
