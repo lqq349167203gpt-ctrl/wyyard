@@ -1,5 +1,5 @@
 const {
-  classRecordApi, courseApi, spaceApi, customerApi,
+  classRecordApi, courseTypeApi, spaceApi, customerApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
   ohCardReadingSessionApi,
@@ -136,7 +136,7 @@ Page({
 
     // 加载空间/课程/客户，然后解析老师名称
     await this.loadSpaces(raw.space_id, raw.room_id)
-    await this.loadCourses(raw.course_id)
+    await this.loadCourses(raw.course_type)
     await this.loadCustomers()
     this.resolveTeacherNames()
   },
@@ -168,16 +168,16 @@ Page({
     }
   },
 
-  async loadCourses(courseId) {
+  async loadCourses(courseType) {
     try {
-      const courses = await courseApi.list()
-      const courseIndex = courseId
-        ? Math.max(-1, courses.findIndex(c => c.id === courseId))
+      const types = await courseTypeApi.list()
+      const courses = types.map(t => ({ id: t.name, name: t.name }))
+      const courseIndex = courseType
+        ? Math.max(-1, courses.findIndex(c => c.name === courseType))
         : -1
-      console.log('loadCourses: courseId=', courseId, 'courseIndex=', courseIndex, 'total=', courses.length)
       this.setData({ courses, courseIndex })
     } catch (e) {
-      console.error('加载课程失败:', e)
+      console.error('加载课程类型失败:', e)
     }
   },
 
@@ -366,10 +366,10 @@ Page({
         const course = this.data.courses[this.data.courseIndex]
         payload = {
           ...baseFields,
-          course_id: course.id,
+          course_id: '',
           course_name: course.name,
           activity_name: this.data.activityName || '',
-          course_type: course.type || '',
+          course_type: course.name,
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
           is_public_welfare: this.data.isPublicWelfare,

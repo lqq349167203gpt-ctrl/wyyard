@@ -84,11 +84,6 @@ const classRecordApi = {
   delete: (id) => request(`/api/class-records/${id}`, { method: 'DELETE' }),
 }
 
-// 课程 API
-const courseApi = {
-  list: () => request('/api/courses'),
-}
-
 // 课程类型 API
 const courseTypeApi = {
   list: () => request('/api/course-types'),
@@ -177,7 +172,6 @@ module.exports = {
   memberIdentityApi,
   authApi,
   dailyGroupingApi,
-  courseApi,
   courseTypeApi,
   groupCaseSessionApi,
   emotionalReleaseSessionApi,

@@ -14,11 +14,11 @@ import {
   classRecordApi, groupCaseSessionApi,
   emotionalReleaseSessionApi,
   energyKnotSessionApi, energyKnotApi,
-  internalCourseSessionApi, courseApi, customerApi, uploadApi, spaceApi,
+  internalCourseSessionApi, courseTypeApi, customerApi, uploadApi, spaceApi,
   activityThemeApi, ohCardReadingSessionApi, memberIdentityApi,
   type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession,
   type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession,
-  type Course, type CustomerLight, type Space,
+  type CourseType, type CustomerLight, type Space,
   type InternalCourseSessionCustomerSearchResult,
   type GroupCaseCustomerSearchResult,
   type ActivityTheme, type MemberIdentity,
@@ -1349,7 +1349,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
 
 // ===== Salon Dialog (独立组件) =====
 const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defaultSpaceId, onClose, onSaved }: {
-  open: boolean; date: string; spaces: Space[]; courses: Course[]
+  open: boolean; date: string; spaces: Space[]; courses: {id: string, name: string}[]
   teachers: CustomerLight[]; session?: ClassRecord | null; defaultSpaceId?: string; onClose: () => void
   onSaved: (record: ClassRecord) => void
 }) => {
@@ -1374,7 +1374,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         setFormDate(session.date)
         setFormStartTime(session.start_time || "")
         setFormEndTime(session.end_time || "")
-        setFormCourseId(session.course_id)
+        setFormCourseId(session.course_type || session.course_id)
         setFormTeacherIds(session.teacher_ids || [])
         setFormDescription(session.course_description || "")
         setFormIsPublicWelfare(session.is_public_welfare || false)
@@ -1405,7 +1405,8 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         const course = courses.find(c => c.id === formCourseId)
         result = await classRecordApi.update(editingRecord.id, {
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
-          course_id: formCourseId, course_name: course?.name || editingRecord.course_name,
+          course_id: '', course_name: course?.name || editingRecord.course_name,
+          course_type: course?.name || editingRecord.course_type || '',
           course_description: formDescription, teacher_ids: formTeacherIds,
           is_public_welfare: formIsPublicWelfare,
           activity_mode: formActivityMode,
@@ -1418,7 +1419,8 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         if (!course) return
         result = await classRecordApi.create({
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
-          course_id: formCourseId, course_name: course.name,
+          course_id: '', course_name: course.name,
+          course_type: course.name,
           course_description: formDescription, teacher_ids: formTeacherIds,
           is_public_welfare: formIsPublicWelfare,
           activity_mode: formActivityMode,
@@ -1846,7 +1848,7 @@ export default function DailyActivitiesPage() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
-  const [courses, setCourses] = useState<Course[]>([])
+  const [courses, setCourses] = useState<{id: string, name: string}[]>([])
   const [teachers, setTeachers] = useState<CustomerLight[]>([])
   const [calendarCounts, setCalendarCounts] = useState<Record<string, number>>({})
   const [spaces, setSpaces] = useState<Space[]>([])
@@ -2326,7 +2328,7 @@ export default function DailyActivitiesPage() {
   }, [])
 
   const load = () => {
-    courseApi.list().then(data => setCourses([...data].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)))).catch(() => {})
+    courseTypeApi.list().then(data => setCourses(data.map(t => ({ id: t.name, name: t.name })))).catch(() => {})
     spaceApi.list().then((list) => {
       setSpaces(list)
       if (list.length > 0) {

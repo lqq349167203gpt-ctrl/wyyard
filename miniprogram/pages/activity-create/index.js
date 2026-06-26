@@ -1,5 +1,5 @@
 const {
-  classRecordApi, courseApi, spaceApi, customerApi,
+  classRecordApi, courseTypeApi, spaceApi, customerApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
   ohCardReadingSessionApi,
@@ -95,10 +95,12 @@ Page({
 
   async loadCourses() {
     try {
-      const courses = await courseApi.list()
+      const types = await courseTypeApi.list()
+      // 转换为 picker 可用的格式 { id: name, name: name }
+      const courses = types.map(t => ({ id: t.name, name: t.name }))
       this.setData({ courses })
     } catch (e) {
-      console.error('加载课程失败:', e)
+      console.error('加载课程类型失败:', e)
     }
   },
 
@@ -328,10 +330,10 @@ Page({
           const course = this.data.courses[this.data.courseIndex]
           await classRecordApi.create({
             ...baseFields,
-            course_id: course.id,
+            course_id: '',
             course_name: course.name,
             activity_name: this.data.activityName || '',
-            course_type: course.type || '',
+            course_type: course.name,
             course_description: this.data.description,
             teacher_ids: this.data.teacherIds,
             is_public_welfare: this.data.isPublicWelfare,

@@ -5,11 +5,10 @@ import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi,
   courseTypeApi,
-  type Course, type CustomerLight, type Space, type MemberIdentity, type CourseType,
+  type CustomerLight, type Space, type MemberIdentity, type CourseType,
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
-import { CourseDropdown } from "@/components/course-dropdown"
 import { SpaceRoomDropdown } from "@/components/space-room-dropdown"
 import type { CardCallbacks } from "./index"
 
@@ -140,7 +139,7 @@ interface ActivityRow {
 
 let nextKey = 1
 
-function recordToRow(type: ActivityType, data: any, courses: Course[], defaultSpaceId: string, spaces: Space[]): ActivityRow {
+function recordToRow(type: ActivityType, data: any, courses: {id: string, name: string}[], defaultSpaceId: string, spaces: Space[]): ActivityRow {
   const key = nextKey++
   let ownerId = ""
   let ownerName = ""
@@ -250,7 +249,7 @@ export interface HistoryEntry {
 
 interface ActivityBatchTableProps {
   date: string
-  courses: Course[]
+  courses: {id: string, name: string}[]
   customers: CustomerLight[]
   teachers: CustomerLight[]
   spaces: Space[]
