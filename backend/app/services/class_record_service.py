@@ -121,7 +121,6 @@ def create_record(data: ClassRecordCreate) -> ClassRecord:
     )
     _records[record.id] = record
     _save(record.id)
-    _deduct_for_record(record)
     return record
 
 

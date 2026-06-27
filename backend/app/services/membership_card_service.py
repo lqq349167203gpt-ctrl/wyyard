@@ -118,7 +118,11 @@ def get_activity_deductions(customer_id: str) -> int:
         activity_date = _get_activity_date(key)
         if activity_date and activity_date in arrived_dates:
             count += 1
-    count += len(_debt_activities.get(customer_id, []))
+    # _debt_activities 去重后再过滤到场
+    for key in set(_debt_activities.get(customer_id, [])):
+        activity_date = _get_activity_date(key)
+        if activity_date and activity_date in arrived_dates:
+            count += 1
     return count
 
 
@@ -166,7 +170,9 @@ def get_effective_remaining(customer_id: str) -> Optional[int]:
     # 全部卡（含过期）的总购买，用于"过期后剩余=0"场景的基数
     all_cards = [c for c in list_cards() if c.customer_id == customer_id]
     if not all_cards:
-        return 0
+        manual = get_manual_deductions(customer_id)
+        activity = get_activity_deductions(customer_id)
+        return 0 - manual - activity
     # 有不限次卡在有效期内 → 不限次
     if any(c.remaining_count is None for c in active):
         return None

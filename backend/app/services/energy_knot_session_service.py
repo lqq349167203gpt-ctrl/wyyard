@@ -96,7 +96,6 @@ def create_session(data: EnergyKnotSessionCreate) -> EnergyKnotSession:
     )
     _sessions[session.id] = session
     _save(session.id)
-    _deduct_for_session(session)
     return session
 
 

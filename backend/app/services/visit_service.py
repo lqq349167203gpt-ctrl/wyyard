@@ -586,6 +586,9 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
     # 从未到店 → 已到店：执行会员活动扣费
     if not old_arrived and new_arrived:
         _deduct_for_arrival(record)
+    # 已到店 → 未到店：退还会员活动扣费
+    if old_arrived and not new_arrived:
+        _restore_for_arrival(record)
     # 自动刷新会员身份
     from app.services import member_identity_service
     member_identity_service.refresh_member_type(record.customer_id)
@@ -632,6 +635,44 @@ def _deduct_for_arrival(visit):
             chargeable = class_record_service._get_group_member_ids(cr)
             if cid in chargeable:
                 membership_card_service.deduct_for_activity(cid, f"class:{cr.id}")
+
+
+def _restore_for_arrival(visit):
+    """取消到场退费：遍历当天所有 session，退还参与/主持人员的会员活动扣费"""
+    from app.services import membership_card_service
+    from app.services import (
+        class_record_service,
+        group_case_session_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+    )
+    cid = visit.customer_id
+    date = visit.visit_date
+
+    for s in group_case_session_service.list_sessions():
+        if s.date == date:
+            chargeable = group_case_session_service._get_chargeable_ids(s)
+            if cid in chargeable:
+                membership_card_service.restore_for_activity(cid, f"gcs:{s.id}")
+
+    for s in emotional_release_session_service.list_sessions():
+        if s.date == date:
+            chargeable = emotional_release_session_service._get_chargeable_ids(s)
+            if cid in chargeable:
+                membership_card_service.restore_for_activity(cid, f"ers:{s.id}")
+
+    for s in energy_knot_session_service.list_sessions():
+        if s.date == date and not s.is_deleted:
+            chargeable = set(s.participant_ids)
+            chargeable.discard(s.owner_id)
+            if cid in chargeable:
+                membership_card_service.restore_for_activity(cid, f"eks:{s.id}")
+
+    for cr in class_record_service.list_records():
+        if cr.date == date and not cr.is_public_welfare:
+            chargeable = class_record_service._get_group_member_ids(cr)
+            if cid in chargeable:
+                membership_card_service.restore_for_activity(cid, f"class:{cr.id}")
 
 
 def _remove_from_parallel_lists(ids: list, names: list, target_id: str):
