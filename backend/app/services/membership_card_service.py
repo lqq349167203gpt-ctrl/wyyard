@@ -100,8 +100,59 @@ def get_manual_deductions(customer_id: str) -> int:
 
 
 def get_activity_deductions(customer_id: str) -> int:
-    """活动扣卡次数（ Hunting _deductions 流水中 activity_key 的条数；欠费登记的 _debt_activities 也算扣过）"""
-    return len(_deductions.get(customer_id, [])) + len(_debt_activities.get(customer_id, []))
+    """活动扣卡次数（仅统计已到场的扣费记录）"""
+    from app.services import (
+        visit_service,
+        class_record_service,
+        group_case_session_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+        oh_card_reading_session_service,
+    )
+    # 已到场日期集合
+    arrived_dates = {v.visit_date for v in visit_service._visits.values()
+                     if v.customer_id == customer_id and v.arrived and not v.is_deleted}
+    # 遍历扣费记录，只统计活动日期在已到场日期中的
+    count = 0
+    for key in _deductions.get(customer_id, []):
+        activity_date = _get_activity_date(key)
+        if activity_date and activity_date in arrived_dates:
+            count += 1
+    count += len(_debt_activities.get(customer_id, []))
+    return count
+
+
+def _get_activity_date(activity_key: str) -> Optional[str]:
+    """根据 activity_key（如 class:xxx, gcs:xxx）查找活动日期"""
+    from app.services import (
+        class_record_service,
+        group_case_session_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+        oh_card_reading_session_service,
+    )
+    if ':' not in activity_key:
+        return None
+    type_prefix, item_id = activity_key.split(':', 1)
+    try:
+        if type_prefix == 'class':
+            r = class_record_service.get_record(item_id)
+            return r.date if r else None
+        elif type_prefix == 'gcs':
+            s = group_case_session_service.get_session(item_id)
+            return s.date if s else None
+        elif type_prefix == 'ers':
+            s = emotional_release_session_service.get_session(item_id)
+            return s.date if s else None
+        elif type_prefix == 'eks':
+            s = energy_knot_session_service.get_session(item_id)
+            return s.date if s else None
+        elif type_prefix == 'ocr':
+            s = oh_card_reading_session_service.get_session(item_id)
+            return s.date if s else None
+    except Exception:
+        return None
+    return None
 
 
 def get_effective_remaining(customer_id: str) -> Optional[int]:
