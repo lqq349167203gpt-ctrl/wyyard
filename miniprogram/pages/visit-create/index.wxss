@@ -22,7 +22,6 @@
   flex: 1;
   font-size: 28rpx;
   color: #1f2329;
-  text-align: right;
 }
 
 .picker-display.placeholder {
@@ -32,7 +31,6 @@
 .picker-value-wrap {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   flex: 1;
   min-width: 0;
 }
