@@ -162,19 +162,29 @@ def _get_activity_date(activity_key: str) -> Optional[str]:
 def get_effective_remaining(customer_id: str) -> Optional[int]:
     """唯一真理：有效剩余 = 总购买 - 销卡 - 活动扣卡
 
-    返回 None 表示不限次（有任一不限次卡在有效期）；无任何卡或卡全过期则返回 0。
+    返回 None 表示不限次。触发不限次的两种情况：
+    1. 有任一不限次卡在有效期内
+    2. 在内部课程有效期（疗愈师课程等已购课程生效区间）
+
+    其余情况按 total - manual - activity 计算（可为负数，表示欠费）。
     不再读 card.remaining_count 作为依据，仅用流水相减。
     """
+    from app.services import internal_course_service
     today = datetime.now().strftime("%Y-%m-%d")
     active = _active_cards(customer_id, today)
-    # 全部卡（含过期）的总购买，用于"过期后剩余=0"场景的基数
     all_cards = [c for c in list_cards() if c.customer_id == customer_id]
     if not all_cards:
+        # 无会员卡：若在内部课程有效期，视为不限次；否则按流水算欠费（负数）
+        if internal_course_service.has_active_course(customer_id):
+            return None
         manual = get_manual_deductions(customer_id)
         activity = get_activity_deductions(customer_id)
         return 0 - manual - activity
     # 有不限次卡在有效期内 → 不限次
     if any(c.remaining_count is None for c in active):
+        return None
+    # 在内部课程有效期 → 不限次（即使会员卡次数已扣完，也不显示负数）
+    if internal_course_service.has_active_course(customer_id):
         return None
     total = get_grand_total(customer_id)
     manual = get_manual_deductions(customer_id)
@@ -375,6 +385,10 @@ def deduct_for_activity(customer_id: str, activity_key: str) -> bool:
     """为指定用户在指定活动中扣费（同一活动同一人只扣一次）"""
     if customer_id in _deductions and activity_key in _deductions[customer_id]:
         return True  # 已扣过，跳过
+    # 在内部课程有效期：会员次数不限，不再扣会员卡、也不记欠费
+    from app.services import internal_course_service
+    if internal_course_service.has_active_course(customer_id):
+        return True
     success = _deduct_one(customer_id)
     if success:
         _deductions.setdefault(customer_id, []).append(activity_key)

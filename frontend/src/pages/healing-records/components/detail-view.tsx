@@ -199,9 +199,9 @@ export default function DetailView({
           <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />
           <div className="px-4 pt-2 pb-3 flex items-baseline gap-2">
             <span className="text-[12px] text-[#8f959e] font-normal shrink-0 w-[56px] text-right tracking-widest">其他信息</span>
-            <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has("其他信息") ? "" : "line-clamp-2 pr-10 h-[36px] overflow-hidden"}`}>
+            <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has("其他信息") ? "" : "line-clamp-1 pr-8 h-[18px] overflow-hidden"}`}>
               {c.other_info || <span className="text-[#d0d3d6]">-</span>}
-              {c.other_info && c.other_info.length > 80 && (
+              {c.other_info && c.other_info.length > 40 && (
                 <button className="absolute bottom-0 right-0 text-[12px] text-[#8f959e] hover:text-[#4e535a] bg-white pl-1" onClick={() => setExpandedFields(prev => { const n = new Set(prev); n.has("其他信息") ? n.delete("其他信息") : n.add("其他信息"); return n })}>
                   {expandedFields.has("其他信息") ? "收起" : "展开"}
                 </button>
@@ -213,22 +213,21 @@ export default function DetailView({
         {/* 右栏：背景信息 */}
         <div className="flex-1 min-w-0 flex flex-col relative">
           <div className="absolute left-0 top-[10px] bottom-[10px] w-px bg-[#f0f0f0]" />
-          {[["到访目的",c.tags||""],["创伤经历",c.basic_info||""],["当下卡点",c.assessment||""],["工作情况",c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "")]].map(([l,v], i) => (
-            <div key={l}>
-              {i > 0 && <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />}
-              <div className="px-4 py-2 flex items-baseline gap-2">
-                <span className="text-[12px] text-[#8f959e] font-normal shrink-0">{l}</span>
-                <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has(l as string) ? "" : "line-clamp-2 pr-10 h-[36px] overflow-hidden"}`}>
+          <div className="px-4 pt-2 pb-3 grid grid-cols-2 gap-y-2.5 gap-x-6">
+            {[["到访目的",c.tags||""],["创伤经历",c.basic_info||""],["当下卡点",c.assessment||""],["工作情况",c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "")]].map(([l,v], i) => (
+              <div key={l as string} className="flex items-baseline gap-2">
+                <span className="text-[12px] text-[#8f959e] font-normal shrink-0 w-[56px] text-right tracking-widest">{l as string}</span>
+                <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has(l as string) ? "" : "line-clamp-1 pr-8 h-[18px] overflow-hidden"}`}>
                   {v || <span className="text-[#d0d3d6]">-</span>}
-                  {v && (v as string).length > 80 && (
+                  {v && (v as string).length > 40 && (
                     <button className="absolute bottom-0 right-0 text-[12px] text-[#8f959e] hover:text-[#4e535a] bg-white pl-1" onClick={() => setExpandedFields(prev => { const n = new Set(prev); n.has(l as string) ? n.delete(l as string) : n.add(l as string); return n })}>
                       {expandedFields.has(l as string) ? "收起" : "展开"}
                     </button>
                   )}
                 </span>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
@@ -450,15 +449,20 @@ export default function DetailView({
                       const expired = s.expiry_date && s.expiry_date < today
                       const noCount = typeof s.remaining === "number" && s.remaining === 0
                       return (
-                        <div key={i} className="flex items-center gap-2 py-3">
+<div key={i} className="flex items-center gap-2 py-3">
                           <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">{s.type}</span>
                           <span className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
-                            {s.type === "内部课程" ? (
-                              <span className="inline-flex items-baseline gap-2">
-                                <span>{s.name}</span>
-                                <span>{s.effective_date || <span className="text-[#d0d3d6]">-</span>}/{s.expiry_date || <span className="text-[#d0d3d6]">-</span>}</span>
-                              </span>
-                            ) : s.type === "其他项目" ? (
+                            {s.type === "内部课程" ? (() => {
+                              const notStarted = s.effective_date && s.effective_date > today
+                              return (
+                                <span className={expired ? "text-[#c4506a]" : notStarted ? "text-[#8f959e]" : ""}>
+                                  {s.name}
+                                  {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
+                                  {expired && "（已过期）"}
+                                  {notStarted && "（未生效）"}
+                                </span>
+                              )
+                            })() : s.type === "其他项目" ? (
                               <span className="inline-flex items-baseline gap-2">
                                 <span>{s.name}</span>
                                 <span>{s.activity_mode || "线下"}</span>
@@ -469,8 +473,8 @@ export default function DetailView({
                               <span>{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
                             )}
                           </span>
-                          {expired && <span className="text-[12px] text-[#c4506a] bg-[#fef0f0] px-1.5 py-0.5 rounded shrink-0">已过期</span>}
-                          {noCount && !expired && <span className="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded shrink-0">无次数</span>}
+                          {expired && s.type !== "内部课程" && <span className="text-[12px] text-[#c4506a] bg-[#fef0f0] px-1.5 py-0.5 rounded shrink-0">已过期</span>}
+                          {noCount && !expired && !(s.effective_date && s.effective_date > today) && s.type !== "内部课程" && <span className="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded shrink-0">无次数</span>}
                         </div>
                       )
                     })}

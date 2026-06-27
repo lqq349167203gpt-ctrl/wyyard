@@ -368,6 +368,32 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     return `新增 - ${typeName}`
   }, [formType, editingItem])
 
+  const resetTypeFields = () => {
+    // 会员卡
+    setFormCardType("")
+    setFormEffectiveDate(today)
+    setFormDurationType("day")
+    setFormDurationValue("")
+    setFormRemainingCount("")
+    setFormUnlimited(false)
+    setFormPrice("")
+    // 觉醒等
+    setFormPurchaseCount("")
+    setFormAmount("")
+    // 内部课程
+    setFormCourseType("")
+    setFormCourseAmount(0)
+    // 其他项目
+    setFormCategory("")
+    setFormProjectName("")
+    setFormFee("")
+    setFormOtherEffectiveDate(today)
+    setFormOtherDurationType("day")
+    setFormOtherDurationValue("")
+    setFormOtherRemainingCount("")
+    setFormOtherUnlimited(false)
+  }
+
   const resetForm = () => {
     setFormCustomerId("")
     setFormNickname("")
@@ -1180,7 +1206,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                     label: PROJECT_TYPES[key].label,
                   }))}
                   placeholder="请选择项目类型"
-                  onChange={(v) => { setFormType(v as ProjectTypeKey); resetForm() }}
+                  onChange={(v) => { setFormType(v as ProjectTypeKey); resetTypeFields() }}
                 />
               </div>
             )}
