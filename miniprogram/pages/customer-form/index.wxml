@@ -1,7 +1,6 @@
 <view class="container">
   <!-- 基本信息 -->
   <view class="form-card">
-    <view class="form-card-title">基本信息</view>
     <view class="form-item">
       <text class="form-label required">昵称</text>
       <input class="form-input" placeholder="必填" placeholder-class="form-input-placeholder" value="{{nickname}}" bindinput="onInput" data-field="nickname" />
@@ -91,7 +90,6 @@
 
   <!-- 详细信息 -->
   <view class="form-card">
-    <view class="form-card-title">详细信息</view>
     <view class="form-item">
       <text class="form-label">工作情况</text>
       <picker class="form-picker" mode="selector" range="{{['在职', '离职', '自由职业']}}" bindchange="onWorkStatusChange">
@@ -120,7 +118,11 @@
     </view>
   </view>
 
-  <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
-    {{isEdit ? '保存' : '添加'}}
-  </button>
+  <view class="btn-row" wx:if="{{isEdit}}">
+    <button class="btn-danger" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+  </view>
+  <view class="btn-row" wx:else>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">添    加</button>
+  </view>
 </view>

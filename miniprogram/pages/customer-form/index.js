@@ -8,6 +8,7 @@ Page({
     id: '',
     isEdit: false,
     saving: false,
+    deleting: false,
     nickname: '',
     name: '',
     gender: '',
@@ -152,6 +153,27 @@ Page({
   onPickerClear(e) {
     const field = e.currentTarget.dataset.field
     this.setData({ [field]: '' })
+  },
+
+  onDelete() {
+    wx.showModal({
+      title: '确认删除',
+      content: '确定要删除该客户吗？',
+      confirmColor: '#f54a45',
+      success: async (res) => {
+        if (!res.confirm) return
+        this.setData({ deleting: true })
+        try {
+          await customerApi.delete(this.data.id)
+          wx.showToast({ title: '已删除' })
+          wx.navigateBack()
+        } catch (e) {
+          wx.showToast({ title: '删除失败', icon: 'none' })
+        } finally {
+          this.setData({ deleting: false })
+        }
+      }
+    })
   },
 
   async onSubmit() {

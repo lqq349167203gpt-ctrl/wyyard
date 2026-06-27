@@ -16,6 +16,14 @@
   background-color: #f7f8fa;
   padding: 12rpx 20rpx;
   border-radius: 8rpx;
+  text-align: right;
+}
+
+.form-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2329;
+  text-align: right;
 }
 
 .form-picker {
@@ -27,6 +35,7 @@
   flex: 1;
   font-size: 28rpx;
   color: #1f2329;
+  text-align: right;
 }
 
 .submit-btn {
@@ -64,6 +73,7 @@
 .picker-value-wrap {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex: 1;
   min-width: 0;
 }

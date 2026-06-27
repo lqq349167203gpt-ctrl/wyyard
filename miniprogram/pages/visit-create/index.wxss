@@ -29,6 +29,13 @@
   color: #b0b5bb;
 }
 
+.form-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2329;
+  text-align: right;
+}
+
 .picker-value-wrap {
   display: flex;
   align-items: center;

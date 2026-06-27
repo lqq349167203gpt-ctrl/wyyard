@@ -24,9 +24,9 @@
         <text class="picker-clear" wx:if="{{customerName}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
-    <view class="form-item column textarea-row">
-      <text class="form-label" style="margin-bottom: 16rpx;">本次需求</text>
-      <textarea class="form-textarea" style="height: 126rpx;" placeholder="描述客户需求" placeholder-class="form-textarea-placeholder" value="{{needs}}" bindinput="onNeedsInput" />
+    <view class="form-item">
+      <text class="form-label">本次需求</text>
+      <input class="form-input" placeholder="描述客户需求" placeholder-class="form-input-placeholder" value="{{needs}}" bindinput="onNeedsInput" />
     </view>
     <view class="form-item" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>

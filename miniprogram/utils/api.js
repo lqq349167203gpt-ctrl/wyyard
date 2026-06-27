@@ -143,6 +143,7 @@ const customerApi = {
   },
   create: (data) => request('/api/customers', { method: 'POST', data }),
   update: (id, data) => request(`/api/customers/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/customers/${id}`, { method: 'DELETE' }),
 }
 
 // 空间 API
