@@ -1,5 +1,5 @@
 const {
-  classRecordApi, courseTypeApi, spaceApi, customerApi,
+  classRecordApi, courseTypeApi, spaceApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
   ohCardReadingSessionApi,
@@ -42,16 +42,16 @@ const ACTIVITY_TYPES = [
   { value: 'class', label: '沙龙活动' },
   { value: 'gcs', label: '觉醒游戏' },
   { value: 'ers', label: '情绪释放' },
+  { value: 'ocr', label: 'OH卡' },
   { value: 'eks', label: '能量结' },
   { value: 'ics', label: '内部课程' },
-  { value: 'ocr', label: 'OH卡' },
 ]
 
 Page({
   data: {
     activityType: '',
-    typeIndex: 0,
-    activityTypes: ACTIVITY_TYPES,
+    unifiedTypes: [],
+    unifiedIndex: 0,
     typeLabel: '',
     typeColor: '',
     date: '',
@@ -69,7 +69,11 @@ Page({
     ownerName: '',
     teacherIds: [],
     teacherNames: [],
+    teacherDisplay: '',
     isPublicWelfare: false,
+    participantIds: [],
+    participantList: [],
+    dayVisitors: [],
     activityName: '',
     description: '',
     allCustomers: [],
@@ -78,6 +82,8 @@ Page({
     pickerMode: '',
     pickerKeyword: '',
     pickerList: [],
+    showTypePicker: false,
+    typePickerStep: 1,
     saving: false,
     deleting: false,
     _recordId: '',
@@ -93,14 +99,7 @@ Page({
       return
     }
 
-    console.log('activity-detail raw:', JSON.stringify({
-      id: raw.id, date: raw.date, start_time: raw.start_time, end_time: raw.end_time,
-      course_id: raw.course_id, course_name: raw.course_name,
-      owner_id: raw.owner_id, host_id: raw.host_id, teacher_ids: raw.teacher_ids,
-    }))
-
     const activityType = SOURCE_TO_TYPE[source]
-    const typeIndex = ACTIVITY_TYPES.findIndex(t => t.value === activityType)
     const typeLabel = raw.course_type || TYPE_LABELS[activityType] || ''
     const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
 
@@ -110,7 +109,6 @@ Page({
 
     const initData = {
       activityType,
-      typeIndex: typeIndex >= 0 ? typeIndex : 0,
       typeLabel,
       typeColor,
       _recordId: raw.id,
@@ -124,6 +122,7 @@ Page({
       ownerName: raw.owner_name || '',
       teacherIds: raw.teacher_ids || [],
       isPublicWelfare: raw.is_public_welfare || false,
+      participantIds: raw.participant_ids || [],
       activityModeIndex: (raw.activity_mode === '线上') ? 1 : 0,
     }
 
@@ -132,23 +131,36 @@ Page({
       initData.teacherIds = raw.host_id ? [raw.host_id] : []
     }
 
-    this.setData(initData)
-
-    // 加载空间/课程/客户，然后解析老师名称
+    // 加载空间/课程/客户/到场人员
     await this.loadSpaces(raw.space_id, raw.room_id)
     await this.loadCourses(raw.course_type)
     await this.loadCustomers()
-    this.resolveTeacherNames()
-  },
+    await this.loadDayVisitors(raw.date)
 
-  resolveTeacherNames() {
-    const { teacherIds, allCustomers, activityType } = this.data
-    if (teacherIds.length === 0 || allCustomers.length === 0) return
-    const names = teacherIds.map(id => {
-      const c = allCustomers.find(c => c.id === id)
-      return c ? c.nickname : ''
-    }).filter(Boolean)
-    this.setData({ teacherNames: names })
+    // 计算 unifiedIndex
+    const { unifiedTypes } = this.data
+    let unifiedIndex = 0
+    if (activityType === 'class' && raw.course_type) {
+      unifiedIndex = unifiedTypes.findIndex(t => !t.isType && t.courseName === raw.course_type)
+    } else {
+      unifiedIndex = unifiedTypes.findIndex(t => t.isType && t.value === activityType)
+    }
+    if (unifiedIndex < 0) unifiedIndex = 0
+    initData.unifiedIndex = unifiedIndex
+
+    // 解析老师名称
+    const { teacherIds } = initData
+    const allCustomers = this.data.allCustomers
+    if (teacherIds.length > 0 && allCustomers.length > 0) {
+      initData.teacherNames = teacherIds.map(id => {
+        const c = allCustomers.find(c => c.id === id)
+        return c ? c.nickname : ''
+      }).filter(Boolean)
+      initData.teacherDisplay = initData.teacherNames.join('、')
+    }
+
+    this.setData(initData)
+    this.updateParticipantList()
   },
 
   async loadSpaces(savedSpaceId, savedRoomId) {
@@ -175,7 +187,18 @@ Page({
       const courseIndex = courseType
         ? Math.max(-1, courses.findIndex(c => c.name === courseType))
         : -1
-      this.setData({ courses, courseIndex })
+
+      // 构建合并列表：非 class 类型 + 课程类型
+      const nonClassTypes = ACTIVITY_TYPES.filter(t => t.value !== 'class')
+      const courseItems = courses.map(c => ({
+        value: 'class', label: c.name, isType: false, courseName: c.name,
+      }))
+      const unifiedTypes = [
+        ...nonClassTypes.map(t => ({ ...t, isType: true })),
+        ...courseItems,
+      ]
+
+      this.setData({ courses, courseIndex, unifiedTypes })
     } catch (e) {
       console.error('加载课程类型失败:', e)
     }
@@ -187,6 +210,19 @@ Page({
       this.setData({ allCustomers: customers })
     } catch (e) {
       console.error('加载客户列表失败:', e)
+    }
+  },
+
+  async loadDayVisitors(date) {
+    try {
+      const visits = await visitApi.listLight(date)
+      const visitors = (visits || []).map(v => ({
+        id: v.customer_id || '',
+        nickname: v.customer_nickname || v.nickname || '',
+      })).filter(v => v.id)
+      this.setData({ dayVisitors: visitors })
+    } catch (e) {
+      console.error('加载到场人员失败:', e)
     }
   },
 
@@ -205,32 +241,77 @@ Page({
     this.setData({ roomIndex: e.detail.value })
   },
 
-  onCourseChange(e) {
-    this.setData({ courseIndex: e.detail.value })
+  // ---------- 类型选择弹窗 ----------
+
+  onTypePickerOpen() {
+    this.setData({ showTypePicker: true, typePickerStep: 1 })
   },
 
-  onActivityModeChange(e) {
-    this.setData({ activityModeIndex: e.detail.value })
+  onTypePickerClose() {
+    this.setData({ showTypePicker: false, typePickerStep: 1 })
   },
 
-  onTypeChange(e) {
-    const typeIndex = e.detail.value
-    const activityType = ACTIVITY_TYPES[typeIndex].value
-    const typeLabel = TYPE_LABELS[activityType] || ''
-    const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
-    this.setData({
-      typeIndex,
-      activityType,
-      typeLabel,
-      typeColor,
-      courseIndex: -1,
+  onTypePickerBack() {
+    this.setData({ typePickerStep: 1 })
+  },
+
+  onTypeSelect(e) {
+    const value = e.currentTarget.dataset.value
+    if (value === 'class') {
+      this.setData({ typePickerStep: 2 })
+    } else {
+      // 非课程类型，直接确认
+      this.applyTypeSelection(value, -1)
+      this.setData({ showTypePicker: false, typePickerStep: 1 })
+    }
+  },
+
+  onCourseSelect(e) {
+    const index = e.currentTarget.dataset.index
+    this.applyTypeSelection('class', index)
+    this.setData({ showTypePicker: false, typePickerStep: 1 })
+  },
+
+  applyTypeSelection(activityType, courseIndex) {
+    const resetFields = {
       ownerId: '',
       ownerName: '',
       teacherIds: [],
       teacherNames: [],
+      teacherDisplay: '',
       isPublicWelfare: false,
       activityModeIndex: 0,
-    })
+    }
+
+    if (activityType === 'class' && courseIndex >= 0) {
+      const course = this.data.courses[courseIndex]
+      const typeColor = BADGE_COLORS['沙龙'] || '#3370ff'
+      const unifiedIndex = this.data.unifiedTypes.findIndex(t => !t.isType && t.courseName === course.name)
+      this.setData({
+        ...resetFields,
+        activityType: 'class',
+        typeLabel: course.name,
+        typeColor,
+        courseIndex,
+        unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
+      })
+    } else {
+      const typeLabel = TYPE_LABELS[activityType] || ''
+      const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
+      const unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === activityType)
+      this.setData({
+        ...resetFields,
+        activityType,
+        typeLabel,
+        typeColor,
+        courseIndex: -1,
+        unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
+      })
+    }
+  },
+
+  onActivityModeChange(e) {
+    this.setData({ activityModeIndex: e.detail.value })
   },
 
   onPublicWelfareChange(e) {
@@ -243,6 +324,30 @@ Page({
 
   onDescriptionInput(e) {
     this.setData({ description: e.detail.value })
+  },
+
+  // ---------- 参与者 ----------
+
+  updateParticipantList() {
+    const { dayVisitors, participantIds } = this.data
+    const participantList = dayVisitors.map(c => ({
+      ...c,
+      selected: participantIds.includes(c.id),
+    }))
+    this.setData({ participantList })
+  },
+
+  onParticipantToggle(e) {
+    const id = e.currentTarget.dataset.id
+    let participantIds = [...this.data.participantIds]
+    const idx = participantIds.indexOf(id)
+    if (idx >= 0) {
+      participantIds.splice(idx, 1)
+    } else {
+      participantIds.push(id)
+    }
+    this.setData({ participantIds })
+    this.updateParticipantList()
   },
 
   // ---------- 搜索弹窗 ----------
@@ -307,7 +412,8 @@ Page({
     if (this.data.pickerMode === 'owner') {
       this.setData({ ownerId: id, ownerName: nickname, showPicker: false, pickerKeyword: '' })
     } else {
-      let { teacherIds, teacherNames } = this.data
+      let teacherIds = [...this.data.teacherIds]
+      let teacherNames = [...this.data.teacherNames]
       const idx = teacherIds.indexOf(id)
       if (idx >= 0) {
         teacherIds.splice(idx, 1)
@@ -317,7 +423,7 @@ Page({
         teacherNames.push(nickname)
       }
       const pickerList = this.data.pickerList.map(c => ({ ...c, _selected: teacherIds.includes(c.id) }))
-      this.setData({ teacherIds, teacherNames, pickerList })
+      this.setData({ teacherIds, teacherNames, teacherDisplay: teacherNames.join('、'), pickerList })
     }
   },
 
@@ -326,7 +432,7 @@ Page({
   },
 
   onTeacherClear() {
-    this.setData({ teacherIds: [], teacherNames: [] })
+    this.setData({ teacherIds: [], teacherNames: [], teacherDisplay: '' })
   },
 
   // ---------- 保存 ----------
@@ -342,10 +448,6 @@ Page({
       wx.showToast({ title: '请选择案主', icon: 'none' })
       return
     }
-    if (activityType === 'ics' && !this.data.activityName) {
-      wx.showToast({ title: '请输入名称', icon: 'none' })
-      return
-    }
 
     const space = this.data.spaces[this.data.spaceIndex]
     const room = this.data.rooms[this.data.roomIndex]
@@ -358,6 +460,7 @@ Page({
       room_name: room?.name || '',
       space_name: space?.name || '',
       activity_mode: this.data.activityModes[this.data.activityModeIndex],
+      participant_ids: this.data.participantIds,
     }
 
     let payload

@@ -9,14 +9,6 @@ const BADGE_COLORS = {
   '能量结': '#d9944a',
   '内部课程': '#5ba88a',
   'OH卡': '#c772a0',
-  '读书会': '#3370ff',
-  '呼吸禅茶': '#5ba88a',
-  'AB情景剧': '#d9944a',
-  '沙盘疗愈': '#8b72c7',
-  '身体课': '#d97070',
-  '颂钵': '#c772a0',
-  '艺术疗愈': '#bfa060',
-  '疗愈行业分享会': '#4a90d9',
 }
 
 Page({
@@ -88,12 +80,13 @@ Page({
             id: r.id,
             badge,
             name: r.activity_name || r.course_name || '',
-            color: BADGE_COLORS[badge] || BADGE_COLORS['沙龙'],
+            color: BADGE_COLORS['沙龙'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'class_record',
+            isPublicWelfare: r.is_public_welfare || false,
           })
         })
       }

@@ -69,6 +69,7 @@ def create_deduction(data: OtherProjectDeductionCreate) -> OtherProjectDeduction
     if project.remaining_count is not None:
         if project.remaining_count < data.count:
             raise ValueError(f"剩余次数不足（剩余 {project.remaining_count} 次）")
+        # 字段是销卡次数的可视图层，写流水与改字段同步（PATCH 已禁止外部直接改）
         project.remaining_count -= data.count
         other_project_service.update_project(project.id, {"remaining_count": project.remaining_count})
     remaining_after = project.remaining_count if project.remaining_count is not None else -1

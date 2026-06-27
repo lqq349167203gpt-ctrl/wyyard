@@ -1443,10 +1443,14 @@ export const healingRecordApi = {
 // Customer Detail (聚合)
 export interface PurchaseSummaryItem {
   type: string
-  total_purchased: number
+  total_purchased: number | string
+  grand_total?: number
   total_amount: number
   used: number | string
   remaining: number | string
+  effective_remaining?: number | string
+  manual_deductions?: number
+  activity_deductions?: number
   name?: string
   effective_date?: string
   expiry_date?: string

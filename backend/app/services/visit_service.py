@@ -72,7 +72,7 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
     def _role(cid: str) -> str:
         return "组长" if cid in leader_set else "参与者"
 
-    # 1. 沙龙活动（teacher 优先于 participant）
+    # 1. 沙龙活动（teacher 优先于 participant；participant 范围含 groups 分组人员，与 _count_untracked_chargeable_activities 保持一致）
     for cr in class_record_service.list_records(date):
         teacher_names = []
         for tid in cr.teacher_ids:
@@ -80,11 +80,12 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
             if tc:
                 teacher_names.append(tc.nickname or tc.name)
         owner_name = "、".join(teacher_names)
-        all_ids = set(cr.teacher_ids) | set(cr.participant_ids)
+        chargeable = class_record_service._get_group_member_ids(cr)  # participant_ids ∪ groups.* - teacher_ids
+        all_ids = set(cr.teacher_ids) | chargeable
         for cid in all_ids:
             if cid in cr.teacher_ids:
                 result[cid].append(ActivityInfo(name=cr.course_name, role="课程老师", type="沙龙", owner_name=owner_name, is_welfare=cr.is_public_welfare))
-            elif cid in cr.participant_ids:
+            else:
                 result[cid].append(ActivityInfo(name=cr.course_name, role=_role(cid), type="沙龙", owner_name=owner_name, is_welfare=cr.is_public_welfare))
 
     # 2. 觉醒游戏（owner > host > participant）
@@ -316,7 +317,7 @@ def get_date_counts(customer_ids: list[str] | None = None, start_date: str | Non
 
 
 def _count_untracked_chargeable_activities(customer_id: str) -> int:
-    """统计某客户需要扣费但尚未扣费的活动数"""
+    """统计某客户需要扣费但尚未扣费的活动数（只统计实际到场的）"""
     from app.services import membership_card_service
     from app.services import (
         class_record_service,
@@ -330,31 +331,83 @@ def _count_untracked_chargeable_activities(customer_id: str) -> int:
         return 0
 
     deducted = set(membership_card_service._deductions.get(customer_id, []))
+    debt_acts = set(membership_card_service._debt_activities.get(customer_id, []))
+    tracked = deducted | debt_acts
+
+    # 获取该客户实际到场的日期集合（直接读 _visits 避免递归）
+    arrived_dates = set()
+    for v in _visits.values():
+        if not v.is_deleted and v.customer_id == customer_id and v.arrived:
+            arrived_dates.add(v.visit_date)
+
     count = 0
 
     # 觉醒游戏
     for s in group_case_session_service.list_sessions():
         if not s.is_deleted and customer_id in group_case_session_service._get_chargeable_ids(s):
-            if f"gcs:{s.id}" not in deducted:
+            if f"gcs:{s.id}" not in tracked and s.date in arrived_dates:
                 count += 1
 
     # 情绪释放
     for s in emotional_release_session_service.list_sessions():
         if not s.is_deleted and customer_id in emotional_release_session_service._get_chargeable_ids(s):
-            if f"ers:{s.id}" not in deducted:
+            if f"ers:{s.id}" not in tracked and s.date in arrived_dates:
                 count += 1
 
     # 能量结
     for s in energy_knot_session_service.list_sessions():
         if not s.is_deleted and customer_id in energy_knot_session_service._get_chargeable_ids(s):
-            if f"eks:{s.id}" not in deducted:
+            if f"eks:{s.id}" not in tracked and s.date in arrived_dates:
                 count += 1
 
     # 沙龙（排除公益）
     for cr in class_record_service.list_records():
         if not cr.is_deleted and not cr.is_public_welfare:
             if customer_id in class_record_service._get_group_member_ids(cr):
-                if f"class:{cr.id}" not in deducted:
+                if f"class:{cr.id}" not in tracked and cr.date in arrived_dates:
+                    count += 1
+
+    return count
+
+
+def count_arrived_chargeable_activities(customer_id: str) -> int:
+    """统计某客户所有已到场的可扣费活动数（用于显示活动扣卡次数）"""
+    from app.services import (
+        class_record_service,
+        group_case_session_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+    )
+    from app.services import internal_course_service
+    if internal_course_service.has_active_course(customer_id):
+        return 0
+
+    arrived_dates = set()
+    for v in _visits.values():
+        if not v.is_deleted and v.customer_id == customer_id and v.arrived:
+            arrived_dates.add(v.visit_date)
+
+    count = 0
+
+    for s in group_case_session_service.list_sessions():
+        if not s.is_deleted and customer_id in group_case_session_service._get_chargeable_ids(s):
+            if s.date in arrived_dates:
+                count += 1
+
+    for s in emotional_release_session_service.list_sessions():
+        if not s.is_deleted and customer_id in emotional_release_session_service._get_chargeable_ids(s):
+            if s.date in arrived_dates:
+                count += 1
+
+    for s in energy_knot_session_service.list_sessions():
+        if not s.is_deleted and customer_id in energy_knot_session_service._get_chargeable_ids(s):
+            if s.date in arrived_dates:
+                count += 1
+
+    for cr in class_record_service.list_records():
+        if not cr.is_deleted and not cr.is_public_welfare:
+            if customer_id in class_record_service._get_group_member_ids(cr):
+                if cr.date in arrived_dates:
                     count += 1
 
     return count
@@ -402,28 +455,17 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
                 r.member_type = customer.member_type or ""
         r.activity_count = all_activity_counts.get(r.customer_id, 0)
         r.welfare_count = all_welfare_counts.get(r.customer_id, 0)
-        # 会员活动剩余次数
-        all_cards = all_cards_map.get(r.customer_id, [])
-        active_cards = [c for c in all_cards if not c.expiry_date or c.expiry_date >= today]
-        untracked = _count_untracked_chargeable_activities(r.customer_id)
-        if active_cards:
-            unlimited = [c for c in active_cards if c.remaining_count is None]
-            if unlimited:
+        # 会员活动剩余次数：唯一真理由流水派生（总-销卡-活动扣卡），None=不限次
+        effective = membership_card_service.get_effective_remaining(r.customer_id)
+        if effective is None:
+            # 检查是否有不限次卡在有效期，若有则 -999 标记不限
+            active_cards = all_cards_map.get(r.customer_id, [])
+            if any(c.remaining_count is None for c in active_cards):
                 r.remaining_count = -999
             else:
-                total = sum(c.remaining_count or 0 for c in active_cards)
-                r.remaining_count = total - untracked
-        else:
-            from app.services import internal_course_service
-            if internal_course_service.has_active_course(r.customer_id):
                 r.remaining_count = 0
-            else:
-                debt = membership_card_service.get_debt(r.customer_id)
-                total_debt = debt + untracked
-                if total_debt > 0:
-                    r.remaining_count = -total_debt
-                else:
-                    r.remaining_count = 0
+        else:
+            r.remaining_count = effective
         r.activities = all_activities.get((r.customer_id, r.visit_date), [])
 
     if records:
@@ -460,20 +502,19 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 if customer:
                     member_type = customer.member_type or ""
 
-            # remaining_count
+            # remaining_count：唯一真理由流水派生（总-销卡-活动扣卡）
             remaining_count = 0
-            all_cards = [c for c in membership_card_service.list_cards() if c.customer_id == r.customer_id and not c.is_deleted]
-            active_cards = [c for c in all_cards if not c.expiry_date or c.expiry_date >= today]
-            if active_cards:
-                unlimited = [c for c in active_cards if c.remaining_count is None]
-                if unlimited:
+            effective = membership_card_service.get_effective_remaining(r.customer_id)
+            if effective is None:
+                # 是否有效期内的不限次卡
+                all_cards = [c for c in membership_card_service.list_cards() if c.customer_id == r.customer_id and not c.is_deleted]
+                active_cards = [c for c in all_cards if not c.expiry_date or c.expiry_date >= today]
+                if any(c.remaining_count is None for c in active_cards):
                     remaining_count = -999
                 else:
-                    remaining_count = sum(c.remaining_count or 0 for c in active_cards)
-            else:
-                from app.services import internal_course_service
-                if internal_course_service.has_active_course(r.customer_id):
                     remaining_count = 0
+            else:
+                remaining_count = effective
 
             result.append({
                 "id": r.id,

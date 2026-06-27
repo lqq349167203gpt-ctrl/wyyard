@@ -32,6 +32,12 @@ def create_knot(data: EnergyKnotCreate):
 
 @router.patch("/{knot_id}")
 def update_knot(knot_id: str, data: dict):
+    # purchase_count 创建时定，禁止外部 PATCH 修改（防止绕过活动扣减恒等式）
+    if "purchase_count" in data:
+        raise HTTPException(
+            status_code=400,
+            detail="不允许直接修改总购买次数。请通过新增购买记录或销卡流水操作。",
+        )
     knot = energy_knot_service.update_knot(knot_id, data)
     if not knot:
         raise HTTPException(status_code=404, detail="记录不存在")

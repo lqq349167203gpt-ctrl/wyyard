@@ -140,6 +140,18 @@
   color: #1f2329;
 }
 
+.picker-header-left {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.picker-back {
+  font-size: 28rpx;
+  color: #3370ff;
+  padding: 8rpx;
+}
+
 .picker-close {
   font-size: 28rpx;
   color: #8f959e;
@@ -190,6 +202,12 @@
   font-weight: 500;
 }
 
+.picker-item-arrow {
+  font-size: 44rpx;
+  color: #b0b5bb;
+  margin-left: 8rpx;
+}
+
 .picker-empty {
   display: flex;
   justify-content: center;
@@ -205,25 +223,89 @@
 
 /* 操作按钮 */
 .actions {
+  display: flex;
+  gap: 32rpx;
   margin-top: 48rpx;
+  padding: 0 28rpx;
 }
 
 .submit-btn {
-  width: 100%;
+  flex: 1;
+  font-size: 32rpx;
+  padding: 0 8rpx !important;
 }
 
 .btn-danger {
-  width: 100%;
+  flex: 1;
   height: 88rpx;
   line-height: 88rpx;
-  font-size: 30rpx;
-  color: #fff;
-  background-color: #e34d59;
+  font-size: 32rpx;
+  color: #e34d59;
+  background-color: #fff;
   border-radius: 12rpx;
-  border: none;
-  margin-top: 24rpx;
+  border: 1rpx solid #e34d59;
+  padding: 0 8rpx !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-danger[disabled] {
   opacity: 0.5;
+}
+
+/* 参与者 */
+.participant-search {
+  padding: 16rpx 0;
+}
+
+.participant-hint {
+  font-size: 22rpx;
+  color: #8f959e;
+  padding-bottom: 12rpx;
+}
+
+.participant-search-input {
+  height: 64rpx;
+  background-color: #f2f3f5;
+  border-radius: 8rpx;
+  padding: 0 24rpx;
+  font-size: 26rpx;
+}
+
+.participant-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  padding: 8rpx 0 16rpx;
+}
+
+.participant-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 20rpx;
+  border-radius: 8rpx;
+  border: 1rpx solid #e0e0e0;
+  background-color: #fff;
+  font-size: 24rpx;
+  color: #4e535a;
+}
+
+.participant-item.selected {
+  background-color: #f0f5ff;
+  border-color: #3370ff;
+  color: #3370ff;
+}
+
+.participant-check {
+  font-size: 22rpx;
+  color: #3370ff;
+  font-weight: 500;
+}
+
+.participant-empty {
+  padding: 16rpx 0;
+  color: #b0b5bb;
+  font-size: 26rpx;
 }

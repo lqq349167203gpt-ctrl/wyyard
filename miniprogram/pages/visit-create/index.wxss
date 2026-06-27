@@ -22,6 +22,7 @@
   flex: 1;
   font-size: 28rpx;
   color: #1f2329;
+  text-align: right;
 }
 
 .picker-display.placeholder {
@@ -31,6 +32,7 @@
 .picker-value-wrap {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex: 1;
   min-width: 0;
 }
@@ -136,9 +138,33 @@
   font-size: 28rpx;
 }
 
-.submit-btn {
+/* 操作按钮 */
+.actions {
+  display: flex;
+  gap: 32rpx;
   margin-top: 48rpx;
-  width: 100%;
+  padding: 0 28rpx;
+}
+
+.submit-btn {
+  flex: 1;
+  font-size: 32rpx;
+  padding: 0 8rpx !important;
+}
+
+.btn-secondary {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 32rpx;
+  color: #1f2329;
+  background-color: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dee0e3;
+  padding: 0 8rpx !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 每组最后一个输入框去掉下划线 */

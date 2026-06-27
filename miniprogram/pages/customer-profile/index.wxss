@@ -376,6 +376,16 @@
   color: #8f959e;
 }
 
+.pur-detail {
+  font-size: 22rpx;
+  color: #8f959e;
+}
+
+.pur-deductions {
+  font-size: 22rpx;
+  color: #8f959e;
+}
+
 /* 交易记录 */
 .pay-item {
   padding: 20rpx 0;

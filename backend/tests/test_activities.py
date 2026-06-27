@@ -92,8 +92,7 @@ class TestGroupCases:
         })
         cid = resp.json()["id"]
         resp = client.patch(f"/api/group-cases/{cid}", json={"purchase_count": 5})
-        assert resp.status_code == 200
-        assert resp.json()["purchase_count"] == 5
+        assert resp.status_code == 400  # purchase_count 由活动扣减流水派生，禁止直接 PATCH
 
     def test_delete(self, client, created_customer):
         resp = client.post("/api/group-cases", json={

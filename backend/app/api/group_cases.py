@@ -33,6 +33,12 @@ def create_case(data: GroupCaseCreate):
 
 @router.patch("/{case_id}")
 def update_case(case_id: str, data: dict):
+    # purchase_count 是总购买次数，创建时定，禁止外部 PATCH 修改（防止绕过活动扣减恒等式）
+    if "purchase_count" in data:
+        raise HTTPException(
+            status_code=400,
+            detail="不允许直接修改总购买次数。请通过新增购买记录或销卡流水操作。",
+        )
     case = group_case_service.update_case(case_id, data)
     if not case:
         raise HTTPException(status_code=404, detail="记录不存在")

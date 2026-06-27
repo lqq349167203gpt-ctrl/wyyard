@@ -1,14 +1,11 @@
 <view class="container" wx:if="{{!loading}}">
   <!-- 时间地点 -->
   <view class="form-card">
-    <view class="form-card-title">时间地点</view>
-    <view class="form-item">
-      <text class="form-label">空间</text>
-      <text class="form-value">{{spaceName || '-'}}</text>
-    </view>
     <view class="form-item">
       <text class="form-label">日期</text>
-      <text class="form-value">{{visit.visit_date}}</text>
+      <picker class="form-picker" mode="date" value="{{visitDate}}" bindchange="onDateChange">
+        <view class="picker-display">{{visitDate}}</view>
+      </picker>
     </view>
     <view class="form-item last">
       <text class="form-label">时间</text>
@@ -20,25 +17,35 @@
 
   <!-- 基本信息 -->
   <view class="form-card">
-    <view class="form-card-title">基本信息</view>
-    <view class="form-item">
+    <view class="form-item" bindtap="onPickerOpen" data-field="customer">
       <text class="form-label">客户</text>
-      <text class="form-value">{{visit.nickname}}</text>
+      <view class="picker-value-wrap">
+        <text class="{{nickname ? '' : 'placeholder'}}">{{nickname || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{nickname}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
     </view>
-    <view class="form-item" bindtap="onPickerOpen">
+    <view class="form-item column textarea-row">
+      <text class="form-label" style="margin-bottom: 16rpx;">本次需求</text>
+      <textarea class="form-textarea" style="height: 126rpx;" value="{{needs}}" bindinput="onNeedsInput" placeholder="描述客户需求" placeholder-class="form-textarea-placeholder" />
+    </view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>
       <view class="picker-value-wrap">
         <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || '选择用户'}}</text>
-        <text class="picker-clear" wx:if="{{referrerHandler}}" catchtap="onPickerClear">x</text>
+        <text class="picker-clear" wx:if="{{referrerHandler}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
       </view>
     </view>
     <view class="form-item switch-row">
       <text class="form-label">组长</text>
-      <switch checked="{{isLeader}}" bindchange="onLeaderChange" color="#3370ff" />
+      <view style="flex: 1; display: flex; justify-content: flex-end;">
+        <switch checked="{{isLeader}}" bindchange="onLeaderChange" color="#3370ff" />
+      </view>
     </view>
     <view class="form-item switch-row {{arrived ? '' : 'last'}}">
       <text class="form-label">已到场</text>
-      <switch checked="{{arrived}}" bindchange="onArrivedChange" color="#3370ff" />
+      <view style="flex: 1; display: flex; justify-content: flex-end;">
+        <switch checked="{{arrived}}" bindchange="onArrivedChange" color="#3370ff" />
+      </view>
     </view>
     <view class="form-item last" wx:if="{{arrived}}">
       <text class="form-label">到达时间</text>
@@ -50,11 +57,6 @@
 
   <!-- 记录 -->
   <view class="form-card">
-    <view class="form-card-title">记录</view>
-    <view class="form-item column textarea-row">
-      <text class="form-label" style="margin-bottom: 16rpx;">本次需求</text>
-      <textarea class="form-textarea" style="height: 126rpx;" value="{{needs}}" bindinput="onNeedsInput" placeholder="描述客户需求" placeholder-class="form-textarea-placeholder" />
-    </view>
     <view class="form-item column textarea-row">
       <text class="form-label" style="margin-bottom: 16rpx;">客户收获</text>
       <textarea class="form-textarea" style="height: 126rpx;" value="{{feedback}}" bindinput="onFeedbackInput" placeholder="客户收获" placeholder-class="form-textarea-placeholder" />
@@ -63,7 +65,7 @@
       <text class="form-label" style="margin-bottom: 16rpx;">跟进点</text>
       <textarea class="form-textarea" style="height: 126rpx;" value="{{healingNotes}}" bindinput="onHealingNotesInput" placeholder="跟进点" placeholder-class="form-textarea-placeholder" />
     </view>
-    <view class="form-item column last">
+    <view class="form-item column textarea-row last">
       <text class="form-label" style="margin-bottom: 16rpx;">组长反馈</text>
       <textarea class="form-textarea" style="height: 126rpx;" value="{{groupLeaderFeedback}}" bindinput="onGroupLeaderFeedbackInput" placeholder="组长反馈" placeholder-class="form-textarea-placeholder" />
     </view>
@@ -73,7 +75,7 @@
   <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
   <view class="picker-popup" wx:if="{{showPicker}}">
     <view class="picker-header">
-      <text class="picker-title">选择邀约人</text>
+      <text class="picker-title">选择{{pickerTitle}}</text>
       <text class="picker-close" bindtap="onPickerClose">关闭</text>
     </view>
     <view class="picker-search">

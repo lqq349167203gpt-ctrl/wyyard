@@ -32,6 +32,15 @@ def create_card(data: MembershipCardCreate):
 
 @router.patch("/{card_id}")
 def update_card(card_id: str, data: dict):
+    # 次数字段是流水派生的缓存，禁止直接通过 PATCH 修改，否则会破坏恒等式
+    # 剩余次数 = 总购买 - 销卡 - 活动扣卡
+    forbidden = {"total_count", "remaining_count"}
+    violated = forbidden & set(data.keys())
+    if violated:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不允许直接修改次数字段：{','.join(sorted(violated))}。请通过销卡或活动扣卡流水操作。",
+        )
     card = membership_card_service.update_card(card_id, data)
     if not card:
         raise HTTPException(status_code=404, detail="记录不存在")

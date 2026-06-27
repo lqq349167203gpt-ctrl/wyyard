@@ -145,6 +145,10 @@ Page({
     }
   },
 
+  onBack() {
+    wx.navigateBack()
+  },
+
   async onSubmit() {
     if (!this.data.customerId) {
       wx.showToast({ title: '请选择客户', icon: 'none' })

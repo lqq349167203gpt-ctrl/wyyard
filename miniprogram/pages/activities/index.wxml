@@ -33,12 +33,14 @@
   <!-- 活动列表 -->
   <view class="activity-list" wx:if="{{!loading && records.length > 0}}">
     <view class="activity-card" wx:for="{{records}}" wx:key="id" bindtap="onActivityTap" data-record="{{item}}">
-      <view class="card-left-bar" style="background-color: {{item.color}};"></view>
       <view class="card-body">
         <view class="card-header">
           <view class="card-title">
             <view class="badge" style="background-color: {{item.color}}20; color: {{item.color}};">
               <text>{{item.badge}}</text>
+            </view>
+            <view wx:if="{{item.isPublicWelfare}}" class="badge" style="background-color: #f0f5ff; color: #3370ff;">
+              <text>公益</text>
             </view>
             <text class="card-name" wx:if="{{item.name}}">{{item.name}}</text>
           </view>
@@ -46,7 +48,7 @@
         </view>
         <view class="card-info">
           <text class="info-item" wx:if="{{item.teacher}}">{{item.teacher}}</text>
-          <text class="info-item" wx:if="{{item.participants > 0}}">参与{{item.participants}}人</text>
+          <text class="info-item">参与{{item.participants}}人</text>
         </view>
         <view class="card-arrow">›</view>
       </view>

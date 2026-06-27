@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -11,13 +12,14 @@ def client():
 
 @pytest.fixture
 def sample_customer():
-    """测试用客户数据"""
+    """测试用客户数据（每次加唯一后缀，避免与历史污染冲突）"""
+    u = uuid.uuid4().hex[:8]
     return {
-        "nickname": "测试客户A",
-        "name": "张三",
+        "nickname": f"测试客户A_{u}",
+        "name": f"张三_{u}",
         "gender": "女",
-        "phone": "13800138000",
-        "wechat": "test_wechat",
+        "phone": f"138{u[:8]}",
+        "wechat": f"test_wechat_{u}",
         "traffic_source": "小红书",
         "traffic_source_detail": "https://example.com/post/123",
     }

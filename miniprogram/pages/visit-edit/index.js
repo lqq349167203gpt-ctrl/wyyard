@@ -6,7 +6,10 @@ Page({
     loading: true,
     saving: false,
     spaceName: '',
+    visitDate: '',
     visitTime: '09:00',
+    customerId: '',
+    nickname: '',
     referrerHandler: '',
     isLeader: false,
     needs: '',
@@ -18,6 +21,8 @@ Page({
     // 搜索选择弹窗
     allCustomers: [],
     showPicker: false,
+    pickerField: '',
+    pickerTitle: '',
     pickerKeyword: '',
     pickerList: [],
   },
@@ -43,7 +48,10 @@ Page({
         visit,
         spaceName,
         loading: false,
+        visitDate: visit.visit_date || '',
         visitTime: visit.visit_time || '09:00',
+        customerId: visit.customer_id || '',
+        nickname: visit.nickname || '',
         referrerHandler: visit.referrer_handler || '',
         isLeader: visit.is_leader || false,
         needs: visit.needs || '',
@@ -71,6 +79,10 @@ Page({
     this.setData({ visitTime: e.detail.value })
   },
 
+  onDateChange(e) {
+    this.setData({ visitDate: e.detail.value })
+  },
+
   onLeaderChange(e) {
     this.setData({ isLeader: e.detail.value })
   },
@@ -94,16 +106,20 @@ Page({
   },
 
   // 搜索选择弹窗
-  onPickerOpen() {
+  onPickerOpen(e) {
+    const field = e.currentTarget.dataset.field
+    const titleMap = { customer: '客户', referrerHandler: '邀约人' }
     this.setData({
       showPicker: true,
+      pickerField: field,
+      pickerTitle: titleMap[field] || field,
       pickerKeyword: '',
       pickerList: this.data.allCustomers,
     })
   },
 
   onPickerClose() {
-    this.setData({ showPicker: false, pickerKeyword: '' })
+    this.setData({ showPicker: false, pickerField: '', pickerKeyword: '' })
   },
 
   onPickerSearch(e) {
@@ -116,23 +132,33 @@ Page({
   },
 
   onPickerSelect(e) {
-    const { nickname } = e.currentTarget.dataset
-    this.setData({
-      referrerHandler: nickname,
-      showPicker: false,
-      pickerKeyword: '',
-    })
+    const { id, nickname } = e.currentTarget.dataset
+    const field = this.data.pickerField
+    if (field === 'customer') {
+      this.setData({ customerId: id, nickname: nickname })
+    } else if (field === 'referrerHandler') {
+      this.setData({ referrerHandler: nickname, referrerHandlerId: id })
+    }
+    this.setData({ showPicker: false, pickerField: '', pickerKeyword: '' })
   },
 
-  onPickerClear() {
-    this.setData({ referrerHandler: '' })
+  onPickerClear(e) {
+    const field = e.currentTarget.dataset.field
+    if (field === 'customer') {
+      this.setData({ customerId: '', nickname: '' })
+    } else if (field === 'referrerHandler') {
+      this.setData({ referrerHandler: '', referrerHandlerId: '' })
+    }
   },
 
   async onSubmit() {
     this.setData({ saving: true })
     try {
       await visitApi.update(this.data.visit.id, {
+        visit_date: this.data.visitDate,
         visit_time: this.data.visitTime,
+        customer_id: this.data.customerId,
+        nickname: this.data.nickname,
         referrer_handler: this.data.referrerHandler,
         is_leader: this.data.isLeader,
         needs: this.data.needs,

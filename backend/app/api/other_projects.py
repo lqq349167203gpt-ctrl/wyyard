@@ -32,6 +32,14 @@ def create_project(data: OtherProjectCreate):
 
 @router.patch("/{project_id}")
 def update_project(project_id: str, data: dict):
+    # 次数字段由销卡流水写，禁止外部 PATCH 直接修改（恒等式：剩余 = 总 - 销卡流水）
+    forbidden = {"remaining_count"}
+    violated = forbidden & set(data.keys())
+    if violated:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不允许直接修改次数字段：{','.join(sorted(violated))}。请通过销卡流水操作。",
+        )
     project = other_project_service.update_project(project_id, data)
     if not project:
         raise HTTPException(status_code=404, detail="记录不存在")

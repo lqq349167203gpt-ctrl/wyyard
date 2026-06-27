@@ -46,8 +46,7 @@ class TestMembershipCards:
         })
         cid = resp.json()["id"]
         resp = client.patch(f"/api/membership-cards/{cid}", json={"remaining_count": 5})
-        assert resp.status_code == 200
-        assert resp.json()["remaining_count"] == 5
+        assert resp.status_code == 400  # 次数字段由流水派生，禁止直接 PATCH
 
     def test_delete(self, client, created_customer):
         resp = client.post("/api/membership-cards", json={

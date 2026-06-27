@@ -10,11 +10,14 @@ from app.services import customer_service
 FILENAME = "membership_cards.json"
 DEDUCTIONS_FILE = "membership_deductions.json"
 DEBTS_FILE = "membership_debts.json"
+DEBT_ACTIVITIES_FILE = "membership_debt_activities.json"
 _cards: Dict[str, MembershipCard] = {}
 # 追踪已扣费记录：{customer_id: [activity_key, ...]}
 _deductions: Dict[str, list] = {}
 # 追踪欠费记录：{customer_id: debt_count}
 _debts: Dict[str, int] = {}
+# 追踪欠费对应的活动：{customer_id: [activity_key, ...]}
+_debt_activities: Dict[str, list] = {}
 
 
 def _migrate_closers(item: MembershipCard) -> MembershipCard:
@@ -23,14 +26,21 @@ def _migrate_closers(item: MembershipCard) -> MembershipCard:
     return item
 
 
+def _migrate_total_count(item: MembershipCard) -> MembershipCard:
+    if item.total_count is None and item.remaining_count is not None:
+        item.total_count = item.remaining_count
+    return item
+
+
 def _load():
-    global _cards, _deductions, _debts
+    global _cards, _deductions, _debts, _debt_activities
     data = load_data(FILENAME)
     _cards = {}
     for k, v in data.items():
-        _cards[k] = _migrate_closers(MembershipCard(**v))
+        _cards[k] = _migrate_total_count(_migrate_closers(MembershipCard(**v)))
     _deductions = load_data(DEDUCTIONS_FILE) or {}
     _debts = load_data(DEBTS_FILE) or {}
+    _debt_activities = load_data(DEBT_ACTIVITIES_FILE) or {}
 
 
 def _save(card_id: str = ""):
@@ -49,18 +59,81 @@ def _save_deductions():
 
 def _save_debts():
     save_data(DEBTS_FILE, _debts)
+    save_data(DEBT_ACTIVITIES_FILE, _debt_activities)
 
 
 def get_debt(customer_id: str) -> int:
-    """获取用户的欠费次数"""
-    return _debts.get(customer_id, 0)
+    """获取用户的欠费次数（仅统计有对应活动记录的欠费，排除旧系统脏数据）"""
+    raw = _debts.get(customer_id, 0)
+    if raw <= 0:
+        return 0
+    # 只有 _debt_activities 里有记录的欠费才算数
+    tracked = len(_debt_activities.get(customer_id, []))
+    return min(raw, tracked)
+
+
+def _active_cards(customer_id: str, today: Optional[str] = None) -> List[MembershipCard]:
+    """获取某用户在有效期内的卡（已生效、未过期、未删除）"""
+    if today is None:
+        today = datetime.now().strftime("%Y-%m-%d")
+    return [
+        c for c in list_cards()
+        if c.customer_id == customer_id
+        and (not c.effective_date or c.effective_date <= today)
+        and (not c.expiry_date or c.expiry_date >= today)
+    ]
+
+
+def get_grand_total(customer_id: str) -> int:
+    """总购买次数（所有未删除的次数卡 total_count 之和；不限次卡不计入）"""
+    return sum(
+        (c.total_count or 0)
+        for c in list_cards()
+        if c.customer_id == customer_id and c.remaining_count is not None
+    )
+
+
+def get_manual_deductions(customer_id: str) -> int:
+    """销卡次数（来自 project_deduction 流水，project_type=membership-cards，仅未删除）"""
+    from app.services import project_deduction_service
+    return project_deduction_service.get_deduction_total(customer_id, "membership-cards")
+
+
+def get_activity_deductions(customer_id: str) -> int:
+    """活动扣卡次数（ Hunting _deductions 流水中 activity_key 的条数；欠费登记的 _debt_activities 也算扣过）"""
+    return len(_deductions.get(customer_id, [])) + len(_debt_activities.get(customer_id, []))
+
+
+def get_effective_remaining(customer_id: str) -> Optional[int]:
+    """唯一真理：有效剩余 = 总购买 - 销卡 - 活动扣卡
+
+    返回 None 表示不限次（有任一不限次卡在有效期）；无任何卡或卡全过期则返回 0。
+    不再读 card.remaining_count 作为依据，仅用流水相减。
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    active = _active_cards(customer_id, today)
+    # 全部卡（含过期）的总购买，用于"过期后剩余=0"场景的基数
+    all_cards = [c for c in list_cards() if c.customer_id == customer_id]
+    if not all_cards:
+        return 0
+    # 有不限次卡在有效期内 → 不限次
+    if any(c.remaining_count is None for c in active):
+        return None
+    total = get_grand_total(customer_id)
+    manual = get_manual_deductions(customer_id)
+    activity = get_activity_deductions(customer_id)
+    return total - manual - activity
 
 
 _load()
 
 
 def _calc_expiry(effective_date: str, duration_type: Optional[str], duration_value: Optional[int]) -> Optional[str]:
-    """根据生效日期和时长自动计算到期日期"""
+    """根据生效日期和时长自动计算到期日期。
+
+    语义：到期日是生效日 + 时长的最后一天，即"3 个月卡 5/1 生效"到期为 8/1（次日失效）。
+    时长 1 天：5/1 生效，5/1 到期。1 个月：5/1 生效，6/1 到期。
+    """
     if not duration_type or not duration_value:
         return None
     try:
@@ -68,9 +141,9 @@ def _calc_expiry(effective_date: str, duration_type: Optional[str], duration_val
     except ValueError:
         return None
     if duration_type == "day":
-        end = start + timedelta(days=duration_value) - timedelta(days=1)
+        end = start + timedelta(days=duration_value - 1)
     elif duration_type == "month":
-        end = start + relativedelta(months=duration_value) - timedelta(days=1)
+        end = start + relativedelta(months=duration_value)
     else:
         return None
     return end.strftime("%Y-%m-%d")
@@ -88,24 +161,30 @@ def get_card(card_id: str) -> Optional[MembershipCard]:
 
 
 def deduct_card(card_id: str, count: int = 1) -> int:
-    """扣减指定卡片的剩余次数，返回扣减后的 remaining_count"""
+    """[已废弃/兼容保留] 销卡由 project_deduction_service 写流水，扣减本身已不再修改 card.remaining_count。
+
+    此函数仅做权限校验，并返回扣减后的有效剩余次数。保留是为了兼容旧调用方。
+    新代码请直接走 project_deduction_service.create_deduction。
+    """
     card = _cards.get(card_id)
     if not card or card.is_deleted:
         raise ValueError("卡片不存在")
     if card.remaining_count is None:
         raise ValueError("该卡为不限次卡，无法销卡")
-    if card.remaining_count < count:
-        raise ValueError(f"剩余次数不足（剩余 {card.remaining_count} 次）")
-    card.remaining_count -= count
-    card.updated_at = datetime.now(timezone.utc)
-    _cards[card_id] = card
-    _save(card_id)
-    return card.remaining_count
+    effective = get_effective_remaining(card.customer_id)
+    if effective is None:
+        raise ValueError("该卡为不限次卡，无法销卡")
+    if effective < count:
+        raise ValueError(f"剩余次数不足（剩余 {effective} 次）")
+    return effective - count
 
 
 def create_card(data: MembershipCardCreate) -> MembershipCard:
     now = datetime.now(timezone.utc)
     card_data = data.model_dump()
+    # 如果未传 total_count，默认等于 remaining_count
+    if card_data.get("total_count") is None and card_data.get("remaining_count") is not None:
+        card_data["total_count"] = card_data["remaining_count"]
     # 自动计算到期日期
     card_data["expiry_date"] = _calc_expiry(
         card_data["effective_date"],
@@ -120,18 +199,25 @@ def create_card(data: MembershipCardCreate) -> MembershipCard:
     )
     _cards[card.id] = card
     _save(card.id)
-    # 购买新卡后，扣除之前的欠费
+    # 购买新卡后，把之前的欠费活动补登记为已扣费（移到 _deductions 流水，不动 card.remaining_count）
     customer_id = card.customer_id
-    debt = _debts.get(customer_id, 0)
-    if debt > 0 and card.remaining_count is not None:
-        deduct_amount = min(debt, card.remaining_count)
-        card.remaining_count -= deduct_amount
-        _debts[customer_id] = debt - deduct_amount
-        if _debts[customer_id] <= 0:
-            del _debts[customer_id]
-        card.updated_at = datetime.now(timezone.utc)
-        _cards[card.id] = card
-        _save(card.id)
+    debt_acts = list(_debt_activities.get(customer_id, []))
+    debt_count = _debts.get(customer_id, 0)
+    tracked_count = min(debt_count, len(debt_acts))
+    if tracked_count > 0 and card.remaining_count is not None:
+        to_settle = debt_acts[:tracked_count]
+        _deductions.setdefault(customer_id, []).extend(to_settle)
+        remaining_acts = debt_acts[tracked_count:]
+        if remaining_acts:
+            _debt_activities[customer_id] = remaining_acts
+        else:
+            _debt_activities.pop(customer_id, None)
+        new_debt = debt_count - tracked_count
+        if new_debt > 0:
+            _debts[customer_id] = new_debt
+        else:
+            _debts.pop(customer_id, None)
+        _save_deductions()
         _save_debts()
     _refresh_member_type(customer_id)
     return card
@@ -170,23 +256,18 @@ def delete_card(card_id: str) -> bool:
 
 
 def _deduct_one(customer_id: str) -> bool:
-    """内部：为指定用户扣除一次会员活动剩余次数"""
+    """内部：为指定用户扣除一次会员活动剩余次数。
+
+    新逻辑：仅判定 get_effective_remaining 是否够扣，不修改 card.remaining_count 字段。
+    实际的"扣减"通过调用方往 _deductions 里追加 activity_key 实现（见 deduct_for_activity）。
+    """
     today = datetime.now().strftime("%Y-%m-%d")
-    # 筛选有效期内的卡（已生效、未过期、未删除）
-    active_cards = [
-        c for c in _cards.values()
-        if c.customer_id == customer_id
-        and not c.is_deleted
-        and (not c.effective_date or c.effective_date <= today)
-        and (not c.expiry_date or c.expiry_date >= today)
-    ]
+    active_cards = _active_cards(customer_id, today)
     if not active_cards:
         # 检查是否有未生效的卡
         pending_cards = [
-            c for c in _cards.values()
-            if c.customer_id == customer_id
-            and not c.is_deleted
-            and c.effective_date and c.effective_date > today
+            c for c in list_cards()
+            if c.customer_id == customer_id and c.effective_date and c.effective_date > today
         ]
         if pending_cards:
             return False  # 有未生效的卡，不记录欠费，等生效后再扣
@@ -197,49 +278,29 @@ def _deduct_one(customer_id: str) -> bool:
         _debts[customer_id] = _debts.get(customer_id, 0) + 1
         _save_debts()
         return False  # 仅记录欠费，未实际扣卡
-    # 优先扣不限次的卡（remaining_count 为 None）
-    unlimited = [c for c in active_cards if c.remaining_count is None]
-    if unlimited:
-        unlimited.sort(key=lambda c: c.created_at, reverse=True)
-        return True  # 不限次卡无需扣减
-    # 其次扣有剩余次数的卡
-    positive = [c for c in active_cards if c.remaining_count is not None and c.remaining_count > 0]
-    if positive:
-        positive.sort(key=lambda c: c.remaining_count, reverse=True)  # 优先扣剩余多的
-        card = positive[0]
-        card.remaining_count -= 1
-        card.updated_at = datetime.now(timezone.utc)
-        _cards[card.id] = card
-        _save(card.id)
+    # 不限次卡：直接放行
+    if any(c.remaining_count is None for c in active_cards):
         return True
-    # 都没有剩余：有内部课程有效期时不扣（归零即停），否则允许负数
-    from app.services import internal_course_service
-    if internal_course_service.has_active_course(customer_id):
+    effective = get_effective_remaining(customer_id)
+    if effective is None:
+        return True
+    if effective <= 0:
+        # 没有剩余：有内部课程有效期时不扣（归零即停），否则允许欠费
+        from app.services import internal_course_service
+        if internal_course_service.has_active_course(customer_id):
+            return False
+        _debts[customer_id] = _debts.get(customer_id, 0) + 1
+        _save_debts()
         return False
-    active_cards.sort(key=lambda c: c.created_at, reverse=True)
-    card = active_cards[0]
-    card.remaining_count = (card.remaining_count or 0) - 1
-    card.updated_at = datetime.now(timezone.utc)
-    _cards[card.id] = card
-    _save(card.id)
     return True
 
 
 def _restore_one(customer_id: str) -> bool:
-    """内部：为指定用户返还一次会员活动剩余次数"""
-    candidates = [
-        c for c in _cards.values()
-        if c.customer_id == customer_id
-        and c.remaining_count is not None
-    ]
-    if not candidates:
-        return False
-    candidates.sort(key=lambda c: c.created_at, reverse=True)
-    card = candidates[0]
-    card.remaining_count += 1
-    card.updated_at = datetime.now(timezone.utc)
-    _cards[card.id] = card
-    _save(card.id)
+    """内部：为指定用户返还一次会员活动剩余次数。
+
+    新逻辑：不需要回写 card.remaining_count，因为 effective_remaining 完全由流水派生。
+    返还的本质由调用方从 _deductions/_debt_activities 里移除 activity_key 实现。
+    """
     return True
 
 
@@ -247,12 +308,10 @@ def can_deduct(customer_id: str, activity_key: str) -> bool:
     """检查指定用户是否可以扣费（不实际扣减）"""
     if customer_id in _deductions and activity_key in _deductions[customer_id]:
         return True  # 已扣过
-    # 检查是否有可用卡（None=不限次，>0=有剩余）
-    for c in _cards.values():
-        if c.customer_id == customer_id:
-            if c.remaining_count is None or c.remaining_count > 0:
-                return True
-    return False
+    effective = get_effective_remaining(customer_id)
+    if effective is None:
+        return True  # 不限次
+    return effective > 0
 
 
 def deduct_for_activity(customer_id: str, activity_key: str) -> bool:
@@ -263,19 +322,36 @@ def deduct_for_activity(customer_id: str, activity_key: str) -> bool:
     if success:
         _deductions.setdefault(customer_id, []).append(activity_key)
         _save_deductions()
+    else:
+        # 无卡欠费：记录活动，以便移除时清除欠费
+        _debt_activities.setdefault(customer_id, []).append(activity_key)
+        _save_debts()
     return success
 
 
 def restore_for_activity(customer_id: str, activity_key: str) -> bool:
     """返还指定用户在指定活动中的扣费"""
-    if customer_id not in _deductions or activity_key not in _deductions[customer_id]:
-        return False  # 未扣过，无需返还
-    success = _restore_one(customer_id)
-    _deductions[customer_id].remove(activity_key)
-    if not _deductions[customer_id]:
-        del _deductions[customer_id]
-    _save_deductions()
-    return success
+    if customer_id in _deductions and activity_key in _deductions[customer_id]:
+        # 有扣费记录：正常退费
+        success = _restore_one(customer_id)
+        _deductions[customer_id].remove(activity_key)
+        if not _deductions[customer_id]:
+            del _deductions[customer_id]
+        _save_deductions()
+        return success
+    # 无扣费记录：检查欠费活动表
+    if customer_id in _debt_activities and activity_key in _debt_activities[customer_id]:
+        _debt_activities[customer_id].remove(activity_key)
+        if not _debt_activities[customer_id]:
+            del _debt_activities[customer_id]
+        # 清除一笔欠费
+        if customer_id in _debts and _debts[customer_id] > 0:
+            _debts[customer_id] -= 1
+            if _debts[customer_id] <= 0:
+                del _debts[customer_id]
+        _save_debts()
+        return True
+    return False
 
 
 def _refresh_member_type(customer_id: str):

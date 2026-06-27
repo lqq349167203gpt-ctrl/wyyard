@@ -122,6 +122,18 @@
   padding: 8rpx;
 }
 
+.picker-header-left {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.picker-back {
+  font-size: 28rpx;
+  color: #3370ff;
+  padding: 8rpx;
+}
+
 .picker-search {
   padding: 16rpx 32rpx;
 }
@@ -166,6 +178,12 @@
   font-weight: 500;
 }
 
+.picker-item-arrow {
+  font-size: 44rpx;
+  color: #b0b5bb;
+  margin-left: 8rpx;
+}
+
 .picker-empty {
   display: flex;
   justify-content: center;
@@ -188,7 +206,69 @@
   border-bottom: none;
 }
 
-.submit-btn {
+/* 操作按钮 */
+.actions {
+  display: flex;
+  gap: 32rpx;
   margin-top: 48rpx;
-  width: 100%;
+  padding: 0 28rpx;
+}
+
+.submit-btn {
+  flex: 1;
+  font-size: 32rpx;
+  padding: 0 8rpx !important;
+}
+
+.btn-secondary {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 32rpx;
+  color: #1f2329;
+  background-color: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dee0e3;
+  padding: 0 8rpx !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 参与者 */
+.participant-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  padding: 8rpx 0 16rpx;
+}
+
+.participant-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 20rpx;
+  border-radius: 8rpx;
+  border: 1rpx solid #e0e0e0;
+  background-color: #fff;
+  font-size: 24rpx;
+  color: #4e535a;
+}
+
+.participant-item.selected {
+  background-color: #f0f5ff;
+  border-color: #3370ff;
+  color: #3370ff;
+}
+
+.participant-check {
+  font-size: 22rpx;
+  color: #3370ff;
+  font-weight: 500;
+}
+
+.participant-empty {
+  padding: 16rpx 0;
+  color: #b0b5bb;
+  font-size: 26rpx;
 }

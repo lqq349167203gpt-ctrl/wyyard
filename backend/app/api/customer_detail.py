@@ -3,6 +3,7 @@
 汇总单个客户的所有业务数据
 """
 import json
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from app.services import (
     customer_service,
@@ -21,6 +22,7 @@ from app.services import (
     other_project_service,
     oh_card_reading_service,
     oh_card_reading_session_service,
+    project_deduction_service,
 )
 
 router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
@@ -76,18 +78,56 @@ def _build_purchase_summary(customer_id: str) -> list:
     """构建购买汇总: 每个服务类型的总购买次数/金额和剩余次数"""
     summary = []
 
-    # 会员活动
+    # 会员活动 — 唯一真理：剩余 = 总 - 销卡 - 活动扣卡
+    today = datetime.now().strftime("%Y-%m-%d")
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
-    for c in cards:
+    grand_total = membership_card_service.get_grand_total(customer_id)
+    manual_deductions = membership_card_service.get_manual_deductions(customer_id)
+    # 活动扣卡 = 已扣卡流水 + 欠费登记流水
+    activity_deductions = membership_card_service.get_activity_deductions(customer_id)
+    # 有效剩余次数（None=不限次）；无卡则 0
+    effective_remaining = membership_card_service.get_effective_remaining(customer_id)
+    # 用于展示每张卡的 used/remaining：保持向后兼容，used 取流水总数 - 卡上余额
+    if cards:
+        for c in cards:
+            if c.remaining_count is None:
+                total = "不限"
+                used = "-"
+                card_remaining = "不限"
+            else:
+                total = c.total_count if c.total_count is not None else c.remaining_count
+                # 单卡 used 仅用于显示，不参与恒等式计算
+                card_used = max(0, (c.total_count or 0) - (c.remaining_count or 0))
+                used = card_used
+                card_remaining = c.remaining_count
+            summary.append({
+                "type": "会员活动",
+                "name": c.card_type,
+                "total_purchased": total,
+                "grand_total": grand_total,
+                "total_amount": c.price,
+                "used": used,
+                "remaining": card_remaining,
+                "effective_remaining": effective_remaining,
+                "manual_deductions": manual_deductions,
+                "activity_deductions": activity_deductions,
+                "effective_date": c.effective_date,
+                "expiry_date": c.expiry_date or "",
+            })
+    else:
         summary.append({
             "type": "会员活动",
-            "name": c.card_type,
-            "total_purchased": c.remaining_count if c.remaining_count is not None else "不限",
-            "total_amount": c.price,
+            "name": "",
+            "total_purchased": 0,
+            "grand_total": 0,
+            "total_amount": 0,
             "used": "-",
-            "remaining": c.remaining_count if c.remaining_count is not None else "不限",
-            "effective_date": c.effective_date,
-            "expiry_date": c.expiry_date or "",
+            "remaining": 0,
+            "effective_remaining": 0 if effective_remaining is None else effective_remaining,
+            "manual_deductions": manual_deductions,
+            "activity_deductions": activity_deductions,
+            "effective_date": "",
+            "expiry_date": "",
         })
 
     # 觉醒游戏
@@ -191,8 +231,11 @@ def _build_activities(customer_id: str) -> list:
     activities = []
 
     # 课程记录 - 作为参与者
+    # 人员范围与 visit_service._count_untracked_chargeable_activities 一致：
+    # 顶层 participant_ids ∪ groups 里的 leader/deputy/member，排除 teacher_ids
     for r in class_record_service.list_records():
-        if customer_id in r.participant_ids:
+        chargeable = class_record_service._get_group_member_ids(r)
+        if customer_id in chargeable:
             teacher_names = []
             for tid in r.teacher_ids:
                 t = customer_service.get_customer(tid)

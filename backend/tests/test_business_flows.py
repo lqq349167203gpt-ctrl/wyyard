@@ -193,10 +193,9 @@ class TestPaymentFlows:
         assert resp.status_code == 200
         assert any(c["id"] == card_id for c in resp.json())
 
-        # 更新剩余次数
+        # 更新剩余次数：流水派生后禁止直接 PATCH 修改次数
         resp = client.patch(f"/api/membership-cards/{card_id}", json={"remaining_count": 15})
-        assert resp.status_code == 200
-        assert resp.json()["remaining_count"] == 15
+        assert resp.status_code == 400
 
         # 删除
         resp = client.delete(f"/api/membership-cards/{card_id}")
@@ -237,10 +236,9 @@ class TestPaymentFlows:
         case_id = resp.json()["id"]
         assert resp.json()["purchase_count"] == 5
 
-        # 更新
+        # 更新：purchase_count 由活动扣减流水派生，禁止直接 PATCH 修改
         resp = client.patch(f"/api/group-cases/{case_id}", json={"purchase_count": 3})
-        assert resp.status_code == 200
-        assert resp.json()["purchase_count"] == 3
+        assert resp.status_code == 400
 
         # 删除
         resp = client.delete(f"/api/group-cases/{case_id}")

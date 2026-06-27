@@ -148,9 +148,9 @@ class TestMembershipCardUpdate:
 
     def test_update_remaining_count(self, client, created_customer):
         cid = self._create(client, created_customer)
+        # 次数字段是流水派生的，禁止直接 PATCH 修改（恒等式：剩余=总-销卡-活动扣卡）
         resp = client.patch(f"/api/membership-cards/{cid}", json={"remaining_count": 15})
-        assert resp.status_code == 200
-        assert resp.json()["remaining_count"] == 15
+        assert resp.status_code == 400
 
     def test_update_price(self, client, created_customer):
         cid = self._create(client, created_customer)
@@ -266,8 +266,7 @@ class TestGroupCaseCRUD:
         })
         cid = resp.json()["id"]
         resp = client.patch(f"/api/group-cases/{cid}", json={"purchase_count": 10})
-        assert resp.status_code == 200
-        assert resp.json()["purchase_count"] == 10
+        assert resp.status_code == 400  # purchase_count 禁止直接 PATCH
 
     def test_update_amount(self, client, created_customer):
         resp = client.post("/api/group-cases", json={
@@ -280,7 +279,7 @@ class TestGroupCaseCRUD:
         assert resp.json()["amount"] == 2999.0
 
     def test_update_nonexistent(self, client):
-        resp = client.patch("/api/group-cases/nonexistent", json={"purchase_count": 1})
+        resp = client.patch("/api/group-cases/nonexistent", json={"amount": 1.0})
         assert resp.status_code == 404
 
     def test_delete(self, client, created_customer):
@@ -356,11 +355,10 @@ class TestEmotionalReleaseCRUD:
         })
         rid = resp.json()["id"]
         resp = client.patch(f"/api/emotional-releases/{rid}", json={"purchase_count": 5})
-        assert resp.status_code == 200
-        assert resp.json()["purchase_count"] == 5
+        assert resp.status_code == 400  # purchase_count 禁止直接 PATCH
 
     def test_update_nonexistent(self, client):
-        resp = client.patch("/api/emotional-releases/nonexistent", json={"purchase_count": 1})
+        resp = client.patch("/api/emotional-releases/nonexistent", json={"amount": 1.0})
         assert resp.status_code == 404
 
     def test_delete(self, client, created_customer):
@@ -422,11 +420,10 @@ class TestEnergyKnotCRUD:
         })
         rid = resp.json()["id"]
         resp = client.patch(f"/api/energy-knots/{rid}", json={"purchase_count": 7})
-        assert resp.status_code == 200
-        assert resp.json()["purchase_count"] == 7
+        assert resp.status_code == 400  # purchase_count 禁止直接 PATCH
 
     def test_update_nonexistent(self, client):
-        resp = client.patch("/api/energy-knots/nonexistent", json={"purchase_count": 1})
+        resp = client.patch("/api/energy-knots/nonexistent", json={"amount": 1.0})
         assert resp.status_code == 404
 
     def test_delete(self, client, created_customer):

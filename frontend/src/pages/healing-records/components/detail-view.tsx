@@ -373,13 +373,22 @@ export default function DetailView({
               const bExpired = b.expiry_date && b.expiry_date < today
               return (aExpired ? 1 : 0) - (bExpired ? 1 : 0)
             })
-            const memberTotal = memberItems.reduce((sum, s) => {
-              const expired = s.expiry_date && s.expiry_date < today
-              const notStarted = s.effective_date && s.effective_date > today
-              if (expired || notStarted) return sum
-              if (typeof s.remaining === "number") return sum + s.remaining
-              return sum
+            // 总次数 = 所有卡 total_count 之和
+            const firstItem = memberItems[0]
+            const memberGrandTotal = firstItem?.grand_total ?? memberItems.reduce((sum, s) => {
+              return sum + (typeof s.total_purchased === "number" ? s.total_purchased : 0)
             }, 0)
+            // 剩余次数 = effective_remaining（已扣减未追踪活动和欠费）
+            const effectiveItem = memberItems.find(s => s.effective_remaining !== undefined && s.effective_remaining !== null)
+            const memberTotal = effectiveItem && typeof effectiveItem.effective_remaining === "number"
+              ? effectiveItem.effective_remaining
+              : memberItems.reduce((sum, s) => {
+                  const expired = s.expiry_date && s.expiry_date < today
+                  const notStarted = s.effective_date && s.effective_date > today
+                  if (expired || notStarted) return sum
+                  if (typeof s.remaining === "number") return sum + s.remaining
+                  return sum
+                }, 0)
             const memberHasUnlimited = memberItems.some(s => {
               const expired = s.expiry_date && s.expiry_date < today
               const notStarted = s.effective_date && s.effective_date > today
@@ -405,9 +414,17 @@ export default function DetailView({
                 <div className="flex items-center gap-2 py-3 border-b border-[#f0f0f0]">
                   <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">会员卡</span>
                   <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
-                    <span>
-                      {memberHasUnlimited ? "不限次" : `剩余${memberTotal}次`}
-                    </span>
+                    {(() => {
+                      const first = memberItems[0]
+                      const manual = first?.manual_deductions || 0
+                      const activity = first?.activity_deductions || 0
+                      return (
+                        <span>
+                          {memberHasUnlimited ? "不限次" : `剩余${memberTotal}次`}
+                          {!memberHasUnlimited && <span className="ml-1 text-[11px] text-[#8f959e]">（总{memberGrandTotal}次/销卡{manual}次/活动扣卡{activity}次）</span>}
+                        </span>
+                      )
+                    })()}
                     {memberSorted.length > 0 && memberSorted.map((s, i) => {
                       const expired = s.expiry_date && s.expiry_date < today
                       const notStarted = s.effective_date && s.effective_date > today
@@ -415,7 +432,7 @@ export default function DetailView({
                         <span key={i} className="ml-3 text-[11px] text-[#8f959e]">
                           <span className={expired ? "text-[#c4506a]" : notStarted ? "text-[#8f959e]" : ""}>
                             {s.name}
-                            {" "}{s.remaining === "不限" ? "不限次" : `${Math.max(0, s.remaining as number)}次`}
+                            {s.remaining === "不限" ? " 不限次" : ` ${Math.max(0, s.remaining as number)}次`}
                             {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
                             {expired && "（已过期）"}
                             {notStarted && "（未生效）"}
