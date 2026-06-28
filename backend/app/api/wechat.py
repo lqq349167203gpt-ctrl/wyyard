@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services import account_service, wechat_service, position_permission_service, position_customer_permission_service, customer_service
+from app.api.accounts import ALL_PAGE_KEYS
 
 router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 
@@ -26,7 +27,7 @@ def _build_login_response(account) -> dict:
         all_identities = [i.name for i in member_identity_service.list_identities()]
         return {
             "account": account_data,
-            "permissions": position_permission_service.ALL_PAGE_KEYS if hasattr(position_permission_service, 'ALL_PAGE_KEYS') else [],
+            "permissions": ALL_PAGE_KEYS,
             "customer_permissions": all_identities,
             "customer_permissions_class_records": all_identities,
             "customer_permissions_payment": all_identities,

@@ -69,7 +69,8 @@ GETTER_MAP = {
     "/api/daily-groupings": ("人员安排", "daily_grouping_service", "get_grouping"),
     "/api/positions": ("角色管理", "position_service", "get_position"),
     "/api/position-permissions": ("角色管理", "position_permission_service", "get_permissions"),
-    "/api/position-customer-permissions": ("角色管理", "position_customer_permission_service", "get_data"),
+    # position-customer-permissions 不走通用 getter（按 section+position 取，不是按 id）；
+    # 它的快照在下方专用分支里处理
     "/api/other-projects": ("活动安排", "other_project_service", "get_project"),
     "/api/oh-card-readings": ("活动安排", "oh_card_reading_service", "get_reading"),
     "/api/oh-card-reading-sessions": ("活动安排", "oh_card_reading_session_service", "get_session"),

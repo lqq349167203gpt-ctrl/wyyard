@@ -31,7 +31,9 @@ async def get_all_page_permissions():
 
 @router.get("/page-permissions/{position}")
 async def get_page_permissions(position: str):
-    return position_page_permission_service.get_all()
+    # 按 position 查：遍历所有 page，每个 page 取该 position 的 member_types；返回 {page_key: [member_types]}
+    all_perms = position_page_permission_service.get_all()
+    return {page: perms.get(position, []) for page, perms in all_perms.items()}
 
 
 @router.get("/{position}")
@@ -48,13 +50,12 @@ async def set_permissions(data: PermissionUpdate):
 @router.put("/full")
 async def set_full_permissions(data: FullPermissionUpdate):
     position_permission_service.set_permissions(data.position, data.pages)
-    if data.customers:
-        position_customer_permission_service.set_customer_permissions("customers", data.position, data.customers)
-    if data.class_records:
-        position_customer_permission_service.set_customer_permissions("class_records", data.position, data.class_records)
-    if data.payment:
-        position_customer_permission_service.set_customer_permissions("payment", data.position, data.payment)
-    # 按页面存储的权限
+    # 无条件写入三块客户权限；空列表表示"该 position 不可见任何身份"，必须落盘
+    position_customer_permission_service.set_customer_permissions("customers", data.position, data.customers)
+    position_customer_permission_service.set_customer_permissions("class_records", data.position, data.class_records)
+    position_customer_permission_service.set_customer_permissions("payment", data.position, data.payment)
+    # 按页面存储的权限：page_permissions 缺失的 page 不会清空（保留旧值），
+    # 这是为了支持增量保存；前端若需清空某 page 应显式传空列表
     for page_key, member_types in data.page_permissions.items():
         position_page_permission_service.set_page_permissions(page_key, data.position, member_types)
     return {"message": "已保存"}

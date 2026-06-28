@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客户详情页风格预览</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f7; }
+  .card { background: #fff; border-radius: 10px; }
+</style>
+</head>
+<body class="p-6 space-y-10">
+
+<div class="max-w-[1400px] mx-auto space-y-10">
+
+<!-- ===== A. Linear/Notion 风格（推荐） ===== -->
+<div>
+  <div class="flex items-center gap-3 mb-3">
+    <span class="text-[20px] font-semibold text-[#2b2f36]">A. Linear / Notion 风格</span>
+    <span class="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-2 py-0.5 rounded">推荐</span>
+  </div>
+  <div class="card overflow-hidden border border-[#ededed]">
+    <!-- 顶部 -->
+    <div class="px-7 pt-6 pb-5 border-b border-[#f0f0f0]">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span class="text-[20px] font-semibold text-[#1a1a1a]">秀芹</span>
+        <span class="text-[13px] text-[#8f959e]">王秀芹</span>
+        <span class="text-[12px] text-[#4e535a] bg-[#f4f5f6] rounded px-2 py-0.5 rounded-sm">398客户</span>
+        <span class="text-[12px] text-[#8f959e] ml-auto">首次到访 2026-04-12</span>
+      </div>
+      <!-- 核心指标条 -->
+      <div class="flex items-stretch gap-0 mt-5 -mx-7 -mb-5 px-7 pt-4 pb-5 bg-[#fafbfc] border-t border-[#f0f0f0]">
+        <div class="flex-1 px-2">
+          <div class="text-[11px] text-[#8f959e] tracking-wide">到店次数</div>
+          <div class="text-[22px] font-semibold text-[#1a1a1a] leading-tight mt-0.5">12<span class="text-[12px] text-[#8f959e] font-normal ml-1">次</span></div>
+        </div>
+        <div class="w-px bg-[#ededed]"></div>
+        <div class="flex-1 px-4">
+          <div class="text-[11px] text-[#8f959e] tracking-wide">累计消费</div>
+          <div class="text-[22px] font-semibold text-[#1a1a1a] leading-tight mt-0.5">¥3,580</div>
+        </div>
+        <div class="w-px bg-[#ededed]"></div>
+        <div class="flex-1 px-4">
+          <div class="text-[11px] text-[#8f959e] tracking-wide">会员剩余</div>
+          <div class="text-[22px] font-semibold text-[#3370ff] leading-tight mt-0.5">4<span class="text-[12px] text-[#8f959e] font-normal ml-1">次</span></div>
+        </div>
+        <div class="w-px bg-[#ededed]"></div>
+        <div class="flex-1 px-4">
+          <div class="text-[11px] text-[#8f959e] tracking-wide">内部课程</div>
+          <div class="text-[14px] font-medium text-[#3baa7a] leading-tight mt-2">不限次 · 生效中</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 双栏 -->
+    <div class="grid grid-cols-2 divide-x divide-[#f0f0f0]">
+      <div class="px-7 py-5 space-y-4">
+        <div class="text-[11px] font-medium text-[#8f959e] tracking-widest uppercase">联系方式</div>
+        <div class="grid grid-cols-2 gap-y-3 gap-x-8">
+          <div><div class="text-[11px] text-[#8f959e]">年龄</div><div class="text-[13px] text-[#1a1a1a] mt-0.5">32</div></div>
+          <div><div class="text-[11px] text-[#8f959e]">电话</div><div class="text-[13px] text-[#1a1a1a] mt-0.5">138****6789</div></div>
+          <div><div class="text-[11px] text-[#8f959e]">微信</div><div class="text-[13px] text-[#1a1a1a] mt-0.5">xiuqin_wx</div></div>
+          <div><div class="text-[11px] text-[#8f959e]">疗愈老师</div><div class="flex gap-1 mt-1"><span class="text-[11px] bg-[#f4f5f6] text-[#4e535a] px-1.5 py-0.5 rounded">成就君</span></div></div>
+        </div>
+      </div>
+      <div class="px-7 py-5 space-y-4">
+        <div class="text-[11px] font-medium text-[#8f959e] tracking-widest uppercase">来源信息</div>
+        <div class="grid grid-cols-2 gap-y-3 gap-x-8">
+          <div><div class="text-[11px] text-[#8f959e]">引流人</div><div class="text-[13px] text-[#1a1a1a] mt-0.5">薇薇</div></div>
+          <div><div class="text-[11px] text-[#8f959e]">承接人</div><div class="text-[13px] text-[#1a1a1a] mt-0.5">不闹</div></div>
+          <div><div class="text-[11px] text-[#8f959e]">流量来源</div><div class="text-[13px] text-[#1a1a1a] mt-0.5">小红书</div></div>
+          <div><div class="text-[11px] text-[#8f959e]">链接</div><div class="text-[13px] text-[#3370ff] truncate mt-0.5">https://xiaohongshu.com/post/123</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 标签页 -->
+    <div class="px-7 pt-2 border-t border-[#f0f0f0]">
+      <div class="flex gap-1 -mb-px">
+        <button class="px-3 py-2 text-[13px] bg-[#f4f5f6] text-[#1a1a1a] rounded-t-md">活动记录</button>
+        <button class="px-3 py-2 text-[13px] text-[#8f959e] hover:bg-[#f4f5f6] rounded-t-md">跟进点</button>
+        <button class="px-3 py-2 text-[13px] text-[#8f959e] hover:bg-[#f4f5f6] rounded-t-md">剩余次数</button>
+        <button class="px-3 py-2 text-[13px] text-[#8f959e] hover:bg-[#f4f5f6] rounded-t-md">交易记录</button>
+      </div>
+    </div>
+
+    <div class="px-7 py-5">
+      <div class="space-y-3">
+        <div class="flex gap-4">
+          <div class="w-[120px] shrink-0">
+            <div class="text-[13px] text-[#1a1a1a]">2026/06/24</div>
+            <div class="text-[11px] text-[#8f959e] mt-0.5">09:00 已到店</div>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-start gap-2 mb-1.5"><span class="text-[11px] text-[#8f959e] w-[60px] shrink-0">活动名称</span><span class="text-[13px] text-[#1a1a1a]">觉醒游戏 · 私密疗愈</span></div>
+            <div class="flex items-start gap-2 mb-1.5"><span class="text-[11px] text-[#8f959e] w-[60px] shrink-0">角色</span><span class="text-[13px] text-[#1a1a1a]">案主</span></div>
+            <div class="flex items-start gap-2"><span class="text-[11px] text-[#8f959e] w-[60px] shrink-0">课程老师</span><span class="text-[13px] text-[#4e535a]">lulu</span></div>
+          </div>
+        </div>
+        <div class="border-t border-[#f5f5f5]"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== B. Stripe Dashboard 风格 ===== -->
+<div>
+  <div class="flex items-center gap-3 mb-3">
+    <span class="text-[20px] font-semibold text-[#2b2f36]">B. Stripe Dashboard 风格</span>
+    <span class="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-2 py-0.5 rounded">数据感</span>
+  </div>
+  <div class="card overflow-hidden shadow-sm" style="border:1px solid #e6e8eb">
+    <!-- 顶部 -->
+    <div class="px-6 py-5 flex items-center justify-between border-b border-[#eee]">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#635bff] to-[#8b85ff] flex items-center justify-center text-white font-semibold text-[14px]">秀</div>
+        <div>
+          <div class="text-[16px] font-semibold text-[#1a1a1a] leading-tight">秀芹</div>
+          <div class="text-[12px] text-[#6b6c6f] mt-0.5">398客户 · 首次到访 2026-04-12</div>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button class="text-[12px] text-[#635bff] bg-[#f0f1ff] px-3 py-1.5 rounded-md font-medium">编辑</button>
+      </div>
+    </div>
+
+    <!-- 大号数据指标 -->
+    <div class="grid grid-cols-4 gap-4 px-6 py-5 border-b border-[#eee]">
+      <div>
+        <div class="text-[11px] text-[#6b6c6f] uppercase tracking-wider">到店次数</div>
+        <div class="text-[26px] font-semibold text-[#1a1a1a] mt-1">12</div>
+        <div class="text-[11px] text-[#6b6c6f] mt-0.5">本月 3 次</div>
+      </div>
+      <div>
+        <div class="text-[11px] text-[#6b6c6f] uppercase tracking-wider">累计消费</div>
+        <div class="text-[26px] font-semibold text-[#1a1a1a] mt-1">¥3,580</div>
+        <div class="text-[11px] text-[#3baa7a] mt-0.5">↑ +¥398 本月</div>
+      </div>
+      <div>
+        <div class="text-[11px] text-[#6b6c6f] uppercase tracking-wider">会员剩余</div>
+        <div class="text-[26px] font-semibold text-[#635bff] mt-1">4<span class="text-[14px] text-[#6b6c6f] ml-1 font-normal">/10</span></div>
+        <div class="text-[11px] text-[#6b6c6f] mt-0.5">体验会员</div>
+      </div>
+      <div>
+        <div class="text-[11px] text-[#6b6c6f] uppercase tracking-wider">内部课程</div>
+        <div class="text-[14px] font-medium text-[#3baa7a] mt-2 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#3baa7a]"></span>生效中</div>
+        <div class="text-[11px] text-[#6b6c6f] mt-0.5">不限次 · 2027/04 到期</div>
+      </div>
+    </div>
+
+    <div class="flex">
+      <!-- 左侧导航式标签 -->
+      <div class="w-[140px] shrink-0 border-r border-[#eee] py-3">
+        <div class="px-3 py-1.5 text-[12px] text-[#6b6c6f] uppercase tracking-wider">详情</div>
+        <button class="w-full text-left px-3 py-2 text-[13px] bg-[#f0f1ff] text-[#635bff] border-l-2 border-[#635bff]">活动记录</button>
+        <button class="w-full text-left px-3 py-2 text-[13px] text-[#4e535a] hover:bg-[#f9f9fa]">跟进点</button>
+        <button class="w-full text-left px-3 py-2 text-[13px] text-[#4e535a] hover:bg-[#f9f9fa]">剩余次数</button>
+        <button class="w-full text-left px-3 py-2 text-[13px] text-[#4e535a] hover:bg-[#f9f9fa]">交易记录</button>
+      </div>
+
+      <!-- 右侧内容 -->
+      <div class="flex-1 p-6">
+        <table class="w-full text-[13px]">
+          <thead>
+            <tr class="border-b border-[#eee] text-[11px] text-[#6b6c6f] uppercase">
+              <th class="text-left py-2 font-normal">日期</th>
+              <th class="text-left py-2 font-normal">活动名称</th>
+              <th class="text-left py-2 font-normal">角色</th>
+              <th class="text-left py-2 font-normal">课程老师</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-[#f5f5f5] text-[13px] text-[#1a1a1a]">
+              <td class="py-3">2026-06-24</td>
+              <td>觉醒游戏</td>
+              <td>案主</td>
+              <td class="text-[#4e535a]">lulu</td>
+            </tr>
+            <tr class="border-b border-[#f5f5f5] text-[13px] text-[#1a1a1a]">
+              <td class="py-3">2026-06-20</td>
+              <td>《养育你内心的小孩》读书会</td>
+              <td>组员</td>
+              <td class="text-[#4e535a]">薇薇</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== C. 保守微调（基于当前最小改动） ===== -->
+<div>
+  <div class="flex items-center gap-3 mb-3">
+    <span class="text-[20px] font-semibold text-[#2b2f36]">C. 保守微调</span>
+    <span class="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-2 py-0.5 rounded">最小改动</span>
+  </div>
+  <div class="card overflow-hidden border border-[#ededed]">
+    <!-- 顶部统一蓝灰冷色调 -->
+    <div class="px-7 pt-6 pb-3 flex items-center gap-3 flex-wrap">
+      <span class="text-[16px] font-medium text-[#2b2f36]">秀芹</span>
+      <span class="text-[12px] text-[#8f959e]">王秀芹</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f1f2] text-[#646a73]">398客户</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f4f5f6] text-[#4e535a]">到店 12 次</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f4f5f6] text-[#4e535a]">消费 ¥3,580</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f4f5f6] text-[#4e535a]">内部课程 生效中</span>
+      <span class="text-[11px] text-[#8f959e] ml-auto">首次到访 2026-04-12</span>
+    </div>
+
+    <!-- 双栏 -->
+    <div class="flex px-7 pb-3 pt-2 gap-8">
+      <div class="flex-1">
+        <div class="text-[11px] font-medium text-[#8f959e] tracking-widest uppercase mb-3">联系方式</div>
+        <div class="grid grid-cols-2 gap-y-2 gap-x-8">
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">年龄</span><span class="text-[13px] text-[#2b2f36]">32</span></div>
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">电话</span><span class="text-[13px] text-[#2b2f36]">138****6789</span></div>
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">微信</span><span class="text-[13px] text-[#2b2f36]">xiuqin_wx</span></div>
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">疗愈老师</span><span class="text-[11px] bg-[#f0f1f2] text-[#646a73] px-1.5 py-0.5 rounded">成就君</span></div>
+        </div>
+      </div>
+      <div class="w-px bg-[#f0f0f0]"></div>
+      <div class="flex-1">
+        <div class="text-[11px] font-medium text-[#8f959e] tracking-widest uppercase mb-3">来源信息</div>
+        <div class="grid grid-cols-2 gap-y-2 gap-x-8">
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">引流人</span><span class="text-[13px] text-[#2b2f36]">薇薇</span></div>
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">承接人</span><span class="text-[13px] text-[#2b2f36]">不闹</span></div>
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">流量来源</span><span class="text-[13px] text-[#2b2f36]">小红书</span></div>
+          <div class="flex items-baseline gap-2"><span class="text-[12px] text-[#8f959e] w-[60px] text-right">链接</span><span class="text-[13px] text-[#3370ff] truncate max-w-[180px]">xiaohongshu.com/post/123</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 标签页 - 改用浅灰底块代替下划线 -->
+    <div class="px-7 pt-2 pb-0 flex gap-1 border-t border-[#f0f0f0] mt-2">
+      <button class="px-3 py-2 text-[13px] bg-[#1a1a1a] text-white rounded-md">活动记录</button>
+      <button class="px-3 py-2 text-[13px] text-[#4e535a] hover:bg-[#f4f5f6] rounded-md">跟进点</button>
+      <button class="px-3 py-2 text-[13px] text-[#4e535a] hover:bg-[#f4f5f6] rounded-md">剩余次数</button>
+      <button class="px-3 py-2 text-[13px] text-[#4e535a] hover:bg-[#f4f5f6] rounded-md">交易记录</button>
+    </div>
+
+    <div class="px-7 py-5">
+      <table class="w-full text-[13px]">
+        <thead>
+          <tr class="text-[11px] text-[#8f959e] uppercase">
+            <th class="text-left py-2 font-normal">日期</th>
+            <th class="text-left py-2 font-normal">活动名称</th>
+            <th class="text-left py-2 font-normal">角色</th>
+            <th class="text-left py-2 font-normal">课程老师</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-[#f0f0f0] text-[13px] text-[#2b2f36]">
+            <td class="py-3">2026-06-24</td>
+            <td>觉醒游戏</td>
+            <td>案主</td>
+            <td class="text-[#4e535a]">lulu</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
