@@ -1124,9 +1124,8 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                         item.purchase_count ? `${item.purchase_count} 次` : "-"
                       )}
                       {item.type === "membership_card" && (() => {
-                        if (item.remaining_count === null) return "不限"
-                        if (item.total_count != null) return `${item.total_count} 次`
-                        return "-"
+                        if (item.remaining_count === null || item.total_count == null) return "不限"
+                        return `${item.total_count} 次`
                       })()}
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">{item.effective_date || "-"}</TableCell>
