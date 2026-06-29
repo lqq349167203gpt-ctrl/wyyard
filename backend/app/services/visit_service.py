@@ -579,7 +579,7 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
         return None
     old_arrived = record.arrived
     for key, value in data.items():
-        if hasattr(record, key) and key not in ("id", "created_at"):
+        if hasattr(record, key) and key not in ("id", "created_at", "created_by"):
             setattr(record, key, value)
     new_arrived = record.arrived
     record.updated_at = datetime.now(timezone.utc)

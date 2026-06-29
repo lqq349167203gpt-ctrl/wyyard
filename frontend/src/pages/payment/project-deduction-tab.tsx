@@ -60,12 +60,15 @@ export function ProjectDeductionTab() {
   const appliedNicknameRef = useRef("")
   const [searchProjectType, setSearchProjectType] = useState("all")
   const appliedProjectTypeRef = useRef("")
+  const [searchCardType, setSearchCardType] = useState("all")
+  const appliedCardTypeRef = useRef("")
 
   // 扣次记录（分页）
   const fetchDeductions = useCallback(async (page: number, pageSize: number) => {
     const params: Record<string, string> = {}
     if (appliedNicknameRef.current) params.nickname = appliedNicknameRef.current
     if (appliedProjectTypeRef.current) params.project_type = appliedProjectTypeRef.current
+    if (appliedCardTypeRef.current) params.card_type = appliedCardTypeRef.current
     return projectDeductionApi.listPaginated(page, pageSize, Object.keys(params).length > 0 ? params : undefined)
   }, [])
   const {
@@ -113,14 +116,25 @@ export function ProjectDeductionTab() {
   const handleTypeChange = useCallback((value: string) => {
     setSearchProjectType(value)
     appliedProjectTypeRef.current = value === "all" ? "" : value
+    // 切换项目类型时重置卡类型
+    setSearchCardType("all")
+    appliedCardTypeRef.current = ""
+    refreshDeductions()
+  }, [refreshDeductions])
+
+  const handleCardTypeChange = useCallback((value: string) => {
+    setSearchCardType(value)
+    appliedCardTypeRef.current = value === "all" ? "" : value
     refreshDeductions()
   }, [refreshDeductions])
 
   const handleClearSearch = useCallback(() => {
     setSearchNickname("")
     setSearchProjectType("all")
+    setSearchCardType("all")
     appliedNicknameRef.current = ""
     appliedProjectTypeRef.current = ""
+    appliedCardTypeRef.current = ""
     refreshDeductions()
   }, [refreshDeductions])
 
@@ -525,6 +539,18 @@ export function ProjectDeductionTab() {
               onChange={handleTypeChange}
             />
           </div>
+          {searchProjectType === "membership-cards" && (
+            <div className="w-32">
+              <SelectDropdown
+                value={searchCardType}
+                options={[
+                  { value: "all", label: "全部卡类型" },
+                  ...CARD_TYPE_OPTIONS,
+                ]}
+                onChange={handleCardTypeChange}
+              />
+            </div>
+          )}
           <button onClick={handleClearSearch} className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]">
             清空
           </button>

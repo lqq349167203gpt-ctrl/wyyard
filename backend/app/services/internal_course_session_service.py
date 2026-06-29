@@ -78,7 +78,7 @@ def update_session(session_id: str, data: dict) -> Optional[InternalCourseSessio
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at"):
+        if hasattr(session, key) and key not in ("id", "created_at", "created_by"):
             setattr(session, key, value)
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session

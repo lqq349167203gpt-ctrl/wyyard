@@ -62,7 +62,7 @@ def update_identity(identity_id: str, data: MemberIdentityUpdate) -> Optional[Me
     if not identity:
         return None
     for key, value in data.model_dump(exclude_unset=True).items():
-        if hasattr(identity, key) and key not in ("id", "created_at"):
+        if hasattr(identity, key) and key not in ("id", "created_at", "created_by"):
             setattr(identity, key, value)
     identity.updated_at = datetime.now(timezone.utc)
     _identities[identity_id] = identity

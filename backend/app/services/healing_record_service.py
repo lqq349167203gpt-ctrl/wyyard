@@ -62,7 +62,7 @@ def update_record(record_id: str, data: HealingRecordUpdate) -> Optional[Healing
     if not record:
         return None
     for key, value in data.model_dump(exclude_unset=True).items():
-        if hasattr(record, key) and key not in ("id", "created_at"):
+        if hasattr(record, key) and key not in ("id", "created_at", "created_by"):
             setattr(record, key, value)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record

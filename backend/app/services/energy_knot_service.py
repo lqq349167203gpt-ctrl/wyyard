@@ -68,7 +68,7 @@ def update_knot(knot_id: str, data: dict) -> Optional[EnergyKnot]:
     if not knot:
         return None
     for key, value in data.items():
-        if hasattr(knot, key) and key not in ("id", "created_at"):
+        if hasattr(knot, key) and key not in ("id", "created_at", "created_by"):
             setattr(knot, key, value)
     knot.updated_at = datetime.now(timezone.utc)
     _knots[knot_id] = knot

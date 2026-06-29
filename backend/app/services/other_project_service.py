@@ -89,7 +89,7 @@ def update_project(project_id: str, data: dict) -> Optional[OtherProject]:
     if not project:
         return None
     for key, value in data.items():
-        if hasattr(project, key) and key not in ("id", "created_at"):
+        if hasattr(project, key) and key not in ("id", "created_at", "created_by"):
             setattr(project, key, value)
     project.expiry_date = _calc_expiry(
         project.effective_date,

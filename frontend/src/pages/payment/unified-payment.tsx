@@ -153,6 +153,8 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     return "all"
   })
   const [mcTypeFilter, setMcTypeFilter] = useState("all")
+  const mcTypeFilterRef = useRef("all")
+  useEffect(() => { mcTypeFilterRef.current = mcTypeFilter }, [mcTypeFilter])
 
   // 弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -244,7 +246,11 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     const p = hasParams ? params : undefined
 
     if (activeType !== "all") {
-      const res = await getApi(activeType).listPaginated(page, pageSize, p)
+      const pp = { ...p }
+      if (activeType === "membership_card" && mcTypeFilterRef.current !== "all") {
+        pp.card_type = mcTypeFilterRef.current
+      }
+      const res = await getApi(activeType).listPaginated(page, pageSize, pp)
       return { ...res, items: res.items.map((i: any) => toUnified(i, activeType)) }
     }
 
@@ -259,13 +265,13 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     const total = allItems.length
     const start = (page - 1) * pageSize
     return { items: allItems.slice(start, start + pageSize), total, page, page_size: pageSize, total_pages: Math.ceil(total / pageSize) }
-  }, [activeType])
+  }, [activeType, mcTypeFilter])
 
   const { paginatedItems: rawItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
   const paginatedItems = rawItems as unknown as UnifiedItem[]
 
-  // 类型切换时重新加载
-  useEffect(() => { refresh() }, [activeType, refresh])
+  // 类型切换或会员卡类型筛选变化时回到第 1 页
+  useEffect(() => { goToPage(1) }, [activeType, mcTypeFilter, goToPage])
 
   // 加载客户
   useEffect(() => {
@@ -1160,10 +1166,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(isMembershipOnly && mcTypeFilter !== "all"
-                  ? paginatedItems.filter(item => item.card_type === mcTypeFilter)
-                  : paginatedItems
-                ).map((item) => (
+                {paginatedItems.map((item) => (
                   <TableRow key={`${item.type}-${item.id}`} className="group hover:bg-[#f7f8fa]">
                     <TableCell className="pl-4 text-[#2b2f36]">{item.deal_date || "-"}</TableCell>
                     <TableCell className="text-[#2b2f36]">{item.nickname}</TableCell>

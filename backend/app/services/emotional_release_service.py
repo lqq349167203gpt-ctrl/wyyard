@@ -68,7 +68,7 @@ def update_release(release_id: str, data: dict) -> Optional[EmotionalRelease]:
     if not release:
         return None
     for key, value in data.items():
-        if hasattr(release, key) and key not in ("id", "created_at"):
+        if hasattr(release, key) and key not in ("id", "created_at", "created_by"):
             setattr(release, key, value)
     release.updated_at = datetime.now(timezone.utc)
     _releases[release_id] = release

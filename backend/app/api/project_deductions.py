@@ -8,8 +8,10 @@ router = APIRouter(prefix="/api/project-deductions", tags=["project-deductions"]
 
 
 @router.get("")
-def list_deductions(customer_id: str | None = Query(None), nickname: str | None = Query(None), project_type: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+def list_deductions(customer_id: str | None = Query(None), nickname: str | None = Query(None), project_type: str | None = Query(None), card_type: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
     items = [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id, nickname, project_type)]
+    if card_type:
+        items = [i for i in items if i.get("project_name") == card_type]
     if page is not None:
         return paginate(items, page, page_size or 10)
     return items

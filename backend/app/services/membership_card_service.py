@@ -383,7 +383,7 @@ def update_card(card_id: str, data: dict) -> Optional[MembershipCard]:
     if not card:
         return None
     for key, value in data.items():
-        if hasattr(card, key) and key not in ("id", "created_at"):
+        if hasattr(card, key) and key not in ("id", "created_at", "created_by"):
             setattr(card, key, value)
     # 重新计算到期日期
     card.expiry_date = _calc_expiry(

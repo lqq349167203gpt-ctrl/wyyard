@@ -69,7 +69,7 @@ def update_reading(reading_id: str, data: dict) -> Optional[OhCardReading]:
     if not reading:
         return None
     for key, value in data.items():
-        if hasattr(reading, key) and key not in ("id", "created_at"):
+        if hasattr(reading, key) and key not in ("id", "created_at", "created_by"):
             setattr(reading, key, value)
     reading.updated_at = datetime.now(timezone.utc)
     _readings[reading_id] = reading

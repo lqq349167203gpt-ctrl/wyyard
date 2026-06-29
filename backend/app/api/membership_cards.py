@@ -7,7 +7,7 @@ router = APIRouter(prefix="/api/membership-cards", tags=["membership-cards"])
 
 
 @router.get("")
-def list_cards(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None), nickname: str | None = Query(None), closer_name: str | None = Query(None)):
+def list_cards(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None), nickname: str | None = Query(None), closer_name: str | None = Query(None), card_type: str | None = Query(None)):
     items = membership_card_service.list_cards()
     items_dict = [i.model_dump() if hasattr(i, "model_dump") else i for i in items]
     if customer_ids:
@@ -19,6 +19,8 @@ def list_cards(page: int | None = Query(None, ge=1), page_size: int | None = Que
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
+    if card_type:
+        items_dict = [i for i in items_dict if i.get("card_type") == card_type]
     items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     # 为非不限次卡附加有效剩余次数（总购买 - 该卡销卡次数）
     for item in items_dict:

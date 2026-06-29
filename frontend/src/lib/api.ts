@@ -1184,7 +1184,7 @@ export interface MembershipCardCreate {
 
 export const membershipCardApi = {
   list: () => request<MembershipCard[]>("/api/membership-cards"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; card_type?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}${params?.card_type ? `&card_type=${encodeURIComponent(params.card_type)}` : ""}`),
   create: (data: MembershipCardCreate) => request<MembershipCard>("/api/membership-cards", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<MembershipCardCreate>) => request<MembershipCard>(`/api/membership-cards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/membership-cards/${id}`, { method: "DELETE" }),

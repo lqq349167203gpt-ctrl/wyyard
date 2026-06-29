@@ -68,7 +68,7 @@ def update_case(case_id: str, data: dict) -> Optional[GroupCase]:
     if not case:
         return None
     for key, value in data.items():
-        if hasattr(case, key) and key not in ("id", "created_at"):
+        if hasattr(case, key) and key not in ("id", "created_at", "created_by"):
             setattr(case, key, value)
     case.updated_at = datetime.now(timezone.utc)
     _cases[case_id] = case

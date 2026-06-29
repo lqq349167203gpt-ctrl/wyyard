@@ -134,7 +134,7 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
     old_is_public_welfare = record.is_public_welfare
 
     for key, value in data.items():
-        if hasattr(record, key) and key not in ("id", "created_at"):
+        if hasattr(record, key) and key not in ("id", "created_at", "created_by"):
             setattr(record, key, value)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record

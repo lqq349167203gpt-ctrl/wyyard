@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Query
 from pydantic import BaseModel
 
 from app.models.customer import CustomerCreate, CustomerUpdate, ChatLogParseRequest
@@ -96,7 +96,32 @@ async def list_customers(
 
 
 @router.post("")
-async def create_customer(data: CustomerCreate):
+async def create_customer(data: CustomerCreate, request: Request):
+    # 自动填充创建人
+    if not data.created_by:
+        account_id = ""
+        # 优先从 X-User-Id 获取（管理端）
+        user_id = request.headers.get("X-User-Id", "")
+        if user_id:
+            account_id = user_id
+        else:
+            # 从 Authorization: Bearer <token> 获取（小程序端）
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                token = auth[7:]
+                try:
+                    from app.services.wechat_service import validate_token
+                    account_id = validate_token(token) or ""
+                except Exception:
+                    pass
+        if account_id:
+            try:
+                from app.services import account_service
+                account = account_service.get_account(account_id)
+                if account:
+                    data.created_by = account.owner or account.username
+            except Exception:
+                pass
     try:
         customer = customer_service.create_customer(data)
     except ValueError as e:
