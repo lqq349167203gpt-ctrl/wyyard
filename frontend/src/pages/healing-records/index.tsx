@@ -124,9 +124,13 @@ export default function HealingRecordsPage() {
         data.age = form.age ? `${form.age} (${range})` : range
       }
       delete data.age_range
-      // 新增客户时自动设置当前空间
+      // 新增客户时自动设置当前空间和创建人
       if (!editingId) {
-        try { data.space_id = localStorage.getItem("selected-space-id") || "" } catch {}
+        try {
+          data.space_id = localStorage.getItem("selected-space-id") || ""
+          const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
+          data.created_by = currentUser.owner || currentUser.username || ""
+        } catch {}
       }
       if (editingId) {
         await customerApi.update(editingId, data as Partial<CustomerCreate>)

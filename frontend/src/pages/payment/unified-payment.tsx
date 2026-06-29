@@ -510,14 +510,19 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     switch (formType) {
       case "membership_card": {
         const config = MEMBERSHIP_CARD_TYPES[formCardType]
-        return {
+        const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname, card_type: formCardType,
           price: formPrice ? parseFloat(formPrice) : config.price,
           effective_date: formEffectiveDate, duration_type: formDurationType,
           duration_value: formDurationValue ? parseInt(formDurationValue) : null,
-          remaining_count: (config.unlimited || formUnlimited) ? null : (formRemainingCount ? parseInt(formRemainingCount) : null),
           closer_id, closer_name, closers, organization_id, deal_date,
         }
+        // 仅新建卡时才允许带 remaining_count；编辑卡时 PATCH 端点拒绝修改次数字段，
+        // 因为 remaining_count 是流水派生缓存，不允许直接改写
+        if (!editingItem) {
+          payload.remaining_count = (config.unlimited || formUnlimited) ? null : (formRemainingCount ? parseInt(formRemainingCount) : null)
+        }
+        return payload
       }
       case "group_case":
       case "emotional_release":
@@ -525,7 +530,8 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
       case "energy_knot":
         return {
           customer_id: formCustomerId, nickname: formNickname,
-          purchase_count: parseInt(formPurchaseCount) || 0,
+          // purchase_count 是创建时定，编辑时不发送（后端 PATCH 禁止直接修改）
+          ...(editingItem ? {} : { purchase_count: parseInt(formPurchaseCount) || 0 }),
           amount: parseFloat(formAmount) || 0,
           closer_id, closer_name, closers, organization_id, deal_date,
         }
@@ -536,16 +542,20 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
           effective_date: formEffectiveDate,
           closer_id, closer_name, closers, organization_id, deal_date,
         }
-      case "other":
-        return {
+      case "other": {
+        const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname,
           category: formCategory || null, project_name: formProjectName, fee: parseFloat(formFee) || 0,
           effective_date: formOtherEffectiveDate,
           duration_type: formOtherDurationType,
           duration_value: formOtherDurationValue ? parseInt(formOtherDurationValue) : null,
-          remaining_count: formOtherUnlimited ? null : (formOtherRemainingCount ? parseInt(formOtherRemainingCount) : null),
           closer_id, closer_name, closers, organization_id, deal_date,
         }
+        if (!editingItem) {
+          payload.remaining_count = formOtherUnlimited ? null : (formOtherRemainingCount ? parseInt(formOtherRemainingCount) : null)
+        }
+        return payload
+      }
     }
   }
 
@@ -562,8 +572,9 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
       setConfirmOpen(false)
       setDialogOpen(false)
       refresh()
-    } catch (error) {
+    } catch (error: any) {
       console.error("保存失败:", error)
+      alert(error?.message || error?.detail || "保存失败")
     } finally {
       setSaving(false)
     }

@@ -64,6 +64,7 @@ class CustomerBase(BaseModel):
     tracking_plan: str = ""
     position_sort_orders: Dict[str, int] = {}
     space_id: str = ""
+    created_by: str = ""
 
 
 class CustomerCreate(CustomerBase):

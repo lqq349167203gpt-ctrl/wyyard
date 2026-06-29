@@ -195,6 +195,10 @@ export default function DetailView({
                 <span className="text-[12px] text-[#d0d3d6]">-</span>
               )}
             </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">创建人</span>
+              <span className="text-[12px] text-[#2b2f36]">{c.created_by || <span className="text-[#d0d3d6]">-</span>}</span>
+            </div>
           </div>
           <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />
           <div className="px-4 pt-2 pb-3 flex items-baseline gap-2">
@@ -432,7 +436,11 @@ export default function DetailView({
                         <span key={i} className="ml-3 text-[11px] text-[#8f959e]">
                           <span className={expired ? "text-[#c4506a]" : notStarted ? "text-[#8f959e]" : ""}>
                             {s.name}
-                            {s.remaining === "不限" ? " 不限次" : s.total_purchased ? ` ${Math.max(0, s.remaining as number)}次/${s.total_purchased}次` : ''}
+                            {s.remaining === "不限" || s.total_purchased === "不限"
+                              ? " 不限次"
+                              : typeof s.remaining === "number" && typeof s.total_purchased === "number"
+                                ? ` ${Math.max(0, s.remaining)}次/${s.total_purchased}次`
+                                : ''}
                             {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
                             {expired && "（已过期）"}
                             {notStarted && "（未生效）"}

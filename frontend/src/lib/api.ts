@@ -243,6 +243,7 @@ export interface Customer {
   tracking_plan: string
   position_sort_orders: Record<string, number>
   space_id: string
+  created_by: string
   created_at: string
   updated_at: string
 }
