@@ -32,9 +32,9 @@ def create_card(data: MembershipCardCreate):
 
 @router.patch("/{card_id}")
 def update_card(card_id: str, data: dict):
-    # 次数字段是流水派生的缓存，禁止直接通过 PATCH 修改，否则会破坏恒等式
-    # 剩余次数 = 总购买 - 销卡 - 活动扣卡
-    forbidden = {"total_count", "remaining_count"}
+    # remaining_count 是流水派生的缓存，禁止直接修改
+    # total_count 是原始购买次数，允许修正
+    forbidden = {"remaining_count"}
     violated = forbidden & set(data.keys())
     if violated:
         raise HTTPException(

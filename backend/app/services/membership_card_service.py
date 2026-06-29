@@ -244,8 +244,8 @@ _load()
 def _calc_expiry(effective_date: str, duration_type: Optional[str], duration_value: Optional[int]) -> Optional[str]:
     """根据生效日期和时长自动计算到期日期。
 
-    语义：到期日是生效日 + 时长的最后一天，即"3 个月卡 5/1 生效"到期为 8/1（次日失效）。
-    时长 1 天：5/1 生效，5/1 到期。1 个月：5/1 生效，6/1 到期。
+    语义：到期日是生效日 + 时长 - 1 天，即该日为最后一天可用，次日失效。
+    时长 1 天：5/1 生效，5/1 到期（5/2 失效）。1 个月：5/1 生效，5/31 到期（6/1 失效）。
     """
     if not duration_type or not duration_value:
         return None
@@ -256,7 +256,7 @@ def _calc_expiry(effective_date: str, duration_type: Optional[str], duration_val
     if duration_type == "day":
         end = start + timedelta(days=duration_value - 1)
     elif duration_type == "month":
-        end = start + relativedelta(months=duration_value)
+        end = start + relativedelta(months=duration_value) - timedelta(days=1)
     else:
         return None
     return end.strftime("%Y-%m-%d")

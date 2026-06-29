@@ -169,6 +169,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
   const [formDurationType, setFormDurationType] = useState<string | null>("day")
   const [formDurationValue, setFormDurationValue] = useState("")
   const [formRemainingCount, setFormRemainingCount] = useState("")
+  const [formTotalCount, setFormTotalCount] = useState("")
   const [formUnlimited, setFormUnlimited] = useState(false)
   const [formPrice, setFormPrice] = useState("")
 
@@ -306,6 +307,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     setFormPrice(String(config.price))
     if (config.defaultCount) {
       setFormRemainingCount(String(config.defaultCount))
+      setFormTotalCount(String(config.defaultCount))
       setFormUnlimited(false)
       let durType = "month"
       let durValue = "12"
@@ -376,6 +378,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     setFormDurationType("day")
     setFormDurationValue("")
     setFormRemainingCount("")
+    setFormTotalCount("")
     setFormUnlimited(false)
     setFormPrice("")
     // 觉醒等
@@ -408,6 +411,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     setFormDurationType("day")
     setFormDurationValue("")
     setFormRemainingCount("")
+    setFormTotalCount("")
     setFormUnlimited(false)
     setFormPrice("")
     // 觉醒等
@@ -445,6 +449,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
         setFormDurationType(item.duration_type || "day")
         setFormDurationValue(item.duration_value ? String(item.duration_value) : "")
         setFormRemainingCount(item.remaining_count !== null && item.remaining_count !== undefined ? String(item.remaining_count) : "")
+        setFormTotalCount(item.total_count !== null && item.total_count !== undefined ? String(item.total_count) : "")
         setFormUnlimited(item.remaining_count === null || item.remaining_count === undefined)
         setFormPrice(String(item.price))
         break
@@ -520,7 +525,16 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
         // 仅新建卡时才允许带 remaining_count；编辑卡时 PATCH 端点拒绝修改次数字段，
         // 因为 remaining_count 是流水派生缓存，不允许直接改写
         if (!editingItem) {
-          payload.remaining_count = (config.unlimited || formUnlimited) ? null : (formRemainingCount ? parseInt(formRemainingCount) : null)
+          if (config.unlimited || formUnlimited) {
+            payload.remaining_count = null
+          } else {
+            // 次数留空时套用该卡类默认次数（与 Excel 导入行为一致）
+            payload.remaining_count = formRemainingCount ? parseInt(formRemainingCount) : (config.defaultCount ?? null)
+          }
+        }
+        // total_count 是原始购买次数，编辑时允许修正
+        if (editingItem && formTotalCount) {
+          payload.total_count = parseInt(formTotalCount)
         }
         return payload
       }
@@ -1011,7 +1025,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "会员卡", value: formCardType || "-" })
       rows.push({ label: "费用金额", value: `¥${parseFloat(formPrice || "0").toLocaleString()}` })
-      if (mcShowDurationInfo) rows.push({ label: "有效期", value: `${formDurationValue || MEMBERSHIP_CARD_TYPES[formCardType]?.duration} 个月，${MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited ? "次数不限" : `${MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次`}` })
+      if (mcShowDurationInfo) rows.push({ label: "有效期", value: `${formDurationValue || MEMBERSHIP_CARD_TYPES[formCardType]?.duration} 个月，${MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited ? "次数不限" : `${formTotalCount || MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次`}` })
     } else if (formType === "internal_course") {
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "课程类型", value: formCourseType || "-" })
@@ -1034,7 +1048,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     rows.push({ label: "所属组织", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
     rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : "-" })
     return rows
-  }, [formType, formDealDate, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo])
+  }, [formType, formDealDate, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited])
 
   return (
     <>
@@ -1264,6 +1278,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                   }}
                   onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
                   disabled={!!editingItem}
+                  showClear={!editingItem}
                   placeholder="搜索昵称"
                 />
               </div>
@@ -1276,12 +1291,6 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formEffectiveDate} onChange={(e) => setFormEffectiveDate(e.target.value)} className="h-8 text-xs" />
                 </div>
-                {formCardType && (
-                  <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-                    <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">费用金额</span>
-                    <Input type="text" inputMode="decimal" value={formPrice} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={MEMBERSHIP_CARD_TYPES[formCardType] ? `${MEMBERSHIP_CARD_TYPES[formCardType].price}` : ""} className="h-8 text-xs" />
-                  </div>
-                )}
                 {mcShowDuration && (
                   <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                     <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">时长</span>
@@ -1303,10 +1312,10 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                     <div>
                       <div className="flex gap-2">
                         {!formUnlimited && (
-                          <Input type="number" value={formRemainingCount} onChange={(e) => setFormRemainingCount(e.target.value)} placeholder={MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount ? `${MEMBERSHIP_CARD_TYPES[formCardType].defaultCount} 次（默认）` : "输入次数（可选）"} className="h-8 text-xs flex-1" min="0" />
+                          <Input type="number" value={editingItem ? formTotalCount : formRemainingCount} onChange={(e) => editingItem ? setFormTotalCount(e.target.value) : setFormRemainingCount(e.target.value)} placeholder={editingItem ? "" : (MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount ? `${MEMBERSHIP_CARD_TYPES[formCardType].defaultCount}` : "输入次数")} className="h-8 text-xs flex-1" min="0" />
                         )}
                         {!MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount && (
-                          <button className={`px-3 h-8 rounded border text-[12px] whitespace-nowrap transition-colors ${formUnlimited ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]" : "border-[#e0e0e0] text-[#4e535a] hover:border-[#c0c0c0]"}`} onClick={() => { setFormUnlimited(!formUnlimited); if (!formUnlimited) setFormRemainingCount("") }}>不限</button>
+                          <button className={`px-3 h-8 rounded border text-[12px] whitespace-nowrap transition-colors ${formUnlimited ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]" : "border-[#e0e0e0] text-[#4e535a] hover:border-[#c0c0c0]"}`} onClick={() => { setFormUnlimited(!formUnlimited); if (!formUnlimited) { setFormRemainingCount(""); setFormTotalCount("") } }}>不限</button>
                         )}
                       </div>
                     </div>
@@ -1316,12 +1325,14 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                   <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                     <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">有效期</span>
                     <div className="flex gap-2 items-center">
-                      <Input type="number" value={formDurationValue} onChange={(e) => setFormDurationValue(e.target.value)} className="h-8 text-xs w-[50px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" min="1" />
+                      <Input type="number" value={formDurationValue} onChange={(e) => { setFormDurationValue(e.target.value); setFormDurationType("month") }} className="h-8 text-xs w-[50px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" min="1" />
                       <span className="text-[12px] text-[#8f959e]">个月，</span>
-                      {!MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited && (
-                        <span className="text-[12px] text-[#8f959e]">{MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次</span>
-                      )}
-                      {MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited && (
+                      {!MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited ? (
+                        <>
+                          <Input type="number" value={editingItem ? formTotalCount : formRemainingCount} onChange={(e) => editingItem ? setFormTotalCount(e.target.value) : setFormRemainingCount(e.target.value)} placeholder={editingItem ? "" : (MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount ? `${MEMBERSHIP_CARD_TYPES[formCardType].defaultCount}` : "")} className="h-8 text-xs w-[50px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" min="0" />
+                          <span className="text-[12px] text-[#8f959e]">次</span>
+                        </>
+                      ) : (
                         <span className="text-[12px] text-[#8f959e]">次数不限</span>
                       )}
                     </div>
@@ -1330,7 +1341,13 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
               </>
             )}
 
-            {/* ===== 觉醒/情绪/OH/能量专属字段 ===== */}
+            {/* 会员卡费用金额（统一放在时长/次数之后） */}
+            {formType === "membership_card" && formCardType && (
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">费用金额</span>
+                <Input type="text" inputMode="decimal" value={formPrice} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={MEMBERSHIP_CARD_TYPES[formCardType] ? `${MEMBERSHIP_CARD_TYPES[formCardType].price}` : ""} className="h-8 text-xs" />
+              </div>
+            )}
             {(formType === "group_case" || formType === "emotional_release" || formType === "oh_card_reading" || formType === "energy_knot") && (
               <>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
