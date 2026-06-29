@@ -104,9 +104,9 @@ const FIELD_CN: Record<string, string> = {
 }
 
 const SECTION_OPTIONS = [
-  "用户管理", "客户信息", "人员安排", "活动安排", "活动配置", "付费项目",
-  "会员身份", "疗愈老师", "组织管理", "空间配置", "提醒配置",
-  "账号管理", "角色管理", "密码修改", "AI 配置", "系统日志", "知识库", "业务数据", "操作日志",
+  "客户资料", "邀约", "课表", "付费项目", "活动配置", "会员身份",
+  "疗愈老师", "组织管理", "空间配置", "提醒配置", "提醒",
+  "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
 
 const ALL_PAGES = [
@@ -159,11 +159,12 @@ export default function OperationLogsPage() {
   const [sectionFilter, setSectionFilter] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [keywordFilter, setKeywordFilter] = useState("")
   const [selectedLog, setSelectedLog] = useState<OperationLog | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, dateFrom, dateTo })
+  const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, dateFrom, dateTo, keywordFilter })
 
   // 权限编辑弹窗状态
   const [permDialogOpen, setPermDialogOpen] = useState(false)
@@ -183,6 +184,7 @@ export default function OperationLogsPage() {
       section: f.sectionFilter || undefined,
       date_from: f.dateFrom || undefined,
       date_to: f.dateTo || undefined,
+      keyword: f.keywordFilter || undefined,
     }, page, pageSize)
   }, [])
 
@@ -212,6 +214,7 @@ export default function OperationLogsPage() {
       case "section": setSectionFilter(value); filtersRef.current.sectionFilter = value; break
       case "from": setDateFrom(value); filtersRef.current.dateFrom = value; break
       case "to": setDateTo(value); filtersRef.current.dateTo = value; break
+      case "keyword": setKeywordFilter(value); filtersRef.current.keywordFilter = value; break
     }
     goToPage(1)
   }
@@ -222,7 +225,8 @@ export default function OperationLogsPage() {
     setSectionFilter("")
     setDateFrom("")
     setDateTo("")
-    filtersRef.current = { operatorFilter: "", methodFilter: "", sectionFilter: "", dateFrom: "", dateTo: "" }
+    setKeywordFilter("")
+    filtersRef.current = { operatorFilter: "", methodFilter: "", sectionFilter: "", dateFrom: "", dateTo: "", keywordFilter: "" }
     goToPage(1)
   }
 
@@ -324,10 +328,10 @@ export default function OperationLogsPage() {
   const dayGroups = groupByDay(pagedLogs)
 
   const SECTION_ENTITY: Record<string, string> = {
-    "空间配置": "空间", "活动配置": "活动", "用户管理": "客户", "客户信息": "客户",
-    "人员安排": "记录", "活动安排": "活动", "付费项目": "项目", "会员身份": "身份",
-    "疗愈老师": "老师", "组织管理": "组织", "提醒配置": "提醒", "账号管理": "账号",
-    "角色管理": "角色", "AI 配置": "配置", "系统日志": "日志",
+    "空间配置": "空间", "活动配置": "活动", "客户资料": "客户",
+    "邀约": "记录", "课表": "活动", "付费项目": "项目", "会员身份": "身份",
+    "疗愈老师": "老师", "组织管理": "组织", "提醒配置": "提醒", "提醒": "提醒", "账号管理": "账号",
+    "AI 配置": "配置", "系统日志": "日志",
   }
 
   const getEntityLabel = (section?: string, path?: string): string | null => {
@@ -477,6 +481,16 @@ export default function OperationLogsPage() {
             value={dateTo}
             onChange={(e) => handleFilterChange("to", e.target.value)}
             className={`h-8 w-36 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] ${!dateTo ? "text-[#8f959e] date-empty" : "text-[#2b2f36]"}`}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] text-[#8f959e]">内容搜索</label>
+          <input
+            type="text"
+            value={keywordFilter}
+            onChange={(e) => handleFilterChange("keyword", e.target.value)}
+            placeholder="输入关键词"
+            className="h-8 w-40 rounded-md border border-[#e0e0e0] px-2.5 text-[12px] outline-none focus:border-[#3370ff] text-[#2b2f36] placeholder:text-[#8f959e]"
           />
         </div>
         <button

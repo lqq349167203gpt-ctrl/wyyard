@@ -206,7 +206,8 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
         paid_amount=paid_amount,
         refund_amount=data.refund_amount,
         refund_date=now.strftime("%Y-%m-%d"),
-        operator_name=data.operator_name,
+        created_by=data.created_by,
+        updated_by=data.created_by,
         created_at=now,
     )
     _refunds[refund.id] = refund
@@ -214,7 +215,8 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
     return refund
 
 
-def update_refund(refund_id: str, refund_amount: float, operator_name: str = "") -> ProjectRefund:
+def update_refund(refund_id: str, refund_amount: float, updated_by: str = "") -> ProjectRefund:
+    """修改退费金额（不覆盖创建人）"""
     refund = _refunds.get(refund_id)
     if not refund or refund.is_deleted:
         raise ValueError("记录不存在")
@@ -223,7 +225,7 @@ def update_refund(refund_id: str, refund_amount: float, operator_name: str = "")
     if refund_amount > refund.paid_amount:
         raise ValueError(f"退费金额不能超过已付金额（¥{refund.paid_amount}）")
     refund.refund_amount = refund_amount
-    refund.operator_name = operator_name
+    refund.updated_by = updated_by
     _refunds[refund_id] = refund
     _save(refund_id)
     return refund

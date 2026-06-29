@@ -1268,7 +1268,8 @@ export interface ProjectDeduction {
   count: number
   deduction_date: string
   remaining_after: number
-  operator_name: string
+  created_by: string
+  updated_by: string
   created_at: string
 }
 
@@ -1280,9 +1281,9 @@ export const projectDeductionApi = {
     if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
     return request<PaginatedResponse<ProjectDeduction>>(`/api/project-deductions?${qs}`)
   },
-  create: (data: { customer_id: string; project_type: string; project_id: string; count: number; operator_name?: string }) =>
+  create: (data: { customer_id: string; project_type: string; project_id: string; count: number; created_by?: string }) =>
     request<ProjectDeduction>("/api/project-deductions", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: { count: number; operator_name?: string }) =>
+  update: (id: string, data: { count: number; updated_by?: string }) =>
     request<ProjectDeduction>(`/api/project-deductions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/api/project-deductions/${id}`, { method: "DELETE" }),
@@ -1290,7 +1291,7 @@ export const projectDeductionApi = {
     request<{ id: string; name: string; remaining_count: number; detail?: string; card_type?: string; expiry_date?: string }[]>(
       `/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`
     ),
-  autoDeduct: (data: { nickname: string; project_type: string; count: number; operator_name?: string; name_filter?: string }) =>
+  autoDeduct: (data: { nickname: string; project_type: string; count: number; created_by?: string; name_filter?: string }) =>
     request<ProjectDeduction>("/api/project-deductions/auto", { method: "POST", body: JSON.stringify(data) }),
 }
 
@@ -1304,7 +1305,8 @@ export interface ProjectRefund {
   paid_amount: number
   refund_amount: number
   refund_date: string
-  operator_name: string
+  created_by: string
+  updated_by: string
   created_at: string
 }
 
@@ -1314,9 +1316,9 @@ export const projectRefundApi = {
     if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
     return request<PaginatedResponse<ProjectRefund>>(`/api/project-refunds?${qs}`)
   },
-  create: (data: { customer_id: string; project_type: string; project_id: string; refund_amount: number; operator_name?: string }) =>
+  create: (data: { customer_id: string; project_type: string; project_id: string; refund_amount: number; created_by?: string }) =>
     request<ProjectRefund>("/api/project-refunds", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: { refund_amount: number; operator_name?: string }) =>
+  update: (id: string, data: { refund_amount: number; updated_by?: string }) =>
     request<ProjectRefund>(`/api/project-refunds/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/api/project-refunds/${id}`, { method: "DELETE" }),

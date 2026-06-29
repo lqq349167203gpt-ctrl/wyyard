@@ -25,13 +25,13 @@ def create_refund(data: ProjectRefundCreate):
 
 class RefundUpdate(BaseModel):
     refund_amount: float
-    operator_name: str = ""
+    updated_by: str = ""
 
 
 @router.patch("/{refund_id}")
 def update_refund(refund_id: str, data: RefundUpdate):
     try:
-        return project_refund_service.update_refund(refund_id, data.refund_amount, data.operator_name).model_dump(mode="json")
+        return project_refund_service.update_refund(refund_id, data.refund_amount, data.updated_by).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

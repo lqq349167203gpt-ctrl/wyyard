@@ -43,7 +43,11 @@ def list_logs(
 ) -> List[OperationLog]:
     logs = list(_logs.values())
     if operator:
-        logs = [l for l in logs if l.operator == operator]
+        # 兼容旧数据：operator 字段可能存的是 username 或 owner
+        from app.services import account_service
+        accounts = account_service.list_accounts()
+        owner_usernames = {a.username for a in accounts if a.owner == operator}
+        logs = [l for l in logs if l.operator == operator or (owner_usernames and l.operator in owner_usernames)]
     if section:
         logs = [l for l in logs if l.section == section]
     if method:
@@ -55,11 +59,7 @@ def list_logs(
         logs = [l for l in logs if l.entity_id == entity_id]
     if keyword:
         kw = keyword.lower()
-        logs = [l for l in logs if (
-            (l.content and kw in l.content.lower()) or
-            (l.before_data and kw in str(l.before_data).lower()) or
-            (l.after_data and kw in str(l.after_data).lower())
-        )]
+        logs = [l for l in logs if l.content and kw in l.content.lower()]
     if date_from:
         try:
             dt = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)

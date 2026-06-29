@@ -197,7 +197,7 @@ export function ProjectDeductionTab() {
         project_type: projectType,
         project_id: selectedItemId,
         count: parseInt(deductCount) || 1,
-        operator_name: currentUserName,
+        created_by: currentUserName,
       })
       setDialogOpen(false)
       setCustomerId("")
@@ -221,7 +221,7 @@ export function ProjectDeductionTab() {
     try {
       await projectDeductionApi.update(editTarget.id, {
         count: parseInt(editCount) || 1,
-        operator_name: currentUserName,
+        updated_by: currentUserName,
       })
       setEditTarget(null)
       refreshDeductions()
@@ -441,7 +441,7 @@ export function ProjectDeductionTab() {
               continue
             }
             try {
-              await projectDeductionApi.autoDeduct({ nickname, project_type: projectType, count, operator_name: currentUserName })
+              await projectDeductionApi.autoDeduct({ nickname, project_type: projectType, count, created_by: currentUserName })
               success++
             } catch (err: any) {
               failed++
@@ -478,7 +478,7 @@ export function ProjectDeductionTab() {
               continue
             }
             try {
-              await projectDeductionApi.autoDeduct({ nickname, project_type: mappedType, count, operator_name: currentUserName, name_filter: nameFilter })
+              await projectDeductionApi.autoDeduct({ nickname, project_type: mappedType, count, created_by: currentUserName, name_filter: nameFilter })
               success++
             } catch (err: any) {
               failed++
@@ -570,7 +570,7 @@ export function ProjectDeductionTab() {
                 <TableHead>销卡次数</TableHead>
                 <TableHead>销卡日期</TableHead>
                 <TableHead>该卡剩余</TableHead>
-                <TableHead>操作人</TableHead>
+                <TableHead>创建人</TableHead>
                 <TableHead className="w-20">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -589,7 +589,7 @@ export function ProjectDeductionTab() {
                   <TableCell className="text-[#2b2f36]">
                     {d.remaining_after < 0 ? <span className="text-[#c4506a]">{d.remaining_after} 次</span> : `${d.remaining_after} 次`}
                   </TableCell>
-                  <TableCell className="text-[#8f959e]">{d.operator_name || "-"}</TableCell>
+                  <TableCell className="text-[#8f959e]">{d.created_by || "-"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button className="p-1 hover:bg-[#f0f1f2] rounded" onClick={() => { setEditTarget(d); setEditCount(String(d.count)) }}>
@@ -646,7 +646,7 @@ export function ProjectDeductionTab() {
             </div>
 
             {/* 项目类型 */}
-            <div className="grid grid-cols-[70px_1fr] items-center gap-[14px]">
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">类型</span>
               {!customerId ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">请先选择用户</div>
@@ -662,8 +662,8 @@ export function ProjectDeductionTab() {
 
             {/* 会员卡卡类型子选项 */}
             {projectType === "membership-cards" && (
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">卡类型</span>
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">卡类型</span>
                 <SelectDropdown
                   value={cardType}
                   options={CARD_TYPE_OPTIONS}
@@ -675,8 +675,8 @@ export function ProjectDeductionTab() {
 
             {/* 选择项目 */}
             {projectType && (
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">项目</span>
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目</span>
                 {loadingItems ? (
                   <div className="h-8 flex items-center text-[12px] text-[#8f959e]">加载中...</div>
                 ) : filteredItems.length === 0 ? (

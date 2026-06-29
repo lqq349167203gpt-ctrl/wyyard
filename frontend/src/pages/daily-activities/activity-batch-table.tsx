@@ -706,6 +706,24 @@ export function ActivityBatchTable({
             desc = `将「${oldName}」改为「${newName}」`
           }
         }
+        // 参与人/老师/案主编辑显示具体人员
+        if ((field === "participant_ids" || field === "host_ids") && row) {
+          const oldIds: string[] = row[field] as string[] || []
+          const newIds: string[] = Array.isArray(value) ? value : []
+          const added = newIds.filter(id => !oldIds.includes(id)).map(id => getMemberName(id)).filter(Boolean)
+          const removed = oldIds.filter(id => !newIds.includes(id)).map(id => getMemberName(id)).filter(Boolean)
+          const parts: string[] = []
+          if (added.length) parts.push(`新增 ${added.join("、")}`)
+          if (removed.length) parts.push(`移除 ${removed.join("、")}`)
+          if (parts.length) desc = `编辑了「${rowName}」的${label}：${parts.join("；")}`
+        }
+        if ((field === "owner_id" || field === "owner_name") && row) {
+          const oldName = field === "owner_name" ? (row.owner_name || "") : getMemberName(row.owner_id || "")
+          const newName = field === "owner_name" ? String(value || "") : getMemberName(String(value || ""))
+          if (newName && newName !== oldName) {
+            desc = `编辑了「${rowName}」的案主：${oldName || "无"} → ${newName}`
+          }
+        }
         // 传入编辑后的行快照
         const postRows = rowsRef.current.map(r => r.key === key ? { ...r, [field]: value } : { ...r })
         pushHistory("编辑了活动", [key], desc, postRows, [{ rowKey: key, fields: [field as string] }])

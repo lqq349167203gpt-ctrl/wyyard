@@ -39,7 +39,54 @@ def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] =
     if project_type:
         results = [d for d in results if d.project_type == project_type]
     results.sort(key=lambda d: d.created_at, reverse=True)
+
+    # 动态计算当前实际剩余次数
+    _fill_current_remaining(results)
+
     return results
+
+
+def _fill_current_remaining(deductions: List[ProjectDeduction]):
+    """为扣减记录填充当前实际剩余次数"""
+    from app.services import membership_card_service
+
+    # 按 customer_id + project_type 分组
+    groups: dict[str, list[ProjectDeduction]] = {}
+    for d in deductions:
+        key = f"{d.customer_id}|{d.project_type}"
+        groups.setdefault(key, []).append(d)
+
+    for key, items in groups.items():
+        customer_id, project_type = key.split("|", 1)
+        current_remaining = None
+
+        if project_type == "membership-cards":
+            current_remaining = membership_card_service.get_effective_remaining(customer_id)
+        elif project_type == "other-projects":
+            from app.services import other_project_service
+            for d in items:
+                project = other_project_service.get_project(d.project_id)
+                if project and project.remaining_count is not None:
+                    d.remaining_after = project.remaining_count
+            continue
+        else:
+            from app.services import (
+                group_case_session_service, emotional_release_session_service,
+                oh_card_reading_session_service, energy_knot_session_service,
+            )
+            svc_map = {
+                "group-cases": group_case_session_service,
+                "emotional-releases": emotional_release_session_service,
+                "oh-card-readings": oh_card_reading_session_service,
+                "energy-knots": energy_knot_session_service,
+            }
+            svc = svc_map.get(project_type)
+            if svc:
+                current_remaining = svc.get_remaining_count(customer_id)
+
+        if current_remaining is not None:
+            for d in items:
+                d.remaining_after = current_remaining
 
 
 def get_deduction_total(customer_id: str, project_type: str) -> int:
@@ -163,7 +210,7 @@ def get_available_items(customer_id: str, project_type: str) -> list:
     return []
 
 
-def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name: str = "", name_filter: str = "") -> ProjectDeduction:
+def auto_deduct(nickname: str, project_type: str, count: int = 1, created_by: str = "", name_filter: str = "") -> ProjectDeduction:
     """按昵称自动销卡：找到最早到期的可用项目并扣减（仅用于 Excel 导入）"""
     customers = customer_service.list_customers()
     customer = next((c for c in customers if c.nickname == nickname), None)
@@ -204,7 +251,7 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, operator_name:
         project_type=project_type,
         project_id=target["id"],
         count=count,
-        operator_name=operator_name,
+        created_by=created_by,
     )
     return create_deduction(data)
 
@@ -299,7 +346,8 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
         count=data.count,
         deduction_date=now.strftime("%Y-%m-%d"),
         remaining_after=remaining_after,
-        operator_name=data.operator_name,
+        created_by=data.created_by,
+        updated_by=data.created_by,
         created_at=now,
     )
     _deductions[deduction.id] = deduction
@@ -307,15 +355,17 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
     return deduction
 
 
-def update_deduction(deduction_id: str, count: int, operator_name: str = "") -> ProjectDeduction:
-    """修改销卡次数（仅修改次数和操作人，不重新扣费）"""
+
+def update_deduction(deduction_id: str, count: int, updated_by: str = "") -> ProjectDeduction:
+    """修改销卡次数（不重新扣费，不覆盖创建人）"""
     deduction = _deductions.get(deduction_id)
     if not deduction or deduction.is_deleted:
         raise ValueError("记录不存在")
     if count < 1:
         raise ValueError("次数必须大于 0")
+
     deduction.count = count
-    deduction.operator_name = operator_name
+    deduction.updated_by = updated_by
     _deductions[deduction_id] = deduction
     _save(deduction_id)
     return deduction

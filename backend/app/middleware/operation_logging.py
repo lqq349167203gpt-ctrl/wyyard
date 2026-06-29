@@ -7,68 +7,71 @@ from app.services.operation_log_service import create_log
 from app.models.operation_log import OperationLogCreate
 
 SECTION_MAP = {
-    "/api/customers": "用户管理",
-    "/api/visits": "人员安排",
-    "/api/healing-records": "客户信息",
+    "/api/customers": "客户资料",
+    "/api/visits": "邀约",
+    "/api/healing-records": "客户资料",
     "/api/courses": "活动配置",
     "/api/course-types": "活动配置",
     "/api/spaces": "空间配置",
     "/api/member-identities": "会员身份",
-    "/api/activity-permissions": "活动安排",
+    "/api/activity-permissions": "课表",
     "/api/membership-cards": "付费项目",
-    "/api/group-cases": "付费项目",
-    "/api/group-case-sessions": "活动安排",
-    "/api/emotional-releases": "付费项目",
-    "/api/emotional-release-sessions": "活动安排",
-    "/api/energy-knots": "付费项目",
-    "/api/energy-knot-sessions": "活动安排",
-    "/api/internal-courses": "付费项目",
-    "/api/internal-course-sessions": "活动安排",
+    "/api/group-cases": "课表",
+    "/api/group-case-sessions": "课表",
+    "/api/emotional-releases": "课表",
+    "/api/emotional-release-sessions": "课表",
+    "/api/energy-knots": "课表",
+    "/api/energy-knot-sessions": "课表",
+    "/api/internal-courses": "课表",
+    "/api/internal-course-sessions": "课表",
     "/api/agents": "AI 配置",
     "/api/ai-configs": "AI 配置",
-    "/api/class-records": "人员安排",
+    "/api/class-records": "邀约",
     "/api/accounts": "账号管理",
-    "/api/positions": "角色管理",
+    "/api/positions": "账号管理",
     "/api/healing-identities": "疗愈老师",
     "/api/account-change-password": "密码修改",
-    "/api/daily-groupings": "人员安排",
-    "/api/position-permissions": "角色管理",
-    "/api/position-customer-permissions": "角色管理",
+    "/api/daily-groupings": "邀约",
+    "/api/position-permissions": "账号管理",
+    "/api/position-customer-permissions": "账号管理",
     "/api/system-logs": "系统日志",
-    "/api/other-projects": "付费项目",
-    "/api/oh-card-readings": "付费项目",
-    "/api/oh-card-reading-sessions": "活动安排",
+    "/api/other-projects": "课表",
+    "/api/oh-card-readings": "课表",
+    "/api/oh-card-reading-sessions": "课表",
     "/api/project-deductions": "付费项目",
+    "/api/project-refunds": "付费项目",
     "/api/reminders": "提醒配置",
-    "/api/business-reminders": "提醒配置",
-    "/api/activity-themes": "活动安排",
+    "/api/business-reminders": "提醒",
+    "/api/activity-themes": "课表",
     "/api/organizations": "组织管理",
+    "/api/activity-history": "邀约",
+    "/api/visit-history": "邀约",
 }
 
 # 路径前缀 → (section, service_module, get_function_name)
 GETTER_MAP = {
-    "/api/customers": ("用户管理", "customer_service", "get_customer"),
-    "/api/healing-records": ("客户信息", "healing_record_service", "get_record"),
+    "/api/customers": ("客户资料", "customer_service", "get_customer"),
+    "/api/healing-records": ("客户资料", "healing_record_service", "get_record"),
     "/api/courses": ("活动配置", "course_service", "get_course"),
     "/api/spaces": ("空间配置", "space_service", "get_space"),
     "/api/member-identities": ("会员身份", "member_identity_service", "get_identity"),
     "/api/membership-cards": ("付费项目", "membership_card_service", "get_card"),
-    "/api/group-cases": ("活动安排", "group_case_service", "get_case"),
-    "/api/group-case-sessions": ("活动安排", "group_case_session_service", "get_session"),
-    "/api/emotional-releases": ("活动安排", "emotional_release_service", "get_release"),
-    "/api/emotional-release-sessions": ("活动安排", "emotional_release_session_service", "get_session"),
-    "/api/energy-knots": ("活动安排", "energy_knot_service", "get_knot"),
-    "/api/energy-knot-sessions": ("活动安排", "energy_knot_session_service", "get_session"),
-    "/api/internal-courses": ("活动安排", "internal_course_service", "get_course"),
-    "/api/internal-course-sessions": ("活动安排", "internal_course_session_service", "get_session"),
+    "/api/group-cases": ("课表", "group_case_service", "get_case"),
+    "/api/group-case-sessions": ("课表", "group_case_session_service", "get_session"),
+    "/api/emotional-releases": ("课表", "emotional_release_service", "get_release"),
+    "/api/emotional-release-sessions": ("课表", "emotional_release_session_service", "get_session"),
+    "/api/energy-knots": ("课表", "energy_knot_service", "get_knot"),
+    "/api/energy-knot-sessions": ("课表", "energy_knot_session_service", "get_session"),
+    "/api/internal-courses": ("课表", "internal_course_service", "get_course"),
+    "/api/internal-course-sessions": ("课表", "internal_course_session_service", "get_session"),
     "/api/agents": ("AI 配置", "agent_service", "get_agent"),
     "/api/ai-configs": ("AI 配置", "ai_config_service", "get_config"),
-    "/api/class-records": ("人员安排", "class_record_service", "get_record"),
+    "/api/class-records": ("邀约", "class_record_service", "get_record"),
     "/api/accounts": ("账号管理", "account_service", "get_account"),
-    "/api/visits": ("人员安排", "visit_service", "get_visit"),
-    "/api/daily-groupings": ("人员安排", "daily_grouping_service", "get_grouping"),
-    "/api/positions": ("角色管理", "position_service", "get_position"),
-    "/api/position-permissions": ("角色管理", "position_permission_service", "get_permissions"),
+    "/api/visits": ("邀约", "visit_service", "get_visit"),
+    "/api/daily-groupings": ("邀约", "daily_grouping_service", "get_grouping"),
+    "/api/positions": ("账号管理", "position_service", "get_position"),
+    "/api/position-permissions": ("账号管理", "position_permission_service", "get_permissions"),
     # position-customer-permissions 不走通用 getter（按 section+position 取，不是按 id）；
     # 它的快照在下方专用分支里处理
     "/api/other-projects": ("活动安排", "other_project_service", "get_project"),
@@ -81,28 +84,28 @@ GETTER_MAP = {
 
 PAGE_LABELS: dict[str, str] = {
     "dashboard": "工作台",
-    "customers": "用户管理",
-    "healing-records": "客户信息",
-    "activity-records": "活动记录",
-    "traffic-records": "引流记录",
-    "class-records": "人员安排",
-    "class-records-visitors": "到场人员",
-    "class-records-activities": "当日活动",
-    "class-records-arrival": "到场确认",
-    "daily-activities": "活动安排",
+    "customers": "客户资料",
+    "healing-records": "客户资料",
+    "activity-records": "数据记录",
+    "traffic-records": "数据记录",
+    "class-records": "邀约",
+    "class-records-visitors": "邀约",
+    "class-records-activities": "邀约",
+    "class-records-arrival": "邀约",
+    "daily-activities": "课表",
     "payment": "付费项目",
-    "membership-cards": "会员活动",
-    "group-cases": "觉醒游戏",
-    "emotional-releases": "情绪释放",
-    "energy-knots": "能量结",
-    "internal-courses": "内部课程",
-    "group-case-sessions": "活动安排",
-    "emotional-release-sessions": "活动安排",
-    "energy-knot-sessions": "活动安排",
-    "internal-course-sessions": "活动安排",
+    "membership-cards": "付费项目",
+    "group-cases": "课表",
+    "emotional-releases": "课表",
+    "energy-knots": "课表",
+    "internal-courses": "课表",
+    "group-case-sessions": "课表",
+    "emotional-release-sessions": "课表",
+    "energy-knot-sessions": "课表",
+    "internal-course-sessions": "课表",
     "agents": "AI 配置",
     "knowledge": "知识库",
-    "business": "业务数据",
+    "business": "数据记录",
     "system-logs": "系统日志",
     "operation-logs": "操作日志",
     "accounts": "账号管理",
@@ -111,14 +114,16 @@ PAGE_LABELS: dict[str, str] = {
     "healing-identities": "疗愈老师",
     "position-management": "账号管理",
     "courses": "活动配置",
-    "spaces": "疗愈空间",
-    "other-projects": "其他项目",
-    "oh-card-readings": "活动安排",
-    "oh-card-reading-sessions": "活动安排",
+    "spaces": "空间配置",
+    "other-projects": "课表",
+    "oh-card-readings": "课表",
+    "oh-card-reading-sessions": "课表",
     "reminders": "提醒配置",
-    "business-reminders": "业务提醒",
-    "activity-themes": "活动安排",
+    "business-reminders": "提醒",
+    "activity-themes": "课表",
     "organizations": "组织管理",
+    "activity-history": "邀约",
+    "visit-history": "邀约",
 }
 
 SKIP_PATHS = [
@@ -157,7 +162,7 @@ FIELD_NAMES = {
     "location": "地点", "address": "地址",
     "start_date": "开始日期", "end_date": "结束日期",
     "owner_id": "案主", "space_name": "空间名",
-    "card_type": "卡类型", "remaining_count": "剩余次数",
+    "card_type": "卡类型", "remaining_count": "剩余次数", "total_count": "总次数", "effective_date": "生效日期", "expiry_date": "到期日期", "voided": "退费状态", "voided_at": "退费时间",
     "customer_name": "用户",
     "password": "密码", "old_password": "旧密码", "new_password": "新密码",
     "positions": "疗愈老师",
@@ -167,6 +172,8 @@ FIELD_NAMES = {
     "basic_info": "创伤经历", "assessment": "当下卡点",
     "tags": "到访目的", "self_tags": "个人标签",
     "wechat": "微信", "core_situation": "核心情况",
+    "deal_date": "成交日期", "last_visit_date": "最近到店", "other_info": "其他信息",
+    "service_teacher": "服务老师", "is_leader": "组长", "group_leader_feedback": "组长反馈",
     "need_tags": "需求标签", "follow_up_node": "跟进节点",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
@@ -375,11 +382,21 @@ def _resolve_customer_name_if_uuid(val: str) -> str:
     return val
 
 
+VALUE_LABELS = {
+    "day": "日卡", "month": "月卡", "year": "年卡", "quarter": "季卡",
+    "half_year": "半年卡", "single": "单次",
+    "True": "是", "False": "否",
+    "true": "是", "false": "否",
+    "offline": "线下", "online": "线上",
+}
+
 def _format_value(val, field_name: str = "") -> str:
     if val is None or val == "" or val == []:
         return ""
     if isinstance(val, bool):
         return "是" if val else "否"
+    if isinstance(val, str) and val in VALUE_LABELS:
+        return VALUE_LABELS[val]
     if isinstance(val, dict):
         if field_name == "position_sort_orders":
             parts = [f"{k}:{v}" for k, v in val.items() if isinstance(v, int)]
@@ -712,12 +729,14 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         parts.append(f"扣减{count}次")
         return " · ".join(parts) if len(parts) > 1 else parts[0]
 
-    # 项目销卡：生成"用户名 · 项目类型 扣减N次"格式
+    # 项目销卡：生成"用户名 · 项目名 扣减N次"格式
     if path.rstrip("/") == "/api/project-deductions" and method == "POST":
         customer_id = body.get("customer_id", "")
         project_type = body.get("project_type", "")
+        project_id = body.get("project_id", "")
         count = body.get("count", 1)
         customer_name = ""
+        project_name = ""
         try:
             from app.services import customer_service
             c = customer_service.get_customer(customer_id)
@@ -725,16 +744,114 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                 customer_name = c.nickname or c.name
         except Exception:
             pass
-        type_labels = {
-            "membership-cards": "会员活动", "group-cases": "觉醒游戏",
-            "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
-        }
-        type_label = type_labels.get(project_type, project_type)
+        # 根据 project_type 和 project_id 解析项目名称
+        try:
+            if project_type == "membership-cards" and project_id:
+                from app.services import membership_card_service
+                card = membership_card_service.get_card(project_id)
+                if card:
+                    project_name = card.card_type
+            elif project_type == "group-cases" and project_id:
+                from app.services import group_case_service
+                g = group_case_service.get_case(project_id)
+                if g:
+                    project_name = g.name
+            elif project_type == "emotional-releases" and project_id:
+                from app.services import emotional_release_service
+                r = emotional_release_service.get_release(project_id)
+                if r:
+                    project_name = r.name
+            elif project_type == "oh-card-readings" and project_id:
+                from app.services import oh_card_reading_service
+                o = oh_card_reading_service.get_reading(project_id)
+                if o:
+                    project_name = o.name
+            elif project_type == "energy-knots" and project_id:
+                from app.services import energy_knot_service
+                e = energy_knot_service.get_knot(project_id)
+                if e:
+                    project_name = e.name
+            elif project_type == "other-projects" and project_id:
+                from app.services import other_project_service
+                p = other_project_service.get_project(project_id)
+                if p:
+                    project_name = p.project_name
+        except Exception:
+            pass
+        if not project_name:
+            type_labels = {
+                "membership-cards": "会员活动", "group-cases": "觉醒游戏",
+                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
+                "other-projects": "其他项目",
+            }
+            project_name = type_labels.get(project_type, project_type)
         parts = []
         if customer_name:
             parts.append(customer_name)
-        parts.append(type_label)
+        parts.append(project_name)
         parts.append(f"扣减{count}次")
+        return " · ".join(parts)
+
+    # 项目退费：生成"用户名 · 项目名 退费¥金额"格式
+    if path.rstrip("/") == "/api/project-refunds" and method == "POST":
+        customer_id = body.get("customer_id", "")
+        project_type = body.get("project_type", "")
+        project_id = body.get("project_id", "")
+        refund_amount = body.get("refund_amount", 0)
+        customer_name = ""
+        project_name = ""
+        try:
+            from app.services import customer_service
+            c = customer_service.get_customer(customer_id)
+            if c:
+                customer_name = c.nickname or c.name
+        except Exception:
+            pass
+        try:
+            if project_type == "membership-cards" and project_id:
+                from app.services import membership_card_service
+                card = membership_card_service.get_card(project_id)
+                if card:
+                    project_name = card.card_type
+            elif project_type == "group-cases" and project_id:
+                from app.services import group_case_service
+                g = group_case_service.get_case(project_id)
+                if g:
+                    project_name = g.name
+            elif project_type == "emotional-releases" and project_id:
+                from app.services import emotional_release_service
+                r = emotional_release_service.get_release(project_id)
+                if r:
+                    project_name = r.name
+            elif project_type == "oh-card-readings" and project_id:
+                from app.services import oh_card_reading_service
+                o = oh_card_reading_service.get_reading(project_id)
+                if o:
+                    project_name = o.name
+            elif project_type == "energy-knots" and project_id:
+                from app.services import energy_knot_service
+                e = energy_knot_service.get_knot(project_id)
+                if e:
+                    project_name = e.name
+            elif project_type == "other-projects" and project_id:
+                from app.services import other_project_service
+                p = other_project_service.get_project(project_id)
+                if p:
+                    project_name = p.project_name
+        except Exception:
+            pass
+        if not project_name:
+            type_labels = {
+                "membership-cards": "会员活动", "group-cases": "觉醒游戏",
+                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
+                "other-projects": "其他项目",
+            }
+            project_name = type_labels.get(project_type, project_type)
+        parts = []
+        if customer_name:
+            parts.append(customer_name)
+        parts.append(project_name)
+        parts.append(f"退费¥{refund_amount}")
         return " · ".join(parts)
 
     # 其他项目新增：生成"客户 · 项目名（¥金额，N次）"格式
@@ -832,6 +949,58 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     if "/rooms" in path and section == "空间配置":
         entity_type = "房间"
 
+    # activity-history / visit-history：body.action 直接就是描述
+    if "/activity-history" in path or "/visit-history" in path:
+        action = body.get("action", "")
+        date = body.get("date", "")
+        if action:
+            return f"{action}（{date}）" if date else action
+        return f"记录{entity_type} {date}" if date else f"记录{entity_type}"
+
+    # 销卡/退费修改：显示客户 · 项目 · 次数
+    if path.rstrip("/") == "/api/project-deductions" and method in ("PUT", "PATCH"):
+        b = before or {}
+        count = body.get("count")
+        parts = []
+        if b.get("nickname"):
+            parts.append(b["nickname"])
+        if b.get("project_name"):
+            parts.append(b["project_name"])
+        if count is not None:
+            parts.append(f"次数改为{count}")
+        return " · ".join(parts) if parts else "修改销卡记录"
+
+    if path.rstrip("/") == "/api/project-refunds" and method in ("PUT", "PATCH"):
+        b = before or {}
+        refund_amount = body.get("refund_amount")
+        parts = []
+        if b.get("nickname"):
+            parts.append(b["nickname"])
+        if b.get("project_name"):
+            parts.append(b["project_name"])
+        if refund_amount is not None:
+            parts.append(f"退费改为¥{refund_amount}")
+        return " · ".join(parts) if parts else "修改退费记录"
+
+    # 销卡/退费删除：显示客户 · 项目
+    if path.rstrip("/") == "/api/project-deductions" and method == "DELETE":
+        b = before or {}
+        parts = []
+        if b.get("nickname"):
+            parts.append(b["nickname"])
+        if b.get("project_name"):
+            parts.append(b["project_name"])
+        return " · ".join(parts) if parts else "删除销卡记录"
+
+    if path.rstrip("/") == "/api/project-refunds" and method == "DELETE":
+        b = before or {}
+        parts = []
+        if b.get("nickname"):
+            parts.append(b["nickname"])
+        if b.get("project_name"):
+            parts.append(b["project_name"])
+        return " · ".join(parts) if parts else "删除退费记录"
+
     if method == "POST":
         summary = _build_create_summary(body)
         if summary:
@@ -840,6 +1009,27 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     elif method in ("PUT", "PATCH"):
         desc = build_change_description(before or {}, body)
         if desc:
+            # 课表场次 / 邀约 编辑：补充日期和空间信息
+            date_space_prefixes = [
+                "/api/group-case-sessions", "/api/emotional-release-sessions",
+                "/api/energy-knot-sessions", "/api/internal-course-sessions",
+                "/api/oh-card-reading-sessions", "/api/visits",
+            ]
+            if any(path.startswith(p) for p in date_space_prefixes) and before:
+                session_date = before.get("visit_date") or before.get("date", "")
+                space_id = before.get("space_id", "")
+                space_name = ""
+                if space_id:
+                    try:
+                        from app.services import space_service
+                        space = space_service.get_space(space_id)
+                        if space:
+                            space_name = space.name
+                    except Exception:
+                        pass
+                suffix_parts = [p for p in [session_date, space_name] if p]
+                if suffix_parts:
+                    return f"{name}：{desc}（{'，'.join(suffix_parts)}）"
             return f"{name}：{desc}"
         return f"保存{name}（无变更）"
     elif method == "DELETE":
@@ -876,7 +1066,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                 from app.services import account_service
                 account = account_service.get_account(user_id)
                 if account:
-                    operator = account.username
+                    operator = account.owner or account.username
                     operator_role = account.role
             except Exception:
                 operator = user_id[:8]

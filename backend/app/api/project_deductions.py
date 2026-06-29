@@ -25,13 +25,13 @@ def create_deduction(data: ProjectDeductionCreate):
 
 class DeductionUpdate(BaseModel):
     count: int
-    operator_name: str = ""
+    updated_by: str = ""
 
 
 @router.patch("/{deduction_id}")
 def update_deduction(deduction_id: str, data: DeductionUpdate):
     try:
-        return project_deduction_service.update_deduction(deduction_id, data.count, data.operator_name).model_dump(mode="json")
+        return project_deduction_service.update_deduction(deduction_id, data.count, data.updated_by).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -54,7 +54,7 @@ class AutoDeductRequest(BaseModel):
     nickname: str
     project_type: str
     count: int = 1
-    operator_name: str = ""
+    created_by: str = ""
     name_filter: str = ""
 
 
@@ -62,7 +62,7 @@ class AutoDeductRequest(BaseModel):
 def auto_deduct(data: AutoDeductRequest):
     try:
         return project_deduction_service.auto_deduct(
-            data.nickname, data.project_type, data.count, data.operator_name, data.name_filter
+            data.nickname, data.project_type, data.count, data.created_by, data.name_filter
         ).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

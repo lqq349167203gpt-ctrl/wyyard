@@ -11,7 +11,8 @@ class ProjectRefundBase(BaseModel):
     paid_amount: float = 0  # 已付金额
     refund_amount: float = 0  # 退费金额
     refund_date: str  # YYYY-MM-DD
-    operator_name: str = ""
+    created_by: str = ""
+    updated_by: str = ""
 
 
 class ProjectRefundCreate(BaseModel):
@@ -19,7 +20,7 @@ class ProjectRefundCreate(BaseModel):
     project_type: str
     project_id: str
     refund_amount: float = 0
-    operator_name: str = ""
+    created_by: str = ""
 
 
 class ProjectRefund(ProjectRefundBase):

@@ -175,7 +175,7 @@ export function RefundTab() {
         project_type: projectType,
         project_id: selectedItemId,
         refund_amount: parseFloat(refundAmount) || 0,
-        operator_name: currentUserName,
+        created_by: currentUserName,
       })
       setDialogOpen(false)
       setCustomerId("")
@@ -198,7 +198,7 @@ export function RefundTab() {
     try {
       await projectRefundApi.update(editTarget.id, {
         refund_amount: parseFloat(editAmount) || 0,
-        operator_name: currentUserName,
+        updated_by: currentUserName,
       })
       setEditTarget(null)
       refreshRefunds()
@@ -283,7 +283,7 @@ export function RefundTab() {
                 <TableHead>已付金额</TableHead>
                 <TableHead>退费金额</TableHead>
                 <TableHead>退费日期</TableHead>
-                <TableHead>操作人</TableHead>
+                <TableHead>创建人</TableHead>
                 <TableHead className="w-20">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -300,7 +300,7 @@ export function RefundTab() {
                   <TableCell className="text-[#2b2f36]">¥{r.paid_amount.toLocaleString()}</TableCell>
                   <TableCell className="text-[#c4506a]">¥{r.refund_amount.toLocaleString()}</TableCell>
                   <TableCell className="text-[#2b2f36]">{r.refund_date}</TableCell>
-                  <TableCell className="text-[#8f959e]">{r.operator_name || "-"}</TableCell>
+                  <TableCell className="text-[#8f959e]">{r.created_by || "-"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button className="p-1 hover:bg-[#f0f1f2] rounded" onClick={() => { setEditTarget(r); setEditAmount(String(r.refund_amount)) }}>

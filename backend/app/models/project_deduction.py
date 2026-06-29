@@ -11,7 +11,8 @@ class ProjectDeductionBase(BaseModel):
     count: int = 1
     deduction_date: str  # YYYY-MM-DD
     remaining_after: int
-    operator_name: str = ""  # 操作人
+    created_by: str = ""
+    updated_by: str = ""
 
 
 class ProjectDeductionCreate(BaseModel):
@@ -19,7 +20,7 @@ class ProjectDeductionCreate(BaseModel):
     project_type: str
     project_id: str
     count: int = 1
-    operator_name: str = ""
+    created_by: str = ""
 
 
 class ProjectDeduction(ProjectDeductionBase):

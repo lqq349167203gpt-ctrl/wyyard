@@ -410,8 +410,22 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     }, 500)
   }, [saveRow])
 
+  const FIELD_LABELS: Record<string, string> = {
+    visit_time: "到店时间", nickname: "昵称", member_type: "会员类型",
+    is_leader: "组长", needs: "需求", referrer_handler: "引流处理",
+    arrived: "到店状态", feedback: "反馈", healing_notes: "疗愈记录",
+    group_leader_feedback: "组长反馈",
+  }
+
   const updateRow = useCallback((key: number, field: keyof Row, value: any) => {
-    pushEditHistory(`编辑了${field}`, [key], undefined, [{ rowKey: key, fields: [field as string] }])
+    const row = rowsRef.current.find(r => r.key === key)
+    const name = row?.nickname || "未命名"
+    const label = FIELD_LABELS[field as string] || field
+    let desc = `编辑了「${name}」的${label}`
+    if (field === "arrived") {
+      desc = value ? `标记「${name}」已到店` : `标记「${name}」未到店`
+    }
+    pushEditHistory(`编辑了${field}`, [key], desc, [{ rowKey: key, fields: [field as string] }])
     setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
     if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
       setRowStatus(prev => ({ ...prev, [key]: "idle" }))
