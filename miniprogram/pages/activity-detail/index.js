@@ -25,9 +25,15 @@ const TYPE_LABELS = {
 }
 
 const TEACHER_POSITION = {
-  class: '课程老师', gcs: '成就君', ers: '成就君',
-  eks: '能量结老师', ics: '课程老师', ocr: '成就君',
+  class: '课程老师', gcs: '成就君', ers: '成就君', ocr: '成就君',
+  eks: '能量结老师', ics: '课程老师',
 }
+
+// 单选老师类型（用 achiever_id/achiever_name）
+const SINGLE_TEACHER_TYPES = ['gcs', 'ers', 'ocr']
+
+// 内部课程类型
+const ICS_COURSE_TYPES = ['疗愈师课程', '商业框架陪跑', '落地赋能班']
 
 const API_MAP = {
   class: classRecordApi,
@@ -63,6 +69,8 @@ Page({
     roomIndex: 0,
     courses: [],
     courseIndex: -1,
+    icsCourses: ICS_COURSE_TYPES,
+    icsCourseType: '',
     activityModes: ['线下', '线上'],
     activityModeIndex: 0,
     ownerId: '',
@@ -70,6 +78,8 @@ Page({
     teacherIds: [],
     teacherNames: [],
     teacherDisplay: '',
+    achieverId: '',
+    achieverName: '',
     isPublicWelfare: false,
     participantIds: [],
     participantList: [],
@@ -84,6 +94,8 @@ Page({
     pickerList: [],
     showTypePicker: false,
     typePickerStep: 1,
+    _pendingType: '',
+    _pendingCourseName: '',
     saving: false,
     deleting: false,
     _recordId: '',
@@ -121,27 +133,27 @@ Page({
       ownerId: raw.owner_id || '',
       ownerName: raw.owner_name || '',
       teacherIds: raw.teacher_ids || [],
+      achieverId: raw.achiever_id || raw.host_id || (raw.teacher_ids || [])[0] || '',
+      achieverName: raw.achiever_name || raw.host_name || (raw.teacher_names || [])[0] || '',
       isPublicWelfare: raw.is_public_welfare || false,
       participantIds: raw.participant_ids || [],
       activityModeIndex: (raw.activity_mode === '线上') ? 1 : 0,
+      icsCourseType: (activityType === 'ics') ? (raw.course_type || '') : '',
     }
 
-    // 主持人/老师：class/ics 从 teacher_ids 解析，其他用 host_id
-    if (source !== 'class_record' && source !== 'internal_course') {
-      initData.teacherIds = raw.host_id ? [raw.host_id] : []
-    }
-
-    // 加载空间/课程/客户/到场人员
+    // 加载空间/课程/客户/到店人员
     await this.loadSpaces(raw.space_id, raw.room_id)
     await this.loadCourses(raw.course_type)
     await this.loadCustomers()
     await this.loadDayVisitors(raw.date)
 
-    // 计算 unifiedIndex
+    // 计算 unifiedIndex 和 courseIndex
     const { unifiedTypes } = this.data
     let unifiedIndex = 0
     if (activityType === 'class' && raw.course_type) {
       unifiedIndex = unifiedTypes.findIndex(t => !t.isType && t.courseName === raw.course_type)
+      const ci = this.data.courses.findIndex(c => c.name === raw.course_type)
+      if (ci >= 0) initData.courseIndex = ci
     } else {
       unifiedIndex = unifiedTypes.findIndex(t => t.isType && t.value === activityType)
     }
@@ -157,6 +169,11 @@ Page({
         return c ? c.nickname : ''
       }).filter(Boolean)
       initData.teacherDisplay = initData.teacherNames.join('、')
+      // gcs/ers/ocr：如果 achieverName 为空，从 teacherIds 兜底
+      if (SINGLE_TEACHER_TYPES.includes(activityType) && !initData.achieverName && initData.teacherNames.length > 0) {
+        initData.achieverId = teacherIds[0]
+        initData.achieverName = initData.teacherNames[0]
+      }
     }
 
     this.setData(initData)
@@ -222,7 +239,7 @@ Page({
       })).filter(v => v.id)
       this.setData({ dayVisitors: visitors })
     } catch (e) {
-      console.error('加载到场人员失败:', e)
+      console.error('加载到店人员失败:', e)
     }
   },
 
@@ -257,28 +274,38 @@ Page({
 
   onTypeSelect(e) {
     const value = e.currentTarget.dataset.value
-    if (value === 'class') {
-      this.setData({ typePickerStep: 2 })
+    if (value === 'class' || value === 'ics') {
+      const pendingName = value === 'class'
+        ? (this.data.courseIndex >= 0 ? this.data.courses[this.data.courseIndex]?.name || '' : '')
+        : this.data.icsCourseType || ''
+      this.setData({ typePickerStep: 2, _pendingType: value, _pendingCourseName: pendingName })
     } else {
-      // 非课程类型，直接确认
       this.applyTypeSelection(value, -1)
       this.setData({ showTypePicker: false, typePickerStep: 1 })
     }
   },
 
   onCourseSelect(e) {
-    const index = e.currentTarget.dataset.index
-    this.applyTypeSelection('class', index)
-    this.setData({ showTypePicker: false, typePickerStep: 1 })
+    const name = e.currentTarget.dataset.name
+    const pendingType = this.data._pendingType
+    if (pendingType === 'class') {
+      const index = this.data.courses.findIndex(c => c.name === name)
+      this.applyTypeSelection('class', index >= 0 ? index : -1)
+    } else {
+      this.applyTypeSelection('ics', -1, name)
+    }
+    this.setData({ showTypePicker: false, typePickerStep: 1, _pendingType: '', _pendingCourseName: '' })
   },
 
-  applyTypeSelection(activityType, courseIndex) {
+  applyTypeSelection(activityType, courseIndex, icsCourseType) {
     const resetFields = {
       ownerId: '',
       ownerName: '',
       teacherIds: [],
       teacherNames: [],
       teacherDisplay: '',
+      achieverId: '',
+      achieverName: '',
       isPublicWelfare: false,
       activityModeIndex: 0,
     }
@@ -293,6 +320,20 @@ Page({
         typeLabel: course.name,
         typeColor,
         courseIndex,
+        icsCourseType: '',
+        unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
+      })
+    } else if (activityType === 'ics' && icsCourseType) {
+      const typeColor = BADGE_COLORS['内部课程'] || '#5ba88a'
+      const unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === 'ics')
+      this.setData({
+        ...resetFields,
+        activityType: 'ics',
+        typeLabel: icsCourseType,
+        typeColor,
+        courseIndex: -1,
+        icsCourseType,
+        activityName: icsCourseType,
         unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
       })
     } else {
@@ -305,6 +346,7 @@ Page({
         typeLabel,
         typeColor,
         courseIndex: -1,
+        icsCourseType: '',
         unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
       })
     }
@@ -370,15 +412,17 @@ Page({
   },
 
   onTeacherPickerOpen() {
-    const position = TEACHER_POSITION[this.data.activityType] || ''
+    const { activityType } = this.data
+    const position = TEACHER_POSITION[activityType] || ''
+    const isSingle = SINGLE_TEACHER_TYPES.includes(activityType)
+    const selectedId = isSingle ? this.data.achieverId : null
+    const selectedIds = isSingle ? null : this.data.teacherIds
     const list = this.getFilteredCustomers(position).map(c => ({
       ...c,
-      _selected: this.data.teacherIds.includes(c.id),
+      _selected: isSingle ? c.id === selectedId : selectedIds.includes(c.id),
     }))
-    const title = (this.data.activityType === 'class' || this.data.activityType === 'ics' || this.data.activityType === 'eks')
-      ? '老师' : '主持人'
     this.setData({
-      showPicker: true, pickerTitle: title, pickerMode: 'teacher',
+      showPicker: true, pickerTitle: '老师', pickerMode: isSingle ? 'achiever' : 'teacher',
       pickerKeyword: '', pickerList: list,
     })
   },
@@ -389,19 +433,20 @@ Page({
 
   onPickerSearch(e) {
     const keyword = e.detail.value
+    const { pickerMode, activityType } = this.data
     let baseList
-    if (this.data.pickerMode === 'owner') {
+    if (pickerMode === 'owner') {
       baseList = this.getFilteredCustomers('')
     } else {
-      const position = TEACHER_POSITION[this.data.activityType] || ''
+      const position = TEACHER_POSITION[activityType] || ''
       baseList = this.getFilteredCustomers(position)
     }
     const list = baseList
       .filter(c => !keyword || (c.nickname || '').includes(keyword) || (c.name || '').includes(keyword))
       .map(c => ({
         ...c,
-        _selected: this.data.pickerMode === 'owner'
-          ? c.id === this.data.ownerId
+        _selected: pickerMode === 'owner' ? c.id === this.data.ownerId
+          : pickerMode === 'achiever' ? c.id === this.data.achieverId
           : this.data.teacherIds.includes(c.id),
       }))
     this.setData({ pickerKeyword: keyword, pickerList: list })
@@ -411,6 +456,8 @@ Page({
     const { id, nickname } = e.currentTarget.dataset
     if (this.data.pickerMode === 'owner') {
       this.setData({ ownerId: id, ownerName: nickname, showPicker: false, pickerKeyword: '' })
+    } else if (this.data.pickerMode === 'achiever') {
+      this.setData({ achieverId: id, achieverName: nickname, showPicker: false, pickerKeyword: '' })
     } else {
       let teacherIds = [...this.data.teacherIds]
       let teacherNames = [...this.data.teacherNames]
@@ -433,6 +480,10 @@ Page({
 
   onTeacherClear() {
     this.setData({ teacherIds: [], teacherNames: [], teacherDisplay: '' })
+  },
+
+  onAchieverClear() {
+    this.setData({ achieverId: '', achieverName: '' })
   },
 
   // ---------- 保存 ----------
@@ -488,9 +539,9 @@ Page({
           owner_name: this.data.ownerName,
           name: this.data.activityName,
           description: this.data.description,
-          host_id: this.data.teacherIds[0] || '',
-          host_name: this.data.teacherNames[0] || '',
-          teacher_ids: this.data.teacherIds,
+          achiever_id: this.data.achieverId,
+          achiever_name: this.data.achieverName,
+          teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
         }
         break
       case 'eks':
@@ -506,7 +557,8 @@ Page({
       case 'ics':
         payload = {
           ...baseFields,
-          course_name: this.data.activityName,
+          course_name: this.data.activityName || this.data.icsCourseType || '',
+          course_type: this.data.icsCourseType || '',
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
         }

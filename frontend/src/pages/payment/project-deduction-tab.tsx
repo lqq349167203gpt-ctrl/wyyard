@@ -55,9 +55,18 @@ export function ProjectDeductionTab() {
   const cpRef = useRef(cp)
   cpRef.current = cp
 
+  // 搜索
+  const [searchNickname, setSearchNickname] = useState("")
+  const appliedNicknameRef = useRef("")
+  const [searchProjectType, setSearchProjectType] = useState("all")
+  const appliedProjectTypeRef = useRef("")
+
   // 扣次记录（分页）
   const fetchDeductions = useCallback(async (page: number, pageSize: number) => {
-    return projectDeductionApi.listPaginated(page, pageSize)
+    const params: Record<string, string> = {}
+    if (appliedNicknameRef.current) params.nickname = appliedNicknameRef.current
+    if (appliedProjectTypeRef.current) params.project_type = appliedProjectTypeRef.current
+    return projectDeductionApi.listPaginated(page, pageSize, Object.keys(params).length > 0 ? params : undefined)
   }, [])
   const {
     paginatedItems: deductions, currentPage, totalPages, totalItems,
@@ -93,6 +102,27 @@ export function ProjectDeductionTab() {
   const currentUserName = (() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}").owner || "" } catch { return "" }
   })()
+
+  // 搜索
+  const handleFilterChange = useCallback((value: string) => {
+    setSearchNickname(value)
+    appliedNicknameRef.current = value
+    refreshDeductions()
+  }, [refreshDeductions])
+
+  const handleTypeChange = useCallback((value: string) => {
+    setSearchProjectType(value)
+    appliedProjectTypeRef.current = value === "all" ? "" : value
+    refreshDeductions()
+  }, [refreshDeductions])
+
+  const handleClearSearch = useCallback(() => {
+    setSearchNickname("")
+    setSearchProjectType("all")
+    appliedNicknameRef.current = ""
+    appliedProjectTypeRef.current = ""
+    refreshDeductions()
+  }, [refreshDeductions])
 
   // 加载客户列表
   useEffect(() => {
@@ -473,11 +503,32 @@ export function ProjectDeductionTab() {
 
   return (
     <>
-      {/* 销卡按钮 */}
+      {/* 搜索 + 操作栏 */}
       <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          {totalItems > 0 && <span>共 {totalItems} 条记录</span>}
-        </p>
+        <div className="flex items-center gap-2">
+          <div className="w-44">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchNickname}
+              onChange={(v) => handleFilterChange(typeof v === "string" ? v : "")}
+              placeholder="搜索用户"
+              filterSelected={false}
+            />
+          </div>
+          <div className="w-36">
+            <SelectDropdown
+              value={searchProjectType}
+              options={[
+                { value: "all", label: "全部类型" },
+                ...PROJECT_TYPE_OPTIONS,
+              ]}
+              onChange={handleTypeChange}
+            />
+          </div>
+          <button onClick={handleClearSearch} className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]">
+            清空
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleDownloadTemplate}>
             <Download className="mr-1 h-3.5 w-3.5" /> 下载模板
@@ -490,6 +541,13 @@ export function ProjectDeductionTab() {
             <CreditCard className="mr-1 h-3.5 w-3.5" /> 销卡
           </Button>
         </div>
+      </div>
+
+      {/* 统计 */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground mt-[6px]">
+          {totalItems > 0 && <span>共 {totalItems} 条记录</span>}
+        </p>
       </div>
 
       {/* 扣次记录表格 */}

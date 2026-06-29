@@ -60,7 +60,7 @@
   margin-top: 6rpx;
 }
 
-/* 到场按钮 */
+/* 到店按钮 */
 .section {
   background-color: #ffffff;
   border-radius: 12rpx;

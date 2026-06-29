@@ -148,7 +148,7 @@
   color: #8f959e;
 }
 
-/* 到场时间弹窗 */
+/* 到店时间弹窗 */
 .dialog-mask {
   position: fixed;
   top: 0;

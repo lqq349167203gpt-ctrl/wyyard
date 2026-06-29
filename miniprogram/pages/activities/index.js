@@ -1,7 +1,6 @@
 const { classRecordApi, spaceApi } = require('../../utils/api')
-const { formatDate, getWeekDates } = require('../../utils/util')
+const { formatDate } = require('../../utils/util')
 
-// 标签颜色（level-1 标签 + 活动类型）
 const BADGE_COLORS = {
   '沙龙': '#3370ff',
   '觉醒': '#7c5cfc',
@@ -11,24 +10,77 @@ const BADGE_COLORS = {
   'OH卡': '#c772a0',
 }
 
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+
+function pad(n) { return n < 10 ? '0' + n : '' + n }
+
+function buildCalendar(year, month, selectedDate, calendarCounts) {
+  const today = formatDate(new Date())
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const daysInPrev = new Date(year, month, 0).getDate()
+
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7
+  const days = []
+
+  for (let i = 0; i < totalCells; i++) {
+    let day, date, isCurrent
+    if (i < firstDay) {
+      day = daysInPrev - firstDay + 1 + i
+      const m = month === 0 ? 12 : month
+      const y = month === 0 ? year - 1 : year
+      date = `${y}-${pad(m)}-${pad(day)}`
+      isCurrent = false
+    } else if (i >= firstDay + daysInMonth) {
+      day = i - firstDay - daysInMonth + 1
+      const m = month === 11 ? 1 : month + 2
+      const y = month === 11 ? year + 1 : year
+      date = `${y}-${pad(m)}-${pad(day)}`
+      isCurrent = false
+    } else {
+      day = i - firstDay + 1
+      date = `${year}-${pad(month + 1)}-${pad(day)}`
+      isCurrent = true
+    }
+    days.push({
+      day,
+      date,
+      isCurrent,
+      isSelected: date === selectedDate,
+      isToday: date === today,
+      count: (calendarCounts || {})[date] || 0,
+    })
+  }
+  return days
+}
+
 Page({
   data: {
-    currentDate: formatDate(new Date()),
+    currentDate: '',
     currentDateShort: '',
-    weekDates: [],
+    currentWeekday: '',
+    calendarExpanded: false,
+    calYear: 0,
+    calMonth: 0,
+    calendarDays: [],
+    weekdays: WEEKDAYS,
     spaces: [],
     spaceIndex: 0,
     spaceId: '',
     currentSpaceName: '',
     records: [],
     loading: true,
-    scrollLeft: 0,
   },
 
-  async onLoad() {
+  async onLoad(options) {
+    const date = options.date || formatDate(new Date())
+    const d = new Date(date)
     this.setData({
-      weekDates: getWeekDates(new Date()),
-      currentDateShort: this.formatDateShort(new Date()),
+      currentDate: date,
+      currentDateShort: this._formatDateShort(date),
+      currentWeekday: '周' + WEEKDAYS[d.getDay()],
+      calYear: d.getFullYear(),
+      calMonth: d.getMonth(),
     })
     await this.loadSpaces()
     this.loadData()
@@ -42,18 +94,78 @@ Page({
     this.loadData().then(() => wx.stopPullDownRefresh())
   },
 
+  _formatDateShort(date) {
+    const d = new Date(date)
+    return `${d.getMonth() + 1}月${d.getDate()}日`
+  },
+
+  // ---------- 日历 ----------
+
+  onCalendarToggle() {
+    if (this.data.calendarExpanded) {
+      this.setData({ calendarExpanded: false })
+    } else {
+      const counts = this._calendarCounts || {}
+      this.setData({
+        calendarExpanded: true,
+        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, this.data.currentDate, counts),
+      })
+    }
+  },
+
+  onCalendarClose() {
+    this.setData({ calendarExpanded: false })
+  },
+
+  onPrevMonth() {
+    let { calYear, calMonth } = this.data
+    calMonth--
+    if (calMonth < 0) { calMonth = 11; calYear-- }
+    const counts = this._calendarCounts || {}
+    this.setData({
+      calYear, calMonth,
+      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
+    })
+  },
+
+  onNextMonth() {
+    let { calYear, calMonth } = this.data
+    calMonth++
+    if (calMonth > 11) { calMonth = 0; calYear++ }
+    const counts = this._calendarCounts || {}
+    this.setData({
+      calYear, calMonth,
+      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
+    })
+  },
+
+  onCalendarDayTap(e) {
+    const date = e.currentTarget.dataset.date
+    const d = new Date(date)
+    const counts = this._calendarCounts || {}
+    this.setData({
+      currentDate: date,
+      currentDateShort: this._formatDateShort(date),
+      currentWeekday: '周' + WEEKDAYS[d.getDay()],
+      calYear: d.getFullYear(),
+      calMonth: d.getMonth(),
+      calendarExpanded: false,
+      calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts),
+    })
+    this.loadData()
+  },
+
+  // ---------- 空间 ----------
+
   async loadSpaces() {
     try {
       const spaces = await spaceApi.list()
       if (spaces.length === 0) return
-
       const savedIndex = wx.getStorageSync('activity_space_index') || 0
       const spaceIndex = Math.min(savedIndex, spaces.length - 1)
       const space = spaces[spaceIndex]
-
       this.setData({
-        spaces,
-        spaceIndex,
+        spaces, spaceIndex,
         spaceId: space?.id || '',
         currentSpaceName: space?.name || '',
       })
@@ -62,23 +174,34 @@ Page({
     }
   },
 
-  async loadData() {
+  onSpaceChange(e) {
+    const index = e.detail.value
+    const space = this.data.spaces[index]
+    this.setData({
+      spaceIndex: index,
+      spaceId: space?.id || '',
+      currentSpaceName: space?.name || '',
+    })
+    wx.setStorageSync('activity_space_index', index)
+    this.loadData(space?.id || '')
+  },
+
+  // ---------- 数据 ----------
+
+  async loadData(spaceId) {
     this.setData({ loading: true })
     try {
-      const dashboard = await classRecordApi.dashboard(this.data.currentDate, this.data.spaceId || undefined)
+      const sid = spaceId !== undefined ? spaceId : this.data.spaceId
+      const dashboard = await classRecordApi.dashboard(this.data.currentDate, sid || undefined)
       const records = []
-
-      // 原始数据存储（供详情编辑用）
       this._rawMap = {}
 
-      // 课程活动 — badge: course_type(有则显示) 或 沙龙(兜底), name: activity_name || course_name
       if (dashboard.class_records) {
         dashboard.class_records.forEach(r => {
           const badge = r.course_type || '沙龙'
           this._rawMap[`class_record_${r.id}`] = r
           records.push({
-            id: r.id,
-            badge,
+            id: r.id, badge,
             name: r.activity_name || r.course_name || '',
             color: BADGE_COLORS['沙龙'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
@@ -91,19 +214,16 @@ Page({
         })
       }
 
-      // 觉醒游戏
       if (dashboard.gcs_sessions) {
         dashboard.gcs_sessions.forEach(r => {
           const owner = r.owner_name || ''
           this._rawMap[`group_case_${r.id}`] = r
-          const defaultName = owner ? `觉醒游戏·${owner}` : '觉醒游戏'
           records.push({
-            id: r.id,
-            badge: '觉醒',
-            name: r.name || defaultName,
+            id: r.id, badge: '觉醒',
+            name: r.name || (owner ? `觉醒游戏·${owner}` : '觉醒游戏'),
             color: BADGE_COLORS['觉醒'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: r.host_name || '',
+            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'group_case',
@@ -111,17 +231,16 @@ Page({
         })
       }
 
-      // 情绪释放
       if (dashboard.ers_sessions) {
         dashboard.ers_sessions.forEach(r => {
+          const achiever = r.achiever_name || ''
           this._rawMap[`emotional_release_${r.id}`] = r
           records.push({
-            id: r.id,
-            badge: '情绪释放',
-            name: r.name || '',
+            id: r.id, badge: '情绪释放',
+            name: r.name || (achiever ? `情绪释放·${achiever}` : '情绪释放'),
             color: BADGE_COLORS['情绪释放'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: r.host_name || '',
+            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
             participants: 0,
             space: r.space_name || '',
             source: 'emotional_release',
@@ -129,14 +248,13 @@ Page({
         })
       }
 
-      // 能量结
       if (dashboard.eks_sessions) {
         dashboard.eks_sessions.forEach(r => {
+          const teacher = (r.teacher_names || [])[0] || ''
           this._rawMap[`energy_knot_${r.id}`] = r
           records.push({
-            id: r.id,
-            badge: '能量结',
-            name: r.name || '',
+            id: r.id, badge: '能量结',
+            name: r.name || (teacher ? `能量结·${teacher}` : '能量结'),
             color: BADGE_COLORS['能量结'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
@@ -147,17 +265,15 @@ Page({
         })
       }
 
-      // 内部课程
       if (dashboard.ics_sessions) {
         dashboard.ics_sessions.forEach(r => {
           this._rawMap[`internal_course_${r.id}`] = r
           records.push({
-            id: r.id,
-            badge: '内部课程',
-            name: r.course_name || '',
+            id: r.id, badge: '内部课程',
+            name: r.course_name || r.course_type || '',
             color: BADGE_COLORS['内部课程'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: r.host_name || '',
+            teacher: r.host_name || (r.teacher_names || [])[0] || '',
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'internal_course',
@@ -165,17 +281,16 @@ Page({
         })
       }
 
-      // OH卡
       if (dashboard.ocr_sessions) {
         dashboard.ocr_sessions.forEach(r => {
+          const achiever = r.achiever_name || ''
           this._rawMap[`oh_card_${r.id}`] = r
           records.push({
-            id: r.id,
-            badge: 'OH卡',
-            name: r.name || '',
+            id: r.id, badge: 'OH卡',
+            name: r.name || (achiever ? `OH卡·${achiever}` : 'OH卡'),
             color: BADGE_COLORS['OH卡'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: r.host_name || '',
+            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'oh_card',
@@ -183,47 +298,18 @@ Page({
         })
       }
 
-      // 按时间排序
       records.sort((a, b) => (a.time || '').localeCompare(b.time || ''))
 
-      // 更新日历周的活动场数
-      const calCounts = dashboard.calendar_counts || {}
-      const weekDates = this.data.weekDates.map(d => ({
-        ...d,
-        count: calCounts[d.date] || 0,
-      }))
-
-      this.setData({ records, weekDates, loading: false })
+      // 保存日历计数，供展开时使用
+      this._calendarCounts = dashboard.calendar_counts || {}
+      this.setData({ records, loading: false })
     } catch (e) {
       console.error('加载活动失败:', e)
       this.setData({ loading: false })
     }
   },
 
-  formatDateShort(date) {
-    const d = new Date(date)
-    const month = d.getMonth() + 1
-    const day = d.getDate()
-    return `${month}月${day}日`
-  },
-
-  onDateTap(e) {
-    const date = e.currentTarget.dataset.date
-    this.setData({
-      currentDate: date,
-      currentDateShort: this.formatDateShort(date),
-    })
-    this.loadData()
-  },
-
-  onDateChange(e) {
-    const date = e.detail.value
-    this.setData({
-      currentDate: date,
-      currentDateShort: this.formatDateShort(date),
-    })
-    this.loadData()
-  },
+  // ---------- 导航 ----------
 
   onActivityTap(e) {
     const record = e.currentTarget.dataset.record
@@ -232,18 +318,6 @@ Page({
     getApp().globalData._selectedActivity = raw || record
     getApp().globalData._selectedActivitySource = record.source
     wx.navigateTo({ url: '/pages/activity-detail/index' })
-  },
-
-  onSpaceChange(e) {
-    const index = e.detail.value
-    const space = this.data.spaces[index]
-    this.setData({
-      spaceIndex: index,
-      spaceId: space?.id || '',
-      currentSpaceName: space?.name || '',
-    })
-    wx.setStorageSync('activity_space_index', index)
-    this.loadData()
   },
 
   onCreateTap() {

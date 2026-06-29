@@ -27,19 +27,27 @@
     "list": [
       {
         "pagePath": "pages/customers/index",
-        "text": "客户"
+        "text": "客户",
+        "iconPath": "images/tab-customers.png",
+        "selectedIconPath": "images/tab-customers-active.png"
       },
       {
         "pagePath": "pages/visits/index",
-        "text": "邀约"
+        "text": "邀约",
+        "iconPath": "images/tab-invite.png",
+        "selectedIconPath": "images/tab-invite-active.png"
       },
       {
         "pagePath": "pages/activities/index",
-        "text": "课表"
+        "text": "课表",
+        "iconPath": "images/tab-schedule.png",
+        "selectedIconPath": "images/tab-schedule-active.png"
       },
       {
         "pagePath": "pages/me/index",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "images/tab-me.png",
+        "selectedIconPath": "images/tab-me-active.png"
       }
     ]
   },

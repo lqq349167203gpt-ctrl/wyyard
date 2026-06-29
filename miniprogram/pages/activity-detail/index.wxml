@@ -46,7 +46,7 @@
     <!-- 类型 -->
     <view class="form-item" bindtap="onTypePickerOpen">
       <text class="form-label">类型</text>
-      <view class="picker-display">{{unifiedTypes[unifiedIndex].label}}</view>
+      <view class="picker-display">{{typeLabel || unifiedTypes[unifiedIndex].label}}</view>
     </view>
 
     <!-- 名称 -->
@@ -80,19 +80,21 @@
       </view>
     </view>
 
-    <!-- 主持人/老师 -->
-    <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr'}}" bindtap="onTeacherPickerOpen">
-      <text class="form-label">主持人</text>
-      <view class="picker-value-wrap">
-        <text style="{{teacherDisplay ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{teacherDisplay || '选择主持人'}}</text>
-        <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
-      </view>
-    </view>
+    <!-- 老师（多选：class/eks/ics） -->
     <view class="form-item last" wx:if="{{activityType === 'class' || activityType === 'eks' || activityType === 'ics'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
         <text style="{{teacherDisplay ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{teacherDisplay || '选择老师'}}</text>
         <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
+      </view>
+    </view>
+
+    <!-- 成就君（单选：gcs/ers/ocr） -->
+    <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr'}}" bindtap="onTeacherPickerOpen">
+      <text class="form-label">老师</text>
+      <view class="picker-value-wrap">
+        <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || '选择老师'}}</text>
+        <text class="picker-clear" wx:if="{{achieverId}}" catchtap="onAchieverClear">x</text>
       </view>
     </view>
   </view>
@@ -123,10 +125,11 @@
           <text class="picker-item-check" wx:if="{{activityType === 'class'}}">✓</text>
           <text class="picker-item-arrow">›</text>
         </view>
+        <!-- 非课程类型（不含 ics） -->
         <view
           wx:for="{{unifiedTypes}}"
           wx:key="value"
-          wx:if="{{item.isType}}"
+          wx:if="{{item.isType && item.value !== 'ics'}}"
           class="picker-item {{item.value === activityType ? 'selected' : ''}}"
           bindtap="onTypeSelect"
           data-value="{{item.value}}"
@@ -134,19 +137,41 @@
           <text class="picker-item-name">{{item.label}}</text>
           <text class="picker-item-check" wx:if="{{item.value === activityType}}">✓</text>
         </view>
-      </block>
-      <!-- 第二步：选择课程 -->
-      <block wx:if="{{typePickerStep === 2}}">
-        <view
-          wx:for="{{courses}}"
-          wx:key="name"
-          class="picker-item {{index === courseIndex ? 'selected' : ''}}"
-          bindtap="onCourseSelect"
-          data-index="{{index}}"
-        >
-          <text class="picker-item-name">{{item.name}}</text>
-          <text class="picker-item-check" wx:if="{{index === courseIndex}}">✓</text>
+        <!-- 内部课程入口 -->
+        <view class="picker-item {{activityType === 'ics' ? 'selected' : ''}}" bindtap="onTypeSelect" data-value="ics">
+          <text class="picker-item-name">内部课程</text>
+          <text class="picker-item-check" wx:if="{{activityType === 'ics'}}">✓</text>
+          <text class="picker-item-arrow">›</text>
         </view>
+      </block>
+      <!-- 第二步：选择课程/课程类型 -->
+      <block wx:if="{{typePickerStep === 2}}">
+        <!-- 沙龙活动：课程列表 -->
+        <block wx:if="{{_pendingType === 'class'}}">
+          <view
+            wx:for="{{courses}}"
+            wx:key="name"
+            class="picker-item {{item.name === _pendingCourseName ? 'selected' : ''}}"
+            bindtap="onCourseSelect"
+            data-name="{{item.name}}"
+          >
+            <text class="picker-item-name">{{item.name}}</text>
+            <text class="picker-item-check" wx:if="{{item.name === _pendingCourseName}}">✓</text>
+          </view>
+        </block>
+        <!-- 内部课程：课程类型列表 -->
+        <block wx:if="{{_pendingType === 'ics'}}">
+          <view
+            wx:for="{{icsCourses}}"
+            wx:key="*this"
+            class="picker-item {{item === _pendingCourseName ? 'selected' : ''}}"
+            bindtap="onCourseSelect"
+            data-name="{{item}}"
+          >
+            <text class="picker-item-name">{{item}}</text>
+            <text class="picker-item-check" wx:if="{{item === _pendingCourseName}}">✓</text>
+          </view>
+        </block>
       </block>
     </scroll-view>
   </view>

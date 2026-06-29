@@ -28,7 +28,7 @@
 
   <view class="card-actions" wx:if="{{!editMode}}">
     <view class="arrival-badge {{visit.arrived ? 'arrived' : ''}}" catchtap="{{visit.arrived ? 'onCancelArrival' : 'onArrivalTap'}}">
-      <text>{{visit.arrived ? '已到场' : '未到场'}}</text>
+      <text>{{visit.arrived ? '已到店' : '未到店'}}</text>
     </view>
     <view class="action-btn" catchtap="onProfileTap">
       <text>资料</text>
@@ -40,13 +40,13 @@
   </view>
 </view>
 
-<!-- 到场时间弹窗 -->
+<!-- 到店时间弹窗 -->
 <view class="dialog-mask" wx:if="{{showArrivalDialog}}" catchtap="onCloseArrivalDialog">
   <view class="dialog-box" catchtap>
-    <view class="dialog-title">确认到场</view>
+    <view class="dialog-title">确认到店</view>
     <view class="dialog-body">
       <view class="dialog-field">
-        <text class="dialog-label">到场时间</text>
+        <text class="dialog-label">到店时间</text>
         <picker mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
           <view class="time-picker">{{arrivalTime}}</view>
         </picker>

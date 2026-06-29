@@ -38,9 +38,38 @@
   text-align: right;
 }
 
-.submit-btn {
+/* 操作按钮 */
+.actions {
+  display: flex;
+  gap: 32rpx;
   margin-top: 48rpx;
-  width: 100%;
+  padding: 0 28rpx;
+}
+
+.submit-btn {
+  flex: 1;
+  font-size: 32rpx;
+  padding: 0 8rpx !important;
+}
+
+.btn-secondary {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 32rpx;
+  color: #1f2329;
+  background-color: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dee0e3;
+  padding: 0 8rpx !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compact-row {
+  padding-top: 4rpx;
+  padding-bottom: 4rpx;
 }
 
 /* 每组最后一个输入框去掉下划线 */
@@ -51,8 +80,7 @@
 /* 调整 switch 高度与其他输入框一致 */
 .form-item switch {
   transform: scale(0.75);
-  transform-origin: left center;
-  margin-right: -10rpx;
+  transform-origin: right center;
 }
 
 .form-item.switch-row {

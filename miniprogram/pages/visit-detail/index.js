@@ -46,7 +46,7 @@ Page({
           'visit.arrived': arrived,
           'visit.arrival_time': arrivalTime,
         })
-        wx.showToast({ title: '已取消到场' })
+        wx.showToast({ title: '已取消到店' })
       }
     }).catch(() => {
       wx.showToast({ title: '操作失败', icon: 'none' })

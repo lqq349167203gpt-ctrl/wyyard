@@ -5,23 +5,6 @@
   position: relative;
 }
 
-/* 编辑按钮 */
-.edit-btn {
-  position: absolute;
-  top: 24rpx;
-  right: 32rpx;
-  z-index: 10;
-  padding: 8rpx 24rpx;
-  background-color: #ffffff;
-  border-radius: 8rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
-}
-
-.edit-btn text {
-  font-size: 26rpx;
-  color: #3370ff;
-}
-
 /* 头像区 */
 .hero {
   background-color: #ffffff;
@@ -32,6 +15,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+}
+
+.edit-link {
+  position: absolute;
+  top: 24rpx;
+  right: 32rpx;
+}
+
+.edit-link text {
+  font-size: 26rpx;
+  color: #8f959e;
 }
 
 .hero-info {
@@ -41,21 +36,10 @@
   margin-bottom: 28rpx;
 }
 
-.hero-name-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8rpx;
-}
-
 .hero-name {
   font-size: 36rpx;
   font-weight: 400;
   color: #1f2329;
-}
-
-.hero-sub {
-  font-size: 26rpx;
-  color: #8f959e;
 }
 
 .hero-type {
@@ -139,9 +123,17 @@
   word-break: break-all;
 }
 
+.row-value.empty-val {
+  color: #d0d3d6;
+}
+
+.empty-val {
+  color: #d0d3d6;
+}
+
 .block {
   padding: 20rpx 0;
-  border-bottom: 1rpx solid #f7f8fa;
+  border-bottom: 1rpx solid #f0f1f2;
 }
 
 .block:last-child {
@@ -151,7 +143,7 @@
 .block-label {
   display: block;
   font-size: 22rpx;
-  color: #b0b5bb;
+  color: #8f959e;
   margin-bottom: 8rpx;
 }
 
@@ -161,6 +153,10 @@
   color: #1f2329;
   line-height: 1.7;
   word-break: break-all;
+}
+
+.block-value.empty-val {
+  color: #d0d3d6;
 }
 
 /* 记录区 */

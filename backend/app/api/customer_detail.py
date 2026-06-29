@@ -104,11 +104,22 @@ def _build_purchase_summary(customer_id: str) -> list:
             else:
                 # 单卡购买总次数：严格用 total_count，不再回退到可能被历史扣减过的 remaining_count
                 total = c.total_count
-                # 单卡剩余 = 用户聚合剩余按 total 占比分摊到此卡；单卡用户即等于 effective_remaining
+                # 拿该卡维度的扣卡数据
+                card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
+                card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
                 if effective_remaining is None:
                     card_remaining = "不限"
                     used = "-"
+                elif activity_deductions == 0:
+                    # 该用户根本没有活动扣卡 → 每张卡仅扣销卡，按卡精确即可
+                    card_remaining = max(0, total - card_manual)
+                    used = max(0, total - card_remaining)
+                elif card_activity > 0:
+                    # 这是新数据：本活动扣卡已分到该卡 → 用精确
+                    card_remaining = max(0, total - card_manual - card_activity)
+                    used = max(0, total - card_remaining)
                 elif sum_total > 0:
+                    # 老数据活动扣卡没分卡到该卡 → 退化到聚合分摊
                     share = round(effective_remaining * (total / sum_total))
                     card_remaining = share
                     used = max(0, total - share)

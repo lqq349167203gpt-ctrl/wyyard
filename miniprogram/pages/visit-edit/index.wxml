@@ -1,4 +1,14 @@
 <view class="container" wx:if="{{!loading}}">
+  <!-- 是否组长 -->
+  <view class="form-card">
+    <view class="form-item last compact-row">
+      <text class="form-label">是否组长</text>
+      <view style="flex: 1; display: flex; justify-content: flex-end;">
+        <switch checked="{{isLeader}}" bindchange="onLeaderChange" color="#3370ff" />
+      </view>
+    </view>
+  </view>
+
   <!-- 时间地点 -->
   <view class="form-card">
     <view class="form-item">
@@ -7,10 +17,22 @@
         <view class="picker-display">{{visitDate}}</view>
       </picker>
     </view>
-    <view class="form-item last">
+    <view class="form-item">
       <text class="form-label">时间</text>
       <picker class="form-picker" mode="time" value="{{visitTime}}" bindchange="onTimeChange">
         <view class="picker-display">{{visitTime}}</view>
+      </picker>
+    </view>
+    <view class="form-item switch-row {{arrived ? '' : 'last'}}">
+      <text class="form-label">到店</text>
+      <view style="flex: 1; display: flex; justify-content: flex-end;">
+        <switch checked="{{arrived}}" bindchange="onArrivedChange" color="#3370ff" />
+      </view>
+    </view>
+    <view class="form-item last" wx:if="{{arrived}}">
+      <text class="form-label">到达时间</text>
+      <picker class="form-picker" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
+        <view class="picker-display">{{arrivalTime || '选择时间'}}</view>
       </picker>
     </view>
   </view>
@@ -28,30 +50,12 @@
       <text class="form-label">本次需求</text>
       <input class="form-input" value="{{needs}}" bindinput="onNeedsInput" placeholder="描述客户需求" placeholder-class="form-input-placeholder" />
     </view>
-    <view class="form-item" bindtap="onPickerOpen" data-field="referrerHandler">
+    <view class="form-item last" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>
       <view class="picker-value-wrap">
         <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || '选择用户'}}</text>
         <text class="picker-clear" wx:if="{{referrerHandler}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
       </view>
-    </view>
-    <view class="form-item switch-row">
-      <text class="form-label">组长</text>
-      <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{isLeader}}" bindchange="onLeaderChange" color="#3370ff" />
-      </view>
-    </view>
-    <view class="form-item switch-row {{arrived ? '' : 'last'}}">
-      <text class="form-label">已到场</text>
-      <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{arrived}}" bindchange="onArrivedChange" color="#3370ff" />
-      </view>
-    </view>
-    <view class="form-item last" wx:if="{{arrived}}">
-      <text class="form-label">到达时间</text>
-      <picker class="form-picker" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
-        <view class="picker-display">{{arrivalTime || '选择时间'}}</view>
-      </picker>
     </view>
   </view>
 
@@ -92,9 +96,10 @@
     </scroll-view>
   </view>
 
-  <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
-    保存
-  </button>
+  <view class="actions">
+    <button class="btn-secondary" bindtap="onBack">返    回</button>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+  </view>
 </view>
 
 <view class="loading" wx:if="{{loading}}">

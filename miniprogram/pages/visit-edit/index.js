@@ -151,6 +151,10 @@ Page({
     }
   },
 
+  onBack() {
+    wx.navigateBack()
+  },
+
   async onSubmit() {
     this.setData({ saving: true })
     try {

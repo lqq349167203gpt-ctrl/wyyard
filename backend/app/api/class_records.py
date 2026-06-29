@@ -313,16 +313,46 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     records_eks = energy_knot_session_service.list_sessions(date)
     records_ics = internal_course_session_service.list_sessions(date)
     records_ocr = oh_card_reading_session_service.list_sessions(date)
+    if space_id:
+        records_cr = [r for r in records_cr if _match_space(r)]
+        records_gcs = [r for r in records_gcs if _match_space(r)]
+        records_ers = [r for r in records_ers if _match_space(r)]
+        records_eks = [r for r in records_eks if _match_space(r)]
+        records_ics = [r for r in records_ics if _match_space(r)]
+        records_ocr = [r for r in records_ocr if _match_space(r)]
     for lst in (records_cr, records_gcs, records_ers, records_eks, records_ics, records_ocr):
         _fill_room_name(lst)
 
+    # 填充 host_name / achiever_name / teacher_names
+    customers = list_customers()
+    customer_map = {c.id: c.nickname for c in customers}
+    for s in records_gcs + records_ers + records_ocr:
+        if s.host_id and not s.host_name:
+            s.host_name = customer_map.get(s.host_id, "")
+        if s.achiever_id and not s.achiever_name:
+            s.achiever_name = customer_map.get(s.achiever_id, "")
+    for s in records_eks + records_ics:
+        if s.host_id and not s.host_name:
+            s.host_name = customer_map.get(s.host_id, "")
+
+    # 通过 dict 注入 teacher_names（Pydantic 模型无此字段）
+    gcs_dicts = [s.model_dump(mode="json") for s in records_gcs]
+    ers_dicts = [s.model_dump(mode="json") for s in records_ers]
+    ocr_dicts = [s.model_dump(mode="json") for s in records_ocr]
+    eks_dicts = [s.model_dump(mode="json") for s in records_eks]
+    ics_dicts = [s.model_dump(mode="json") for s in records_ics]
+    cr_dicts = [r.model_dump(mode="json") for r in records_cr]
+    for d in gcs_dicts + ers_dicts + ocr_dicts + eks_dicts + ics_dicts + cr_dicts:
+        ids = d.get("teacher_ids", []) or []
+        d["teacher_names"] = [customer_map.get(tid, "") for tid in ids if customer_map.get(tid)]
+
     return {
-        "class_records": records_cr,
-        "gcs_sessions": records_gcs,
-        "ers_sessions": records_ers,
-        "eks_sessions": records_eks,
-        "ics_sessions": records_ics,
-        "ocr_sessions": records_ocr,
+        "class_records": cr_dicts,
+        "gcs_sessions": gcs_dicts,
+        "ers_sessions": ers_dicts,
+        "eks_sessions": eks_dicts,
+        "ics_sessions": ics_dicts,
+        "ocr_sessions": ocr_dicts,
         "visits": visit_service.list_visits(date, space_id=space_id if space_id else None),
         "visit_counts": visit_service.get_date_counts(start_date=start_date, end_date=end_date, space_id=space_id if space_id else None),
         "calendar_counts": dict(cal_counts),

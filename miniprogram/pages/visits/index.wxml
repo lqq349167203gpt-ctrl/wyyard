@@ -1,37 +1,42 @@
 <view class="page">
-  <!-- 日期选择器 -->
-  <scroll-view scroll-x class="date-strip" scroll-left="{{scrollLeft}}">
-    <view class="date-items">
-      <view
-        wx:for="{{weekDates}}"
-        wx:key="date"
-        class="date-item {{item.date === currentDate ? 'active' : ''}} {{item.isToday ? 'today' : ''}}"
-        bindtap="onDateTap"
-        data-date="{{item.date}}"
-      >
-        <text class="date-weekday">{{item.weekday}}</text>
-        <text class="date-day">{{item.day}}</text>
-        <text class="date-count" wx:if="{{item.count > 0}}">{{item.count}}人</text>
+  <!-- 日历 -->
+  <view class="calendar">
+    <view class="calendar-header">
+      <text class="summary-date" bindtap="onCalendarToggle">{{currentDateShort}} {{currentWeekday}}</text>
+      <picker class="space-picker" catchtap="" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <text class="summary-space">{{currentSpaceName}}</text>
+      </picker>
+      <view class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
+        <text>{{editMode ? '完成' : '排序'}}</text>
       </view>
     </view>
-  </scroll-view>
-
-  <!-- 筛选栏 -->
-  <view class="filter-bar">
-    <picker mode="date" value="{{currentDate}}" bindchange="onDateChange">
-      <view class="date-picker">
-        <text class="date-label">{{currentDateShort}}</text>
+    <!-- 下拉日历 -->
+    <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
+      <view class="calendar-nav">
+        <view class="nav-arrow" catchtap="onPrevMonth">‹</view>
+        <text class="nav-title">{{calYear}}年{{calMonth + 1}}月</text>
+        <view class="nav-arrow" catchtap="onNextMonth">›</view>
       </view>
-    </picker>
-    <picker mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-      <view class="space-picker">
-        <text class="space-label">{{currentSpaceName}}</text>
+      <view class="weekday-row">
+        <text class="weekday-cell" wx:for="{{weekdays}}" wx:key="*this">{{item}}</text>
       </view>
-    </picker>
-    <view class="edit-toggle {{editMode ? 'active' : ''}}" bindtap="onToggleEditMode">
-      <text>{{editMode ? '完成' : '排序'}}</text>
+      <view class="day-grid">
+        <view
+          wx:for="{{calendarDays}}"
+          wx:key="date"
+          class="day-cell {{item.isCurrent ? '' : 'other'}} {{item.isSelected ? 'selected' : ''}} {{item.isToday ? 'today' : ''}}"
+          bindtap="onCalendarDayTap"
+          data-date="{{item.date}}"
+        >
+          <text>{{item.day}}</text>
+          <view class="day-dot" wx:if="{{item.count > 0}}"></view>
+        </view>
+      </view>
     </view>
   </view>
+
+  <!-- 遮罩 -->
+  <view class="calendar-mask" wx:if="{{calendarExpanded}}" bindtap="onCalendarClose"></view>
 
   <!-- 访客列表 -->
   <view class="visit-list" wx:if="{{!loading && visits.length > 0}}">

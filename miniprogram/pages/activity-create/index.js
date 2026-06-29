@@ -25,10 +25,16 @@ const TEACHER_POSITION = {
   class: '课程老师',
   gcs: '成就君',
   ers: '成就君',
+  ocr: '成就君',
   eks: '能量结老师',
   ics: '课程老师',
-  ocr: '成就君',
 }
+
+// 单选老师类型（用 achiever_id/achiever_name）
+const SINGLE_TEACHER_TYPES = ['gcs', 'ers', 'ocr']
+
+// 内部课程类型（独立于沙龙课程类型）
+const ICS_COURSE_TYPES = ['疗愈师课程', '商业框架陪跑', '落地赋能班']
 
 Page({
   data: {
@@ -49,16 +55,22 @@ Page({
     // 课程（沙龙）
     courses: [],
     courseIndex: -1,
+    // 内部课程类型
+    icsCourses: ICS_COURSE_TYPES,
+    icsCourseType: '',
     // 活动方式（沙龙/内部课程）
     activityModes: ['线下', '线上'],
     activityModeIndex: 0,
     // 案主（觉醒/情绪释放/OH卡/能量结）
     ownerId: '',
     ownerName: '',
-    // 主持人/老师
+    // 老师（多选，class/eks/ics）
     teacherIds: [],
     teacherNames: [],
     teacherDisplay: '',
+    // 成就君（单选，gcs/ers/ocr）
+    achieverId: '',
+    achieverName: '',
     // 公益（沙龙）
     isPublicWelfare: false,
     // 参与者
@@ -74,12 +86,14 @@ Page({
     // 统一搜索弹窗
     showPicker: false,
     pickerTitle: '',
-    pickerMode: '', // 'teacher' | 'owner'
+    pickerMode: '', // 'teacher' | 'owner' | 'achiever'
     pickerKeyword: '',
     pickerList: [],
     // 类型选择弹窗
     showTypePicker: false,
     typePickerStep: 1,
+    _pendingType: '',
+    _pendingCourseName: '',
     saving: false,
   },
 
@@ -164,8 +178,12 @@ Page({
 
   onTypeSelect(e) {
     const value = e.currentTarget.dataset.value
-    if (value === 'class') {
-      this.setData({ typePickerStep: 2 })
+    if (value === 'class' || value === 'ics') {
+      // 预填当前已选课程名
+      const pendingName = value === 'class'
+        ? (this.data.courseIndex >= 0 ? this.data.courses[this.data.courseIndex]?.name || '' : '')
+        : this.data.icsCourseType || ''
+      this.setData({ typePickerStep: 2, _pendingType: value, _pendingCourseName: pendingName })
     } else {
       this.applyTypeSelection(value, -1)
       this.setData({ showTypePicker: false, typePickerStep: 1 })
@@ -173,17 +191,27 @@ Page({
   },
 
   onCourseSelect(e) {
-    const index = e.currentTarget.dataset.index
-    this.applyTypeSelection('class', index)
-    this.setData({ showTypePicker: false, typePickerStep: 1 })
+    const name = e.currentTarget.dataset.name
+    const pendingType = this.data._pendingType
+    if (pendingType === 'class') {
+      const index = this.data.courses.findIndex(c => c.name === name)
+      this.applyTypeSelection('class', index >= 0 ? index : -1)
+    } else if (pendingType === 'ics' && name) {
+      this.applyTypeSelection('ics', -1, name)
+    }
+    this.setData({ showTypePicker: false, typePickerStep: 1, _pendingType: '', _pendingCourseName: '' })
   },
 
-  applyTypeSelection(activityType, courseIndex) {
-    let typeLabel, unifiedIndex
+  applyTypeSelection(activityType, courseIndex, icsCourseType) {
+    let typeLabel, unifiedIndex, activityName
     if (activityType === 'class' && courseIndex >= 0) {
       const course = this.data.courses[courseIndex]
       typeLabel = course.name
       unifiedIndex = this.data.unifiedTypes.findIndex(t => !t.isType && t.courseName === course.name)
+    } else if (activityType === 'ics' && icsCourseType) {
+      typeLabel = icsCourseType
+      unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === 'ics')
+      activityName = icsCourseType
     } else {
       typeLabel = TYPE_LABELS[activityType] || ''
       unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === activityType)
@@ -192,12 +220,17 @@ Page({
     this.setData({
       unifiedIndex,
       activityType,
-      courseIndex,
+      courseIndex: activityType === 'class' ? courseIndex : -1,
+      icsCourseType: icsCourseType || '',
       typeLabel,
+      activityName: activityName || '',
       ownerId: '',
       ownerName: '',
       teacherIds: [],
       teacherNames: [],
+      teacherDisplay: '',
+      achieverId: '',
+      achieverName: '',
       isPublicWelfare: false,
       activityModeIndex: 0,
       activityName: '',
@@ -268,19 +301,21 @@ Page({
     })
   },
 
-  // 打开主持人/老师选择器（多选）
+  // 打开老师选择器
   onTeacherPickerOpen() {
-    const position = TEACHER_POSITION[this.data.activityType] || ''
+    const { activityType } = this.data
+    const position = TEACHER_POSITION[activityType] || ''
+    const isSingle = SINGLE_TEACHER_TYPES.includes(activityType)
+    const selectedId = isSingle ? this.data.achieverId : null
+    const selectedIds = isSingle ? null : this.data.teacherIds
     const list = this.getFilteredCustomers(position).map(c => ({
       ...c,
-      _selected: this.data.teacherIds.includes(c.id),
+      _selected: isSingle ? c.id === selectedId : selectedIds.includes(c.id),
     }))
-    const title = (this.data.activityType === 'class' || this.data.activityType === 'ics' || this.data.activityType === 'eks')
-      ? '老师' : '主持人'
     this.setData({
       showPicker: true,
-      pickerTitle: title,
-      pickerMode: 'teacher',
+      pickerTitle: '老师',
+      pickerMode: isSingle ? 'achiever' : 'teacher',
       pickerKeyword: '',
       pickerList: list,
     })
@@ -294,11 +329,12 @@ Page({
   // 搜索
   onPickerSearch(e) {
     const keyword = e.detail.value
+    const { pickerMode, activityType } = this.data
     let baseList
-    if (this.data.pickerMode === 'owner') {
+    if (pickerMode === 'owner') {
       baseList = this.getFilteredCustomers('')
     } else {
-      const position = TEACHER_POSITION[this.data.activityType] || ''
+      const position = TEACHER_POSITION[activityType] || ''
       baseList = this.getFilteredCustomers(position)
     }
     const list = baseList
@@ -308,8 +344,8 @@ Page({
       })
       .map(c => ({
         ...c,
-        _selected: this.data.pickerMode === 'owner'
-          ? c.id === this.data.ownerId
+        _selected: pickerMode === 'owner' ? c.id === this.data.ownerId
+          : pickerMode === 'achiever' ? c.id === this.data.achieverId
           : this.data.teacherIds.includes(c.id),
       }))
     this.setData({ pickerKeyword: keyword, pickerList: list })
@@ -319,15 +355,23 @@ Page({
   onPickerSelect(e) {
     const { id, nickname } = e.currentTarget.dataset
     if (this.data.pickerMode === 'owner') {
-      // 单选，直接关闭
+      // 案主单选
       this.setData({
         ownerId: id,
         ownerName: nickname,
         showPicker: false,
         pickerKeyword: '',
       })
+    } else if (this.data.pickerMode === 'achiever') {
+      // 成就君单选
+      this.setData({
+        achieverId: id,
+        achieverName: nickname,
+        showPicker: false,
+        pickerKeyword: '',
+      })
     } else {
-      // 多选
+      // 老师多选
       let { teacherIds, teacherNames } = this.data
       const idx = teacherIds.indexOf(id)
       if (idx >= 0) {
@@ -356,6 +400,11 @@ Page({
     this.setData({ teacherIds: [], teacherNames: [], teacherDisplay: '' })
   },
 
+  // 清空成就君
+  onAchieverClear() {
+    this.setData({ achieverId: '', achieverName: '' })
+  },
+
   // ---------- 参与者 ----------
 
   async loadDayVisitors(date) {
@@ -368,7 +417,7 @@ Page({
       this.setData({ dayVisitors: visitors })
       this.updateParticipantList()
     } catch (e) {
-      console.error('加载到场人员失败:', e)
+      console.error('加载到店人员失败:', e)
     }
   },
 
@@ -457,9 +506,9 @@ Page({
             owner_name: this.data.ownerName,
             name: this.data.activityName,
             description: this.data.description,
-            host_id: this.data.teacherIds[0] || '',
-            host_name: this.data.teacherNames[0] || '',
-            teacher_ids: this.data.teacherIds,
+            achiever_id: this.data.achieverId,
+            achiever_name: this.data.achieverName,
+            teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
           })
           break
         case 'ers':
@@ -469,9 +518,9 @@ Page({
             owner_name: this.data.ownerName,
             name: this.data.activityName,
             description: this.data.description,
-            host_id: this.data.teacherIds[0] || '',
-            host_name: this.data.teacherNames[0] || '',
-            teacher_ids: this.data.teacherIds,
+            achiever_id: this.data.achieverId,
+            achiever_name: this.data.achieverName,
+            teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
           })
           break
         case 'eks':
@@ -489,8 +538,8 @@ Page({
         case 'ics':
           await internalCourseSessionApi.create({
             ...baseFields,
-            course_name: this.data.activityName,
-            course_type: '',
+            course_name: this.data.activityName || this.data.icsCourseType || '',
+            course_type: this.data.icsCourseType || '',
             course_description: this.data.description,
             teacher_ids: this.data.teacherIds,
             host_id: '',
@@ -504,9 +553,9 @@ Page({
             owner_name: this.data.ownerName,
             name: this.data.activityName,
             description: this.data.description,
-            host_id: this.data.teacherIds[0] || '',
-            host_name: this.data.teacherNames[0] || '',
-            teacher_ids: this.data.teacherIds,
+            achiever_id: this.data.achieverId,
+            achiever_name: this.data.achieverName,
+            teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
           })
           break
       }

@@ -3,93 +3,127 @@
   background-color: #f7f8fa;
 }
 
-/* 日期选择器 */
-.date-strip {
+/* 日历 */
+.calendar {
   background-color: #ffffff;
-  white-space: nowrap;
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
   position: relative;
-  z-index: 10;
+  z-index: 101;
 }
 
-.date-items {
+.calendar-header {
+  padding: 24rpx 32rpx;
   display: flex;
-  padding: 20rpx 16rpx;
+  align-items: center;
+  gap: 20rpx;
 }
 
-.date-item {
+.summary-date {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.summary-space {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+/* 下拉日历 */
+
+.calendar-dropdown {
+  padding: 24rpx 32rpx;
+  border-top: 1rpx solid #f0f1f2;
+  background-color: #ffffff;
+}
+
+.calendar-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48rpx;
+  margin-bottom: 24rpx;
+}
+
+.nav-arrow {
+  font-size: 40rpx;
+  color: #8f959e;
+  padding: 8rpx 16rpx;
+}
+
+.nav-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.weekday-row {
+  display: flex;
+  padding-bottom: 12rpx;
+}
+
+.weekday-cell {
+  flex: 1;
+  text-align: center;
+  font-size: 22rpx;
+  color: #b0b5bb;
+}
+
+.day-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.day-cell {
+  width: 14.2857%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16rpx 28rpx;
-  border-radius: 12rpx;
+  padding: 14rpx 0;
   position: relative;
-  min-width: 80rpx;
 }
 
-.date-item.active {
-  background-color: #f0f5ff;
+.day-cell text {
+  font-size: 28rpx;
+  color: #1f2329;
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 
-.date-item.active .date-weekday {
-  color: #3370ff;
+.day-cell.other text {
+  color: #d0d3d6;
 }
 
-.date-item.active .date-day {
+.day-cell.today text {
   color: #3370ff;
   font-weight: 600;
 }
 
-.date-weekday {
-  font-size: 22rpx;
-  color: #8f959e;
+.day-cell.selected text {
+  background-color: #3370ff;
+  color: #ffffff;
+  font-weight: 600;
 }
 
-.date-day {
-  font-size: 34rpx;
-  font-weight: 500;
-  color: #1f2329;
-  margin-top: 6rpx;
-}
-
-.date-count {
-  font-size: 20rpx;
-  color: #c9cdd4;
+.day-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background-color: #3370ff;
   margin-top: 4rpx;
-}
-
-.date-item.active .date-count {
-  color: #c9cdd4;
-}
-
-/* 筛选栏 */
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  padding: 16rpx 32rpx;
-  background-color: #ffffff;
-  border-bottom: 1rpx solid #f0f1f2;
-}
-
-.date-picker {
-  display: flex;
-  align-items: center;
-}
-
-.date-label {
-  font-size: 26rpx;
-  color: #8f959e;
-}
-
-.space-picker {
-  display: flex;
-  align-items: center;
-}
-
-.space-label {
-  font-size: 26rpx;
-  color: #8f959e;
 }
 
 /* 活动列表 */
@@ -122,6 +156,7 @@
 
 .card-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   min-width: 0;
   flex: 1;
@@ -151,8 +186,8 @@
 .card-time {
   font-size: 24rpx;
   color: #8f959e;
-  flex-shrink: 0;
-  margin-left: 16rpx;
+  flex-basis: 100%;
+  margin-top: 8rpx;
 }
 
 .card-info {
@@ -166,13 +201,50 @@
   color: #8f959e;
 }
 
-.card-arrow {
+.card-arrow-wrap {
   position: absolute;
   right: 28rpx;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.card-participants {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
+.card-arrow {
   font-size: 36rpx;
   color: #d0d3d6;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 160rpx 0;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #b0b5bb;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 120rpx 0;
+  color: #8f959e;
+  font-size: 28rpx;
 }
 
 .fab {

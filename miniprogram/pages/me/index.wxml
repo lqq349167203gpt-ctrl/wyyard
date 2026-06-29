@@ -28,6 +28,6 @@
 
   <!-- 退出按钮 -->
   <view class="logout-area">
-    <button class="logout-btn" bindtap="onLogout">退出登录</button>
+    <view class="logout-btn" bindtap="onLogout">退出登录</view>
   </view>
 </view>

@@ -29,10 +29,15 @@ def _save(deduction_id: str = ""):
 _load()
 
 
-def list_deductions(customer_id: Optional[str] = None) -> List[ProjectDeduction]:
+def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] = None, project_type: Optional[str] = None) -> List[ProjectDeduction]:
     results = [d for d in _deductions.values() if not d.is_deleted]
     if customer_id:
         results = [d for d in results if d.customer_id == customer_id]
+    if nickname:
+        q = nickname.lower()
+        results = [d for d in results if q in (d.nickname or "").lower()]
+    if project_type:
+        results = [d for d in results if d.project_type == project_type]
     results.sort(key=lambda d: d.created_at, reverse=True)
     return results
 
@@ -40,6 +45,14 @@ def list_deductions(customer_id: Optional[str] = None) -> List[ProjectDeduction]
 def get_deduction_total(customer_id: str, project_type: str) -> int:
     return sum(d.count for d in _deductions.values()
                if d.customer_id == customer_id and d.project_type == project_type and not d.is_deleted)
+
+
+# 注意：project_deduction_service 内部 _deductions 与 membership_card_service._deductions 重名但语义不同：
+#       前者是销卡（ProjectDeduction，带 project_id 字段）的字典；后者是会员卡活动扣费追踪的 dict。
+def get_deduction_total_for_project(project_id: str) -> int:
+    """统计某 project_id（例如某张会员卡 id）的销卡次数总和。"""
+    return sum(d.count for d in _deductions.values()
+               if d.project_id == project_id and not d.is_deleted)
 
 
 def get_available_items(customer_id: str, project_type: str) -> list:

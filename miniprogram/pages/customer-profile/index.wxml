@@ -1,16 +1,12 @@
 <view class="container" wx:if="{{!loading && customer}}">
-  <!-- 编辑按钮 -->
-  <view class="edit-btn" bindtap="onEditTap">
-    <text>编辑</text>
-  </view>
 
   <!-- 头像区 -->
   <view class="hero">
+    <view class="edit-link" bindtap="onEditTap">
+      <text>编辑</text>
+    </view>
     <view class="hero-info">
-      <view class="hero-name-row">
-        <text class="hero-name">{{customer.nickname || '-'}}</text>
-        <text class="hero-sub" wx:if="{{customer.name}}">（{{customer.name}}）</text>
-      </view>
+      <text class="hero-name">{{customer.nickname || '-'}}</text>
       <text class="hero-type" wx:if="{{customer.member_type}}">{{customer.member_type}}</text>
     </view>
     <view class="hero-stats">
@@ -33,21 +29,29 @@
 
   <!-- 联系方式 -->
   <view class="card">
+    <view class="row" wx:if="{{customer.name}}">
+      <text class="row-label">姓名</text>
+      <text class="row-value">{{customer.name}}</text>
+    </view>
     <view class="row">
       <text class="row-label">年龄</text>
-      <text class="row-value">{{customer.age || '-'}}</text>
+      <text class="row-value" wx:if="{{customer.age}}">{{customer.age}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
       <text class="row-label">电话</text>
-      <text class="row-value">{{customer.phone || '-'}}</text>
+      <text class="row-value" wx:if="{{customer.phone}}">{{customer.phone}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
       <text class="row-label">微信</text>
-      <text class="row-value">{{customer.wechat || '-'}}</text>
+      <text class="row-value" wx:if="{{customer.wechat}}">{{customer.wechat}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
       <text class="row-label">工作</text>
-      <text class="row-value">{{customer.work_status || ''}}{{customer.work_status && customer.work_description ? ' · ' : ''}}{{customer.work_description || '-'}}</text>
+      <text class="row-value" wx:if="{{customer.work_status || customer.work_description}}">{{customer.work_status || ''}}{{customer.work_status && customer.work_description ? ' · ' : ''}}{{customer.work_description}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
   </view>
 
@@ -55,23 +59,28 @@
   <view class="card">
     <view class="row">
       <text class="row-label">引流人</text>
-      <text class="row-value">{{customer.referrer || '-'}}</text>
+      <text class="row-value" wx:if="{{customer.referrer}}">{{customer.referrer}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
       <text class="row-label">承接人</text>
-      <text class="row-value">{{customer.referrer_handler || '-'}}</text>
+      <text class="row-value" wx:if="{{customer.referrer_handler}}">{{customer.referrer_handler}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
       <text class="row-label">流量来源</text>
-      <text class="row-value">{{customer.traffic_source || '-'}}</text>
+      <text class="row-value" wx:if="{{customer.traffic_source}}">{{customer.traffic_source}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
       <text class="row-label">流量链接</text>
-      <text class="row-value break">{{customer.traffic_source_detail || '-'}}</text>
+      <text class="row-value break" wx:if="{{customer.traffic_source_detail}}">{{customer.traffic_source_detail}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
       <text class="row-label">疗愈老师</text>
-      <text class="row-value">{{healerText || '-'}}</text>
+      <text class="row-value" wx:if="{{healerText}}">{{healerText}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
     </view>
   </view>
 
@@ -79,19 +88,23 @@
   <view class="card">
     <view class="block">
       <text class="block-label">到访目的</text>
-      <text class="block-value">{{customer.tags || '-'}}</text>
+      <text class="block-value" wx:if="{{customer.tags}}">{{customer.tags}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
     </view>
     <view class="block">
       <text class="block-label">创伤经历</text>
-      <text class="block-value">{{customer.basic_info || '-'}}</text>
+      <text class="block-value" wx:if="{{customer.basic_info}}">{{customer.basic_info}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
     </view>
     <view class="block">
       <text class="block-label">当下卡点</text>
-      <text class="block-value">{{customer.assessment || '-'}}</text>
+      <text class="block-value" wx:if="{{customer.assessment}}">{{customer.assessment}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
     </view>
     <view class="block">
       <text class="block-label">其他信息</text>
-      <text class="block-value">{{customer.other_info || '-'}}</text>
+      <text class="block-value" wx:if="{{customer.other_info}}">{{customer.other_info}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
     </view>
   </view>
 

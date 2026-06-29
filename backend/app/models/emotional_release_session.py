@@ -14,6 +14,8 @@ class EmotionalReleaseSessionBase(BaseModel):
     teacher_ids: List[str] = []  # 老师
     host_id: str = ""  # 主持人
     host_name: str = ""
+    achiever_id: str = ""  # 成就君
+    achiever_name: str = ""
     description: str = ""
     materials: List[dict] = []
     activity_mode: str = "线下"

@@ -1272,8 +1272,11 @@ export interface ProjectDeduction {
 export const projectDeductionApi = {
   list: (customerId?: string) =>
     request<ProjectDeduction[]>(`/api/project-deductions${customerId ? `?customer_id=${customerId}` : ""}`),
-  listPaginated: (page: number, pageSize: number) =>
-    request<PaginatedResponse<ProjectDeduction>>(`/api/project-deductions?page=${page}&page_size=${pageSize}`),
+  listPaginated: (page: number, pageSize: number, params?: Record<string, string>) => {
+    const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
+    return request<PaginatedResponse<ProjectDeduction>>(`/api/project-deductions?${qs}`)
+  },
   create: (data: { customer_id: string; project_type: string; project_id: string; count: number; operator_name?: string }) =>
     request<ProjectDeduction>("/api/project-deductions", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: { count: number; operator_name?: string }) =>
