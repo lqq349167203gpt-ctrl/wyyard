@@ -15,8 +15,13 @@ def _load():
     global _permissions
     for section, filename in FILENAMES.items():
         raw = load_data(filename) or {}
-        # 兼容旧格式：如果 raw 包含 section key（如 {"customers": {...}}），取内层
-        if section in raw and isinstance(raw[section], dict):
+        # 优先按 per-position 格式解读（key=position, value=list），
+        # 过滤掉遗留聚合行（key==section, value=dict）
+        has_per_position = any(isinstance(v, list) for v in raw.values())
+        if has_per_position:
+            _permissions[section] = {k: v for k, v in raw.items() if isinstance(v, list)}
+        elif section in raw and isinstance(raw[section], dict):
+            # 旧聚合格式：{section: {position: list}}
             _permissions[section] = raw[section]
         else:
             _permissions[section] = raw
