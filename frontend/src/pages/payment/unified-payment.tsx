@@ -85,6 +85,7 @@ interface UnifiedItem {
   organization_id: string | null
   // 会员卡专属
   card_type?: string
+  total_count?: number | null
   duration_type?: string | null
   duration_value?: number | null
   // 内部课程专属
@@ -119,7 +120,7 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
   }
   switch (type) {
     case "membership_card":
-      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, duration_type: item.duration_type, duration_value: item.duration_value }
+      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, duration_type: item.duration_type, duration_value: item.duration_value }
     case "group_case":
     case "emotional_release":
     case "oh_card_reading":
@@ -1123,9 +1124,8 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                         item.purchase_count ? `${item.purchase_count} 次` : "-"
                       )}
                       {item.type === "membership_card" && (() => {
-                        const config = MEMBERSHIP_CARD_TYPES[item.card_type || ""]
-                        if (config?.unlimited) return "不限"
-                        if (config?.defaultCount) return `${config.defaultCount} 次`
+                        if (item.remaining_count === null) return "不限"
+                        if (item.total_count != null) return `${item.total_count} 次`
                         return "-"
                       })()}
                     </TableCell>
