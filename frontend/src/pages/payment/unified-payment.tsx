@@ -90,6 +90,7 @@ interface UnifiedItem {
   duration_type?: string | null
   duration_value?: number | null
   created_by?: string
+  voided?: boolean
   // 内部课程专属
   course_type?: string
   // 其他项目专属
@@ -122,7 +123,7 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
   }
   switch (type) {
     case "membership_card":
-      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, effective_remaining: item.effective_remaining, duration_type: item.duration_type, duration_value: item.duration_value, created_by: item.created_by }
+      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, effective_remaining: item.effective_remaining, duration_type: item.duration_type, duration_value: item.duration_value, created_by: item.created_by, voided: item.voided }
     case "group_case":
     case "emotional_release":
     case "oh_card_reading":
@@ -146,10 +147,12 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
   const navigate = useNavigate()
 
   // 筛选
+  const isMembershipOnly = filterTypes?.length === 1 && filterTypes[0] === "membership_card"
   const [activeType, setActiveType] = useState<ProjectTypeKey | "all">(() => {
     if (filterTypes && filterTypes.length === 1) return filterTypes[0]
     return "all"
   })
+  const [mcTypeFilter, setMcTypeFilter] = useState("all")
 
   // 弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -300,6 +303,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
   const handleClearSearch = () => {
     setSearchNickname("")
     setSearchCloserName("")
+    setMcTypeFilter("all")
     appliedNicknameRef.current = ""
     appliedCloserNameRef.current = ""
     refresh()
@@ -1073,21 +1077,30 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           />
         </div>
         <div className="w-36">
-          <SelectDropdown
-            value={activeType}
-            options={filterTypes ? (
-              filterTypes.length === 1
-                ? [{ value: filterTypes[0], label: PROJECT_TYPES[filterTypes[0]].label }]
-                : filterTypes.map(key => ({ value: key, label: PROJECT_TYPES[key].label }))
-            ) : [
-              { value: "all", label: "全部类型" },
-              ...(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
-                value: key,
-                label: PROJECT_TYPES[key].label,
-              })),
-            ]}
-            onChange={(v) => setActiveType(v as ProjectTypeKey | "all")}
-          />
+          {isMembershipOnly ? (
+            <SelectDropdown
+              value={mcTypeFilter}
+              options={[
+                { value: "all", label: "全部卡类型" },
+                ...Object.keys(MEMBERSHIP_CARD_TYPES).map(t => ({ value: t, label: t })),
+              ]}
+              onChange={setMcTypeFilter}
+            />
+          ) : (
+            <SelectDropdown
+              value={activeType}
+              options={filterTypes
+                ? filterTypes.map(key => ({ value: key, label: PROJECT_TYPES[key].label }))
+                : [
+                    { value: "all", label: "全部类型" },
+                    ...(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
+                      value: key,
+                      label: PROJECT_TYPES[key].label,
+                    })),
+                  ]}
+              onChange={(v) => setActiveType(v as ProjectTypeKey | "all")}
+            />
+          )}
         </div>
         <div className="w-44">
           <CustomerSearchInput
@@ -1133,31 +1146,34 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="pl-4">成交日期</TableHead>
-                  <TableHead>项目类型</TableHead>
                   <TableHead>用户</TableHead>
-                  <TableHead>项目名称</TableHead>
+                  {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && <TableHead>项目名称</TableHead>}
                   <TableHead>金额</TableHead>
                   <TableHead>购买次数</TableHead>
                   <TableHead>生效日期</TableHead>
                   <TableHead>到期日期</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>剩余次数</TableHead>
-                  <TableHead>创建人</TableHead>
                   <TableHead>成交人</TableHead>
+                  <TableHead>创建人</TableHead>
                   <TableHead className="text-right pr-4">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedItems.map((item) => (
+                {(isMembershipOnly && mcTypeFilter !== "all"
+                  ? paginatedItems.filter(item => item.card_type === mcTypeFilter)
+                  : paginatedItems
+                ).map((item) => (
                   <TableRow key={`${item.type}-${item.id}`} className="group hover:bg-[#f7f8fa]">
                     <TableCell className="pl-4 text-[#2b2f36]">{item.deal_date || "-"}</TableCell>
-                    <TableCell className="text-[#2b2f36]">{PROJECT_TYPES[item.type].label}</TableCell>
                     <TableCell className="text-[#2b2f36]">{item.nickname}</TableCell>
-                    <TableCell className="text-[#2b2f36]">
-                      {item.type === "other"
-                        ? [item.category, item.project_name].filter(Boolean).join(" / ") || "-"
-                        : (item.detail || "-")}
-                    </TableCell>
+                    {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && (
+                      <TableCell className="text-[#2b2f36]">
+                        {item.type === "other"
+                          ? [item.category, item.project_name].filter(Boolean).join(" / ") || "-"
+                          : (item.detail || "-")}
+                      </TableCell>
+                    )}
                     <TableCell className="text-[#2b2f36]">¥{item.price.toLocaleString()}</TableCell>
                     <TableCell className="text-[#2b2f36]">
                       {(item.type === "group_case" || item.type === "emotional_release" || item.type === "oh_card_reading" || item.type === "energy_knot") && (
@@ -1173,6 +1189,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                     <TableCell className="text-[12px]">
                       {(() => {
                         const today = new Date().toISOString().slice(0,10)
+                        if (item.type === "membership_card" && item.voided) return <span className="text-[#c4506a]">已退费</span>
                         if (item.effective_date && item.effective_date > today) return <span className="text-[#8f959e]">未开始</span>
                         if (item.expiry_date && item.expiry_date < today) return <span className="text-[#c4506a]">已过期</span>
                         if (item.effective_date || item.expiry_date) return <span className="text-[#3370ff]">生效中</span>
@@ -1181,17 +1198,19 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">
                       {item.type === "membership_card" && (
-                        item.effective_remaining === null || item.effective_remaining === undefined
-                          ? "不限"
-                          : `${item.effective_remaining} 次`
+                        item.voided
+                          ? <span className="text-[#c4506a]">已退费</span>
+                          : item.effective_remaining === null || item.effective_remaining === undefined
+                            ? "不限"
+                            : `${item.effective_remaining} 次`
                       )}
                     </TableCell>
-                    <TableCell className="text-[#8f959e]">{item.created_by || "-"}</TableCell>
                     <TableCell className="text-[#2b2f36]">
                       {item.closers?.length
                         ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、")
                         : (item.closer_name || "-")}
                     </TableCell>
+                    <TableCell className="text-[#8f959e]">{item.created_by || "-"}</TableCell>
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(item)}>

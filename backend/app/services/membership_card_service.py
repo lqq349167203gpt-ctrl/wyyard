@@ -88,23 +88,56 @@ def get_debt(customer_id: str) -> int:
 
 
 def _active_cards(customer_id: str, today: Optional[str] = None) -> List[MembershipCard]:
-    """获取某用户在有效期内的卡（已生效、未过期、未删除）"""
+    """获取某用户在有效期内的卡（已生效、未过期、未删除、未作废）"""
     if today is None:
         today = datetime.now().strftime("%Y-%m-%d")
     return [
         c for c in list_cards()
         if c.customer_id == customer_id
+        and not c.voided
         and (not c.effective_date or c.effective_date <= today)
         and (not c.expiry_date or c.expiry_date >= today)
     ]
 
 
+def void_card(card_id: str) -> Optional[MembershipCard]:
+    """作废会员卡（退费后调用）：卡不再可用于扣费，但保留记录和已扣次数"""
+    card = _cards.get(card_id)
+    if not card or card.is_deleted:
+        return None
+    card.voided = True
+    card.voided_at = datetime.now(timezone.utc)
+    card.updated_at = datetime.now(timezone.utc)
+    _cards[card_id] = card
+    save_item(FILENAME, card_id, card.model_dump(mode="json"))
+    return card
+
+
+def is_card_voided(card_id: str) -> bool:
+    """判断卡是否已作废（退费）"""
+    card = _cards.get(card_id)
+    return bool(card and card.voided)
+
+
+def unvoid_card(card_id: str) -> Optional[MembershipCard]:
+    """恢复作废的会员卡（撤销退费时调用）"""
+    card = _cards.get(card_id)
+    if not card or card.is_deleted:
+        return None
+    card.voided = False
+    card.voided_at = None
+    card.updated_at = datetime.now(timezone.utc)
+    _cards[card_id] = card
+    save_item(FILENAME, card_id, card.model_dump(mode="json"))
+    return card
+
+
 def get_grand_total(customer_id: str) -> int:
-    """总购买次数（所有未删除的次数卡 total_count 之和；不限次卡不计入）"""
+    """总购买次数（所有未删除、未作废的次数卡 total_count 之和；不限次卡不计入）"""
     return sum(
         (c.total_count or 0)
         for c in list_cards()
-        if c.customer_id == customer_id and c.remaining_count is not None
+        if c.customer_id == customer_id and c.remaining_count is not None and not c.voided
     )
 
 

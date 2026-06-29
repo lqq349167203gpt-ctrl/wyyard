@@ -195,10 +195,6 @@ export default function DetailView({
                 <span className="text-[12px] text-[#d0d3d6]">-</span>
               )}
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">创建人</span>
-              <span className="text-[12px] text-[#2b2f36]">{c.created_by || <span className="text-[#d0d3d6]">-</span>}</span>
-            </div>
           </div>
           <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />
           <div className="px-4 pt-2 pb-3 flex items-baseline gap-2">
@@ -424,7 +420,7 @@ export default function DetailView({
                       const activity = first?.activity_deductions || 0
                       return (
                         <span>
-                          {memberHasUnlimited ? "不限次" : `剩余${memberTotal}次`}
+                          {memberHasUnlimited ? "不限次" : (typeof memberTotal === "number" && memberTotal < 0 ? <span className="text-[#c4506a]">剩余{memberTotal}次</span> : `剩余${memberTotal}次`)}
                           {!memberHasUnlimited && <span className="ml-1 text-[11px] text-[#8f959e]">（总{memberGrandTotal}次/销卡{manual}次/活动扣卡{activity}次）</span>}
                         </span>
                       )
@@ -432,15 +428,18 @@ export default function DetailView({
                     {memberSorted.length > 0 && memberSorted.map((s, i) => {
                       const expired = s.expiry_date && s.expiry_date < today
                       const notStarted = s.effective_date && s.effective_date > today
+                      const voided = s.voided === true
                       return (
                         <span key={i} className="ml-3 text-[11px] text-[#8f959e]">
-                          <span className={expired ? "text-[#c4506a]" : notStarted ? "text-[#8f959e]" : ""}>
+                          <span className={voided ? "text-[#c4506a] line-through" : expired ? "text-[#c4506a]" : notStarted ? "text-[#8f959e]" : ""}>
                             {s.name}
-                            {s.remaining === "不限" || s.total_purchased === "不限"
-                              ? " 不限次"
-                              : typeof s.remaining === "number" && typeof s.total_purchased === "number"
-                                ? ` ${Math.max(0, s.remaining)}次/${s.total_purchased}次`
-                                : ''}
+                            {voided
+                              ? " 已退费"
+                              : s.remaining === "不限" || s.total_purchased === "不限"
+                                ? " 不限次"
+                                : typeof s.remaining === "number" && typeof s.total_purchased === "number"
+                                  ? ` ${Math.max(0, s.remaining)}次/${s.total_purchased}次`
+                                  : ''}
                             {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
                             {expired && "（已过期）"}
                             {notStarted && "（未生效）"}

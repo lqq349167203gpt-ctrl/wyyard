@@ -1,19 +1,25 @@
 import { useState } from "react"
 import { UnifiedPaymentContent } from "./unified-payment"
-import { ProjectDeductionTab } from "./project-deduction-tab"
 
 const TABS = [
-  { key: "membership", label: "会员卡" },
+  { key: "membership_card", label: "会员卡" },
+  { key: "group_case", label: "觉醒游戏" },
+  { key: "emotional_release", label: "情绪释放" },
+  { key: "oh_card_reading", label: "OH卡梳理" },
+  { key: "energy_knot", label: "能量结" },
+  { key: "internal_course", label: "内部课程" },
   { key: "other", label: "其他项目" },
-  { key: "deductions", label: "项目销卡" },
 ]
 
-const MEMBERSHIP_TYPES = ["membership_card"] as const
-const NON_MEMBERSHIP_TYPES = ["group_case", "emotional_release", "oh_card_reading", "energy_knot", "internal_course", "other"] as const
+const VALID_TAB_KEYS = new Set(TABS.map(t => t.key))
 
 export default function PaymentPage() {
   const [activeTab, setActiveTab] = useState(() => {
-    try { return localStorage.getItem("tab_payment") || "membership" } catch { return "membership" }
+    try {
+      const saved = localStorage.getItem("tab_payment")
+      if (saved && VALID_TAB_KEYS.has(saved)) return saved
+    } catch {}
+    return "membership_card"
   })
 
   const handleTabChange = (key: string) => {
@@ -25,7 +31,7 @@ export default function PaymentPage() {
     <div className="px-6 pt-4 pb-6 space-y-3">
 
       {/* Tab 切换 */}
-      <div className="flex items-center justify-between border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
+      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
         <div className="flex items-center gap-6">
           {TABS.map((tab) => (
             <button
@@ -47,9 +53,7 @@ export default function PaymentPage() {
       </div>
 
       {/* 内容区 */}
-      {activeTab === "membership" && <UnifiedPaymentContent embedded filterTypes={[...MEMBERSHIP_TYPES]} />}
-      {activeTab === "other" && <UnifiedPaymentContent embedded filterTypes={[...NON_MEMBERSHIP_TYPES]} />}
-      {activeTab === "deductions" && <ProjectDeductionTab />}
+      <UnifiedPaymentContent key={activeTab} embedded filterTypes={[activeTab as any]} />
     </div>
   )
 }

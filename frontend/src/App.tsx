@@ -18,6 +18,8 @@ import OrganizationsPage from "@/pages/organizations"
 import ClassRecordsPage from "@/pages/class-records"
 import DailyActivitiesPage from "@/pages/daily-activities"
 import PaymentPage from "@/pages/payment"
+import PaymentDeductionsPage from "@/pages/payment-deductions"
+import PaymentRefundsPage from "@/pages/payment-refunds"
 import MemberIdentitiesPage from "@/pages/member-identities"
 import HealingRecordsPage from "@/pages/healing-records"
 
@@ -42,6 +44,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/courses/class-records": "class-records",
   "/courses/daily-activities": "class-records-activities",
   "/payment": "payment",
+  "/payment-deductions": "payment",
+  "/payment-refunds": "payment",
   "/agents": "agents",
 
 
@@ -135,6 +139,8 @@ function App() {
               <Route path="/courses/class-records" element={<ClassRecordsPage />} />
               <Route path="/courses/daily-activities" element={<DailyActivitiesPage />} />
               <Route path="/payment" element={<PaymentPage />} />
+              <Route path="/payment-deductions" element={<PaymentDeductionsPage />} />
+              <Route path="/payment-refunds" element={<PaymentRefundsPage />} />
               <Route path="/other-projects" element={<Navigate to="/payment" replace />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id/chat" element={<ChatPage />} />

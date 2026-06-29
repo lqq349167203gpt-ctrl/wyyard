@@ -94,8 +94,22 @@ def _build_purchase_summary(customer_id: str) -> list:
     sum_total = sum((c.total_count or 0) for c in countable_cards)
     # 先计算每张卡的 remaining，再汇总为 effective_remaining
     card_info_list = []
+    voided_cards_info = []
     if cards:
         for c in cards:
+            if c.voided:
+                # 已作废（退费）卡：不参与有效剩余计算，单独标记显示
+                total = c.total_count if c.total_count is not None else "不限"
+                card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
+                card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
+                if c.total_count is not None:
+                    used = card_manual + card_activity
+                    card_remaining = max(0, c.total_count - used)
+                else:
+                    used = "-"
+                    card_remaining = "已退费"
+                voided_cards_info.append((c, total, used, card_remaining))
+                continue
             if c.remaining_count is None:
                 total = "不限"
                 used = "-"
@@ -123,8 +137,10 @@ def _build_purchase_summary(customer_id: str) -> list:
                     used = max(0, total - card_remaining)
             card_info_list.append((c, total, used, card_remaining))
         # 用各卡 remaining 之和覆盖 effective_remaining，保证全局与单卡一致
+        # 但如果存在欠费未分卡的扣费记录（_debt_activities），各卡统计不完整，保留全局值
+        has_debt = bool(membership_card_service._debt_activities.get(customer_id))
         numeric_remaining = [info[3] for info in card_info_list if isinstance(info[3], (int, float))]
-        if numeric_remaining:
+        if numeric_remaining and not has_debt:
             effective_remaining = sum(numeric_remaining)
         for c, total, used, card_remaining in card_info_list:
             summary.append({
@@ -140,6 +156,25 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "activity_deductions": activity_deductions,
                 "effective_date": c.effective_date,
                 "expiry_date": c.expiry_date or "",
+                "voided": False,
+            })
+        # 追加已作废（退费）卡，放在可用卡之后，不参与有效剩余汇总
+        for c, total, used, card_remaining in voided_cards_info:
+            summary.append({
+                "type": "会员活动",
+                "name": c.card_type,
+                "total_purchased": total,
+                "grand_total": grand_total,
+                "total_amount": c.price,
+                "used": used,
+                "remaining": card_remaining,
+                "effective_remaining": effective_remaining,
+                "manual_deductions": manual_deductions,
+                "activity_deductions": activity_deductions,
+                "effective_date": c.effective_date,
+                "expiry_date": c.expiry_date or "",
+                "voided": True,
+                "voided_at": c.voided_at.strftime("%Y-%m-%d") if c.voided_at else "",
             })
     else:
         summary.append({
@@ -155,6 +190,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "activity_deductions": activity_deductions,
             "effective_date": "",
             "expiry_date": "",
+            "voided": False,
         })
 
     # 觉醒游戏

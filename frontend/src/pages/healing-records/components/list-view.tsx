@@ -83,6 +83,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
               <TableHead>消费总额</TableHead>
               <TableHead>引流人</TableHead>
               <TableHead>创建日期</TableHead>
+              <TableHead>创建人</TableHead>
               <TableHead className="text-right pr-4">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -99,6 +100,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                 <TableCell className="text-[#2b2f36]">¥{(c.total_payment ?? 0).toLocaleString()}</TableCell>
                 <TableCell className="text-[#2b2f36]">{c.referrer || "-"}</TableCell>
                 <TableCell className="text-[#8f959e]">{new Date(c.created_at).toLocaleDateString("zh-CN")}</TableCell>
+                <TableCell className="text-[#2b2f36]">{c.created_by || "-"}</TableCell>
                 <TableCell className="text-right pr-4">
                   <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEditCustomer(c.id)}>

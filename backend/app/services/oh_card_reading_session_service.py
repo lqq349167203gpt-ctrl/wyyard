@@ -60,7 +60,36 @@ def create_session(data: OhCardReadingSessionCreate) -> OhCardReadingSession:
     )
     _sessions[session.id] = session
     _save(session.id)
+    _deduct_for_session(session)
     return session
+
+
+def _deduct_for_session(session):
+    """为新创建的活动扣费"""
+    from app.services import membership_card_service
+    chargeable = _get_chargeable_ids(session)
+    activity_key = f"ocr:{session.id}"
+    for cid in chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
+
+
+def _restore_for_session(session):
+    """为删除的活动退费"""
+    from app.services import membership_card_service
+    chargeable = _get_chargeable_ids(session)
+    activity_key = f"ocr:{session.id}"
+    for cid in chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+
+
+def _sync_deduction(session, old_chargeable, new_chargeable):
+    """同步扣费：为新增人员扣费，为移除人员退费"""
+    from app.services import membership_card_service
+    activity_key = f"ocr:{session.id}"
+    for cid in old_chargeable - new_chargeable:
+        membership_card_service.restore_for_activity(cid, activity_key)
+    for cid in new_chargeable - old_chargeable:
+        membership_card_service.deduct_for_activity(cid, activity_key)
 
 
 def update_session(session_id: str, data: dict):
@@ -70,6 +99,9 @@ def update_session(session_id: str, data: dict):
     session = _sessions.get(session_id)
     if not session:
         return None, []
+
+    # 获取旧的可扣费人员
+    old_chargeable = _get_chargeable_ids(session)
 
     # 自动过滤不在到场名单中的人员
     if "participant_ids" in data:
@@ -88,6 +120,11 @@ def update_session(session_id: str, data: dict):
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
     _save(session_id)
+
+    # 同步扣费
+    new_chargeable = _get_chargeable_ids(session)
+    _sync_deduction(session, old_chargeable, new_chargeable)
+
     return session, []
 
 
@@ -102,6 +139,7 @@ def delete_session(session_id: str) -> bool:
     session = _sessions.get(session_id)
     if not session:
         return False
+    _restore_for_session(session)
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
     _save()

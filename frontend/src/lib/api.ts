@@ -1162,6 +1162,8 @@ export interface MembershipCard {
   deal_date: string | null
   created_at: string
   updated_at: string
+  voided?: boolean
+  voided_at?: string | null
 }
 
 export interface MembershipCardCreate {
@@ -1290,6 +1292,38 @@ export const projectDeductionApi = {
     ),
   autoDeduct: (data: { nickname: string; project_type: string; count: number; operator_name?: string; name_filter?: string }) =>
     request<ProjectDeduction>("/api/project-deductions/auto", { method: "POST", body: JSON.stringify(data) }),
+}
+
+export interface ProjectRefund {
+  id: string
+  customer_id: string
+  nickname: string
+  project_type: string
+  project_id: string
+  project_name: string
+  paid_amount: number
+  refund_amount: number
+  refund_date: string
+  operator_name: string
+  created_at: string
+}
+
+export const projectRefundApi = {
+  listPaginated: (page: number, pageSize: number, params?: Record<string, string>) => {
+    const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
+    return request<PaginatedResponse<ProjectRefund>>(`/api/project-refunds?${qs}`)
+  },
+  create: (data: { customer_id: string; project_type: string; project_id: string; refund_amount: number; operator_name?: string }) =>
+    request<ProjectRefund>("/api/project-refunds", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: { refund_amount: number; operator_name?: string }) =>
+    request<ProjectRefund>(`/api/project-refunds/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/api/project-refunds/${id}`, { method: "DELETE" }),
+  getAvailableItems: (customerId: string, projectType: string) =>
+    request<{ id: string; name: string; paid_amount: number; detail?: string; card_type?: string }[]>(
+      `/api/project-refunds/available-items?customer_id=${customerId}&project_type=${projectType}`
+    ),
 }
 
 // Space
@@ -1459,6 +1493,8 @@ export interface PurchaseSummaryItem {
   effective_date?: string
   expiry_date?: string
   activity_mode?: string
+  voided?: boolean
+  voided_at?: string
 }
 
 export interface ActivityRecord {

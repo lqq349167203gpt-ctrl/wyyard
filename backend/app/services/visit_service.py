@@ -605,6 +605,7 @@ def _deduct_for_arrival(visit):
         group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        oh_card_reading_session_service,
     )
     cid = visit.customer_id
     date = visit.visit_date
@@ -631,6 +632,14 @@ def _deduct_for_arrival(visit):
             if cid in chargeable:
                 membership_card_service.deduct_for_activity(cid, f"eks:{s.id}")
 
+    # OH卡梳理
+    for s in oh_card_reading_session_service.list_sessions():
+        if s.date == date and not s.is_deleted:
+            chargeable = set(s.participant_ids)
+            chargeable.discard(s.owner_id)
+            if cid in chargeable:
+                membership_card_service.deduct_for_activity(cid, f"ocr:{s.id}")
+
     # 沙龙类型
     for cr in class_record_service.list_records():
         if cr.date == date and not cr.is_public_welfare:
@@ -647,6 +656,7 @@ def _restore_for_arrival(visit):
         group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        oh_card_reading_session_service,
     )
     cid = visit.customer_id
     date = visit.visit_date
@@ -669,6 +679,13 @@ def _restore_for_arrival(visit):
             chargeable.discard(s.owner_id)
             if cid in chargeable:
                 membership_card_service.restore_for_activity(cid, f"eks:{s.id}")
+
+    for s in oh_card_reading_session_service.list_sessions():
+        if s.date == date and not s.is_deleted:
+            chargeable = set(s.participant_ids)
+            chargeable.discard(s.owner_id)
+            if cid in chargeable:
+                membership_card_service.restore_for_activity(cid, f"ocr:{s.id}")
 
     for cr in class_record_service.list_records():
         if cr.date == date and not cr.is_public_welfare:

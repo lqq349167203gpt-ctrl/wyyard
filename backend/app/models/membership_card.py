@@ -32,3 +32,5 @@ class MembershipCard(MembershipCardBase):
     updated_at: datetime
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None
+    voided: bool = False  # 退费作废标记（退费后卡不可再使用，但保留记录）
+    voided_at: Optional[datetime] = None  # 作废时间

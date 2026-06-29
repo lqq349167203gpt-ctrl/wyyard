@@ -233,7 +233,7 @@ export function AppSidebar() {
       <SidebarContent className="mt-5">
         <FixedGroup label="数据" items={businessItems} />
         <FixedGroup label="业务" items={courseItems} />
-        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCardFilled, clearTab: "tab_payment" }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
+        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCardFilled, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "", icon: IconClipboardTextFilled }, { title: "退费", path: "/payment-refunds", permission: "", icon: IconFileTextFilled }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />
