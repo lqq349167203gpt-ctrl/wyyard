@@ -86,8 +86,10 @@ interface UnifiedItem {
   // 会员卡专属
   card_type?: string
   total_count?: number | null
+  effective_remaining?: number | null
   duration_type?: string | null
   duration_value?: number | null
+  created_by?: string
   // 内部课程专属
   course_type?: string
   // 其他项目专属
@@ -120,7 +122,7 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
   }
   switch (type) {
     case "membership_card":
-      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, duration_type: item.duration_type, duration_value: item.duration_value }
+      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, effective_remaining: item.effective_remaining, duration_type: item.duration_type, duration_value: item.duration_value, created_by: item.created_by }
     case "group_case":
     case "emotional_release":
     case "oh_card_reading":
@@ -139,12 +141,15 @@ function getApi(type: ProjectTypeKey) {
 
 /* ========== 组件 ========== */
 
-export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {}) {
+export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: boolean; filterTypes?: ProjectTypeKey[] } = {}) {
   const enterToNext = useEnterToNext()
   const navigate = useNavigate()
 
   // 筛选
-  const [activeType, setActiveType] = useState<ProjectTypeKey | "all">("all")
+  const [activeType, setActiveType] = useState<ProjectTypeKey | "all">(() => {
+    if (filterTypes && filterTypes.length === 1) return filterTypes[0]
+    return "all"
+  })
 
   // 弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -359,7 +364,7 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     if (!hasAnyOrganization) { setNoOrgDialogOpen(true); return }
     if (organizations.length === 0) { setNoAssignmentDialogOpen(true); return }
     setEditingItem(null)
-    setFormType(activeType === "all" ? "membership_card" : activeType)
+    setFormType(activeType === "all" ? (filterTypes ? filterTypes[0] : "membership_card") : activeType)
     resetForm()
     setDialogOpen(true)
   }
@@ -515,12 +520,15 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
     switch (formType) {
       case "membership_card": {
         const config = MEMBERSHIP_CARD_TYPES[formCardType]
+        let createdBy = ""
+        try { const u = JSON.parse(localStorage.getItem("currentUser") || "{}"); createdBy = u.owner || u.username || "" } catch {}
         const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname, card_type: formCardType,
           price: formPrice ? parseFloat(formPrice) : config.price,
           effective_date: formEffectiveDate, duration_type: formDurationType,
           duration_value: formDurationValue ? parseInt(formDurationValue) : null,
           closer_id, closer_name, closers, organization_id, deal_date,
+          created_by: createdBy,
         }
         // 仅新建卡时才允许带 remaining_count；编辑卡时 PATCH 端点拒绝修改次数字段，
         // 因为 remaining_count 是流水派生缓存，不允许直接改写
@@ -671,7 +679,8 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
   const handleDownloadTemplate = async () => {
     const wb = new ExcelJS.Workbook()
 
-    for (const type of Object.keys(PROJECT_TYPES) as ProjectTypeKey[]) {
+    const typesToExport = filterTypes || (Object.keys(PROJECT_TYPES) as ProjectTypeKey[])
+    for (const type of typesToExport) {
       const cols = TEMPLATE_COLUMNS[type]
       const ws = wb.addWorksheet(PROJECT_TYPES[type].label)
 
@@ -1066,7 +1075,11 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
         <div className="w-36">
           <SelectDropdown
             value={activeType}
-            options={[
+            options={filterTypes ? (
+              filterTypes.length === 1
+                ? [{ value: filterTypes[0], label: PROJECT_TYPES[filterTypes[0]].label }]
+                : filterTypes.map(key => ({ value: key, label: PROJECT_TYPES[key].label }))
+            ) : [
               { value: "all", label: "全部类型" },
               ...(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
                 value: key,
@@ -1128,6 +1141,8 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                   <TableHead>生效日期</TableHead>
                   <TableHead>到期日期</TableHead>
                   <TableHead>状态</TableHead>
+                  <TableHead>剩余次数</TableHead>
+                  <TableHead>创建人</TableHead>
                   <TableHead>成交人</TableHead>
                   <TableHead className="text-right pr-4">操作</TableHead>
                 </TableRow>
@@ -1164,6 +1179,14 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
                         return <span className="text-[#8f959e]">-</span>
                       })()}
                     </TableCell>
+                    <TableCell className="text-[#2b2f36]">
+                      {item.type === "membership_card" && (
+                        item.effective_remaining === null || item.effective_remaining === undefined
+                          ? "不限"
+                          : `${item.effective_remaining} 次`
+                      )}
+                    </TableCell>
+                    <TableCell className="text-[#8f959e]">{item.created_by || "-"}</TableCell>
                     <TableCell className="text-[#2b2f36]">
                       {item.closers?.length
                         ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、")
@@ -1219,13 +1242,13 @@ export function UnifiedPaymentContent({ embedded }: { embedded?: boolean } = {})
             </div>
             <div className="border-b border-[#ebedf0] ml-[19px] -mt-[2px]" style={{ borderBottomWidth: "0.5px" }} />
 
-            {/* 项目类型选择（新增时） */}
-            {!editingItem && (
+            {/* 项目类型选择（新增时，单一类型时不显示） */}
+            {!editingItem && !(filterTypes && filterTypes.length === 1) && (
               <div className="grid grid-cols-[70px_1fr] items-center gap-2 -mt-[2px]">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目类型</span>
                 <SelectDropdown
                   value={formType}
-                  options={(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
+                  options={(filterTypes || (Object.keys(PROJECT_TYPES) as ProjectTypeKey[])).map(key => ({
                     value: key,
                     label: PROJECT_TYPES[key].label,
                   }))}

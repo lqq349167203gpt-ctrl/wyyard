@@ -87,9 +87,13 @@ def _build_purchase_summary(customer_id: str) -> list:
     activity_deductions = membership_card_service.get_activity_deductions(customer_id)
     # 有效剩余次数（None=不限次）；无卡则 0
     effective_remaining = membership_card_service.get_effective_remaining(customer_id)
+    # 是否存在未分卡的老扣费记录（card_id=None），决定是否需要聚合分摊
+    has_untracked_deductions = membership_card_service.has_untracked_deductions(customer_id)
     # 仅保留次数卡参与分摊（不限次卡不参与分摊）
     countable_cards = [c for c in cards if c.remaining_count is not None]
     sum_total = sum((c.total_count or 0) for c in countable_cards)
+    # 先计算每张卡的 remaining，再汇总为 effective_remaining
+    card_info_list = []
     if cards:
         for c in cards:
             if c.remaining_count is None:
@@ -97,35 +101,32 @@ def _build_purchase_summary(customer_id: str) -> list:
                 used = "-"
                 card_remaining = "不限"
             elif c.total_count is None:
-                # total_count 缺失（老数据）通常意味着不限次卡，统一按"不限"展示
                 total = "不限"
                 used = "-"
                 card_remaining = "不限"
             else:
-                # 单卡购买总次数：严格用 total_count，不再回退到可能被历史扣减过的 remaining_count
                 total = c.total_count
-                # 拿该卡维度的扣卡数据
                 card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
                 card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
                 if effective_remaining is None:
                     card_remaining = "不限"
                     used = "-"
-                elif activity_deductions == 0:
-                    # 该用户根本没有活动扣卡 → 每张卡仅扣销卡，按卡精确即可
-                    card_remaining = max(0, total - card_manual)
-                    used = max(0, total - card_remaining)
-                elif card_activity > 0:
-                    # 这是新数据：本活动扣卡已分到该卡 → 用精确
+                elif card_activity > 0 or card_manual > 0:
                     card_remaining = max(0, total - card_manual - card_activity)
                     used = max(0, total - card_remaining)
-                elif sum_total > 0:
-                    # 老数据活动扣卡没分卡到该卡 → 退化到聚合分摊
+                elif has_untracked_deductions and sum_total > 0:
                     share = round(effective_remaining * (total / sum_total))
                     card_remaining = share
                     used = max(0, total - share)
                 else:
-                    card_remaining = effective_remaining
-                    used = max(0, total - effective_remaining)
+                    card_remaining = max(0, total - card_manual)
+                    used = max(0, total - card_remaining)
+            card_info_list.append((c, total, used, card_remaining))
+        # 用各卡 remaining 之和覆盖 effective_remaining，保证全局与单卡一致
+        numeric_remaining = [info[3] for info in card_info_list if isinstance(info[3], (int, float))]
+        if numeric_remaining:
+            effective_remaining = sum(numeric_remaining)
+        for c, total, used, card_remaining in card_info_list:
             summary.append({
                 "type": "会员活动",
                 "name": c.card_type,

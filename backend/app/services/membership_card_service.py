@@ -154,6 +154,15 @@ def get_card_activity_deductions(card_id: str) -> int:
     return _get_card_activity_deductions_count(card_id)
 
 
+def has_untracked_deductions(customer_id: str) -> bool:
+    """该用户是否存在未分卡的老扣费记录（card_id=None）"""
+    for item in _deductions.get(customer_id, []):
+        card_id = item.get("card_id") if isinstance(item, dict) else None
+        if card_id is None:
+            return True
+    return False
+
+
 def get_card_effective_remaining(card_id: str) -> Optional[int]:
     """该卡的真实剩余次数：total_count - 销卡流水 - 有 card_id 的活动扣卡流水。
 

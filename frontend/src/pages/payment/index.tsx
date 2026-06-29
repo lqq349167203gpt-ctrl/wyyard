@@ -1,15 +1,19 @@
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { UnifiedPaymentContent } from "./unified-payment"
 import { ProjectDeductionTab } from "./project-deduction-tab"
 
 const TABS = [
-  { key: "unified", label: "付费项目" },
+  { key: "membership", label: "会员卡" },
+  { key: "other", label: "其他项目" },
   { key: "deductions", label: "项目销卡" },
 ]
 
+const MEMBERSHIP_TYPES = ["membership_card"] as const
+const NON_MEMBERSHIP_TYPES = ["group_case", "emotional_release", "oh_card_reading", "energy_knot", "internal_course", "other"] as const
+
 export default function PaymentPage() {
   const [activeTab, setActiveTab] = useState(() => {
-    try { return localStorage.getItem("tab_payment") || "unified" } catch { return "unified" }
+    try { return localStorage.getItem("tab_payment") || "membership" } catch { return "membership" }
   })
 
   const handleTabChange = (key: string) => {
@@ -43,7 +47,8 @@ export default function PaymentPage() {
       </div>
 
       {/* 内容区 */}
-      {activeTab === "unified" && <UnifiedPaymentContent embedded />}
+      {activeTab === "membership" && <UnifiedPaymentContent embedded filterTypes={[...MEMBERSHIP_TYPES]} />}
+      {activeTab === "other" && <UnifiedPaymentContent embedded filterTypes={[...NON_MEMBERSHIP_TYPES]} />}
       {activeTab === "deductions" && <ProjectDeductionTab />}
     </div>
   )
