@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,7 +56,46 @@ const PERMISSION_GROUPS = [
 ]
 
 const CUSTOMER_FILTER_PAGES = [
-  "healing-records", "consumption-records",
+  "healing-records",
+  "class-records-visitors", "class-records-activities", "class-records-arrival",
+  "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses",
+]
+
+const getSectionForPage = (pageKey: string): string | null => {
+  if (pageKey === "healing-records") return "customers"
+  if (["class-records-visitors", "class-records-activities", "class-records-arrival"].includes(pageKey)) return "class_records"
+  if (["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"].includes(pageKey)) return "payment"
+  return null
+}
+
+// pageKey → 中文标签（用于"用户信息权限"分组渲染；含 class-records-* 等不在 ALL_PAGES 中的子键）
+const PAGE_LABELS: Record<string, string> = {
+  "healing-records": "客户资料",
+  "class-records-visitors": "到场人员",
+  "class-records-activities": "当日活动",
+  "class-records-arrival": "到场确认",
+  "membership-cards": "会员卡",
+  "group-cases": "觉醒游戏",
+  "emotional-releases": "情绪释放",
+  "energy-knots": "能量结",
+  "internal-courses": "内部课程",
+}
+
+// 按 sidebar 顶层分组组织"用户信息权限"展示
+const CUSTOMER_PERM_GROUPS = [
+  {
+    label: "业务",
+    sections: [
+      { section: "customers" as const, pages: ["healing-records"] },
+      { section: "class_records" as const, pages: ["class-records-visitors", "class-records-activities", "class-records-arrival"] },
+    ],
+  },
+  {
+    label: "付费",
+    sections: [
+      { section: "payment" as const, pages: ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"] },
+    ],
+  },
 ]
 
 export default function PositionManagementPage() {
@@ -88,6 +127,9 @@ export default function PositionManagementPage() {
   // 权限编辑状态
   const [formPermissions, setFormPermissions] = useState<string[]>([])
   const [formPagePermissions, setFormPagePermissions] = useState<Record<string, string[]>>({})
+  const [formCustomerPermissions, setFormCustomerPermissions] = useState<string[]>([])
+  const [formCustomerPermissionsCR, setFormCustomerPermissionsCR] = useState<string[]>([])
+  const [formCustomerPermissionsPay, setFormCustomerPermissionsPay] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
   // 新增角色 Dialog
@@ -135,8 +177,12 @@ export default function PositionManagementPage() {
   }, [selectedPositionId])
 
   // 选中角色变化时，加载权限到 form 状态
+  const lastLoadedPositionId = useRef<string | null>(selectedPositionId)
   useEffect(() => {
-    if (!selectedPositionId) return
+    if (!selectedPositionId) {
+      lastLoadedPositionId.current = null
+      return
+    }
     const pos = positions.find(p => p.id === selectedPositionId)
     if (!pos) return
     setFormPermissions(permissions[pos.name] || [])
@@ -146,7 +192,25 @@ export default function PositionManagementPage() {
       pagePerms[pageKey] = pagePermissions[pageKey]?.[pos.name] || []
     })
     setFormPagePermissions(pagePerms)
-    setPermTab("page")
+    // 从 page_permissions 初始化 3 个 section state
+    setFormCustomerPermissions(pagePerms["healing-records"] || [])
+    setFormCustomerPermissionsCR([
+      ...(pagePerms["class-records-visitors"] || []),
+      ...(pagePerms["class-records-activities"] || []),
+      ...(pagePerms["class-records-arrival"] || []),
+    ])
+    setFormCustomerPermissionsPay([
+      ...(pagePerms["membership-cards"] || []),
+      ...(pagePerms["group-cases"] || []),
+      ...(pagePerms["emotional-releases"] || []),
+      ...(pagePerms["energy-knots"] || []),
+      ...(pagePerms["internal-courses"] || []),
+    ])
+    // 仅当角色真正切换时才重置 permTab，避免保存后 loadData 刷新把用户拉回"页面权限"
+    if (lastLoadedPositionId.current !== selectedPositionId) {
+      lastLoadedPositionId.current = selectedPositionId
+      setPermTab("page")
+    }
   }, [selectedPositionId, positions, permissions, pagePermissions])
 
   const selectedPosition = positions.find(p => p.id === selectedPositionId) || null
@@ -159,6 +223,11 @@ export default function PositionManagementPage() {
   const autoFillPagePerms = (pageKey: string) => {
     if (!formPagePermissions[pageKey] || formPagePermissions[pageKey].length === 0) {
       setFormPagePermissions(prev => ({ ...prev, [pageKey]: [...memberIdentityNames] }))
+      // 同步更新 section state
+      const section = getSectionForPage(pageKey)
+      if (section === "customers") setFormCustomerPermissions([...memberIdentityNames])
+      else if (section === "class_records") setFormCustomerPermissionsCR(prev => [...new Set([...prev, ...memberIdentityNames])])
+      else if (section === "payment") setFormCustomerPermissionsPay(prev => [...new Set([...prev, ...memberIdentityNames])])
     }
   }
 
@@ -184,7 +253,9 @@ export default function PositionManagementPage() {
     await positionPermissionApi.setFull(
       created.name,
       ALL_PAGES.map(p => p.key),
-      [], [], [],
+      [...memberIdentityNames],
+      [...memberIdentityNames],
+      [...memberIdentityNames],
       pagePerms
     )
     setCreateDialogOpen(false)
@@ -213,12 +284,14 @@ export default function PositionManagementPage() {
       await positionPermissionApi.setFull(
         selectedPosition.name,
         formPermissions,
-        formPagePermissions["healing-records"] || [],
-        formPagePermissions["class-attendance"] || [],
-        formPagePermissions["consumption-records"] || [],
+        formCustomerPermissions,
+        formCustomerPermissionsCR,
+        formCustomerPermissionsPay,
         formPagePermissions
       )
       setSaveResult({ success: true, message: "权限保存成功" })
+      // 保存后立即重新拉取最新数据，确保切角色回来后 UI 状态正确
+      await loadData()
     } catch (e: any) {
       setSaveResult({ success: false, message: e?.message || "保存失败" })
     } finally {
@@ -425,78 +498,96 @@ export default function PositionManagementPage() {
                     <div className="mb-3">
                       <span className="text-[12px] text-[#8f959e]">选择该角色有权限浏览的用户信息</span>
                     </div>
-                    <div>
-                      {CUSTOMER_FILTER_PAGES.map((pageKey) => {
-                        const page = ALL_PAGES.find(p => p.key === pageKey)
-                        if (!page) return null
-                        // 只显示已启用页面权限的页面
-                        if (!formPermissions.includes(pageKey)) return null
-
-                        const perms = formPagePermissions[pageKey] || []
-                        const checkedCount = memberIdentityNames.filter(n => perms.includes(n)).length
-
-                        return (
-                          <div key={pageKey} className="mb-4">
-                            <div className="flex items-center justify-between px-3 py-2 bg-[#f7f8fa] rounded-md mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[12px] font-medium text-[#2b2f36]">{page.label}</span>
-                                <span className="text-[11px] text-[#8f959e]">({checkedCount}/{memberIdentityNames.length})</span>
-                              </div>
-                              {!isSystemRole && (
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={memberIdentityNames.length > 0 && memberIdentityNames.every(n => perms.includes(n))}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setFormPagePermissions(prev => ({ ...prev, [pageKey]: [...memberIdentityNames] }))
-                                      } else {
-                                        setFormPagePermissions(prev => ({ ...prev, [pageKey]: [] }))
-                                      }
-                                    }}
-                                    className="rounded"
-                                  />
-                                  <span className="text-[11px] text-[#8f959e]">全选</span>
-                                </label>
-                              )}
-                            </div>
-                            <div className="px-3">
-                              {memberIdentityNames.length === 0 ? (
-                                <span className="text-[12px] text-[#b0b5bb]">暂无会员身份类型，请先在"会员身份"页面创建</span>
-                              ) : (
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                  {memberIdentityNames.map((name) => (
-                                    <label key={name} className={`flex items-center gap-3 py-1.5 rounded ${isSystemRole ? "" : "hover:bg-[#fafbfc] cursor-pointer"}`}>
+                    {CUSTOMER_PERM_GROUPS.map((group) => {
+                      // 只显示分组中已启用页面权限的 section
+                      const visibleSections = group.sections
+                        .map((sec) => ({ section: sec.section, pages: sec.pages.filter((p) => formPermissions.includes(p)) }))
+                        .filter((s) => s.pages.length > 0)
+                      if (visibleSections.length === 0) return null
+                      return (
+                        <div key={group.label} className="mb-5">
+                          <div className="px-3 py-2 bg-[#f7f8fa] rounded-md mb-2">
+                            <span className="text-[12px] font-medium text-[#2b2f36]">{group.label}</span>
+                          </div>
+                          {visibleSections.map((sec) => {
+                            const perms = sec.section === "customers" ? formCustomerPermissions
+                              : sec.section === "class_records" ? formCustomerPermissionsCR
+                              : formCustomerPermissionsPay
+                            const setPerms = sec.section === "customers" ? setFormCustomerPermissions
+                              : sec.section === "class_records" ? setFormCustomerPermissionsCR
+                              : setFormCustomerPermissionsPay
+                            // 同步更新 section state 与该 section 下所有 pageKey 的 formPagePermissions
+                            const updateAll = (next: string[]) => {
+                              setPerms(next)
+                              setFormPagePermissions((prev) => {
+                                const updated = { ...prev }
+                                sec.pages.forEach((p) => { updated[p] = next })
+                                return updated
+                              })
+                            }
+                            const sectionLabel = sec.section === "customers" ? "客户资料"
+                              : sec.section === "class_records" ? "邀约"
+                              : "付费项目"
+                            const pagesText = sec.pages.map((p) => PAGE_LABELS[p] || p).join("、")
+                            const checkedCount = memberIdentityNames.filter((n) => perms.includes(n)).length
+                            return (
+                              <div key={sec.section} className="mb-4 ml-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[12px] font-medium text-[#2b2f36]">{sectionLabel}</span>
+                                    <span className="text-[11px] text-[#8f959e]">（{pagesText}）</span>
+                                    <span className="text-[11px] text-[#8f959e]">({checkedCount}/{memberIdentityNames.length})</span>
+                                  </div>
+                                  {!isSystemRole && (
+                                    <label className="flex items-center gap-2 cursor-pointer">
                                       <input
                                         type="checkbox"
-                                        checked={perms.includes(name)}
-                                        onChange={() => {
-                                          if (isSystemRole) return
-                                          setFormPagePermissions(prev => ({
-                                            ...prev,
-                                            [pageKey]: prev[pageKey]?.includes(name)
-                                              ? prev[pageKey].filter(n => n !== name)
-                                              : [...(prev[pageKey] || []), name]
-                                          }))
+                                        checked={memberIdentityNames.length > 0 && memberIdentityNames.every((n) => perms.includes(n))}
+                                        onChange={(e) => {
+                                          if (e.target.checked) updateAll([...memberIdentityNames])
+                                          else updateAll([])
                                         }}
-                                        disabled={isSystemRole}
                                         className="rounded"
                                       />
-                                      <span className="text-[13px] text-[#2b2b2b]">{name}</span>
+                                      <span className="text-[11px] text-[#8f959e]">全选</span>
                                     </label>
-                                  ))}
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                      {CUSTOMER_FILTER_PAGES.filter(k => formPermissions.includes(k)).length === 0 && (
-                        <div className="text-center py-8 text-[12px] text-[#b0b5bb]">
-                          请先在"页面权限"中启用相关页面
+                                <div className="px-3">
+                                  {memberIdentityNames.length === 0 ? (
+                                    <span className="text-[12px] text-[#b0b5bb]">暂无会员身份类型，请先在"会员身份"页面创建</span>
+                                  ) : (
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                      {memberIdentityNames.map((name) => (
+                                        <label key={name} className={`flex items-center gap-3 py-1.5 rounded ${isSystemRole ? "" : "hover:bg-[#fafbfc] cursor-pointer"}`}>
+                                          <input
+                                            type="checkbox"
+                                            checked={perms.includes(name)}
+                                            disabled={isSystemRole}
+                                            onChange={() => {
+                                              if (isSystemRole) return
+                                              const next = perms.includes(name) ? perms.filter((n) => n !== name) : [...perms, name]
+                                              updateAll(next)
+                                            }}
+                                            className="rounded"
+                                          />
+                                          <span className="text-[13px] text-[#2b2b2b]">{name}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
-                      )}
-                    </div>
+                      )
+                    })}
+                    {CUSTOMER_FILTER_PAGES.filter((k) => formPermissions.includes(k)).length === 0 && (
+                      <div className="text-center py-8 text-[12px] text-[#b0b5bb]">
+                        请先在"页面权限"中启用相关页面
+                      </div>
+                    )}
                   </div>}
                 </div>
               </>
