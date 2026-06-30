@@ -593,7 +593,7 @@ export function ActivityBatchTable({
   }, [records, courses, date, spaceId, spaces, courseTypes])
 
   // 保存单行（返回 API 结果，供 handleCreate 获取 record_id）
-  const saveRowInner = useCallback(async (row: ActivityRow, isCancelled?: () => boolean): Promise<any> => {
+  const saveRowInner = useCallback(async (row: ActivityRow): Promise<any> => {
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       const type = row.record_type
@@ -729,36 +729,38 @@ export function ActivityBatchTable({
         }
       }
 
-      if (!isCancelled?.()) {
-        setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
-        historyPushedRef.current.delete(row.key)
-        if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
-        // 保存后刷新剩余次数（fetchRemaining 会获取该类型所有客户，调一次即可）
-        if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
-          if (row.owner_id || prevOwnerRef.current[row.key]) {
-            delete prevOwnerRef.current[row.key]
-          }
-          fetchRemaining(row.record_type, "all")
+      setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+      historyPushedRef.current.delete(row.key)
+      if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
+      // 保存后刷新剩余次数（fetchRemaining 会获取该类型所有客户，调一次即可）
+      if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+        if (row.owner_id || prevOwnerRef.current[row.key]) {
+          delete prevOwnerRef.current[row.key]
         }
+        fetchRemaining(row.record_type, "all")
       }
     } catch (e: any) {
-      console.error("[SAVE] error", { key: row.key, type: row.record_type, id: row.record_id, error: e?.message })
-      if (!isCancelled?.()) {
-        setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+      const msg = e?.message || ""
+      // 404 = record_id 已失效（记录被删后重建），降级为 create
+      if (row.record_id && !row.pendingCreate && (msg.includes("404") || msg.includes("不存在"))) {
+        await deleteRecordFromBackend(row).catch(() => {})
+        return await saveRowInner({ ...row, record_id: "", pendingCreate: true })
       }
+      console.error("[SAVE] error", { key: row.key, type: row.record_type, id: row.record_id, error: e?.message })
+      setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       throw e
     }
   }, [courses, spaceId, spaces, date, fetchRemaining])
 
   // saveRow 包装：加 15 秒超时，防止 API 挂起时 status 永远停在 "saving"
   const saveRow = useCallback(async (row: ActivityRow): Promise<any> => {
-    let cancelled = false
+    const key = row.key
     const timer = setTimeout(() => {
-      cancelled = true
-      setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+      // 仅当状态仍为 "saving" 时才改为 "error"
+      setRowStatus(prev => prev[key] === "saving" ? { ...prev, [key]: "error" } : prev)
     }, 15000)
     try {
-      return await saveRowInner(row, () => cancelled)
+      return await saveRowInner(row)
     } finally {
       clearTimeout(timer)
     }
