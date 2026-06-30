@@ -176,7 +176,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [canRedo, setCanRedo] = useState(false)
   const undoRef = useRef<() => void>(() => {})
   const redoRef = useRef<() => void>(() => {})
-  const restoreRef = useRef<((entry: VisitHistoryEntry) => void) | null>(null)
+  const restoreRef = useRef<((entry: VisitHistoryEntry) => Promise<void>) | null>(null)
   const captureRef = useRef<(() => VisitHistoryEntry) | null>(null)
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
   const [historyEntries, setHistoryEntries] = useState<VisitHistoryEntry[]>([])
@@ -795,7 +795,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           {previewEntry && (
             <div className="border-t border-[#f0f1f2] p-3 shrink-0 flex gap-2">
               <Button size="sm" variant="outline" className="flex-1 h-8 text-[12px]" onClick={() => { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>返回编辑</Button>
-              <Button size="sm" className="flex-1 h-8 text-[12px]" onClick={() => { restoreRef.current?.(previewEntry); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>恢复此版本</Button>
+              <Button size="sm" className="flex-1 h-8 text-[12px]" onClick={async () => { await restoreRef.current?.(previewEntry); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>恢复此版本</Button>
             </div>
           )}
         </div>

@@ -12,6 +12,7 @@ import { SelectDropdown } from "@/components/select-dropdown"
 
 interface Row {
   key: number
+  visit_id: string
   visit_time: string
   customer_id: string
   nickname: string
@@ -30,7 +31,7 @@ interface Row {
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, feedback: "", healing_notes: "", group_leader_feedback: "", activities: "" }
+  return { key: nextKey++, visit_id: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, feedback: "", healing_notes: "", group_leader_feedback: "", activities: "" }
 }
 
 export interface VisitChangedCell {
@@ -68,7 +69,7 @@ interface BatchInputTableProps {
   onActivityClick?: (customerId: string) => void
   onCreateCustomer?: (nickname: string) => void
   onUndoRedoChange?: (canUndo: boolean, canRedo: boolean, undo: () => void, redo: () => void, history: VisitHistoryEntry[]) => void
-  onRestoreRef?: (restore: (entry: VisitHistoryEntry) => void) => void
+  onRestoreRef?: (restore: (entry: VisitHistoryEntry) => Promise<void>) => void
   onCaptureRef?: (capture: () => VisitHistoryEntry) => void
   onHistoryPushed?: (entry: VisitHistoryEntry) => void
   previewRows?: Row[]
@@ -192,11 +193,43 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     onUndoRedoChange?.(undoStack.length > 0, redoStack.length > 0, undo, redo, undoStack)
   }, [undoStack, redoStack, undo, redo, onUndoRedoChange])
 
-  // 恢复历史版本
-  const restoreFromHistory = useCallback((entry: VisitHistoryEntry) => {
+  // 恢复历史版本：同步到后端，确保刷新后仍然保持该版本
+  const restoreFromHistory = useCallback(async (entry: VisitHistoryEntry) => {
     pushHistory("恢复了历史版本")
-    setRows(entry.rows.map(r => ({ ...r })))
-  }, [pushHistory])
+    // 快照中的 visit_id 集合
+    const snapshotVisitIds = new Set(entry.rows.map(r => r.visit_id).filter(Boolean))
+    // 当前存在但快照中没有的行 → 删除
+    const currentRows = rowsRef.current
+    const rowsToDelete = currentRows.filter(r => r.visit_id && !snapshotVisitIds.has(r.visit_id))
+    // 快照中的行 → 有 visit_id 的 update，没有的 create
+    const restoredRows = entry.rows.map(r => ({ ...r }))
+    setRows(restoredRows)
+    const statuses: Record<number, RowStatus> = {}
+    restoredRows.forEach(r => { statuses[r.key] = "saving" })
+    setRowStatus(statuses)
+    // 并行执行保存和删除
+    const savePromises = restoredRows.map(async (row) => {
+      try {
+        if (row.visit_id) {
+          savedVisitIds.current[row.key] = row.visit_id
+        }
+        await saveRowRef.current(row)
+      } catch (e) {
+        // saveRow 内部已处理 error 状态
+      }
+    })
+    const deletePromises = rowsToDelete.map(async (row) => {
+      try {
+        if (row.visit_id) {
+          await visitApi.delete(row.visit_id)
+        }
+      } catch (e) {
+        console.error("[BATCH] 恢复时删除行失败:", e)
+      }
+    })
+    await Promise.allSettled([...savePromises, ...deletePromises])
+    onSaved()
+  }, [pushHistory, onSaved])
 
   useEffect(() => {
     onRestoreRef?.(restoreFromHistory)
@@ -254,6 +287,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   rowsRef.current = rows
   const timersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
   const savedVisitIds = useRef<Record<number, string>>({})
+  const saveRowRef = useRef<(row: Row) => Promise<void>>(() => Promise.resolve())
 
   // 加载会员卡数据
   useEffect(() => {
@@ -298,6 +332,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         const key = nextKey++
         loaded.push({
           key,
+          visit_id: v.id,
           visit_time: v.visit_time || "",
           customer_id: v.customer_id,
           nickname: v.nickname,
@@ -378,6 +413,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         console.log("[BATCH] 创建结果:", result?.id, "space_id:", result?.space_id)
         if (result?.id) {
           savedVisitIds.current[row.key] = result.id
+          setRows(prev => prev.map(r => r.key === row.key ? { ...r, visit_id: result.id } : r))
           // 追加到行顺序
           const orderKey = `visit_order_${date}_${spaceId || ""}`
           try {
@@ -400,6 +436,9 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       }
     }
   }, [date, spaceId, onSaved])
+
+  // 同步 saveRow 到 ref，供 restoreFromHistory 使用
+  useEffect(() => { saveRowRef.current = saveRow }, [saveRow])
 
   const scheduleSave = useCallback((key: number) => {
     if (timersRef.current[key]) clearTimeout(timersRef.current[key])
