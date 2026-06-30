@@ -65,7 +65,7 @@ def create_case(data: GroupCaseCreate) -> GroupCase:
 
 def update_case(case_id: str, data: dict) -> Optional[GroupCase]:
     case = _cases.get(case_id)
-    if not case:
+    if not case or case.is_deleted:
         return None
     for key, value in data.items():
         if hasattr(case, key) and key not in ("id", "created_at", "created_by"):

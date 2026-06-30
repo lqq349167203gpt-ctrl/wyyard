@@ -230,6 +230,7 @@ def calendar_counts():
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
+        oh_card_reading_session_service,
     )
     from collections import defaultdict
     counts: dict[str, int] = defaultdict(int)
@@ -247,6 +248,9 @@ def calendar_counts():
         if s.date:
             counts[s.date] += 1
     for s in internal_course_session_service.list_sessions():
+        if s.date:
+            counts[s.date] += 1
+    for s in oh_card_reading_session_service.list_sessions():
         if s.date:
             counts[s.date] += 1
 

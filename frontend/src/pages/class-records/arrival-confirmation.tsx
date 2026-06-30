@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import type { VisitRecord, HealingRecord, OperationLog } from "@/lib/api"
 import { healingRecordApi, operationLogApi, visitApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -43,9 +43,11 @@ export default function ArrivalConfirmationView({
   const [editExpText, setEditExpText] = useState("")
   const [editFeedbackText, setEditFeedbackText] = useState("")
   const [savingExp, setSavingExp] = useState(false)
+  const fetchIdRef = useRef(0)
   // 加载每个到访人员当日对应的疗愈记录
   useEffect(() => {
-    if (visits.length === 0) return
+    if (visits.length === 0) { setHrMap({}); return }
+    const fetchId = ++fetchIdRef.current
     const map: Record<string, HealingRecord | null> = {}
     Promise.all(
       visits.map(async (v) => {
@@ -56,7 +58,10 @@ export default function ArrivalConfirmationView({
           map[v.id] = null
         }
       })
-    ).then(() => setHrMap({ ...map }))
+    ).then(() => {
+      if (fetchId !== fetchIdRef.current) return
+      setHrMap({ ...map })
+    })
   }, [visits])
 
   const openDetail = async (v: VisitRecord) => {
@@ -102,7 +107,7 @@ export default function ArrivalConfirmationView({
         setHrMap((prev) => ({ ...prev, [editVisit.id]: created }))
       }
       setEditVisit(null)
-    } catch {} finally {
+    } catch { alert("保存失败，请重试") } finally {
       setSavingHR(false)
     }
   }
@@ -114,7 +119,7 @@ export default function ArrivalConfirmationView({
       await visitApi.update(editExpVisit.id, { experience: editExpText, feedback: editFeedbackText })
       setEditExpVisit(null)
       onRefresh?.()
-    } catch {} finally {
+    } catch { alert("保存失败，请重试") } finally {
       setSavingExp(false)
     }
   }

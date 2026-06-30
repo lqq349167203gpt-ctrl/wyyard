@@ -154,9 +154,11 @@ export function useIcsDialogs({
 
   const handleDelete = async () => {
     if (!deleteId) return
-    await internalCourseSessionApi.delete(deleteId)
-    setDeleteId(null)
-    onReload()
+    try {
+      await internalCourseSessionApi.delete(deleteId)
+      setDeleteId(null)
+      onReload()
+    } catch { alert("删除失败，请重试") }
   }
 
   // 资料
@@ -182,12 +184,12 @@ export function useIcsDialogs({
   const handleDeleteMaterial = async (filename: string) => {
     if (!materialsRecord) return
     try {
-      await uploadApi.deleteMaterial(filename)
       const newMaterials = (materialsRecord.materials || []).filter(m => !m.url.includes(filename))
       await internalCourseSessionApi.update(materialsRecord.id, { materials: newMaterials } as any)
       setMaterialsRecord({ ...materialsRecord, materials: newMaterials })
       onReload()
-    } catch { }
+      uploadApi.deleteMaterial(filename).catch(() => {})
+    } catch { alert("删除失败，请重试") }
   }
 
   // 成员
@@ -224,7 +226,7 @@ export function useIcsDialogs({
       setMemberSearchResults([])
       setMemberShowDropdown(false)
       onReload()
-    } catch { }
+    } catch { alert("添加失败，请重试") }
   }
 
   const handleRemoveParticipant = async (id: string) => {
@@ -234,19 +236,21 @@ export function useIcsDialogs({
       await internalCourseSessionApi.update(membersRecord.id, { participant_ids: newIds } as any)
       setMembersRecord({ ...membersRecord, participant_ids: newIds })
       onReload()
-    } catch { }
+    } catch { alert("移除失败，请重试") }
   }
 
   const handleDrop = async (session: InternalCourseSession, customer: { customer_id: string }) => {
     const ids = session.participant_ids || []
     if (ids.includes(customer.customer_id)) return
-    await internalCourseSessionApi.update(session.id, { participant_ids: [...ids, customer.customer_id] } as any)
-    onReload()
+    try {
+      await internalCourseSessionApi.update(session.id, { participant_ids: [...ids, customer.customer_id] } as any)
+      onReload()
+    } catch { alert("添加失败，请重试") }
   }
 
   const actions: IcsActions = useMemo(() => ({
     handleOpenEdit, handleOpenMaterials, handleOpenMembers, handleDrop, deleteId, setDeleteId,
-  }), [deleteId])
+  }), [deleteId, onReload])
 
   const dialogs: ReactNode = (
     <>

@@ -714,12 +714,16 @@ def _cleanup_activity_records(customer_id: str, date: str):
 
     # 沙龙：teacher_ids, participant_ids, groups
     try:
+        from app.services import membership_card_service
         for cr in class_record_service.list_records(date=date):
             changed = False
             if customer_id in cr.teacher_ids:
                 cr.teacher_ids = [x for x in cr.teacher_ids if x != customer_id]
                 changed = True
             if customer_id in cr.participant_ids:
+                # 退费后再移除
+                if not cr.is_public_welfare:
+                    membership_card_service.restore_for_activity(customer_id, f"class:{cr.id}")
                 cr.participant_ids = [x for x in cr.participant_ids if x != customer_id]
                 changed = True
             # 清理 groups 中的该人员
@@ -749,6 +753,8 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if customer_id in s.teacher_ids:
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
+                if customer_id != s.owner_id:
+                    membership_card_service.restore_for_activity(customer_id, f"gcs:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -765,6 +771,8 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if customer_id in s.teacher_ids:
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
+                if customer_id != s.owner_id:
+                    membership_card_service.restore_for_activity(customer_id, f"ers:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -779,6 +787,8 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if customer_id in s.teacher_ids:
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
+                if customer_id != s.owner_id:
+                    membership_card_service.restore_for_activity(customer_id, f"eks:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -793,6 +803,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if customer_id in s.teacher_ids:
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
+                membership_card_service.restore_for_activity(customer_id, f"ics:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -809,6 +820,8 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if customer_id in s.teacher_ids:
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
+                if customer_id != s.owner_id:
+                    membership_card_service.restore_for_activity(customer_id, f"ocr:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:

@@ -49,19 +49,31 @@ export default function DetailView({
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set())
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const loadSeqRef = useRef(0)
 
   useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
   // 客户到店日期集合（用于标记未参加活动）
   const arrivedDates = new Set((detail?.visit_records || []).filter(v => v.arrived).map(v => v.visit_date))
 
   const loadDetail = useCallback(async (cid: string) => {
+    const seq = ++loadSeqRef.current
     setLoading(true)
+    setLoadError(null)
     setCopied(false)
+    setExpandedFields(new Set())
+    setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1)
     try {
       const data = await customerDetailApi.get(cid)
+      if (seq !== loadSeqRef.current) return // 过期请求，丢弃
       setDetail(data)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    } catch (e) {
+      if (seq !== loadSeqRef.current) return
+      setLoadError("加载失败，请重试")
+      console.error(e)
+    } finally {
+      if (seq === loadSeqRef.current) setLoading(false)
+    }
   }, [])
 
   useEffect(() => { if (selectedCustomerId) loadDetail(selectedCustomerId) }, [selectedCustomerId, loadDetail])
@@ -83,7 +95,7 @@ export default function DetailView({
       setEditingRec(null)
       refresh()
     } catch (e) {
-      console.error(e)
+      alert("保存失败：" + (e instanceof Error ? e.message : "未知错误"))
     } finally {
       setSaving(false)
     }
@@ -122,9 +134,19 @@ export default function DetailView({
     return <div className="bg-white rounded-lg py-20 text-center text-[12px] text-muted-foreground">搜索用户以查看详细档案</div>
   }
 
-  if (loading || !detail) {
+  if (loading || (!detail && !loadError)) {
     return <div className="py-16 text-center text-[12px] text-muted-foreground">加载中...</div>
   }
+  if (loadError) {
+    return (
+      <div className="py-16 text-center space-y-2">
+        <p className="text-[12px] text-[#c4506a]">{loadError}</p>
+        <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => selectedCustomerId && loadDetail(selectedCustomerId)}>重试</Button>
+      </div>
+    )
+  }
+
+  if (!detail) return null
 
   const c = detail.customer
   const arrivedRecords = (detail?.visit_records || []).filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
@@ -143,7 +165,7 @@ export default function DetailView({
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f1f2] text-[#646a73]">{c.member_type}</span>
         )}
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f5ff] text-[#3370ff]">到店 {c.visit_count} 次</span>
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f5ff] text-[#3370ff]">消费 ¥{detail!.payment_records.reduce((sum, g) => sum + g.amount, 0).toLocaleString()}</span>
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[#f0f5ff] text-[#3370ff]">消费 ¥{(detail?.payment_records || []).filter(g => !g.voided).reduce((sum, g) => sum + g.amount, 0).toLocaleString()}</span>
         <span className="text-[11px] text-[#8f959e]">首次到访 {firstVisit || <span className="text-[#d0d3d6]">-</span>}</span>
       </div>
 
@@ -266,7 +288,7 @@ export default function DetailView({
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-[10px] pb-4">
           {/* 疗愈记录 — 到店记录 */}
           {activeTab === "healing" && (() => {
-            const visitRecords = (detail!.visit_records || []).sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.arrival_time || "").localeCompare(a.arrival_time || ""))
+            const visitRecords = (detail?.visit_records || []).sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.arrival_time || "").localeCompare(a.arrival_time || ""))
             const pageSize = 8
             const totalPages = Math.ceil(visitRecords.length / pageSize)
             const paginatedRecords = visitRecords.slice((healingPage - 1) * pageSize, healingPage * pageSize)
@@ -295,7 +317,7 @@ export default function DetailView({
                           <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.group_leader_feedback || <span className="text-[#8f959e]">-</span>}</p>
                         </div>
                         {(() => {
-                          const hr = detail!.healing_records.find(r => r.date === v.visit_date)
+                          const hr = detail?.healing_records.find(r => r.date === v.visit_date)
                           const record = hr?.growth_record || v.healing_notes
                           return (
                             <div className="flex items-start gap-2">
@@ -323,7 +345,7 @@ export default function DetailView({
 
           {/* 活动记录 */}
           {activeTab === "activities" && (() => {
-            const activities = detail!.activities || []
+            const activities = detail?.activities || []
             const pageSize = 5
             const totalPages = Math.ceil(activities.length / pageSize)
             const paginatedActivities = activities.slice((activitiesPage - 1) * pageSize, activitiesPage * pageSize)
@@ -363,7 +385,7 @@ export default function DetailView({
           {/* 项目次数 */}
           {activeTab === "purchase" && (() => {
             const today = new Date().toLocaleDateString("sv-SE")
-            const allItems = detail!.purchase_summary || []
+            const allItems = detail?.purchase_summary || []
             const memberItems = allItems.filter(s => s.type === "会员活动")
             const otherItems = allItems.filter(s => s.type !== "会员活动")
 
@@ -496,7 +518,7 @@ export default function DetailView({
 
           {/* 交易记录 */}
           {activeTab === "payment" && (() => {
-            const paymentRecords = detail!.payment_records || []
+            const paymentRecords = detail?.payment_records || []
             const pageSize = 5
             const totalPages = Math.ceil(paymentRecords.length / pageSize)
             const paginatedRecords = paymentRecords.slice((paymentPage - 1) * pageSize, paymentPage * pageSize)
@@ -517,7 +539,10 @@ export default function DetailView({
                     const today = new Date().toISOString().slice(0,10)
                     let status: React.ReactNode = <span className="text-[#d0d3d6]">-</span>
                     let statusClass = ""
-                    if (r.effective_date && r.effective_date > today) {
+                    if (r.voided) {
+                      status = "已退费"
+                      statusClass = "text-[#c4506a]"
+                    } else if (r.effective_date && r.effective_date > today) {
                       status = "未开始"
                       statusClass = "text-[#8f959e]"
                     } else if (r.expiry_date && r.expiry_date < today) {
@@ -543,7 +568,7 @@ export default function DetailView({
                 </TableBody></Table>
                 {totalPages > 1 && (
                   <div className="px-4 py-2">
-                    <PaginationBar currentPage={paymentPage} totalPages={totalPages} totalItems={detail!.payment_records.length} startIndex={(paymentPage-1)*pageSize+1} endIndex={Math.min(paymentPage*pageSize, detail!.payment_records.length)} onPageChange={setPaymentPage} />
+                    <PaginationBar currentPage={paymentPage} totalPages={totalPages} totalItems={detail?.payment_records.length ?? 0} startIndex={(paymentPage-1)*pageSize+1} endIndex={Math.min(paymentPage*pageSize, detail?.payment_records.length ?? 0)} onPageChange={setPaymentPage} />
                   </div>
                 )}
               </div>
@@ -581,12 +606,13 @@ function RecordForm({
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    if (!open) return
     if (rec) {
       setDate(rec.date); setTitle(rec.title); setTeacher(rec.teacher || ""); setGrowth(rec.growth_record || ""); setMats(rec.materials || [])
     } else {
       setDate(""); setTitle(""); setTeacher(""); setGrowth(""); setMats([])
     }
-  }, [rec])
+  }, [rec, open])
 
   const handleSave = () => {
     if (!date || !title.trim()) return
@@ -609,8 +635,8 @@ function RecordForm({
       const succeeded = results.filter((r): r is PromiseFulfilledResult<Material> => r.status === "fulfilled").map(r => r.value)
       setMats(prev => [...prev, ...succeeded])
       const failed = results.filter(r => r.status === "rejected")
-      if (failed.length > 0) console.error(`${failed.length} 个文件上传失败`)
-    } catch (err) { console.error(err) }
+      if (failed.length > 0) alert(`${failed.length} 个文件上传失败`)
+    } catch { alert("上传失败，请重试") }
     finally { setUploading(false); if (fileRef.current) fileRef.current.value = "" }
   }
 

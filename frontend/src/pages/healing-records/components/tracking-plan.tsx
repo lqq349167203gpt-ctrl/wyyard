@@ -15,6 +15,7 @@ export default function TrackingPlan({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     setDraft(value)
@@ -22,11 +23,14 @@ export default function TrackingPlan({
 
   const handleSave = async () => {
     setSaving(true)
+    setError("")
     try {
       await customerApi.update(customerId, { tracking_plan: draft })
       onChange(draft)
       setEditing(false)
-    } catch {} finally {
+    } catch {
+      setError("保存失败，请重试")
+    } finally {
       setSaving(false)
     }
   }
@@ -51,8 +55,9 @@ export default function TrackingPlan({
               rows={4}
               className="text-xs resize-none"
             />
+            {error && <p className="text-[11px] text-[#f54a45]">{error}</p>}
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditing(false); setDraft(value) }}>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditing(false); setDraft(value); setError("") }}>
                 取消
               </Button>
               <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={saving}>

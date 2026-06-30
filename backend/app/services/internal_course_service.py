@@ -99,10 +99,10 @@ def create_course(data: InternalCourseCreate) -> InternalCourse:
 
 def update_course(course_id: str, data: dict) -> Optional[InternalCourse]:
     course = _courses.get(course_id)
-    if not course:
+    if not course or course.is_deleted:
         return None
     for key, value in data.items():
-        if hasattr(course, key) and key not in ("id", "created_at", "created_by"):
+        if hasattr(course, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
             setattr(course, key, value)
     course.expiry_date = _calc_expiry(course.effective_date, course.course_type)
     course.updated_at = datetime.now(timezone.utc)

@@ -121,12 +121,13 @@ def create_record(data: ClassRecordCreate) -> ClassRecord:
     )
     _records[record.id] = record
     _save(record.id)
+    _deduct_for_record(record)
     return record
 
 
 def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
     record = _records.get(record_id)
-    if not record:
+    if not record or record.is_deleted:
         return None
 
     # 获取旧状态
@@ -134,7 +135,7 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
     old_is_public_welfare = record.is_public_welfare
 
     for key, value in data.items():
-        if hasattr(record, key) and key not in ("id", "created_at", "created_by"):
+        if hasattr(record, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
             setattr(record, key, value)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
@@ -164,9 +165,12 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
 def update_participants(record_id: str, participant_ids: List[str]):
     """返回 (record, []) 成功, (None, []) 未找到"""
     record = _records.get(record_id)
-    if not record:
+    if not record or record.is_deleted:
         return None, []
+    old_chargeable = _get_group_member_ids(record)
     record.participant_ids = participant_ids
+    new_chargeable = _get_group_member_ids(record)
+    _sync_deduction(record, old_chargeable, new_chargeable)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
     _save(record_id)
@@ -175,7 +179,7 @@ def update_participants(record_id: str, participant_ids: List[str]):
 
 def delete_record(record_id: str) -> bool:
     record = _records.get(record_id)
-    if not record:
+    if not record or record.is_deleted:
         return False
     _restore_for_record(record)
     record.is_deleted = True
@@ -190,7 +194,7 @@ def update_groups(record_id: str, groups: list):
     from app.services import visit_service
 
     record = _records.get(record_id)
-    if not record:
+    if not record or record.is_deleted:
         return None, []
 
     # 校验成员必须在当日到场名单中，自动过滤已删除的人员
@@ -214,8 +218,11 @@ def update_groups(record_id: str, groups: list):
         g["member_ids"] = valid_mids
         all_member_ids.update(valid_mids)
 
+    old_chargeable = _get_group_member_ids(record)
     record.participant_ids = list(all_member_ids)
     record.groups = [GroupMember(**g) for g in groups]
+    new_chargeable = _get_group_member_ids(record)
+    _sync_deduction(record, old_chargeable, new_chargeable)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
     _save(record_id)
@@ -253,6 +260,16 @@ def rename_course_name(old_name: str, new_name: str) -> int:
     for record in _records.values():
         if record.course_name == old_name:
             record.course_name = new_name
+            _save(record.id)
+            count += 1
+    return count
+
+
+def rename_course_type(old_type: str, new_type: str) -> int:
+    count = 0
+    for record in _records.values():
+        if record.course_type == old_type:
+            record.course_type = new_type
             _save(record.id)
             count += 1
     return count

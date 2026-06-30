@@ -39,7 +39,6 @@ export default function HealingRecordsPage() {
   const [searchIdentity, setSearchIdentity] = useState("")
   const [searchReferrer, setSearchReferrer] = useState("")
   const [searchReferrerHandler, setSearchReferrerHandler] = useState("")
-  const [filterKey, setFilterKey] = useState(0)
 
   useEffect(() => {
     customerApi.clearLightCache()
@@ -52,7 +51,6 @@ export default function HealingRecordsPage() {
     setSearchIdentity("")
     setSearchReferrer("")
     setSearchReferrerHandler("")
-    setFilterKey(k => k + 1)
   }
 
   const handleSelectCustomer = (customerId: string) => {
@@ -63,6 +61,9 @@ export default function HealingRecordsPage() {
   const handleAddNew = () => {
     setEditingId(null)
     setForm(emptyCustomer)
+    setSaveError("")
+    setReferrerError("")
+    setReferrerHandlerError("")
     setCreateOpen(true)
   }
 
@@ -78,6 +79,9 @@ export default function HealingRecordsPage() {
         age_range: ageParts?.[2] || (isRangeOnly ? c.age : ""),
       })
       setEditingId(id)
+      setSaveError("")
+      setReferrerError("")
+      setReferrerHandlerError("")
       setCreateOpen(true)
     } catch {
       alert("加载客户信息失败")
@@ -89,11 +93,19 @@ export default function HealingRecordsPage() {
     setDeleteConfirmName("")
   }
 
+  const [deleteError, setDeleteError] = useState("")
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return
-    await customerApi.delete(deleteTarget.id)
-    setDeleteTarget(null)
-    setRefreshKey(k => k + 1)
+    setDeleteError("")
+    try {
+      await customerApi.delete(deleteTarget.id)
+      setDeleteTarget(null)
+      setDeleteConfirmName("")
+      setRefreshKey(k => k + 1)
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "删除失败")
+    }
   }
 
   const handleSave = async () => {
@@ -139,6 +151,8 @@ export default function HealingRecordsPage() {
       }
       setCreateOpen(false)
       setRefreshKey(k => k + 1)
+      customerApi.clearLightCache()
+      customerApi.light().then(setCustomers).catch(() => {})
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "保存失败")
     } finally {
@@ -159,7 +173,7 @@ export default function HealingRecordsPage() {
           <CustomerSearchInput
             customers={customers}
             value={searchNickname}
-            onChange={(v) => { setSearchNickname(typeof v === "string" ? v : ""); setFilterKey(k => k + 1) }}
+            onChange={(v) => { setSearchNickname(typeof v === "string" ? v : "") }}
             placeholder="搜索昵称"
             filterSelected={false}
           />
@@ -169,13 +183,13 @@ export default function HealingRecordsPage() {
           value={searchIdentity}
           options={[{value: "", label: "全部身份"}, ...identityNames.map(id => ({value: id, label: id}))]}
           placeholder="全部身份"
-          onChange={(v) => { setSearchIdentity(v); setFilterKey(k => k + 1) }}
+          onChange={(v) => { setSearchIdentity(v) }}
         />
         <div className="w-44">
           <CustomerSearchInput
             customers={customers}
             value={searchReferrer}
-            onChange={(v) => { setSearchReferrer(typeof v === "string" ? v : ""); setFilterKey(k => k + 1) }}
+            onChange={(v) => { setSearchReferrer(typeof v === "string" ? v : "") }}
             placeholder="搜索引流人"
             filterSelected={false}
           />
@@ -184,7 +198,7 @@ export default function HealingRecordsPage() {
           <CustomerSearchInput
             customers={customers}
             value={searchReferrerHandler}
-            onChange={(v) => { setSearchReferrerHandler(typeof v === "string" ? v : ""); setFilterKey(k => k + 1) }}
+            onChange={(v) => { setSearchReferrerHandler(typeof v === "string" ? v : "") }}
             placeholder="搜索承接人"
             filterSelected={false}
           />
@@ -203,7 +217,7 @@ export default function HealingRecordsPage() {
       </div>
 
       <ListView
-        key={`${refreshKey}-${filterKey}`}
+        refreshKey={refreshKey}
         onSelectCustomer={handleSelectCustomer}
         onDeleteCustomer={handleDeleteCustomer}
         onEditCustomer={handleEditCustomer}
@@ -383,32 +397,33 @@ export default function HealingRecordsPage() {
       </Dialog>
 
       {/* 删除确认弹窗 */}
-      <Dialog open={!!deleteTarget} onOpenChange={() => { setDeleteTarget(null); setDeleteConfirmName("") }}>
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmName(""); setDeleteError("") } }}>
         <DialogContent className="w-[360px] max-w-[90vw] p-0 gap-0">
           <div className="px-5 py-3 border-b border-[#f0f0f0]">
             <h3 className="text-[14px] font-normal">删除客户</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
             <p className="text-[12px] text-[#2b2f36]">
-              确定要删除「<span className="font-medium">{deleteTarget?.nickname}</span>」吗？删除后不可恢复。
+              确定要删除「<span className="font-medium">{deleteTarget?.nickname || deleteTarget?.id}</span>」吗？删除后不可恢复。
             </p>
             <div>
               <label className="text-[11px] text-[#8f959e] mb-1 block">请输入客户昵称确认删除</label>
               <Input
                 value={deleteConfirmName}
-                onChange={(e) => setDeleteConfirmName(e.target.value)}
-                placeholder={deleteTarget?.nickname || ""}
+                onChange={(e) => { setDeleteConfirmName(e.target.value); setDeleteError("") }}
+                placeholder={deleteTarget?.nickname || "请输入昵称"}
                 className="h-8"
               />
             </div>
+            {deleteError && <p className="text-[11px] text-[#f54a45]">{deleteError}</p>}
           </div>
           <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">
-            <Button variant="outline" size="sm" onClick={() => { setDeleteTarget(null); setDeleteConfirmName("") }}>取消</Button>
+            <Button variant="outline" size="sm" onClick={() => { setDeleteTarget(null); setDeleteConfirmName(""); setDeleteError("") }}>取消</Button>
             <Button
               variant="destructive"
               size="sm"
               onClick={handleConfirmDelete}
-              disabled={deleteConfirmName !== deleteTarget?.nickname}
+              disabled={!deleteTarget?.nickname || deleteConfirmName !== deleteTarget?.nickname}
             >
               确定删除
             </Button>

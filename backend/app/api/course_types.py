@@ -28,7 +28,10 @@ def list_types():
 def create_type(data: CourseTypeCreate):
     if not data.name.strip():
         raise HTTPException(status_code=400, detail="类型名称不能为空")
-    return course_type_service.create_course_type(data.name.strip(), data.organization_id or "")
+    try:
+        return course_type_service.create_course_type(data.name.strip(), data.organization_id or "")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.patch("/{name}")
@@ -52,8 +55,11 @@ def rename_type(name: str, data: CourseTypeRename):
 
 @router.delete("/{name}")
 def delete_type(name: str):
-    if not course_type_service.delete_course_type(name):
-        raise HTTPException(status_code=404, detail="类型不存在")
+    try:
+        if not course_type_service.delete_course_type(name):
+            raise HTTPException(status_code=404, detail="类型不存在")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return {"message": "删除成功"}
 
 

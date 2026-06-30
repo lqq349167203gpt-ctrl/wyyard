@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi,
-  courseTypeApi,
+  courseTypeApi, activityOrderApi,
   type CustomerLight, type Space, type MemberIdentity, type CourseType,
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -245,6 +245,7 @@ export interface HistoryEntry {
   rows: ActivityRow[]
   changedKeys?: number[]
   changedCells?: ChangedCell[]
+  deletedRowKeys?: number[]
 }
 
 interface ActivityBatchTableProps {
@@ -262,7 +263,7 @@ interface ActivityBatchTableProps {
   onSavingCountChange?: (count: number) => void
   onSavedCountChange?: (count: number) => void
   onUndoRedoChange?: (canUndo: boolean, canRedo: boolean, undo: () => void, redo: () => void, history: HistoryEntry[]) => void
-  onRestoreRef?: (restore: (entry: HistoryEntry) => void) => void
+  onRestoreRef?: (restore: (entry: HistoryEntry) => Promise<void>) => void
   onCaptureRef?: (capture: () => void) => void
   onHistoryPushed?: (entry: HistoryEntry) => void
   previewRows?: ActivityRow[]
@@ -302,7 +303,7 @@ export function ActivityBatchTable({
   // 撤回/重做历史栈
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([])
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([])
-  const historyPushedRef = useRef(false)
+  const historyPushedRef = useRef<Set<number>>(new Set())
   const saveRowRef = useRef<(row: ActivityRow) => Promise<void>>(() => Promise.resolve())
 
   const getUserName = useCallback(() => {
@@ -324,60 +325,118 @@ export function ActivityBatchTable({
     }
     setUndoStack(prev => [...prev, entry])
     setRedoStack([])
-    historyPushedRef.current = true
+    if (changedKeys) changedKeys.forEach(k => historyPushedRef.current.add(k))
     onHistoryPushed?.(entry)
   }, [getUserName, onHistoryPushed])
 
+  const deleteRecordFromBackend = useCallback(async (row: ActivityRow) => {
+    const id = row.record_id
+    if (!id) return
+    if (row.record_type === "class") await classRecordApi.delete(id)
+    else if (row.record_type === "gcs") await groupCaseSessionApi.delete(id)
+    else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(id)
+    else if (row.record_type === "eks") await energyKnotSessionApi.delete(id)
+    else if (row.record_type === "ics") await internalCourseSessionApi.delete(id)
+    else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(id)
+  }, [])
+
   const undo = useCallback(() => {
-    setUndoStack(prev => {
-      if (prev.length === 0) return prev
-      const entry = prev[prev.length - 1]
-      const currentEntry: HistoryEntry = {
-        timestamp: Date.now(), action: "撤回", userName: getUserName(),
-        rows: rowsRef.current.map(r => ({ ...r }))
+    if (undoStack.length === 0) return
+    const entry = undoStack[undoStack.length - 1]
+    // 同步捕获当前快照（在 state 更新前）
+    const deletedRowKeys: number[] = []
+    const newKeys = new Set(entry.changedKeys || [])
+    const entryKeySet = new Set(entry.rows.map(r => r.key))
+    for (const key of newKeys) {
+      if (!entryKeySet.has(key)) {
+        const currentRow = rowsRef.current.find(r => r.key === key)
+        if (currentRow?.record_id) {
+          deletedRowKeys.push(key)
+          deleteRecordFromBackend(currentRow).catch(() => {})
+        }
       }
-      setRedoStack(r => [...r, currentEntry])
-      setRows(entry.rows)
-      const statuses: Record<number, RowStatus> = {}
-      entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
-      setRowStatus(statuses)
-      entry.rows.forEach(row => { if (row.record_id && !row.pendingCreate) saveRowRef.current(row) })
-      return prev.slice(0, -1)
-    })
-  }, [getUserName])
+    }
+    const currentEntry: HistoryEntry = {
+      timestamp: Date.now(), action: "撤回", userName: getUserName(),
+      rows: rowsRef.current.map(r => ({ ...r })),
+      deletedRowKeys: deletedRowKeys.length > 0 ? deletedRowKeys : undefined,
+    }
+    setUndoStack(prev => prev.slice(0, -1))
+    setRedoStack(prev => [...prev, currentEntry])
+    setRows(entry.rows)
+    const statuses: Record<number, RowStatus> = {}
+    entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+    setRowStatus(statuses)
+    // "编辑" 操作：撤回 = 保存旧数据
+    entry.rows.forEach(row => { if (row.record_id && !row.pendingCreate) saveRowRef.current(row).catch(() => {}) })
+  }, [undoStack, getUserName, deleteRecordFromBackend])
 
   const redo = useCallback(() => {
-    setRedoStack(prev => {
-      if (prev.length === 0) return prev
-      const entry = prev[prev.length - 1]
-      const currentEntry: HistoryEntry = {
-        timestamp: Date.now(), action: "重做", userName: getUserName(),
-        rows: rowsRef.current.map(r => ({ ...r }))
+    if (redoStack.length === 0) return
+    const entry = redoStack[redoStack.length - 1]
+    const currentEntry: HistoryEntry = {
+      timestamp: Date.now(), action: "重做", userName: getUserName(),
+      rows: rowsRef.current.map(r => ({ ...r }))
+    }
+    setRedoStack(prev => prev.slice(0, -1))
+    setUndoStack(prev => [...prev, currentEntry])
+    setRows(entry.rows)
+    const statuses: Record<number, RowStatus> = {}
+    entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+    setRowStatus(statuses)
+    // "新增" 操作 redo：被 undo 删除的行需要重新创建
+    const deletedKeys = new Set(entry.deletedRowKeys || [])
+    for (const row of entry.rows) {
+      if (deletedKeys.has(row.key) && row.record_id) {
+        const freshRow = { ...row, record_id: "", pendingCreate: true }
+        setRows(prev => prev.map(r => r.key === row.key ? freshRow : r))
+        statuses[row.key] = "saving"
+        saveRowRef.current(freshRow).catch(() => {})
+      } else if (row.record_id && !row.pendingCreate) {
+        saveRowRef.current(row).catch(() => {})
       }
-      setUndoStack(u => [...u, currentEntry])
-      setRows(entry.rows)
-      const statuses: Record<number, RowStatus> = {}
-      entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
-      setRowStatus(statuses)
-      entry.rows.forEach(row => { if (row.record_id && !row.pendingCreate) saveRowRef.current(row) })
-      return prev.slice(0, -1)
-    })
-  }, [getUserName])
+    }
+    setRowStatus(statuses)
+  }, [redoStack, getUserName])
 
   // 通知父组件撤回/重做状态和历史记录
   useEffect(() => {
     onUndoRedoChange?.(undoStack.length > 0, redoStack.length > 0, undo, redo, undoStack)
   }, [undoStack, redoStack, undo, redo, onUndoRedoChange])
 
-  // 恢复历史版本函数
-  const restoreFromHistory = useCallback((entry: HistoryEntry) => {
+  // 恢复历史版本函数（async，等待所有保存完成）
+  const restoreFromHistory = useCallback(async (entry: HistoryEntry) => {
     pushHistory("恢复了历史版本")
-    setRows(entry.rows)
+    // 在 setRows 之前捕获当前行，用于找出需要删除的行
+    const currentRows = rowsRef.current
+    // 将快照中的行分为两类：已有记录（update）和未创建记录（create）
+    const rowsToRestore = entry.rows.map(r => {
+      if (!r.record_id || r.pendingCreate) {
+        // 没有 record_id 的行：标记为待创建，让 saveRow 走 create 路径
+        return { ...r, pendingCreate: true, record_id: "" }
+      }
+      return r
+    })
+    setRows(rowsToRestore)
+    // 所有行都需要保存（已有的 update，未有的 create）
     const statuses: Record<number, RowStatus> = {}
-    entry.rows.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+    rowsToRestore.forEach(r => { statuses[r.key] = "saving" })
     setRowStatus(statuses)
-    entry.rows.forEach(row => { if (row.record_id && !row.pendingCreate) saveRowRef.current(row) })
-  }, [pushHistory])
+    // 删除当前存在但快照中没有的行（快照之后新增的行）
+    const snapshotRecordIds = new Set(entry.rows.filter(r => r.record_id).map(r => r.record_id))
+    const rowsToDelete = currentRows.filter(r => r.record_id && !snapshotRecordIds.has(r.record_id))
+    // 等待所有保存 + 删除完成
+    const results = await Promise.allSettled([
+      ...rowsToRestore.map(row => saveRowRef.current(row)),
+      ...rowsToDelete.map(row => deleteRecordFromBackend(row)),
+    ])
+    // 根据结果更新最终状态
+    const finalStatuses: Record<number, RowStatus> = {}
+    rowsToRestore.forEach((r, i) => {
+      finalStatuses[r.key] = results[i]?.status === "fulfilled" ? "saved" : "error"
+    })
+    setRowStatus(finalStatuses)
+  }, [pushHistory, deleteRecordFromBackend])
 
   // 捕获当前状态到历史记录（打开历史面板时调用）
   const captureCurrentState = useCallback(() => {
@@ -465,54 +524,63 @@ export function ActivityBatchTable({
     } catch {}
   }, [])
 
-  // 从 records 加载行数据
+  // 从 records 加载行数据（优先从 API 获取排序，fallback 到 localStorage）
   const prevRecordsRef = useRef<string | null>(null)
   useEffect(() => {
     const sig = records.map(r => `${r.type}-${r.data.id}`).join(",")
     if (prevRecordsRef.current !== null && sig === prevRecordsRef.current) return
     prevRecordsRef.current = sig
 
-    const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
-    let savedOrder: string[] = []
-    try { savedOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
-
-    let items = records.map(r => {
-      const row = recordToRow(r.type, r.data, courses, spaceId || "", spaces)
-      // 恢复 eks 编辑中的案主和部位数
-      if (r.type === "eks" && r.data.id) {
-        const edit = eksEditsRef.current.get(r.data.id)
-        if (edit) {
-          row.owner_id = edit.owner_id
-          row.owner_name = edit.owner_name
-          row.description = edit.description
+    const buildRows = (order: string[]) => {
+      let items = records.map(r => {
+        const row = recordToRow(r.type, r.data, courses, spaceId || "", spaces)
+        if (r.type === "eks" && r.data.id) {
+          const edit = eksEditsRef.current.get(r.data.id)
+          if (edit) {
+            row.owner_id = edit.owner_id
+            row.owner_name = edit.owner_name
+            row.description = edit.description
+          }
         }
+        return row
+      })
+      if (order.length) {
+        const orderMap = new Map(order.map((id, i) => [id, i]))
+        items.sort((a, b) => (orderMap.get(`${a.record_type}-${a.record_id}`) ?? 999) - (orderMap.get(`${b.record_type}-${b.record_id}`) ?? 999))
       }
-      return row
-    })
-    if (savedOrder.length) {
-      const orderMap = new Map(savedOrder.map((id, i) => [id, i]))
-      items.sort((a, b) => (orderMap.get(`${a.record_type}-${a.record_id}`) ?? 999) - (orderMap.get(`${b.record_type}-${b.record_id}`) ?? 999))
+      if (items.length === 0) {
+        const defaultCourseType = courseTypes.find(ct => ct.name === "读书会")?.name || courseTypes[0]?.name || ""
+        const fresh = createFreshRow("class", spaceId || "", spaces)
+        if (defaultCourseType) {
+          fresh.class_course_type = defaultCourseType
+          fresh.name = defaultCourseType
+        }
+        items = [fresh]
+      }
+      setRows(items)
+      const statuses: Record<number, RowStatus> = {}
+      items.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+      setRowStatus(statuses)
     }
 
-    // 无记录时默认一行
-    if (items.length === 0) {
-      const defaultCourseType = courseTypes.find(ct => ct.name === "读书会")?.name || courseTypes[0]?.name || ""
-      const fresh = createFreshRow("class", spaceId || "", spaces)
-      if (defaultCourseType) {
-        fresh.class_course_type = defaultCourseType
-        fresh.name = defaultCourseType
-      }
-      items = [fresh]
-    }
+    // 先用 localStorage 排序立即渲染
+    const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
+    let localOrder: string[] = []
+    try { localOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
+    buildRows(localOrder)
 
-    setRows(items)
-    const statuses: Record<number, RowStatus> = {}
-    items.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
-    setRowStatus(statuses)
+    // 再从 API 获取排序（覆盖 localStorage）
+    activityOrderApi.get(date, spaceId || "").then(apiOrder => {
+      if (apiOrder.length > 0) {
+        buildRows(apiOrder)
+        // 同步回 localStorage
+        try { localStorage.setItem(orderKey, JSON.stringify(apiOrder)) } catch {}
+      }
+    }).catch(() => {})
   }, [records, courses, date, spaceId, spaces, courseTypes])
 
-  // 保存单行
-  const saveRow = useCallback(async (row: ActivityRow) => {
+  // 保存单行（返回 API 结果，供 handleCreate 获取 record_id）
+  const saveRow = useCallback(async (row: ActivityRow): Promise<any> => {
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       const type = row.record_type
@@ -580,6 +648,7 @@ export function ActivityBatchTable({
           } catch {}
           return next
         })
+        return result
       } else {
         // 更新已有记录
         const id = row.record_id
@@ -599,8 +668,8 @@ export function ActivityBatchTable({
           await groupCaseSessionApi.update(id, {
             ...common,
             name: row.name,
-            owner_id: row.owner_id || row.raw.owner_id,
-            owner_name: row.owner_name || row.raw.owner_name,
+            owner_id: row.owner_id || "",
+            owner_name: row.owner_name || "",
             teacher_ids: row.host_ids,
             participant_ids: row.participant_ids,
             description: row.description,
@@ -609,8 +678,8 @@ export function ActivityBatchTable({
           await emotionalReleaseSessionApi.update(id, {
             ...common,
             name: row.name,
-            owner_id: row.owner_id || row.raw.owner_id,
-            owner_name: row.owner_name || row.raw.owner_name,
+            owner_id: row.owner_id || "",
+            owner_name: row.owner_name || "",
             teacher_ids: row.host_ids,
             description: row.description,
             participant_ids: row.participant_ids,
@@ -638,8 +707,8 @@ export function ActivityBatchTable({
           await ohCardReadingSessionApi.update(id, {
             ...common,
             name: row.name,
-            owner_id: row.owner_id || row.raw.owner_id,
-            owner_name: row.owner_name || row.raw.owner_name,
+            owner_id: row.owner_id || "",
+            owner_name: row.owner_name || "",
             teacher_ids: row.host_ids,
             description: row.description,
             participant_ids: row.participant_ids,
@@ -648,23 +717,19 @@ export function ActivityBatchTable({
       }
 
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
-      historyPushedRef.current = false
+      historyPushedRef.current.delete(row.key)
       if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
-      // 保存后刷新剩余次数
+      // 保存后刷新剩余次数（fetchRemaining 会获取该类型所有客户，调一次即可）
       if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
-        const customerId = row.owner_id || prevOwnerRef.current[row.key]
-        if (customerId) {
-          fetchRemaining(row.record_type, customerId)
+        if (row.owner_id || prevOwnerRef.current[row.key]) {
           delete prevOwnerRef.current[row.key]
         }
-        // 刷新所有参与者的剩余次数
-        for (const pid of row.participant_ids) {
-          fetchRemaining(row.record_type, pid)
-        }
+        fetchRemaining(row.record_type, "all")
       }
     } catch (e: any) {
-      console.error("[ACT] 保存失败:", e)
+      console.error("[SAVE] error", { key: row.key, type: row.record_type, id: row.record_id, error: e?.message })
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+      throw e
     }
   }, [courses, spaceId, spaces, date, fetchRemaining])
 
@@ -675,10 +740,10 @@ export function ActivityBatchTable({
     if (timersRef.current[key]) clearTimeout(timersRef.current[key])
     timersRef.current[key] = setTimeout(() => {
       const row = rowsRef.current.find(r => r.key === key)
-      if (row) saveRow(row)
+      if (row) saveRowRef.current(row).catch(() => {})
       delete timersRef.current[key]
     }, 500)
-  }, [saveRow])
+  }, [])
 
   const FIELD_LABELS: Record<string, string> = {
     name: "名称", start_time: "时间", end_time: "时间",
@@ -693,7 +758,7 @@ export function ActivityBatchTable({
   const updateRow = useCallback((key: number, field: keyof ActivityRow, value: any) => {
     // 首次编辑时记录历史
     if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
-      if (!historyPushedRef.current) {
+      if (!historyPushedRef.current.has(key)) {
         const row = rowsRef.current.find(r => r.key === key)
         const rowName = row?.name || ""
         const label = FIELD_LABELS[field as string] || "活动"
@@ -724,13 +789,28 @@ export function ActivityBatchTable({
             desc = `编辑了「${rowName}」的案主：${oldName || "无"} → ${newName}`
           }
         }
-        // 传入编辑后的行快照
-        const postRows = rowsRef.current.map(r => r.key === key ? { ...r, [field]: value } : { ...r })
-        pushHistory("编辑了活动", [key], desc, postRows, [{ rowKey: key, fields: [field as string] }])
+        // 传入编辑前的行快照（用于 undo 恢复）
+        const preRows = rowsRef.current.map(r => ({ ...r }))
+        pushHistory("编辑了活动", [key], desc, preRows, [{ rowKey: key, fields: [field as string] }])
       }
       setRowStatus(prev => ({ ...prev, [key]: "idle" }))
     }
     setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
+    scheduleSave(key)
+  }, [rowStatus, scheduleSave, pushHistory])
+
+  // 批量修改行字段（用于一次修改多个关联字段的场景，如 eks 案主+描述）
+  const updateRowMulti = useCallback((key: number, changes: Partial<ActivityRow>, desc?: string) => {
+    if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
+      if (!historyPushedRef.current.has(key)) {
+        const row = rowsRef.current.find(r => r.key === key)
+        const rowName = row?.name || ""
+        const preRows = rowsRef.current.map(r => ({ ...r }))
+        pushHistory("编辑了活动", [key], desc || `编辑了「${rowName}」`, preRows)
+      }
+      setRowStatus(prev => ({ ...prev, [key]: "idle" }))
+    }
+    setRows(prev => prev.map(r => r.key === key ? { ...r, ...changes } : r))
     scheduleSave(key)
   }, [rowStatus, scheduleSave, pushHistory])
 
@@ -745,7 +825,7 @@ export function ActivityBatchTable({
     else if (row.record_type === "ocr") callbacks.onDeleteOcr(row.record_id)
   }, [callbacks])
 
-  // 类型切换 → 删除旧记录 + 重置为新类型行
+  // 类型切换 → 先创建新记录，成功后再删除旧记录（防止数据丢失）
   const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {
     const row = rowsRef.current.find(r => r.key === rowKey)
     if (!row) return
@@ -754,6 +834,8 @@ export function ActivityBatchTable({
     const oldName = row.name || "未命名活动"
     const newTypeName = parsedCourse || TYPE_NAMES[parsedType as ActivityType] || parsedType
     const type = parsedType as ActivityType
+    // 同类型且同课程 → 忽略（在 pushHistory 之前检查，避免污染 undo 栈）
+    if (type === row.record_type && parsedCourse && parsedCourse === row.ics_course_key?.replace("ics:", "")) return
     // 构造切换后的行，用于历史快照
     const switchedRow: ActivityRow = {
       ...row,
@@ -767,24 +849,8 @@ export function ActivityBatchTable({
       raw: {},
       deduction_count: type === "eks" ? 2 : 1,
     }
-    const postRows = rowsRef.current.map(r => r.key === rowKey ? switchedRow : { ...r })
-    pushHistory("切换了类型", [rowKey], `将「${oldName}」切换为${newTypeName}`, postRows, [{ rowKey, fields: ["record_type", "name"] }])
-    // 同类型且同课程 → 忽略
-    if (type === row.record_type && parsedCourse && parsedCourse === row.ics_course_key?.replace("ics:", "")) return
-
-    // 删除旧记录（如果已保存到后端）
-    if (row.record_id && !row.pendingCreate) {
-      try {
-        if (row.record_type === "class") await classRecordApi.delete(row.record_id)
-        else if (row.record_type === "gcs") await groupCaseSessionApi.delete(row.record_id)
-        else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(row.record_id)
-        else if (row.record_type === "eks") await energyKnotSessionApi.delete(row.record_id)
-        else if (row.record_type === "ics") await internalCourseSessionApi.delete(row.record_id)
-        else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(row.record_id)
-      } catch (e) {
-        console.error("[ACT] 删除旧记录失败:", e)
-      }
-    }
+    // 存 pre-change 快照用于 undo
+    const preRows = rowsRef.current.map(r => ({ ...r }))
 
     // 保留已有数据，只更新活动名称和类型相关字段
     const updated: ActivityRow = {
@@ -802,8 +868,29 @@ export function ActivityBatchTable({
     setRows(prev => prev.map(r => r.key === rowKey ? updated : r))
     setRowStatus(prev => ({ ...prev, [rowKey]: "idle" }))
     lastEditedEksRef.current = null
-    // 保存新记录
-    try { await saveRow(updated) } catch { /* saveRow handles its own errors */ }
+    // 先保存新记录，成功后再推历史快照（确保快照包含 record_id）
+    try {
+      const result = await saveRow(updated)
+      const savedId = result?.id || ""
+      pushHistory("切换了类型", [rowKey], `将「${oldName}」切换为${newTypeName}`, preRows, [{ rowKey, fields: ["record_type", "name"] }])
+      // 新记录创建成功，删除旧记录
+      if (row.record_id && !row.pendingCreate) {
+        try {
+          if (row.record_type === "class") await classRecordApi.delete(row.record_id)
+          else if (row.record_type === "gcs") await groupCaseSessionApi.delete(row.record_id)
+          else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(row.record_id)
+          else if (row.record_type === "eks") await energyKnotSessionApi.delete(row.record_id)
+          else if (row.record_type === "ics") await internalCourseSessionApi.delete(row.record_id)
+          else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(row.record_id)
+        } catch (e) {
+          console.error("[ACT] 删除旧记录失败（新记录已创建）:", e)
+        }
+      }
+    } catch {
+      // 新记录创建失败，恢复旧行状态
+      setRows(prev => prev.map(r => r.key === rowKey ? row : r))
+      setRowStatus(prev => ({ ...prev, [rowKey]: row.record_id ? "saved" : "idle" }))
+    }
   }, [spaceId, spaces, saveRow, pushHistory])
 
   // 拖拽排序
@@ -826,7 +913,6 @@ export function ActivityBatchTable({
           if (!alreadyInRow) {
             const newParticipantIds = [...targetRow.participant_ids, data.customer_id]
             updateRow(targetKey, "participant_ids", newParticipantIds)
-            saveRow({ ...targetRow, participant_ids: newParticipantIds })
           }
         }
       } catch {}
@@ -844,10 +930,10 @@ export function ActivityBatchTable({
       const [moved] = next.splice(srcIdx, 1)
       next.splice(tgtIdx, 0, moved)
       const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
-      try {
-        const order = next.map(r => `${r.record_type}-${r.record_id}`)
-        localStorage.setItem(orderKey, JSON.stringify(order))
-      } catch {}
+      const order = next.map(r => `${r.record_type}-${r.record_id}`)
+      try { localStorage.setItem(orderKey, JSON.stringify(order)) } catch {}
+      // 持久化到后端
+      activityOrderApi.save(date, spaceId || "", order).catch(() => {})
       return next
     })
     dragKeyRef.current = null
@@ -920,8 +1006,6 @@ export function ActivityBatchTable({
   const handleCreate = async (type: string, classCourseType?: string) => {
     const fresh = createFreshRow(type as ActivityType, spaceId || "", spaces)
     const newName = classCourseType || fresh.name || TYPE_NAMES[type as ActivityType] || "活动"
-    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "space_id"]
-    pushHistory("新增了活动", undefined, `新增了「${newName}」`, undefined, [{ rowKey: fresh.key, fields: allFields }])
     if (classCourseType) {
       fresh.class_course_type = classCourseType
       fresh.name = classCourseType
@@ -936,6 +1020,10 @@ export function ActivityBatchTable({
         fresh.deduction_count = parseEksDescription(src.description).count
       }
     }
+    // 先捕获 pre-change 快照（与 updateRow/handleTypeChange 一致）
+    const preRows = rowsRef.current.map(r => ({ ...r }))
+    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "space_id"]
+    pushHistory("新增了活动", [fresh.key], `新增了「${newName}」`, preRows, [{ rowKey: fresh.key, fields: allFields }])
     setRows(prev => [...prev, fresh])
     setRowStatus(prev => ({ ...prev, [fresh.key]: "idle" }))
     try { await saveRow(fresh) } catch { /* saveRow handles its own errors */ }
@@ -1106,21 +1194,15 @@ export function ActivityBatchTable({
                         onChange={(v) => {
                           const name = typeof v === "string" ? v : v[0] || ""
                           if (!name) {
-                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, owner_id: "", owner_name: "" } : r))
-                            scheduleSave(row.key)
+                            updateRowMulti(row.key, { owner_id: "", owner_name: "" })
                           }
                         }}
                         onSelectItem={(c) => {
-                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, owner_id: c.id, owner_name: c.nickname || c.name || "" } : r))
-                          if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
-                            setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
-                          }
-                          scheduleSave(row.key)
+                          updateRowMulti(row.key, { owner_id: c.id, owner_name: c.nickname || c.name || "" })
                         }}
                         onBlur={(v) => {
                           if (v && !customers.some(c => c.nickname === v || c.name === v)) {
-                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, owner_id: "", owner_name: "" } : r))
-                            scheduleSave(row.key)
+                            updateRowMulti(row.key, { owner_id: "", owner_name: "" })
                           }
                         }}
                         placeholder=""
@@ -1140,35 +1222,25 @@ export function ActivityBatchTable({
                             const name = typeof v === "string" ? v : v[0] || ""
                             if (!name) {
                               if (row.owner_id) prevOwnerRef.current[row.key] = row.owner_id
-                              setRows(prev => prev.map(r => {
-                                if (r.key !== row.key) return r
-                                const eksDesc = parseEksDescription(r.description)
-                                return { ...r, owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) }
-                              }))
-                              scheduleSave(row.key)
+                              const currentRow = rowsRef.current.find(r => r.key === row.key)
+                              const eksDesc = parseEksDescription(currentRow?.description || row.description)
+                              updateRowMulti(row.key, { owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) })
                             }
                           }}
                           onSelectItem={(c) => {
                             delete prevOwnerRef.current[row.key]
-                            const eksDesc = parseEksDescription(row.description)
+                            const currentRow = rowsRef.current.find(r => r.key === row.key)
+                            const eksDesc = parseEksDescription(currentRow?.description || row.description)
                             const newDesc = serializeEksDescription(c.id, c.nickname || c.name || "", eksDesc.count)
-                            const updated = { ...row, owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc }
-                            lastEditedEksRef.current = updated
-                            if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: updated.owner_id, owner_name: updated.owner_name, description: updated.description })
-                            setRows(prev => prev.map(r => r.key === row.key ? updated : r))
-                            if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
-                              setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
-                            }
-                            scheduleSave(row.key)
+                            lastEditedEksRef.current = { ...(currentRow || row), owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc }
+                            if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc })
+                            updateRowMulti(row.key, { owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc })
                           }}
                           onBlur={(v) => {
                             if (v && !customers.some(c => c.nickname === v || c.name === v)) {
-                              setRows(prev => prev.map(r => {
-                                if (r.key !== row.key) return r
-                                const eksDesc = parseEksDescription(r.description)
-                                return { ...r, owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) }
-                              }))
-                              scheduleSave(row.key)
+                              const currentRow = rowsRef.current.find(r => r.key === row.key)
+                              const eksDesc = parseEksDescription(currentRow?.description || row.description)
+                              updateRowMulti(row.key, { owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) })
                             }
                           }}
                           placeholder=""
@@ -1191,42 +1263,29 @@ export function ActivityBatchTable({
                           onChange={(e) => {
                             const raw = e.target.value
                             eksCountEditRef.current[`dc_${row.key}`] = raw
+                            const currentRow = rowsRef.current.find(r => r.key === row.key)
+                            const eksDesc = parseEksDescription(currentRow?.description || row.description)
                             if (raw === "") {
-                              setRows(prev => prev.map(r => {
-                                if (r.key !== row.key) return r
-                                const eksDesc = parseEksDescription(r.description)
-                                const updated = { ...r, deduction_count: 0, description: serializeEksDescription(eksDesc.id, eksDesc.name, 0) }
-                                lastEditedEksRef.current = updated
-                                if (r.record_id) eksEditsRef.current.set(r.record_id, { owner_id: r.owner_id, owner_name: r.owner_name, description: updated.description })
-                                return updated
-                              }))
+                              const desc = serializeEksDescription(eksDesc.id, eksDesc.name, 0)
+                              lastEditedEksRef.current = { ...(currentRow || row), deduction_count: 0, description: desc }
+                              if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, description: desc })
+                              updateRowMulti(row.key, { deduction_count: 0, description: desc })
                             } else {
                               const count = Math.max(1, parseInt(raw) || 1)
-                              setRows(prev => prev.map(r => {
-                                if (r.key !== row.key) return r
-                                const eksDesc = parseEksDescription(r.description)
-                                const updated = { ...r, deduction_count: count, description: serializeEksDescription(eksDesc.id, eksDesc.name, count) }
-                                lastEditedEksRef.current = updated
-                                if (r.record_id) eksEditsRef.current.set(r.record_id, { owner_id: r.owner_id, owner_name: r.owner_name, description: updated.description })
-                                return updated
-                              }))
+                              const desc = serializeEksDescription(eksDesc.id, eksDesc.name, count)
+                              lastEditedEksRef.current = { ...(currentRow || row), deduction_count: count, description: desc }
+                              if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, description: desc })
+                              updateRowMulti(row.key, { deduction_count: count, description: desc })
                             }
-                            if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
-                              setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
-                            }
-                            scheduleSave(row.key)
                           }}
                           onBlur={() => {
                             delete eksCountEditRef.current[`dc_${row.key}`]
-                            const eksDesc = parseEksDescription(row.description)
+                            const currentRow = rowsRef.current.find(r => r.key === row.key)
+                            const eksDesc = parseEksDescription(currentRow?.description || row.description)
                             let count = eksDesc.count
                             if (count < 1) count = 1
                             if (count !== eksDesc.count) {
-                              setRows(prev => prev.map(r => {
-                                if (r.key !== row.key) return r
-                                return { ...r, deduction_count: count, description: serializeEksDescription(eksDesc.id, eksDesc.name, count) }
-                              }))
-                              scheduleSave(row.key)
+                              updateRowMulti(row.key, { deduction_count: count, description: serializeEksDescription(eksDesc.id, eksDesc.name, count) })
                             }
                           }}
                           className="w-[34px] h-7 text-center rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1260,11 +1319,8 @@ export function ActivityBatchTable({
                           const c = customers.find(c => c.nickname === n || c.name === n)
                           return c?.id || ""
                         }).filter(Boolean)
-                        setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_ids: ids, host_names: names } : r))
-                        if (rowStatus[row.key] === "saved" || rowStatus[row.key] === "error") {
-                          setRowStatus(prev => ({ ...prev, [row.key]: "idle" }))
-                        }
-                        scheduleSave(row.key)
+                        updateRow(row.key, "host_ids", ids)
+                        setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_names: names } : r))
                       }}
                       positionFilter={TEACHER_POSITION_MAP[row.record_type]}
                       filterSelected
@@ -1294,7 +1350,6 @@ export function ActivityBatchTable({
                             onClick={() => {
                               const newIds = row.participant_ids.filter(id => id !== m.id)
                               updateRow(row.key, "participant_ids", newIds)
-                              saveRow({ ...row, participant_ids: newIds })
                             }}
                             className="hover:text-[#e02020] cursor-pointer"
                           >
@@ -1315,7 +1370,6 @@ export function ActivityBatchTable({
                             onClick={() => {
                               const newIds = row.participant_ids.filter(id => id !== m.id)
                               updateRow(row.key, "participant_ids", newIds)
-                              saveRow({ ...row, participant_ids: newIds })
                             }}
                             className="hover:text-[#e02020] cursor-pointer"
                           >

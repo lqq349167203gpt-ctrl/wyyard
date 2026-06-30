@@ -65,7 +65,7 @@ def create_release(data: EmotionalReleaseCreate) -> EmotionalRelease:
 
 def update_release(release_id: str, data: dict) -> Optional[EmotionalRelease]:
     release = _releases.get(release_id)
-    if not release:
+    if not release or release.is_deleted:
         return None
     for key, value in data.items():
         if hasattr(release, key) and key not in ("id", "created_at", "created_by"):

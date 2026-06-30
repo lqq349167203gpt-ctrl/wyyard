@@ -42,6 +42,7 @@ from app.api.reminders import router as reminders_router
 from app.api.business_reminders import router as business_reminders_router
 from app.api.organizations import router as organizations_router
 from app.api.activity_themes import router as activity_themes_router
+from app.api.activity_orders import router as activity_orders_router
 from app.api.project_deductions import router as project_deductions_router
 from app.api.project_refunds import router as project_refunds_router
 from app.api.system_helper import router as system_helper_router
@@ -102,6 +103,7 @@ app.include_router(reminders_router)
 app.include_router(business_reminders_router)
 app.include_router(organizations_router)
 app.include_router(activity_themes_router)
+app.include_router(activity_orders_router)
 app.include_router(project_deductions_router)
 app.include_router(project_refunds_router)
 app.include_router(system_helper_router)

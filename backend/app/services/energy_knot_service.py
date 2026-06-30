@@ -65,7 +65,7 @@ def create_knot(data: EnergyKnotCreate) -> EnergyKnot:
 
 def update_knot(knot_id: str, data: dict) -> Optional[EnergyKnot]:
     knot = _knots.get(knot_id)
-    if not knot:
+    if not knot or knot.is_deleted:
         return None
     for key, value in data.items():
         if hasattr(knot, key) and key not in ("id", "created_at", "created_by"):

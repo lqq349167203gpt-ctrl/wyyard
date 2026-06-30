@@ -66,7 +66,7 @@ def create_reading(data: OhCardReadingCreate) -> OhCardReading:
 
 def update_reading(reading_id: str, data: dict) -> Optional[OhCardReading]:
     reading = _readings.get(reading_id)
-    if not reading:
+    if not reading or reading.is_deleted:
         return None
     for key, value in data.items():
         if hasattr(reading, key) and key not in ("id", "created_at", "created_by"):

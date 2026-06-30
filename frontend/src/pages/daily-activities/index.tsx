@@ -29,10 +29,12 @@ import { ActivityBatchTable, type HistoryEntry } from "./activity-batch-table"
 import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
 
 // ===== Date utilities =====
-const today = new Date().toISOString().split("T")[0]
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0]
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 function addDays(d: Date, n: number): Date {
   const r = new Date(d); r.setDate(r.getDate() + n); return r
@@ -47,6 +49,16 @@ function formatDateChinese(d: string): string {
 
 const ICS_COURSE_TYPES = ["疗愈师课程", "商业框架陪跑", "落地赋能班"]
 const ICS_COURSE_LABELS: Record<string, string> = { "疗愈师课程": "疗愈师", "商业框架陪跑": "陪跑", "落地赋能班": "赋能班" }
+
+function isDepleted(remaining: number | undefined): boolean {
+  return remaining !== undefined && remaining !== -1 && remaining <= 0
+}
+
+function formatRemaining(remaining: number | undefined): string {
+  if (remaining === undefined) return ""
+  if (remaining === -1) return ""
+  return `余${remaining}`
+}
 const MAX_OWNER_VISIBLE = 50
 
 // ===== Pure helpers =====
@@ -270,8 +282,8 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   autoComplete="off"
                 />
                 {formOwnerId && ownerRemaining !== null && (
-                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${ownerRemaining <= 0 ? "text-red-500" : "text-[#8f959e]"}`}>
-                    剩余{ownerRemaining}次
+                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${isDepleted(ownerRemaining) ? "text-red-500" : "text-[#8f959e]"}`}>
+                    {ownerRemaining === -1 ? "不限次" : `剩余${ownerRemaining}次`}
                   </span>
                 )}
                 {formOwnerId && (
@@ -287,8 +299,8 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
-                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
-                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  const sa = isDepleted(ra) ? 1 : 0
+                  const sb = isDepleted(rb) ? 1 : 0
                   return sa - sb
                 })
                 const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
@@ -299,7 +311,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining < 0
+                      const isDepleted = remaining !== undefined && remaining !== -1 && remaining <= 0
                       return (
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
@@ -491,14 +503,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
               />
             </div>
           </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown rounded="[2px]"
-              value={formActivityMode}
-              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
-              onChange={setFormActivityMode}
-            />
-          </div>
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
             <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
@@ -514,8 +518,8 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   autoComplete="off"
                 />
                 {formOwnerId && ownerRemaining !== null && (
-                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${ownerRemaining <= 0 ? "text-red-500" : "text-[#8f959e]"}`}>
-                    剩余{ownerRemaining}次
+                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${isDepleted(ownerRemaining) ? "text-red-500" : "text-[#8f959e]"}`}>
+                    {ownerRemaining === -1 ? "不限次" : `剩余${ownerRemaining}次`}
                   </span>
                 )}
                 {formOwnerId && (
@@ -531,8 +535,8 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
-                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
-                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  const sa = isDepleted(ra) ? 1 : 0
+                  const sb = isDepleted(rb) ? 1 : 0
                   return sa - sb
                 })
                 const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
@@ -543,7 +547,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining < 0
+                      const isDepleted = remaining !== undefined && remaining !== -1 && remaining <= 0
                       return (
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
@@ -750,8 +754,8 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   autoComplete="off"
                 />
                 {formOwnerId && ownerRemaining !== null && (
-                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${ownerRemaining <= 0 ? "text-red-500" : "text-[#8f959e]"}`}>
-                    剩余{ownerRemaining}次
+                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${isDepleted(ownerRemaining) ? "text-red-500" : "text-[#8f959e]"}`}>
+                    {ownerRemaining === -1 ? "不限次" : `剩余${ownerRemaining}次`}
                   </span>
                 )}
                 {formOwnerId && (
@@ -767,8 +771,8 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
-                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
-                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  const sa = isDepleted(ra) ? 1 : 0
+                  const sb = isDepleted(rb) ? 1 : 0
                   return sa - sb
                 })
                 const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
@@ -779,7 +783,7 @@ const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining < 0
+                      const isDepleted = remaining !== undefined && remaining !== -1 && remaining <= 0
                       return (
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
@@ -864,7 +868,15 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         setFormOwnerDescriptions(descs)
         setFormOwnerIds(descs.map(d => d.id).filter(Boolean))
         setFormOwnerNames(descs.map(d => d.name).filter(Boolean))
-        setFormHostIds([]); setFormHostNames([])
+        setFormHostIds(session.teacher_ids || []); setFormHostNames((session.teacher_ids || []).map(id => hostCustomers.find(c => c.id === id)?.nickname || hostCustomers.find(c => c.id === id)?.name || "").filter(Boolean))
+        // 编辑时加载案主剩余次数
+        if (descs.length > 0) {
+          energyKnotSessionApi.searchCustomers("").then(results => {
+            const map: Record<string, number> = {}
+            results.forEach(r => { map[r.id] = r.remaining })
+            setRemainingMap(map)
+          }).catch(() => {})
+        }
         setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
@@ -878,7 +890,8 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
         setSpaceId(ds); setRoomId(dr)
       }
-      setSearchKeyword("")}
+      setSearchKeyword("")
+    }
   }, [open, date, spaces, session, defaultSpaceId])
 
   useEffect(() => {
@@ -890,7 +903,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         if (fetchId !== remainingFetchRef.current) return
         const map: Record<string, number> = {}
         results.forEach(r => { map[r.id] = r.remaining })
-        setRemainingMap(map)
+        setRemainingMap(prev => ({ ...prev, ...map }))
       } catch {}
     }, 200)
     return () => clearTimeout(timer)
@@ -908,7 +921,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
   const selectOwner = (customer: CustomerLight) => {
     if (formOwnerIds.includes(customer.id)) return
     const remaining = remainingMap[customer.id]
-    if (remaining !== undefined && remaining !== -1 && remaining < 0) {
+    if (isDepleted(remaining)) {
       setPendingOwner({ id: customer.id, nickname: customer.nickname, name: customer.name })
       setPurchaseDialogOpen(true)
       return
@@ -928,9 +941,9 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         purchase_count: parseInt(purchaseCount) || 0, amount: parseFloat(purchaseAmount) || 0,
       })
       setRemainingMap(prev => ({ ...prev, [pendingOwner.id]: (prev[pendingOwner.id] ?? 0) + (parseInt(purchaseCount) || 0) }))
-      setFormOwnerIds([...formOwnerIds, pendingOwner.id])
-      setFormOwnerNames([...formOwnerNames, pendingOwner.nickname])
-      setFormOwnerDescriptions([...formOwnerDescriptions, { id: pendingOwner.id, name: pendingOwner.nickname, description: "", count: 1 }])
+      setFormOwnerIds(prev => [...prev, pendingOwner.id])
+      setFormOwnerNames(prev => [...prev, pendingOwner.nickname])
+      setFormOwnerDescriptions(prev => [...prev, { id: pendingOwner.id, name: pendingOwner.nickname, description: "", count: 1 }])
       setPurchaseDialogOpen(false); setPendingOwner(null)
     } catch (e) { console.error("新增购买失败:", e) }
     finally { setPurchaseSaving(false) }
@@ -965,7 +978,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
         owner_id: formOwnerIds[0], owner_name: formOwnerNames.join("、"),
         description: JSON.stringify(formOwnerDescriptions),
-        host_ids: formHostIds, host_names: formHostNames,
+        teacher_ids: formHostIds,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
         room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
@@ -1056,8 +1069,8 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                   (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
-                  const sa = ra !== undefined && ra > 0 ? 0 : ra !== undefined && ra <= 0 ? 1 : 2
-                  const sb = rb !== undefined && rb > 0 ? 0 : rb !== undefined && rb <= 0 ? 1 : 2
+                  const sa = isDepleted(ra) ? 1 : 0
+                  const sb = isDepleted(rb) ? 1 : 0
                   return sa - sb
                 })
                 const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
@@ -1068,18 +1081,18 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                   ) : (
                     visible.map(c => {
                       const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining < 0
+                      const dep = isDepleted(remaining)
                       const alreadySelected = formOwnerIds.includes(c.id)
                       return (
                         <button key={c.id}
-                          className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted || alreadySelected ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
-                          disabled={isDepleted || alreadySelected}
+                          className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${dep || alreadySelected ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
+                          disabled={dep || alreadySelected}
                           onClick={() => {
-                            if (isDepleted || alreadySelected) return
+                            if (dep || alreadySelected) return
                             selectOwner(c)
                           }}>
-                          <span className={isDepleted || alreadySelected ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
-                          <span className={`text-[#8f959e] ${isDepleted ? "text-red-500" : ""}`}>
+                          <span className={dep || alreadySelected ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
+                          <span className={`text-[#8f959e] ${dep ? "text-red-500" : ""}`}>
                             {alreadySelected ? "已添加" : remaining !== undefined ? (remaining === -1 ? "" : `余${remaining}`) : ""}
                           </span>
                         </button>
@@ -1218,7 +1231,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
         setFormCourseType(session.course_type || ICS_COURSE_TYPES[0])
         setFormCourseName(session.course_name || "")
         setFormDescription(session.course_description || "")
-        setFormHostId(""); setFormHostName("")
+        setFormHostId(session.host_id || ""); setFormHostName(session.host_name || "")
         setFormActivityMode(session.activity_mode || "线下")
         setSpaceId(session.space_id || (spaces[0]?.id || ""))
         setRoomId(session.room_id || "")
@@ -1239,13 +1252,11 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
   const handleSave = async () => {
     setSaving(true)
     try {
-      const hostIds = formHostId ? [formHostId] : []
-      const hostNames = formHostName ? [formHostName] : []
       const data = {
         date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
         course_type: formCourseType, course_name: formCourseName,
         course_description: formDescription || undefined,
-        host_ids: hostIds, host_names: hostNames,
+        host_id: formHostId, host_name: formHostName,
         activity_mode: formActivityMode,
         space_id: spaceId || undefined, room_id: roomId || undefined,
         room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
@@ -1374,7 +1385,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         setFormDate(session.date)
         setFormStartTime(session.start_time || "")
         setFormEndTime(session.end_time || "")
-        setFormCourseId(session.course_type || session.course_id)
+        setFormCourseId(session.course_id || "")
         setFormTeacherIds(session.teacher_ids || [])
         setFormDescription(session.course_description || "")
         setFormIsPublicWelfare(session.is_public_welfare || false)
@@ -1405,7 +1416,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         const course = courses.find(c => c.id === formCourseId)
         result = await classRecordApi.update(editingRecord.id, {
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
-          course_id: '', course_name: course?.name || editingRecord.course_name,
+          course_id: formCourseId, course_name: course?.name || editingRecord.course_name,
           course_type: course?.name || editingRecord.course_type || '',
           course_description: formDescription, teacher_ids: formTeacherIds,
           is_public_welfare: formIsPublicWelfare,
@@ -1419,7 +1430,7 @@ const SalonDialog = memo(({ open, date, spaces, courses, teachers, session, defa
         if (!course) return
         result = await classRecordApi.create({
           date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
-          course_id: '', course_name: course.name,
+          course_id: formCourseId, course_name: course.name,
           course_type: course.name,
           course_description: formDescription, teacher_ids: formTeacherIds,
           is_public_welfare: formIsPublicWelfare,
@@ -1610,7 +1621,7 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
       }
       setSelectedSpaceIds(Array.from(spaceIds))
     }
-  }, [open, weekDays, themeMap])
+  }, [open, weekDays])
 
   const [spaceError, setSpaceError] = useState(false)
 
@@ -1834,6 +1845,7 @@ function HistoryDayGroup({ day, defaultExpanded, previewEntry, onSelectEntry }: 
 
 export default function DailyActivitiesPage() {
   const navigate = useNavigate()
+  const today = useMemo(() => formatDate(new Date()), [])
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(() => {
     try { return localStorage.getItem("shared-selected-date") || localStorage.getItem("daily-activities-date") || today } catch { return today }
@@ -1913,6 +1925,7 @@ export default function DailyActivitiesPage() {
   // ===== Save status =====
   const [savingCount, setSavingCount] = useState(0)
   const [savedCount, setSavedCount] = useState(0)
+  const [restoring, setRestoring] = useState(false)
 
   // ===== Undo/Redo state =====
   const [canUndo, setCanUndo] = useState(false)
@@ -1923,8 +1936,9 @@ export default function DailyActivitiesPage() {
   const [cloudHistory, setCloudHistory] = useState<HistoryEntry[]>([])
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
   const [previewEntry, setPreviewEntry] = useState<HistoryEntry | null>(null)
-  const restoreRef = useRef<((entry: HistoryEntry) => void) | null>(null)
+  const restoreRef = useRef<((entry: HistoryEntry) => Promise<void>) | null>(null)
   const captureRef = useRef<(() => void) | null>(null)
+  const loadSeqRef = useRef(0)
 
   const handleUndoRedoChange = useCallback((cu: boolean, cr: boolean, u: () => void, r: () => void, history: HistoryEntry[]) => {
     setCanUndo(cu); setCanRedo(cr)
@@ -1974,18 +1988,18 @@ export default function DailyActivitiesPage() {
     all.sort((a, b) => b.timestamp - a.timestamp)
     // 按行数据去重：相同 rows 只保留一条，优先保留有描述操作的条目
     const result: HistoryEntry[] = []
-    let prevRowsKey = ""
+    const seenRowsKeys = new Set<string>()
     for (const entry of all) {
       const rowsKey = JSON.stringify(entry.rows)
-      if (rowsKey === prevRowsKey) {
+      if (seenRowsKeys.has(rowsKey)) {
         // rows 相同时，优先保留有操作描述的条目（非"当前状态"）
-        const last = result[result.length - 1]
-        if (last.action === "当前状态" && entry.action !== "当前状态") {
-          result[result.length - 1] = entry
+        const existingIdx = result.findIndex(e => JSON.stringify(e.rows) === rowsKey)
+        if (existingIdx >= 0 && result[existingIdx].action === "当前状态" && entry.action !== "当前状态") {
+          result[existingIdx] = entry
         }
         continue
       }
-      prevRowsKey = rowsKey
+      seenRowsKeys.add(rowsKey)
       result.push(entry)
     }
     // 移除多余的"当前状态"条目（只在第一条时保留）
@@ -2028,10 +2042,7 @@ export default function DailyActivitiesPage() {
     for (const prevRow of prevEntry.rows) {
       const id = prevRow.record_id || `__key_${prevRow.key}`
       if (!matchedPrevIds.has(id)) {
-        const curMatch = previewEntry.rows.find(r => (r.record_id || `__key_${r.key}`) === id)
-        if (curMatch) {
-          diffCells.push({ rowKey: curMatch.key, fields: ["__deleted"] })
-        }
+        diffCells.push({ rowKey: prevRow.key, fields: ["__deleted"] })
       }
     }
     return diffCells.length > 0 ? diffCells : undefined
@@ -2123,10 +2134,14 @@ export default function DailyActivitiesPage() {
     return themeWeeks.findIndex(w => w.days.some(d => d.date === detailDate))
   }, [themeWeeks, detailDate])
 
-  // 加载主题（按空间筛选）
+  // 加载主题（按空间筛选，带序列号防竞态）
+  const themeSeqRef = useRef(0)
   useEffect(() => {
+    const seq = ++themeSeqRef.current
     const spaceFilter = selectedSpaceId ? [selectedSpaceId] : undefined
-    activityThemeApi.list(themeMonthStart, themeMonthEnd, spaceFilter).then(setThemes).catch(() => setThemes([]))
+    activityThemeApi.list(themeMonthStart, themeMonthEnd, spaceFilter)
+      .then(data => { if (seq === themeSeqRef.current) setThemes(data) })
+      .catch(() => { if (seq === themeSeqRef.current) setThemes([]) })
   }, [themeMonthStart, themeMonthEnd, selectedSpaceId])
 
   const saveTheme = async (date: string, weekTheme: string, dayTheme: string, spaceIds: string[]) => {
@@ -2164,7 +2179,7 @@ export default function DailyActivitiesPage() {
   const isSuperAdmin = currentUser?.role === "超级管理员"
 
   // ===== Derived data =====
-  const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
+  const dateRange = useMemo(() => Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i))), [dateRangeStart])
 
   // detailDate 变化时，确保日期在可视范围内
   useEffect(() => {
@@ -2222,9 +2237,11 @@ export default function DailyActivitiesPage() {
 
   // ===== Data loading =====
   const loadDateData = async (date: string) => {
+    const seq = ++loadSeqRef.current
     setDetailLoading(true)
     try {
       const dashboard = await classRecordApi.dashboard(date, selectedSpaceId || undefined)
+      if (seq !== loadSeqRef.current) return
       const { class_records: records, gcs_sessions: gcs, ers_sessions: ers, eks_sessions: eks, ics_sessions: ics, ocr_sessions: ocr } = dashboard
 
       setDetailRecords(records)
@@ -2274,6 +2291,7 @@ export default function DailyActivitiesPage() {
       const uniqueIds = [...ids]
       if (uniqueIds.length > 0) {
         const customers = await customerApi.batch(uniqueIds).catch(() => [] as CustomerLight[])
+        if (seq !== loadSeqRef.current) return
         // Merge into allCustomers without overwriting (teachers loaded separately via load())
         setAllCustomers(prev => {
           const existingIds = new Set(prev.map(c => c.id))
@@ -2283,8 +2301,10 @@ export default function DailyActivitiesPage() {
       }
 
     } finally {
-      setDetailLoading(false)
-      setLoading(false)
+      if (seq === loadSeqRef.current) {
+        setDetailLoading(false)
+        setLoading(false)
+      }
     }
   }
 
@@ -2297,33 +2317,51 @@ export default function DailyActivitiesPage() {
   const handleOcrClose = useCallback(() => { setOcrDialogOpen(false) }, [])
 
   const handleSalonSaved = useCallback((record: ClassRecord) => {
-    setDetailRecords(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
-    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setDetailRecords(prev => {
+      const exists = prev.some(r => r.id === record.id)
+      if (!exists) setCalendarCounts(c => ({ ...c, [record.date]: (c[record.date] || 0) + 1 }))
+      return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
+    })
     setDialogOpen(false)
   }, [])
   const handleGcsSaved = useCallback((record: GroupCaseSession) => {
-    setDetailGcsSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
-    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setDetailGcsSessions(prev => {
+      const exists = prev.some(r => r.id === record.id)
+      if (!exists) setCalendarCounts(c => ({ ...c, [record.date]: (c[record.date] || 0) + 1 }))
+      return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
+    })
     setGcsDialogOpen(false)
   }, [])
   const handleErsSaved = useCallback((record: EmotionalReleaseSession) => {
-    setDetailErsSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
-    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setDetailErsSessions(prev => {
+      const exists = prev.some(r => r.id === record.id)
+      if (!exists) setCalendarCounts(c => ({ ...c, [record.date]: (c[record.date] || 0) + 1 }))
+      return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
+    })
     setErsDialogOpen(false)
   }, [])
   const handleEksSaved = useCallback((record: EnergyKnotSession) => {
-    setDetailEksSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
-    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setDetailEksSessions(prev => {
+      const exists = prev.some(r => r.id === record.id)
+      if (!exists) setCalendarCounts(c => ({ ...c, [record.date]: (c[record.date] || 0) + 1 }))
+      return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
+    })
     setEksDialogOpen(false)
   }, [])
   const handleIcsSaved = useCallback((record: InternalCourseSession) => {
-    setDetailIcsSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
-    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setDetailIcsSessions(prev => {
+      const exists = prev.some(r => r.id === record.id)
+      if (!exists) setCalendarCounts(c => ({ ...c, [record.date]: (c[record.date] || 0) + 1 }))
+      return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
+    })
     setIcsDialogOpen(false)
   }, [])
   const handleOcrSaved = useCallback((record: OhCardReadingSession) => {
-    setDetailOcrSessions(prev => prev.some(r => r.id === record.id) ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev])
-    setCalendarCounts(prev => ({ ...prev, [record.date]: (prev[record.date] || 0) + 1 }))
+    setDetailOcrSessions(prev => {
+      const exists = prev.some(r => r.id === record.id)
+      if (!exists) setCalendarCounts(c => ({ ...c, [record.date]: (c[record.date] || 0) + 1 }))
+      return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
+    })
     setOcrDialogOpen(false)
   }, [])
 
@@ -2400,7 +2438,7 @@ export default function DailyActivitiesPage() {
     if (!materialsRecord) return
     try {
       await uploadApi.deleteMaterial(filename)
-      const newMaterials = (materialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      const newMaterials = (materialsRecord.materials || []).filter(m => (m.url.split("/").pop() || "") !== filename)
       await classRecordApi.update(materialsRecord.id, { materials: newMaterials } as any)
       setMaterialsRecord({ ...materialsRecord, materials: newMaterials })
       loadDateData(detailDate)
@@ -2450,7 +2488,7 @@ export default function DailyActivitiesPage() {
     if (!gcsMaterialsRecord) return
     try {
       await uploadApi.deleteMaterial(filename)
-      const newMaterials = (gcsMaterialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      const newMaterials = (gcsMaterialsRecord.materials || []).filter(m => (m.url.split("/").pop() || "") !== filename)
       await groupCaseSessionApi.update(gcsMaterialsRecord.id, { materials: newMaterials } as any)
       setGcsMaterialsRecord({ ...gcsMaterialsRecord, materials: newMaterials })
       loadDateData(detailDate)
@@ -2540,7 +2578,7 @@ export default function DailyActivitiesPage() {
     if (!icsMaterialsRecord) return
     try {
       await uploadApi.deleteMaterial(filename)
-      const newMaterials = (icsMaterialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      const newMaterials = (icsMaterialsRecord.materials || []).filter(m => (m.url.split("/").pop() || "") !== filename)
       await internalCourseSessionApi.update(icsMaterialsRecord.id, { materials: newMaterials } as any)
       setIcsMaterialsRecord({ ...icsMaterialsRecord, materials: newMaterials })
       loadDateData(detailDate)
@@ -2590,7 +2628,7 @@ export default function DailyActivitiesPage() {
     if (!ocrMaterialsRecord) return
     try {
       await uploadApi.deleteMaterial(filename)
-      const newMaterials = (ocrMaterialsRecord.materials || []).filter(m => !m.url.includes(filename))
+      const newMaterials = (ocrMaterialsRecord.materials || []).filter(m => (m.url.split("/").pop() || "") !== filename)
       await ohCardReadingSessionApi.update(ocrMaterialsRecord.id, { materials: newMaterials } as any)
       setOcrMaterialsRecord({ ...ocrMaterialsRecord, materials: newMaterials })
       loadDateData(detailDate)
@@ -2893,8 +2931,8 @@ export default function DailyActivitiesPage() {
               <div className="text-center text-[12px] text-[#8f959e] py-8">暂无历史记录</div>
             ) : (
               (() => {
-                const todayStr = new Date().toISOString().split("T")[0]
-                const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0]
+                const todayStr = formatDate(new Date())
+                const yesterdayStr = formatDate(new Date(Date.now() - 86400000))
 
                 // 三级分组：天 → 小时 → 条目
                 type HourGroup = { hour: string; entries: HistoryEntry[] }
@@ -2903,7 +2941,7 @@ export default function DailyActivitiesPage() {
 
                 for (const entry of mergedHistory) {
                   const d = new Date(entry.timestamp)
-                  const dateKey = d.toISOString().split("T")[0]
+                  const dateKey = formatDate(d)
                   const hourKey = String(d.getHours()).padStart(2, "0")
 
                   if (!dayMap.has(dateKey)) {
@@ -2947,15 +2985,21 @@ export default function DailyActivitiesPage() {
               <Button
                 size="sm"
                 className="flex-1 h-8 text-[12px]"
-                onClick={() => {
+                disabled={restoring}
+                onClick={async () => {
                   if (restoreRef.current && previewEntry) {
-                    restoreRef.current(previewEntry)
+                    setRestoring(true)
+                    try {
+                      await restoreRef.current(previewEntry)
+                    } finally {
+                      setRestoring(false)
+                    }
                   }
                   setPreviewEntry(null)
                   setHistoryPanelOpen(false)
                 }}
               >
-                恢复此版本
+                {restoring ? "恢复中..." : "恢复此版本"}
               </Button>
             </div>
           )}

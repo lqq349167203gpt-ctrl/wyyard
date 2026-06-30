@@ -30,11 +30,14 @@ export default function CoursesPage() {
   const [formError, setFormError] = useState("")
   const [typeBlockedOpen, setTypeBlockedOpen] = useState(false)
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
+  const [moving, setMoving] = useState(false)
   const navigate = useNavigate()
 
   const loadData = useCallback(() => {
-    courseTypeApi.list().then(setCourseTypes).catch(() => {})
-    organizationApi.list().then(setOrganizations).catch(() => {})
+    Promise.all([
+      courseTypeApi.list().then(setCourseTypes),
+      organizationApi.list().then(setOrganizations),
+    ]).catch((e) => { console.error("[courses] 加载失败:", e) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -69,6 +72,7 @@ export default function CoursesPage() {
       if (editingType) {
         if (formName.trim() !== editingType) {
           await courseTypeApi.rename(editingType, formName.trim())
+          setEditingType(formName.trim())
         }
         await courseTypeApi.update(formName.trim(), { organization_id: formOrgId })
       } else {
@@ -78,6 +82,7 @@ export default function CoursesPage() {
       loadData()
     } catch (e: any) {
       setFormError(e?.message || "保存失败")
+      loadData()  // 刷新状态，防止 rename 成功但 update 失败导致 UI 过期
     } finally {
       setSaving(false)
     }
@@ -91,14 +96,17 @@ export default function CoursesPage() {
       setDeletingType(null)
       loadData()
     } catch (e: any) {
-      if (e?.message?.includes("存在")) {
-        setDeleteDialogOpen(false)
+      setDeleteDialogOpen(false)
+      if (e?.message?.includes("引用")) {
         setTypeBlockedOpen(true)
+      } else {
+        alert(e?.message || "删除失败")
       }
     }
   }
 
   const handleMoveType = async (typeName: string, direction: "up" | "down") => {
+    if (moving) return
     const names = courseTypes.map(t => t.name)
     const idx = names.indexOf(typeName)
     if (idx < 0) return
@@ -108,11 +116,14 @@ export default function CoursesPage() {
     const tmp = reordered[idx]
     reordered[idx] = reordered[targetIdx]
     reordered[targetIdx] = tmp
+    setMoving(true)
     try {
       await courseTypeApi.reorder(reordered)
       loadData()
     } catch (error) {
       console.error("排序失败:", error)
+    } finally {
+      setMoving(false)
     }
   }
 

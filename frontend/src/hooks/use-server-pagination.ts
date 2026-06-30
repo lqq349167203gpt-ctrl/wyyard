@@ -18,6 +18,7 @@ interface UseServerPaginationReturn<T> {
   totalPages: number
   totalItems: number
   goToPage: (page: number) => void
+  resetPage: () => void
   startIndex: number
   endIndex: number
   loading: boolean
@@ -60,10 +61,9 @@ export function useServerPagination<T>(
 
   const goToPage = useCallback((page: number) => {
     const p = Math.max(1, page)
-    setCurrentPage(p)
-    // If already on this page, force a re-fetch via refreshKey
     setCurrentPage(prev => {
       if (prev === p) {
+        // 已在当前页，强制重新请求
         setRefreshKey(k => k + 1)
       }
       return p
@@ -71,6 +71,11 @@ export function useServerPagination<T>(
   }, [])
 
   const refresh = useCallback(() => {
+    setRefreshKey(k => k + 1)
+  }, [])
+
+  const resetPage = useCallback(() => {
+    setCurrentPage(1)
     setRefreshKey(k => k + 1)
   }, [])
 
@@ -84,6 +89,7 @@ export function useServerPagination<T>(
     totalPages,
     totalItems,
     goToPage,
+    resetPage,
     startIndex,
     endIndex,
     loading,

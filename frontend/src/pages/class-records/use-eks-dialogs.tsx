@@ -210,9 +210,11 @@ export function useEksDialogs({
 
   const handleDelete = async () => {
     if (!deleteId) return
-    await energyKnotSessionApi.delete(deleteId)
-    setDeleteId(null)
-    onReload()
+    try {
+      await energyKnotSessionApi.delete(deleteId)
+      setDeleteId(null)
+      onReload()
+    } catch { alert("删除失败，请重试") }
   }
 
   const handleAddPurchase = async () => {
@@ -245,13 +247,15 @@ export function useEksDialogs({
   const handleDrop = async (session: EnergyKnotSession, customer: { customer_id: string }) => {
     const ids = session.teacher_ids || []
     if (ids.includes(customer.customer_id)) return
-    await energyKnotSessionApi.update(session.id, { teacher_ids: [...ids, customer.customer_id] } as any)
-    onReload()
+    try {
+      await energyKnotSessionApi.update(session.id, { teacher_ids: [...ids, customer.customer_id] } as any)
+      onReload()
+    } catch { alert("添加失败，请重试") }
   }
 
   const actions: EksActions = useMemo(() => ({
     handleOpenEdit, handleDrop, deleteId, setDeleteId,
-  }), [deleteId])
+  }), [deleteId, allCustomers, onReload])
 
   const dialogs: ReactNode = (
     <>

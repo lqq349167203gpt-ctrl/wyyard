@@ -64,7 +64,7 @@ def update_course(course_id: str, data: dict) -> Optional[Course]:
     old_name = course.name
     old_type = course.type
     for key, value in data.items():
-        if hasattr(course, key):
+        if hasattr(course, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
             setattr(course, key, value)
     course.updated_at = datetime.now(timezone.utc)
     _courses[course_id] = course

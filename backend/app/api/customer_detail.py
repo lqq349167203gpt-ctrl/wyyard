@@ -98,16 +98,10 @@ def _build_purchase_summary(customer_id: str) -> list:
     if cards:
         for c in cards:
             if c.voided:
-                # 已作废（退费）卡：不参与有效剩余计算，单独标记显示
+                # 已作废（退费）卡：不参与有效剩余计算，剩余次数归零
                 total = c.total_count if c.total_count is not None else "不限"
-                card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
-                card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
-                if c.total_count is not None:
-                    used = card_manual + card_activity
-                    card_remaining = max(0, c.total_count - used)
-                else:
-                    used = "-"
-                    card_remaining = "已退费"
+                used = total if isinstance(total, int) else "-"
+                card_remaining = "已退费"
                 voided_cards_info.append((c, total, used, card_remaining))
                 continue
             if c.remaining_count is None:
@@ -185,7 +179,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "total_amount": 0,
             "used": "-",
             "remaining": 0,
-            "effective_remaining": 0 if effective_remaining is None else effective_remaining,
+            "effective_remaining": effective_remaining,
             "manual_deductions": manual_deductions,
             "activity_deductions": activity_deductions,
             "effective_date": "",
@@ -443,6 +437,7 @@ def _build_payment_records(customer_id: str) -> list:
             "expiry_date": c.expiry_date or "",
             "closer_name": ", ".join(cl["name"] for cl in c.closers) if c.closers else (c.closer_name or ""),
             "created_at": c.effective_date,
+            "voided": c.voided,
         })
 
     # 觉醒游戏

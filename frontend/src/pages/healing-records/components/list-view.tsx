@@ -17,9 +17,10 @@ interface Props {
   filterIdentity: string
   filterReferrer: string
   filterReferrerHandler: string
+  refreshKey?: number
 }
 
-export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler }: Props) {
+export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, refreshKey = 0 }: Props) {
   const { permissions: cpCustomers, ready: permReady } = useCustomerPermissions("customers")
 
   // Keep latest permission values in refs so the fetch function always reads current state
@@ -56,7 +57,16 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
     })
   }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler])
 
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, resetPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
+
+  // 外部触发刷新（新增/编辑/删除后）
+  const refreshKeyRef = useRef(refreshKey)
+  useEffect(() => {
+    if (refreshKey !== refreshKeyRef.current) {
+      refreshKeyRef.current = refreshKey
+      refresh()
+    }
+  }, [refreshKey, refresh])
 
   // Re-fetch when permissions become ready (skip initial mount when already ready)
   const isFirst = useRef(true)
@@ -66,6 +76,13 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
     }
     isFirst.current = false
   }, [permReady, refresh])
+
+  // 筛选条件变化时回到第一页（跳过首次挂载）
+  const filterInitRef = useRef(true)
+  useEffect(() => {
+    if (filterInitRef.current) { filterInitRef.current = false; return }
+    resetPage()
+  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, resetPage])
 
   return (
     <div className="bg-white rounded-lg">

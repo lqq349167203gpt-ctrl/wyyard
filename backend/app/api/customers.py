@@ -24,38 +24,36 @@ class TagsGenerateRequest(BaseModel):
     tags: str
 
 
-def _fill_total_payment(customer_id: str) -> int:
-    """计算客户消费总额"""
-    total = 0
+def _build_payment_map() -> dict[str, int]:
+    """预计算所有客户的消费总额（O(N) 复杂度）"""
+    from collections import defaultdict
+    totals: dict[str, int] = defaultdict(int)
     for c in membership_card_service.list_cards():
-        if c.customer_id == customer_id:
-            total += c.price
+        if not c.voided:
+            totals[c.customer_id] += c.price
     for c in group_case_service.list_cases():
-        if c.customer_id == customer_id:
-            total += c.amount
+        totals[c.customer_id] += c.amount
     for r in emotional_release_service.list_releases():
-        if r.customer_id == customer_id:
-            total += r.amount
+        totals[r.customer_id] += r.amount
     for k in energy_knot_service.list_knots():
-        if k.customer_id == customer_id:
-            total += k.amount
+        totals[k.customer_id] += k.amount
     for c in internal_course_service.list_courses():
-        if c.customer_id == customer_id:
-            total += c.price
+        totals[c.customer_id] += c.price
     for r in oh_card_reading_service.list_readings():
-        if r.customer_id == customer_id:
-            total += r.amount
+        totals[r.customer_id] += r.amount
     for p in other_project_service.list_projects():
-        if p.customer_id == customer_id:
-            total += p.fee
-    return total
+        totals[p.customer_id] += p.fee
+    return totals
 
 
-def _fill_visit_count(customer):
+def _fill_visit_count(customer, payment_map: dict[str, int] | None = None):
     """填充历史到场次数、消费总额、最近到店日期"""
     data = customer.model_dump(mode="json")
     data["visit_count"] = count_customer_visits(customer.id)
-    data["total_payment"] = _fill_total_payment(customer.id)
+    if payment_map is not None:
+        data["total_payment"] = payment_map.get(customer.id, 0)
+    else:
+        data["total_payment"] = _build_payment_map().get(customer.id, 0)
     data["last_visit_date"] = get_last_visit_date(customer.id)
     return data
 
@@ -71,7 +69,8 @@ async def list_customers(
     member_types: str | None = Query(None),
 ):
     customers = customer_service.list_customers()
-    items = [_fill_visit_count(c) for c in customers]
+    payment_map = _build_payment_map()
+    items = [_fill_visit_count(c, payment_map) for c in customers]
 
     # Apply filters
     if nickname:

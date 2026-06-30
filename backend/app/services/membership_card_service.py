@@ -380,7 +380,7 @@ def create_card(data: MembershipCardCreate) -> MembershipCard:
 
 def update_card(card_id: str, data: dict) -> Optional[MembershipCard]:
     card = _cards.get(card_id)
-    if not card:
+    if not card or card.voided:
         return None
     for key, value in data.items():
         if hasattr(card, key) and key not in ("id", "created_at", "created_by"):

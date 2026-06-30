@@ -223,6 +223,7 @@ export interface Customer {
   referrer: string
   referrer_handler: string
   member_type: string
+  service_teacher: string
   paid_content: PaidContentItem[]
   visit_count: number
   total_payment: number
@@ -1042,7 +1043,7 @@ export const energyKnotSessionApi = {
   list: (date?: string) => request<EnergyKnotSession[]>(`/api/energy-knot-sessions${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<EnergyKnotSession>>(`/api/energy-knot-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
   create: (data: EnergyKnotSessionCreate) => request<EnergyKnotSession>("/api/energy-knot-sessions", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<EnergyKnotSessionCreate>) => request<EnergyKnotSession>(`/api/energy-knot-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<EnergyKnotSessionCreate>) => request<EnergyKnotSession & { warnings?: string[] }>(`/api/energy-knot-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/energy-knot-sessions/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<EnergyKnotCustomerSearchResult[]>(`/api/energy-knot-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
@@ -1098,7 +1099,7 @@ export const internalCourseSessionApi = {
   list: (date?: string) => request<InternalCourseSession[]>(`/api/internal-course-sessions${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<InternalCourseSession>>(`/api/internal-course-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
   create: (data: InternalCourseSessionCreate) => request<InternalCourseSession>("/api/internal-course-sessions", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<InternalCourseSessionCreate>) => request<InternalCourseSession>(`/api/internal-course-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<InternalCourseSessionCreate>) => request<InternalCourseSession & { warnings?: string[] }>(`/api/internal-course-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/internal-course-sessions/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<InternalCourseSessionCustomerSearchResult[]>(`/api/internal-course-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
@@ -1518,6 +1519,7 @@ export interface PaymentRecord {
   expiry_date: string
   closer_name: string
   created_at: string
+  voided?: boolean
 }
 
 export interface CustomerDetail {
@@ -1808,6 +1810,19 @@ export const activityThemeApi = {
     request<ActivityTheme[]>(`/api/activity-themes/batch`, {
       method: "POST",
       body: JSON.stringify({ themes }),
+    }),
+}
+
+export const activityOrderApi = {
+  get: (date: string, spaceId?: string) => {
+    const params = new URLSearchParams({ date })
+    if (spaceId) params.set("space_id", spaceId)
+    return request<string[]>(`/api/activity-orders?${params.toString()}`)
+  },
+  save: (date: string, spaceId: string, order: string[]) =>
+    request<{ ok: boolean }>(`/api/activity-orders`, {
+      method: "POST",
+      body: JSON.stringify({ date, space_id: spaceId, order }),
     }),
 }
 

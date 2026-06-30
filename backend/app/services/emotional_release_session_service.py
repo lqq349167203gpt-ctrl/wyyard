@@ -95,6 +95,7 @@ def create_session(data: EmotionalReleaseSessionCreate) -> EmotionalReleaseSessi
     )
     _sessions[session.id] = session
     _save(session.id)
+    _deduct_for_session(session)
     return session
 
 
@@ -103,7 +104,7 @@ def update_session(session_id: str, data: dict):
     from app.services import visit_service
 
     session = _sessions.get(session_id)
-    if not session:
+    if not session or session.is_deleted:
         return None, []
 
     # 获取旧的可扣费人员
@@ -116,7 +117,7 @@ def update_session(session_id: str, data: dict):
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at", "created_by"):
+        if hasattr(session, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
             setattr(session, key, value)
 
     # 案主不能同时是参与者
@@ -136,7 +137,7 @@ def update_session(session_id: str, data: dict):
 
 def delete_session(session_id: str) -> bool:
     session = _sessions.get(session_id)
-    if not session:
+    if not session or session.is_deleted:
         return False
     _restore_for_session(session)
     session.is_deleted = True

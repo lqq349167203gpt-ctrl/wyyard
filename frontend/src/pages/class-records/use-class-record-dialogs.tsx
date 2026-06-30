@@ -136,9 +136,11 @@ export function useClassRecordDialogs({
 
   const handleDelete = async () => {
     if (!deleteId) return
-    await classRecordApi.delete(deleteId)
-    setDeleteId(null)
-    onReload()
+    try {
+      await classRecordApi.delete(deleteId)
+      setDeleteId(null)
+      onReload()
+    } catch { alert("删除失败，请重试") }
   }
 
   // 资料
@@ -164,12 +166,12 @@ export function useClassRecordDialogs({
   const handleDeleteMaterial = async (filename: string) => {
     if (!materialsRecord) return
     try {
-      await uploadApi.deleteMaterial(filename)
       const newMaterials = (materialsRecord.materials || []).filter(m => !m.url.includes(filename))
       await classRecordApi.update(materialsRecord.id, { materials: newMaterials } as any)
       setMaterialsRecord({ ...materialsRecord, materials: newMaterials })
       onReload()
-    } catch { }
+      uploadApi.deleteMaterial(filename).catch(() => {})
+    } catch { alert("删除失败，请重试") }
   }
 
   // 小组管理
@@ -359,7 +361,7 @@ export function useClassRecordDialogs({
 
   const actions: ClassRecordActions = useMemo(() => ({
     handleOpenEdit, handleOpenMaterials, handleOpenGroups, handleDropToClass, deleteId, setDeleteId,
-  }), [deleteId])
+  }), [deleteId, groups, courses, onReload])
 
   const selectedCourse = courses.find(c => c.id === formCourseId)
 
@@ -518,7 +520,7 @@ export function useClassRecordDialogs({
                       <span className="text-[12px] text-[#8f959e] shrink-0">{(m.size / 1024).toFixed(1)}KB</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <a href={`${"http://127.0.0.1:8000"}${m.url}`} download className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]">
+                      <a href={m.url} download className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]">
                         <Download className="h-3.5 w-3.5 text-[#8f959e]" />
                       </a>
                       <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => handleDeleteMaterial(m.url.split("/").pop()!)}>

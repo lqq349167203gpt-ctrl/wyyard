@@ -173,9 +173,11 @@ export function useOcrDialogs({
 
   const handleDelete = async () => {
     if (!deleteId) return
-    await ohCardReadingSessionApi.delete(deleteId)
-    setDeleteId(null)
-    onReload()
+    try {
+      await ohCardReadingSessionApi.delete(deleteId)
+      setDeleteId(null)
+      onReload()
+    } catch { alert("删除失败，请重试") }
   }
 
   const handleAddPurchase = async () => {
@@ -223,12 +225,12 @@ export function useOcrDialogs({
   const handleDeleteMaterial = async (filename: string) => {
     if (!materialsRecord) return
     try {
-      await uploadApi.deleteMaterial(filename)
       const newMaterials = (materialsRecord.materials || []).filter(m => !m.url.includes(filename))
       await ohCardReadingSessionApi.update(materialsRecord.id, { materials: newMaterials } as any)
       setMaterialsRecord({ ...materialsRecord, materials: newMaterials })
       onReload()
-    } catch { }
+      uploadApi.deleteMaterial(filename).catch(() => {})
+    } catch { alert("删除失败，请重试") }
   }
 
   // 成员
@@ -315,13 +317,15 @@ export function useOcrDialogs({
   const handleDrop = async (session: OhCardReadingSession, customer: { customer_id: string }) => {
     const ids = session.participant_ids || []
     if (ids.includes(customer.customer_id) || customer.customer_id === session.host_id) return
-    await ohCardReadingSessionApi.update(session.id, { participant_ids: [...ids, customer.customer_id] } as any)
-    onReload()
+    try {
+      await ohCardReadingSessionApi.update(session.id, { participant_ids: [...ids, customer.customer_id] } as any)
+      onReload()
+    } catch { alert("添加失败，请重试") }
   }
 
   const actions: OcrActions = useMemo(() => ({
     handleOpenEdit, handleOpenMaterials, handleOpenMembers, handleDrop, deleteId, setDeleteId,
-  }), [deleteId])
+  }), [deleteId, onReload])
 
   const dialogs: ReactNode = (
     <>
@@ -455,7 +459,7 @@ export function useOcrDialogs({
                       <span className="text-[12px] text-[#8f959e] shrink-0">{(m.size / 1024).toFixed(1)}KB</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <a href={`${"http://127.0.0.1:8000"}${m.url}`} download className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]">
+                      <a href={m.url} download className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]">
                         <Download className="h-3.5 w-3.5 text-[#8f959e]" />
                       </a>
                       <button className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0]" onClick={() => handleDeleteMaterial(m.url.split("/").pop()!)}>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, startTransition } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
 import { ChevronRight, ChevronLeft } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
@@ -80,14 +80,18 @@ export default function ClassRecordsPage() {
   useEffect(() => { load() }, [])
 
   // 加载人员分组
+  const groupsLoadedDateRef = useRef<string>("")
   useEffect(() => {
     dailyGroupingApi.get(detailDate).then((data) => {
+      groupsLoadedDateRef.current = detailDate
       setGroups(data.groups || [])
-    }).catch(() => setGroups([]))
+    }).catch(() => { groupsLoadedDateRef.current = detailDate; setGroups([]) })
   }, [detailDate])
 
   // 人员删除后，同步清理分组中的该人员并持久化
   useEffect(() => {
+    // 仅当 groups 和 dayVisits 都已加载为当前日期时才清理
+    if (groupsLoadedDateRef.current !== detailDate) return
     if (groups.length === 0 || dayVisits.length === 0) return
     const visitIdSet = new Set(dayVisits.map(v => v.id))
     const hasStale = groups.some(g =>
@@ -104,7 +108,7 @@ export default function ClassRecordsPage() {
     })).filter(g => g.leader_id || g.deputy_id || g.member_ids.length > 0)
     setGroups(cleaned)
     dailyGroupingApi.upsert({ date: detailDate, groups: cleaned }).catch(() => {})
-  }, [dayVisits, groups])
+  }, [detailDate, dayVisits, groups])
 
   // 加载日期范围内的到场人数（轻量 API，日期滑块需要）
   useEffect(() => {
