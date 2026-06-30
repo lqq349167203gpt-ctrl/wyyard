@@ -412,22 +412,33 @@ export function ActivityBatchTable({
     // 将快照中的行分为两类：已有记录（update）和未创建记录（create）
     const rowsToRestore = entry.rows.map(r => {
       if (!r.record_id || r.pendingCreate) {
-        // 没有 record_id 的行：标记为待创建，让 saveRow 走 create 路径
         return { ...r, pendingCreate: true, record_id: "" }
       }
       return r
     })
     setRows(rowsToRestore)
-    // 所有行都需要保存（已有的 update，未有的 create）
     const statuses: Record<number, RowStatus> = {}
     rowsToRestore.forEach(r => { statuses[r.key] = "saving" })
     setRowStatus(statuses)
     // 删除当前存在但快照中没有的行（快照之后新增的行）
     const snapshotRecordIds = new Set(entry.rows.filter(r => r.record_id).map(r => r.record_id))
     const rowsToDelete = currentRows.filter(r => r.record_id && !snapshotRecordIds.has(r.record_id))
+    // 保存每行：如果 update 失败（record_id 已失效），删除旧记录后降级为 create
+    const savePromises = rowsToRestore.map(async (row) => {
+      try {
+        return await saveRowRef.current(row)
+      } catch (e: any) {
+        const msg = e?.message || ""
+        if (row.record_id && (msg.includes("404") || msg.includes("不存在"))) {
+          await deleteRecordFromBackend(row).catch(() => {})
+          return await saveRowRef.current({ ...row, record_id: "", pendingCreate: true })
+        }
+        throw e
+      }
+    })
     // 等待所有保存 + 删除完成
     const results = await Promise.allSettled([
-      ...rowsToRestore.map(row => saveRowRef.current(row)),
+      ...savePromises,
       ...rowsToDelete.map(row => deleteRecordFromBackend(row)),
     ])
     // 根据结果更新最终状态
