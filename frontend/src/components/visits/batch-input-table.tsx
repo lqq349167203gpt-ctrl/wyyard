@@ -194,42 +194,71 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   }, [undoStack, redoStack, undo, redo, onUndoRedoChange])
 
   // 恢复历史版本：同步到后端，确保刷新后仍然保持该版本
+  // 用 customer_id 匹配数据库记录，而不是 visit_id（visit_id 可能已失效）
   const restoreFromHistory = useCallback(async (entry: VisitHistoryEntry) => {
     pushHistory("恢复了历史版本")
-    // 快照中的 visit_id 集合
-    const snapshotVisitIds = new Set(entry.rows.map(r => r.visit_id).filter(Boolean))
-    // 当前存在但快照中没有的行 → 删除
-    const currentRows = rowsRef.current
-    const rowsToDelete = currentRows.filter(r => r.visit_id && !snapshotVisitIds.has(r.visit_id))
-    // 快照中的行 → 有 visit_id 的 update，没有的 create
     const restoredRows = entry.rows.map(r => ({ ...r }))
     setRows(restoredRows)
     const statuses: Record<number, RowStatus> = {}
     restoredRows.forEach(r => { statuses[r.key] = "saving" })
     setRowStatus(statuses)
-    // 并行执行保存和删除
+    // 获取数据库当前记录，按 customer_id 建立映射
+    const currentVisits = await visitApi.list(date, undefined, spaceId).catch(() => [])
+    const existingByCustomerId = new Map<string, string>()
+    for (const v of currentVisits) {
+      if (v.customer_id) existingByCustomerId.set(v.customer_id, v.id)
+    }
+    // 当前数据库中的所有 visit id
+    const currentVisitIds = new Set(currentVisits.map(v => v.id))
+    // 快照中行对应的 visit id 集合（用于判断哪些行需要删除）
+    const snapshotVisitIds = new Set<string>()
+    // 为每行设置 savedVisitIds（用 customer_id 匹配数据库中的真实 id）
+    for (const row of restoredRows) {
+      if (row.customer_id) {
+        const dbVisitId = existingByCustomerId.get(row.customer_id)
+        if (dbVisitId) {
+          savedVisitIds.current[row.key] = dbVisitId
+          snapshotVisitIds.add(dbVisitId)
+          row.visit_id = dbVisitId
+        } else {
+          delete savedVisitIds.current[row.key]
+          row.visit_id = ""
+        }
+      } else {
+        // 没有 customer_id 的空行，用 visit_id 匹配
+        if (row.visit_id && currentVisitIds.has(row.visit_id)) {
+          savedVisitIds.current[row.key] = row.visit_id
+          snapshotVisitIds.add(row.visit_id)
+        } else {
+          delete savedVisitIds.current[row.key]
+          row.visit_id = ""
+        }
+      }
+    }
+    // 更新 rows state（visit_id 已更新为数据库中的真实 id）
+    setRows(restoredRows.map(r => ({ ...r })))
+    // 需要删除的行：数据库中有但快照中没有的
+    const visitIdsToDelete = currentVisits
+      .filter(v => !snapshotVisitIds.has(v.id))
+      .map(v => v.id)
+    // 并行执行：保存快照中的行 + 删除多余的行
     const savePromises = restoredRows.map(async (row) => {
       try {
-        if (row.visit_id) {
-          savedVisitIds.current[row.key] = row.visit_id
-        }
         await saveRowRef.current(row)
       } catch (e) {
         // saveRow 内部已处理 error 状态
       }
     })
-    const deletePromises = rowsToDelete.map(async (row) => {
+    const deletePromises = visitIdsToDelete.map(async (visitId) => {
       try {
-        if (row.visit_id) {
-          await visitApi.delete(row.visit_id)
-        }
+        await visitApi.delete(visitId)
       } catch (e) {
         console.error("[BATCH] 恢复时删除行失败:", e)
       }
     })
     await Promise.allSettled([...savePromises, ...deletePromises])
     onSaved()
-  }, [pushHistory, onSaved])
+  }, [pushHistory, onSaved, date, spaceId])
 
   useEffect(() => {
     onRestoreRef?.(restoreFromHistory)
