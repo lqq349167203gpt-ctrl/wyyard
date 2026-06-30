@@ -281,6 +281,8 @@ export function ActivityBatchTable({
 }: ActivityBatchTableProps) {
   const [rows, setRows] = useState<ActivityRow[]>([])
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
+  const rowStatusRef = useRef(rowStatus)
+  rowStatusRef.current = rowStatus
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
   const eksCountEditRef = useRef<Record<string, string>>({})
@@ -591,7 +593,7 @@ export function ActivityBatchTable({
   }, [records, courses, date, spaceId, spaces, courseTypes])
 
   // 保存单行（返回 API 结果，供 handleCreate 获取 record_id）
-  const saveRow = useCallback(async (row: ActivityRow): Promise<any> => {
+  const saveRowInner = useCallback(async (row: ActivityRow): Promise<any> => {
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       const type = row.record_type
@@ -744,6 +746,14 @@ export function ActivityBatchTable({
     }
   }, [courses, spaceId, spaces, date, fetchRemaining])
 
+  // saveRow 包装：加 15 秒超时，防止 API 挂起时 status 永远停在 "saving"
+  const saveRow = useCallback(async (row: ActivityRow): Promise<any> => {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("保存超时，请检查网络后重试")), 15000)
+    )
+    return Promise.race([saveRowInner(row), timeout])
+  }, [saveRowInner])
+
   // 同步 saveRow 到 ref，供 undo/redo 使用
   useEffect(() => { saveRowRef.current = saveRow }, [saveRow])
 
@@ -751,7 +761,7 @@ export function ActivityBatchTable({
     if (timersRef.current[key]) clearTimeout(timersRef.current[key])
     timersRef.current[key] = setTimeout(() => {
       const row = rowsRef.current.find(r => r.key === key)
-      if (row) saveRowRef.current(row).catch(() => {})
+      if (row && rowStatusRef.current[key] !== "saving") saveRowRef.current(row).catch(() => {})
       delete timersRef.current[key]
     }, 500)
   }, [])
