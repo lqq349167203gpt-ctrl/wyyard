@@ -593,7 +593,7 @@ export function ActivityBatchTable({
   }, [records, courses, date, spaceId, spaces, courseTypes])
 
   // 保存单行（返回 API 结果，供 handleCreate 获取 record_id）
-  const saveRowInner = useCallback(async (row: ActivityRow): Promise<any> => {
+  const saveRowInner = useCallback(async (row: ActivityRow, isCancelled?: () => boolean): Promise<any> => {
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       const type = row.record_type
@@ -729,29 +729,39 @@ export function ActivityBatchTable({
         }
       }
 
-      setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
-      historyPushedRef.current.delete(row.key)
-      if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
-      // 保存后刷新剩余次数（fetchRemaining 会获取该类型所有客户，调一次即可）
-      if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
-        if (row.owner_id || prevOwnerRef.current[row.key]) {
-          delete prevOwnerRef.current[row.key]
+      if (!isCancelled?.()) {
+        setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+        historyPushedRef.current.delete(row.key)
+        if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
+        // 保存后刷新剩余次数（fetchRemaining 会获取该类型所有客户，调一次即可）
+        if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+          if (row.owner_id || prevOwnerRef.current[row.key]) {
+            delete prevOwnerRef.current[row.key]
+          }
+          fetchRemaining(row.record_type, "all")
         }
-        fetchRemaining(row.record_type, "all")
       }
     } catch (e: any) {
       console.error("[SAVE] error", { key: row.key, type: row.record_type, id: row.record_id, error: e?.message })
-      setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+      if (!isCancelled?.()) {
+        setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+      }
       throw e
     }
   }, [courses, spaceId, spaces, date, fetchRemaining])
 
   // saveRow 包装：加 15 秒超时，防止 API 挂起时 status 永远停在 "saving"
   const saveRow = useCallback(async (row: ActivityRow): Promise<any> => {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("保存超时，请检查网络后重试")), 15000)
-    )
-    return Promise.race([saveRowInner(row), timeout])
+    let cancelled = false
+    const timer = setTimeout(() => {
+      cancelled = true
+      setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+    }, 15000)
+    try {
+      return await saveRowInner(row, () => cancelled)
+    } finally {
+      clearTimeout(timer)
+    }
   }, [saveRowInner])
 
   // 同步 saveRow 到 ref，供 undo/redo 使用
