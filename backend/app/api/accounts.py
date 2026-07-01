@@ -212,7 +212,7 @@ async def delete_my_session(session_id: str, request: StarletteRequest):
 # ===== 角色 =====
 
 @router.get("/roles")
-async def list_roles(_admin: str = Depends(require_admin)):
+async def list_roles():
     return account_service.list_roles()
 
 
