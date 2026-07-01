@@ -713,8 +713,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     if not entity_name and before:
         entity_name = get_entity_name(before)
 
-    # 邀约编辑：从 customer_id 反查昵称
-    if not entity_name and "/api/visits" in path:
+    # 邀约：从 customer_id 反查昵称（始终执行，覆盖 member_type/date 等误匹配）
+    if "/api/visits" in path:
         customer_id = (body or {}).get("customer_id") or (before or {}).get("customer_id", "")
         if customer_id:
             try:
@@ -975,6 +975,15 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         return "批量操作"
 
     name = entity_name or get_entity_id(path) or "记录"
+    # 邀约：entity_id 是 visit_id，尝试从 visit 反查客户昵称
+    if not entity_name and "/api/visits" in path and name and name != "记录":
+        try:
+            from app.services import visit_service
+            visit = visit_service.get_visit(name)
+            if visit and visit.nickname:
+                name = visit.nickname
+        except Exception:
+            pass
 
     # 空间房间排序：直接解析 room_ids 为房间名
     if "/rooms-order" in path and method == "PATCH":
