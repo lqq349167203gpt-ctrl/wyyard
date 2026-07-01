@@ -20,7 +20,6 @@ ADMIN_PATHS = (
     "/api/system-helper-config",
     "/api/agents",
     "/api/uploads",
-    "/api/system-logs",
 )
 
 JWT_ISSUER = "wyyard-backend"
