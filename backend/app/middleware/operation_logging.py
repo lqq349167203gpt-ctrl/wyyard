@@ -713,6 +713,18 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     if not entity_name and before:
         entity_name = get_entity_name(before)
 
+    # 邀约编辑：从 customer_id 反查昵称
+    if not entity_name and "/api/visits" in path:
+        customer_id = (body or {}).get("customer_id") or (before or {}).get("customer_id", "")
+        if customer_id:
+            try:
+                from app.services import customer_service
+                c = customer_service.get_customer(customer_id)
+                if c:
+                    entity_name = c.nickname or c.name or ""
+            except Exception:
+                pass
+
     # 业务提醒切换状态
     if "/api/business-reminders/" in path and path.rstrip("/").endswith("/toggle"):
         item_id_match = re.search(r"/api/business-reminders/([^/]+)/toggle", path)
