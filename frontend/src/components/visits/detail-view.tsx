@@ -434,7 +434,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         if (cancelled) return
         let filtered = data
         const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
-        if (cu.role !== "超级管理员" && cp.length > 0) {
+        if (cu.role !== "超级管理员") {
           filtered = data.filter(c => !c.member_type || cp.includes(c.member_type))
         }
         setCustomerList(filtered)
