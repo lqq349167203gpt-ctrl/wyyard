@@ -323,8 +323,7 @@ def refresh_member_type(customer_id: str):
     customer_positions = customer.positions or []
 
     # 按 sort_order 顺序匹配，第一条命中即为身份
-    # 用 None 哨兵：无匹配时不改写客户身份
-    member_type = None
+    member_type = ""
     for identity in identities:
         if not identity.conditions:
             member_type = identity.name
@@ -345,7 +344,7 @@ def refresh_member_type(customer_id: str):
             member_type = identity.name
             break
 
-    if member_type is not None and customer.member_type != member_type:
+    if customer.member_type != member_type:
         customer_service.update_customer(customer_id, CustomerUpdate(member_type=member_type))
 
 
@@ -454,7 +453,7 @@ def refresh_all():
         welfare_count = welfare_map.get(c.id, 0)
         customer_positions = c.positions or []
 
-        member_type = None
+        member_type = ""
         for identity in identities:
             if not identity.conditions:
                 member_type = identity.name
@@ -475,5 +474,5 @@ def refresh_all():
                 member_type = identity.name
                 break
 
-        if member_type is not None and c.member_type != member_type:
+        if c.member_type != member_type:
             customer_service.update_customer(c.id, CustomerUpdate(member_type=member_type))
