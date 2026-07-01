@@ -1,11 +1,11 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
-from app.models.member_identity import MemberIdentity, MemberIdentityCreate, MemberIdentityUpdate, IdentityCondition
 from app.models.customer import CustomerUpdate
-from app.services.storage import load_data, save_data, save_item
+from app.models.member_identity import IdentityCondition, MemberIdentity, MemberIdentityCreate, MemberIdentityUpdate
 from app.services import customer_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "member_identities.json"
 _identities: Dict[str, MemberIdentity] = {}
@@ -154,7 +154,8 @@ def _check_condition(condition, customer_id: str,
                      customer_cards, customer_courses, customer_group_cases,
                      customer_emotional_releases, customer_energy_knots,
                      customer_oh_card_readings, customer_other_projects, today_str: str,
-                     welfare_count: int = 0, customer_positions: list = None) -> bool:
+                     welfare_count: int = 0, customer_positions: list = None,
+                     customer_nickname: str = "") -> bool:
     if isinstance(condition, dict):
         condition = IdentityCondition(**condition)
     t = condition.type
@@ -168,6 +169,8 @@ def _check_condition(condition, customer_id: str,
         if not condition.items:
             return False
         return any(p in positions for p in condition.items)
+    elif t == "fixed":
+        return customer_nickname in (condition.items or [])
     elif t in ("card", "course", "payment"):
         cats = _get_payment_categories(condition)
         item_set = set(condition.items) if condition.items else set()
@@ -263,11 +266,21 @@ def refresh_member_type(customer_id: str):
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # 预计算用户数据
-    from app.services import membership_card_service, visit_service, internal_course_service
-    from app.services import group_case_service, emotional_release_service, energy_knot_service
-    from app.services import oh_card_reading_service, other_project_service, class_record_service
-    from app.services import group_case_session_service, emotional_release_session_service
-    from app.services import energy_knot_session_service, internal_course_session_service
+    from app.services import (
+        class_record_service,
+        emotional_release_service,
+        emotional_release_session_service,
+        energy_knot_service,
+        energy_knot_session_service,
+        group_case_service,
+        group_case_session_service,
+        internal_course_service,
+        internal_course_session_service,
+        membership_card_service,
+        oh_card_reading_service,
+        other_project_service,
+        visit_service,
+    )
 
     all_cards = membership_card_service.list_cards()
     customer_cards = [c for c in all_cards if c.customer_id == customer_id and not c.voided]
@@ -321,7 +334,8 @@ def refresh_member_type(customer_id: str):
                                     customer_group_cases, customer_emotional_releases,
                                     customer_energy_knots, customer_oh_card_readings,
                                     customer_other_projects, today_str,
-                                    welfare_count, customer_positions)
+                                    welfare_count, customer_positions,
+                                    customer.nickname or "")
                    for cond in identity.conditions]
         if identity.operator == "any":
             matched = any(results)
@@ -337,11 +351,21 @@ def refresh_member_type(customer_id: str):
 
 def refresh_all():
     """批量刷新所有用户的 member_type，共享数据源避免重复加载"""
-    from app.services import membership_card_service, visit_service, internal_course_service
-    from app.services import group_case_service, emotional_release_service, energy_knot_service
-    from app.services import oh_card_reading_service, other_project_service, class_record_service
-    from app.services import group_case_session_service, emotional_release_session_service
-    from app.services import energy_knot_session_service, internal_course_session_service
+    from app.services import (
+        class_record_service,
+        emotional_release_service,
+        emotional_release_session_service,
+        energy_knot_service,
+        energy_knot_session_service,
+        group_case_service,
+        group_case_session_service,
+        internal_course_service,
+        internal_course_session_service,
+        membership_card_service,
+        oh_card_reading_service,
+        other_project_service,
+        visit_service,
+    )
 
     identities = list_identities()
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -440,7 +464,8 @@ def refresh_all():
                                         customer_group_cases, customer_emotional_releases,
                                         customer_energy_knots, customer_oh_card_readings,
                                         customer_other_projects, today_str,
-                                        welfare_count, customer_positions)
+                                        welfare_count, customer_positions,
+                                        c.nickname or "")
                        for cond in identity.conditions]
             if identity.operator == "any":
                 matched = any(results)

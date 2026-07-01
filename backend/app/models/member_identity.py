@@ -1,11 +1,13 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
-from pydantic import Field
 from datetime import datetime
-from typing import Optional, List, Literal
+from typing import List, Literal, Optional
+
+from pydantic import Field
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class IdentityCondition(SafeBaseModel):
-    type: Literal["arrival", "activity", "card", "course", "payment", "teacher"]
+    type: Literal["arrival", "activity", "card", "course", "payment", "teacher", "fixed"]
     payment_categories: List[str] = []
     items: List[str] = []
     count_op: Literal[">", "=", "<"] = ">"

@@ -11,8 +11,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { memberIdentityApi, type MemberIdentity, type MemberIdentityCreate, type IdentityCondition } from "@/lib/api"
+import { memberIdentityApi, customerApi, type MemberIdentity, type MemberIdentityCreate, type IdentityCondition, type Customer } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { ActivityConfigContent } from "@/pages/activity-config"
@@ -30,6 +31,7 @@ const TYPE_LABELS: Record<string, string> = {
   card: "付费项目",
   course: "付费项目",
   teacher: "疗愈老师",
+  fixed: "固定人员",
 }
 
 const TEACHER_POSITIONS = [...HEALING_POSITIONS]
@@ -54,6 +56,10 @@ function conditionSummary(c: IdentityCondition): string {
   if (c.type === "teacher") {
     if (!c.items || c.items.length === 0) return "疗愈老师（未选择）"
     return `疗愈老师：${c.items[0]}`
+  }
+  if (c.type === "fixed") {
+    if (!c.items || c.items.length === 0) return "固定人员（未选择）"
+    return `固定人员：${c.items.join("、")}`
   }
   if (c.type === "card" || c.type === "course" || c.type === "payment") {
     const categories = getPaymentCategories(c)
@@ -99,6 +105,9 @@ export default function MemberIdentitiesPage() {
   const [formType, setFormType] = useState("")
   const [formConditions, setFormConditions] = useState<IdentityCondition[]>([defaultCondition()])
   const [formOperator, setFormOperator] = useState<"all" | "any">("all")
+  const [customerList, setCustomerList] = useState<Customer[]>([])
+
+  useEffect(() => { customerApi.list().then(setCustomerList).catch(() => {}) }, [])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(identities)
 
@@ -449,7 +458,7 @@ export default function MemberIdentitiesPage() {
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
                           value={cond.type}
-                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}]}
+                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}, {value: "fixed", label: "固定人员"}]}
                           placeholder="请选择条件类型"
                           onChange={(v) => updateCondition(ci, { type: v as IdentityCondition["type"] })}
                         />
@@ -509,6 +518,22 @@ export default function MemberIdentitiesPage() {
                             placeholder="请选择身份"
                             onChange={(v) => updateCondition(ci, { items: v ? [v] : [] })}
                           />
+                        </div>
+                      )}
+
+                      {/* 固定人员 → 多昵称选择 */}
+                      {cond.type === "fixed" && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right pt-2">人员</span>
+                          <div className="flex-1">
+                            <CustomerSearchInput
+                              customers={customerList}
+                              value={cond.items}
+                              onChange={(val) => updateCondition(ci, { items: val as string[] })}
+                              multi
+                              placeholder="输入昵称搜索添加..."
+                            />
+                          </div>
                         </div>
                       )}
 
