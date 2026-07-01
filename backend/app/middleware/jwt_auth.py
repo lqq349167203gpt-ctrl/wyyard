@@ -15,7 +15,6 @@ SKIP_PATHS = (
 
 # 需要管理员权限的路径前缀（POST/PUT/PATCH/DELETE 自动拦截非管理员）
 ADMIN_PATHS = (
-    "/api/accounts/roles",
     "/api/positions",
     "/api/position-permissions",
     "/api/activity-permissions",

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from starlette.requests import Request as StarletteRequest
 
-from app.middleware.jwt_auth import create_access_token, decode_token, require_admin
+from app.middleware.jwt_auth import create_access_token, decode_token
 from app.middleware.rate_limit import limiter
 from app.models.account import AccountCreate, AccountUpdate, RoleCreate, RoleUpdate
 from app.models.base import StrictBaseModel
@@ -39,7 +39,7 @@ async def list_accounts():
 
 @router.post("")
 @limiter.limit("3/minute")
-async def create_account(data: AccountCreate, request: StarletteRequest, _admin: str = Depends(require_admin)):
+async def create_account(data: AccountCreate, request: StarletteRequest):
     if len(data.password) < 8:
         raise HTTPException(status_code=400, detail="密码至少8位")
     if len(data.password) > 128:
@@ -125,17 +125,6 @@ async def login(data: LoginRequest, request: StarletteRequest):
 
 @router.patch("/{account_id}")
 async def update_account(account_id: str, data: AccountUpdate, request: StarletteRequest):
-    # 所有权检查：管理员可改任何人，普通用户只能改自己
-    current_user_id = getattr(request.state, "user_id", "")
-    current_role = getattr(request.state, "user_role", "")
-    if current_role != "超级管理员" and account_id != current_user_id:
-        raise HTTPException(status_code=403, detail="权限不足")
-    # 普通用户不能修改 role、is_system、username、enabled 字段
-    if current_role != "超级管理员":
-        if data.role is not None or data.is_system is not None:
-            raise HTTPException(status_code=403, detail="权限不足")
-        if data.username is not None or data.enabled is not None:
-            raise HTTPException(status_code=403, detail="权限不足")
     # 改密码必须走 POST /{id}/change-password，需要验证旧密码
     if data.password is not None:
         raise HTTPException(status_code=400, detail="修改密码请使用专门的密码修改接口")
@@ -149,7 +138,7 @@ async def update_account(account_id: str, data: AccountUpdate, request: Starlett
 
 
 @router.delete("/{account_id}")
-async def delete_account(account_id: str, _admin: str = Depends(require_admin)):
+async def delete_account(account_id: str):
     if not account_service.delete_account(account_id):
         raise HTTPException(status_code=404, detail="账号不存在")
     return {"message": "已删除"}
@@ -179,7 +168,7 @@ async def change_password(account_id: str, data: ChangePasswordRequest, request:
 
 @router.post("/{account_id}/reset-password")
 @limiter.limit("3/minute")
-async def admin_reset_password(account_id: str, data: AdminResetPasswordRequest, request: StarletteRequest, _admin: str = Depends(require_admin)):
+async def admin_reset_password(account_id: str, data: AdminResetPasswordRequest, request: StarletteRequest):
     """管理员重置密码（不需要旧密码，仅管理员可用）"""
     current_user_id = getattr(request.state, "user_id", "")
     if account_id == current_user_id:
@@ -228,12 +217,12 @@ async def list_roles(_admin: str = Depends(require_admin)):
 
 
 @router.post("/roles")
-async def create_role(data: RoleCreate, _admin: str = Depends(require_admin)):
+async def create_role(data: RoleCreate):
     return account_service.create_role(data)
 
 
 @router.patch("/roles/{role_id}")
-async def update_role(role_id: str, data: RoleUpdate, _admin: str = Depends(require_admin)):
+async def update_role(role_id: str, data: RoleUpdate):
     result = account_service.update_role(role_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="角色不存在")
@@ -241,7 +230,7 @@ async def update_role(role_id: str, data: RoleUpdate, _admin: str = Depends(requ
 
 
 @router.delete("/roles/{role_id}")
-async def delete_role(role_id: str, _admin: str = Depends(require_admin)):
+async def delete_role(role_id: str):
     if not account_service.delete_role(role_id):
         raise HTTPException(status_code=404, detail="角色不存在")
     return {"message": "已删除"}
