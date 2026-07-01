@@ -84,10 +84,28 @@ def _sync_deduction(session, old_chargeable, new_chargeable):
         membership_card_service.deduct_for_activity(cid, activity_key)
 
 
+def _get_all_member_ids(session) -> set:
+    ids = set(session.participant_ids or [])
+    ids.update(session.teacher_ids or [])
+    if session.host_id:
+        ids.add(session.host_id)
+    return ids
+
+
+def _refresh_affected_identities(customer_ids: set):
+    from app.services.member_identity_service import refresh_member_type
+    for cid in customer_ids:
+        if cid:
+            try:
+                refresh_member_type(cid)
+            except Exception:
+                pass
+
+
 def create_session(data: InternalCourseSessionCreate) -> InternalCourseSession:
     now = datetime.now(timezone.utc)
     session = InternalCourseSession(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),
@@ -95,6 +113,7 @@ def create_session(data: InternalCourseSessionCreate) -> InternalCourseSession:
     _sessions[session.id] = session
     _save(session.id)
     _deduct_for_session(session)
+    _refresh_affected_identities(_get_all_member_ids(session))
     return session
 
 
@@ -105,9 +124,9 @@ def update_session(session_id: str, data: dict) -> Optional[InternalCourseSessio
     if not session or session.is_deleted:
         return None
 
+    old_ids = _get_all_member_ids(session)
     old_chargeable = _get_chargeable_ids(session)
 
-    # 自动过滤不在到场名单中的人员
     if "participant_ids" in data:
         visits = visit_service.list_visits(session.date)
         visit_ids = {v.customer_id for v in visits}
@@ -122,6 +141,7 @@ def update_session(session_id: str, data: dict) -> Optional[InternalCourseSessio
 
     new_chargeable = _get_chargeable_ids(session)
     _sync_deduction(session, old_chargeable, new_chargeable)
+    _refresh_affected_identities(old_ids | _get_all_member_ids(session))
 
     return session
 
@@ -130,10 +150,12 @@ def delete_session(session_id: str) -> bool:
     session = _sessions.get(session_id)
     if not session or session.is_deleted:
         return False
+    affected_ids = _get_all_member_ids(session)
     _restore_for_session(session)
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
     _save(session_id)
+    _refresh_affected_identities(affected_ids)
     return True
 
 

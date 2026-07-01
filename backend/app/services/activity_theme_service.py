@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional
-import uuid
 
-from app.models.activity_theme import ActivityTheme, ActivityThemeCreate
+from app.models.activity_theme import ActivityTheme
 from app.services import storage
 
 FILENAME = "activity_themes.json"

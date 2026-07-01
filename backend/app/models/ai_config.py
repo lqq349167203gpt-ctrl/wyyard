@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
 
 
-class AIConfigBase(BaseModel):
+class AIConfigBase(SafeBaseModel):
     name: str
     provider: str  # qwen / kimi / glm / deepseek / xiaomi
     model: str
@@ -16,7 +16,7 @@ class AIConfigCreate(AIConfigBase):
     pass
 
 
-class AIConfigUpdate(BaseModel):
+class AIConfigUpdate(StrictBaseModel):
     name: Optional[str] = None
     provider: Optional[str] = None
     model: Optional[str] = None

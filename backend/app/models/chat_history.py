@@ -1,9 +1,8 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
-from typing import Optional
 
 
-class ChatRecordBase(BaseModel):
+class ChatRecordBase(SafeBaseModel):
     user_id: str
     user_name: str = ""
     user_role: str = ""

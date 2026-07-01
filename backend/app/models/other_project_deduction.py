@@ -1,9 +1,8 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
-from typing import Optional
 
 
-class OtherProjectDeductionBase(BaseModel):
+class OtherProjectDeductionBase(SafeBaseModel):
     customer_id: str
     nickname: str
     other_project_id: str
@@ -15,7 +14,7 @@ class OtherProjectDeductionBase(BaseModel):
     remaining_after: int
 
 
-class OtherProjectDeductionCreate(BaseModel):
+class OtherProjectDeductionCreate(StrictBaseModel):
     customer_id: str
     other_project_id: str
     count: int = 1

@@ -9,6 +9,7 @@ import {
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
+import { ACTIVITY_POSITION_MAP } from "@/lib/positions"
 import { SpaceRoomDropdown } from "@/components/space-room-dropdown"
 import type { CardCallbacks } from "./index"
 
@@ -98,14 +99,7 @@ function getTypeSelectValue(type: ActivityType, courseName: string, classCourseT
 }
 
 // 每种活动类型对应的老师身份
-const TEACHER_POSITION_MAP: Record<string, string> = {
-  class: "课程老师",
-  gcs: "成就君",
-  ocr: "成就君",
-  ers: "成就君",
-  eks: "能量结老师",
-  ics: "课程老师",
-}
+const TEACHER_POSITION_MAP = ACTIVITY_POSITION_MAP
 
 const ACTIVITY_MODE_OPTIONS = [
   { value: "线下", label: "线下" },

@@ -90,7 +90,7 @@ def create_space(data: SpaceCreate) -> Space:
         raise ValueError("当前名称已存在")
     now = datetime.now(timezone.utc)
     space = Space(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         rooms=[],
         created_at=now,
         updated_at=now,
@@ -145,7 +145,7 @@ def add_room(space_id: str, data: RoomCreate) -> Optional[Room]:
                 if not r.is_deleted and r.name == data.name:
                     raise ValueError("当前名称已存在")
     room = Room(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         space_id=space_id,
         name=data.name,
     )

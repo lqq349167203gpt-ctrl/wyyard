@@ -51,9 +51,7 @@ export default function OrganizationsPage() {
     try {
       const orgs = await organizationApi.list().catch((e) => { console.error("加载组织失败:", e); return [] as Organization[] })
       setOrganizations(orgs)
-      if (!activeOrgId && orgs.length > 0) {
-        setActiveOrgId(orgs[0].id)
-      }
+      setActiveOrgId(prev => prev || (orgs.length > 0 ? orgs[0].id : null))
     } catch {}
     try {
       const custs = await customerApi.list().catch((e) => { console.error("加载客户失败:", e); return [] as Customer[] })
@@ -64,7 +62,7 @@ export default function OrganizationsPage() {
       setCourseTypes(types)
     } catch {}
     setLoading(false)
-  }, [activeOrgId])
+  }, [])
 
   useEffect(() => { loadData() }, [loadData])
 

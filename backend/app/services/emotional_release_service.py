@@ -51,7 +51,7 @@ def get_release(release_id: str) -> Optional[EmotionalRelease]:
 def create_release(data: EmotionalReleaseCreate) -> EmotionalRelease:
     now = datetime.now(timezone.utc)
     release = EmotionalRelease(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),

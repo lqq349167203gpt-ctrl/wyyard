@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -10,7 +10,7 @@ class DocStatus(str, Enum):
     FAILED = "failed"
 
 
-class KnowledgeBase(BaseModel):
+class KnowledgeBase(SafeBaseModel):
     id: str
     name: str
     description: str = ""
@@ -20,7 +20,7 @@ class KnowledgeBase(BaseModel):
     deleted_at: Optional[datetime] = None
 
 
-class Document(BaseModel):
+class Document(SafeBaseModel):
     id: str
     name: str
     type: str
@@ -32,6 +32,6 @@ class Document(BaseModel):
     deleted_at: Optional[datetime] = None
 
 
-class DocumentUpload(BaseModel):
+class DocumentUpload(StrictBaseModel):
     knowledge_base_id: str
     filename: str

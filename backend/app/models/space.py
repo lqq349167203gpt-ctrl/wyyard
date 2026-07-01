@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class RoomBase(BaseModel):
+class RoomBase(SafeBaseModel):
     name: str
 
 
@@ -13,7 +13,7 @@ class Room(RoomBase):
     is_deleted: bool = False
 
 
-class SpaceBase(BaseModel):
+class SpaceBase(SafeBaseModel):
     name: str
     sort_order: int = 0
 
@@ -31,5 +31,5 @@ class Space(SpaceBase):
     deleted_at: Optional[datetime] = None
 
 
-class RoomCreate(BaseModel):
+class RoomCreate(StrictBaseModel):
     name: str

@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 
 
-class ProjectRefundBase(BaseModel):
+class ProjectRefundBase(SafeBaseModel):
     customer_id: str
     nickname: str
     project_type: str  # membership-cards / group-cases / emotional-releases / oh-card-readings / energy-knots / other-projects
@@ -15,7 +15,7 @@ class ProjectRefundBase(BaseModel):
     updated_by: str = ""
 
 
-class ProjectRefundCreate(BaseModel):
+class ProjectRefundCreate(StrictBaseModel):
     customer_id: str
     project_type: str
     project_id: str

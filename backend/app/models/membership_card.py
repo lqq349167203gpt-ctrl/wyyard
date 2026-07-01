@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class MembershipCardBase(BaseModel):
+class MembershipCardBase(SafeBaseModel):
     customer_id: str
     nickname: str
     card_type: str  # 体验会员 / 常规通卡 / 半年卡 / 年卡

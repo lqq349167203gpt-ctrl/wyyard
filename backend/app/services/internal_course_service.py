@@ -85,7 +85,7 @@ def create_course(data: InternalCourseCreate) -> InternalCourse:
         course_data["effective_date"], course_data["course_type"]
     )
     course = InternalCourse(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **course_data,
@@ -143,9 +143,19 @@ def search_customers(keyword: str) -> list:
 
 def rename_course_type(old_type: str, new_type: str) -> int:
     count = 0
+    affected_customers = set()
     for course in _courses.values():
         if course.course_type == old_type:
             course.course_type = new_type
             _save(course.id)
+            affected_customers.add(course.customer_id)
             count += 1
+    # 课程类型变更影响身份条件匹配
+    if affected_customers:
+        from app.services.member_identity_service import refresh_member_type
+        for cid in affected_customers:
+            try:
+                refresh_member_type(cid)
+            except Exception:
+                pass
     return count

@@ -61,7 +61,7 @@ def upsert_grouping(data: DailyGroupingUpsert) -> DailyGrouping:
         return existing
     else:
         record = DailyGrouping(
-            id=str(uuid.uuid4())[:8],
+            id=str(uuid.uuid4())[:12],
             date=data.date,
             groups=data.groups,
             created_at=now,

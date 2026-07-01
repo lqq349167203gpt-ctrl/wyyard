@@ -1,23 +1,23 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 
-class ReminderCondition(BaseModel):
-    type: str  # "acquaintance_date" | "visit_count" | "activity"
-    mode: str  # "fixed_cycle" | "relative" | "participation_count" | "remaining_count"
-    operator: str = ""  # "gt" | "eq" | "lt"
+class ReminderCondition(SafeBaseModel):
+    type: Literal["acquaintance_date", "visit_count", "activity"]
+    mode: Literal["fixed_cycle", "relative", "participation_count", "remaining_count"]
+    operator: Literal["gt", "eq", "lt", ""] = ""
     value: int = 0
-    activity_type: str = ""  # "membership" | "emotional_release" | "group_case" | "energy_knot" | "internal_course"
+    activity_type: Literal["", "membership", "emotional_release", "group_case", "energy_knot", "internal_course"] = ""
 
 
-class ReminderBase(BaseModel):
+class ReminderBase(SafeBaseModel):
     name: str
     account_role: str = "全部"
     account_id: str = "全部"
-    condition_logic: str = "all"  # "all" | "any"
+    condition_logic: Literal["all", "any"] = "all"
     conditions: List[ReminderCondition] = []
-    trigger_mode: str = "once"
+    trigger_mode: Literal["once", "every_time"] = "once"
 
 
 class ReminderCreate(ReminderBase):

@@ -2,23 +2,28 @@ from fastapi import APIRouter, HTTPException, Query
 from app.utils.pagination import paginate
 from app.services import internal_course_session_service
 from app.models.internal_course_session import InternalCourseSessionCreate
-from app.services.customer_service import list_customers
 
 router = APIRouter(prefix="/api/internal-course-sessions", tags=["internal-course-sessions"])
 
 
 def _fill_ics_names(sessions: list) -> list:
-    customers = list_customers()
-    cmap = {c.id: c for c in customers}
-
-    def get_name(cid: str) -> str:
-        if not cid:
-            return ""
-        c = cmap.get(cid)
-        return c.nickname if c else ""
+    from app.services import space_service
+    _space_map: dict[str, str] = {}
+    _room_map: dict[str, str] = {}
+    for sp in space_service.get_all_spaces():
+        _space_map[sp.id] = sp.name
+        for rm in sp.rooms:
+            _room_map[rm.id] = rm.name
 
     for s in sessions:
-        pass  # teacher_ids 的名称由前端解析，无需后端填充
+        sid = getattr(s, "space_id", "")
+        rid = getattr(s, "room_id", "")
+        sn = _space_map.get(sid, "") if sid else ""
+        rn = _room_map.get(rid, "") if rid else ""
+        if getattr(s, "space_name", "") != sn:
+            setattr(s, "space_name", sn)
+        if getattr(s, "room_name", "") != rn:
+            setattr(s, "room_name", rn)
     return sessions
 
 

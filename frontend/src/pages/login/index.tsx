@@ -37,6 +37,7 @@ export default function LoginPage() {
           return
         }
         localStorage.setItem("isLoggedIn", "true")
+        if (result.token) localStorage.setItem("authToken", result.token)
         localStorage.setItem("currentUser", JSON.stringify(result.account))
         localStorage.setItem("userPermissions", JSON.stringify(permissions))
         localStorage.setItem("userCustomerPermissions", JSON.stringify(result.customer_permissions || []))

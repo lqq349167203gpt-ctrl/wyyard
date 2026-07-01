@@ -1,7 +1,13 @@
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Query
-from pydantic import BaseModel
+import logging
+
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Query, Depends
+from app.models.base import StrictBaseModel
+from pydantic import Field
+from starlette.requests import Request as StarletteRequest
 
 from app.models.customer import CustomerCreate, CustomerUpdate, ChatLogParseRequest
+from app.middleware.jwt_auth import require_admin
+from app.middleware.rate_limit import limiter
 from app.services import (
     customer_service,
     membership_card_service,
@@ -11,49 +17,112 @@ from app.services import (
     internal_course_service,
     oh_card_reading_service,
     other_project_service,
+    project_refund_service,
 )
 from app.services.visit_service import count_customer_visits, get_last_visit_date
 from app.services.chat_parser import parse_chat_log, generate_tags
 from app.services.excel_parser import parse_excel
 from app.utils.pagination import paginate
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 
 
-class TagsGenerateRequest(BaseModel):
+class TagsGenerateRequest(StrictBaseModel):
     tags: str
 
 
-def _build_payment_map() -> dict[str, int]:
-    """预计算所有客户的消费总额（O(N) 复杂度）"""
-    from collections import defaultdict
-    totals: dict[str, int] = defaultdict(int)
+class BatchRequest(StrictBaseModel):
+    ids: list[str] = Field(max_length=500)
+
+
+def _fill_total_payment(customer_id: str) -> float:
+    """计算客户净消费总额 = 所有项目付款 - 所有退款（排除已作废的会员卡）"""
+    total = 0.0
     for c in membership_card_service.list_cards():
-        if not c.voided:
-            totals[c.customer_id] += c.price
+        if c.customer_id == customer_id:
+            total += c.price
     for c in group_case_service.list_cases():
-        totals[c.customer_id] += c.amount
+        if c.customer_id == customer_id:
+            total += c.amount
     for r in emotional_release_service.list_releases():
-        totals[r.customer_id] += r.amount
+        if r.customer_id == customer_id:
+            total += r.amount
     for k in energy_knot_service.list_knots():
-        totals[k.customer_id] += k.amount
+        if k.customer_id == customer_id:
+            total += k.amount
     for c in internal_course_service.list_courses():
-        totals[c.customer_id] += c.price
+        if c.customer_id == customer_id:
+            total += c.price
     for r in oh_card_reading_service.list_readings():
-        totals[r.customer_id] += r.amount
+        if r.customer_id == customer_id:
+            total += r.amount
     for p in other_project_service.list_projects():
-        totals[p.customer_id] += p.fee
-    return totals
+        if p.customer_id == customer_id:
+            total += p.fee
+    # 扣除退款金额
+    for r in project_refund_service.list_refunds(customer_id=customer_id):
+        total -= r.refund_amount
+    return max(total, 0)
 
 
-def _fill_visit_count(customer, payment_map: dict[str, int] | None = None):
-    """填充历史到场次数、消费总额、最近到店日期"""
+def _build_enriched_items(customers) -> list[dict]:
+    """批量构建客户列表，一次性扫描所有项目，避免 N*7 次全表扫描"""
+    from collections import defaultdict
+
+    payment_map: dict[str, float] = defaultdict(float)
+
+    # 会员卡（作废卡仍计入消费总额，退费由 refund 记录扣除）
+    for c in membership_card_service.list_cards():
+        payment_map[c.customer_id] += c.price
+    # 觉醒游戏
+    for c in group_case_service.list_cases():
+        payment_map[c.customer_id] += c.amount
+    # 情绪释放
+    for r in emotional_release_service.list_releases():
+        payment_map[r.customer_id] += r.amount
+    # 能量结
+    for k in energy_knot_service.list_knots():
+        payment_map[k.customer_id] += k.amount
+    # 内部课程
+    for c in internal_course_service.list_courses():
+        payment_map[c.customer_id] += c.price
+    # OH卡梳理
+    for r in oh_card_reading_service.list_readings():
+        payment_map[r.customer_id] += r.amount
+    # 其他项目
+    for p in other_project_service.list_projects():
+        payment_map[p.customer_id] += p.fee
+    # 扣除退款
+    for r in project_refund_service.list_refunds():
+        payment_map[r.customer_id] -= r.refund_amount
+
+    _SLIM_FIELDS = (
+        "id", "nickname", "name", "gender", "phone", "wechat", "age",
+        "member_type", "positions", "self_tags", "paid_content",
+        "referrer", "referrer_handler", "service_teacher",
+        "traffic_source", "traffic_source_detail",
+        "need_tags", "follow_up_node", "follow_up_action",
+        "core_situation", "tags", "work_status", "work_description",
+        "basic_info", "assessment", "other_info", "tracking_plan",
+        "created_at", "created_by", "space_id", "position_sort_orders",
+    )
+    items = []
+    for c in customers:
+        data = {k: getattr(c, k, None) for k in _SLIM_FIELDS}
+        data["visit_count"] = count_customer_visits(c.id)
+        data["total_payment"] = max(payment_map.get(c.id, 0), 0)
+        data["last_visit_date"] = get_last_visit_date(c.id)
+        items.append(data)
+    return items
+
+
+def _fill_visit_count(customer):
+    """填充历史到场次数、消费总额、最近到店日期（单个客户，用于详情）"""
     data = customer.model_dump(mode="json")
     data["visit_count"] = count_customer_visits(customer.id)
-    if payment_map is not None:
-        data["total_payment"] = payment_map.get(customer.id, 0)
-    else:
-        data["total_payment"] = _build_payment_map().get(customer.id, 0)
+    data["total_payment"] = _fill_total_payment(customer.id)
     data["last_visit_date"] = get_last_visit_date(customer.id)
     return data
 
@@ -69,8 +138,7 @@ async def list_customers(
     member_types: str | None = Query(None),
 ):
     customers = customer_service.list_customers()
-    payment_map = _build_payment_map()
-    items = [_fill_visit_count(c, payment_map) for c in customers]
+    items = _build_enriched_items(customers)
 
     # Apply filters
     if nickname:
@@ -96,40 +164,21 @@ async def list_customers(
 
 @router.post("")
 async def create_customer(data: CustomerCreate, request: Request):
-    # 自动填充创建人
-    if not data.created_by:
-        account_id = ""
-        # 优先从 X-User-Id 获取（管理端）
-        user_id = request.headers.get("X-User-Id", "")
-        if user_id:
-            account_id = user_id
-        else:
-            # 从 Authorization: Bearer <token> 获取（小程序端）
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer "):
-                token = auth[7:]
-                try:
-                    from app.services.wechat_service import validate_token
-                    account_id = validate_token(token) or ""
-                except Exception:
-                    pass
-        if account_id:
-            try:
-                from app.services import account_service
-                account = account_service.get_account(account_id)
-                if account:
-                    data.created_by = account.owner or account.username
-            except Exception:
-                pass
+    # 强制从 JWT 派生 created_by，忽略客户端传入值
+    account_id = getattr(request.state, "user_id", "")
+    if account_id:
+        try:
+            from app.services import account_service
+            account = account_service.get_account(account_id)
+            if account:
+                data.created_by = account.owner or account.username
+        except Exception:
+            logger.warning("无法从 JWT 派生 created_by: account_id=%s", account_id)
     try:
         customer = customer_service.create_customer(data)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     return _fill_visit_count(customer)
-
-
-class BatchRequest(BaseModel):
-    ids: list[str]
 
 
 @router.get("/light")
@@ -199,37 +248,77 @@ async def delete_customer(customer_id: str):
     return {"message": "已删除"}
 
 
+@router.post("/{customer_id}/restore")
+async def restore_customer(customer_id: str, _admin: str = Depends(require_admin)):
+    customer = customer_service.restore_customer(customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="客户不存在或未被删除")
+    return _fill_visit_count(customer)
+
+
 @router.post("/parse-chat")
-async def parse_chat(data: ChatLogParseRequest):
+@limiter.limit("10/minute")
+async def parse_chat(data: ChatLogParseRequest, request: StarletteRequest):
+    # 需要登录
+    if not getattr(request.state, "user_id", ""):
+        raise HTTPException(status_code=401, detail="请先登录")
+    # 输入长度限制
+    if len(data.chat_log) > 50000:
+        raise HTTPException(status_code=400, detail="聊天记录过长，最多 50000 字符")
     try:
         result = parse_chat_log(data.chat_log)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
+    except Exception:
+        logger.exception("聊天记录解析失败")
+        raise HTTPException(status_code=500, detail="解析失败，请稍后重试")
 
 
 @router.post("/parse-excel")
-async def parse_excel_file(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def parse_excel_file(request: StarletteRequest, file: UploadFile = File(...)):
+    if not getattr(request.state, "user_id", ""):
+        raise HTTPException(status_code=401, detail="请先登录")
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="请上传 Excel 文件（.xlsx 或 .xls）")
     try:
-        content = await file.read()
+        # 分块读取，提前检查大小，避免超大文件占满内存
+        max_size = 10 * 1024 * 1024  # 10MB
+        chunks = []
+        total = 0
+        while True:
+            chunk = await file.read(8192)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_size:
+                raise HTTPException(status_code=400, detail="文件过大，最多 10MB")
+            chunks.append(chunk)
+        content = b"".join(chunks)
         results = parse_excel(content)
         return results
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
+    except Exception:
+        logger.exception("Excel 解析失败")
+        raise HTTPException(status_code=500, detail="解析失败，请稍后重试")
 
 
 @router.post("/generate-tags")
-async def generate_tags_endpoint(data: TagsGenerateRequest):
+@limiter.limit("10/minute")
+async def generate_tags_endpoint(data: TagsGenerateRequest, request: StarletteRequest):
+    if not getattr(request.state, "user_id", ""):
+        raise HTTPException(status_code=401, detail="请先登录")
+    if len(data.tags) > 10000:
+        raise HTTPException(status_code=400, detail="输入过长，最多 10000 字符")
     try:
         result = generate_tags(data.tags)
         return {"tags": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+    except Exception:
+        logger.exception("标签生成失败")
+        raise HTTPException(status_code=500, detail="生成失败，请稍后重试")

@@ -13,6 +13,7 @@ import { customerApi, type Customer } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { POSITION_COURSE_DEPT } from "@/lib/positions"
 
 export default function PositionsPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -35,8 +36,8 @@ export default function PositionsPage() {
     loadCustomers()
   }, [])
 
-  // Filter customers who have "课程部" position
-  const courseTeachers = customers.filter(c => c.positions?.includes("课程部"))
+  // Filter customers who have POSITION_COURSE_DEPT position
+  const courseTeachers = customers.filter(c => c.positions?.includes(POSITION_COURSE_DEPT))
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(courseTeachers)
 
@@ -48,8 +49,8 @@ export default function PositionsPage() {
         const customer = customers.find(c => c.nickname === nickname)
         if (!customer) continue
         const existingPositions = customer.positions || []
-        if (!existingPositions.includes("课程部")) {
-          await customerApi.update(customer.id, { positions: [...existingPositions, "课程部"] })
+        if (!existingPositions.includes(POSITION_COURSE_DEPT)) {
+          await customerApi.update(customer.id, { positions: [...existingPositions, POSITION_COURSE_DEPT] })
         }
       }
       setSelectedNicknames([])
@@ -64,8 +65,8 @@ export default function PositionsPage() {
 
   const handleDelete = async () => {
     if (!deletingTeacher) return
-    // Remove "课程部" from positions instead of deleting the user
-    const newPositions = deletingTeacher.positions.filter(p => p !== "课程部")
+    // Remove POSITION_COURSE_DEPT from positions instead of deleting the user
+    const newPositions = deletingTeacher.positions.filter(p => p !== POSITION_COURSE_DEPT)
     await customerApi.update(deletingTeacher.id, { positions: newPositions })
     setDeleteDialogOpen(false)
     setDeletingTeacher(null)

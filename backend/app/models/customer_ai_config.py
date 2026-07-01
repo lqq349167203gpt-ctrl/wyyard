@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
 
 
-class CustomerAIConfig(BaseModel):
+class CustomerAIConfig(SafeBaseModel):
     """客户管理 AI 配置，全局唯一，1:1 强关联"""
     id: str = "default"
     name: str = "客户信息提取"
@@ -18,7 +18,7 @@ class CustomerAIConfig(BaseModel):
     updated_at: Optional[datetime] = None
 
 
-class CustomerAIConfigUpdate(BaseModel):
+class CustomerAIConfigUpdate(StrictBaseModel):
     name: Optional[str] = None
     provider: Optional[str] = None
     model: Optional[str] = None

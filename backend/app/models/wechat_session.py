@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime, timezone
 
 
-class WechatSession(BaseModel):
+class WechatSession(SafeBaseModel):
     token: str
     openid: str
     account_id: str

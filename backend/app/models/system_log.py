@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import Optional
 
 
-class SystemLogBase(BaseModel):
+class SystemLogBase(SafeBaseModel):
     section: str  # 板块名称
     content: str  # 操作内容
 

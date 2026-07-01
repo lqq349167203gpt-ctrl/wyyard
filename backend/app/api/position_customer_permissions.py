@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from app.services import position_customer_permission_service
 
 router = APIRouter(prefix="/api/position-customer-permissions", tags=["position-customer-permissions"])
@@ -7,12 +7,12 @@ router = APIRouter(prefix="/api/position-customer-permissions", tags=["position-
 VALID_SECTIONS = {"customers", "class_records", "payment"}
 
 
-class CustomerPermissionUpdate(BaseModel):
+class CustomerPermissionUpdate(StrictBaseModel):
     position: str
     member_types: list[str]
 
 
-class CustomerPermissionBatchUpdate(BaseModel):
+class CustomerPermissionBatchUpdate(StrictBaseModel):
     position: str
     customers: list[str] = []
     class_records: list[str] = []

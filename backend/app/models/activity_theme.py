@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 
 
-class ActivityThemeBase(BaseModel):
+class ActivityThemeBase(SafeBaseModel):
     date: str          # YYYY-MM-DD
     space_id: str = ""  # 所属空间，空字符串表示未关联空间
     week_theme: str = ""

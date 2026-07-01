@@ -1,16 +1,16 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class GroupMember(BaseModel):
+class GroupMember(SafeBaseModel):
     name: str = ""
     member_ids: List[str] = []
     leader_id: str = ""
     deputy_id: str = ""
 
 
-class ClassRecordBase(BaseModel):
+class ClassRecordBase(SafeBaseModel):
     date: str  # YYYY-MM-DD
     start_time: Optional[str] = None  # HH:MM
     end_time: Optional[str] = None  # HH:MM
@@ -31,7 +31,7 @@ class ClassRecordBase(BaseModel):
     space_name: str = ""
 
 
-class ClassRecordCreate(BaseModel):
+class ClassRecordCreate(StrictBaseModel):
     date: str
     start_time: Optional[str] = None
     end_time: Optional[str] = None

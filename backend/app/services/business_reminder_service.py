@@ -1,5 +1,3 @@
-import uuid
-import time
 import threading
 from datetime import datetime, timezone, date
 from typing import List, Dict, Any, Optional
@@ -83,6 +81,8 @@ def _evaluate_condition(condition, customer_id: str) -> bool:
 
     if condition.type == "visit_count":
         count = visit_service.count_customer_visits(customer_id)
+        if condition.mode == "fixed_cycle":
+            return condition.value > 0 and count > 0 and count % condition.value == 0
         return _compare(condition.operator, count, condition.value)
 
     if condition.type == "activity":
@@ -107,7 +107,6 @@ def _evaluate_condition(condition, customer_id: str) -> bool:
 def _format_condition(condition) -> str:
     """将条件格式化为可读文字"""
     op_map = {"gt": "大于", "eq": "等于", "lt": "小于"}
-    type_map = {"acquaintance_date": "认识日期", "visit_count": "到店次数", "activity": "活动参与"}
     activity_map = {
         "membership": "会员活动", "emotional_release": "情绪释放",
         "group_case": "觉醒游戏", "energy_knot": "能量结", "internal_course": "内部课程",
@@ -151,7 +150,7 @@ def _precompute_metrics(customer_ids: set) -> Dict[str, Dict[str, Any]]:
     # 1. 到店次数 — 一次遍历所有 visits
     visit_counts: Dict[str, set] = {}
     for v in visit_service._visits.values():
-        if v.customer_id in customer_ids:
+        if v.customer_id in customer_ids and v.arrived:
             visit_counts.setdefault(v.customer_id, set()).add(v.visit_date)
     for cid in customer_ids:
         metrics[cid]["visit_count"] = len(visit_counts.get(cid, set()))
@@ -187,16 +186,9 @@ def _precompute_metrics(customer_ids: set) -> Dict[str, Dict[str, Any]]:
     for cid in customer_ids:
         metrics[cid]["activity_counts"] = activity_counts[cid]
 
-    # 3. 会员卡剩余次数 — 一次遍历所有 cards
-    latest_cards: Dict[str, MembershipCard] = {}
-    for card in membership_card_service.list_cards():
-        if card.customer_id in customer_ids and card.remaining_count is not None:
-            existing = latest_cards.get(card.customer_id)
-            if not existing or card.created_at > existing.created_at:
-                latest_cards[card.customer_id] = card
+    # 3. 会员卡剩余次数 — 使用 get_effective_remaining（唯一真实数据源）
     for cid in customer_ids:
-        card = latest_cards.get(cid)
-        metrics[cid]["remaining_count"] = card.remaining_count if card else None
+        metrics[cid]["remaining_count"] = membership_card_service.get_effective_remaining(cid)
 
     return metrics
 
@@ -219,6 +211,8 @@ def _evaluate_condition_cached(condition, customer_id: str, customer, metrics: D
 
     if condition.type == "visit_count":
         count = metrics.get("visit_count", 0)
+        if condition.mode == "fixed_cycle":
+            return condition.value > 0 and count > 0 and count % condition.value == 0
         return _compare(condition.operator, count, condition.value)
 
     if condition.type == "activity":

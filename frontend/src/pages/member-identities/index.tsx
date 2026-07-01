@@ -16,7 +16,9 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { ActivityConfigContent } from "@/pages/activity-config"
+import { HEALING_POSITIONS } from "@/lib/positions"
 
+// 与 membership_card.card_type 实际值对齐；新增卡类型时需同步更新
 const CARD_TYPES = ["次卡", "体验会员", "月卡", "3月卡", "30次卡", "半年卡", "年卡"]
 const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
 const PAYMENT_CATEGORIES = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "内部课程", "其他项目"]
@@ -27,7 +29,10 @@ const TYPE_LABELS: Record<string, string> = {
   payment: "付费项目",
   card: "付费项目",
   course: "付费项目",
+  teacher: "疗愈老师",
 }
+
+const TEACHER_POSITIONS = [...HEALING_POSITIONS]
 
 const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于" }
 const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "其他项目"]
@@ -40,10 +45,15 @@ function getPaymentCategories(c: IdentityCondition): string[] {
 
 function conditionSummary(c: IdentityCondition): string {
   if (c.type === "arrival" || c.type === "activity") {
-    const label = TYPE_LABELS[c.type]
-    if (c.count_value === 0 && c.count_op === "=") return `未${c.type === "arrival" ? "到店" : "参与活动"}`
+    const isWelfare = c.type === "activity" && c.activity_scope === "welfare"
+    const label = c.type === "arrival" ? "到店情况" : (isWelfare ? "公益活动" : "活动参与")
+    if (c.count_value === 0 && c.count_op === "=") return `未${c.type === "arrival" ? "到店" : (isWelfare ? "参加公益活动" : "参与活动")}`
     if (c.count_value === 0 && c.count_op === ">") return `${label} ≥ 1 次`
     return `${label} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`
+  }
+  if (c.type === "teacher") {
+    if (!c.items || c.items.length === 0) return "疗愈老师（未选择）"
+    return `疗愈老师：${c.items[0]}`
   }
   if (c.type === "card" || c.type === "course" || c.type === "payment") {
     const categories = getPaymentCategories(c)
@@ -64,7 +74,7 @@ function conditionSummary(c: IdentityCondition): string {
 }
 
 function defaultCondition(): IdentityCondition {
-  return { type: "" as any, items: [], payment_categories: [], count_op: ">", count_value: "" as any, validity: "active" }
+  return { type: "" as any, items: [], payment_categories: [], count_op: ">", count_value: "" as any, validity: "active", activity_scope: "all" }
 }
 
 export default function MemberIdentitiesPage() {
@@ -114,7 +124,13 @@ export default function MemberIdentitiesPage() {
     setEditingItem(item)
     setFormName(item.name)
     setFormType(item.type || "")
-    setFormConditions(item.conditions.length > 0 ? [...item.conditions] : [defaultCondition()])
+    // 兼容旧类型：card/course 自动转为 payment
+    const conditions = item.conditions.length > 0 ? item.conditions.map(c => {
+      if (c.type === "card") return { ...c, type: "payment" as const, payment_categories: ["会员卡"] }
+      if (c.type === "course") return { ...c, type: "payment" as const, payment_categories: ["内部课程"] }
+      return c
+    }) : [defaultCondition()]
+    setFormConditions(conditions)
     setFormOperator(item.operator || "all")
     setDialogOpen(true)
   }
@@ -212,6 +228,7 @@ export default function MemberIdentitiesPage() {
         updated.count_op = ">"
         updated.count_value = "" as any
         updated.validity = "active"
+        updated.activity_scope = "all"
       }
       return updated
     }))
@@ -432,7 +449,7 @@ export default function MemberIdentitiesPage() {
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
                           value={cond.type}
-                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "payment", label: "付费项目"}]}
+                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}]}
                           placeholder="请选择条件类型"
                           onChange={(v) => updateCondition(ci, { type: v as IdentityCondition["type"] })}
                         />
@@ -451,6 +468,7 @@ export default function MemberIdentitiesPage() {
 
                       {/* 到店/活动 → 按次数 */}
                       {cond.type && (cond.type === "arrival" || cond.type === "activity") && (
+                        <>
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">次数</span>
                           <SelectDropdown
@@ -466,6 +484,31 @@ export default function MemberIdentitiesPage() {
                             className="w-20 h-8 text-[12px]"
                           />
                           <span className="text-[12px] text-[#4e535a]">次</span>
+                        </div>
+                        {cond.type === "activity" && (
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={cond.activity_scope === "welfare"}
+                              onChange={(e) => updateCondition(ci, { activity_scope: e.target.checked ? "welfare" : "all" })}
+                              className="w-3.5 h-3.5 rounded border-[#dee0e3]"
+                            />
+                            <span className="text-[12px] text-[#4e535a]">仅公益活动</span>
+                          </label>
+                        )}
+                        </>
+                      )}
+
+                      {/* 疗愈老师 → 身份选择 */}
+                      {cond.type === "teacher" && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">身份</span>
+                          <SelectDropdown
+                            value={cond.items[0] || ""}
+                            options={TEACHER_POSITIONS.map(p => ({value: p, label: p}))}
+                            placeholder="请选择身份"
+                            onChange={(v) => updateCondition(ci, { items: v ? [v] : [] })}
+                          />
                         </div>
                       )}
 

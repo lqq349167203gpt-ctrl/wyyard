@@ -1,16 +1,16 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 
-class GroupInfo(BaseModel):
+class GroupInfo(SafeBaseModel):
     name: str = ""
     leader_id: str = ""
     deputy_id: str = ""
     member_ids: List[str] = []
 
 
-class DailyGrouping(BaseModel):
+class DailyGrouping(SafeBaseModel):
     id: str
     date: str
     groups: List[GroupInfo] = []
@@ -18,6 +18,6 @@ class DailyGrouping(BaseModel):
     updated_at: datetime
 
 
-class DailyGroupingUpsert(BaseModel):
+class DailyGroupingUpsert(StrictBaseModel):
     date: str
     groups: List[GroupInfo] = []

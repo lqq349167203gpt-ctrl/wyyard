@@ -23,7 +23,7 @@ _load()
 def save_message(data: ChatRecordCreate) -> ChatRecord:
     now = datetime.now(timezone.utc)
     record = ChatRecord(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         **data.model_dump(),
     )

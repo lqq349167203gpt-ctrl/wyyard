@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from typing import List, Optional
 
 from app.services import activity_order_service
@@ -7,7 +7,7 @@ from app.services import activity_order_service
 router = APIRouter(prefix="/api/activity-orders", tags=["activity-orders"])
 
 
-class SaveOrderRequest(BaseModel):
+class SaveOrderRequest(StrictBaseModel):
     date: str
     space_id: str = ""
     order: List[str]

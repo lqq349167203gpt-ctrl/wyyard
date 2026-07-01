@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class OtherProjectBase(BaseModel):
+class OtherProjectBase(SafeBaseModel):
     customer_id: str
     nickname: str
     category: Optional[str] = None  # 二级类目

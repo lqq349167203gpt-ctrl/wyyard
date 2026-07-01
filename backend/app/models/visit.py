@@ -1,9 +1,10 @@
-from pydantic import BaseModel, field_validator
+from app.models.base import SafeBaseModel
+from pydantic import field_validator
 from datetime import datetime
 from typing import Optional, List
 
 
-class ActivityInfo(BaseModel):
+class ActivityInfo(SafeBaseModel):
     name: str = ""
     role: str = ""  # 组长 / 副组长 / 组员 / 空
     type: str = ""  # 沙龙 / 觉醒 / 情绪 / 能量结 / 内部课
@@ -12,7 +13,7 @@ class ActivityInfo(BaseModel):
     is_welfare: bool = False  # 是否公益活动
 
 
-class VisitRecordBase(BaseModel):
+class VisitRecordBase(SafeBaseModel):
     visit_date: str  # YYYY-MM-DD
     visit_time: str = "09:00"  # HH:MM
     customer_id: str
@@ -61,7 +62,7 @@ class VisitRecord(VisitRecordBase):
     deleted_at: Optional[datetime] = None
 
 
-class CustomerSearchResult(BaseModel):
+class CustomerSearchResult(SafeBaseModel):
     id: str
     nickname: str
     name: str = ""

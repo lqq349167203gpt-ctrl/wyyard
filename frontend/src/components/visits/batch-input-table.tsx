@@ -334,10 +334,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   useEffect(() => {
     if (initialLoaded.current) return
     let cancelled = false
-    console.log(`[BATCH] 开始加载 date=${date} spaceId=${spaceId}`)
     visitApi.list(date, undefined, spaceId).then(visits => {
       if (cancelled) return
-      console.log(`[BATCH] 加载 ${date} 的记录: ${visits.length} 条`, visits.map(v => v.id))
       initialLoaded.current = true
       if (!visits.length) {
         setRows(initRows())
@@ -387,7 +385,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       setRowStatus(statuses)
       setSavedCount(visits.length)
     }).catch((err) => { console.error("[BATCH] 加载失败:", err) })
-    return () => { cancelled = true; console.log(`[BATCH] effect cleanup date=${date} spaceId=${spaceId}`) }
+    return () => { cancelled = true }
   }, [date, spaceId])
 
   const saveRow = useCallback(async (row: Row) => {
@@ -437,9 +435,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           group_leader_feedback: row.group_leader_feedback,
           space_id: spaceId || undefined,
         }
-        console.log("[BATCH] 创建行:", payload)
         const result = await visitApi.create(payload)
-        console.log("[BATCH] 创建结果:", result?.id, "space_id:", result?.space_id)
         if (result?.id) {
           savedVisitIds.current[row.key] = result.id
           setRows(prev => prev.map(r => r.key === row.key ? { ...r, visit_id: result.id } : r))
@@ -524,7 +520,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   const addRow = useCallback(async () => {
     const row = emptyRow()
-    console.log("[BATCH] addRow, key:", row.key)
     const allFields = Object.keys(row).filter(k => k !== "key") as string[]
     pushHistory("新增了人员", undefined, undefined, undefined, [{ rowKey: row.key, fields: allFields }])
     setRows(prev => [...prev, row])

@@ -1,3 +1,4 @@
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
@@ -8,6 +9,7 @@ from app.services import customer_service, membership_card_service
 
 FILENAME = "class_records.json"
 _records: Dict[str, ClassRecord] = {}
+_record_lock = threading.Lock()
 
 
 def _load():
@@ -111,10 +113,34 @@ def _sync_deduction(record, old_chargeable, new_chargeable):
         membership_card_service.deduct_for_activity(cid, activity_key)
 
 
+def _refresh_affected_identities(customer_ids: set):
+    """刷新受影响客户的会员身份"""
+    from app.services.member_identity_service import refresh_member_type
+    for cid in customer_ids:
+        if cid:
+            try:
+                refresh_member_type(cid)
+            except Exception:
+                pass
+
+
+def _get_all_member_ids(record) -> set:
+    """获取记录中所有相关人员 ID（参与者 + 老师 + 分组成员）"""
+    ids = set(record.participant_ids or [])
+    ids.update(record.teacher_ids or [])
+    for g in record.groups:
+        if g.leader_id:
+            ids.add(g.leader_id)
+        if g.deputy_id:
+            ids.add(g.deputy_id)
+        ids.update(g.member_ids or [])
+    return ids
+
+
 def create_record(data: ClassRecordCreate) -> ClassRecord:
     now = datetime.now(timezone.utc)
     record = ClassRecord(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),
@@ -122,44 +148,48 @@ def create_record(data: ClassRecordCreate) -> ClassRecord:
     _records[record.id] = record
     _save(record.id)
     _deduct_for_record(record)
+    _refresh_affected_identities(_get_all_member_ids(record))
     return record
 
 
 def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
-    record = _records.get(record_id)
-    if not record or record.is_deleted:
-        return None
+    with _record_lock:
+        record = _records.get(record_id)
+        if not record or record.is_deleted:
+            return None
 
-    # 获取旧状态
-    old_chargeable = _get_group_member_ids(record)
-    old_is_public_welfare = record.is_public_welfare
+        # 获取旧状态
+        old_chargeable = _get_group_member_ids(record)
+        old_is_public_welfare = record.is_public_welfare
 
-    for key, value in data.items():
-        if hasattr(record, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
-            setattr(record, key, value)
-    record.updated_at = datetime.now(timezone.utc)
-    _records[record_id] = record
-    _save(record_id)
+        for key, value in data.items():
+            if hasattr(record, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
+                setattr(record, key, value)
+        record.updated_at = datetime.now(timezone.utc)
+        _records[record_id] = record
+        _save(record_id)
 
-    # 公益状态变更：非公益→公益 退费，公益→非公益 扣费
-    new_is_public_welfare = record.is_public_welfare
-    if old_is_public_welfare != new_is_public_welfare:
-        activity_key = f"class:{record.id}"
-        if new_is_public_welfare:
-            # 非公益→公益：退费
-            for cid in old_chargeable:
-                membership_card_service.restore_for_activity(cid, activity_key)
+        # 公益状态变更：非公益→公益 退费，公益→非公益 扣费
+        new_is_public_welfare = record.is_public_welfare
+        if old_is_public_welfare != new_is_public_welfare:
+            activity_key = f"class:{record.id}"
+            if new_is_public_welfare:
+                # 非公益→公益：退费
+                for cid in old_chargeable:
+                    membership_card_service.restore_for_activity(cid, activity_key)
+            else:
+                # 公益→非公益：扣费
+                new_chargeable = _get_group_member_ids(record)
+                for cid in new_chargeable:
+                    membership_card_service.deduct_for_activity(cid, activity_key)
         else:
-            # 公益→非公益：扣费
+            # 同步扣费（人员变更）
             new_chargeable = _get_group_member_ids(record)
-            for cid in new_chargeable:
-                membership_card_service.deduct_for_activity(cid, activity_key)
-    else:
-        # 同步扣费（人员变更）
-        new_chargeable = _get_group_member_ids(record)
-        _sync_deduction(record, old_chargeable, new_chargeable)
+            _sync_deduction(record, old_chargeable, new_chargeable)
 
-    return record
+        # 刷新所有受影响客户的会员身份（旧参与者 + 新参与者）
+        _refresh_affected_identities(old_chargeable | _get_all_member_ids(record))
+        return record
 
 
 def update_participants(record_id: str, participant_ids: List[str]):
@@ -168,12 +198,14 @@ def update_participants(record_id: str, participant_ids: List[str]):
     if not record or record.is_deleted:
         return None, []
     old_chargeable = _get_group_member_ids(record)
+    old_ids = _get_all_member_ids(record)
     record.participant_ids = participant_ids
     new_chargeable = _get_group_member_ids(record)
     _sync_deduction(record, old_chargeable, new_chargeable)
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
     _save(record_id)
+    _refresh_affected_identities(old_ids | _get_all_member_ids(record))
     return record, []
 
 
@@ -181,10 +213,12 @@ def delete_record(record_id: str) -> bool:
     record = _records.get(record_id)
     if not record or record.is_deleted:
         return False
+    affected_ids = _get_all_member_ids(record)
     _restore_for_record(record)
     record.is_deleted = True
     record.deleted_at = datetime.now(timezone.utc)
     _save(record_id)
+    _refresh_affected_identities(affected_ids)
     return True
 
 
@@ -218,6 +252,7 @@ def update_groups(record_id: str, groups: list):
         g["member_ids"] = valid_mids
         all_member_ids.update(valid_mids)
 
+    old_ids = _get_all_member_ids(record)
     old_chargeable = _get_group_member_ids(record)
     record.participant_ids = list(all_member_ids)
     record.groups = [GroupMember(**g) for g in groups]
@@ -226,6 +261,7 @@ def update_groups(record_id: str, groups: list):
     record.updated_at = datetime.now(timezone.utc)
     _records[record_id] = record
     _save(record_id)
+    _refresh_affected_identities(old_ids | _get_all_member_ids(record))
     return record, []
 
 

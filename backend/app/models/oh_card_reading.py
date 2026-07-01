@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import Optional, List
 
 
-class OhCardReadingBase(BaseModel):
+class OhCardReadingBase(SafeBaseModel):
     customer_id: str
     nickname: str
     purchase_count: int = 0

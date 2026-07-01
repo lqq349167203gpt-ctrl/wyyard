@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class GroupCaseSessionBase(BaseModel):
+class GroupCaseSessionBase(SafeBaseModel):
     date: str  # YYYY-MM-DD
     start_time: Optional[str] = None  # HH:MM
     end_time: Optional[str] = None  # HH:MM

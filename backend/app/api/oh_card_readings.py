@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 from app.utils.pagination import paginate
 from app.services import oh_card_reading_service
 from app.models.oh_card_reading import OhCardReadingCreate

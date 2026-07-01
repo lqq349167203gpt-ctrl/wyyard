@@ -1,21 +1,21 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from typing import Optional
 from app.services import course_type_service
 
 router = APIRouter(prefix="/api/course-types", tags=["course-types"])
 
 
-class CourseTypeCreate(BaseModel):
+class CourseTypeCreate(StrictBaseModel):
     name: str
     organization_id: Optional[str] = ""
 
 
-class CourseTypeRename(BaseModel):
+class CourseTypeRename(StrictBaseModel):
     new_name: str
 
 
-class CourseTypeUpdate(BaseModel):
+class CourseTypeUpdate(StrictBaseModel):
     organization_id: Optional[str] = None
 
 
@@ -63,7 +63,7 @@ def delete_type(name: str):
     return {"message": "删除成功"}
 
 
-class CourseTypeReorder(BaseModel):
+class CourseTypeReorder(StrictBaseModel):
     names: list[str]
 
 

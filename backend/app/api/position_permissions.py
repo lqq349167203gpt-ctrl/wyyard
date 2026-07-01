@@ -1,16 +1,16 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from app.services import position_permission_service, position_customer_permission_service, position_page_permission_service
 
 router = APIRouter(prefix="/api/position-permissions", tags=["position-permissions"])
 
 
-class PermissionUpdate(BaseModel):
+class PermissionUpdate(StrictBaseModel):
     position: str
     pages: list[str]
 
 
-class FullPermissionUpdate(BaseModel):
+class FullPermissionUpdate(StrictBaseModel):
     position: str
     pages: list[str]
     customers: list[str] = []

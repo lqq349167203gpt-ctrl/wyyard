@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from enum import Enum
 from datetime import datetime
 from typing import Optional
@@ -10,7 +10,7 @@ class AgentStatus(str, Enum):
     ERROR = "error"
 
 
-class AgentBase(BaseModel):
+class AgentBase(SafeBaseModel):
     name: str
     description: str = ""
     model: str = "glm-5"
@@ -24,7 +24,7 @@ class AgentCreate(AgentBase):
     pass
 
 
-class AgentUpdate(BaseModel):
+class AgentUpdate(StrictBaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     model: Optional[str] = None
@@ -45,12 +45,12 @@ class Agent(AgentBase):
     deleted_at: Optional[datetime] = None
 
 
-class AgentMessage(BaseModel):
+class AgentMessage(SafeBaseModel):
     role: str
     content: str
     timestamp: datetime
 
 
-class AgentChatRequest(BaseModel):
+class AgentChatRequest(StrictBaseModel):
     message: str
     history: list[AgentMessage] = []

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from app.services import project_refund_service
 from app.models.project_refund import ProjectRefundCreate
 from app.utils.pagination import paginate
@@ -23,7 +23,7 @@ def create_refund(data: ProjectRefundCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-class RefundUpdate(BaseModel):
+class RefundUpdate(StrictBaseModel):
     refund_amount: float
     updated_by: str = ""
 

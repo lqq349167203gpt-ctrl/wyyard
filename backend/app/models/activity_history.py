@@ -1,13 +1,13 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
-from typing import List, Optional, Any
+from typing import List, Any
 
 
-class ChangedCell(BaseModel):
+class ChangedCell(SafeBaseModel):
     rowKey: int
     fields: List[str]
 
-class ActivityHistoryBase(BaseModel):
+class ActivityHistoryBase(SafeBaseModel):
     date: str                    # "2026-06-18"
     space_id: str
     action: str                  # "编辑了活动" | "新增了活动" | ...

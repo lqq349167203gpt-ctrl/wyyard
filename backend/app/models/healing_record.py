@@ -1,16 +1,16 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class Material(BaseModel):
+class Material(SafeBaseModel):
     id: str
     name: str
     url: str
     size: int = 0
 
 
-class HealingRecordBase(BaseModel):
+class HealingRecordBase(SafeBaseModel):
     customer_id: str
     customer_name: str = ""
     date: str  # YYYY-MM-DD
@@ -24,7 +24,7 @@ class HealingRecordCreate(HealingRecordBase):
     pass
 
 
-class HealingRecordUpdate(BaseModel):
+class HealingRecordUpdate(StrictBaseModel):
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     date: Optional[str] = None

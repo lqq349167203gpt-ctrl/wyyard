@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from app.services import storage
 
 FILENAME = "activity_orders.json"

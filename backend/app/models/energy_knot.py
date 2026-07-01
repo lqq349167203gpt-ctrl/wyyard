@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class EnergyKnotBase(BaseModel):
+class EnergyKnotBase(SafeBaseModel):
     customer_id: str
     nickname: str
     purchase_count: int = 0

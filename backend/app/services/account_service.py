@@ -1,15 +1,19 @@
+import threading
 import uuid
-import bcrypt
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
-from app.models.account import Account, AccountCreate, Role, RoleCreate
+import bcrypt
+
+from app.models.account import Account, AccountCreate, AccountUpdate, Role, RoleCreate, RoleUpdate
 from app.services.storage import load_data, save_data, save_item
 
 ACCOUNTS_FILE = "accounts.json"
 ROLES_FILE = "roles.json"
 _accounts: Dict[str, Account] = {}
 _roles: Dict[str, Role] = {}
+_account_lock = threading.Lock()
+_role_lock = threading.Lock()
 
 
 def _hash_password(password: str) -> str:
@@ -17,9 +21,6 @@ def _hash_password(password: str) -> str:
 
 
 def _check_password(password: str, hashed: str) -> bool:
-    # 兼容明文密码：如果 hashed 不是 bcrypt 格式，直接比较
-    if not hashed.startswith("$2b$"):
-        return password == hashed
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
@@ -85,59 +86,68 @@ def get_account(account_id: str) -> Optional[Account]:
 
 
 def create_account(data: AccountCreate) -> Account:
-    # 验证归属人唯一性（跳过已删除的账号）
-    for account in _accounts.values():
-        if account.is_deleted:
-            continue
-        if account.owner == data.owner:
-            raise ValueError("归属人已存在")
-        if account.username == data.username:
-            raise ValueError("账号已存在")
+    with _account_lock:
+        # 验证归属人唯一性（跳过已删除的账号）
+        for account in _accounts.values():
+            if account.is_deleted:
+                continue
+            if account.owner == data.owner:
+                raise ValueError("归属人已存在")
+            if account.username == data.username:
+                raise ValueError("账号已存在")
 
-    now = datetime.now(timezone.utc)
-    account_data = data.model_dump()
-    account_data["password"] = _hash_password(account_data["password"])
-    account = Account(id=str(uuid.uuid4())[:8], created_at=now, **account_data)
-    _accounts[account.id] = account
-    _save_accounts(account.id)
-    return account
+        now = datetime.now(timezone.utc)
+        account_data = data.model_dump()
+        account_data["password"] = _hash_password(account_data["password"])
+        account = Account(id=str(uuid.uuid4())[:12], created_at=now, **account_data)
+        _accounts[account.id] = account
+        _save_accounts(account.id)
+        return account
 
 
-def update_account(account_id: str, data: dict) -> Optional[Account]:
-    account = _accounts.get(account_id)
-    if not account:
-        return None
-    # 系统账号只允许修改账号、密码和归属人
-    if account.is_system:
-        allowed_fields = {"username", "password", "owner"}
-        filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
-        for k, v in filtered_data.items():
+def update_account(account_id: str, data: AccountUpdate) -> Optional[Account]:
+    with _account_lock:
+        account = _accounts.get(account_id)
+        if not account or account.is_deleted:
+            return None
+        update_data = data.model_dump(exclude_unset=True)
+        # 唯一性校验（排除自身和已删除）
+        if "owner" in update_data:
+            for other in _accounts.values():
+                if other.id != account_id and not other.is_deleted and other.owner == update_data["owner"]:
+                    raise ValueError("归属人已存在")
+        if "username" in update_data:
+            for other in _accounts.values():
+                if other.id != account_id and not other.is_deleted and other.username == update_data["username"]:
+                    raise ValueError("账号已存在")
+        # 密码字段需要 hash
+        if "password" in update_data:
+            update_data["password"] = _hash_password(update_data["password"])
+        for k, v in update_data.items():
             if hasattr(account, k):
                 setattr(account, k, v)
         _save_accounts(account_id)
         return account
-    for k, v in data.items():
-        if hasattr(account, k):
-            setattr(account, k, v)
-    _save_accounts(account_id)
-    return account
 
 
 def delete_account(account_id: str) -> bool:
-    account = _accounts.get(account_id)
-    if not account:
-        return False
-    # 系统账号不可删除
-    if account.is_system:
-        return False
-    account.is_deleted = True
-    account.deleted_at = datetime.now(timezone.utc)
-    _save_accounts(account_id)
-    return True
+    with _account_lock:
+        account = _accounts.get(account_id)
+        if not account:
+            return False
+        # 系统账号不可删除
+        if account.is_system:
+            return False
+        account.is_deleted = True
+        account.deleted_at = datetime.now(timezone.utc)
+        _save_accounts(account_id)
+        return True
 
 
 def login(username: str, password: str) -> Optional[Account]:
     for account in _accounts.values():
+        if account.is_deleted:
+            continue
         if account.username == username and _check_password(password, account.password) and account.enabled:
             return account
     return None
@@ -160,13 +170,35 @@ def get_by_username(username: str) -> Optional[Account]:
 
 
 def change_password(account_id: str, old_password: str, new_password: str) -> bool:
-    account = _accounts.get(account_id)
-    if not account:
-        return False
-    if not _check_password(old_password, account.password):
-        raise ValueError("原密码错误")
-    account.password = _hash_password(new_password)
-    _save_accounts(account_id)
+    with _account_lock:
+        account = _accounts.get(account_id)
+        if not account or account.is_deleted:
+            return False
+        if not _check_password(old_password, account.password):
+            raise ValueError("原密码错误")
+        if old_password == new_password:
+            raise ValueError("新密码不能与原密码相同")
+        account.password = _hash_password(new_password)
+        account.password_changed_at = datetime.now(timezone.utc)
+        _save_accounts(account_id)
+    # 清除该账号所有 session（密码修改后其他设备需重新登录）
+    from app.services import session_service
+    session_service.delete_account_sessions(account_id)
+    return True
+
+
+def admin_reset_password(account_id: str, new_password: str) -> bool:
+    """管理员重置密码（不需要旧密码）"""
+    with _account_lock:
+        account = _accounts.get(account_id)
+        if not account or account.is_deleted:
+            return False
+        account.password = _hash_password(new_password)
+        account.password_changed_at = datetime.now(timezone.utc)
+        _save_accounts(account_id)
+    # 清除该账号所有 session（密码重置后其他设备需重新登录）
+    from app.services import session_service
+    session_service.delete_account_sessions(account_id)
     return True
 
 
@@ -177,29 +209,33 @@ def list_roles() -> List[Role]:
 
 
 def create_role(data: RoleCreate) -> Role:
-    now = datetime.now(timezone.utc)
-    role = Role(id=str(uuid.uuid4())[:8], created_at=now, **data.model_dump())
-    _roles[role.id] = role
-    _save_roles(role.id)
-    return role
+    with _role_lock:
+        now = datetime.now(timezone.utc)
+        role = Role(id=str(uuid.uuid4())[:12], created_at=now, **data.model_dump())
+        _roles[role.id] = role
+        _save_roles(role.id)
+        return role
 
 
-def update_role(role_id: str, data: dict) -> Optional[Role]:
-    role = _roles.get(role_id)
-    if not role:
-        return None
-    for k, v in data.items():
-        if hasattr(role, k):
-            setattr(role, k, v)
-    _save_roles(role_id)
-    return role
+def update_role(role_id: str, data: RoleUpdate) -> Optional[Role]:
+    with _role_lock:
+        role = _roles.get(role_id)
+        if not role:
+            return None
+        update_data = data.model_dump(exclude_unset=True)
+        for k, v in update_data.items():
+            if hasattr(role, k):
+                setattr(role, k, v)
+        _save_roles(role_id)
+        return role
 
 
 def delete_role(role_id: str) -> bool:
-    role = _roles.get(role_id)
-    if not role:
-        return False
-    role.is_deleted = True
-    role.deleted_at = datetime.now(timezone.utc)
-    _save_roles(role_id)
-    return True
+    with _role_lock:
+        role = _roles.get(role_id)
+        if not role:
+            return False
+        role.is_deleted = True
+        role.deleted_at = datetime.now(timezone.utc)
+        _save_roles(role_id)
+        return True

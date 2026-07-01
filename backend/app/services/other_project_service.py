@@ -72,7 +72,7 @@ def create_project(data: OtherProjectCreate) -> OtherProject:
         project_data.get("duration_value"),
     )
     project = OtherProject(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **project_data,

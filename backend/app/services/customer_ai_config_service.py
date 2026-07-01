@@ -3,7 +3,7 @@ from typing import Optional
 
 from app.models.customer_ai_config import CustomerAIConfig, CustomerAIConfigUpdate
 from app.models.ai_config import PROVIDER_DEFAULTS
-from app.services.storage import load_data, save_data, save_item
+from app.services.storage import load_data, save_item
 
 FILENAME = "customer_ai_config.json"
 _config: Optional[CustomerAIConfig] = None

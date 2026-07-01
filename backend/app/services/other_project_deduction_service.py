@@ -1,13 +1,15 @@
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.other_project_deduction import OtherProjectDeduction, OtherProjectDeductionCreate
 from app.services.storage import load_data, save_data, save_item
-from app.services import other_project_service, customer_service
+from app.services import other_project_service
 
 FILENAME = "other_project_deductions.json"
 _deductions: Dict[str, OtherProjectDeduction] = {}
+_deduct_lock = threading.Lock()
 
 
 def _load():
@@ -63,31 +65,33 @@ def get_available_projects(customer_id: str) -> list:
 
 
 def create_deduction(data: OtherProjectDeductionCreate) -> OtherProjectDeduction:
-    project = other_project_service.get_project(data.other_project_id)
-    if not project:
-        raise ValueError("项目不存在")
-    if project.remaining_count is not None:
-        if project.remaining_count < data.count:
-            raise ValueError(f"剩余次数不足（剩余 {project.remaining_count} 次）")
-        # 字段是销卡次数的可视图层，写流水与改字段同步（PATCH 已禁止外部直接改）
-        project.remaining_count -= data.count
-        other_project_service.update_project(project.id, {"remaining_count": project.remaining_count})
-    remaining_after = project.remaining_count if project.remaining_count is not None else -1
+    with _deduct_lock:
+        project = other_project_service.get_project(data.other_project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        if project.customer_id != data.customer_id:
+            raise ValueError("该项目不属于该客户")
+        if project.remaining_count is not None:
+            if project.remaining_count < data.count:
+                raise ValueError(f"剩余次数不足（剩余 {project.remaining_count} 次）")
+            other_project_service.update_project(project.id, {"remaining_count": project.remaining_count - data.count})
+            project = other_project_service.get_project(data.other_project_id)
+        remaining_after = project.remaining_count if project.remaining_count is not None else -1
 
-    now = datetime.now(timezone.utc)
-    deduction = OtherProjectDeduction(
-        id=str(uuid.uuid4())[:8],
-        customer_id=data.customer_id,
-        nickname=project.nickname,
-        other_project_id=data.other_project_id,
-        project_name=project.project_name,
-        activity_mode=project.activity_mode,
-        project_created_at=project.created_at.strftime("%Y-%m-%d") if hasattr(project.created_at, "strftime") else str(project.created_at),
-        count=data.count,
-        deduction_date=now.strftime("%Y-%m-%d"),
-        remaining_after=remaining_after,
-        created_at=now,
-    )
-    _deductions[deduction.id] = deduction
-    _save(deduction.id)
-    return deduction
+        now = datetime.now(timezone.utc)
+        deduction = OtherProjectDeduction(
+            id=str(uuid.uuid4())[:12],
+            customer_id=data.customer_id,
+            nickname=project.nickname,
+            other_project_id=data.other_project_id,
+            project_name=project.project_name,
+            activity_mode=project.activity_mode,
+            project_created_at=project.created_at.strftime("%Y-%m-%d") if hasattr(project.created_at, "strftime") else str(project.created_at),
+            count=data.count,
+            deduction_date=now.strftime("%Y-%m-%d"),
+            remaining_after=remaining_after,
+            created_at=now,
+        )
+        _deductions[deduction.id] = deduction
+        _save(deduction.id)
+        return deduction

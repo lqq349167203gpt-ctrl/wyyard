@@ -1,4 +1,5 @@
 import uuid
+import threading
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
@@ -8,6 +9,7 @@ from app.services import customer_service
 
 FILENAME = "project_deductions.json"
 _deductions: Dict[str, ProjectDeduction] = {}
+_deduct_lock = threading.Lock()
 
 
 def _load():
@@ -61,7 +63,11 @@ def _fill_current_remaining(deductions: List[ProjectDeduction]):
         current_remaining = None
 
         if project_type == "membership-cards":
-            current_remaining = membership_card_service.get_effective_remaining(customer_id)
+            for d in items:
+                card_remaining = membership_card_service.get_card_effective_remaining(d.project_id)
+                if card_remaining is not None:
+                    d.remaining_after = card_remaining
+            continue
         elif project_type == "other-projects":
             from app.services import other_project_service
             for d in items:
@@ -213,9 +219,12 @@ def get_available_items(customer_id: str, project_type: str) -> list:
 def auto_deduct(nickname: str, project_type: str, count: int = 1, created_by: str = "", name_filter: str = "") -> ProjectDeduction:
     """按昵称自动销卡：找到最早到期的可用项目并扣减（仅用于 Excel 导入）"""
     customers = customer_service.list_customers()
-    customer = next((c for c in customers if c.nickname == nickname), None)
-    if not customer:
+    matches = [c for c in customers if c.nickname == nickname]
+    if not matches:
         raise ValueError(f'用户"{nickname}"不存在')
+    if len(matches) > 1:
+        raise ValueError(f'存在多个昵称为"{nickname}"的用户，请使用客户ID销卡')
+    customer = matches[0]
 
     items = get_available_items(customer.id, project_type)
     if not items:
@@ -257,142 +266,145 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, created_by: st
 
 
 def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
-    customer = customer_service.get_customer(data.customer_id)
-    if not customer:
-        raise ValueError("客户不存在")
+    with _deduct_lock:
+        customer = customer_service.get_customer(data.customer_id)
+        if not customer:
+            raise ValueError("客户不存在")
 
-    from app.services import membership_card_service
+        from app.services import membership_card_service
 
-    # 计算扣减后的剩余次数
-    if data.project_type == "membership-cards":
-        # 销卡只写流水，不动 card.remaining_count 字段（其早已是派生缓存）
-        card = membership_card_service.get_card(data.project_id)
-        if not card:
-            raise ValueError("会员卡不存在")
-        if card.remaining_count is None:
-            raise ValueError("该卡为不限次卡，无法销卡")
-        effective = membership_card_service.get_effective_remaining(data.customer_id)
-        if effective is None:
-            raise ValueError("该卡为不限次卡，无法销卡")
-        if effective < data.count:
-            raise ValueError(f"剩余次数不足（剩余 {effective} 次）")
-        project_name = card.card_type if card else "会员活动"
-        remaining_after = effective - data.count
+        # 计算扣减后的剩余次数
+        if data.project_type == "membership-cards":
+            # 销卡只写流水，不动 card.remaining_count 字段（其早已是派生缓存）
+            card = membership_card_service.get_card(data.project_id)
+            if not card:
+                raise ValueError("会员卡不存在")
+            if card.voided:
+                raise ValueError("该卡已退费，无法销卡")
+            if card.customer_id != data.customer_id:
+                raise ValueError("该会员卡不属于该客户")
+            if card.remaining_count is None:
+                raise ValueError("该卡为不限次卡，无法销卡")
+            effective = membership_card_service.get_effective_remaining(data.customer_id)
+            if effective is None:
+                raise ValueError("该卡为不限次卡，无法销卡")
+            if effective < data.count:
+                raise ValueError(f"剩余次数不足（剩余 {effective} 次）")
+            project_name = card.card_type if card else "会员活动"
+            card_remaining = membership_card_service.get_card_effective_remaining(data.project_id)
+            remaining_after = (card_remaining or 0) - data.count
 
-    elif data.project_type == "other-projects":
-        from app.services import other_project_service
-        project = other_project_service.get_project(data.project_id)
-        if not project or project.is_deleted:
-            raise ValueError("项目不存在")
-        if project.remaining_count is None:
-            raise ValueError("该项目为不限次，无法销卡")
-        if project.remaining_count < data.count:
-            raise ValueError(f"剩余次数不足（剩余 {project.remaining_count} 次）")
-        project.remaining_count -= data.count
-        project.updated_at = datetime.now(timezone.utc)
-        other_project_service._projects[project.id] = project
-        save_item(other_project_service.FILENAME, project.id, project.model_dump(mode="json"))
-        project_name = project.project_name
-        remaining_after = project.remaining_count
+        elif data.project_type == "other-projects":
+            from app.services import other_project_service
+            project = other_project_service.get_project(data.project_id)
+            if not project or project.is_deleted:
+                raise ValueError("项目不存在")
+            if project.remaining_count is None:
+                raise ValueError("该项目为不限次，无法销卡")
+            if project.remaining_count < data.count:
+                raise ValueError(f"剩余次数不足（剩余 {project.remaining_count} 次）")
+            other_project_service.update_project(project.id, {"remaining_count": project.remaining_count - data.count})
+            project = other_project_service.get_project(data.project_id)
+            project_name = project.project_name
+            remaining_after = project.remaining_count
 
-    else:
-        from app.services import (
-            group_case_session_service, emotional_release_session_service,
-            oh_card_reading_session_service, energy_knot_session_service,
-            group_case_service, emotional_release_service,
-            oh_card_reading_service, energy_knot_service,
+        else:
+            from app.services import (
+                group_case_session_service, emotional_release_session_service,
+                oh_card_reading_session_service, energy_knot_session_service,
+                group_case_service, emotional_release_service,
+                oh_card_reading_service, energy_knot_service,
+            )
+
+            service_map = {
+                "group-cases": (group_case_session_service, group_case_service),
+                "emotional-releases": (emotional_release_session_service, emotional_release_service),
+                "oh-card-readings": (oh_card_reading_session_service, oh_card_reading_service),
+                "energy-knots": (energy_knot_session_service, energy_knot_service),
+            }
+
+            if data.project_type not in service_map:
+                raise ValueError(f"不支持的项目类型: {data.project_type}")
+
+            session_svc, parent_svc = service_map[data.project_type]
+            remaining = session_svc.get_remaining_count(data.customer_id)
+            if remaining < data.count:
+                raise ValueError(f"剩余次数不足（剩余 {remaining} 次）")
+
+            item = parent_svc.get_case(data.project_id) if hasattr(parent_svc, 'get_case') else None
+            if not item:
+                item = parent_svc.get_release(data.project_id) if hasattr(parent_svc, 'get_release') else None
+            if not item:
+                item = parent_svc.get_reading(data.project_id) if hasattr(parent_svc, 'get_reading') else None
+            if not item:
+                item = parent_svc.get_knot(data.project_id) if hasattr(parent_svc, 'get_knot') else None
+
+            type_labels = {
+                "group-cases": "觉醒游戏",
+                "emotional-releases": "情绪释放",
+                "oh-card-readings": "OH卡梳理",
+                "energy-knots": "能量结",
+            }
+            project_name = type_labels.get(data.project_type, data.project_type)
+            remaining_after = remaining - data.count
+
+        now = datetime.now(timezone.utc)
+        deduction = ProjectDeduction(
+            id=str(uuid.uuid4())[:12],
+            customer_id=data.customer_id,
+            nickname=customer.nickname,
+            project_type=data.project_type,
+            project_id=data.project_id,
+            project_name=project_name,
+            count=data.count,
+            deduction_date=now.strftime("%Y-%m-%d"),
+            remaining_after=remaining_after,
+            created_by=data.created_by,
+            updated_by=data.created_by,
+            created_at=now,
         )
-
-        service_map = {
-            "group-cases": (group_case_session_service, group_case_service),
-            "emotional-releases": (emotional_release_session_service, emotional_release_service),
-            "oh-card-readings": (oh_card_reading_session_service, oh_card_reading_service),
-            "energy-knots": (energy_knot_session_service, energy_knot_service),
-        }
-
-        if data.project_type not in service_map:
-            raise ValueError(f"不支持的项目类型: {data.project_type}")
-
-        session_svc, parent_svc = service_map[data.project_type]
-        remaining = session_svc.get_remaining_count(data.customer_id)
-        if remaining < data.count:
-            raise ValueError(f"剩余次数不足（剩余 {remaining} 次）")
-
-        item = parent_svc.get_case(data.project_id) if hasattr(parent_svc, 'get_case') else None
-        if not item:
-            item = parent_svc.get_release(data.project_id) if hasattr(parent_svc, 'get_release') else None
-        if not item:
-            item = parent_svc.get_reading(data.project_id) if hasattr(parent_svc, 'get_reading') else None
-        if not item:
-            item = parent_svc.get_knot(data.project_id) if hasattr(parent_svc, 'get_knot') else None
-
-        type_labels = {
-            "group-cases": "觉醒游戏",
-            "emotional-releases": "情绪释放",
-            "oh-card-readings": "OH卡梳理",
-            "energy-knots": "能量结",
-        }
-        project_name = type_labels.get(data.project_type, data.project_type)
-        remaining_after = remaining - data.count
-
-    now = datetime.now(timezone.utc)
-    deduction = ProjectDeduction(
-        id=str(uuid.uuid4())[:8],
-        customer_id=data.customer_id,
-        nickname=customer.nickname,
-        project_type=data.project_type,
-        project_id=data.project_id,
-        project_name=project_name,
-        count=data.count,
-        deduction_date=now.strftime("%Y-%m-%d"),
-        remaining_after=remaining_after,
-        created_by=data.created_by,
-        updated_by=data.created_by,
-        created_at=now,
-    )
-    _deductions[deduction.id] = deduction
-    _save(deduction.id)
-    return deduction
+        _deductions[deduction.id] = deduction
+        _save(deduction.id)
+        return deduction
 
 
 
 def update_deduction(deduction_id: str, count: int, updated_by: str = "") -> ProjectDeduction:
     """修改销卡次数（不重新扣费，不覆盖创建人）"""
-    deduction = _deductions.get(deduction_id)
-    if not deduction or deduction.is_deleted:
-        raise ValueError("记录不存在")
-    if count < 1:
-        raise ValueError("次数必须大于 0")
+    with _deduct_lock:
+        deduction = _deductions.get(deduction_id)
+        if not deduction or deduction.is_deleted:
+            raise ValueError("记录不存在")
+        if count < 1:
+            raise ValueError("次数必须大于 0")
 
-    deduction.count = count
-    deduction.updated_by = updated_by
-    _deductions[deduction_id] = deduction
-    _save(deduction_id)
-    return deduction
+        deduction.count = count
+        deduction.updated_by = updated_by
+        _deductions[deduction_id] = deduction
+        _save(deduction_id)
+        return deduction
 
 
 def delete_deduction(deduction_id: str) -> None:
     """软删除销卡记录，并恢复对应项目的剩余次数"""
-    deduction = _deductions.get(deduction_id)
-    if not deduction or deduction.is_deleted:
-        raise ValueError("记录不存在")
+    with _deduct_lock:
+        deduction = _deductions.get(deduction_id)
+        if not deduction or deduction.is_deleted:
+            raise ValueError("记录不存在")
 
-    # 会员卡销卡基于流水，软删除即自动从 get_deduction_total 中排除，无需回写 card.remaining_count
-    if deduction.project_type == "membership-cards":
-        pass
+        # 会员卡销卡基于流水，软删除即自动从 get_deduction_total 中排除，无需回写 card.remaining_count
+        if deduction.project_type == "membership-cards":
+            pass
 
-    elif deduction.project_type == "other-projects":
-        from app.services import other_project_service
-        project = other_project_service.get_project(deduction.project_id)
-        if project and project.remaining_count is not None:
-            project.remaining_count += deduction.count
-            project.updated_at = datetime.now(timezone.utc)
-            other_project_service._projects[project.id] = project
-            save_item(other_project_service.FILENAME, project.id, project.model_dump(mode="json"))
+        elif deduction.project_type == "other-projects":
+            from app.services import other_project_service
+            project = other_project_service.get_project(deduction.project_id)
+            if project and project.remaining_count is not None:
+                other_project_service.update_project(project.id, {"remaining_count": project.remaining_count + deduction.count})
 
-    # 觉醒/情绪释放/OH卡/能量结：剩余次数由 get_deduction_total 计算，
-    # 软删除后自动排除，无需额外处理
+        # 觉醒/情绪释放/OH卡/能量结：剩余次数由 get_deduction_total 计算，
+        # 软删除后自动排除，无需额外处理
 
-    deduction.is_deleted = True
-    _deductions[deduction_id] = deduction
-    _save(deduction_id)
+        deduction.is_deleted = True
+        _deductions[deduction_id] = deduction
+        _save(deduction_id)

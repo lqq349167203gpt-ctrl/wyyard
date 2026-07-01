@@ -78,7 +78,7 @@ def list_logs(
 def create_log(data: OperationLogCreate, extra: dict = None) -> OperationLog:
     now = datetime.now(timezone.utc)
     log = OperationLog(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         **data.model_dump(),
     )

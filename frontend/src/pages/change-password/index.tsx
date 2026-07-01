@@ -1,11 +1,37 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { accountApi } from "@/lib/api"
+import { accountApi, clearAuthState } from "@/lib/api"
 import {
   AlertDialog, AlertDialogAction, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
+interface Session {
+  id: string
+  account_id: string
+  device_info: string
+  ip: string
+  login_time: string
+  last_active: string
+}
+
+function parseDeviceInfo(ua: string): string {
+  if (!ua) return "未知设备"
+  if (ua.includes("Windows")) return "Windows"
+  if (ua.includes("Mac OS")) return "macOS"
+  if (ua.includes("Linux")) return "Linux"
+  if (ua.includes("Android")) return "Android"
+  if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS"
+  return "未知设备"
+}
+
+function formatTime(iso: string): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  const pad = (n: number) => n.toString().padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 export default function ChangePasswordPage() {
   const [form, setForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" })
@@ -14,19 +40,43 @@ export default function ChangePasswordPage() {
   const [showError, setShowError] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [loading, setLoading] = useState(false)
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [currentJti, setCurrentJti] = useState("")
 
   const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
-  console.log("currentUser:", currentUser)
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      const data = await accountApi.listSessions()
+      setSessions(data)
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    fetchSessions()
+    // 从 token 中解析当前 session 的 jti
+    const token = localStorage.getItem("token")
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]))
+        setCurrentJti(payload.jti || "")
+      } catch { /* ignore */ }
+    }
+  }, [fetchSessions])
 
   const handleSubmit = async () => {
     const newErrors: typeof errors = {}
 
     if (!form.oldPassword.trim()) newErrors.oldPassword = "请输入原密码"
-    if (!form.newPassword.trim()) newErrors.newPassword = "请输入新密码"
-    if (form.newPassword.length < 8 || form.newPassword.length > 15) newErrors.newPassword = "密码需要8~15位"
-    else if (!/[a-zA-Z]/.test(form.newPassword) || !/[0-9]/.test(form.newPassword)) newErrors.newPassword = "密码必须包含字母和数字"
+    if (!form.newPassword.trim()) {
+      newErrors.newPassword = "请输入新密码"
+    } else if (form.newPassword.length < 8) {
+      newErrors.newPassword = "密码至少8位"
+    } else if (!/[a-zA-Z]/.test(form.newPassword) || !/[0-9]/.test(form.newPassword)) {
+      newErrors.newPassword = "密码必须包含字母和数字"
+    }
     if (!form.confirmPassword.trim()) newErrors.confirmPassword = "请确认新密码"
-    if (form.newPassword !== form.confirmPassword) newErrors.confirmPassword = "两次密码不一致"
+    else if (form.newPassword !== form.confirmPassword) newErrors.confirmPassword = "两次密码不一致"
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -59,6 +109,13 @@ export default function ChangePasswordPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      await accountApi.deleteSession(sessionId)
+      setSessions(prev => prev.filter(s => s.id !== sessionId))
+    } catch { /* ignore */ }
   }
 
   return (
@@ -98,7 +155,7 @@ export default function ChangePasswordPage() {
                 type="password"
                 value={form.newPassword}
                 onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-                placeholder="8~15位，包含字母和数字"
+                placeholder="至少8位，包含字母和数字"
                 className="h-8"
               />
               {errors.newPassword && <p className="text-[11px] text-red-500 mt-0.5">{errors.newPassword}</p>}
@@ -135,7 +192,11 @@ export default function ChangePasswordPage() {
             <AlertDialogDescription>密码修改成功，请使用新密码登录。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowSuccess(false)}>确定</AlertDialogAction>
+            <AlertDialogAction onClick={() => {
+              setShowSuccess(false)
+              clearAuthState()
+              window.location.href = "/login"
+            }}>确定</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -151,6 +212,48 @@ export default function ChangePasswordPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 在线设备 */}
+      <div className="bg-white rounded-lg p-6 max-w-[480px] mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[13px] font-medium text-[#2b2f36]">在线设备</h2>
+          <span className="text-[12px] text-[#8f959e]">{sessions.length} 个设备</span>
+        </div>
+        {sessions.length === 0 ? (
+          <p className="text-[12px] text-[#8f959e]">暂无在线设备</p>
+        ) : (
+          <div className="space-y-3">
+            {sessions.map((s) => {
+              const isCurrent = s.id === currentJti
+              return (
+                <div key={s.id} className="flex items-center justify-between py-2 border-b border-[#f0f1f3] last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] text-[#2b2f36]">{parseDeviceInfo(s.device_info)}</span>
+                      {isCurrent && (
+                        <span className="text-[10px] text-[#3370ff] bg-[#f0f4ff] px-1.5 py-0.5 rounded">当前设备</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[#8f959e] mt-0.5">
+                      {s.ip || "未知 IP"} · 登录于 {formatTime(s.login_time)}
+                    </div>
+                  </div>
+                  {!isCurrent && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-[12px] text-[#8f959e] hover:text-[#f53f3f] h-7 px-2"
+                      onClick={() => handleDeleteSession(s.id)}
+                    >
+                      退出
+                    </Button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

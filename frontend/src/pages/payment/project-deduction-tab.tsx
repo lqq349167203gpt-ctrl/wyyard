@@ -559,10 +559,12 @@ export function ProjectDeductionTab() {
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleDownloadTemplate}>
             <Download className="mr-1 h-3.5 w-3.5" /> 下载模板
           </Button>
+          {/* 导入功能暂时隐藏
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => fileInputRef.current?.click()} disabled={importing}>
             <Upload className="mr-1 h-3.5 w-3.5" /> 导入
           </Button>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+          */}
           <Button size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(true)}>
             <CreditCard className="mr-1 h-3.5 w-3.5" /> 销卡
           </Button>

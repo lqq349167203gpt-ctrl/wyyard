@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -21,14 +22,32 @@ class Settings(BaseSettings):
     wechat_appid: str = ""
     wechat_secret: str = ""
 
+    # JWT
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 24
+
     # 数据库
-    database_url: str = "postgresql://wyyard:FYSTHXQTXQQ3@localhost:5432/wyyard"
+    database_url: str = ""
 
     # 服务器
     host: str = "127.0.0.1"
     port: int = 8000
 
+    # CORS
+    allowed_origins: str = "http://localhost:5173"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @model_validator(mode="after")
+    def _validate_secrets(self):
+        if not self.jwt_secret:
+            raise ValueError("JWT_SECRET 环境变量未设置，启动拒绝")
+        if len(self.jwt_secret) < 32:
+            raise ValueError("JWT_SECRET 长度不足 32 字符，安全要求不满足")
+        if not self.database_url:
+            raise ValueError("DATABASE_URL 环境变量未设置，启动拒绝")
+        return self
 
 
 settings = Settings()

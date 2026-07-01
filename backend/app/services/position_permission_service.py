@@ -33,3 +33,17 @@ def set_permissions(position: str, pages: List[str]):
 
 def get_all() -> Dict[str, List[str]]:
     return _permissions
+
+
+def rename_position_in_permissions(old_name: str, new_name: str):
+    """角色改名时，迁移 page permissions 的 key"""
+    if old_name in _permissions:
+        _permissions[new_name] = _permissions.pop(old_name)
+        _save(new_name)
+        # 清除旧 key 的持久化数据
+        from app.services.storage import load_data
+        data = load_data(FILENAME) or {}
+        if old_name in data:
+            del data[old_name]
+            from app.services.storage import save_data as sd
+            sd(FILENAME, data)

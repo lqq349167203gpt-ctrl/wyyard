@@ -37,32 +37,25 @@ wyyard/
 ## 页面清单
 | 分组 | 页面 | 路由 |
 |------|------|------|
-| 业务数据 | 客户信息 | /healing-records |
-| 业务数据 | 活动记录 | /activity-records |
-| 业务数据 | 消费记录 | /consumption-records |
-| 业务数据 | 引流记录 | /traffic-records |
-| 活动管理 | 邀约到场 | /courses/class-records |
-| 活动管理 | 当日活动 | /courses/class-records |
-| 活动管理 | 到场确认 | /courses/class-records |
-| 活动管理 | 活动安排 | /courses/daily-activities |
-| 付费项目 | 付费项目 | /payment |
-| 付费项目 | 会员活动 | /membership-cards |
-| 付费项目 | 觉醒游戏 | /group-cases |
-| 付费项目 | 情绪释放 | /emotional-releases |
-| 付费项目 | 能量结 | /energy-knots |
-| 付费项目 | 内部课程 | /internal-courses |
-| 付费项目 | 其他项目 | /other-projects |
-| 信息配置 | 活动配置 | /positions/courses |
-| 信息配置 | 组织管理 | /organizations |
+| 疗愈 | 提醒 | /business-reminders |
+| 疗愈 | 数据记录 | /data-records |
+| 疗愈 | 客户资料 | /healing-records |
+| 疗愈 | 邀约 | /courses/class-records |
+| 疗愈 | 课表 | /courses/daily-activities |
+| 付费 | 付费项目 | /payment |
+| 付费 | 销卡 | /payment-deductions |
+| 付费 | 退费 | /payment-refunds |
 | 信息配置 | 会员身份 | /config/member-identities |
 | 信息配置 | 疗愈老师 | /healing-identities |
-| 信息配置 | 疗愈空间 | /courses/spaces |
+| 信息配置 | 组织管理 | /organizations |
+| 信息配置 | 空间配置 | /courses/spaces |
 | 信息配置 | 提醒配置 | /config/reminders |
-| 账号管理 | 账号管理 | /positions/management |
+| 账号 | 账号管理 | /positions/management |
+| 账号 | 密码修改 | /change-password |
 | 系统配置 | AI 配置 | /agents |
-| 系统配置 | 业务提醒 | /business-reminders |
-| 系统配置 | 操作日志 | /operation-logs |
+| 系统配置 | 沟通记录 | /chat-history |
 | 系统配置 | 系统日志 | /system-logs |
+| 系统配置 | 操作日志 | /operation-logs |
 
 ## 开发规范
 
@@ -94,6 +87,14 @@ wyyard/
 - commit 信息用中文，简洁说明做了什么
 - 不提交 node_modules/、__pycache__/、.env、dist/
 
+### 冗余代码检测
+- **提交前**运行 `bash scripts/check-dead-code.sh`，确保无新增冗余
+- 后端用 `ruff check app/` 检测未使用导入/变量（F401、F841）
+- 前端用 `npx knip` 检测未使用文件/导出
+- **发现未使用文件**：先移到 `archive/` 目录，确认无影响后再删除，不要直接删
+- **废弃方法**：必须标注 `# [已废弃]` 注释 + 写明替代方案，不能直接删除
+- `archive/` 下的文件不参与构建和检测，保留至少 30 天再清理
+
 ## 验证命令
 - 前端：`cd frontend && npm run build`
 - 后端：`cd backend && python -m pytest`
@@ -105,9 +106,10 @@ wyyard/
 - 使用 lark-cli 进行本地调试和验证
 
 ## 红线（必须先问）
-- 删除文件或数据库表
-- 修改 .env 或密钥配置
-- 数据库 schema 变更
+- 删除文件或数据库表(跳过)
+- 修改 .env 或密钥配置(跳过)
+- 数据库 schema 变更(跳过)
 - git push / force push
 - 安装新的全局依赖
 - 公开发布
+- 修 bug 必须执行第一性原理：找到根因，不要绕过症状

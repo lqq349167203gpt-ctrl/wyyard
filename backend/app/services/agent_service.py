@@ -42,7 +42,7 @@ def get_agent(agent_id: str) -> Optional[Agent]:
 def create_agent(data: AgentCreate) -> Agent:
     now = datetime.now(timezone.utc)
     agent = Agent(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         status=AgentStatus.STOPPED,
         created_at=now,
         updated_at=now,

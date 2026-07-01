@@ -140,6 +140,35 @@ SKIP_PATHS = [
     "/api/wechat",  # 微信登录不记录操作日志
 ]
 
+SENSITIVE_FIELDS = {
+    "password", "old_password", "new_password",
+    "api_key", "secret", "token", "access_token", "refresh_token",
+    "wechat", "basic_info", "assessment", "core_situation",
+    "system_prompt",
+}
+
+PHONE_FIELDS = {"phone", "mobile", "tel"}
+
+
+def _scrub_sensitive(data: dict) -> dict:
+    """过滤敏感字段：密码/API 密钥替换为 ***，手机号部分掩码"""
+    if not isinstance(data, dict):
+        return data
+    result = {}
+    for k, v in data.items():
+        if k in SENSITIVE_FIELDS:
+            result[k] = "***"
+        elif k in PHONE_FIELDS and isinstance(v, str) and len(v) >= 7:
+            result[k] = v[:3] + "****" + v[-4:]
+        elif isinstance(v, dict):
+            result[k] = _scrub_sensitive(v)
+        elif isinstance(v, list):
+            result[k] = [_scrub_sensitive(i) if isinstance(i, dict) else i for i in v]
+        else:
+            result[k] = v
+    return result
+
+
 FIELD_NAMES = {
     "nickname": "昵称", "name": "名称", "title": "标题", "username": "用户名", "owner": "归属人",
     "phone": "手机", "email": "邮箱", "gender": "性别", "birthday": "生日",
@@ -933,6 +962,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             return "排序调整"
         return "批量操作"
 
+    name = entity_name or get_entity_id(path) or "记录"
+
     # 空间房间排序：直接解析 room_ids 为房间名
     if "/rooms-order" in path and method == "PATCH":
         room_ids = body.get("room_ids", [])
@@ -940,8 +971,6 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             names = _resolve_room_names(room_ids)
             return f"{name}：房间顺序设为{'、'.join(names)}"
         return f"{name}：调整房间顺序"
-
-    name = entity_name or get_entity_id(path) or "记录"
 
     section = get_section(path)
     entity_type = section.replace("配置", "").replace("管理", "")
@@ -1058,7 +1087,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         except json.JSONDecodeError:
             body = {}
 
-        user_id = request.headers.get("X-User-Id", "")
+        user_id = getattr(request.state, "user_id", "")
         operator = ""
         operator_role = ""
         if user_id:
@@ -1087,6 +1116,11 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         # 过滤掉前端可能回传的计算字段（不应记录为变更）
         for computed_key in ("total_payment", "visit_count", "activity_count", "welfare_count"):
             body.pop(computed_key, None)
+
+        # 过滤敏感字段（密码、API 密钥、手机号等）
+        body = _scrub_sensitive(body)
+        if before_data:
+            before_data = _scrub_sensitive(before_data)
 
         try:
             section = get_section(path)

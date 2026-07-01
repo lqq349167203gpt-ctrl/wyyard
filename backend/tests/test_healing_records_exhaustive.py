@@ -4,7 +4,7 @@ import uuid
 
 
 def _u():
-    return uuid.uuid4().hex[:8]
+    return uuid.uuid4().hex[:12]
 
 
 class TestHealingRecordCreate:

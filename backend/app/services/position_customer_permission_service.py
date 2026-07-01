@@ -50,3 +50,35 @@ def set_customer_permissions(section: str, position: str, member_types: List[str
 
 def get_all(section: str) -> Dict[str, List[str]]:
     return _permissions.get(section, {})
+
+
+def rename_identity_in_permissions(old_name: str, new_name: str):
+    """身份改名时，同步更新所有权限配置中的引用"""
+    for section in _permissions:
+        changed = False
+        for position, types in _permissions[section].items():
+            if old_name in types:
+                types[types.index(old_name)] = new_name
+                changed = True
+        if changed:
+            _save(section)
+
+
+def remove_identity_from_permissions(identity_name: str):
+    """身份删除时，从所有权限配置中移除"""
+    for section in _permissions:
+        changed = False
+        for position, types in list(_permissions[section].items()):
+            if identity_name in types:
+                types.remove(identity_name)
+                changed = True
+        if changed:
+            _save(section)
+
+
+def rename_position_in_permissions(old_name: str, new_name: str):
+    """角色改名时，迁移 customer permissions 各 section 的 key"""
+    for section in _permissions:
+        if old_name in _permissions[section]:
+            _permissions[section][new_name] = _permissions[section].pop(old_name)
+            _save(section)

@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from typing import List, Optional
 from app.utils.pagination import paginate
 from app.services import class_record_service
@@ -183,7 +183,7 @@ def update_record(record_id: str, data: dict):
     return record
 
 
-class ParticipantUpdate(BaseModel):
+class ParticipantUpdate(StrictBaseModel):
     participant_ids: List[str]
 
 

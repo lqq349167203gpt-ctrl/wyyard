@@ -47,7 +47,7 @@ def get_record(record_id: str) -> Optional[HealingRecord]:
 def create_record(data: HealingRecordCreate) -> HealingRecord:
     now = datetime.now(timezone.utc)
     record = HealingRecord(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),

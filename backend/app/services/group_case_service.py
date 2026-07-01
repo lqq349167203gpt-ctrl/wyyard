@@ -51,7 +51,7 @@ def get_case(case_id: str) -> Optional[GroupCase]:
 def create_case(data: GroupCaseCreate) -> GroupCase:
     now = datetime.now(timezone.utc)
     case = GroupCase(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),

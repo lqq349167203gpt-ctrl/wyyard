@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+import threading
 from pathlib import Path
 from typing import Any, Dict
 
@@ -17,16 +19,37 @@ from app.config.settings import settings
 DB_URL = settings.database_url
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
+_pool_lock = threading.Lock()
+
+# 每张表一把锁，防止 save_data 的 DELETE+INSERT 竞态
+_table_locks: Dict[str, threading.Lock] = {}
+_table_locks_mutex = threading.Lock()
+
+_FILENAME_RE = re.compile(r"^[a-z_]+\.json$")
+
+
+def _validate_filename(filename: str):
+    if not _FILENAME_RE.match(filename):
+        raise ValueError(f"非法文件名: {filename!r}，必须匹配 ^[a-z_]+\\.json$")
+
+
+def _get_table_lock(table: str) -> threading.Lock:
+    with _table_locks_mutex:
+        if table not in _table_locks:
+            _table_locks[table] = threading.Lock()
+        return _table_locks[table]
 
 
 def _get_pool():
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=2,
-            maxconn=10,
-            dsn=DB_URL,
-        )
+        with _pool_lock:
+            if _pool is None:
+                _pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=2,
+                    maxconn=10,
+                    dsn=DB_URL,
+                )
     return _pool
 
 
@@ -55,6 +78,7 @@ def _ensure_table(table: str):
 
 
 def load_data(filename: str) -> Dict[str, Any]:
+    _validate_filename(filename)
     table = _table_name(filename)
     conn = _get_conn()
     try:
@@ -75,30 +99,34 @@ def load_data(filename: str) -> Dict[str, Any]:
 
 
 def save_data(filename: str, data: Dict[str, Any]):
+    _validate_filename(filename)
     table = _table_name(filename)
-    conn = _get_conn()
-    try:
-        _ensure_table(table)
+    lock = _get_table_lock(table)
+    with lock:
+        conn = _get_conn()
+        try:
+            _ensure_table(table)
 
-        if filename == "customer_ai_config.json" and not any(
-            isinstance(v, dict) for v in data.values()
-        ):
-            data = {"default": data}
+            if filename == "customer_ai_config.json" and not any(
+                isinstance(v, dict) for v in data.values()
+            ):
+                data = {"default": data}
 
-        with conn.cursor() as cur:
-            cur.execute(f'DELETE FROM "{table}"')
-            for key, value in data.items():
-                cur.execute(
-                    f'INSERT INTO "{table}" (id, data) VALUES (%s, %s)',
-                    (key, json.dumps(value, ensure_ascii=False)),
-                )
-        conn.commit()
-    finally:
-        _put_conn(conn)
+            with conn.cursor() as cur:
+                cur.execute(f'DELETE FROM "{table}"')
+                for key, value in data.items():
+                    cur.execute(
+                        f'INSERT INTO "{table}" (id, data) VALUES (%s, %s)',
+                        (key, json.dumps(value, ensure_ascii=False)),
+                    )
+            conn.commit()
+        finally:
+            _put_conn(conn)
 
 
 def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
     """Upsert 单条记录，避免全表重写"""
+    _validate_filename(filename)
     table = _table_name(filename)
     conn = _get_conn()
     try:
@@ -108,10 +136,10 @@ def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
                 f'INSERT INTO "{table}" (id, data) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data',
                 (item_id, json.dumps(item_data, ensure_ascii=False)),
             )
-            print(f"[SAVE] {table}/{item_id}: rowcount={cur.rowcount}", flush=True)
+            logger.debug("[SAVE] %s/%s: rowcount=%d", table, item_id, cur.rowcount)
         conn.commit()
     except Exception as e:
-        print(f"[SAVE_ERROR] {table}/{item_id}: {e}", flush=True)
+        logger.error("[SAVE_ERROR] %s/%s: %s", table, item_id, e)
         try: conn.rollback()
         except: pass
         raise
@@ -121,6 +149,7 @@ def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
 
 def delete_item(filename: str, item_id: str):
     """删除单条记录"""
+    _validate_filename(filename)
     table = _table_name(filename)
     conn = _get_conn()
     try:

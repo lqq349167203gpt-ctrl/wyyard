@@ -1124,10 +1124,12 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         <button onClick={handleDownloadTemplate} className="h-8 px-3 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1">
           <Download className="h-3.5 w-3.5" /> 下载模板
         </button>
+        {/* 导入功能暂时隐藏
         <button onClick={() => fileInputRef.current?.click()} className="h-8 px-3 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1">
           <Upload className="h-3.5 w-3.5" /> 导入
         </button>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+        */}
         <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
           <Plus className="mr-1 h-3.5 w-3.5" /> 新增
         </Button>

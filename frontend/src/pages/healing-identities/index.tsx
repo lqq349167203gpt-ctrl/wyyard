@@ -14,18 +14,19 @@ import { customerApi, type Customer } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { POSITION_ACHIEVER, POSITION_ENERGY_TEACHER, POSITION_COURSE_TEACHER } from "@/lib/positions"
 
 const HEALING_POSITIONS = [
-  { key: "成就君", label: "成就君", icon: Users, desc: "负责成就达成" },
-  { key: "能量结老师", label: "能量结老师", icon: Zap, desc: "负责能量结活动的课程老师" },
-  { key: "课程老师", label: "课程老师", icon: Users, desc: "负责沙龙活动的课程老师" },
+  { key: POSITION_ACHIEVER, label: POSITION_ACHIEVER, icon: Users, desc: "负责成就达成" },
+  { key: POSITION_ENERGY_TEACHER, label: POSITION_ENERGY_TEACHER, icon: Zap, desc: "负责能量结活动的课程老师" },
+  { key: POSITION_COURSE_TEACHER, label: POSITION_COURSE_TEACHER, icon: Users, desc: "负责沙龙活动的课程老师" },
 ] as const
 
 type PositionKey = typeof HEALING_POSITIONS[number]["key"]
 
 export default function HealingIdentitiesPage() {
   const enterToNext = useEnterToNext()
-  const [activePosition, setActivePosition] = useState<PositionKey>("成就君")
+  const [activePosition, setActivePosition] = useState<PositionKey>(POSITION_ACHIEVER)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Edit, Trash2, X, KeyRound } from "lucide-react"
+import { Plus, Edit, Trash2, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -55,18 +55,16 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     if (!form.username.trim()) errors.username = "账号不能为空"
     if (!editingId) {
       if (!form.password.trim()) errors.password = "密码不能为空"
-      else if (form.password.length < 8 || form.password.length > 15) errors.password = "密码需要8~15位"
+      else if (form.password.length < 8) errors.password = "密码至少8位"
       else if (!/[a-zA-Z]/.test(form.password) || !/[0-9]/.test(form.password)) errors.password = "密码必须包含字母和数字"
     }
 
-    // 唯一性验证（仅新增时）
-    if (!editingId) {
-      if (form.owner.trim() && accounts.some(a => a.owner === form.owner.trim())) {
-        errors.owner = "归属人已存在"
-      }
-      if (form.username.trim() && accounts.some(a => a.username === form.username.trim())) {
-        errors.username = "账号已存在"
-      }
+    // 唯一性验证
+    if (form.owner.trim() && accounts.some(a => a.id !== editingId && a.owner === form.owner.trim())) {
+      errors.owner = "归属人已存在"
+    }
+    if (form.username.trim() && accounts.some(a => a.id !== editingId && a.username === form.username.trim())) {
+      errors.username = "账号已存在"
     }
 
     if (Object.keys(errors).length > 0) {
@@ -107,8 +105,15 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     setShowForm(true)
   }
 
+  const currentUser = (() => { try { return JSON.parse(localStorage.getItem("currentUser") || "{}") } catch { return {} } })()
+
   const handleDelete = async () => {
     if (!deleteId || deleting) return
+    if (deleteId === currentUser.id) {
+      alert("不能删除当前登录的账号")
+      setDeleteId(null)
+      return
+    }
     setDeleting(true)
     try {
       await accountApi.delete(deleteId)
@@ -125,7 +130,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     const errors: { old?: string; new?: string; confirm?: string } = {}
     if (!changePwdForm.oldPassword) errors.old = "请输入原密码"
     if (!changePwdForm.newPassword) errors.new = "请输入新密码"
-    else if (changePwdForm.newPassword.length < 8 || changePwdForm.newPassword.length > 15) errors.new = "密码需要8~15位"
+    else if (changePwdForm.newPassword.length < 8) errors.new = "密码至少8位"
     else if (!/[a-zA-Z]/.test(changePwdForm.newPassword) || !/[0-9]/.test(changePwdForm.newPassword)) errors.new = "密码必须包含字母和数字"
     if (changePwdForm.newPassword !== changePwdForm.confirmPassword) errors.confirm = "两次密码不一致"
     if (Object.keys(errors).length > 0) { setChangePwdErrors(errors); return }
@@ -287,7 +292,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
               <div className="flex items-start gap-3">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">密码</span>
                 <div className="flex-1">
-                  <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8~15位，包含字母和数字" className="h-8" />
+                  <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="至少8位，包含字母和数字" className="h-8" />
                   {formErrors.password && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.password}</p>}
                 </div>
               </div>
@@ -328,43 +333,40 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
       </AlertDialog>
 
       {/* 修改密码弹窗 */}
-      {changePwdId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setChangePwdId(null); setChangePwdErrors({}) }}>
-          <div className="bg-white rounded-lg w-[400px] shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b">
-              <span className="text-sm font-medium">修改密码</span>
-              <button onClick={() => { setChangePwdId(null); setChangePwdErrors({}) }}><X className="h-4 w-4 text-[#8f959e]" /></button>
-            </div>
-            <div className="px-5 py-4 space-y-4">
-              <div className="flex items-start gap-3">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">原密码</span>
-                <div className="flex-1">
-                  <Input type="password" value={changePwdForm.oldPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, oldPassword: e.target.value })} placeholder="输入原密码" className="h-8" />
-                  {changePwdErrors.old && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.old}</p>}
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">新密码</span>
-                <div className="flex-1">
-                  <Input type="password" value={changePwdForm.newPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, newPassword: e.target.value })} placeholder="8~15位，包含字母和数字" className="h-8" />
-                  {changePwdErrors.new && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.new}</p>}
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">确认密码</span>
-                <div className="flex-1">
-                  <Input type="password" value={changePwdForm.confirmPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, confirmPassword: e.target.value })} placeholder="再次输入新密码" className="h-8" />
-                  {changePwdErrors.confirm && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.confirm}</p>}
-                </div>
+      <Dialog open={!!changePwdId} onOpenChange={(open) => { if (!open) { setChangePwdId(null); setChangePwdErrors({}) } }}>
+        <DialogContent className="w-[400px]">
+          <DialogHeader>
+            <DialogTitle>修改密码</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">原密码</span>
+              <div className="flex-1">
+                <Input type="password" value={changePwdForm.oldPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, oldPassword: e.target.value })} placeholder="输入原密码" className="h-8" />
+                {changePwdErrors.old && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.old}</p>}
               </div>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t">
-              <Button variant="outline" size="sm" onClick={() => { setChangePwdId(null); setChangePwdErrors({}) }}>取消</Button>
-              <Button size="sm" onClick={handleSavePassword} disabled={changePwdSaving}>{changePwdSaving ? "保存中..." : "确认修改"}</Button>
+            <div className="flex items-start gap-3">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">新密码</span>
+              <div className="flex-1">
+                <Input type="password" value={changePwdForm.newPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, newPassword: e.target.value })} placeholder="至少8位，包含字母和数字" className="h-8" />
+                {changePwdErrors.new && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.new}</p>}
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">确认密码</span>
+              <div className="flex-1">
+                <Input type="password" value={changePwdForm.confirmPassword} onChange={(e) => setChangePwdForm({ ...changePwdForm, confirmPassword: e.target.value })} placeholder="再次输入新密码" className="h-8" />
+                {changePwdErrors.confirm && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{changePwdErrors.confirm}</p>}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => { setChangePwdId(null); setChangePwdErrors({}) }}>取消</Button>
+            <Button size="sm" onClick={handleSavePassword} disabled={changePwdSaving}>{changePwdSaving ? "保存中..." : "确认修改"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

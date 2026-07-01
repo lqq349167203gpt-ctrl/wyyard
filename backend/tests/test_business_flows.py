@@ -4,7 +4,7 @@ import uuid
 
 
 def _u(suffix=""):
-    return f"{uuid.uuid4().hex[:8]}{suffix}"
+    return f"{uuid.uuid4().hex[:12]}{suffix}"
 
 
 # ===== 客户全生命周期 =====

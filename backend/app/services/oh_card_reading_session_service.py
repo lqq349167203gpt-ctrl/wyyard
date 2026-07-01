@@ -50,10 +50,30 @@ def get_session(session_id: str) -> Optional[OhCardReadingSession]:
     return session
 
 
+def _get_all_member_ids(session) -> set:
+    ids = set(session.participant_ids or [])
+    ids.update(session.teacher_ids or [])
+    if session.host_id:
+        ids.add(session.host_id)
+    if session.owner_id:
+        ids.add(session.owner_id)
+    return ids
+
+
+def _refresh_affected_identities(customer_ids: set):
+    from app.services.member_identity_service import refresh_member_type
+    for cid in customer_ids:
+        if cid:
+            try:
+                refresh_member_type(cid)
+            except Exception:
+                pass
+
+
 def create_session(data: OhCardReadingSessionCreate) -> OhCardReadingSession:
     now = datetime.now(timezone.utc)
     session = OhCardReadingSession(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),
@@ -61,6 +81,7 @@ def create_session(data: OhCardReadingSessionCreate) -> OhCardReadingSession:
     _sessions[session.id] = session
     _save(session.id)
     _deduct_for_session(session)
+    _refresh_affected_identities(_get_all_member_ids(session))
     return session
 
 
@@ -100,10 +121,9 @@ def update_session(session_id: str, data: dict):
     if not session or session.is_deleted:
         return None, []
 
-    # 获取旧的可扣费人员
+    old_ids = _get_all_member_ids(session)
     old_chargeable = _get_chargeable_ids(session)
 
-    # 自动过滤不在到场名单中的人员
     if "participant_ids" in data:
         visits = visit_service.list_visits(session.date)
         visit_ids = {v.customer_id for v in visits}
@@ -113,7 +133,6 @@ def update_session(session_id: str, data: dict):
         if hasattr(session, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
             setattr(session, key, value)
 
-    # 案主不能同时是参与者
     if session.owner_id:
         session.participant_ids = [pid for pid in session.participant_ids if pid != session.owner_id]
 
@@ -121,9 +140,9 @@ def update_session(session_id: str, data: dict):
     _sessions[session_id] = session
     _save(session_id)
 
-    # 同步扣费
     new_chargeable = _get_chargeable_ids(session)
     _sync_deduction(session, old_chargeable, new_chargeable)
+    _refresh_affected_identities(old_ids | _get_all_member_ids(session))
 
     return session, []
 
@@ -139,10 +158,12 @@ def delete_session(session_id: str) -> bool:
     session = _sessions.get(session_id)
     if not session or session.is_deleted:
         return False
+    affected_ids = _get_all_member_ids(session)
     _restore_for_session(session)
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
     _save(session_id)
+    _refresh_affected_identities(affected_ids)
     return True
 
 

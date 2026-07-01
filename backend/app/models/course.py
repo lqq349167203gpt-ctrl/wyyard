@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class CourseBase(BaseModel):
+class CourseBase(SafeBaseModel):
     type: str  # 课程类型
     name: str
     teachers: List[str] = []  # List of teacher IDs (课程老师)

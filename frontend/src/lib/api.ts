@@ -1,5 +1,23 @@
 const API_BASE = ""
 
+export function clearAuthState() {
+  localStorage.removeItem("authToken")
+  localStorage.removeItem("isLoggedIn")
+  localStorage.removeItem("currentUser")
+  localStorage.removeItem("userPermissions")
+  localStorage.removeItem("userCustomerPermissions")
+  localStorage.removeItem("userCustomerPermissionsClassRecords")
+  localStorage.removeItem("userCustomerPermissionsPayment")
+  localStorage.removeItem("customerPermissions")
+  localStorage.removeItem("customerPermissionsClassRecords")
+  localStorage.removeItem("customerPermissionsPayment")
+}
+
+function handle401() {
+  clearAuthState()
+  window.location.href = "/login"
+}
+
 export interface PaginatedResponse<T> {
   items: T[]
   total: number
@@ -8,18 +26,22 @@ export interface PaginatedResponse<T> {
   total_pages: number
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   }
-  try {
-    const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
-    if (user?.id) headers["X-User-Id"] = user.id
-  } catch {}
+  const token = localStorage.getItem("authToken")
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  return headers
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const authHeaders = getAuthHeaders()
   const res = await fetch(`${API_BASE}${path}`, {
-    headers,
     ...options,
+    headers: { ...authHeaders, ...options?.headers },
   })
+  if (res.status === 401) { handle401(); throw new Error("登录已过期") }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     throw new Error(data.detail || `请求失败: ${res.status}`)
@@ -94,15 +116,12 @@ export const systemHelperApi = {
     permissions?: string[],
     signal?: AbortSignal
   ): AsyncGenerator<string> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
+    const headers = getAuthHeaders()
     let userId = ""
     let userName = ""
     try {
       const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
       if (user?.id) {
-        headers["X-User-Id"] = user.id
         userId = user.id
         userName = user.owner || user.username || ""
       }
@@ -115,6 +134,7 @@ export const systemHelperApi = {
       signal,
     })
 
+    if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.detail || `请求失败: ${res.status}`)
@@ -150,9 +170,10 @@ export const systemHelperApi = {
   parseEntry: async (message: string, history: { role: string; content: string }[] = []) => {
     const res = await fetch("/api/system-helper/parse-entry", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ message, history }),
     })
+    if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error(`请求失败: ${res.status}`)
     return res.json()
   },
@@ -160,9 +181,10 @@ export const systemHelperApi = {
   executeEntry: async (action: string, data: Record<string, any> = {}) => {
     const res = await fetch("/api/system-helper/execute-entry", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ action, data }),
     })
+    if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error(`请求失败: ${res.status}`)
     return res.json()
   },
@@ -170,9 +192,10 @@ export const systemHelperApi = {
   analyzeImage: async (image: string, text: string = "", history: { role: string; content: string }[] = []) => {
     const res = await fetch("/api/system-helper/analyze-image", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ image, text, history }),
     })
+    if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error(`请求失败: ${res.status}`)
     return res.json()
   },
@@ -293,21 +316,6 @@ export const customerApi = {
   create: (data: Partial<CustomerCreate>) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
   update: (id: string, data: Partial<CustomerCreate>) => request<Customer>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
   delete: (id: string) => request<{ message: string }>(`/api/customers/${id}`, { method: "DELETE" }).then(r => { _customerLightCache = null; return r }),
-  parseChat: (chatLog: string) => request<CustomerCreate>("/api/customers/parse-chat", { method: "POST", body: JSON.stringify({ chat_log: chatLog }) }),
-  parseExcel: (file: File) => {
-    const formData = new FormData()
-    formData.append("file", file)
-    return fetch(`${API_BASE}/api/customers/parse-excel`, {
-      method: "POST",
-      body: formData,
-    }).then(async (res) => {
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `请求失败: ${res.status}`)
-      }
-      return res.json() as Promise<CustomerCreate[]>
-    })
-  },
   generateTags: (tags: string) => request<{ tags: string }>("/api/customers/generate-tags", { method: "POST", body: JSON.stringify({ tags }) }),
 }
 
@@ -585,7 +593,11 @@ export const uploadApi = {
   uploadMaterial: async (file: File): Promise<Material> => {
     const formData = new FormData()
     formData.append("file", file)
-    const res = await fetch(`${API_BASE}/api/uploads/materials`, { method: "POST", body: formData })
+    const token = localStorage.getItem("authToken")
+    const uploadHeaders: Record<string, string> = {}
+    if (token) uploadHeaders["Authorization"] = `Bearer ${token}`
+    const res = await fetch(`${API_BASE}/api/uploads/materials`, { method: "POST", headers: uploadHeaders, body: formData })
+    if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error("上传失败")
     return res.json()
   },
@@ -1400,12 +1412,13 @@ export const reminderApi = {
 
 // Member Identity
 export interface IdentityCondition {
-  type: "arrival" | "activity" | "card" | "course" | "payment"
+  type: "arrival" | "activity" | "card" | "course" | "payment" | "teacher"
   payment_categories: string[]
   items: string[]
   count_op: ">" | "=" | "<"
   count_value: number
   validity: "active" | "all"
+  activity_scope: "all" | "welfare"
 }
 
 export interface MemberIdentity {
@@ -1642,7 +1655,6 @@ export interface Account {
   owner: string
   role: string
   username: string
-  password: string
   enabled: boolean
   created_at: string
   is_system?: boolean
@@ -1673,8 +1685,11 @@ export const accountApi = {
   create: (data: AccountCreate) => request<Account>("/api/accounts", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<AccountCreate>) => request<Account>(`/api/accounts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/accounts/${id}`, { method: "DELETE" }),
-  login: (username: string, password: string) => request<{ success: boolean; message?: string; account?: Account; permissions?: string[]; customer_permissions?: string[]; customer_permissions_class_records?: string[]; customer_permissions_payment?: string[] }>("/api/accounts/login", { method: "POST", body: JSON.stringify({ username, password }) }),
+  login: (username: string, password: string) => request<{ success: boolean; message?: string; token?: string; account?: Account; permissions?: string[]; customer_permissions?: string[]; customer_permissions_class_records?: string[]; customer_permissions_payment?: string[] }>("/api/accounts/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   changePassword: (id: string, oldPassword: string, newPassword: string) => request<{ message: string }>(`/api/accounts/${id}/change-password`, { method: "POST", body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }) }),
+  resetPassword: (id: string, newPassword: string) => request<{ message: string }>(`/api/accounts/${id}/reset-password`, { method: "POST", body: JSON.stringify({ new_password: newPassword }) }),
+  listSessions: () => request<{ id: string; account_id: string; device_info: string; ip: string; login_time: string; last_active: string }[]>("/api/accounts/sessions"),
+  deleteSession: (sessionId: string) => request<{ message: string }>(`/api/accounts/sessions/${sessionId}`, { method: "DELETE" }),
   listRoles: () => request<Role[]>("/api/accounts/roles"),
   createRole: (data: RoleCreate) => request<Role>("/api/accounts/roles", { method: "POST", body: JSON.stringify(data) }),
   updateRole: (id: string, data: Partial<RoleCreate>) => request<Role>(`/api/accounts/roles/${id}`, { method: "PATCH", body: JSON.stringify(data) }),

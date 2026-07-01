@@ -64,7 +64,7 @@ def list_logs(
 def create_log(data: SystemLogCreate, extra: dict = None) -> SystemLog:
     now = datetime.now(timezone.utc)
     log = SystemLog(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         **data.model_dump(),
     )

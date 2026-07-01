@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
 
@@ -66,7 +66,7 @@ DEFAULT_SYSTEM_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 助手�
 - 如果涉及多个页面，可以加多个导航链接，如 `{{导航:客户信息:/healing-records}} {{导航:引流记录:/traffic-records}}`"""
 
 
-class SystemHelperConfig(BaseModel):
+class SystemHelperConfig(SafeBaseModel):
     """茶苑助手 AI 配置，全局唯一"""
     id: str = "default"
     provider: str = "glm"
@@ -80,7 +80,7 @@ class SystemHelperConfig(BaseModel):
     updated_at: Optional[datetime] = None
 
 
-class SystemHelperConfigUpdate(BaseModel):
+class SystemHelperConfigUpdate(StrictBaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None

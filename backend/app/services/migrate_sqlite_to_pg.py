@@ -4,7 +4,6 @@
 运行方式：
     cd backend && python3 -m app.services.migrate_sqlite_to_pg
 """
-import json
 import os
 import sys
 from pathlib import Path

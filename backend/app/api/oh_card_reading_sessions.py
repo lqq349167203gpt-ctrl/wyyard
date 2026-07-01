@@ -9,9 +9,16 @@ router = APIRouter(prefix="/api/oh-card-reading-sessions", tags=["oh-card-readin
 
 
 def _fill_session_names(sessions: list) -> list:
-    """从客户信息实时填充 owner_name / host_name"""
+    """从客户信息实时填充 owner_name / host_name，并回填 space_name / room_name"""
+    from app.services import space_service
     customers = list_customers()
     cmap = {c.id: c for c in customers}
+    _space_map: dict[str, str] = {}
+    _room_map: dict[str, str] = {}
+    for sp in space_service.get_all_spaces():
+        _space_map[sp.id] = sp.name
+        for rm in sp.rooms:
+            _room_map[rm.id] = rm.name
 
     def get_name(cid: str) -> str:
         if not cid:
@@ -20,12 +27,19 @@ def _fill_session_names(sessions: list) -> list:
         return c.nickname if c else ""
 
     for s in sessions:
-        data = s.model_dump(mode="json") if hasattr(s, "model_dump") else s
         for field in ("owner_name", "host_name"):
             id_field = field.replace("_name", "_id")
             actual = get_name(getattr(s, id_field, ""))
             if getattr(s, field, "") != actual:
                 setattr(s, field, actual)
+        sid = getattr(s, "space_id", "")
+        rid = getattr(s, "room_id", "")
+        sn = _space_map.get(sid, "") if sid else ""
+        rn = _room_map.get(rid, "") if rid else ""
+        if getattr(s, "space_name", "") != sn:
+            setattr(s, "space_name", sn)
+        if getattr(s, "room_name", "") != rn:
+            setattr(s, "room_name", rn)
     return sessions
 
 

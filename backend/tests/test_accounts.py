@@ -4,7 +4,7 @@ import uuid
 
 
 def _unique(suffix=""):
-    return f"{uuid.uuid4().hex[:8]}{suffix}"
+    return f"{uuid.uuid4().hex[:12]}{suffix}"
 
 
 class TestAccountCRUD:

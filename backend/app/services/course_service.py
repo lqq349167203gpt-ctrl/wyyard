@@ -47,7 +47,7 @@ def get_course(course_id: str) -> Optional[Course]:
 def create_course(data: CourseCreate) -> Course:
     now = datetime.now(timezone.utc)
     course = Course(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),

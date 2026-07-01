@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class InternalCourseBase(BaseModel):
+class InternalCourseBase(SafeBaseModel):
     customer_id: str
     nickname: str
     course_type: str

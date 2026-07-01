@@ -51,7 +51,7 @@ def get_knot(knot_id: str) -> Optional[EnergyKnot]:
 def create_knot(data: EnergyKnotCreate) -> EnergyKnot:
     now = datetime.now(timezone.utc)
     knot = EnergyKnot(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),

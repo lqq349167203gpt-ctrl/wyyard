@@ -1,14 +1,14 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
-from typing import List, Optional, Any
+from typing import List, Any
 
 
-class VisitChangedCell(BaseModel):
+class VisitChangedCell(SafeBaseModel):
     rowKey: int
     fields: List[str]
 
 
-class VisitHistoryBase(BaseModel):
+class VisitHistoryBase(SafeBaseModel):
     date: str
     space_id: str = ""
     action: str

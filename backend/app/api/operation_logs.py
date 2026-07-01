@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from typing import Optional
+from app.middleware.jwt_auth import require_admin
 from app.services import operation_log_service
 from app.utils.pagination import paginate
 
@@ -8,6 +9,7 @@ router = APIRouter(prefix="/api/operation-logs", tags=["operation-logs"])
 
 @router.get("")
 def list_logs(
+    _admin: str = Depends(require_admin),
     operator: Optional[str] = None,
     method: Optional[str] = None,
     section: Optional[str] = None,

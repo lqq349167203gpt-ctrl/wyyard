@@ -3,10 +3,11 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.organization import Organization, OrganizationCreate
-from app.services.storage import load_data, save_item, delete_item
+from app.services.storage import load_data, save_item
 
 FILENAME = "organizations.json"
 _organizations: Dict[str, Organization] = {}
+PROTECTED_NAMES = {"无忧茶苑"}
 
 
 def _load():
@@ -44,7 +45,7 @@ def create_organization(data: OrganizationCreate) -> Organization:
         raise ValueError("组织名称已存在")
     now = datetime.now(timezone.utc)
     org = Organization(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         name=data.name.strip(),
@@ -59,6 +60,8 @@ def update_organization(org_id: str, data: dict) -> Optional[Organization]:
     org = _organizations.get(org_id)
     if not org:
         return None
+    if org.name in PROTECTED_NAMES:
+        raise ValueError(f"「{org.name}」为系统核心组织，不允许修改")
     # 检查名称
     new_name = data.get("name")
     if new_name is not None:
@@ -81,6 +84,8 @@ def delete_organization(org_id: str) -> bool:
     org = _organizations.get(org_id)
     if not org:
         return False
+    if org.name in PROTECTED_NAMES:
+        raise ValueError(f"「{org.name}」为系统核心组织，不允许删除")
     org.is_deleted = True
     org.deleted_at = datetime.now(timezone.utc)
     _save(org_id)

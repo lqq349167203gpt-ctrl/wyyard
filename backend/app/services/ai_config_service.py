@@ -42,7 +42,7 @@ def get_config(config_id: str) -> Optional[AIConfig]:
 def create_config(data: AIConfigCreate) -> AIConfig:
     now = datetime.now(timezone.utc)
     config = AIConfig(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),

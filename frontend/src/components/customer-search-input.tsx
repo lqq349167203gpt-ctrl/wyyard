@@ -137,7 +137,9 @@ export function CustomerSearchInput({
       if (positionFilter && !(c.positions || []).includes(positionFilter)) return false
       if (filterSelected && selectedNames.includes(c.nickname)) return false
       if (seen.has(c.nickname)) return false
-      if (c.nickname.toLowerCase().includes(q)) {
+      const nicknameMatch = c.nickname.toLowerCase().includes(q)
+      const nameMatch = c.name && c.name.toLowerCase().includes(q)
+      if (nicknameMatch || nameMatch) {
         seen.add(c.nickname)
         return true
       }
@@ -251,18 +253,23 @@ export function CustomerSearchInput({
             if (filtered.length === 0 && !showCreate) return null
             return (
               <div className="bg-white border border-[#e8eaed] shadow-lg overflow-y-auto" style={{ ...pos, borderRadius: radiusValue }}>
-                {filtered.slice(0, MAX_VISIBLE).map(c => (
-                  <div
-                    key={c.id}
-                    className="px-3 py-2 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"
-                    onMouseDown={(e) => { e.preventDefault(); selectItem(c) }}
-                  >
-                    <span>{c.nickname}</span>
-                    {(rightLabelMap?.[c.id] || c.member_type) && (
-                      <span className={`text-[10px] ml-auto ${warnLabelIds?.includes(c.id) ? "text-[#e02020]" : "text-[#8f959e]"}`}>{rightLabelMap?.[c.id] || c.member_type}</span>
-                    )}
-                  </div>
-                ))}
+                {filtered.slice(0, MAX_VISIBLE).map(c => {
+                  const q = search.toLowerCase()
+                  const nameMatch = c.name && c.name.toLowerCase().includes(q) && !c.nickname.toLowerCase().includes(q)
+                  return (
+                    <div
+                      key={c.id}
+                      className="px-3 py-2 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); selectItem(c) }}
+                    >
+                      <span>{c.nickname}</span>
+                      {nameMatch && <span className="text-[10px] text-[#8f959e]">（{c.name}）</span>}
+                      {(rightLabelMap?.[c.id] || c.member_type) && (
+                        <span className={`text-[10px] ml-auto ${warnLabelIds?.includes(c.id) ? "text-[#e02020]" : "text-[#8f959e]"}`}>{rightLabelMap?.[c.id] || c.member_type}</span>
+                      )}
+                    </div>
+                  )
+                })}
                 {showCreate && (
                   <div
                     className="px-3 py-2 text-[12px] text-[#3370ff] hover:bg-[#f0f5ff] cursor-pointer text-left border-t border-[#f0f1f2]"

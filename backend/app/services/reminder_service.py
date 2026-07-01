@@ -47,7 +47,7 @@ def get_reminder(reminder_id: str) -> Optional[Reminder]:
 def create_reminder(data: ReminderCreate) -> Reminder:
     now = datetime.now(timezone.utc)
     r = Reminder(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),
@@ -57,14 +57,19 @@ def create_reminder(data: ReminderCreate) -> Reminder:
     return r
 
 
+_UPDATE_ALLOWED_KEYS = {"name", "account_role", "account_id", "condition_logic", "conditions", "trigger_mode"}
+
+
 def update_reminder(reminder_id: str, data: dict) -> Optional[Reminder]:
     r = _reminders.get(reminder_id)
     if not r:
         return None
     for key, value in data.items():
+        if key not in _UPDATE_ALLOWED_KEYS:
+            continue
         if key == "conditions":
             r.conditions = [ReminderCondition(**c) for c in value]
-        elif hasattr(r, key):
+        else:
             setattr(r, key, value)
     r.updated_at = datetime.now(timezone.utc)
     _reminders[reminder_id] = r

@@ -52,7 +52,7 @@ def get_reading(reading_id: str) -> Optional[OhCardReading]:
 def create_reading(data: OhCardReadingCreate) -> OhCardReading:
     now = datetime.now(timezone.utc)
     reading = OhCardReading(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
         **data.model_dump(),

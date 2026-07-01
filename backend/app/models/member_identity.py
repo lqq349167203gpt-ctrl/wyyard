@@ -1,22 +1,24 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel, StrictBaseModel
+from pydantic import Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 
-class IdentityCondition(BaseModel):
-    type: str  # "arrival" | "activity" | "card" | "course" | "payment"
-    payment_categories: List[str] = []  # for payment type
-    items: List[str] = []  # card/course 的子项
-    count_op: str = ">"  # ">" | "=" | "<"
-    count_value: int = 0  # 比较值
-    validity: str = "active"  # 仅 card/course："active" | "all"
+class IdentityCondition(SafeBaseModel):
+    type: Literal["arrival", "activity", "card", "course", "payment", "teacher"]
+    payment_categories: List[str] = []
+    items: List[str] = []
+    count_op: Literal[">", "=", "<"] = ">"
+    count_value: int = 0
+    validity: Literal["active", "all"] = "active"
+    activity_scope: Literal["all", "welfare"] = "all"
 
 
-class MemberIdentityBase(BaseModel):
-    name: str = ""
-    type: str = ""  # "老人" | "新人" | ""
+class MemberIdentityBase(SafeBaseModel):
+    name: str = Field(default="", min_length=1)
+    type: Literal["老人", "新人", ""] = ""
     conditions: List[IdentityCondition] = []
-    operator: str = "all"  # "all" | "any"
+    operator: Literal["all", "any"] = "all"
     sort_order: int = 0
 
 
@@ -24,12 +26,11 @@ class MemberIdentityCreate(MemberIdentityBase):
     pass
 
 
-class MemberIdentityUpdate(BaseModel):
-    name: Optional[str] = None
-    type: Optional[str] = None
+class MemberIdentityUpdate(StrictBaseModel):
+    name: Optional[str] = Field(default=None, min_length=1)
+    type: Optional[Literal["老人", "新人", ""]] = None
     conditions: Optional[List[IdentityCondition]] = None
-    operator: Optional[str] = None
-    sort_order: Optional[int] = None
+    operator: Optional[Literal["all", "any"]] = None
 
 
 class MemberIdentity(MemberIdentityBase):

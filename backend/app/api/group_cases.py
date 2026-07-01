@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 from app.utils.pagination import paginate
 from app.services import group_case_service
 from app.models.group_case import GroupCaseCreate

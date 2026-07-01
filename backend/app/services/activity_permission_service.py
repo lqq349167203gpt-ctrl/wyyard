@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict
 
 from app.services.storage import load_data, save_data, save_item
 
@@ -61,3 +61,24 @@ def set_all(permissions: Dict[str, Dict[str, Dict[str, bool]]]):
         else:
             _permissions[member_type] = activities
     _save()
+
+
+def remove_identity(identity_name: str):
+    """身份删除时，从活动权限配置中移除"""
+    if identity_name in _permissions:
+        del _permissions[identity_name]
+        _save()
+
+
+def rename_identity(old_name: str, new_name: str):
+    """身份改名时，同步更新活动权限配置"""
+    if old_name in _permissions:
+        _permissions[new_name] = _permissions.pop(old_name)
+        _save(new_name)
+        # 清除旧 key 的持久化数据
+        from app.services.storage import load_data
+        data = load_data(FILENAME) or {}
+        if old_name in data:
+            del data[old_name]
+            from app.services.storage import save_data as sd
+            sd(FILENAME, data)

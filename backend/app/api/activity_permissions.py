@@ -1,14 +1,14 @@
 from typing import Dict
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 
 from app.services import activity_permission_service
 
 router = APIRouter(prefix="/api/activity-permissions", tags=["activity-permissions"])
 
 
-class ActivityPermissionSaveAll(BaseModel):
+class ActivityPermissionSaveAll(StrictBaseModel):
     permissions: Dict[str, Dict[str, Dict[str, bool]]]
 
 

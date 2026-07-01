@@ -27,6 +27,7 @@ import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { ActivityBatchTable, type HistoryEntry } from "./activity-batch-table"
 import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
+import { POSITION_ENERGY_TEACHER, POSITION_COURSE_TEACHER } from "@/lib/positions"
 
 // ===== Date utilities =====
 
@@ -2221,7 +2222,7 @@ export default function DailyActivitiesPage() {
   }, [detailVisits, selectedSpaceId])
 
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
-  const eksHostCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes("能量结老师")).sort((a, b) => (a.position_sort_orders?.["能量结老师"] ?? 9999) - (b.position_sort_orders?.["能量结老师"] ?? 9999)), [allCustomers])
+  const eksHostCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes(POSITION_ENERGY_TEACHER)).sort((a, b) => (a.position_sort_orders?.[POSITION_ENERGY_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_ENERGY_TEACHER] ?? 9999)), [allCustomers])
 
   // ===== Helpers =====
   const handleApiError = (error: any) => {
@@ -2379,7 +2380,7 @@ export default function DailyActivitiesPage() {
     customerApi.light()
       .then((customers) => {
         setAllCustomers(customers)
-        setTeachers(customers.filter(c => c.positions?.includes("课程老师")).sort((a, b) => (a.position_sort_orders?.["课程老师"] ?? 9999) - (b.position_sort_orders?.["课程老师"] ?? 9999)))
+        setTeachers(customers.filter(c => c.positions?.includes(POSITION_COURSE_TEACHER)).sort((a, b) => (a.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999)))
       })
       .catch(() => {})
     memberIdentityApi.list().then(setMemberIdentities).catch(() => {})

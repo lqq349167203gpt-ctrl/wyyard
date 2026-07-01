@@ -1,5 +1,5 @@
 from typing import Dict, List
-from app.services.storage import load_data, save_data, save_item
+from app.services.storage import load_data, save_data
 
 FILENAME = "position_page_permissions.json"
 
@@ -35,3 +35,14 @@ def get_all_page(page: str) -> Dict[str, List[str]]:
 
 def get_all() -> Dict[str, Dict[str, List[str]]]:
     return _permissions
+
+
+def rename_position_in_page_permissions(old_name: str, new_name: str):
+    """角色改名时，迁移 page_permissions 各 page 下的 position key"""
+    changed = False
+    for page, positions in _permissions.items():
+        if old_name in positions:
+            positions[new_name] = positions.pop(old_name)
+            changed = True
+    if changed:
+        _save()

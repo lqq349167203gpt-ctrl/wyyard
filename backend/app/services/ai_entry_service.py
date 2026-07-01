@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -18,6 +18,7 @@ from app.models.other_project import OtherProjectCreate
 from app.services import customer_service
 from app.services import visit_service
 from app.services import membership_card_service
+from app.services.chat_parser import _escape_xml
 from app.services import group_case_service
 from app.services import emotional_release_service
 from app.services import energy_knot_service
@@ -200,7 +201,7 @@ def _build_customer_list() -> str:
     lines = []
     for c in customers:
         if not c.is_deleted:
-            lines.append(f"- {c.nickname} (ID: {c.id})")
+            lines.append(f"- {_escape_xml(c.nickname)} (ID: {c.id})")
     return "\n".join(lines) if lines else "（暂无客户）"
 
 

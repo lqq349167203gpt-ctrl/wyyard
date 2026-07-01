@@ -3,7 +3,6 @@
 汇总单个客户的所有业务数据
 """
 import json
-from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from app.services import (
     customer_service,
@@ -22,7 +21,6 @@ from app.services import (
     other_project_service,
     oh_card_reading_service,
     oh_card_reading_session_service,
-    project_deduction_service,
 )
 
 router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
@@ -79,7 +77,6 @@ def _build_purchase_summary(customer_id: str) -> list:
     summary = []
 
     # 会员活动 — 唯一真理：剩余 = 总 - 销卡 - 活动扣卡
-    today = datetime.now().strftime("%Y-%m-%d")
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
     grand_total = membership_card_service.get_grand_total(customer_id)
     manual_deductions = membership_card_service.get_manual_deductions(customer_id)
@@ -287,22 +284,31 @@ def _build_activities(customer_id: str) -> list:
     """合并所有活动记录，按日期倒序"""
     activities = []
 
-    # 课程记录 - 作为参与者
-    # 人员范围与 visit_service._count_untracked_chargeable_activities 一致：
-    # 顶层 participant_ids ∪ groups 里的 leader/deputy/member，排除 teacher_ids
+    # 课程记录 - 作为参与者或老师
     for r in class_record_service.list_records():
+        teacher_names = []
+        for tid in r.teacher_ids:
+            t = customer_service.get_customer(tid)
+            teacher_names.append(t.nickname or t.name if t else tid)
+        host = ", ".join(teacher_names)
         chargeable = class_record_service._get_group_member_ids(r)
         if customer_id in chargeable:
-            teacher_names = []
-            for tid in r.teacher_ids:
-                t = customer_service.get_customer(tid)
-                teacher_names.append(t.nickname or t.name if t else tid)
             activities.append({
                 "type": "沙龙类型",
                 "date": r.date,
                 "name": r.course_name,
                 "role": "参与者",
-                "host": ", ".join(teacher_names),
+                "host": host,
+                "session_id": r.id,
+                "is_public_welfare": r.is_public_welfare,
+            })
+        elif customer_id in (r.teacher_ids or []):
+            activities.append({
+                "type": "沙龙类型",
+                "date": r.date,
+                "name": r.course_name,
+                "role": "老师",
+                "host": host,
                 "session_id": r.id,
                 "is_public_welfare": r.is_public_welfare,
             })
@@ -326,6 +332,16 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": gc_name,
                 "role": "参与者",
+                "host": s.host_name or "",
+                "session_id": s.id,
+                "is_public_welfare": False,
+            })
+        elif customer_id in (s.teacher_ids or []):
+            activities.append({
+                "type": "觉醒游戏",
+                "date": s.date,
+                "name": gc_name,
+                "role": "老师",
                 "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
@@ -354,18 +370,29 @@ def _build_activities(customer_id: str) -> list:
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
+        elif customer_id in (s.teacher_ids or []):
+            activities.append({
+                "type": "情绪释放",
+                "date": s.date,
+                "name": er_name,
+                "role": "老师",
+                "host": s.host_name or "",
+                "session_id": s.id,
+                "is_public_welfare": False,
+            })
 
     # 能量结
     for s in energy_knot_session_service.list_sessions():
         ek_names = _parse_ek_names(s.description)
         ek_name = f"能量结【{ek_names}】" if ek_names else "能量结"
+        host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         if s.owner_id == customer_id:
             activities.append({
                 "type": "能量结",
                 "date": s.date,
                 "name": ek_name,
                 "role": "案主",
-                "host": ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]),
+                "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -375,20 +402,41 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": ek_name,
                 "role": "参与者",
-                "host": ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]),
+                "host": host,
+                "session_id": s.id,
+                "is_public_welfare": False,
+            })
+        elif customer_id in (s.teacher_ids or []):
+            activities.append({
+                "type": "能量结",
+                "date": s.date,
+                "name": ek_name,
+                "role": "老师",
+                "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
 
     # 内部课程
     for s in internal_course_session_service.list_sessions():
+        host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         if customer_id in s.participant_ids:
             activities.append({
                 "type": "内部课程",
                 "date": s.date,
                 "name": s.course_name,
                 "role": "参与者",
-                "host": ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]),
+                "host": host,
+                "session_id": s.id,
+                "is_public_welfare": False,
+            })
+        elif customer_id in (s.teacher_ids or []):
+            activities.append({
+                "type": "内部课程",
+                "date": s.date,
+                "name": s.course_name,
+                "role": "老师",
+                "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
             })
@@ -412,6 +460,16 @@ def _build_activities(customer_id: str) -> list:
                 "date": s.date,
                 "name": ocr_name,
                 "role": "参与者",
+                "host": s.host_name or "",
+                "session_id": s.id,
+                "is_public_welfare": False,
+            })
+        elif customer_id in (s.teacher_ids or []):
+            activities.append({
+                "type": "OH卡梳理",
+                "date": s.date,
+                "name": ocr_name,
+                "role": "老师",
                 "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,

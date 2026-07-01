@@ -62,6 +62,9 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/business-reminders": "business-reminders",
   "/data-records": "data-records",
   "/chat-history": "chat-history",
+  "/positions/teacher": "position-management",
+  "/agents/:id/chat": "agents",
+  "/change-password": "change-password",
 }
 
 function ProtectedRoute() {
@@ -86,6 +89,7 @@ function ProtectedRoute() {
 
   const getFirstAllowedPath = useMemo(() => {
     for (const [path, permission] of Object.entries(PATH_PERMISSIONS)) {
+      if (path.includes(":")) continue // 跳过动态路由模式
       const hasPerm = permission === "payment"
         ? PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
         : permission === "class-records"
@@ -106,7 +110,20 @@ function ProtectedRoute() {
   }
 
   if (currentUser?.role !== "超级管理员") {
-    const requiredPermission = PATH_PERMISSIONS[location.pathname]
+    const requiredPermission = (() => {
+    const exact = PATH_PERMISSIONS[location.pathname]
+    if (exact) return exact
+    // 动态路由匹配：遍历 PATH_PERMISSIONS 中含 :segment 的 key
+    for (const [pattern, perm] of Object.entries(PATH_PERMISSIONS)) {
+      if (!pattern.includes(":")) continue
+      const patternParts = pattern.split("/")
+      const pathParts = location.pathname.split("/")
+      if (patternParts.length !== pathParts.length) continue
+      const match = patternParts.every((seg, i) => seg.startsWith(":") || seg === pathParts[i])
+      if (match) return perm
+    }
+    return undefined
+  })()
     const hasPermission = requiredPermission === "payment"
       ? PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
       : requiredPermission === "class-records"

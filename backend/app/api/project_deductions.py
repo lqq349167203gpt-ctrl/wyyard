@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from app.services import project_deduction_service
 from app.models.project_deduction import ProjectDeductionCreate
 from app.utils.pagination import paginate
@@ -25,7 +25,7 @@ def create_deduction(data: ProjectDeductionCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-class DeductionUpdate(BaseModel):
+class DeductionUpdate(StrictBaseModel):
     count: int
     updated_by: str = ""
 
@@ -52,7 +52,7 @@ def get_available_items(customer_id: str, project_type: str):
     return project_deduction_service.get_available_items(customer_id, project_type)
 
 
-class AutoDeductRequest(BaseModel):
+class AutoDeductRequest(StrictBaseModel):
     nickname: str
     project_type: str
     count: int = 1

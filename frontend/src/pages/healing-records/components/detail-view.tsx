@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/table"
 import { uploadApi, customerApi, healingRecordApi, customerDetailApi, type Customer, type CustomerLight, type Material, type CustomerDetail } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { HEALING_POSITIONS } from "@/lib/positions"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { X, Upload, Copy, Inbox } from "lucide-react"
@@ -183,9 +184,9 @@ export default function DetailView({
             <div className="flex items-baseline gap-2">
               <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">疗愈老师</span>
               <span className="text-[12px] text-[#2b2f36]">
-                {(c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).length === 0
+                {(c.positions||[]).filter(p=>HEALING_POSITIONS.includes(p as any)).length === 0
                   ? <span className="text-[#d0d3d6]">-</span>
-                  : (c.positions||[]).filter(p=>["成就君","能量结老师","课程老师"].includes(p)).map((p,i)=>(
+                  : (c.positions||[]).filter(p=>HEALING_POSITIONS.includes(p as any)).map((p,i)=>(
                       <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] bg-[#f0f1f2] text-[#646a73] mr-1">{p}</span>
                     ))
                 }

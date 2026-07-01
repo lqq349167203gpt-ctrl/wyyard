@@ -58,7 +58,7 @@ def reorder_identities(data: dict, request: Request = None):
         operator = ""
         operator_role = ""
         if request:
-            user_id = request.headers.get("X-User-Id", "")
+            user_id = getattr(request.state, "user_id", "")
             if user_id:
                 try:
                     from app.services import account_service
@@ -76,6 +76,10 @@ def reorder_identities(data: dict, request: Request = None):
             "path": "/api/member-identities/batch/reorder",
             "ip": request.client.host if request and request.client else "",
         })
+    try:
+        member_identity_service.refresh_all()
+    except Exception as e:
+        logger.error(f"刷新用户身份失败: {e}")
     return {"message": "排序更新完成"}
 
 
@@ -87,7 +91,7 @@ def refresh_all(request: Request):
     from app.models.operation_log import OperationLogCreate
     operator = ""
     operator_role = ""
-    user_id = request.headers.get("X-User-Id", "")
+    user_id = getattr(request.state, "user_id", "")
     if user_id:
         try:
             from app.services import account_service

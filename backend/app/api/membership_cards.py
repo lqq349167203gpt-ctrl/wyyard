@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from app.utils.pagination import paginate
-from app.services import membership_card_service, project_deduction_service
+from app.services import membership_card_service
 from app.models.membership_card import MembershipCardCreate
 
 router = APIRouter(prefix="/api/membership-cards", tags=["membership-cards"])
@@ -22,15 +22,10 @@ def list_cards(page: int | None = Query(None, ge=1), page_size: int | None = Que
     if card_type:
         items_dict = [i for i in items_dict if i.get("card_type") == card_type]
     items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    # 为非不限次卡附加有效剩余次数（总购买 - 该卡销卡次数）
+    # 统一使用 service 层计算有效剩余（总购买 - 销卡 - 活动扣卡）
     for item in items_dict:
-        if item.get("remaining_count") is None:
-            item["effective_remaining"] = None  # 不限次
-        else:
-            card_id = item.get("id", "")
-            card_deduct = project_deduction_service.get_deduction_total_for_project(card_id)
-            total = item.get("total_count") or 0
-            item["effective_remaining"] = total - card_deduct
+        card_id = item.get("id", "")
+        item["effective_remaining"] = membership_card_service.get_card_effective_remaining(card_id)
     if page is not None:
         return paginate(items_dict, page, page_size or 10)
     return items_dict

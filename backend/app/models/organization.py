@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
 
 
-class OrganizationBase(BaseModel):
+class OrganizationBase(SafeBaseModel):
     name: str
     member_ids: List[str] = []
     sort_order: int = 0

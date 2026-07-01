@@ -1,17 +1,18 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from app.models.base import StrictBaseModel
 
+from app.config.settings import settings
 from app.services import account_service, wechat_service, position_permission_service, position_customer_permission_service, customer_service
 from app.api.accounts import ALL_PAGE_KEYS
 
 router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 
 
-class WechatLoginRequest(BaseModel):
+class WechatLoginRequest(StrictBaseModel):
     code: str
 
 
-class WechatBindRequest(BaseModel):
+class WechatBindRequest(StrictBaseModel):
     token: str
     username: str
     password: str
@@ -103,13 +104,19 @@ async def wechat_bind(data: WechatBindRequest):
     return resp
 
 
-class DevLoginRequest(BaseModel):
+class DevLoginRequest(StrictBaseModel):
     username: str
 
 
 @router.post("/dev-login")
-async def dev_login(data: DevLoginRequest):
-    """开发环境登录：直接用用户名登录，不需要密码"""
+async def dev_login(data: DevLoginRequest, request: Request):
+    """开发环境登录：直接用用户名登录，不需要密码（仅 debug 模式可用）"""
+    if not settings.debug:
+        raise HTTPException(status_code=404, detail="Not found")
+    # 仅允许本地访问
+    client_ip = request.client.host if request.client else ""
+    if client_ip not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(status_code=403, detail="仅允许本地访问")
     account = account_service.get_by_username(data.username)
     if not account:
         raise HTTPException(status_code=404, detail="账号不存在")
@@ -122,7 +129,7 @@ async def dev_login(data: DevLoginRequest):
     return resp
 
 
-class PhoneLoginRequest(BaseModel):
+class PhoneLoginRequest(StrictBaseModel):
     code: str  # wx.getPhoneNumber 返回的 code
 
 

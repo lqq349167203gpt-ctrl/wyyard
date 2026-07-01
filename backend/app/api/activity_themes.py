@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 from typing import List, Optional
 
 from app.services import activity_theme_service
@@ -7,14 +7,14 @@ from app.services import activity_theme_service
 router = APIRouter(prefix="/api/activity-themes", tags=["activity-themes"])
 
 
-class SaveThemeRequest(BaseModel):
+class SaveThemeRequest(StrictBaseModel):
     date: str
     space_id: str = ""
     week_theme: str = ""
     day_theme: str = ""
 
 
-class BatchSaveThemeRequest(BaseModel):
+class BatchSaveThemeRequest(StrictBaseModel):
     themes: List[SaveThemeRequest]
 
 

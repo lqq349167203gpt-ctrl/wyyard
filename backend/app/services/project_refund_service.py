@@ -1,4 +1,5 @@
 import uuid
+import threading
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
@@ -8,6 +9,7 @@ from app.services import customer_service
 
 FILENAME = "project_refunds.json"
 _refunds: Dict[str, ProjectRefund] = {}
+_refund_lock = threading.Lock()
 
 
 def _load():
@@ -129,116 +131,130 @@ def get_available_items(customer_id: str, project_type: str) -> list:
 
 
 def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
-    customer = customer_service.get_customer(data.customer_id)
-    if not customer:
-        raise ValueError("客户不存在")
+    with _refund_lock:
+        customer = customer_service.get_customer(data.customer_id)
+        if not customer:
+            raise ValueError("客户不存在")
 
-    # 获取项目信息和已付金额
-    project_name = ""
-    paid_amount = data.refund_amount  # fallback
+        # 获取项目信息和已付金额
+        project_name = ""
+        paid_amount = data.refund_amount  # fallback
 
+        if data.project_type == "membership-cards":
+            from app.services import membership_card_service
+            card = membership_card_service.get_card(data.project_id)
+            if not card or card.is_deleted:
+                raise ValueError("会员卡不存在")
+            if card.voided:
+                raise ValueError("该卡已作废，无法退费")
+            if card.customer_id != data.customer_id:
+                raise ValueError("该会员卡不属于该客户")
+            if is_project_refunded("membership-cards", data.project_id):
+                raise ValueError("该卡已退费")
+            project_name = card.card_type
+            paid_amount = card.price
+
+        elif data.project_type == "other-projects":
+            from app.services import other_project_service
+            project = other_project_service.get_project(data.project_id)
+            if not project or project.is_deleted:
+                raise ValueError("项目不存在")
+            if project.customer_id != data.customer_id:
+                raise ValueError("该项目不属于该客户")
+            if is_project_refunded("other-projects", data.project_id):
+                raise ValueError("该项目已退费")
+            project_name = project.project_name
+            paid_amount = project.fee
+
+        else:
+            type_labels = {
+                "group-cases": "觉醒游戏",
+                "emotional-releases": "情绪释放",
+                "oh-card-readings": "OH卡梳理",
+                "energy-knots": "能量结",
+            }
+            project_name = type_labels.get(data.project_type, data.project_type)
+
+            if is_project_refunded(data.project_type, data.project_id):
+                raise ValueError("该项目已退费")
+
+            from app.services import (
+                group_case_service, emotional_release_service,
+                oh_card_reading_service, energy_knot_service,
+            )
+            svc_map = {
+                "group-cases": (group_case_service, "get_case"),
+                "emotional-releases": (emotional_release_service, "get_release"),
+                "oh-card-readings": (oh_card_reading_service, "get_reading"),
+                "energy-knots": (energy_knot_service, "get_knot"),
+            }
+            if data.project_type in svc_map:
+                svc, method = svc_map[data.project_type]
+                item = getattr(svc, method)(data.project_id)
+                if not item or item.is_deleted:
+                    raise ValueError("项目不存在")
+                if item.customer_id != data.customer_id:
+                    raise ValueError("该项目不属于该客户")
+                if hasattr(item, "amount"):
+                    paid_amount = item.amount
+
+        if data.refund_amount > paid_amount:
+            raise ValueError(f"退费金额不能超过已付金额（¥{paid_amount}）")
+        if data.refund_amount <= 0:
+            raise ValueError("退费金额必须大于 0")
+
+        now = datetime.now(timezone.utc)
+        refund = ProjectRefund(
+            id=str(uuid.uuid4())[:12],
+            customer_id=data.customer_id,
+            nickname=customer.nickname,
+            project_type=data.project_type,
+            project_id=data.project_id,
+            project_name=project_name,
+            paid_amount=paid_amount,
+            refund_amount=data.refund_amount,
+            refund_date=now.strftime("%Y-%m-%d"),
+            created_by=data.created_by,
+            updated_by=data.created_by,
+            created_at=now,
+        )
+        _refunds[refund.id] = refund
+        _save(refund.id)
+
+    # 作废会员卡（锁外执行，避免长时间持锁）
     if data.project_type == "membership-cards":
         from app.services import membership_card_service
-        card = membership_card_service.get_card(data.project_id)
-        if not card or card.is_deleted:
-            raise ValueError("会员卡不存在")
-        if card.voided:
-            raise ValueError("该卡已作废，无法退费")
-        if is_project_refunded("membership-cards", data.project_id):
-            raise ValueError("该卡已退费")
-        project_name = card.card_type
-        paid_amount = card.price
-        # 标记卡为已作废：不再可用于扣费，已扣次数不返还
         membership_card_service.void_card(data.project_id)
 
-    elif data.project_type == "other-projects":
-        from app.services import other_project_service
-        project = other_project_service.get_project(data.project_id)
-        if not project or project.is_deleted:
-            raise ValueError("项目不存在")
-        if is_project_refunded("other-projects", data.project_id):
-            raise ValueError("该项目已退费")
-        project_name = project.project_name
-        paid_amount = project.fee
-
-    else:
-        type_labels = {
-            "group-cases": "觉醒游戏",
-            "emotional-releases": "情绪释放",
-            "oh-card-readings": "OH卡梳理",
-            "energy-knots": "能量结",
-        }
-        project_name = type_labels.get(data.project_type, data.project_type)
-
-        if is_project_refunded(data.project_type, data.project_id):
-            raise ValueError("该项目已退费")
-
-        # 获取已付金额
-        from app.services import (
-            group_case_service, emotional_release_service,
-            oh_card_reading_service, energy_knot_service,
-        )
-        svc_map = {
-            "group-cases": (group_case_service, "get_case"),
-            "emotional-releases": (emotional_release_service, "get_release"),
-            "oh-card-readings": (oh_card_reading_service, "get_reading"),
-            "energy-knots": (energy_knot_service, "get_knot"),
-        }
-        if data.project_type in svc_map:
-            svc, method = svc_map[data.project_type]
-            item = getattr(svc, method)(data.project_id)
-            if item and hasattr(item, "amount"):
-                paid_amount = item.amount
-
-    if data.refund_amount > paid_amount:
-        raise ValueError(f"退费金额不能超过已付金额（¥{paid_amount}）")
-    if data.refund_amount <= 0:
-        raise ValueError("退费金额必须大于 0")
-
-    now = datetime.now(timezone.utc)
-    refund = ProjectRefund(
-        id=str(uuid.uuid4())[:8],
-        customer_id=data.customer_id,
-        nickname=customer.nickname,
-        project_type=data.project_type,
-        project_id=data.project_id,
-        project_name=project_name,
-        paid_amount=paid_amount,
-        refund_amount=data.refund_amount,
-        refund_date=now.strftime("%Y-%m-%d"),
-        created_by=data.created_by,
-        updated_by=data.created_by,
-        created_at=now,
-    )
-    _refunds[refund.id] = refund
-    _save(refund.id)
     return refund
 
 
 def update_refund(refund_id: str, refund_amount: float, updated_by: str = "") -> ProjectRefund:
     """修改退费金额（不覆盖创建人）"""
-    refund = _refunds.get(refund_id)
-    if not refund or refund.is_deleted:
-        raise ValueError("记录不存在")
-    if refund_amount <= 0:
-        raise ValueError("退费金额必须大于 0")
-    if refund_amount > refund.paid_amount:
-        raise ValueError(f"退费金额不能超过已付金额（¥{refund.paid_amount}）")
-    refund.refund_amount = refund_amount
-    refund.updated_by = updated_by
-    _refunds[refund_id] = refund
-    _save(refund_id)
-    return refund
+    with _refund_lock:
+        refund = _refunds.get(refund_id)
+        if not refund or refund.is_deleted:
+            raise ValueError("记录不存在")
+        if refund_amount <= 0:
+            raise ValueError("退费金额必须大于 0")
+        if refund_amount > refund.paid_amount:
+            raise ValueError(f"退费金额不能超过已付金额（¥{refund.paid_amount}）")
+        refund.refund_amount = refund_amount
+        refund.updated_by = updated_by
+        _refunds[refund_id] = refund
+        _save(refund_id)
+        return refund
 
 
 def delete_refund(refund_id: str) -> None:
-    refund = _refunds.get(refund_id)
-    if not refund or refund.is_deleted:
-        raise ValueError("记录不存在")
-    refund.is_deleted = True
-    _refunds[refund_id] = refund
-    _save(refund_id)
-    # 撤销退费：恢复会员卡为可用
+    with _refund_lock:
+        refund = _refunds.get(refund_id)
+        if not refund or refund.is_deleted:
+            raise ValueError("记录不存在")
+        refund.is_deleted = True
+        _refunds[refund_id] = refund
+        _save(refund_id)
+    # 撤销退费：恢复会员卡为可用（锁外执行）
     if refund.project_type == "membership-cards":
         from app.services import membership_card_service
         membership_card_service.unvoid_card(refund.project_id)

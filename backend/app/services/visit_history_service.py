@@ -47,7 +47,7 @@ def list_histories(
 def create_history(data: VisitHistoryCreate) -> VisitHistory:
     now = datetime.now(timezone.utc)
     history = VisitHistory(
-        id=str(uuid.uuid4())[:8],
+        id=str(uuid.uuid4())[:12],
         created_at=now,
         **data.model_dump(),
     )

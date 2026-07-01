@@ -1,32 +1,43 @@
 import json
+import time
 import uuid
-from fastapi import APIRouter
+from collections import defaultdict
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel
+from app.models.base import StrictBaseModel
 
 from app.config.settings import settings
-from app.services import system_helper_config_service
+from app.services import system_helper_config_service, position_permission_service
 from app.services.chat_history_service import save_message
 from app.models.chat_history import ChatRecordCreate
 from app.services.ai_entry_service import parse_entry_intent, execute_entry, analyze_image_intent
 
 router = APIRouter(prefix="/api/system-helper", tags=["system-helper"])
 
+# 简单内存限流：每个用户每分钟最多 10 次请求
+_chat_rate: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT = 10
+_RATE_WINDOW = 60
 
-class ChatMessage(BaseModel):
+
+def _check_rate_limit(user_id: str):
+    now = time.time()
+    _chat_rate[user_id] = [t for t in _chat_rate[user_id] if now - t < _RATE_WINDOW]
+    if len(_chat_rate[user_id]) >= _RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+    _chat_rate[user_id].append(now)
+
+
+class ChatMessage(StrictBaseModel):
     role: str
     content: str
 
 
-class SystemHelperRequest(BaseModel):
+class SystemHelperRequest(StrictBaseModel):
     message: str
     history: list[ChatMessage] = []
-    user_id: str = ""
-    user_name: str = ""
-    user_role: str = ""
-    permissions: list[str] = []
 
 
 # 权限与页面的映射关系
@@ -78,7 +89,14 @@ def build_filtered_prompt(base_prompt: str, user_role: str, permissions: list[st
 
 
 @router.post("/chat")
-async def chat(data: SystemHelperRequest):
+async def chat(data: SystemHelperRequest, request: Request):
+    # 从 JWT 中读取身份，不信任客户端
+    user_id = getattr(request.state, "user_id", "")
+    _check_rate_limit(user_id)
+    user_name = getattr(request.state, "user_name", "")
+    user_role = getattr(request.state, "user_role", "")
+    permissions = position_permission_service.get_permissions(user_role)
+
     config = system_helper_config_service.get_config()
 
     llm = ChatOpenAI(
@@ -90,7 +108,7 @@ async def chat(data: SystemHelperRequest):
         streaming=True,
     )
 
-    system_prompt = build_filtered_prompt(config.system_prompt, data.user_role, data.permissions)
+    system_prompt = build_filtered_prompt(config.system_prompt, user_role, permissions)
 
     messages = [SystemMessage(content=system_prompt)]
     for msg in data.history:
@@ -101,12 +119,12 @@ async def chat(data: SystemHelperRequest):
     messages.append(HumanMessage(content=data.message))
 
     # 保存用户消息
-    session_id = str(uuid.uuid4())[:8]
-    if data.user_id:
+    session_id = str(uuid.uuid4())[:12]
+    if user_id:
         save_message(ChatRecordCreate(
-            user_id=data.user_id,
-            user_name=data.user_name,
-            user_role=data.user_role,
+            user_id=user_id,
+            user_name=user_name,
+            user_role=user_role,
             role="user",
             content=data.message,
             session_id=session_id,
@@ -121,11 +139,11 @@ async def chat(data: SystemHelperRequest):
         yield "data: [DONE]\n\n"
 
         # 保存 AI 回复
-        if data.user_id and full_content:
+        if user_id and full_content:
             save_message(ChatRecordCreate(
-                user_id=data.user_id,
-                user_name=data.user_name,
-                user_role=data.user_role,
+                user_id=user_id,
+                user_name=user_name,
+                user_role=user_role,
                 role="assistant",
                 content=full_content,
                 session_id=session_id,
@@ -134,37 +152,55 @@ async def chat(data: SystemHelperRequest):
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
-class ParseEntryRequest(BaseModel):
+class ParseEntryRequest(StrictBaseModel):
     message: str
     history: list[ChatMessage] = []
 
 
-class ExecuteEntryRequest(BaseModel):
+class ExecuteEntryRequest(StrictBaseModel):
     action: str
     data: dict = {}
 
 
 @router.post("/parse-entry")
-async def parse_entry(data: ParseEntryRequest):
+async def parse_entry(data: ParseEntryRequest, request: Request):
+    user_id = getattr(request.state, "user_id", "")
+    _check_rate_limit(user_id)
     history = [{"role": m.role, "content": m.content} for m in data.history]
     result = parse_entry_intent(data.message, history)
     return result
 
 
 @router.post("/execute-entry")
-async def exec_entry(data: ExecuteEntryRequest):
+async def exec_entry(data: ExecuteEntryRequest, request: Request):
+    user_id = getattr(request.state, "user_id", "")
+    _check_rate_limit(user_id)
     result = execute_entry(data.action, data.data)
     return result
 
 
-class AnalyzeImageRequest(BaseModel):
+class AnalyzeImageRequest(StrictBaseModel):
     image: str  # base64 encoded image
     text: str = ""
     history: list[ChatMessage] = []
 
+    @staticmethod
+    def _validate_image_size(v: str) -> str:
+        # base64 开销约 33%，10MB 原始 ≈ 13.3MB base64
+        if len(v) > 14_000_000:
+            raise ValueError("图片数据过大，请压缩后重试")
+        return v
+
+    def __init__(self, **data):
+        if "image" in data:
+            data["image"] = self._validate_image_size(data["image"])
+        super().__init__(**data)
+
 
 @router.post("/analyze-image")
-async def analyze_image(data: AnalyzeImageRequest):
+async def analyze_image(data: AnalyzeImageRequest, request: Request):
+    user_id = getattr(request.state, "user_id", "")
+    _check_rate_limit(user_id)
     history = [{"role": m.role, "content": m.content} for m in data.history]
     result = analyze_image_intent(data.image, data.text, history)
     return result

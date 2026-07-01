@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { Button } from "@/components/ui/button"
+import { clearAuthState } from "@/lib/api"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SystemHelperChat, type ChatMessage } from "@/components/system-helper-chat"
 import { LogOut } from "lucide-react"
@@ -59,9 +60,7 @@ export function AppLayout() {
   }, [location.pathname])
 
   const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn")
-    localStorage.removeItem("currentUser")
-    localStorage.removeItem("userPermissions")
+    clearAuthState()
     navigate("/login")
   }
 
