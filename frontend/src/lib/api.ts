@@ -1412,10 +1412,10 @@ export const reminderApi = {
 
 // Member Identity
 export interface IdentityCondition {
-  type: "arrival" | "activity" | "card" | "course" | "payment" | "teacher" | "fixed"
+  type: "arrival" | "activity" | "card" | "course" | "payment" | "teacher" | "fixed" | "amount"
   payment_categories: string[]
   items: string[]
-  count_op: ">" | "=" | "<"
+  count_op: ">" | "=" | "<" | ">=" | "<="
   count_value: number
   validity: "active" | "all"
   activity_scope: "all" | "welfare"

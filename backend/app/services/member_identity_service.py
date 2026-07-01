@@ -129,11 +129,15 @@ def delete_identity(identity_id: str) -> bool:
     return True
 
 
-def _compare_count(actual: int, op: str, target: int) -> bool:
+def _compare_count(actual, op: str, target) -> bool:
     if op == ">":
         return actual > target
+    elif op == ">=":
+        return actual >= target
     elif op == "=":
         return actual == target
+    elif op == "<=":
+        return actual <= target
     elif op == "<":
         return actual < target
     return False
@@ -155,7 +159,7 @@ def _check_condition(condition, customer_id: str,
                      customer_emotional_releases, customer_energy_knots,
                      customer_oh_card_readings, customer_other_projects, today_str: str,
                      welfare_count: int = 0, customer_positions: list = None,
-                     customer_nickname: str = "") -> bool:
+                     customer_nickname: str = "", customer_total_payment: float = 0) -> bool:
     if isinstance(condition, dict):
         condition = IdentityCondition(**condition)
     t = condition.type
@@ -171,6 +175,8 @@ def _check_condition(condition, customer_id: str,
         return any(p in positions for p in condition.items)
     elif t == "fixed":
         return customer_nickname in (condition.items or [])
+    elif t == "amount":
+        return _compare_count(int(customer_total_payment), condition.count_op, condition.count_value)
     elif t in ("card", "course", "payment"):
         cats = _get_payment_categories(condition)
         item_set = set(condition.items) if condition.items else set()
@@ -322,6 +328,27 @@ def refresh_member_type(customer_id: str):
     # 客户职位
     customer_positions = customer.positions or []
 
+    # 消费总额
+    from app.services import project_refund_service
+    customer_total_payment = 0.0
+    for c in customer_cards:
+        customer_total_payment += c.price
+    for c in customer_group_cases:
+        customer_total_payment += c.amount
+    for r in customer_emotional_releases:
+        customer_total_payment += r.amount
+    for k in customer_energy_knots:
+        customer_total_payment += k.amount
+    for c in customer_courses:
+        customer_total_payment += c.price
+    for r in customer_oh_card_readings:
+        customer_total_payment += r.amount
+    for p in customer_other_projects:
+        customer_total_payment += p.fee
+    for r in project_refund_service.list_refunds(customer_id=customer_id):
+        customer_total_payment -= r.refund_amount
+    customer_total_payment = max(customer_total_payment, 0)
+
     # 按 sort_order 顺序匹配，第一条命中即为身份
     member_type = ""
     for identity in identities:
@@ -334,7 +361,7 @@ def refresh_member_type(customer_id: str):
                                     customer_energy_knots, customer_oh_card_readings,
                                     customer_other_projects, today_str,
                                     welfare_count, customer_positions,
-                                    customer.nickname or "")
+                                    customer.nickname or "", customer_total_payment)
                    for cond in identity.conditions]
         if identity.operator == "any":
             matched = any(results)
@@ -385,6 +412,12 @@ def refresh_all():
     all_er_sessions = emotional_release_session_service.list_sessions()
     all_ek_sessions = energy_knot_session_service.list_sessions()
     all_ic_sessions = internal_course_session_service.list_sessions()
+
+    # 退款金额按客户汇总
+    from app.services import project_refund_service
+    refund_map: dict[str, float] = {}
+    for r in project_refund_service.list_refunds():
+        refund_map[r.customer_id] = refund_map.get(r.customer_id, 0) + r.refund_amount
 
     # 预计算每个客户的到店天数、活动参与天数、公益活动次数
     arrival_dates_map: dict[str, set[str]] = {}
@@ -453,6 +486,25 @@ def refresh_all():
         welfare_count = welfare_map.get(c.id, 0)
         customer_positions = c.positions or []
 
+        # 消费总额
+        customer_total_payment = 0.0
+        for x in customer_cards:
+            customer_total_payment += x.price
+        for x in customer_group_cases:
+            customer_total_payment += x.amount
+        for x in customer_emotional_releases:
+            customer_total_payment += x.amount
+        for x in customer_energy_knots:
+            customer_total_payment += x.amount
+        for x in customer_courses:
+            customer_total_payment += x.price
+        for x in customer_oh_card_readings:
+            customer_total_payment += x.amount
+        for x in customer_other_projects:
+            customer_total_payment += x.fee
+        customer_total_payment -= refund_map.get(c.id, 0)
+        customer_total_payment = max(customer_total_payment, 0)
+
         member_type = ""
         for identity in identities:
             if not identity.conditions:
@@ -464,7 +516,7 @@ def refresh_all():
                                         customer_energy_knots, customer_oh_card_readings,
                                         customer_other_projects, today_str,
                                         welfare_count, customer_positions,
-                                        c.nickname or "")
+                                        c.nickname or "", customer_total_payment)
                        for cond in identity.conditions]
             if identity.operator == "any":
                 matched = any(results)

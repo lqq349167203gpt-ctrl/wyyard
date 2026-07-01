@@ -32,11 +32,12 @@ const TYPE_LABELS: Record<string, string> = {
   course: "付费项目",
   teacher: "疗愈老师",
   fixed: "固定人员",
+  amount: "消费金额",
 }
 
 const TEACHER_POSITIONS = [...HEALING_POSITIONS]
 
-const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于" }
+const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于", ">=": "大于等于", "<=": "小于等于" }
 const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "其他项目"]
 
 function getPaymentCategories(c: IdentityCondition): string[] {
@@ -75,6 +76,9 @@ function conditionSummary(c: IdentityCondition): string {
       }
     }
     return parts.join("，")
+  }
+  if (c.type === "amount") {
+    return `消费金额 ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 元`
   }
   return ""
 }
@@ -458,7 +462,7 @@ export default function MemberIdentitiesPage() {
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
                           value={cond.type}
-                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}, {value: "fixed", label: "固定人员"}]}
+                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}, {value: "fixed", label: "固定人员"}, {value: "amount", label: "消费金额"}]}
                           placeholder="请选择条件类型"
                           onChange={(v) => updateCondition(ci, { type: v as IdentityCondition["type"] })}
                         />
@@ -506,6 +510,26 @@ export default function MemberIdentitiesPage() {
                           </label>
                         )}
                         </>
+                      )}
+
+                      {/* 消费金额 → 运算符 + 金额 */}
+                      {cond.type === "amount" && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">金额</span>
+                          <SelectDropdown
+                            value={cond.count_op}
+                            options={[{value: ">", label: "大于"}, {value: ">=", label: "大于等于"}, {value: "=", label: "等于"}, {value: "<=", label: "小于等于"}, {value: "<", label: "小于"}]}
+                            onChange={(v) => updateCondition(ci, { count_op: v as IdentityCondition["count_op"] })}
+                          />
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={cond.count_value}
+                            onChange={(e) => updateCondition(ci, { count_value: e.target.value.replace(/[^0-9]/g, "") } as any)}
+                            className="w-24 h-8 text-[12px]"
+                          />
+                          <span className="text-[12px] text-[#4e535a]">元</span>
+                        </div>
                       )}
 
                       {/* 疗愈老师 → 身份选择 */}

@@ -7,10 +7,10 @@ from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class IdentityCondition(SafeBaseModel):
-    type: Literal["arrival", "activity", "card", "course", "payment", "teacher", "fixed"]
+    type: Literal["arrival", "activity", "card", "course", "payment", "teacher", "fixed", "amount"]
     payment_categories: List[str] = []
     items: List[str] = []
-    count_op: Literal[">", "=", "<"] = ">"
+    count_op: Literal[">", "=", "<", ">=", "<="] = ">"
     count_value: int = 0
     validity: Literal["active", "all"] = "active"
     activity_scope: Literal["all", "welfare"] = "all"
