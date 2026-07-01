@@ -32,7 +32,7 @@ class AdminResetPasswordRequest(StrictBaseModel):
 # ===== 账号 =====
 
 @router.get("")
-async def list_accounts(_admin: str = Depends(require_admin)):
+async def list_accounts():
     accounts = account_service.list_accounts()
     return [acc.model_dump(exclude={"password"}) for acc in accounts]
 
