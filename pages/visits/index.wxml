@@ -1,0 +1,88 @@
+<view class="page">
+  <!-- 日历 -->
+  <view class="calendar">
+    <view class="calendar-header">
+      <text class="summary-date" bindtap="onCalendarToggle">{{currentDateShort}} {{currentWeekday}}</text>
+      <picker class="space-picker" catchtap="" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <text class="summary-space">{{currentSpaceName}}</text>
+      </picker>
+      <view class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
+        <text>{{editMode ? '完成' : '排序'}}</text>
+      </view>
+    </view>
+    <!-- 下拉日历 -->
+    <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
+      <view class="calendar-nav">
+        <view class="nav-arrow" catchtap="onPrevMonth">‹</view>
+        <text class="nav-title">{{calYear}}年{{calMonth + 1}}月</text>
+        <view class="nav-arrow" catchtap="onNextMonth">›</view>
+      </view>
+      <view class="weekday-row">
+        <text class="weekday-cell" wx:for="{{weekdays}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="day-grid">
+        <view
+          wx:for="{{calendarDays}}"
+          wx:key="date"
+          class="day-cell {{item.isCurrent ? '' : 'other'}} {{item.isSelected ? 'selected' : ''}} {{item.isToday ? 'today' : ''}}"
+          bindtap="onCalendarDayTap"
+          data-date="{{item.date}}"
+        >
+          <text>{{item.day}}</text>
+          <view class="day-dot" wx:if="{{item.count > 0}}"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 遮罩 -->
+  <view class="calendar-mask" wx:if="{{calendarExpanded}}" bindtap="onCalendarClose"></view>
+
+  <!-- 访客列表 -->
+  <view class="visit-list" wx:if="{{!loading && visits.length > 0}}">
+    <visit-card
+      wx:for="{{visits}}"
+      wx:key="id"
+      visit="{{item}}"
+      leader-name="{{leaderMap[item.customer_id] || ''}}"
+      edit-mode="{{editMode}}"
+      can-move-up="{{index > 0}}"
+      can-move-down="{{index < visits.length - 1}}"
+      bindtap="onVisitTap"
+      data-visit="{{item}}"
+
+      bind:delete="onDeleteTap"
+      bind:profile="onProfileTap"
+      bind:arrival="onArrivalTap"
+      bind:moveup="onMoveUp"
+      bind:movedown="onMoveDown"
+    />
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && visits.length === 0}}">
+    <text class="empty-icon">📋</text>
+    <text class="empty-text">暂无邀约记录</text>
+    <text class="empty-hint">点击右下角 + 添加</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 浮动添加按钮 -->
+  <view class="fab" wx:if="{{!editMode}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
+    <text class="fab-icon">+</text>
+  </view>
+
+  <!-- 语音对话弹窗 -->
+  <voice-input-popup
+    class="voice-popup"
+    show="{{showVoicePopup}}"
+    mode="visit"
+    bind:close="onVoiceClose"
+    bind:chat="onVoiceChat"
+    wx:if="{{showVoicePopup}}"
+  />
+</view>

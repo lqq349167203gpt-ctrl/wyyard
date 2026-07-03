@@ -1,0 +1,141 @@
+<view class="page">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrap">
+      <input
+        class="search-input"
+        placeholder="搜索昵称"
+        placeholder-class="placeholder"
+        value="{{keyword}}"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+        confirm-type="search"
+      />
+    </view>
+    <view class="filter-btn" bindtap="onToggleFilterPanel">
+      <text>筛选</text>
+      <text class="filter-count" wx:if="{{filterCount > 0}}">{{filterCount}}</text>
+    </view>
+  </view>
+
+  <!-- 筛选下拉面板 -->
+  <view class="dropdown-panel" wx:if="{{showFilterPanel}}">
+    <view class="dropdown-mask" bindtap="onCloseFilterPanel"></view>
+    <view class="dropdown-content filter-dropdown">
+      <!-- 到店间隔 -->
+      <view class="filter-section">
+        <view class="filter-section-title">到店间隔</view>
+        <view class="range-panel-content">
+          <view class="range-values">
+            <text class="range-val">{{rangeMin}}天</text>
+            <text class="range-val">{{rangeMax >= 60 ? '60天往上' : rangeMax + '天'}}</text>
+          </view>
+          <view class="range-track-wrap">
+            <view class="range-track">
+              <view class="range-filled" style="left:{{rangeMin / 60 * 100}}%;right:{{(60 - rangeMax) / 60 * 100}}%"></view>
+            </view>
+            <view class="range-thumb range-thumb-min" style="left:{{rangeMin / 60 * 100}}%"
+              data-type="min"
+              catchtouchstart="onRangeTouchStart"
+              catchtouchmove="onRangeTouchMove"
+              catchtouchend="onRangeTouchEnd">
+            </view>
+            <view class="range-thumb range-thumb-max" style="left:{{rangeMax / 60 * 100}}%"
+              data-type="max"
+              catchtouchstart="onRangeTouchStart"
+              catchtouchmove="onRangeTouchMove"
+              catchtouchend="onRangeTouchEnd">
+            </view>
+          </view>
+          <view class="range-labels">
+            <text>0</text>
+            <text>10</text>
+            <text>20</text>
+            <text>30</text>
+            <text>40</text>
+            <text>50</text>
+            <text>60</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 身份选择 -->
+      <view class="filter-section">
+        <view class="filter-section-title">身份</view>
+        <view class="tags-wrap">
+          <view
+            class="tag-item {{item.selected ? 'active' : ''}}"
+            wx:for="{{memberTypeList}}"
+            wx:key="name"
+            bindtap="onToggleMemberType"
+            data-type="{{item.name}}"
+          >
+            {{item.name}}
+          </view>
+        </view>
+      </view>
+
+      <!-- 操作按钮 -->
+      <view class="filter-actions">
+        <text class="filter-reset" bindtap="onResetFilter">重置</text>
+        <text class="filter-confirm" bindtap="onConfirmFilter">确定</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 分组客户列表 -->
+  <view class="customer-groups" wx:if="{{!loading && groupedCustomers.length > 0}}">
+    <view class="group" wx:for="{{groupedCustomers}}" wx:key="type">
+      <view class="group-header">
+        <text class="group-title">{{item.type}}</text>
+        <text class="group-count">{{item.list.length}} 人</text>
+      </view>
+      <view class="group-list">
+        <view class="group-item" wx:for="{{item.list}}" wx:for-item="customer" wx:key="id" bindtap="onCustomerTap" data-customer="{{customer}}">
+          <view class="item-left">
+            <text class="item-nickname">{{customer.nickname}}</text>
+          </view>
+          <view class="item-right">
+            <text class="item-count" wx:if="{{customer.visit_count}}">到店 {{customer.visit_count}} 次</text>
+            <text class="item-days" wx:if="{{customer.daysAgo >= 0}}">（{{customer.daysAgo}}天前）</text>
+            <text class="item-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && groupedCustomers.length === 0}}">
+    <view class="empty-circle">
+      <text class="empty-char">空</text>
+    </view>
+    <text class="empty-text">暂无客户</text>
+    <text class="empty-hint">点击右下角 + 添加</text>
+  </view>
+
+  <!-- 加载更多 -->
+  <view class="load-more" wx:if="{{!loading && !hasMore && groupedCustomers.length > 0}}">
+    <text>已加载全部</text>
+  </view>
+
+  <!-- 浮动添加按钮 -->
+  <view class="fab" bindtap="onAddTap" bindlongpress="onFabLongPress">
+    <text class="fab-icon">+</text>
+  </view>
+
+  <!-- 语音录入弹窗 -->
+  <voice-input-popup
+    class="voice-popup"
+    show="{{showVoicePopup}}"
+    mode="customer"
+    bind:close="onVoiceClose"
+    bind:chat="onVoiceChat"
+    wx:if="{{showVoicePopup}}"
+  />
+</view>

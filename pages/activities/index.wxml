@@ -1,0 +1,96 @@
+<view class="page">
+  <!-- 日历 -->
+  <view class="calendar">
+    <view class="calendar-header">
+      <text class="summary-date" bindtap="onCalendarToggle">{{currentDateShort}} {{currentWeekday}}</text>
+      <picker class="space-picker" catchtap="" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <text class="summary-space">{{currentSpaceName}}</text>
+      </picker>
+    </view>
+    <view class="participants-row">
+      <view class="participants-divider"></view>
+      <text class="participants-label">参与者</text>
+      <text class="participants-names" wx:if="{{participantText}}">{{participantText}}</text>
+      <text class="participants-empty" wx:else>暂无</text>
+    </view>
+    <!-- 下拉日历 -->
+    <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
+      <view class="calendar-nav">
+        <view class="nav-arrow" catchtap="onPrevMonth">‹</view>
+        <text class="nav-title">{{calYear}}年{{calMonth + 1}}月</text>
+        <view class="nav-arrow" catchtap="onNextMonth">›</view>
+      </view>
+      <view class="weekday-row">
+        <text class="weekday-cell" wx:for="{{weekdays}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="day-grid">
+        <view
+          wx:for="{{calendarDays}}"
+          wx:key="date"
+          class="day-cell {{item.isCurrent ? '' : 'other'}} {{item.isSelected ? 'selected' : ''}} {{item.isToday ? 'today' : ''}}"
+          bindtap="onCalendarDayTap"
+          data-date="{{item.date}}"
+        >
+          <text>{{item.day}}</text>
+          <view class="day-dot" wx:if="{{item.count > 0}}"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 遮罩 -->
+  <view class="calendar-mask" wx:if="{{calendarExpanded}}" bindtap="onCalendarClose"></view>
+
+  <!-- 活动列表 -->
+  <view class="activity-list" wx:if="{{!loading && records.length > 0}}">
+    <view class="activity-card" wx:for="{{records}}" wx:key="id" bindtap="onActivityTap" data-record="{{item}}">
+      <view class="card-body">
+        <view class="card-header">
+          <view class="card-title">
+            <view class="badge" style="background-color: {{item.color}}20; color: {{item.color}};">
+              <text>{{item.badge}}</text>
+            </view>
+            <view wx:if="{{item.isPublicWelfare}}" class="badge" style="background-color: #f0f5ff; color: #3370ff;">
+              <text>公益</text>
+            </view>
+            <text class="card-name" wx:if="{{item.name}}">{{item.name}}</text>
+            <text class="card-time" wx:if="{{item.time}}">{{item.time}}</text>
+          </view>
+        </view>
+        <view class="card-info">
+          <text class="info-item" wx:if="{{item.teacher}}">{{item.teacher}}</text>
+        </view>
+        <view class="card-arrow-wrap">
+          <text class="card-participants">参与{{item.participants}}人</text>
+          <view class="card-arrow">›</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && records.length === 0}}">
+    <text class="empty-icon">📅</text>
+    <text class="empty-text">当日暂无活动安排</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 添加按钮 -->
+  <view class="fab" bindtap="onCreateTap" bindlongpress="onFabLongPress">
+    <text class="fab-icon">+</text>
+  </view>
+
+  <!-- 语音对话弹窗 -->
+  <voice-input-popup
+    class="voice-popup"
+    show="{{showVoicePopup}}"
+    mode="activity"
+    bind:close="onVoiceClose"
+    bind:chat="onVoiceChat"
+    wx:if="{{showVoicePopup}}"
+  />
+</view>

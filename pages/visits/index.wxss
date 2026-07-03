@@ -1,0 +1,215 @@
+.page {
+  min-height: 100vh;
+  background-color: #f7f8fa;
+}
+
+/* 日历 */
+.calendar {
+  background-color: #ffffff;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 101;
+}
+
+.calendar-header {
+  padding: 24rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.summary-date {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.summary-space {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+/* 下拉日历 */
+.calendar-dropdown {
+  padding: 24rpx 32rpx;
+  border-top: 1rpx solid #f0f1f2;
+  background-color: #ffffff;
+}
+
+.calendar-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48rpx;
+  margin-bottom: 24rpx;
+}
+
+.nav-arrow {
+  font-size: 40rpx;
+  color: #8f959e;
+  padding: 8rpx 16rpx;
+}
+
+.nav-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.weekday-row {
+  display: flex;
+  padding-bottom: 12rpx;
+}
+
+.weekday-cell {
+  flex: 1;
+  text-align: center;
+  font-size: 22rpx;
+  color: #b0b5bb;
+}
+
+.day-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.day-cell {
+  width: 14.2857%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14rpx 0;
+  position: relative;
+}
+
+.day-cell text {
+  font-size: 28rpx;
+  color: #1f2329;
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.day-cell.other text {
+  color: #d0d3d6;
+}
+
+.day-cell.today text {
+  color: #3370ff;
+  font-weight: 600;
+}
+
+.day-cell.selected text {
+  background-color: #3370ff;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.day-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background-color: #3370ff;
+  margin-top: 4rpx;
+}
+
+/* 排序按钮 */
+.edit-toggle {
+  display: flex;
+  align-items: center;
+  height: 52rpx;
+  padding: 0 24rpx;
+  background-color: #f2f3f5;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.edit-toggle text {
+  font-size: 26rpx;
+  color: #4e535a;
+}
+
+.edit-toggle.active {
+  background-color: #3370ff;
+}
+
+.edit-toggle.active text {
+  color: #ffffff;
+}
+
+/* 访客列表 */
+.visit-list {
+  padding: 120rpx 32rpx 20rpx;
+}
+
+/* 浮动按钮 */
+.fab {
+  position: fixed;
+  right: 32rpx;
+  bottom: 200rpx;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 28rpx;
+  background-color: #3370ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 32rpx rgba(51, 112, 255, 0.25);
+}
+
+.fab-icon {
+  font-size: 52rpx;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -4rpx;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 160rpx 0 0;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #b0b5bb;
+}
+
+.empty-hint {
+  font-size: 24rpx;
+  color: #c9cdd4;
+  margin-top: 12rpx;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 120rpx 0 0;
+  color: #8f959e;
+  font-size: 28rpx;
+}

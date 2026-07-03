@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "新增邀约",
+  "usingComponents": {
+    "customer-picker": "/components/customer-picker/index"
+  }
+}

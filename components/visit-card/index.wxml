@@ -1,0 +1,60 @@
+<view class="card {{editMode ? 'editing' : ''}}" bindtap="onCardTap" bindlongpress="onCardLongPress">
+  <view class="card-main">
+    <!-- 编辑模式：上下移动按钮 -->
+    <view class="move-btns" wx:if="{{editMode}}">
+      <view class="move-btn {{canMoveUp ? '' : 'disabled'}}" catchtap="onMoveUp">
+        <text>▲</text>
+      </view>
+      <view class="move-btn {{canMoveDown ? '' : 'disabled'}}" catchtap="onMoveDown">
+        <text>▼</text>
+      </view>
+    </view>
+    <view class="card-info">
+      <view class="row-top">
+        <view class="name-area">
+          <text class="nickname">{{visit.nickname}}</text>
+          <text class="leader-tag" wx:if="{{visit.is_leader}}">组长</text>
+          <text class="member-tag" wx:if="{{leaderName}}">{{leaderName}}组员</text>
+        </view>
+      </view>
+      <view class="row-bottom">
+        <text class="info-text" wx:if="{{visit.member_type}}">{{visit.member_type}}</text>
+        <text class="info-sep" wx:if="{{visit.member_type && remainingText}}">|</text>
+        <text class="remaining">{{remainingText}}</text>
+      </view>
+    </view>
+    <view class="card-arrow" wx:if="{{!editMode}}">›</view>
+  </view>
+
+  <view class="card-actions" wx:if="{{!editMode}}">
+    <view class="arrival-badge {{visit.arrived ? 'arrived' : ''}}" catchtap="{{visit.arrived ? 'onCancelArrival' : 'onArrivalTap'}}">
+      <text>{{visit.arrived ? '已到店' : '未到店'}}</text>
+    </view>
+    <view class="action-btn" catchtap="onProfileTap">
+      <text>资料</text>
+    </view>
+    <view class="action-divider"></view>
+    <view class="action-btn delete-btn" catchtap="onDeleteTap">
+      <text>删除</text>
+    </view>
+  </view>
+</view>
+
+<!-- 到店时间弹窗 -->
+<view class="dialog-mask" wx:if="{{showArrivalDialog}}" catchtap="onCloseArrivalDialog">
+  <view class="dialog-box" catchtap>
+    <view class="dialog-title">确认到店</view>
+    <view class="dialog-body">
+      <view class="dialog-field">
+        <text class="dialog-label">到店时间</text>
+        <picker mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
+          <view class="time-picker">{{arrivalTime}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="dialog-footer">
+      <view class="dialog-btn cancel" catchtap="onCloseArrivalDialog">取消</view>
+      <view class="dialog-btn confirm" catchtap="onConfirmArrival">确认</view>
+    </view>
+  </view>
+</view>

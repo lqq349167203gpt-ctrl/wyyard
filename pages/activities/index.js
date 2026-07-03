@@ -1,0 +1,370 @@
+const { classRecordApi, spaceApi, request } = require('../../utils/api')
+const { formatDate } = require('../../utils/util')
+const { BADGE_COLORS } = require('../../utils/activity-constants')
+
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+
+function pad(n) { return n < 10 ? '0' + n : '' + n }
+
+function buildCalendar(year, month, selectedDate, calendarCounts) {
+  const today = formatDate(new Date())
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const daysInPrev = new Date(year, month, 0).getDate()
+
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7
+  const days = []
+
+  for (let i = 0; i < totalCells; i++) {
+    let day, date, isCurrent
+    if (i < firstDay) {
+      day = daysInPrev - firstDay + 1 + i
+      const m = month === 0 ? 12 : month
+      const y = month === 0 ? year - 1 : year
+      date = `${y}-${pad(m)}-${pad(day)}`
+      isCurrent = false
+    } else if (i >= firstDay + daysInMonth) {
+      day = i - firstDay - daysInMonth + 1
+      const m = month === 11 ? 1 : month + 2
+      const y = month === 11 ? year + 1 : year
+      date = `${y}-${pad(m)}-${pad(day)}`
+      isCurrent = false
+    } else {
+      day = i - firstDay + 1
+      date = `${year}-${pad(month + 1)}-${pad(day)}`
+      isCurrent = true
+    }
+    days.push({
+      day,
+      date,
+      isCurrent,
+      isSelected: date === selectedDate,
+      isToday: date === today,
+      count: (calendarCounts || {})[date] || 0,
+    })
+  }
+  return days
+}
+
+Page({
+  data: {
+    currentDate: '',
+    currentDateShort: '',
+    currentWeekday: '',
+    calendarExpanded: false,
+    calYear: 0,
+    calMonth: 0,
+    calendarDays: [],
+    weekdays: WEEKDAYS,
+    spaces: [],
+    spaceIndex: 0,
+    spaceId: '',
+    currentSpaceName: '',
+    records: [],
+    participants: [],
+    participantText: '',
+    loading: true,
+    showVoicePopup: false,
+  },
+
+  async onLoad(options) {
+    const date = options.date || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
+    const d = new Date(date)
+    this.setData({
+      currentDate: date,
+      currentDateShort: this._formatDateShort(date),
+      currentWeekday: '周' + WEEKDAYS[d.getDay()],
+      calYear: d.getFullYear(),
+      calMonth: d.getMonth(),
+    })
+    await this.loadSpaces()
+    this.loadData()
+  },
+
+  onShow() {
+    if (!getApp().checkLogin()) return
+  },
+
+  onPullDownRefresh() {
+    this.loadData().then(() => wx.stopPullDownRefresh())
+  },
+
+  _formatDateShort(date) {
+    const d = new Date(date)
+    return `${d.getMonth() + 1}月${d.getDate()}日`
+  },
+
+  // ---------- 日历 ----------
+
+  onCalendarToggle() {
+    if (this.data.calendarExpanded) {
+      this.setData({ calendarExpanded: false })
+    } else {
+      const counts = this._calendarCounts || {}
+      this.setData({
+        calendarExpanded: true,
+        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, this.data.currentDate, counts),
+      })
+    }
+  },
+
+  onCalendarClose() {
+    this.setData({ calendarExpanded: false })
+  },
+
+  onPrevMonth() {
+    let { calYear, calMonth } = this.data
+    calMonth--
+    if (calMonth < 0) { calMonth = 11; calYear-- }
+    const counts = this._calendarCounts || {}
+    this.setData({
+      calYear, calMonth,
+      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
+    })
+  },
+
+  onNextMonth() {
+    let { calYear, calMonth } = this.data
+    calMonth++
+    if (calMonth > 11) { calMonth = 0; calYear++ }
+    const counts = this._calendarCounts || {}
+    this.setData({
+      calYear, calMonth,
+      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
+    })
+  },
+
+  onCalendarDayTap(e) {
+    const date = e.currentTarget.dataset.date
+    const d = new Date(date)
+    const counts = this._calendarCounts || {}
+    wx.setStorageSync('activity_selected_date', date)
+    this.setData({
+      currentDate: date,
+      currentDateShort: this._formatDateShort(date),
+      currentWeekday: '周' + WEEKDAYS[d.getDay()],
+      calYear: d.getFullYear(),
+      calMonth: d.getMonth(),
+      calendarExpanded: false,
+      calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts),
+    })
+    this.loadData()
+  },
+
+  // ---------- 空间 ----------
+
+  async loadSpaces() {
+    try {
+      const spaces = await spaceApi.list()
+      if (spaces.length === 0) return
+      const savedIndex = wx.getStorageSync('activity_space_index') || 0
+      const spaceIndex = Math.min(savedIndex, spaces.length - 1)
+      const space = spaces[spaceIndex]
+      this.setData({
+        spaces, spaceIndex,
+        spaceId: space?.id || '',
+        currentSpaceName: space?.name || '',
+      })
+    } catch (e) {
+      console.error('加载空间失败:', e)
+    }
+  },
+
+  onSpaceChange(e) {
+    const index = e.detail.value
+    const space = this.data.spaces[index]
+    this.setData({
+      spaceIndex: index,
+      spaceId: space?.id || '',
+      currentSpaceName: space?.name || '',
+    })
+    wx.setStorageSync('activity_space_index', index)
+    this.loadData(space?.id || '')
+  },
+
+  // ---------- 数据 ----------
+
+  async loadData(spaceId) {
+    this.setData({ loading: true })
+    try {
+      const sid = spaceId !== undefined ? spaceId : this.data.spaceId
+      const dashboard = await classRecordApi.dashboard(this.data.currentDate, sid || undefined)
+      const records = []
+      this._rawMap = {}
+
+      if (dashboard.class_records) {
+        dashboard.class_records.forEach(r => {
+          const badge = r.course_type || '沙龙'
+          this._rawMap[`class_record_${r.id}`] = r
+          records.push({
+            id: r.id, badge,
+            name: r.activity_name || r.course_name || '',
+            color: BADGE_COLORS[badge] || BADGE_COLORS['沙龙'],
+            time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
+            teacher: (r.teacher_names || []).join('、'),
+            participants: r.participant_ids?.length || 0,
+            space: r.space_name || '',
+            source: 'class_record',
+            isPublicWelfare: r.is_public_welfare || false,
+          })
+        })
+      }
+
+      if (dashboard.gcs_sessions) {
+        dashboard.gcs_sessions.forEach(r => {
+          const owner = r.owner_name || ''
+          this._rawMap[`group_case_${r.id}`] = r
+          records.push({
+            id: r.id, badge: '觉醒',
+            name: r.name || (owner ? `觉醒游戏·${owner}` : '觉醒游戏'),
+            color: BADGE_COLORS['觉醒'],
+            time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
+            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
+            participants: r.participant_ids?.length || 0,
+            space: r.space_name || '',
+            source: 'group_case',
+          })
+        })
+      }
+
+      if (dashboard.ers_sessions) {
+        dashboard.ers_sessions.forEach(r => {
+          const achiever = r.achiever_name || ''
+          this._rawMap[`emotional_release_${r.id}`] = r
+          records.push({
+            id: r.id, badge: '情绪释放',
+            name: r.name || (achiever ? `情绪释放·${achiever}` : '情绪释放'),
+            color: BADGE_COLORS['情绪释放'],
+            time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
+            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
+            participants: 0,
+            space: r.space_name || '',
+            source: 'emotional_release',
+          })
+        })
+      }
+
+      if (dashboard.eks_sessions) {
+        dashboard.eks_sessions.forEach(r => {
+          const teacher = (r.teacher_names || [])[0] || ''
+          this._rawMap[`energy_knot_${r.id}`] = r
+          records.push({
+            id: r.id, badge: '能量结',
+            name: r.name || (teacher ? `能量结·${teacher}` : '能量结'),
+            color: BADGE_COLORS['能量结'],
+            time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
+            teacher: (r.teacher_names || []).join('、'),
+            participants: r.participant_ids?.length || 0,
+            space: r.space_name || '',
+            source: 'energy_knot',
+          })
+        })
+      }
+
+      if (dashboard.ics_sessions) {
+        dashboard.ics_sessions.forEach(r => {
+          this._rawMap[`internal_course_${r.id}`] = r
+          records.push({
+            id: r.id, badge: '内部课程',
+            name: r.course_name || r.course_type || '',
+            color: BADGE_COLORS['内部课程'],
+            time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
+            teacher: r.host_name || (r.teacher_names || [])[0] || '',
+            participants: r.participant_ids?.length || 0,
+            space: r.space_name || '',
+            source: 'internal_course',
+          })
+        })
+      }
+
+      if (dashboard.ocr_sessions) {
+        dashboard.ocr_sessions.forEach(r => {
+          const achiever = r.achiever_name || ''
+          this._rawMap[`oh_card_${r.id}`] = r
+          records.push({
+            id: r.id, badge: 'OH卡',
+            name: r.name || (achiever ? `OH卡·${achiever}` : 'OH卡'),
+            color: BADGE_COLORS['OH卡'],
+            time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
+            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
+            participants: r.participant_ids?.length || 0,
+            space: r.space_name || '',
+            source: 'oh_card',
+          })
+        })
+      }
+
+      records.sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+
+      // 收集当天所有参与者（去重）
+      const allSources = [
+        ...(dashboard.class_records || []),
+        ...(dashboard.gcs_sessions || []),
+        ...(dashboard.ers_sessions || []),
+        ...(dashboard.eks_sessions || []),
+        ...(dashboard.ics_sessions || []),
+        ...(dashboard.ocr_sessions || []),
+      ]
+      const participantSet = new Set()
+      allSources.forEach(r => {
+        (r.participant_names || []).forEach(name => { if (name) participantSet.add(name) })
+      })
+      const participants = [...participantSet]
+
+      // 保存日历计数，供展开时使用
+      this._calendarCounts = dashboard.calendar_counts || {}
+      this.setData({ records, participants, participantText: participants.join('、'), loading: false })
+    } catch (e) {
+      console.error('加载活动失败:', e)
+      this.setData({ loading: false })
+    }
+  },
+
+  // ---------- 导航 ----------
+
+  onActivityTap(e) {
+    const record = e.currentTarget.dataset.record
+    if (!record || !record.id) return
+    const raw = this._rawMap[`${record.source}_${record.id}`]
+    getApp().globalData._selectedActivity = raw || record
+    getApp().globalData._selectedActivitySource = record.source
+    wx.navigateTo({ url: '/pages/activity-detail/index' })
+  },
+
+  onCreateTap() {
+    const date = this.data.currentDate
+    const spaceId = this.data.spaceId
+    wx.navigateTo({ url: `/pages/activity-create/index?date=${date}&spaceId=${spaceId}` })
+  },
+
+  onFabLongPress() {
+    this.setData({ showVoicePopup: true })
+  },
+
+  onVoiceClose() {
+    this.setData({ showVoicePopup: false })
+    this.loadData()
+  },
+
+  async onVoiceChat(e) {
+    const { message, history } = e.detail
+    try {
+      const res = await request('/api/voice/activity-chat', {
+        method: 'POST',
+        timeout: 120000,
+        data: {
+          message,
+          history: history || [],
+          date: this.data.currentDate,
+          space_id: this.data.spaceId,
+        },
+      })
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setReply(res.reply || '操作完成')
+    } catch (err) {
+      console.error('[onVoiceChat] 错误:', err)
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setError(err.message || '请求失败')
+    }
+  },
+})

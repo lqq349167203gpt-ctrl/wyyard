@@ -1,0 +1,214 @@
+<view class="container" wx:if="{{!loading && customer}}">
+
+  <!-- 头像区 -->
+  <view class="hero">
+    <view class="edit-link" bindtap="onEditTap">
+      <text>编辑</text>
+    </view>
+    <view class="hero-info">
+      <text class="hero-name">{{customer.nickname || '-'}}</text>
+      <text class="hero-type" wx:if="{{customer.member_type}}">{{customer.member_type}}</text>
+    </view>
+    <view class="hero-stats">
+      <view class="stat">
+        <text class="stat-num">{{customer.visit_count || 0}}</text>
+        <text class="stat-label">到店</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat">
+        <text class="stat-num">¥{{totalPayment}}</text>
+        <text class="stat-label">消费</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat">
+        <text class="stat-num">{{firstVisit || '-'}}</text>
+        <text class="stat-label">首次到访</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 联系方式 -->
+  <view class="card">
+    <view class="row" wx:if="{{customer.name}}">
+      <text class="row-label">姓名</text>
+      <text class="row-value">{{customer.name}}</text>
+    </view>
+    <view class="row">
+      <text class="row-label">年龄</text>
+      <text class="row-value" wx:if="{{customer.age}}">{{customer.age}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">电话</text>
+      <text class="row-value" wx:if="{{customer.phone}}">{{customer.phone}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">微信</text>
+      <text class="row-value" wx:if="{{customer.wechat}}">{{customer.wechat}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">工作</text>
+      <text class="row-value" wx:if="{{customer.work_status || customer.work_description}}">{{customer.work_status || ''}}{{customer.work_status && customer.work_description ? ' · ' : ''}}{{customer.work_description}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+  </view>
+
+  <!-- 来源归属 -->
+  <view class="card">
+    <view class="row">
+      <text class="row-label">引流人</text>
+      <text class="row-value" wx:if="{{customer.referrer}}">{{customer.referrer}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">承接人</text>
+      <text class="row-value" wx:if="{{customer.referrer_handler}}">{{customer.referrer_handler}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">流量来源</text>
+      <text class="row-value" wx:if="{{customer.traffic_source}}">{{customer.traffic_source}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">流量链接</text>
+      <text class="row-value break" wx:if="{{customer.traffic_source_detail}}">{{customer.traffic_source_detail}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">疗愈老师</text>
+      <text class="row-value" wx:if="{{healerText}}">{{healerText}}</text>
+      <text class="row-value empty-val" wx:else>-</text>
+    </view>
+  </view>
+
+  <!-- 背景信息 -->
+  <view class="card">
+    <view class="block">
+      <text class="block-label">到访目的</text>
+      <text class="block-value" wx:if="{{customer.tags}}">{{customer.tags}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
+    </view>
+    <view class="block">
+      <text class="block-label">创伤经历</text>
+      <text class="block-value" wx:if="{{customer.basic_info}}">{{customer.basic_info}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
+    </view>
+    <view class="block">
+      <text class="block-label">当下卡点</text>
+      <text class="block-value" wx:if="{{customer.assessment}}">{{customer.assessment}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
+    </view>
+    <view class="block">
+      <text class="block-label">其他信息</text>
+      <text class="block-value" wx:if="{{customer.other_info}}">{{customer.other_info}}</text>
+      <text class="block-value empty-val" wx:else>-</text>
+    </view>
+  </view>
+
+  <!-- 记录区 -->
+  <view class="record-section">
+    <!-- Tab 栏 -->
+    <view class="tab-bar">
+      <view
+        wx:for="{{tabs}}" wx:key="key" wx:for-item="tab"
+        class="tab-item {{activeTab === tab.key ? 'active' : ''}}"
+        bindtap="onTabChange"
+        data-key="{{tab.key}}"
+      >{{tab.label}}</view>
+    </view>
+
+    <!-- 跟进点 -->
+    <view class="tab-content" wx:if="{{activeTab === 'healing'}}">
+      <view wx:if="{{healingRecords.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="heal-item" wx:for="{{healingRecords}}" wx:key="id">
+        <view class="heal-header">
+          <text class="heal-date">{{item.visit_date}}</text>
+          <text class="visit-status {{item.arrived ? 'arrived' : ''}}">{{item.arrived ? '已到店' : '未到店'}}</text>
+        </view>
+        <view class="heal-row" wx:if="{{item.needs}}">
+          <text class="heal-label">当日需求</text>
+          <text class="heal-value">{{item.needs}}</text>
+        </view>
+        <view class="heal-row" wx:if="{{item.group_leader_feedback}}">
+          <text class="heal-label">组长反馈</text>
+          <text class="heal-value">{{item.group_leader_feedback}}</text>
+        </view>
+        <view class="heal-row" wx:if="{{item.growth_record}}">
+          <text class="heal-label">跟进点</text>
+          <text class="heal-value">{{item.growth_record}}</text>
+        </view>
+        <view class="heal-row" wx:if="{{item.feedback || item.experience}}">
+          <text class="heal-label">客户收获</text>
+          <text class="heal-value">{{item.feedback || item.experience}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 活动记录 -->
+    <view class="tab-content" wx:if="{{activeTab === 'activities'}}">
+      <view wx:if="{{activities.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="act-item" wx:for="{{activities}}" wx:key="index">
+        <view class="act-header">
+          <text class="act-date">{{item.date}}</text>
+          <text class="act-tag public" wx:if="{{item.is_public_welfare}}">公益</text>
+          <text class="act-tag absent" wx:if="{{item.notArrived}}">未参加</text>
+        </view>
+        <view class="act-info">
+          <text class="act-name">{{item.name || '-'}}</text>
+          <text class="act-detail" wx:if="{{item.role}}">{{item.role}}</text>
+          <text class="act-detail" wx:if="{{item.host}}">{{item.host}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 剩余次数 -->
+    <view class="tab-content" wx:if="{{activeTab === 'purchase'}}">
+      <view wx:if="{{purchaseSummary.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="pur-item" wx:for="{{purchaseSummary}}" wx:key="index">
+        <view class="pur-header">
+          <text class="pur-type">{{item.type}}</text>
+          <text class="pur-name">{{item.name || ''}}</text>
+        </view>
+        <view class="pur-info">
+          <text class="pur-remaining" wx:if="{{item.type === '会员活动'}}">
+            剩余{{item.effective_remaining !== undefined && item.effective_remaining !== null ? item.effective_remaining : item.remaining}}次
+            <text class="pur-deductions">（总{{item.grand_total || 0}}次/销卡{{item.manual_deductions || 0}}次/活动扣卡{{item.activity_deductions || 0}}次）</text>
+          </text>
+          <text class="pur-remaining" wx:elif="{{item.remaining === '不限'}}">不限次</text>
+          <text class="pur-remaining" wx:else>
+            剩余{{item.remaining}}次
+          </text>
+          <text class="pur-date" wx:if="{{item.effective_date}}">
+            {{item.effective_date}}~{{item.expiry_date || '不限'}}
+          </text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 交易记录 -->
+    <view class="tab-content" wx:if="{{activeTab === 'payment'}}">
+      <view wx:if="{{paymentRecords.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="pay-item" wx:for="{{paymentRecords}}" wx:key="index">
+        <view class="pay-header">
+          <text class="pay-type">{{item.type}}</text>
+          <text class="pay-amount">¥{{item.amount}}</text>
+        </view>
+        <view class="pay-info">
+          <text class="pay-name">{{item.name || ''}}</text>
+          <text class="pay-meta" wx:if="{{item.quantity}}">x{{item.quantity}}</text>
+          <text class="pay-meta" wx:if="{{item.closer_name}}">{{item.closer_name}}</text>
+        </view>
+        <view class="pay-dates" wx:if="{{item.effective_date || item.expiry_date}}">
+          <text>{{item.effective_date || '-'}} ~ {{item.expiry_date || '不限'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<view class="loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>

@@ -1,0 +1,128 @@
+<view class="container">
+  <!-- 基本信息 -->
+  <view class="form-card">
+    <view class="form-item">
+      <text class="form-label required">昵称</text>
+      <input class="form-input" placeholder="必填" placeholder-class="form-input-placeholder" value="{{nickname}}" bindinput="onInput" data-field="nickname" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">姓名</text>
+      <input class="form-input" placeholder="真实姓名" placeholder-class="form-input-placeholder" value="{{name}}" bindinput="onInput" data-field="name" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">性别</text>
+      <picker class="form-picker" mode="selector" range="{{['男', '女', '其他']}}" bindchange="onGenderChange">
+        <view class="picker-display {{gender ? '' : 'placeholder'}}">{{gender || '选择性别'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">电话</text>
+      <input class="form-input" placeholder="手机号" placeholder-class="form-input-placeholder" type="number" value="{{phone}}" bindinput="onInput" data-field="phone" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">微信</text>
+      <input class="form-input" placeholder="微信号" placeholder-class="form-input-placeholder" value="{{wechat}}" bindinput="onInput" data-field="wechat" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">年龄</text>
+      <input class="form-input" placeholder="年龄" placeholder-class="form-input-placeholder" value="{{age}}" bindinput="onInput" data-field="age" />
+    </view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="service_teacher">
+      <text class="form-label">服务老师</text>
+      <view class="picker-value-wrap">
+        <text class="{{service_teacher ? '' : 'placeholder'}}">{{service_teacher || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{service_teacher}}" catchtap="onPickerClear" data-field="service_teacher">x</text>
+      </view>
+    </view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="referrer">
+      <text class="form-label">引流人</text>
+      <view class="picker-value-wrap">
+        <text class="{{referrer ? '' : 'placeholder'}}">{{referrer || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{referrer}}" catchtap="onPickerClear" data-field="referrer">x</text>
+      </view>
+    </view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="referrer_handler">
+      <text class="form-label">承接人</text>
+      <view class="picker-value-wrap">
+        <text class="{{referrer_handler ? '' : 'placeholder'}}">{{referrer_handler || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{referrer_handler}}" catchtap="onPickerClear" data-field="referrer_handler">x</text>
+      </view>
+    </view>
+    <view class="form-item {{(traffic_source === '好友推荐' || traffic_source === '朋友圈' || (traffic_source && needTrafficDetail)) ? '' : 'last'}}">
+      <text class="form-label">流量来源</text>
+      <picker class="form-picker" mode="selector" range="{{trafficSources}}" bindchange="onTrafficSourceChange">
+        <view class="picker-display {{traffic_source ? '' : 'placeholder'}}">{{traffic_source || '选择来源'}}</view>
+      </picker>
+    </view>
+    <view class="form-item {{(traffic_source && needTrafficDetail) ? '' : 'last'}}" wx:if="{{traffic_source === '好友推荐' || traffic_source === '朋友圈'}}" bindtap="onPickerOpen" data-field="traffic_source_detail">
+      <text class="form-label">{{traffic_source === '好友推荐' ? '推荐好友' : '所属人'}}</text>
+      <view class="picker-value-wrap">
+        <text class="{{traffic_source_detail ? '' : 'placeholder'}}">{{traffic_source_detail || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{traffic_source_detail}}" catchtap="onPickerClear" data-field="traffic_source_detail">x</text>
+      </view>
+    </view>
+    <view class="form-item last" wx:if="{{traffic_source && needTrafficDetail}}">
+      <text class="form-label">内容链接</text>
+      <input class="form-input" placeholder="链接地址" placeholder-class="form-input-placeholder" value="{{traffic_source_detail}}" bindinput="onInput" data-field="traffic_source_detail" />
+    </view>
+  </view>
+
+  <!-- 搜索选择弹窗 -->
+  <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
+  <view class="picker-popup" wx:if="{{showPicker}}">
+    <view class="picker-header">
+      <text class="picker-title">选择{{pickerTitle}}</text>
+      <text class="picker-close" bindtap="onPickerClose">关闭</text>
+    </view>
+    <view class="picker-search">
+      <input class="picker-search-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+    </view>
+    <scroll-view class="picker-list" scroll-y>
+      <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-nickname="{{item.nickname}}">
+        <text class="picker-item-name">{{item.nickname}}</text>
+        <text class="picker-item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
+      </view>
+      <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
+        <text>无匹配客户</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 详细信息 -->
+  <view class="form-card">
+    <view class="form-item">
+      <text class="form-label">工作情况</text>
+      <picker class="form-picker" mode="selector" range="{{['在职', '离职', '自由职业']}}" bindchange="onWorkStatusChange">
+        <view class="picker-display {{work_status ? '' : 'placeholder'}}">{{work_status || '选择状态'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">工作描述</text>
+      <input class="form-input" placeholder="描述工作内容" placeholder-class="form-input-placeholder" value="{{work_description}}" bindinput="onInput" data-field="work_description" />
+    </view>
+    <view class="form-item column last">
+      <text class="form-label" style="margin-bottom: 16rpx;">创伤经历</text>
+      <textarea class="form-textarea short" placeholder="创伤经历" placeholder-class="form-textarea-placeholder" value="{{basic_info}}" bindinput="onInput" data-field="basic_info" />
+    </view>
+    <view class="form-item column last">
+      <text class="form-label" style="margin-bottom: 16rpx;">当下卡点</text>
+      <textarea class="form-textarea short" placeholder="当下卡点" placeholder-class="form-textarea-placeholder" value="{{core_situation}}" bindinput="onInput" data-field="core_situation" />
+    </view>
+    <view class="form-item column last">
+      <text class="form-label" style="margin-bottom: 16rpx;">到访目的</text>
+      <textarea class="form-textarea short" placeholder="到访目的" placeholder-class="form-textarea-placeholder" value="{{tags}}" bindinput="onInput" data-field="tags" />
+    </view>
+    <view class="form-item column last">
+      <text class="form-label" style="margin-bottom: 16rpx;">其他信息</text>
+      <textarea class="form-textarea short" placeholder="其他信息" placeholder-class="form-textarea-placeholder" value="{{other_info}}" bindinput="onInput" data-field="other_info" />
+    </view>
+  </view>
+
+  <view class="btn-row" wx:if="{{isEdit}}">
+    <button class="btn-danger" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+  </view>
+  <view class="btn-row" wx:else>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">添    加</button>
+  </view>
+</view>

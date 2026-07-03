@@ -1,0 +1,158 @@
+/* 全局样式 */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  font-size: 28rpx;
+  color: #1f2329;
+  background-color: #f7f8fa;
+}
+
+.container {
+  padding: 24rpx 32rpx;
+}
+
+/* 表单分组卡片 */
+.form-card {
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  padding: 8rpx 32rpx;
+  margin-bottom: 24rpx;
+}
+
+.form-card-title {
+  font-size: 26rpx;
+  color: #8f959e;
+  padding: 24rpx 0 8rpx;
+}
+
+/* 表单样式 */
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.form-item.column {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.form-label {
+  width: 160rpx;
+  font-size: 28rpx;
+  color: #4e535a;
+  flex-shrink: 0;
+}
+
+.form-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2329;
+}
+
+.form-input-placeholder {
+  color: #b0b5bb;
+}
+
+.form-textarea {
+  width: 100%;
+  min-height: 140rpx;
+  font-size: 28rpx;
+  color: #1f2329;
+  padding: 20rpx;
+  border: 1rpx solid #e8eaed;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+  background-color: #fafbfc;
+}
+
+.form-textarea-placeholder {
+  color: #b0b5bb;
+}
+
+/* 按钮 */
+.btn-primary {
+  background-color: #3370ff;
+  color: #ffffff;
+  border-radius: 8rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  padding: 0;
+  text-align: center;
+  border: none;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+
+.btn-primary::after {
+  border: none;
+}
+
+.btn-secondary {
+  background-color: #f7f8fa;
+  color: #3370ff;
+  border-radius: 8rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  padding: 0;
+  text-align: center;
+  border: 1rpx solid #3370ff;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+
+.btn-secondary::after {
+  border: none;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 160rpx 0;
+  color: #8f959e;
+}
+
+.empty-state .empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.5;
+}
+
+.empty-state .empty-text {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.empty-state .empty-hint {
+  font-size: 24rpx;
+  color: #b0b5bb;
+  margin-top: 8rpx;
+}
+
+/* 加载中 */
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 160rpx 0;
+  color: #8f959e;
+  font-size: 28rpx;
+}
+
+/* 标签 */
+.badge {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  border-radius: 4rpx;
+  font-size: 22rpx;
+}
+
+/* 卡片通用 */
+.card {
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}

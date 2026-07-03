@@ -1,0 +1,33 @@
+<view class="page" wx:if="{{user}}">
+  <!-- 用户信息卡 -->
+  <view class="profile-card">
+    <view class="avatar">
+      <text class="avatar-text">{{user.owner[0] || '?'}}</text>
+    </view>
+    <view class="profile-info">
+      <text class="profile-name">{{user.owner}}</text>
+      <text class="profile-role">{{role}}</text>
+    </view>
+  </view>
+
+  <!-- 信息列表 -->
+  <view class="info-card">
+    <view class="info-row">
+      <text class="info-label">账号</text>
+      <text class="info-value">{{user.username}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">归属人</text>
+      <text class="info-value">{{user.owner}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">角色</text>
+      <text class="info-value">{{role}}</text>
+    </view>
+  </view>
+
+  <!-- 退出按钮 -->
+  <view class="logout-area">
+    <view class="logout-btn" bindtap="onLogout">退出登录</view>
+  </view>
+</view>

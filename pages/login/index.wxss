@@ -1,0 +1,249 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: #e8f2fb;
+}
+
+.bg-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.bg-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 70%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* 蓝色头部 */
+.header,
+.login-card,
+.dev-toggle {
+  position: relative;
+  z-index: 2;
+}
+
+.header {
+  padding: 200rpx 144rpx 120rpx;
+  margin-top: 360rpx;
+  margin-left: -100rpx;
+  margin-right: -100rpx;
+  display: flex;
+  justify-content: center;
+}
+
+.header-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-left: -12rpx;
+}
+
+.logo-circle {
+  width: 130rpx;
+  height: 130rpx;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28rpx;
+}
+
+.logo-char {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.logo-text {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #1f2329;
+  letter-spacing: 2rpx;
+}
+
+.logo-icon {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 12rpx;
+  background-color: #4370F7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16rpx;
+}
+
+.logo-w {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.logo-sub {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 12rpx;
+  letter-spacing: 2rpx;
+}
+
+/* 登录卡 */
+.login-card {
+  margin: -40rpx -100rpx 0;
+  background: transparent;
+  padding: 52rpx 144rpx;
+}
+
+.phone-btn {
+  width: 650rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  background: linear-gradient(135deg, #3370ff 0%, #5b8def 100%);
+  color: #ffffff;
+  border-radius: 16rpx;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(51, 112, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 60rpx;
+  box-sizing: border-box;
+}
+
+.phone-btn::after {
+  border: none;
+}
+
+.sms-btn {
+  width: 650rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  background: #ffffff;
+  color: #3370ff;
+  border-radius: 16rpx;
+  border: 2rpx solid #3370ff;
+  margin-top: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.sms-btn::after {
+  border: none;
+}
+
+.phone-btn[disabled] {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+/* 账号密码输入 */
+.login-input {
+  width: 100%;
+  height: 96rpx;
+  padding: 0 28rpx;
+  box-sizing: border-box;
+  background-color: #f7f8fa;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #1f2329;
+  margin-bottom: 24rpx;
+  border: 2rpx solid #e8eaed;
+}
+
+.login-input:focus {
+  border-color: #3370ff;
+}
+
+/* 开发模式 */
+.dev-title {
+  display: block;
+  font-size: 26rpx;
+  color: #8f959e;
+  margin-bottom: 24rpx;
+  text-align: center;
+}
+
+.dev-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 96rpx;
+  padding: 0 28rpx;
+  box-sizing: border-box;
+  background-color: #f7f8fa;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #1f2329;
+  margin-bottom: 28rpx;
+}
+
+.picker-arrow {
+  font-size: 32rpx;
+  color: #b0b5bb;
+}
+
+.dev-btn {
+  width: 100%;
+  height: 96rpx;
+  line-height: 96rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  background: linear-gradient(135deg, #3370ff 0%, #5b8def 100%);
+  color: #ffffff;
+  border-radius: 16rpx;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(51, 112, 255, 0.25);
+}
+
+.dev-btn::after {
+  border: none;
+}
+
+.dev-btn[disabled] {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+/* 错误信息 */
+.error-msg {
+  margin-top: 28rpx;
+  padding: 20rpx 28rpx;
+  background-color: #fff0f0;
+  border-radius: 14rpx;
+}
+
+.error-msg text {
+  font-size: 26rpx;
+  color: #d94040;
+}
+
+/* 开发模式切换 */
+.dev-toggle {
+  margin-top: 36rpx;
+  text-align: center;
+}
+
+.dev-toggle-text {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.6);
+}
