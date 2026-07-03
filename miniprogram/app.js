@@ -5,7 +5,7 @@ App({
     token: '',
     currentUser: null,
     permissions: [],
-    devMode: true, // ⚠️ 上线前必须改为 false
+    devMode: false,
     _selectedActivity: null,
     _loginReady: null, // Promise，登录完成后 resolve
   },
