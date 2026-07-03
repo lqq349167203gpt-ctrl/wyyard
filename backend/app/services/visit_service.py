@@ -432,7 +432,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         sample = records[0]
         print(f"[list_visits] sample: {sample.nickname}, is_leader={sample.is_leader}, activities={[(a.name, a.role) for a in sample.activities]}", flush=True)
 
-    return sorted(records, key=lambda r: r.created_at, reverse=True)
+    return sorted(records, key=lambda r: (r.sort_order, -r.created_at.timestamp()))
 
 
 def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None) -> List[dict]:
@@ -453,7 +453,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
 
     result = []
     today = datetime.now().strftime("%Y-%m-%d")
-    for r in sorted(records, key=lambda r: r.created_at, reverse=True):
+    for r in sorted(records, key=lambda r: (r.sort_order, -r.created_at.timestamp())):
         try:
             # member_type
             member_type = r.member_type or ""
@@ -556,6 +556,17 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
     from app.services import member_identity_service
     member_identity_service.refresh_member_type(record.customer_id)
     return record
+
+
+def reorder_visits(ids: list):
+    """批量更新排序权重，ids 按期望顺序排列"""
+    with _visit_lock:
+        for i, vid in enumerate(ids):
+            record = _visits.get(vid)
+            if record:
+                record.sort_order = i
+                record.updated_at = datetime.now(timezone.utc)
+                _save(vid)
 
 
 def _deduct_for_arrival(visit):

@@ -399,5 +399,8 @@
 .fab-icon {
   font-size: 52rpx;
   color: #ffffff;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -4rpx;
 }

@@ -4,11 +4,10 @@ const {
   energyKnotSessionApi, internalCourseSessionApi,
   ohCardReadingSessionApi,
 } = require('../../utils/api')
-
-const BADGE_COLORS = {
-  '沙龙': '#3370ff', '觉醒': '#7c5cfc', '情绪释放': '#d97070',
-  '能量结': '#d9944a', '内部课程': '#5ba88a', 'OH卡': '#c772a0',
-}
+const {
+  BADGE_COLORS, ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
+  SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
+} = require('../../utils/activity-constants')
 
 const SOURCE_TO_TYPE = {
   class_record: 'class',
@@ -19,22 +18,6 @@ const SOURCE_TO_TYPE = {
   oh_card: 'ocr',
 }
 
-const TYPE_LABELS = {
-  class: '沙龙', gcs: '觉醒', ers: '情绪释放',
-  eks: '能量结', ics: '内部课程', ocr: 'OH卡',
-}
-
-const TEACHER_POSITION = {
-  class: '课程老师', gcs: '成就君', ers: '成就君', ocr: '成就君',
-  eks: '能量结老师', ics: '课程老师',
-}
-
-// 单选老师类型（用 achiever_id/achiever_name）
-const SINGLE_TEACHER_TYPES = ['gcs', 'ers', 'ocr']
-
-// 内部课程类型
-const ICS_COURSE_TYPES = ['疗愈师课程', '商业框架陪跑', '落地赋能班']
-
 const API_MAP = {
   class: classRecordApi,
   gcs: groupCaseSessionApi,
@@ -43,15 +26,6 @@ const API_MAP = {
   ics: internalCourseSessionApi,
   ocr: ohCardReadingSessionApi,
 }
-
-const ACTIVITY_TYPES = [
-  { value: 'class', label: '沙龙活动' },
-  { value: 'gcs', label: '觉醒游戏' },
-  { value: 'ers', label: '情绪释放' },
-  { value: 'ocr', label: 'OH卡' },
-  { value: 'eks', label: '能量结' },
-  { value: 'ics', label: '内部课程' },
-]
 
 Page({
   data: {
@@ -96,6 +70,7 @@ Page({
     typePickerStep: 1,
     _pendingType: '',
     _pendingCourseName: '',
+    loading: true,
     saving: false,
     deleting: false,
     _recordId: '',
@@ -106,8 +81,11 @@ Page({
     const app = getApp()
     const raw = app.globalData._selectedActivity
     const source = app.globalData._selectedActivitySource
+    app.globalData._selectedActivity = null
+    app.globalData._selectedActivitySource = null
     if (!raw || !raw.id || !source) {
-      console.warn('activity-detail: no raw data')
+      wx.showToast({ title: '数据加载失败', icon: 'none' })
+      setTimeout(() => wx.navigateBack(), 1500)
       return
     }
 
@@ -178,6 +156,7 @@ Page({
 
     this.setData(initData)
     this.updateParticipantList()
+    this.setData({ loading: false })
   },
 
   async loadSpaces(savedSpaceId, savedRoomId) {
@@ -243,7 +222,10 @@ Page({
     }
   },
 
-  onDateChange(e) { this.setData({ date: e.detail.value }) },
+  onDateChange(e) {
+    this.setData({ date: e.detail.value })
+    this.loadDayVisitors(e.detail.value)
+  },
   onStartTimeChange(e) { this.setData({ startTime: e.detail.value }) },
   onEndTimeChange(e) { this.setData({ endTime: e.detail.value }) },
 
@@ -442,7 +424,7 @@ Page({
       baseList = this.getFilteredCustomers(position)
     }
     const list = baseList
-      .filter(c => !keyword || (c.nickname || '').includes(keyword) || (c.name || '').includes(keyword))
+      .filter(c => !keyword || (c.nickname || '').toLowerCase().includes(keyword.toLowerCase()) || (c.name || '').toLowerCase().includes(keyword.toLowerCase()))
       .map(c => ({
         ...c,
         _selected: pickerMode === 'owner' ? c.id === this.data.ownerId
@@ -497,6 +479,10 @@ Page({
     }
     if (['gcs', 'ers', 'eks', 'ocr'].includes(activityType) && !this.data.ownerId) {
       wx.showToast({ title: '请选择案主', icon: 'none' })
+      return
+    }
+    if (this.data.startTime && this.data.endTime && this.data.endTime <= this.data.startTime) {
+      wx.showToast({ title: '结束时间需晚于开始时间', icon: 'none' })
       return
     }
 
@@ -572,10 +558,10 @@ Page({
     try {
       const typeChanged = activityType !== this._originalType
       if (typeChanged) {
-        // 类型变更：删除旧记录，创建新记录
+        // 类型变更：先创建新记录，成功后再删除旧记录（防止创建失败导致数据丢失）
+        await api.create(payload)
         const oldApi = API_MAP[this._originalType]
         if (oldApi) await oldApi.delete(this._recordId)
-        await api.create(payload)
       } else {
         await api.update(this._recordId, payload)
       }
@@ -585,10 +571,15 @@ Page({
       if (prevPage && prevPage.loadData) prevPage.loadData()
       wx.navigateBack()
     } catch (e) {
-      wx.showToast({ title: '保存失败', icon: 'none' })
-    } finally {
       this.setData({ saving: false })
+      wx.showModal({
+        title: '保存失败',
+        content: '是否重试？',
+        success: (res) => { if (res.confirm) this.onSave() },
+      })
+      return
     }
+    this.setData({ saving: false })
   },
 
   // ---------- 删除 ----------
@@ -611,10 +602,15 @@ Page({
           if (prevPage && prevPage.loadData) prevPage.loadData()
           wx.navigateBack()
         } catch (e) {
-          wx.showToast({ title: '删除失败', icon: 'none' })
-        } finally {
           this.setData({ deleting: false })
+          wx.showModal({
+            title: '删除失败',
+            content: '是否重试？',
+            success: (res) => { if (res.confirm) this.onDelete() },
+          })
+          return
         }
+        this.setData({ deleting: false })
       },
     })
   },

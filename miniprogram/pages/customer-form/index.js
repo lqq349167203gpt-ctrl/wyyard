@@ -46,6 +46,24 @@ Page({
       wx.setNavigationBarTitle({ title: '新增客户' })
     }
     this.loadCustomers()
+
+    // 语音录入预填
+    if (options.mode === 'voice') {
+      const prefill = getApp().globalData._voicePrefill
+      if (prefill) {
+        const updates = {}
+        const formFields = Object.keys(this.data)
+        for (const [key, value] of Object.entries(prefill)) {
+          if (value && formFields.includes(key) && typeof value === 'string') {
+            updates[key] = value.trim()
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          this.setData(updates)
+        }
+        getApp().globalData._voicePrefill = null
+      }
+    }
   },
 
   async loadCustomers() {
@@ -213,7 +231,10 @@ Page({
       }
       wx.navigateBack()
     } catch (e) {
-      wx.showToast({ title: '保存失败', icon: 'none' })
+      const msg = e.message || '保存失败'
+      wx.showToast({ title: msg, icon: 'none', duration: 3000 })
+      // 将错误信息传回给语音弹窗
+      getApp().globalData._voiceSaveError = msg
     } finally {
       this.setData({ saving: false })
     }

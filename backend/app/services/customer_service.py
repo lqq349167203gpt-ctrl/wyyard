@@ -51,6 +51,23 @@ def get_by_phone(phone: str) -> Optional[Customer]:
     return None
 
 
+def validate_customer_data(data: CustomerCreate, exclude_id: str = "") -> Optional[str]:
+    """校验客户数据是否能保存，返回错误信息或 None（可保存）。
+    exclude_id: 修改时排除自身。"""
+    for c in _customers.values():
+        if c.is_deleted:
+            continue
+        if exclude_id and c.id == exclude_id:
+            continue
+        if data.nickname and c.nickname == data.nickname:
+            return f"昵称「{data.nickname}」已存在"
+        if data.wechat and c.wechat == data.wechat:
+            return f"微信号「{data.wechat}」已存在"
+        if data.phone and c.phone == data.phone:
+            return f"手机号「{data.phone}」已存在"
+    return None
+
+
 def create_customer(data: CustomerCreate) -> Customer:
     with _customer_lock:
         # 检查昵称和微信号唯一性

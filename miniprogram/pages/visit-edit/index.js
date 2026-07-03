@@ -11,6 +11,7 @@ Page({
     customerId: '',
     nickname: '',
     referrerHandler: '',
+    referrerHandlerId: '',
     isLeader: false,
     needs: '',
     feedback: '',
@@ -33,6 +34,24 @@ Page({
     }
   },
 
+  onShow() {
+    if (this.data._expectNewCustomer) {
+      const oldIds = new Set(this.data.allCustomers.map(c => c.id))
+      this.loadCustomers().then(() => {
+        const newOne = this.data.allCustomers.find(c => !oldIds.has(c.id))
+        if (newOne) {
+          this.setData({ customerId: newOne.id, nickname: newOne.nickname })
+        }
+        this.setData({ _expectNewCustomer: false })
+      })
+    }
+  },
+
+  onCreateCustomer() {
+    this.setData({ _expectNewCustomer: true, showPicker: false })
+    wx.navigateTo({ url: '/pages/customer-form/index' })
+  },
+
   async loadVisit(id) {
     try {
       const visit = await visitApi.get(id)
@@ -42,7 +61,10 @@ Page({
           const spaces = await spaceApi.list()
           const space = spaces.find(s => s.id === visit.space_id)
           spaceName = space?.name || ''
-        } catch {}
+        } catch (e) {
+          console.error('加载空间失败:', e)
+          wx.showToast({ title: '加载空间失败', icon: 'none' })
+        }
       }
       this.setData({
         visit,
@@ -53,6 +75,7 @@ Page({
         customerId: visit.customer_id || '',
         nickname: visit.nickname || '',
         referrerHandler: visit.referrer_handler || '',
+        referrerHandlerId: visit.referrer_handler_id || '',
         isLeader: visit.is_leader || false,
         needs: visit.needs || '',
         feedback: visit.feedback || '',
@@ -72,7 +95,10 @@ Page({
     try {
       const list = await customerApi.light()
       this.setData({ allCustomers: list })
-    } catch {}
+    } catch (e) {
+      console.error('加载客户列表失败:', e)
+      wx.showToast({ title: '加载客户列表失败', icon: 'none' })
+    }
   },
 
   onTimeChange(e) {
@@ -126,7 +152,8 @@ Page({
     const keyword = e.detail.value
     const list = this.data.allCustomers.filter(c => {
       if (!keyword) return true
-      return c.nickname.includes(keyword) || (c.name && c.name.includes(keyword))
+      const kw = keyword.toLowerCase()
+      return c.nickname.toLowerCase().includes(kw) || (c.name && c.name.toLowerCase().includes(kw))
     })
     this.setData({ pickerKeyword: keyword, pickerList: list })
   },
@@ -156,6 +183,10 @@ Page({
   },
 
   async onSubmit() {
+    if (!this.data.customerId) {
+      wx.showToast({ title: '请选择客户', icon: 'none' })
+      return
+    }
     this.setData({ saving: true })
     try {
       await visitApi.update(this.data.visit.id, {
@@ -164,6 +195,7 @@ Page({
         customer_id: this.data.customerId,
         nickname: this.data.nickname,
         referrer_handler: this.data.referrerHandler,
+        referrer_handler_id: this.data.referrerHandlerId || '',
         is_leader: this.data.isLeader,
         needs: this.data.needs,
         feedback: this.data.feedback,
@@ -175,9 +207,14 @@ Page({
       wx.showToast({ title: '已保存' })
       wx.navigateBack()
     } catch (e) {
-      wx.showToast({ title: '保存失败', icon: 'none' })
-    } finally {
       this.setData({ saving: false })
+      wx.showModal({
+        title: '保存失败',
+        content: '是否重试？',
+        success: (res) => { if (res.confirm) this.onSubmit() },
+      })
+      return
     }
+    this.setData({ saving: false })
   },
 })

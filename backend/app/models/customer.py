@@ -105,9 +105,9 @@ class CustomerCreate(CustomerBase):
     model_config = {"extra": "forbid"}
 
     @model_validator(mode="after")
-    def validate_nickname_or_phone(self):
-        if not self.nickname and not self.phone:
-            raise ValueError("昵称和手机号至少填写一项")
+    def validate_nickname_required(self):
+        if not self.nickname or not self.nickname.strip():
+            raise ValueError("昵称不能为空")
         return self
 
 

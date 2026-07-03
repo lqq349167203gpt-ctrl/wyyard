@@ -1,5 +1,6 @@
 from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
+from pydantic import Field
 from typing import Optional
 
 
@@ -74,8 +75,8 @@ class SystemHelperConfig(SafeBaseModel):
     api_key: str = ""
     base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    temperature: float = Field(default=0.7, ge=0, le=2)
+    max_tokens: int = Field(default=4096, ge=1, le=32768)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

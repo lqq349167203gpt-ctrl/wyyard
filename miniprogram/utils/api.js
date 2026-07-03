@@ -2,16 +2,63 @@
 // 本地开发: http://localhost:8000
 // 生产环境: 需要替换为实际域名
 
-const BASE_URL = 'http://localhost:8000'
+// ⚠️ 上线前必须替换为生产域名
+const BASE_URL = 'https://www.wyteahouse.cn'
 
-function request(path, options = {}) {
+// 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
+let _loginPromise = null
+
+function _ensureLogin() {
+  const app = getApp()
+  if (!app || !app.globalData.devMode) return Promise.resolve()
+  if (app.globalData._loggingIn && _loginPromise) return _loginPromise
+
+  const token = wx.getStorageSync('auth_token')
+  if (token && token.includes('.')) return Promise.resolve() // JWT 有效
+
+  // 需要登录
+  console.log('[request] token 无效，触发 devAutoLogin...')
+  wx.removeStorageSync('auth_token')
+  wx.removeStorageSync('currentUser')
+  wx.removeStorageSync('userPermissions')
+  _loginPromise = Promise.resolve(app._devAutoLogin())
+    .then(() => {
+      // 登录后检查 token 是否真的拿到了
+      const newToken = wx.getStorageSync('auth_token')
+      if (!newToken) {
+        return Promise.reject(new Error('登录未返回 token'))
+      }
+    })
+    .finally(() => { _loginPromise = null })
+  return _loginPromise
+}
+
+async function request(path, options = {}) {
+  const app = getApp()
+  // devMode 下：确保有有效 JWT（skipAuth 的请求跳过，如 dev-login 本身）
+  if (app && app.globalData.devMode && !options.skipAuth) {
+    const loginP = _ensureLogin()
+    if (loginP) {
+      try {
+        await Promise.race([
+          loginP,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('登录超时')), 15000)),
+        ])
+      } catch (e) {
+        console.error('登录失败:', e.message)
+        wx.showToast({ title: '登录失败，请检查服务是否启动', icon: 'none', duration: 3000 })
+        return Promise.reject(new Error('登录失败: ' + e.message))
+      }
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const token = wx.getStorageSync('auth_token')
     const req = wx.request({
       url: `${BASE_URL}${path}`,
       method: options.method || 'GET',
       data: options.data,
-      timeout: 30000,
+      timeout: options.timeout || 60000,
       header: {
         'Content-Type': 'application/json',
         'Authorization': token ? `Bearer ${token}` : '',
@@ -32,11 +79,13 @@ function request(path, options = {}) {
           reject(new Error('登录已过期'))
         } else {
           const msg = res.data?.detail || res.data?.message || '请求失败'
-          wx.showToast({ title: msg, icon: 'none' })
+          console.error('[request] 请求失败:', path, 'status:', res.statusCode, 'msg:', msg)
+          if (!options.silent) wx.showToast({ title: msg, icon: 'none' })
           reject(new Error(msg))
         }
       },
       fail: (err) => {
+        console.error('[request] 网络错误:', path, err)
         wx.showToast({ title: '网络错误', icon: 'none' })
         reject(err)
       },
@@ -70,6 +119,7 @@ const visitApi = {
     return request(`/api/visits/counts${qs ? '?' + qs : ''}`)
   },
   searchCustomers: (q) => request(`/api/visits/search-customers?q=${encodeURIComponent(q)}`),
+  reorder: (ids) => request('/api/visits/reorder', { method: 'POST', data: { ids } }),
 }
 
 // 活动 API
@@ -132,7 +182,7 @@ const dailyGroupingApi = {
 
 // 客户 API
 const customerApi = {
-  light: () => request('/api/customers/light'),
+  light: (limit) => request(`/api/customers/light${limit ? '?limit=' + limit : ''}`),
   detail: (id) => request(`/api/customer-detail/${id}`),
   list: (params = {}) => {
     const qs = Object.entries(params)
@@ -160,7 +210,8 @@ const memberIdentityApi = {
 const authApi = {
   login: (code) => request('/api/wechat/login', { method: 'POST', data: { code } }),
   phoneLogin: (code) => request('/api/wechat/phone-login', { method: 'POST', data: { code } }),
-  devLogin: (username) => request('/api/wechat/dev-login', { method: 'POST', data: { username } }),
+  devLogin: (username) => request('/api/wechat/dev-login', { method: 'POST', data: { username }, skipAuth: true }),
+  passwordLogin: (username, password) => request('/api/accounts/login', { method: 'POST', data: { username, password } }),
   bind: (token, username, password) => request('/api/wechat/bind', { method: 'POST', data: { token, username, password } }),
 }
 

@@ -349,6 +349,8 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     for d in gcs_dicts + ers_dicts + ocr_dicts + eks_dicts + ics_dicts + cr_dicts:
         ids = d.get("teacher_ids", []) or []
         d["teacher_names"] = [customer_map.get(tid, "") for tid in ids if customer_map.get(tid)]
+        pids = d.get("participant_ids", []) or []
+        d["participant_names"] = [customer_map.get(pid, "") for pid in pids if customer_map.get(pid)]
 
     return {
         "class_records": cr_dicts,

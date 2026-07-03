@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.customer_ai_config import CustomerAIConfig, CustomerAIConfigUpdate
-from app.models.ai_config import PROVIDER_DEFAULTS
 from app.services.storage import load_data, save_item
 
 FILENAME = "customer_ai_config.json"
@@ -32,6 +31,7 @@ def get_config() -> CustomerAIConfig:
             created_at=now,
             updated_at=now,
         )
+        _save("default")
     return _config
 
 
@@ -44,8 +44,3 @@ def update_config(data: CustomerAIConfigUpdate) -> CustomerAIConfig:
     config.updated_at = datetime.now(timezone.utc)
     _save("default")
     return config
-
-
-def apply_provider_defaults(provider: str) -> dict:
-    """根据厂商返回默认配置"""
-    return PROVIDER_DEFAULTS.get(provider, {})

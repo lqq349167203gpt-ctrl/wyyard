@@ -9,6 +9,7 @@ class ChatRecordBase(SafeBaseModel):
     role: str  # "user" or "assistant"
     content: str
     session_id: str = ""
+    mode: str = ""  # "visit" | "customer" | "system" | ""
 
 
 class ChatRecordCreate(ChatRecordBase):

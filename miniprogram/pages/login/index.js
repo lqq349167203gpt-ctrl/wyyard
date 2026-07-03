@@ -1,21 +1,49 @@
 const { authApi } = require('../../utils/api')
 
 const DEV_ACCOUNTS = [
-  { username: 'tingting', label: '婷婷 (管理员)' },
-  { username: 'juanjuan', label: '娟娟 (管理员)' },
-  { username: 'baiyang', label: '白羊 (承接部)' },
-  { username: 'weiwei', label: '薇薇 (课程部)' },
-  { username: 'panpan', label: '潘潘 (承接部)' },
+  { username: 'admin', label: '管理员' },
+  { username: 'tingting', label: '婷婷' },
 ]
 
 Page({
   data: {
     loading: false,
     error: '',
-    devMode: false,
+    loginMode: 'wechat', // 'wechat' | 'password' | 'dev'
+    username: '',
+    password: '',
     devAccounts: DEV_ACCOUNTS,
     devIndex: 0,
   },
+
+  // ---------- 模式切换 ----------
+
+  switchToPassword() {
+    this.setData({ loginMode: 'password', error: '' })
+  },
+
+  switchToWechat() {
+    this.setData({ loginMode: 'wechat', error: '' })
+  },
+
+  onToggleDev() {
+    this.setData({
+      loginMode: this.data.loginMode === 'dev' ? 'wechat' : 'dev',
+      error: '',
+    })
+  },
+
+  // ---------- 输入 ----------
+
+  onUsernameInput(e) {
+    this.setData({ username: e.detail.value })
+  },
+
+  onPasswordInput(e) {
+    this.setData({ password: e.detail.value })
+  },
+
+  // ---------- 微信手机号登录 ----------
 
   onGetPhoneNumber(e) {
     if (e.detail.errMsg !== 'getPhoneNumber:ok') {
@@ -36,9 +64,28 @@ Page({
     })
   },
 
-  onToggleDev() {
-    this.setData({ devMode: !this.data.devMode, error: '' })
+  // ---------- 账号密码登录 ----------
+
+  onPasswordLogin() {
+    const { username, password } = this.data
+    if (!username || !password) {
+      this.setData({ error: '请输入用户名和密码' })
+      return
+    }
+
+    this.setData({ loading: true, error: '' })
+
+    authApi.passwordLogin(username, password).then((data) => {
+      this._saveLogin(data)
+      wx.switchTab({ url: '/pages/customers/index' })
+    }).catch((err) => {
+      this.setData({ error: err.message || '用户名或密码错误' })
+    }).finally(() => {
+      this.setData({ loading: false })
+    })
   },
+
+  // ---------- 开发模式 ----------
 
   onDevAccountChange(e) {
     this.setData({ devIndex: e.detail.value })
@@ -57,6 +104,8 @@ Page({
       this.setData({ loading: false })
     })
   },
+
+  // ---------- 通用 ----------
 
   _saveLogin(data) {
     wx.setStorageSync('auth_token', data.token)

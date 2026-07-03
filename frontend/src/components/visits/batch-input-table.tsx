@@ -344,14 +344,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         setSavedCount(0)
         return
       }
-      // 按保存的行顺序排序
-      const orderKey = `visit_order_${date}_${spaceId || ""}`
-      let savedOrder: string[] = []
-      try { savedOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
-      if (savedOrder.length) {
-        const orderMap = new Map(savedOrder.map((id, i) => [id, i]))
-        visits.sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999))
-      }
+      // visits 已按后端 sort_order 排序，直接使用
       const loaded: Row[] = []
       const ids: Record<number, string> = {}
       const statuses: Record<number, RowStatus> = {}
@@ -377,8 +370,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         ids[key] = v.id
         statuses[key] = "saved"
       }
-      // 保存当前顺序
-      localStorage.setItem(orderKey, JSON.stringify(visits.map(v => v.id)))
       // 不自动补空行，由用户点击"添加一行"来新增
       setRows(loaded)
       savedVisitIds.current = ids
@@ -439,13 +430,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         if (result?.id) {
           savedVisitIds.current[row.key] = result.id
           setRows(prev => prev.map(r => r.key === row.key ? { ...r, visit_id: result.id } : r))
-          // 追加到行顺序
-          const orderKey = `visit_order_${date}_${spaceId || ""}`
-          try {
-            const order: string[] = JSON.parse(localStorage.getItem(orderKey) || "[]")
-            order.push(result.id)
-            localStorage.setItem(orderKey, JSON.stringify(order))
-          } catch {}
         }
         setSavedCount(c => c + 1)
       }
@@ -503,12 +487,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     if (timersRef.current[key]) { clearTimeout(timersRef.current[key]); delete timersRef.current[key] }
     const visitId = savedVisitIds.current[key]
     if (visitId) {
-      // 从 localStorage 顺序中移除
-      const orderKey = `visit_order_${date}_${spaceId || ""}`
-      try {
-        const order: string[] = JSON.parse(localStorage.getItem(orderKey) || "[]")
-        localStorage.setItem(orderKey, JSON.stringify(order.filter(id => id !== visitId)))
-      } catch {}
       // 调用后端删除
       try { await visitApi.delete(visitId) } catch (e) { console.error("删除行失败:", e) }
       onSaved()
@@ -552,11 +530,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       const [moved] = next.splice(srcIdx, 1)
       next.splice(tgtIdx, 0, moved)
       // 保存新顺序到 localStorage
-      const orderKey = `visit_order_${date}_${spaceId || ""}`
-      try {
-        const order = next.map(r => savedVisitIds.current[r.key]).filter(Boolean)
-        localStorage.setItem(orderKey, JSON.stringify(order))
-      } catch {}
+      // 同步排序到后端
+      const ids = next.map(r => savedVisitIds.current[r.key]).filter(Boolean)
+      if (ids.length) {
+        visitApi.reorder(ids).catch(e => console.error("保存排序失败:", e))
+      }
       return next
     })
     dragKeyRef.current = null

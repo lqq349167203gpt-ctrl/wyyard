@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { agentApi, customerAiConfigApi, systemHelperConfigApi, type Agent, type AgentCreate, type SystemHelperConfig, type SystemHelperConfigUpdate } from "@/lib/api"
+import { agentApi, miniappAiConfigApi, customerAiConfigApi, visitAiConfigApi, activityAiConfigApi, systemHelperConfigApi, type Agent, type AgentCreate, type MiniappAIConfig, type MiniappAIConfigUpdate, type CustomerAIConfig, type VisitAIConfig, type ActivityAIConfig, type SystemHelperConfig, type SystemHelperConfigUpdate } from "@/lib/api"
 
 const PROVIDER_LABELS: Record<string, string> = {
   qwen: "通义千问 (Qwen)",
@@ -30,6 +30,20 @@ export default function AgentsPage() {
   const [helperConfigExpanded, setHelperConfigExpanded] = useState(false)
   const [helperSaving, setHelperSaving] = useState(false)
   const [helperLoading, setHelperLoading] = useState(false)
+  const [miniappConfig, setMiniappConfig] = useState<MiniappAIConfig | null>(null)
+  const [miniappConfigExpanded, setMiniappConfigExpanded] = useState(false)
+  const [miniappSaving, setMiniappSaving] = useState(false)
+  const [miniappLoading, setMiniappLoading] = useState(false)
+  const [customerConfig, setCustomerConfig] = useState<CustomerAIConfig | null>(null)
+  const [customerSaving, setCustomerSaving] = useState(false)
+  const [customerLoading, setCustomerLoading] = useState(false)
+  const [visitConfig, setVisitConfig] = useState<VisitAIConfig | null>(null)
+  const [visitSaving, setVisitSaving] = useState(false)
+  const [visitLoading, setVisitLoading] = useState(false)
+  const [activityConfig, setActivityConfig] = useState<ActivityAIConfig | null>(null)
+  const [activitySaving, setActivitySaving] = useState(false)
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [miniappPromptTab, setMiniappPromptTab] = useState<"customer" | "visit" | "activity">("customer")
   const [form, setForm] = useState<AgentCreate>({
     name: "",
     description: "",
@@ -44,11 +58,27 @@ export default function AgentsPage() {
   const loadHelperConfig = () => {
     systemHelperConfigApi.get().then(setHelperConfig).catch(() => {})
   }
+  const loadMiniappConfig = () => {
+    miniappAiConfigApi.get().then(setMiniappConfig).catch(() => {})
+  }
+  const loadCustomerConfig = () => {
+    customerAiConfigApi.get().then(setCustomerConfig).catch(() => {})
+  }
+  const loadVisitConfig = () => {
+    visitAiConfigApi.get().then(setVisitConfig).catch(() => {})
+  }
+  const loadActivityConfig = () => {
+    activityAiConfigApi.get().then(setActivityConfig).catch(() => {})
+  }
 
   useEffect(() => {
     loadAgents()
     loadHelperConfig()
-    customerAiConfigApi.providers().then(setProviders).catch(() => {})
+    loadMiniappConfig()
+    loadCustomerConfig()
+    loadVisitConfig()
+    loadActivityConfig()
+    miniappAiConfigApi.providers().then(setProviders).catch(() => {})
   }, [])
 
   const handleCreateAgent = async () => {
@@ -89,6 +119,42 @@ export default function AgentsPage() {
       setHelperConfigExpanded(false)
     } catch (error) { alert(error instanceof Error ? error.message : "保存失败") }
     finally { setHelperSaving(false) }
+  }
+
+  const handleMiniappProviderChange = (provider: string | null) => {
+    if (!provider) return
+    const defaults = providers[provider] || {}
+    setMiniappConfig((prev) => prev ? { ...prev, provider: provider as MiniappAIConfig["provider"], model: defaults.model || prev.model, base_url: defaults.base_url || prev.base_url } : null)
+  }
+
+  const handleSaveMiniappConfig = async () => {
+    if (!miniappConfig) return
+    setMiniappSaving(true)
+    try {
+      const update: MiniappAIConfigUpdate = {
+        provider: miniappConfig.provider, model: miniappConfig.model,
+        api_key: miniappConfig.api_key, base_url: miniappConfig.base_url,
+        temperature: miniappConfig.temperature, max_tokens: miniappConfig.max_tokens,
+      }
+      const result = await miniappAiConfigApi.update(update)
+      setMiniappConfig(result)
+      setMiniappConfigExpanded(false)
+    } catch (error) { alert(error instanceof Error ? error.message : "保存失败") }
+    finally { setMiniappSaving(false) }
+  }
+
+  const handleSavePromptConfig = async (
+    config: { system_prompt: string },
+    api: { update: (data: any) => Promise<any> },
+    setConfig: (c: any) => void,
+    setSaving: (v: boolean) => void,
+  ) => {
+    setSaving(true)
+    try {
+      const result = await api.update({ system_prompt: config.system_prompt })
+      setConfig(result)
+    } catch (error) { alert(error instanceof Error ? error.message : "保存失败") }
+    finally { setSaving(false) }
   }
 
   return (
@@ -136,10 +202,7 @@ export default function AgentsPage() {
       <Card className="shadow-none">
         <CardHeader className="px-5 pt-4 pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bot className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-semibold">茶苑助手 AI 配置</CardTitle>
-            </div>
+            <CardTitle className="text-sm font-semibold">茶苑助手 AI 配置</CardTitle>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
               setHelperConfigExpanded(true)
               if (!helperConfig) {
@@ -190,7 +253,10 @@ export default function AgentsPage() {
                   </div>
                   <div className="grid grid-cols-[60px_1fr] items-center gap-2">
                     <Label className="text-[12px] text-[#4e535a] font-light text-right">Key</Label>
-                    <Input type="password" value={helperConfig.api_key} onChange={(e) => setHelperConfig({ ...helperConfig, api_key: e.target.value })} placeholder="sk-..." />
+                    <div className="flex items-center gap-2">
+                      <Input type="password" value={helperConfig.api_key} onChange={(e) => setHelperConfig({ ...helperConfig, api_key: e.target.value })} placeholder="留空则不修改已配置的 Key" />
+                      {helperConfig.has_api_key && <span className="text-xs text-[#07c160] whitespace-nowrap">已配置</span>}
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -204,7 +270,7 @@ export default function AgentsPage() {
                   </div>
                   <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                     <Label className="text-[12px] text-[#4e535a] font-light text-right">Max Tokens</Label>
-                    <Input type="number" min="1" max="8192" value={helperConfig.max_tokens} onChange={(e) => setHelperConfig({ ...helperConfig, max_tokens: parseInt(e.target.value) || 2048 })} />
+                    <Input type="number" min="1" max="32768" value={helperConfig.max_tokens} onChange={(e) => setHelperConfig({ ...helperConfig, max_tokens: parseInt(e.target.value) || 2048 })} />
                   </div>
                 </div>
                 <div className="grid grid-cols-[70px_1fr] items-start gap-2">
@@ -214,6 +280,135 @@ export default function AgentsPage() {
                 <div className="flex justify-end gap-2 pt-2 border-t">
                   <Button variant="outline" size="sm" onClick={() => setHelperConfigExpanded(false)}>取消</Button>
                   <Button size="sm" onClick={handleSaveHelperConfig} disabled={helperSaving}>{helperSaving ? "保存中..." : "保存"}</Button>
+                </div>
+              </>
+            ) : (
+              <div className="py-8 text-center text-sm text-muted-foreground">加载失败，请重试</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 小程序模型配置 */}
+      <Card className="shadow-none">
+        <CardHeader className="px-5 pt-4 pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold">小程序模型配置</CardTitle>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+              setMiniappConfigExpanded(true)
+              if (!miniappConfig) {
+                setMiniappLoading(true)
+                miniappAiConfigApi.get().then(setMiniappConfig).catch(() => {}).finally(() => setMiniappLoading(false))
+              }
+              if (!customerConfig) customerAiConfigApi.get().then(setCustomerConfig).catch(() => {})
+              if (!visitConfig) visitAiConfigApi.get().then(setVisitConfig).catch(() => {})
+              if (!activityConfig) activityAiConfigApi.get().then(setActivityConfig).catch(() => {})
+            }}>
+              <Settings className="mr-1 h-3 w-3" /> 配置
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">客户、邀约、课表三个小程序 AI 功能共用的模型和参数</p>
+        </CardHeader>
+        <CardContent className="px-5 pb-4 pt-0">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">当前模型：</span>
+            <Badge variant="secondary" className="text-xs">{miniappConfig?.model || "glm-5"}</Badge>
+            <span className="text-muted-foreground text-xs">({PROVIDER_LABELS[miniappConfig?.provider || "glm"]})</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 小程序模型配置弹窗（含提示词 tab） */}
+      <Dialog open={miniappConfigExpanded} onOpenChange={setMiniappConfigExpanded}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">小程序 AI 配置</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5" {...enterToNext}>
+            {miniappLoading ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : miniappConfig ? (
+              <>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <Label className="text-[12px] text-[#4e535a] font-light text-right">厂商</Label>
+                  <Select value={miniappConfig.provider} onValueChange={handleMiniappProviderChange}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PROVIDER_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-[60px_1fr] items-center gap-2">
+                    <Label className="text-[12px] text-[#4e535a] font-light text-right">模型</Label>
+                    <Input value={miniappConfig.model} onChange={(e) => setMiniappConfig({ ...miniappConfig, model: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-[60px_1fr] items-center gap-2">
+                    <Label className="text-[12px] text-[#4e535a] font-light text-right">Key</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="password" value={miniappConfig.api_key} onChange={(e) => setMiniappConfig({ ...miniappConfig, api_key: e.target.value })} placeholder="留空则不修改已配置的 Key" />
+                      {miniappConfig.has_api_key && <span className="text-xs text-[#07c160] whitespace-nowrap">已配置</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <Label className="text-[12px] text-[#4e535a] font-light text-right">Base URL</Label>
+                  <Input value={miniappConfig.base_url} onChange={(e) => setMiniappConfig({ ...miniappConfig, base_url: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                    <Label className="text-[12px] text-[#4e535a] font-light text-right">Temp</Label>
+                    <Input type="number" min="0" max="2" step="0.1" value={miniappConfig.temperature} onChange={(e) => setMiniappConfig({ ...miniappConfig, temperature: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                  <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                    <Label className="text-[12px] text-[#4e535a] font-light text-right">Max Tokens</Label>
+                    <Input type="number" min="1" max="32768" value={miniappConfig.max_tokens} onChange={(e) => setMiniappConfig({ ...miniappConfig, max_tokens: parseInt(e.target.value) || 2048 })} />
+                  </div>
+                </div>
+
+                {/* 提示词 tab */}
+                <div className="border-t pt-4">
+                  <div className="flex gap-1 mb-3">
+                    {(["customer", "visit", "activity"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        className={`px-3 py-1.5 text-xs rounded-md transition-colors ${miniappPromptTab === tab ? "bg-[#333] text-white" : "text-[#666] hover:bg-[#f5f5f5]"}`}
+                        onClick={() => setMiniappPromptTab(tab)}
+                      >
+                        {tab === "customer" ? "客户" : tab === "visit" ? "邀约" : "课表"}
+                      </button>
+                    ))}
+                  </div>
+                  {miniappPromptTab === "customer" && customerConfig && (
+                    <Textarea value={customerConfig.system_prompt} onChange={(e) => setCustomerConfig({ ...customerConfig, system_prompt: e.target.value })} rows={12} className="resize-none text-xs" />
+                  )}
+                  {miniappPromptTab === "visit" && visitConfig && (
+                    <Textarea value={visitConfig.system_prompt} onChange={(e) => setVisitConfig({ ...visitConfig, system_prompt: e.target.value })} rows={12} className="resize-none text-xs" />
+                  )}
+                  {miniappPromptTab === "activity" && activityConfig && (
+                    <Textarea value={activityConfig.system_prompt} onChange={(e) => setActivityConfig({ ...activityConfig, system_prompt: e.target.value })} rows={12} className="resize-none text-xs" />
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setMiniappConfigExpanded(false)}>取消</Button>
+                  <Button size="sm" onClick={async () => {
+                    setMiniappSaving(true)
+                    try {
+                      await handleSaveMiniappConfig()
+                      if (miniappPromptTab === "customer" && customerConfig) {
+                        await handleSavePromptConfig(customerConfig, customerAiConfigApi, setCustomerConfig, setCustomerSaving)
+                      } else if (miniappPromptTab === "visit" && visitConfig) {
+                        await handleSavePromptConfig(visitConfig, visitAiConfigApi, setVisitConfig, setVisitSaving)
+                      } else if (miniappPromptTab === "activity" && activityConfig) {
+                        await handleSavePromptConfig(activityConfig, activityAiConfigApi, setActivityConfig, setActivitySaving)
+                      }
+                      setMiniappConfigExpanded(false)
+                    } catch { /* handled inside */ }
+                    finally { setMiniappSaving(false) }
+                  }} disabled={miniappSaving}>{miniappSaving ? "保存中..." : "保存"}</Button>
                 </div>
               </>
             ) : (

@@ -128,6 +128,7 @@ async def chat(data: SystemHelperRequest, request: Request):
             role="user",
             content=data.message,
             session_id=session_id,
+            mode="system",
         ))
 
     async def generate():
@@ -147,6 +148,7 @@ async def chat(data: SystemHelperRequest, request: Request):
                 role="assistant",
                 content=full_content,
                 session_id=session_id,
+                mode="system",
             ))
 
     return StreamingResponse(generate(), media_type="text/event-stream")

@@ -72,7 +72,17 @@
   </view>
 
   <!-- 浮动添加按钮 -->
-  <view class="fab" wx:if="{{!editMode}}" bindtap="onAddTap">
+  <view class="fab" wx:if="{{!editMode}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
   </view>
+
+  <!-- 语音对话弹窗 -->
+  <voice-input-popup
+    class="voice-popup"
+    show="{{showVoicePopup}}"
+    mode="visit"
+    bind:close="onVoiceClose"
+    bind:chat="onVoiceChat"
+    wx:if="{{showVoicePopup}}"
+  />
 </view>

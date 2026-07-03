@@ -5,36 +5,10 @@ const {
   ohCardReadingSessionApi,
 } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
-
-const ACTIVITY_TYPES = [
-  { value: 'class', label: '沙龙活动' },
-  { value: 'gcs', label: '觉醒游戏' },
-  { value: 'ers', label: '情绪释放' },
-  { value: 'ocr', label: 'OH卡' },
-  { value: 'eks', label: '能量结' },
-  { value: 'ics', label: '内部课程' },
-]
-
-const TYPE_LABELS = {
-  class: '沙龙', gcs: '觉醒', ers: '情绪释放',
-  eks: '能量结', ics: '内部课程', ocr: 'OH卡',
-}
-
-// 类型对应的老师身份
-const TEACHER_POSITION = {
-  class: '课程老师',
-  gcs: '成就君',
-  ers: '成就君',
-  ocr: '成就君',
-  eks: '能量结老师',
-  ics: '课程老师',
-}
-
-// 单选老师类型（用 achiever_id/achiever_name）
-const SINGLE_TEACHER_TYPES = ['gcs', 'ers', 'ocr']
-
-// 内部课程类型（独立于沙龙课程类型）
-const ICS_COURSE_TYPES = ['疗愈师课程', '商业框架陪跑', '落地赋能班']
+const {
+  ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
+  SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
+} = require('../../utils/activity-constants')
 
 Page({
   data: {
@@ -233,7 +207,6 @@ Page({
       achieverName: '',
       isPublicWelfare: false,
       activityModeIndex: 0,
-      activityName: '',
     })
   },
 
@@ -340,7 +313,8 @@ Page({
     const list = baseList
       .filter(c => {
         if (!keyword) return true
-        return (c.nickname || '').includes(keyword) || (c.name || '').includes(keyword)
+        const kw = keyword.toLowerCase()
+        return (c.nickname || '').toLowerCase().includes(kw) || (c.name || '').toLowerCase().includes(kw)
       })
       .map(c => ({
         ...c,
@@ -467,6 +441,10 @@ Page({
         return
       }
     }
+    if (this.data.startTime && this.data.endTime && this.data.endTime <= this.data.startTime) {
+      wx.showToast({ title: '结束时间需晚于开始时间', icon: 'none' })
+      return
+    }
 
     const space = this.data.spaces[this.data.spaceIndex]
     const room = this.data.rooms[this.data.roomIndex]
@@ -568,9 +546,14 @@ Page({
       }
       wx.navigateBack()
     } catch (e) {
-      wx.showToast({ title: '创建失败', icon: 'none' })
-    } finally {
       this.setData({ saving: false })
+      wx.showModal({
+        title: '创建失败',
+        content: '是否重试？',
+        success: (res) => { if (res.confirm) this.onSubmit() },
+      })
+      return
     }
+    this.setData({ saving: false })
   },
 })

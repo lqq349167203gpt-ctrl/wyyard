@@ -33,6 +33,7 @@ class VisitRecordBase(SafeBaseModel):
     feedback: str = ""  # 客户反馈
     healing_notes: str = ""  # 跟进记录
     group_leader_feedback: str = ""  # 组长反馈
+    sort_order: int = 0  # 排序权重，越小越靠前
 
     @field_validator(
         "visit_time", "member_type", "needs", "referrer_handler",

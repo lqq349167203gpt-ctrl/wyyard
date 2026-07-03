@@ -155,6 +155,24 @@
   box-shadow: none;
 }
 
+/* 账号密码输入 */
+.login-input {
+  width: 100%;
+  height: 96rpx;
+  padding: 0 28rpx;
+  box-sizing: border-box;
+  background-color: #f7f8fa;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #1f2329;
+  margin-bottom: 24rpx;
+  border: 2rpx solid #e8eaed;
+}
+
+.login-input:focus {
+  border-color: #3370ff;
+}
+
 /* 开发模式 */
 .dev-title {
   display: block;

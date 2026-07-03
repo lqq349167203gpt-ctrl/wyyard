@@ -29,6 +29,7 @@ Page({
   },
 
   onArrivalToggle() {
+    if (!this.data.visit) return
     const arrived = !this.data.visit.arrived
     const arrivalTime = arrived ? (() => {
       const now = new Date()

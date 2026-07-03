@@ -77,6 +77,16 @@ async def search_customers(q: str = ""):
     return visit_service.search_customers(q)
 
 
+@router.post("/reorder")
+async def reorder_visits(data: dict):
+    """批量更新排序权重。传入 {"ids": ["id1", "id2", ...]} 按顺序设置 sort_order"""
+    ids = data.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="ids 不能为空")
+    visit_service.reorder_visits(ids)
+    return {"message": "排序已更新"}
+
+
 @router.get("/{visit_id}")
 async def get_visit(visit_id: str):
     record = visit_service.get_visit(visit_id)

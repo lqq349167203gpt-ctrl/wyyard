@@ -44,6 +44,24 @@ def _build_login_response(account) -> dict:
     }
 
 
+def _make_jwt_token(account) -> str:
+    """为账号生成 JWT token（与 accounts/login 一致，全局中间件只认 JWT）"""
+    from app.middleware.jwt_auth import create_access_token
+    from app.services import session_service
+    import uuid
+    token = create_access_token(
+        account_id=account.id,
+        username=account.username,
+        owner=account.owner or "",
+        role=account.role,
+    )
+    # 解码获取 jti，写入 session 表（改密码时可批量失效）
+    from app.middleware.jwt_auth import decode_token
+    payload = decode_token(token)
+    session_service.create_session(session_id=payload.get("jti", str(uuid.uuid4())), account_id=account.id)
+    return token
+
+
 @router.post("/login")
 async def wechat_login(data: WechatLoginRequest):
     """微信登录：用 code 换 openid，查找已绑定的账号"""
@@ -62,7 +80,7 @@ async def wechat_login(data: WechatLoginRequest):
         account = account_service.get_account(existing.account_id)
         if account and account.enabled:
             resp = _build_login_response(account)
-            resp["token"] = existing.token
+            resp["token"] = _make_jwt_token(account)
             resp["bound"] = True
             return resp
 
@@ -99,7 +117,7 @@ async def wechat_bind(data: WechatBindRequest):
     _save_session(data.token)
 
     resp = _build_login_response(account)
-    resp["token"] = data.token
+    resp["token"] = _make_jwt_token(account)
     resp["bound"] = True
     return resp
 
@@ -113,18 +131,25 @@ async def dev_login(data: DevLoginRequest, request: Request):
     """开发环境登录：直接用用户名登录，不需要密码（仅 debug 模式可用）"""
     if not settings.debug:
         raise HTTPException(status_code=404, detail="Not found")
-    # 仅允许本地访问
+    # 仅允许本地/局域网访问
     client_ip = request.client.host if request.client else ""
-    if client_ip not in ("127.0.0.1", "::1", "localhost"):
+    if client_ip not in ("127.0.0.1", "::1", "localhost") and not client_ip.startswith("192.168."):
         raise HTTPException(status_code=403, detail="仅允许本地访问")
     account = account_service.get_by_username(data.username)
     if not account:
         raise HTTPException(status_code=404, detail="账号不存在")
     if not account.enabled:
         raise HTTPException(status_code=403, detail="账号已禁用")
-    session = wechat_service.create_session("", account.id)
+    # 生成 JWT（与 accounts/login 一致），而非 UUID session
+    from app.middleware.jwt_auth import create_access_token
+    token = create_access_token(
+        account_id=account.id,
+        username=account.username,
+        owner=account.owner or "",
+        role=account.role,
+    )
     resp = _build_login_response(account)
-    resp["token"] = session.token
+    resp["token"] = token
     resp["bound"] = True
     return resp
 
@@ -155,9 +180,9 @@ async def phone_login(data: PhoneLoginRequest):
         raise HTTPException(status_code=403, detail="该客户未开通后台账号，无访问权限")
 
     # 创建 session
-    session = wechat_service.create_session("", account.id)
+    wechat_service.create_session("", account.id)
 
     resp = _build_login_response(account)
-    resp["token"] = session.token
+    resp["token"] = _make_jwt_token(account)
     resp["bound"] = True
     return resp

@@ -7,6 +7,12 @@
         <text class="summary-space">{{currentSpaceName}}</text>
       </picker>
     </view>
+    <view class="participants-row">
+      <view class="participants-divider"></view>
+      <text class="participants-label">参与者</text>
+      <text class="participants-names" wx:if="{{participantText}}">{{participantText}}</text>
+      <text class="participants-empty" wx:else>暂无</text>
+    </view>
     <!-- 下拉日历 -->
     <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
       <view class="calendar-nav">
@@ -74,7 +80,17 @@
   </view>
 
   <!-- 添加按钮 -->
-  <view class="fab" bindtap="onCreateTap">
+  <view class="fab" bindtap="onCreateTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
   </view>
+
+  <!-- 语音对话弹窗 -->
+  <voice-input-popup
+    class="voice-popup"
+    show="{{showVoicePopup}}"
+    mode="activity"
+    bind:close="onVoiceClose"
+    bind:chat="onVoiceChat"
+    wx:if="{{showVoicePopup}}"
+  />
 </view>

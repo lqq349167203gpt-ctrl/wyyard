@@ -7,7 +7,10 @@
 .calendar {
   background-color: #ffffff;
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 101;
 }
 
@@ -26,6 +29,42 @@
 .summary-space {
   font-size: 28rpx;
   color: #8f959e;
+}
+
+.participants-row {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  padding: 16rpx 32rpx 20rpx;
+  gap: 12rpx;
+}
+
+.participants-divider {
+  position: absolute;
+  left: 32rpx;
+  right: 32rpx;
+  top: 0;
+  height: 1rpx;
+  background-color: #f0f1f2;
+}
+
+.participants-label {
+  font-size: 24rpx;
+  color: #8f959e;
+  flex-shrink: 0;
+}
+
+.participants-names {
+  font-size: 24rpx;
+  color: #1f2329;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participants-empty {
+  font-size: 24rpx;
+  color: #b0b5bb;
 }
 
 /* 下拉日历 */
@@ -128,7 +167,7 @@
 
 /* 活动列表 */
 .activity-list {
-  padding: 20rpx 32rpx;
+  padding: 160rpx 32rpx 20rpx;
 }
 
 .activity-card {
@@ -158,6 +197,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 4rpx;
   min-width: 0;
   flex: 1;
 }
@@ -226,7 +266,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 160rpx 0;
+  padding: 200rpx 0 0;
 }
 
 .empty-icon {
@@ -242,7 +282,7 @@
 .loading {
   display: flex;
   justify-content: center;
-  padding: 120rpx 0;
+  padding: 200rpx 0 0;
   color: #8f959e;
   font-size: 28rpx;
 }
@@ -264,5 +304,8 @@
 .fab-icon {
   font-size: 52rpx;
   color: #ffffff;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -4rpx;
 }

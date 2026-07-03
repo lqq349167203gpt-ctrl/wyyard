@@ -35,6 +35,25 @@ Page({
     this.loadCustomers()
   },
 
+  onShow() {
+    // 从新建客户页返回时，重新加载客户列表并自动选中新建的客户
+    if (this.data._expectNewCustomer) {
+      const oldIds = new Set(this.data.allCustomers.map(c => c.id))
+      this.loadCustomers().then(() => {
+        const newOne = this.data.allCustomers.find(c => !oldIds.has(c.id))
+        if (newOne) {
+          this.setData({ customerId: newOne.id, customerName: newOne.nickname })
+        }
+        this.setData({ _expectNewCustomer: false })
+      })
+    }
+  },
+
+  onCreateCustomer() {
+    this.setData({ _expectNewCustomer: true, showPicker: false })
+    wx.navigateTo({ url: '/pages/customer-form/index' })
+  },
+
   async loadSpaces() {
     try {
       const spaces = await spaceApi.list()
@@ -42,6 +61,7 @@ Page({
       this.setData({ spaces, spaceIndex: Math.max(0, spaceIndex) })
     } catch (e) {
       console.error('加载空间失败:', e)
+      wx.showToast({ title: '加载空间失败', icon: 'none' })
     }
   },
 
@@ -51,6 +71,7 @@ Page({
       this.setData({ allCustomers: list })
     } catch (e) {
       console.error('加载客户列表失败:', e)
+      wx.showToast({ title: '加载客户列表失败', icon: 'none' })
     }
   },
 
@@ -120,7 +141,8 @@ Page({
     const keyword = e.detail.value
     const list = this.data.allCustomers.filter(c => {
       if (!keyword) return true
-      return c.nickname.includes(keyword) || (c.name && c.name.includes(keyword))
+      const kw = keyword.toLowerCase()
+      return c.nickname.toLowerCase().includes(kw) || (c.name && c.name.toLowerCase().includes(kw))
     })
     this.setData({ pickerKeyword: keyword, pickerList: list })
   },
@@ -168,6 +190,7 @@ Page({
         healing_notes: this.data.healingNotes,
         group_leader_feedback: this.data.groupLeaderFeedback,
         referrer_handler: this.data.referrerHandler,
+        referrer_handler_id: this.data.referrerHandlerId || '',
         space_id: space?.id || '',
         is_leader: this.data.isLeader,
         arrived: this.data.arrived,
@@ -176,9 +199,14 @@ Page({
       wx.showToast({ title: '已添加' })
       wx.navigateBack()
     } catch (e) {
-      wx.showToast({ title: '添加失败', icon: 'none' })
-    } finally {
       this.setData({ saving: false })
+      wx.showModal({
+        title: '添加失败',
+        content: '是否重试？',
+        success: (res) => { if (res.confirm) this.onSubmit() },
+      })
+      return
     }
+    this.setData({ saving: false })
   },
 })

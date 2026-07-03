@@ -1,4 +1,4 @@
-const { visitApi, spaceApi } = require('../../utils/api')
+const { visitApi, spaceApi, request } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -64,29 +64,44 @@ Page({
     loading: true,
     leaderMap: {},
     editMode: false,
+    showVoicePopup: false,
   },
 
   async onLoad() {
     const now = new Date()
-    const date = formatDate(now)
+    const savedDate = wx.getStorageSync('visit_selected_date')
+    const date = savedDate || formatDate(now)
+    const d = savedDate ? new Date(savedDate) : now
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
-      currentWeekday: '周' + WEEKDAYS[now.getDay()],
-      calYear: now.getFullYear(),
-      calMonth: now.getMonth(),
+      currentWeekday: '周' + WEEKDAYS[d.getDay()],
+      calYear: d.getFullYear(),
+      calMonth: d.getMonth(),
     })
     await this.loadSpaces()
-    this.loadData()
+    await this.loadData()
+    this._initialized = true
+    if (this._pendingShowLoad) {
+      this._pendingShowLoad = false
+      this.loadData()
+    }
   },
 
   onShow() {
     if (!getApp().checkLogin()) return
+    if (!this._initialized) {
+      this._pendingShowLoad = true
+      return
+    }
     this.loadData()
   },
 
   onPullDownRefresh() {
-    this.loadData().then(() => wx.stopPullDownRefresh())
+    this.loadData().then(() => {
+      wx.stopPullDownRefresh()
+      wx.pageScrollTo({ scrollTop: 0, duration: 100 })
+    })
   },
 
   _formatDateShort(date) {
@@ -138,6 +153,7 @@ Page({
     const date = e.currentTarget.dataset.date
     const d = new Date(date)
     const counts = this._calendarCounts || {}
+    wx.setStorageSync('visit_selected_date', date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -191,21 +207,23 @@ Page({
     this.setData({ loading: true })
     try {
       const sid = spaceId !== undefined ? spaceId : this.data.spaceId
+      const reqDate = this.data.currentDate
       const [visits, counts] = await Promise.all([
-        visitApi.listLight(this.data.currentDate, sid || undefined),
+        visitApi.listLight(reqDate, sid || undefined),
         visitApi.counts({
           start_date: this._monthStart(),
           end_date: this._monthEnd(),
           space_id: sid || undefined,
         }),
       ])
+      // 迁移 localStorage 排序到后端 sort_order
+      await this._migrateLocalOrder(visits || [])
 
-      const sorted = this.applySavedOrder(visits || [])
-      const leaderMap = this.buildLeaderMap(sorted)
+      const leaderMap = this.buildLeaderMap(visits || [])
 
       this._calendarCounts = counts || {}
       this.setData({
-        visits: sorted,
+        visits: visits || [],
         visitCounts: counts || {},
         leaderMap,
         loading: false,
@@ -215,6 +233,24 @@ Page({
       this.setData({ loading: false })
     } finally {
       this._loading = false
+    }
+  },
+
+  async _migrateLocalOrder(visits) {
+    const key = `visit_order_${this.data.currentDate}_${this.data.spaceId || ''}`
+    let savedOrder = []
+    try { savedOrder = JSON.parse(wx.getStorageSync(key) || '[]') } catch {}
+    if (!savedOrder.length || !visits.length) return
+    // 过滤出当天实际存在的 id，保持 localStorage 的顺序
+    const idSet = new Set(visits.map(v => v.id))
+    const ordered = savedOrder.filter(id => idSet.has(id))
+    if (ordered.length === 0) return
+    try {
+      await visitApi.reorder(ordered)
+      wx.removeStorageSync(key)
+      console.log('[migrate] localStorage 排序已迁移到后端:', key)
+    } catch (e) {
+      console.error('[migrate] 迁移排序失败:', e)
     }
   },
 
@@ -231,27 +267,9 @@ Page({
 
   // ---- 排序存储 ----
 
-  _orderKey() {
-    return `visit_order_${this.data.currentDate}_${this.data.spaceId || ''}`
-  },
-
-  applySavedOrder(visits) {
-    let savedOrder = []
-    try { savedOrder = JSON.parse(wx.getStorageSync(this._orderKey()) || '[]') } catch {}
-    if (!savedOrder.length) {
-      wx.setStorageSync(this._orderKey(), JSON.stringify(visits.map(v => v.id)))
-      return visits
-    }
-    const orderMap = new Map(savedOrder.map((id, i) => [id, i]))
-    const sorted = [...visits].sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999))
-    const merged = sorted.map(v => v.id)
-    wx.setStorageSync(this._orderKey(), JSON.stringify(merged))
-    return sorted
-  },
-
   saveOrder() {
-    const order = this.data.visits.map(v => v.id)
-    wx.setStorageSync(this._orderKey(), JSON.stringify(order))
+    const ids = this.data.visits.map(v => v.id)
+    visitApi.reorder(ids).catch(e => console.error('保存排序失败:', e))
   },
 
   // ---- 组长映射 ----
@@ -302,6 +320,37 @@ Page({
 
   onAddTap() {
     wx.navigateTo({ url: `/pages/visit-create/index?date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
+  },
+
+  onFabLongPress() {
+    this.setData({ showVoicePopup: true })
+  },
+
+  onVoiceClose() {
+    this.setData({ showVoicePopup: false })
+    // 关闭后刷新列表
+    this.loadData()
+  },
+
+  async onVoiceChat(e) {
+    const { message, history } = e.detail
+    try {
+      const res = await request('/api/voice/visit-chat', {
+        method: 'POST',
+        data: {
+          message,
+          history: history || [],
+          date: this.data.currentDate,
+          space_id: this.data.spaceId,
+        },
+      })
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setReply(res.reply || '操作完成')
+    } catch (err) {
+      console.error('[onVoiceChat] 错误:', err)
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setError(err.message || '请求失败')
+    }
   },
 
   onVisitTap(e) {

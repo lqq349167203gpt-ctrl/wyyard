@@ -37,10 +37,13 @@ def list_records(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     keyword: Optional[str] = None,
+    mode: Optional[str] = None,
 ) -> List[ChatRecord]:
     records = list(_records.values())
     if user_id:
         records = [r for r in records if r.user_id == user_id]
+    if mode:
+        records = [r for r in records if r.mode == mode]
     if keyword:
         kw = keyword.lower()
         records = [r for r in records if kw in r.content.lower()]

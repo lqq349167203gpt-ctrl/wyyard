@@ -1,4 +1,4 @@
-const { customerApi, memberIdentityApi } = require('../../utils/api')
+const { customerApi, memberIdentityApi, request } = require('../../utils/api')
 
 Page({
   data: {
@@ -7,6 +7,7 @@ Page({
     loading: false,
     initialized: false,
     keyword: '',
+    showVoicePopup: false,
     // 筛选相关
     showFilterPanel: false,
     filterCount: 0,
@@ -87,11 +88,14 @@ Page({
     this.setData({ loading: true })
 
     try {
+      const token = wx.getStorageSync('auth_token')
+      console.log('[loadData] 请求前 token:', token ? token.substring(0, 20) + '...' : '无')
       const res = await customerApi.list({
         page,
         page_size: this.data.pageSize,
         nickname: this.data.keyword || undefined,
       })
+      console.log('[loadData] 请求成功, items数量:', res?.items?.length ?? res?.length ?? 'N/A')
 
       const items = (res && res.items) || (Array.isArray(res) ? res : [])
       const total = (res && res.total) || items.length
@@ -113,7 +117,7 @@ Page({
       this.setData({ customers, page, total, hasMore: customers.length < total, initialized: true })
       this.applyFilters()
     } catch (e) {
-      console.error('加载客户失败:', e)
+      console.error('[loadData] 加载客户失败:', e.message, e)
       this.setData({ loading: false, initialized: true })
       wx.showToast({ title: '加载失败', icon: 'none' })
     }
@@ -289,5 +293,32 @@ Page({
 
   onAddTap() {
     wx.navigateTo({ url: '/pages/customer-form/index' })
+  },
+
+  // ---------- 语音录入 ----------
+
+  onFabLongPress() {
+    this.setData({ showVoicePopup: true })
+  },
+
+  onVoiceClose() {
+    this.setData({ showVoicePopup: false })
+    this.loadData(true)
+  },
+
+  async onVoiceChat(e) {
+    const { message, history } = e.detail
+    try {
+      const res = await request('/api/voice/customer-chat', {
+        method: 'POST',
+        data: { message, history: history || [] },
+      })
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setReply(res.reply || '操作完成')
+    } catch (err) {
+      console.error('[onVoiceChat] 错误:', err)
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setError(err.message || '请求失败')
+    }
   },
 })

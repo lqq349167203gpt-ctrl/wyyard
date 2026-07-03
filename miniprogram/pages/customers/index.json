@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "客户",
-  "usingComponents": {},
+  "usingComponents": {
+    "voice-input-popup": "../../components/voice-input-popup/index"
+  },
   "enablePullDownRefresh": true
 }

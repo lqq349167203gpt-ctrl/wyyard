@@ -4,6 +4,18 @@
   min-height: 100vh;
 }
 
+.loading-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400rpx;
+}
+
+.loading-text {
+  color: #8f959e;
+  font-size: 28rpx;
+}
+
 .placeholder {
   color: #b0b5bb;
 }

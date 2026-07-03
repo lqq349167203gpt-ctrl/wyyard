@@ -211,16 +211,18 @@ export interface ChatRecord {
   role: "user" | "assistant"
   content: string
   session_id: string
+  mode: string  // "visit" | "customer" | "system" | ""
   created_at: string
 }
 
 export const chatHistoryApi = {
-  listPaginated: (params: { user_id?: string; date_from?: string; date_to?: string; keyword?: string }, page: number, pageSize: number = 20) => {
+  listPaginated: (params: { user_id?: string; date_from?: string; date_to?: string; keyword?: string; mode?: string }, page: number, pageSize: number = 20) => {
     const query = new URLSearchParams()
     if (params.user_id) query.set("user_id", params.user_id)
     if (params.date_from) query.set("date_from", params.date_from)
     if (params.date_to) query.set("date_to", params.date_to)
     if (params.keyword) query.set("keyword", params.keyword)
+    if (params.mode) query.set("mode", params.mode)
     query.set("page", String(page))
     query.set("page_size", String(pageSize))
     return request<PaginatedResponse<ChatRecord>>(`/api/chat-history?${query.toString()}`)
@@ -342,36 +344,69 @@ export const aiConfigApi = {
   delete: (id: string) => request<{ message: string }>(`/api/ai-configs/${id}`, { method: "DELETE" }),
 }
 
-// Customer AI Config (全局唯一，1:1 强关联)
-export interface CustomerAIConfig {
+// Miniapp AI Config (小程序共享模型配置，客户/邀约/课表共用)
+export interface MiniappAIConfig {
   id: string
-  name: string
   provider: "qwen" | "kimi" | "glm" | "deepseek" | "xiaomi"
   model: string
   api_key: string
+  has_api_key: boolean
   base_url: string
-  system_prompt: string
   temperature: number
   max_tokens: number
   created_at: string
   updated_at: string
 }
 
-export interface CustomerAIConfigUpdate {
-  name?: string
+export interface MiniappAIConfigUpdate {
   provider?: string
   model?: string
   api_key?: string
   base_url?: string
-  system_prompt?: string
   temperature?: number
   max_tokens?: number
 }
 
+export const miniappAiConfigApi = {
+  get: () => request<MiniappAIConfig>("/api/miniapp-ai-config"),
+  providers: () => request<Record<string, { base_url: string; model: string }>>("/api/miniapp-ai-config/providers"),
+  update: (data: MiniappAIConfigUpdate) => request<MiniappAIConfig>("/api/miniapp-ai-config", { method: "PATCH", body: JSON.stringify(data) }),
+}
+
+// Customer/Visit/Activity AI Config (提示词配置)
+export interface PromptAIConfig {
+  id: string
+  name: string
+  system_prompt: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PromptAIConfigUpdate {
+  name?: string
+  system_prompt?: string
+}
+
+export type CustomerAIConfig = PromptAIConfig
+export type CustomerAIConfigUpdate = PromptAIConfigUpdate
+export type VisitAIConfig = PromptAIConfig
+export type VisitAIConfigUpdate = PromptAIConfigUpdate
+export type ActivityAIConfig = PromptAIConfig
+export type ActivityAIConfigUpdate = PromptAIConfigUpdate
+
 export const customerAiConfigApi = {
   get: () => request<CustomerAIConfig>("/api/customer-ai-config"),
-  providers: () => request<Record<string, { base_url: string; model: string }>>("/api/customer-ai-config/providers"),
   update: (data: CustomerAIConfigUpdate) => request<CustomerAIConfig>("/api/customer-ai-config", { method: "PATCH", body: JSON.stringify(data) }),
+}
+
+export const visitAiConfigApi = {
+  get: () => request<VisitAIConfig>("/api/visit-ai-config"),
+  update: (data: VisitAIConfigUpdate) => request<VisitAIConfig>("/api/visit-ai-config", { method: "PATCH", body: JSON.stringify(data) }),
+}
+
+export const activityAiConfigApi = {
+  get: () => request<ActivityAIConfig>("/api/activity-ai-config"),
+  update: (data: ActivityAIConfigUpdate) => request<ActivityAIConfig>("/api/activity-ai-config", { method: "PATCH", body: JSON.stringify(data) }),
 }
 
 // System Helper Config
@@ -380,6 +415,7 @@ export interface SystemHelperConfig {
   provider: string
   model: string
   api_key: string
+  has_api_key: boolean
   base_url: string
   system_prompt: string
   temperature: number
@@ -511,6 +547,7 @@ export const visitApi = {
     const str = qs.toString()
     return request<Record<string, number>>(`/api/visits/counts${str ? `?${str}` : ""}`)
   },
+  reorder: (ids: string[]) => request<{ message: string }>("/api/visits/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
 }
 
 // Course

@@ -1,14 +1,6 @@
-const { classRecordApi, spaceApi } = require('../../utils/api')
+const { classRecordApi, spaceApi, request } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
-
-const BADGE_COLORS = {
-  '沙龙': '#3370ff',
-  '觉醒': '#7c5cfc',
-  '情绪释放': '#d97070',
-  '能量结': '#d9944a',
-  '内部课程': '#5ba88a',
-  'OH卡': '#c772a0',
-}
+const { BADGE_COLORS } = require('../../utils/activity-constants')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -69,11 +61,14 @@ Page({
     spaceId: '',
     currentSpaceName: '',
     records: [],
+    participants: [],
+    participantText: '',
     loading: true,
+    showVoicePopup: false,
   },
 
   async onLoad(options) {
-    const date = options.date || formatDate(new Date())
+    const date = options.date || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
     const d = new Date(date)
     this.setData({
       currentDate: date,
@@ -143,6 +138,7 @@ Page({
     const date = e.currentTarget.dataset.date
     const d = new Date(date)
     const counts = this._calendarCounts || {}
+    wx.setStorageSync('activity_selected_date', date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -203,7 +199,7 @@ Page({
           records.push({
             id: r.id, badge,
             name: r.activity_name || r.course_name || '',
-            color: BADGE_COLORS['沙龙'],
+            color: BADGE_COLORS[badge] || BADGE_COLORS['沙龙'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
             participants: r.participant_ids?.length || 0,
@@ -300,9 +296,24 @@ Page({
 
       records.sort((a, b) => (a.time || '').localeCompare(b.time || ''))
 
+      // 收集当天所有参与者（去重）
+      const allSources = [
+        ...(dashboard.class_records || []),
+        ...(dashboard.gcs_sessions || []),
+        ...(dashboard.ers_sessions || []),
+        ...(dashboard.eks_sessions || []),
+        ...(dashboard.ics_sessions || []),
+        ...(dashboard.ocr_sessions || []),
+      ]
+      const participantSet = new Set()
+      allSources.forEach(r => {
+        (r.participant_names || []).forEach(name => { if (name) participantSet.add(name) })
+      })
+      const participants = [...participantSet]
+
       // 保存日历计数，供展开时使用
       this._calendarCounts = dashboard.calendar_counts || {}
-      this.setData({ records, loading: false })
+      this.setData({ records, participants, participantText: participants.join('、'), loading: false })
     } catch (e) {
       console.error('加载活动失败:', e)
       this.setData({ loading: false })
@@ -324,5 +335,36 @@ Page({
     const date = this.data.currentDate
     const spaceId = this.data.spaceId
     wx.navigateTo({ url: `/pages/activity-create/index?date=${date}&spaceId=${spaceId}` })
+  },
+
+  onFabLongPress() {
+    this.setData({ showVoicePopup: true })
+  },
+
+  onVoiceClose() {
+    this.setData({ showVoicePopup: false })
+    this.loadData()
+  },
+
+  async onVoiceChat(e) {
+    const { message, history } = e.detail
+    try {
+      const res = await request('/api/voice/activity-chat', {
+        method: 'POST',
+        timeout: 120000,
+        data: {
+          message,
+          history: history || [],
+          date: this.data.currentDate,
+          space_id: this.data.spaceId,
+        },
+      })
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setReply(res.reply || '操作完成')
+    } catch (err) {
+      console.error('[onVoiceChat] 错误:', err)
+      const popup = this.selectComponent('.voice-popup')
+      if (popup) popup.setError(err.message || '请求失败')
+    }
   },
 })

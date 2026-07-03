@@ -145,12 +145,23 @@
   font-size: 28rpx;
 }
 
+.picker-create {
+  display: flex;
+  justify-content: center;
+  padding: 40rpx 0 80rpx;
+}
+
+.picker-create-text {
+  font-size: 28rpx;
+  color: #3370ff;
+}
+
 /* 操作按钮 */
 .actions {
   display: flex;
   gap: 32rpx;
   margin-top: 48rpx;
-  padding: 0 28rpx;
+  padding: 0 28rpx 20rpx;
 }
 
 .submit-btn {

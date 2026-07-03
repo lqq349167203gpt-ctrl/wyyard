@@ -18,7 +18,7 @@
       </picker>
     </view>
     <view class="form-item">
-      <text class="form-label">时间</text>
+      <text class="form-label">预计时间</text>
       <picker class="form-picker" mode="time" value="{{time}}" bindchange="onTimeChange">
         <view class="picker-display">{{time}}</view>
       </picker>
@@ -90,8 +90,11 @@
         <text class="picker-item-name">{{item.nickname}}</text>
         <text class="picker-item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
       </view>
-      <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
+      <view class="picker-empty" wx:if="{{pickerList.length === 0 && !(pickerKeyword && pickerField === 'customer')}}">
         <text>无匹配用户</text>
+      </view>
+      <view class="picker-create" wx:if="{{pickerList.length === 0 && pickerKeyword && pickerField === 'customer'}}" bindtap="onCreateCustomer">
+        <text class="picker-create-text">未找到，新建客户</text>
       </view>
     </scroll-view>
   </view>

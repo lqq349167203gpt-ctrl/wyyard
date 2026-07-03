@@ -44,7 +44,7 @@
   display: flex;
   gap: 32rpx;
   margin-top: 48rpx;
-  padding: 0 28rpx;
+  padding: 0 28rpx 20rpx;
 }
 
 .btn-row .btn-danger {

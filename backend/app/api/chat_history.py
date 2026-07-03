@@ -13,6 +13,7 @@ def list_records(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     keyword: Optional[str] = None,
+    mode: Optional[str] = None,
     page: int | None = Query(None, ge=1),
     page_size: int | None = Query(None, ge=1, le=100),
 ):
@@ -28,6 +29,7 @@ def list_records(
         date_from=date_from,
         date_to=date_to,
         keyword=keyword,
+        mode=mode,
     )
     # 将 Pydantic 模型转为 dict
     items = [r.model_dump(mode="json") for r in items]

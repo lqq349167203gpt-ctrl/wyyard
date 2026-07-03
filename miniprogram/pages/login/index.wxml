@@ -15,7 +15,8 @@
 
   <!-- 登录卡 -->
   <view class="login-card">
-    <block wx:if="{{!devMode}}">
+    <!-- 微信手机号登录 -->
+    <block wx:if="{{loginMode === 'wechat'}}">
       <button
         class="phone-btn"
         style="width: 550rpx;"
@@ -26,12 +27,44 @@
       >
         本机号一键登录
       </button>
-      <button class="sms-btn" style="width: 550rpx;" bindtap="onSmsLogin">
-        输入手机号登录
+      <button class="sms-btn" style="width: 550rpx;" bindtap="switchToPassword">
+        账号密码登录
       </button>
     </block>
 
-    <block wx:if="{{devMode}}">
+    <!-- 账号密码登录 -->
+    <block wx:if="{{loginMode === 'password'}}">
+      <input
+        class="login-input"
+        placeholder="用户名"
+        placeholder-style="color: #b0b5bb;"
+        value="{{username}}"
+        bindinput="onUsernameInput"
+      />
+      <input
+        class="login-input"
+        placeholder="密码"
+        placeholder-style="color: #b0b5bb;"
+        password="true"
+        value="{{password}}"
+        bindinput="onPasswordInput"
+      />
+      <button
+        class="phone-btn"
+        style="width: 550rpx;"
+        bindtap="onPasswordLogin"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+      >
+        登录
+      </button>
+      <button class="sms-btn" style="width: 550rpx;" bindtap="switchToWechat">
+        微信登录
+      </button>
+    </block>
+
+    <!-- 开发模式 -->
+    <block wx:if="{{loginMode === 'dev'}}">
       <text class="dev-title">选择账号登录</text>
       <picker mode="selector" range="{{devAccounts}}" range-key="label" value="{{devIndex}}" bindchange="onDevAccountChange">
         <view class="dev-picker">
@@ -42,6 +75,9 @@
       <button class="dev-btn" bindtap="onDevLogin" loading="{{loading}}" disabled="{{loading}}">
         登录
       </button>
+      <button class="sms-btn" style="width: 550rpx;" bindtap="switchToWechat">
+        微信登录
+      </button>
     </block>
 
     <view class="error-msg" wx:if="{{error}}">
@@ -50,6 +86,6 @@
   </view>
 
   <view class="dev-toggle" bindtap="onToggleDev">
-    <text class="dev-toggle-text">{{devMode ? '返回微信登录' : '开发模式'}}</text>
+    <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回微信登录' : '开发模式'}}</text>
   </view>
 </view>
