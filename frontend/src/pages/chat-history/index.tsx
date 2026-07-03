@@ -1,15 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from "react"
-import { X, User, MessageSquare } from "lucide-react"
+import { X, MessageSquare } from "lucide-react"
 import { chatHistoryApi, accountApi, type ChatRecord, type Account } from "@/lib/api"
-import { SelectDropdown } from "@/components/select-dropdown"
 
 const PAGE_SIZE = 100
 
-const MODE_OPTIONS = [
+const MODE_TABS = [
   { value: "", label: "全部" },
-  { value: "visit", label: "邀约" },
-  { value: "activity", label: "课表" },
   { value: "customer", label: "客户" },
+  { value: "activity", label: "课表" },
+  { value: "visit", label: "邀约" },
   { value: "system", label: "系统助手" },
 ]
 
@@ -43,10 +42,24 @@ export default function ChatHistoryPage() {
   const [selectedUserId, setSelectedUserId] = useState("")
   const [chatKeyword, setChatKeyword] = useState("")
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const [modeCounts, setModeCounts] = useState<Record<string, number>>({})
 
   // 加载账号列表
   useEffect(() => {
     accountApi.list().then(setAccounts).catch(() => {})
+  }, [])
+
+  // 加载各模块记录数
+  useEffect(() => {
+    chatHistoryApi.listPaginated({}, 1, 1000).then((res) => {
+      const counts: Record<string, number> = { all: 0 }
+      for (const r of (res.items || [])) {
+        const m = r.mode || "other"
+        counts[m] = (counts[m] || 0) + 1
+        counts.all++
+      }
+      setModeCounts(counts)
+    }).catch(() => {})
   }, [])
 
   // 加载所有记录
@@ -165,22 +178,37 @@ export default function ChatHistoryPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-48px)]">
+    <div className="flex flex-col h-[calc(100vh-48px)]">
+      {/* Tab 栏 */}
+      <div className="px-4 py-2 bg-white border-b border-[#e8e8e8] flex items-center gap-1">
+        {MODE_TABS.map((tab) => {
+          const isActive = modeFilter === tab.value
+          const count = tab.value ? (modeCounts[tab.value] || 0) : (modeCounts.all || 0)
+          return (
+            <button
+              key={tab.value}
+              onClick={() => {
+                setModeFilter(tab.value)
+                setSelectedUserId("")
+              }}
+              className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1.5 ${
+                isActive
+                  ? "bg-[#333] text-white"
+                  : "text-[#666] hover:bg-[#f5f5f5]"
+              }`}
+            >
+              {tab.label}
+              <span className={`text-[10px] ${isActive ? "text-white/70" : "text-[#b0b5bb]"}`}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-1 min-h-0">
       {/* 左侧：用户列表 */}
       <div className="w-[280px] border-r border-[#e8e8e8] bg-white flex flex-col shrink-0">
-        {/* 筛选栏 */}
-        <div className="px-4 py-3 border-b border-[#e8e8e8] flex items-center gap-2">
-          <SelectDropdown
-            value={modeFilter}
-            options={MODE_OPTIONS}
-            placeholder="全部模块"
-            onChange={(v) => {
-              setModeFilter(v)
-              setSelectedUserId("")
-            }}
-            className="flex-1"
-          />
-        </div>
 
         {/* 用户列表 */}
         <div className="flex-1 overflow-y-auto">
@@ -310,6 +338,7 @@ export default function ChatHistoryPage() {
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   )
