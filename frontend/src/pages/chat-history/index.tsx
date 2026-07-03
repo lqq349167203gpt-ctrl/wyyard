@@ -5,7 +5,6 @@ import { chatHistoryApi, accountApi, type ChatRecord, type Account } from "@/lib
 const PAGE_SIZE = 100
 
 const MODE_TABS = [
-  { value: "", label: "全部" },
   { value: "customer", label: "客户" },
   { value: "activity", label: "课表" },
   { value: "visit", label: "邀约" },
@@ -35,7 +34,7 @@ interface UserEntry {
 }
 
 export default function ChatHistoryPage() {
-  const [modeFilter, setModeFilter] = useState("")
+  const [modeFilter, setModeFilter] = useState("customer")
   const [accounts, setAccounts] = useState<Account[]>([])
   const [allRecords, setAllRecords] = useState<ChatRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -52,11 +51,10 @@ export default function ChatHistoryPage() {
   // 加载各模块记录数
   useEffect(() => {
     chatHistoryApi.listPaginated({}, 1, 1000).then((res) => {
-      const counts: Record<string, number> = { all: 0 }
+      const counts: Record<string, number> = {}
       for (const r of (res.items || [])) {
         const m = r.mode || "other"
         counts[m] = (counts[m] || 0) + 1
-        counts.all++
       }
       setModeCounts(counts)
     }).catch(() => {})
@@ -198,9 +196,11 @@ export default function ChatHistoryPage() {
               }`}
             >
               {tab.label}
-              <span className={`text-[10px] ${isActive ? "text-white/70" : "text-[#b0b5bb]"}`}>
-                {count}
-              </span>
+              {count > 0 && (
+                <span className={`text-[10px] ${isActive ? "text-white/70" : "text-[#b0b5bb]"}`}>
+                  {count}
+                </span>
+              )}
             </button>
           )
         })}
