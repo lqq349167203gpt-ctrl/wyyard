@@ -167,7 +167,16 @@ def update_customer_fields(customer_name: str, nickname: str = "", gender: str =
         data = CustomerUpdate(**update_data)
         updated = customer_service.update_customer(customer["id"], data)
         if updated:
-            changed = "、".join(update_data.keys())
+            FIELD_LABELS = {
+                "nickname": "昵称", "name": "姓名", "gender": "性别", "age": "年龄",
+                "phone": "电话", "wechat": "微信", "member_type": "会员身份",
+                "service_teacher": "服务老师", "referrer": "引流人", "referrer_handler": "承接人",
+                "traffic_source": "流量来源", "traffic_source_detail": "来源详情",
+                "basic_info": "创伤经历", "core_situation": "当下卡点",
+                "tags": "到访目的", "other_info": "其他信息",
+                "work_status": "工作情况", "work_description": "工作描述",
+            }
+            changed = "、".join(FIELD_LABELS.get(k, k) for k in update_data.keys())
             _log_customer(f"修改客户 {customer['nickname']}：{changed}", method="PATCH")
             return json.dumps({"ok": True, "action": "update", "name": customer["nickname"], "fields": list(update_data.keys())}, ensure_ascii=False)
         return json.dumps({"ok": False, "reason": "update_failed", "name": customer["nickname"]}, ensure_ascii=False)
