@@ -1,19 +1,19 @@
-# wyyard_project — AI 综合管理平台
+# wyyard — 疗愈行业后台管理平台
 
 ## 项目定位
-企业级 AI 综合管理平台 — 用户管理、活动日历、付费项目、账号权限、系统日志，一站式业务管理。
+疗愈行业后台管理平台 — 用户管理、活动日历、付费项目、会员身份、账号权限、系统日志，含客户端小程序。
 
 ## 技术栈
 - **前端**：React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS
 - **后端**：Python 3.11+ + FastAPI
 - **数据持久化**：PostgreSQL（psycopg2），连接串通过 `DATABASE_URL` 环境变量配置
-- **模型**：Claude API（Anthropic SDK）
+- **小程序**：微信小程序原生框架，自定义 tabBar 实现员工/客户角色切换
 
 ## 目录结构
 ```
 wyyard/
 ├── CLAUDE.md                 # 项目规范（本文件）
-├── frontend/                 # React 前端
+├── frontend/                 # React 前端（管理端）
 │   ├── src/
 │   │   ├── components/       # 通用组件
 │   │   ├── pages/            # 页面
@@ -22,12 +22,17 @@ wyyard/
 │   │   └── types/            # TypeScript 类型定义
 │   ├── public/
 │   └── package.json
+├── miniprogram/              # 微信小程序（员工端 + 客户端，同一 appid 角色切换）
+│   ├── pages/                # 页面（员工 pages/ + 客户端 client-*）
+│   ├── components/           # 组件（含 custom-tab-bar 角色切换）
+│   ├── utils/                # API 封装、活动常量
+│   └── app.js                # 角色判断、登录管理
 ├── backend/                  # FastAPI 后端
 │   ├── app/
 │   │   ├── api/              # API 路由（每个资源一个文件）
 │   │   ├── services/         # 业务逻辑
 │   │   ├── models/           # 数据模型（Pydantic）
-│   │   ├── middleware/       # 中间件（操作日志自动记录）
+│   │   ├── middleware/       # 中间件（JWT 认证、操作日志）
 │   │   └── config/           # 配置（pydantic-settings）
 │   ├── data/                 # JSON 数据文件
 │   ├── requirements.txt
@@ -56,6 +61,15 @@ wyyard/
 | 系统配置 | 沟通记录 | /chat-history |
 | 系统配置 | 系统日志 | /system-logs |
 | 系统配置 | 操作日志 | /operation-logs |
+| **小程序（员工）** | 客户列表 | /pages/customers/index |
+| **小程序（员工）** | 邀约 | /pages/visits/index |
+| **小程序（员工）** | 课表 | /pages/activities/index |
+| **小程序（员工）** | 我的 | /pages/me/index |
+| **小程序（客户）** | 首页 | /pages/client-home/index |
+| **小程序（客户）** | 活动 | /pages/client-activities/index |
+| **小程序（客户）** | 活动详情 | /pages/client-activity-detail/index |
+| **小程序（客户）** | 我的 | /pages/client-profile/index |
+| **小程序（客户）** | 到店记录 | /pages/client-visit-history/index |
 
 ## 开发规范
 

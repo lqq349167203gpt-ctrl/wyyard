@@ -3,7 +3,7 @@
 汇总单个客户的所有业务数据
 """
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from app.services import (
     customer_service,
     visit_service,
@@ -27,8 +27,15 @@ router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
 
 
 @router.get("/{customer_id}")
-def get_customer_detail(customer_id: str):
+def get_customer_detail(customer_id: str, request: Request = None):
     """获取单个客户的完整聚合详情"""
+    # 客户角色只能查看自己的数据
+    if request:
+        user_role = getattr(request.state, "user_role", "")
+        if user_role == "customer":
+            state_customer_id = getattr(request.state, "customer_id", "")
+            if state_customer_id != customer_id:
+                raise HTTPException(status_code=403, detail="权限不足")
     customer = customer_service.get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")

@@ -47,6 +47,7 @@ from app.api.daily_groupings import router as daily_groupings_router
 from app.api.activity_permissions import router as activity_permissions_router
 from app.api.reminders import router as reminders_router
 from app.api.business_reminders import router as business_reminders_router
+from app.api.activity_registrations import router as activity_registrations_router
 from app.api.organizations import router as organizations_router
 from app.api.activity_themes import router as activity_themes_router
 from app.api.activity_orders import router as activity_orders_router
@@ -131,6 +132,7 @@ app.include_router(visit_history_router)
 app.include_router(wechat_router)
 app.include_router(voice_router)
 app.include_router(chat_logs_router)
+app.include_router(activity_registrations_router)
 
 
 @app.get("/api/health")

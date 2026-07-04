@@ -68,6 +68,7 @@ Page({
   },
 
   async onLoad(options) {
+    if (!getApp().checkLogin()) return
     const date = options.date || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
     const d = new Date(date)
     this.setData({

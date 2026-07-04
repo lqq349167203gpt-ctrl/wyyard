@@ -9,28 +9,42 @@ Page({
   data: {
     loading: false,
     error: '',
-    loginMode: 'wechat', // 'wechat' | 'password' | 'dev'
+    loginMode: 'password', // 'password' | 'dev'
     username: '',
     password: '',
+    saveAccount: false,
     devAccounts: DEV_ACCOUNTS,
     devIndex: 0,
   },
 
+  onLoad() {
+    // 恢复保存的账号
+    const savedAccount = wx.getStorageSync('login_save_account')
+    if (savedAccount) {
+      this.setData({
+        username: savedAccount,
+        saveAccount: true,
+      })
+    }
+  },
+
   // ---------- 模式切换 ----------
-
-  switchToPassword() {
-    this.setData({ loginMode: 'password', error: '' })
-  },
-
-  switchToWechat() {
-    this.setData({ loginMode: 'wechat', error: '' })
-  },
 
   onToggleDev() {
     this.setData({
-      loginMode: this.data.loginMode === 'dev' ? 'wechat' : 'dev',
+      loginMode: this.data.loginMode === 'dev' ? 'password' : 'dev',
       error: '',
     })
+  },
+
+  // ---------- 保存账号密码 ----------
+
+  onToggleSaveAccount() {
+    const newVal = !this.data.saveAccount
+    this.setData({ saveAccount: newVal })
+    if (!newVal) {
+      wx.removeStorageSync('login_save_account')
+    }
   },
 
   // ---------- 输入 ----------
@@ -41,27 +55,6 @@ Page({
 
   onPasswordInput(e) {
     this.setData({ password: e.detail.value })
-  },
-
-  // ---------- 微信手机号登录 ----------
-
-  onGetPhoneNumber(e) {
-    if (e.detail.errMsg !== 'getPhoneNumber:ok') {
-      this.setData({ error: '授权失败: ' + e.detail.errMsg })
-      return
-    }
-
-    this.setData({ loading: true, error: '' })
-    const code = e.detail.code
-
-    authApi.phoneLogin(code).then((data) => {
-      this._saveLogin(data)
-      wx.switchTab({ url: '/pages/customers/index' })
-    }).catch((err) => {
-      this.setData({ error: err.message || '登录失败' })
-    }).finally(() => {
-      this.setData({ loading: false })
-    })
   },
 
   // ---------- 账号密码登录 ----------
@@ -111,6 +104,13 @@ Page({
     wx.setStorageSync('auth_token', data.token)
     wx.setStorageSync('currentUser', data.account)
     wx.setStorageSync('userPermissions', data.permissions)
+
+    // 保存/清除账号
+    if (this.data.saveAccount) {
+      wx.setStorageSync('login_save_account', this.data.username)
+    } else {
+      wx.removeStorageSync('login_save_account')
+    }
 
     const app = getApp()
     if (app) {

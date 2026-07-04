@@ -13,6 +13,17 @@ SKIP_PATHS = (
     "/api/wechat/",
 )
 
+# 客户角色可访问的路径前缀
+CUSTOMER_ALLOWED_PATHS = (
+    "/api/class-records/unified",
+    "/api/class-records/dashboard",
+    "/api/class-records/calendar-counts",
+    "/api/customer-detail/",
+    "/api/activity-registrations",
+    "/api/spaces",
+    "/api/course-types",
+)
+
 # 需要管理员权限的路径前缀（POST/PUT/PATCH/DELETE 自动拦截非管理员）
 ADMIN_PATHS = (
     "/api/ai-configs",
@@ -31,6 +42,25 @@ def create_access_token(account_id: str, username: str, owner: str, role: str) -
         "username": username,
         "owner": owner,
         "role": role,
+        "iat": now,
+        "nbf": now,
+        "exp": now + settings.jwt_expire_hours * 3600,
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
+        "jti": str(uuid.uuid4()),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def create_customer_token(customer_id: str, nickname: str) -> str:
+    """为客户生成专属 JWT（role=customer，无需后台账号）"""
+    now = int(time.time())
+    payload = {
+        "sub": customer_id,
+        "username": nickname,
+        "owner": "",
+        "role": "customer",
+        "customer_id": customer_id,
         "iat": now,
         "nbf": now,
         "exp": now + settings.jwt_expire_hours * 3600,
@@ -96,6 +126,26 @@ class AuthMiddleware:
         if token:
             try:
                 payload = decode_token(token)
+                role = payload.get("role", "")
+
+                # 客户角色：只允许访问白名单接口
+                if role == "customer":
+                    customer_id = payload.get("customer_id", payload.get("sub", ""))
+                    allowed = any(path == p or path.startswith(p) for p in CUSTOMER_ALLOWED_PATHS)
+                    if not allowed:
+                        response = _json_response(403, "权限不足")
+                        await response(scope, receive, send)
+                        return
+                    state = scope.setdefault("state", {})
+                    state["user_id"] = customer_id
+                    state["user_name"] = payload.get("username", "")
+                    state["user_owner"] = ""
+                    state["user_role"] = "customer"
+                    state["customer_id"] = customer_id
+                    await self.app(scope, receive, send)
+                    return
+
+                # 员工角色：正常校验账号
                 account_id = payload.get("sub", "")
                 from app.services import account_service
                 account = account_service.get_account(account_id)

@@ -28,6 +28,7 @@ Page({
   },
 
   onLoad() {
+    if (!getApp().checkLogin()) return
     this.loadMemberTypes()
     this.loadData(true)
   },

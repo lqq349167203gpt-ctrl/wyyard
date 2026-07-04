@@ -160,7 +160,7 @@ class PhoneLoginRequest(StrictBaseModel):
 
 @router.post("/phone-login")
 async def phone_login(data: PhoneLoginRequest):
-    """手机号自动登录：解密手机号 → 查客户 → 查账号"""
+    """手机号自动登录（员工）：解密手机号 → 查客户 → 查账号"""
     try:
         phone = wechat_service.get_phone_number(data.code)
     except ValueError as e:
@@ -186,3 +186,33 @@ async def phone_login(data: PhoneLoginRequest):
     resp["token"] = _make_jwt_token(account)
     resp["bound"] = True
     return resp
+
+
+@router.post("/customer-login")
+async def customer_login(data: PhoneLoginRequest):
+    """客户手机号登录：解密手机号 → 查客户 → 生成客户专属 JWT（无需后台账号）"""
+    try:
+        phone = wechat_service.get_phone_number(data.code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not phone:
+        raise HTTPException(status_code=400, detail="未获取到手机号")
+
+    customer = customer_service.get_by_phone(phone)
+    if not customer:
+        raise HTTPException(status_code=403, detail="该手机号未注册客户")
+
+    from app.middleware.jwt_auth import create_customer_token
+    token = create_customer_token(customer_id=customer.id, nickname=customer.nickname)
+
+    return {
+        "token": token,
+        "role": "customer",
+        "customer": {
+            "id": customer.id,
+            "nickname": customer.nickname,
+            "name": customer.name,
+            "member_type": customer.member_type,
+        },
+    }

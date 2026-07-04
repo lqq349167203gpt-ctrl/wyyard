@@ -15,23 +15,6 @@
 
   <!-- 登录卡 -->
   <view class="login-card">
-    <!-- 微信手机号登录 -->
-    <block wx:if="{{loginMode === 'wechat'}}">
-      <button
-        class="phone-btn"
-        style="width: 550rpx;"
-        open-type="getPhoneNumber"
-        bindgetphonenumber="onGetPhoneNumber"
-        loading="{{loading}}"
-        disabled="{{loading}}"
-      >
-        本机号一键登录
-      </button>
-      <button class="sms-btn" style="width: 550rpx;" bindtap="switchToPassword">
-        账号密码登录
-      </button>
-    </block>
-
     <!-- 账号密码登录 -->
     <block wx:if="{{loginMode === 'password'}}">
       <input
@@ -49,6 +32,10 @@
         value="{{password}}"
         bindinput="onPasswordInput"
       />
+      <view class="save-item" bindtap="onToggleSaveAccount">
+        <view class="save-checkbox {{saveAccount ? 'checked' : ''}}"></view>
+        <text class="save-label">记住账号</text>
+      </view>
       <button
         class="phone-btn"
         style="width: 550rpx;"
@@ -57,9 +44,6 @@
         disabled="{{loading}}"
       >
         登录
-      </button>
-      <button class="sms-btn" style="width: 550rpx;" bindtap="switchToWechat">
-        微信登录
       </button>
     </block>
 
@@ -75,17 +59,14 @@
       <button class="dev-btn" bindtap="onDevLogin" loading="{{loading}}" disabled="{{loading}}">
         登录
       </button>
-      <button class="sms-btn" style="width: 550rpx;" bindtap="switchToWechat">
-        微信登录
-      </button>
     </block>
 
     <view class="error-msg" wx:if="{{error}}">
-      <text>{{error}}</text>
+      <text class="error-text">{{error}}</text>
     </view>
   </view>
 
   <view class="dev-toggle" bindtap="onToggleDev">
-    <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回微信登录' : '开发模式'}}</text>
+    <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回登录' : '开发模式'}}</text>
   </view>
 </view>

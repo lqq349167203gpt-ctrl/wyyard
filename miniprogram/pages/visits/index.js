@@ -68,6 +68,7 @@ Page({
   },
 
   async onLoad() {
+    if (!getApp().checkLogin()) return
     const now = new Date()
     const savedDate = wx.getStorageSync('visit_selected_date')
     const date = savedDate || formatDate(now)
