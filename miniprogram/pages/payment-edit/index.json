@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "编辑付费项目",
+  "usingComponents": {
+    "payment-form": "/components/payment-form/index"
+  }
+}

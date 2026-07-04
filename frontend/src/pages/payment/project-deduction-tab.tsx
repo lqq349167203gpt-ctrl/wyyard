@@ -35,6 +35,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "emotional-releases": "情绪释放",
   "oh-card-readings": "OH卡梳理",
   "energy-knots": "能量结",
+  "internal-courses": "内部课程",
   "other-projects": "其他项目",
 }
 

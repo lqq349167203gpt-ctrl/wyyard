@@ -1,0 +1,49 @@
+<view class="page">
+  <!-- Tab 栏 -->
+  <scroll-view class="tab-bar" scroll-x enable-flex>
+    <view
+      wx:for="{{tabs}}"
+      wx:key="key"
+      class="tab-item {{activeTab === index ? 'active' : ''}}"
+      data-index="{{index}}"
+      bindtap="onTabChange"
+    >
+      <text>{{item.label}}</text>
+    </view>
+  </scroll-view>
+
+  <!-- 列表 -->
+  <view class="list" wx:if="{{items.length > 0}}">
+    <view class="card" wx:for="{{items}}" wx:key="id" bindtap="onItemTap" data-item="{{item}}">
+      <view class="card-main">
+        <view class="card-row1">
+          <text class="card-name">{{item.nickname}}</text>
+          <text class="card-price">¥{{item._price}}</text>
+        </view>
+        <view class="card-row2">
+          <text class="card-detail" wx:if="{{item._detail}}">{{item._detail}}</text>
+          <text class="card-date" wx:if="{{item._effective}}">{{item._effective}} ~ {{item._expiry}}</text>
+          <text class="card-remaining" wx:if="{{item._remaining !== ''}}">剩余: {{item._remaining}}</text>
+        </view>
+      </view>
+      <view class="card-delete" catchtap="onDeleteTap" data-item="{{item}}">
+        <text class="delete-text">删除</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty" wx:if="{{!loading && items.length === 0}}">
+    <text class="empty-text">暂无数据</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 新增按钮 -->
+  <view class="fab" bindtap="onAddTap">
+    <text class="fab-text">+</text>
+  </view>
+</view>

@@ -4,6 +4,7 @@
   flex-direction: column;
   position: relative;
   background-color: #e8f2fb;
+  overflow: hidden;
 }
 
 .bg-image {

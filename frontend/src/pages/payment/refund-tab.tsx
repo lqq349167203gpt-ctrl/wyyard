@@ -24,6 +24,7 @@ const PROJECT_TYPE_OPTIONS = [
   { value: "emotional-releases", label: "情绪释放" },
   { value: "oh-card-readings", label: "OH卡梳理" },
   { value: "energy-knots", label: "能量结" },
+  { value: "internal-courses", label: "内部课程" },
   { value: "other-projects", label: "其他项目" },
 ]
 
@@ -33,6 +34,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "emotional-releases": "情绪释放",
   "oh-card-readings": "OH卡梳理",
   "energy-knots": "能量结",
+  "internal-courses": "内部课程",
   "other-projects": "其他项目",
 }
 

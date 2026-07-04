@@ -1,0 +1,177 @@
+<view class="form">
+  <!-- 客户搜索 -->
+  <view class="section">
+    <view class="section-title">客户</view>
+    <view class="search-box">
+      <input
+        class="search-input"
+        placeholder="搜索客户昵称"
+        value="{{searchKeyword}}"
+        bindinput="onSearchInput"
+        bindfocus="onSearchFocus"
+      />
+      <view class="search-results" wx:if="{{showResults && searchResults.length > 0}}">
+        <view
+          class="search-result-item"
+          wx:for="{{searchResults}}"
+          wx:key="id"
+          bindtap="onSelectCustomer"
+          data-customer="{{item}}"
+        >
+          <text>{{item.nickname}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="selected-customer" wx:if="{{selectedCustomer}}">
+      <text class="selected-name">{{selectedCustomer.nickname}}</text>
+      <text class="selected-clear" bindtap="onClearCustomer">✕</text>
+    </view>
+  </view>
+
+  <!-- 会员卡字段 -->
+  <block wx:if="{{type === 'membership_card'}}">
+    <view class="section">
+      <view class="section-title">卡类型</view>
+      <picker mode="selector" range="{{cardTypes}}" range-key="label" value="{{cardTypeIndex}}" bindchange="onCardTypeChange">
+        <view class="picker-value">
+          <text>{{cardTypes[cardTypeIndex].label || '请选择'}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="section">
+      <view class="section-title">金额</view>
+      <input class="form-input" type="digit" placeholder="金额" value="{{formData.price}}" bindinput="onFieldInput" data-field="price" />
+    </view>
+    <view class="section">
+      <view class="section-title">生效日期</view>
+      <picker mode="date" value="{{formData.effective_date}}" bindchange="onFieldChange" data-field="effective_date">
+        <view class="picker-value">
+          <text>{{formData.effective_date || '请选择'}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="section">
+      <view class="section-title">时长</view>
+      <view class="duration-row">
+        <input class="form-input short" type="number" placeholder="数值" value="{{formData.duration_value}}" bindinput="onFieldInput" data-field="duration_value" />
+        <picker mode="selector" range="{{durationTypes}}" range-key="label" value="{{durationTypeIndex}}" bindchange="onDurationTypeChange">
+          <view class="picker-value short">
+            <text>{{durationTypes[durationTypeIndex].label || '单位'}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+  </block>
+
+  <!-- 觉醒游戏/情绪释放/OH卡/能量结 字段 -->
+  <block wx:if="{{type === 'group_case' || type === 'emotional_release' || type === 'oh_card_reading' || type === 'energy_knot'}}">
+    <view class="section">
+      <view class="section-title">购买次数</view>
+      <input class="form-input" type="number" placeholder="次数" value="{{formData.purchase_count}}" bindinput="onFieldInput" data-field="purchase_count" />
+    </view>
+    <view class="section">
+      <view class="section-title">金额</view>
+      <input class="form-input" type="digit" placeholder="金额" value="{{formData.amount}}" bindinput="onFieldInput" data-field="amount" />
+    </view>
+  </block>
+
+  <!-- 内部课程字段 -->
+  <block wx:if="{{type === 'internal_course'}}">
+    <view class="section">
+      <view class="section-title">课程类型</view>
+      <picker mode="selector" range="{{courseTypes}}" range-key="label" value="{{courseTypeIndex}}" bindchange="onCourseTypeChange">
+        <view class="picker-value">
+          <text>{{courseTypes[courseTypeIndex].label || '请选择'}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="section">
+      <view class="section-title">金额</view>
+      <input class="form-input" type="digit" placeholder="金额" value="{{formData.price}}" bindinput="onFieldInput" data-field="price" />
+    </view>
+    <view class="section">
+      <view class="section-title">生效日期</view>
+      <picker mode="date" value="{{formData.effective_date}}" bindchange="onFieldChange" data-field="effective_date">
+        <view class="picker-value">
+          <text>{{formData.effective_date || '请选择'}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="section">
+      <view class="section-title">时长</view>
+      <view class="duration-row">
+        <input class="form-input short" type="number" placeholder="数值" value="{{formData.duration_value}}" bindinput="onFieldInput" data-field="duration_value" />
+        <picker mode="selector" range="{{durationTypes}}" range-key="label" value="{{durationTypeIndex}}" bindchange="onDurationTypeChange">
+          <view class="picker-value short">
+            <text>{{durationTypes[durationTypeIndex].label || '单位'}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+  </block>
+
+  <!-- 其他项目字段 -->
+  <block wx:if="{{type === 'other'}}">
+    <view class="section">
+      <view class="section-title">分类</view>
+      <input class="form-input" placeholder="分类" value="{{formData.category}}" bindinput="onFieldInput" data-field="category" />
+    </view>
+    <view class="section">
+      <view class="section-title">项目名称</view>
+      <input class="form-input" placeholder="项目名称" value="{{formData.project_name}}" bindinput="onFieldInput" data-field="project_name" />
+    </view>
+    <view class="section">
+      <view class="section-title">金额</view>
+      <input class="form-input" type="digit" placeholder="金额" value="{{formData.fee}}" bindinput="onFieldInput" data-field="fee" />
+    </view>
+    <view class="section">
+      <view class="section-title">生效日期</view>
+      <picker mode="date" value="{{formData.effective_date}}" bindchange="onFieldChange" data-field="effective_date">
+        <view class="picker-value">
+          <text>{{formData.effective_date || '请选择'}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="section">
+      <view class="section-title">时长</view>
+      <view class="duration-row">
+        <input class="form-input short" type="number" placeholder="数值" value="{{formData.duration_value}}" bindinput="onFieldInput" data-field="duration_value" />
+        <picker mode="selector" range="{{durationTypes}}" range-key="label" value="{{durationTypeIndex}}" bindchange="onDurationTypeChange">
+          <view class="picker-value short">
+            <text>{{durationTypes[durationTypeIndex].label || '单位'}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+    <view class="section">
+      <view class="section-title">剩余次数</view>
+      <input class="form-input" type="number" placeholder="留空为不限" value="{{formData.remaining_count}}" bindinput="onFieldInput" data-field="remaining_count" />
+    </view>
+  </block>
+
+  <!-- 通用字段：成交日期 -->
+  <view class="section">
+    <view class="section-title">成交日期</view>
+    <picker mode="date" value="{{formData.deal_date}}" bindchange="onFieldChange" data-field="deal_date">
+      <view class="picker-value">
+        <text>{{formData.deal_date || '请选择'}}</text>
+        <text class="picker-arrow">›</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-area">
+    <button class="submit-btn" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting}}">
+      {{isEdit ? '保存' : '新增'}}
+    </button>
+  </view>
+</view>

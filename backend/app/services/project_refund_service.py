@@ -115,6 +115,17 @@ def get_available_items(customer_id: str, project_type: str) -> list:
             "detail": f"¥{k.amount}",
         } for k in items if not is_project_refunded("energy-knots", k.id)]
 
+    elif project_type == "internal-courses":
+        from app.services import internal_course_service
+        courses = internal_course_service.list_courses()
+        items = [c for c in courses if c.customer_id == customer_id and not c.is_deleted]
+        return [{
+            "id": c.id,
+            "name": f"{c.course_type}",
+            "paid_amount": c.price,
+            "detail": f"¥{c.price}",
+        } for c in items if not is_project_refunded("internal-courses", c.id)]
+
     elif project_type == "other-projects":
         from app.services import other_project_service
         projects = other_project_service.list_projects()
@@ -153,6 +164,18 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
                 raise ValueError("该卡已退费")
             project_name = card.card_type
             paid_amount = card.price
+
+        elif data.project_type == "internal-courses":
+            from app.services import internal_course_service
+            course = internal_course_service.get_course(data.project_id)
+            if not course or course.is_deleted:
+                raise ValueError("课程不存在")
+            if course.customer_id != data.customer_id:
+                raise ValueError("该课程不属于该客户")
+            if is_project_refunded("internal-courses", data.project_id):
+                raise ValueError("该课程已退费")
+            project_name = course.course_type
+            paid_amount = course.price
 
         elif data.project_type == "other-projects":
             from app.services import other_project_service

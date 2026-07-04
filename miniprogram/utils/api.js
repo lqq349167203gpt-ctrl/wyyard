@@ -3,7 +3,7 @@
 // 生产环境: 需要替换为实际域名
 
 // ⚠️ 上线前必须替换为生产域名
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = 'https://www.wyteahouse.cn'
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
@@ -61,12 +61,13 @@ async function request(path, options = {}) {
       timeout: options.timeout || 60000,
       header: {
         'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
         } else if (res.statusCode === 401) {
+          _loginPromise = null
           wx.removeStorageSync('auth_token')
           wx.removeStorageSync('currentUser')
           wx.removeStorageSync('userPermissions')
@@ -74,11 +75,13 @@ async function request(path, options = {}) {
           if (app) {
             app.globalData.token = ''
             app.globalData.currentUser = null
+            app.globalData.permissions = []
           }
           wx.showToast({ title: '登录已过期', icon: 'none' })
+          setTimeout(() => wx.reLaunch({ url: '/pages/login/index' }), 1500)
           reject(new Error('登录已过期'))
         } else {
-          const msg = res.data?.detail || res.data?.message || '请求失败'
+          const msg = res.data?.detail || res.data?.message || res.data?.error || '请求失败'
           console.error('[request] 请求失败:', path, 'status:', res.statusCode, 'msg:', msg)
           if (!options.silent) wx.showToast({ title: msg, icon: 'none' })
           reject(new Error(msg))
@@ -215,6 +218,115 @@ const authApi = {
   bind: (token, username, password) => request('/api/wechat/bind', { method: 'POST', data: { token, username, password } }),
 }
 
+// ---- 付费项目 API ----
+
+// 项目类型常量（列表 Tab、销卡、退费统一使用）
+const PAYMENT_PROJECT_TYPES = [
+  { key: 'membership_card', label: '会员卡', apiPath: 'membership-cards' },
+  { key: 'group_case', label: '觉醒游戏', apiPath: 'group-cases' },
+  { key: 'emotional_release', label: '情绪释放', apiPath: 'emotional-releases' },
+  { key: 'oh_card_reading', label: 'OH卡梳理', apiPath: 'oh-card-readings' },
+  { key: 'energy_knot', label: '能量结', apiPath: 'energy-knots' },
+  { key: 'internal_course', label: '内部课程', apiPath: 'internal-courses' },
+  { key: 'other', label: '其他项目', apiPath: 'other-projects' },
+]
+
+// 通用项目 CRUD 工厂
+function _projectApi(basePath) {
+  return {
+    list: (params = {}) => {
+      const qs = Object.entries(params)
+        .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+        .join('&')
+      return request(`${basePath}${qs ? '?' + qs : ''}`)
+    },
+    listPaginated: (page = 1, pageSize = 20, params = {}) => {
+      const qs = [`page=${page}`, `page_size=${pageSize}`]
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') qs.push(`${k}=${encodeURIComponent(v)}`)
+      })
+      return request(`${basePath}?${qs.join('&')}`)
+    },
+    create: (data) => request(basePath, { method: 'POST', data }),
+    update: (id, data) => request(`${basePath}/${id}`, { method: 'PATCH', data }),
+    delete: (id) => request(`${basePath}/${id}`, { method: 'DELETE' }),
+    searchCustomers: (q) => request(`${basePath}/search-customers?q=${encodeURIComponent(q)}`),
+  }
+}
+
+const paymentApi = {
+  membershipCards: _projectApi('/api/membership-cards'),
+  groupCases: _projectApi('/api/group-cases'),
+  emotionalReleases: _projectApi('/api/emotional-releases'),
+  ohCardReadings: _projectApi('/api/oh-card-readings'),
+  energyKnots: _projectApi('/api/energy-knots'),
+  internalCourses: _projectApi('/api/internal-courses'),
+  otherProjects: {
+    ..._projectApi('/api/other-projects'),
+    getAvailableProjects: (customerId) => request(`/api/other-projects/${customerId}/available-projects`),
+    deduct: (data) => request('/api/other-projects/deductions', { method: 'POST', data }),
+    listDeductions: (customerId) => {
+      const qs = customerId ? `?customer_id=${customerId}` : ''
+      return request(`/api/other-projects/deductions${qs}`)
+    },
+  },
+
+  // 项目类型 → API 映射
+  getByType(type) {
+    const map = {
+      membership_card: this.membershipCards,
+      group_case: this.groupCases,
+      emotional_release: this.emotionalReleases,
+      oh_card_reading: this.ohCardReadings,
+      energy_knot: this.energyKnots,
+      internal_course: this.internalCourses,
+      other: this.otherProjects,
+    }
+    return map[type]
+  },
+
+  // 销卡
+  deductions: {
+    list: (params = {}) => {
+      const qs = Object.entries(params)
+        .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+        .join('&')
+      return request(`/api/project-deductions${qs ? '?' + qs : ''}`)
+    },
+    create: (data) => {
+      const user = getApp()?.globalData?.currentUser
+      if (!data.created_by && user) data.created_by = user.owner ?? user.username ?? ''
+      return request('/api/project-deductions', { method: 'POST', data })
+    },
+    update: (id, data) => request(`/api/project-deductions/${id}`, { method: 'PATCH', data }),
+    delete: (id) => request(`/api/project-deductions/${id}`, { method: 'DELETE' }),
+    availableItems: (customerId, projectType) =>
+      request(`/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`),
+  },
+
+  // 退费
+  refunds: {
+    list: (params = {}) => {
+      const qs = Object.entries(params)
+        .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+        .join('&')
+      return request(`/api/project-refunds${qs ? '?' + qs : ''}`)
+    },
+    create: (data) => {
+      const user = getApp()?.globalData?.currentUser
+      if (!data.created_by && user) data.created_by = user.owner ?? user.username ?? ''
+      return request('/api/project-refunds', { method: 'POST', data })
+    },
+    update: (id, data) => request(`/api/project-refunds/${id}`, { method: 'PATCH', data }),
+    delete: (id) => request(`/api/project-refunds/${id}`, { method: 'DELETE' }),
+    availableItems: (customerId, projectType) =>
+      request(`/api/project-refunds/available-items?customer_id=${customerId}&project_type=${projectType}`),
+  },
+}
+
 module.exports = {
   request,
   visitApi,
@@ -225,9 +337,11 @@ module.exports = {
   authApi,
   dailyGroupingApi,
   courseTypeApi,
+  PAYMENT_PROJECT_TYPES,
   groupCaseSessionApi,
   emotionalReleaseSessionApi,
   energyKnotSessionApi,
   internalCourseSessionApi,
   ohCardReadingSessionApi,
+  paymentApi,
 }

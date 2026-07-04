@@ -1,0 +1,3 @@
+<view class="page">
+  <payment-form type="{{type}}" bind:success="onFormSuccess" />
+</view>

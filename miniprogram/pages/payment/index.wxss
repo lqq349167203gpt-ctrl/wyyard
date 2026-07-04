@@ -1,0 +1,169 @@
+.page {
+  min-height: 100vh;
+  background-color: #f7f8fa;
+  padding-bottom: 120rpx;
+}
+
+/* Tab 栏 */
+.tab-bar {
+  display: flex;
+  white-space: nowrap;
+  background-color: #ffffff;
+  padding: 0 16rpx;
+  border-bottom: 1rpx solid #f0f1f2;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.tab-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx 24rpx;
+  font-size: 26rpx;
+  color: #8f959e;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tab-item.active {
+  color: #3370ff;
+  font-weight: 600;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40rpx;
+  height: 4rpx;
+  background-color: #3370ff;
+  border-radius: 2rpx;
+}
+
+/* 列表 */
+.list {
+  padding: 20rpx 32rpx 0;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  padding: 28rpx 32rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+.card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-row1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-name {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.card-price {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #3370ff;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+.card-row2 {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 10rpx;
+  flex-wrap: wrap;
+}
+
+.card-detail {
+  font-size: 24rpx;
+  color: #8f959e;
+  background-color: #f7f8fa;
+  padding: 4rpx 12rpx;
+  border-radius: 4rpx;
+}
+
+.card-date {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
+.card-remaining {
+  font-size: 24rpx;
+  color: #52c41a;
+}
+
+.card-delete {
+  padding: 16rpx 0 16rpx 24rpx;
+  flex-shrink: 0;
+}
+
+.delete-text {
+  font-size: 24rpx;
+  color: #ff4d4f;
+}
+
+/* 空状态 */
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #c0c4cc;
+}
+
+/* 加载中 */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+/* FAB 按钮 */
+.fab {
+  position: fixed;
+  right: 40rpx;
+  bottom: 60rpx;
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3370ff 0%, #5b8def 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(51, 112, 255, 0.35);
+  z-index: 100;
+}
+
+.fab-text {
+  font-size: 48rpx;
+  color: #ffffff;
+  line-height: 1;
+}

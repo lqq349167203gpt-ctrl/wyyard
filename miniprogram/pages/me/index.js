@@ -14,6 +14,18 @@ Page({
     })
   },
 
+  onPaymentTap() {
+    wx.navigateTo({ url: '/pages/payment/index' })
+  },
+
+  onDeductionTap() {
+    wx.navigateTo({ url: '/pages/payment-deduction/index' })
+  },
+
+  onRefundTap() {
+    wx.navigateTo({ url: '/pages/payment-refund/index' })
+  },
+
   onLogout() {
     wx.showModal({
       title: '退出登录',

@@ -16,6 +16,11 @@
     "pages/customers/index",
     "pages/customer-form/index",
     "pages/customer-profile/index",
+    "pages/payment/index",
+    "pages/payment-create/index",
+    "pages/payment-edit/index",
+    "pages/payment-deduction/index",
+    "pages/payment-refund/index",
     "pages/me/index"
   ],
   "window": {

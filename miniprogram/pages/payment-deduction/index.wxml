@@ -1,0 +1,76 @@
+<view class="page">
+  <!-- 客户搜索 -->
+  <view class="section">
+    <view class="section-title">客户</view>
+    <view class="search-box">
+      <input
+        class="search-input"
+        placeholder="搜索客户昵称"
+        value="{{searchKeyword}}"
+        bindinput="onSearchInput"
+        bindfocus="onSearchFocus"
+      />
+      <view class="search-results" wx:if="{{showResults && searchResults.length > 0}}">
+        <view
+          class="search-result-item"
+          wx:for="{{searchResults}}"
+          wx:key="id"
+          bindtap="onSelectCustomer"
+          data-customer="{{item}}"
+        >
+          <text>{{item.nickname}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="selected-customer" wx:if="{{selectedCustomer}}">
+      <text class="selected-name">{{selectedCustomer.nickname}}</text>
+      <text class="selected-clear" bindtap="onClearCustomer">✕</text>
+    </view>
+  </view>
+
+  <!-- 项目类型 -->
+  <view class="section" wx:if="{{selectedCustomer}}">
+    <view class="section-title">项目类型</view>
+    <picker mode="selector" range="{{projectTypes}}" range-key="label" value="{{projectTypeIndex}}" bindchange="onProjectTypeChange">
+      <view class="picker-value">
+        <text>{{projectTypeIndex >= 0 ? projectTypes[projectTypeIndex].label : '请选择'}}</text>
+        <text class="picker-arrow">›</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 可用项目列表 -->
+  <view class="section" wx:if="{{availableItems.length > 0}}">
+    <view class="section-title">选择项目</view>
+    <view class="item-list">
+      <view
+        class="item-card {{selectedItem.id === item.id ? 'selected' : ''}}"
+        wx:for="{{availableItems}}"
+        wx:key="id"
+        bindtap="onSelectItem"
+        data-item="{{item}}"
+      >
+        <view class="item-main">
+          <text class="item-name">{{item.project_name || item.card_type || item.nickname}}</text>
+          <text class="item-remaining">剩余: {{item.remaining_count === null ? '不限' : item.remaining_count}}</text>
+        </view>
+        <text class="item-expiry" wx:if="{{item.expiry_date}}">有效期: {{item.expiry_date.slice(0,10)}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-tip" wx:if="{{selectedCustomer && projectTypeIndex >= 0 && availableItems.length === 0}}">
+    <text>暂无可扣次的项目</text>
+  </view>
+
+  <!-- 已选项目 + 扣次 -->
+  <view class="section" wx:if="{{selectedItem}}">
+    <view class="section-title">扣次数量</view>
+    <input class="form-input" type="number" placeholder="输入扣次" value="{{deductCount}}" bindinput="onCountInput" />
+  </view>
+
+  <!-- 提交 -->
+  <view class="submit-area" wx:if="{{selectedItem}}">
+    <button class="submit-btn" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting}}">确认销卡</button>
+  </view>
+</view>
