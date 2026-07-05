@@ -587,42 +587,41 @@ def _deduct_for_arrival(visit):
     cid = visit.customer_id
     date = visit.visit_date
 
-    # 觉醒游戏
-    for s in group_case_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = group_case_session_service._get_chargeable_ids(s)
-            if cid in chargeable:
-                membership_card_service.deduct_for_activity(cid, f"gcs:{s.id}")
+    with membership_card_service._deduct_lock:
+        for s in group_case_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = group_case_session_service._get_chargeable_ids(s)
+                if cid in chargeable:
+                    membership_card_service._do_deduct(cid, f"gcs:{s.id}")
 
-    # 情绪释放
-    for s in emotional_release_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = emotional_release_session_service._get_chargeable_ids(s)
-            if cid in chargeable:
-                membership_card_service.deduct_for_activity(cid, f"ers:{s.id}")
+        for s in emotional_release_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = emotional_release_session_service._get_chargeable_ids(s)
+                if cid in chargeable:
+                    membership_card_service._do_deduct(cid, f"ers:{s.id}")
 
-    # 能量结
-    for s in energy_knot_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if cid in chargeable:
-                membership_card_service.deduct_for_activity(cid, f"eks:{s.id}")
+        for s in energy_knot_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = set(s.participant_ids)
+                chargeable.discard(s.owner_id)
+                if cid in chargeable:
+                    membership_card_service._do_deduct(cid, f"eks:{s.id}")
 
-    # OH卡梳理
-    for s in oh_card_reading_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if cid in chargeable:
-                membership_card_service.deduct_for_activity(cid, f"ocr:{s.id}")
+        for s in oh_card_reading_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = set(s.participant_ids)
+                chargeable.discard(s.owner_id)
+                if cid in chargeable:
+                    membership_card_service._do_deduct(cid, f"ocr:{s.id}")
 
-    # 沙龙类型
-    for cr in class_record_service.list_records():
-        if cr.date == date and not cr.is_public_welfare:
-            chargeable = class_record_service._get_group_member_ids(cr)
-            if cid in chargeable:
-                membership_card_service.deduct_for_activity(cid, f"class:{cr.id}")
+        for cr in class_record_service.list_records():
+            if cr.date == date and not cr.is_public_welfare:
+                chargeable = class_record_service._get_group_member_ids(cr)
+                if cid in chargeable:
+                    membership_card_service._do_deduct(cid, f"class:{cr.id}")
+
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def _restore_for_arrival(visit):
@@ -638,37 +637,41 @@ def _restore_for_arrival(visit):
     cid = visit.customer_id
     date = visit.visit_date
 
-    for s in group_case_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = group_case_session_service._get_chargeable_ids(s)
-            if cid in chargeable:
-                membership_card_service.restore_for_activity(cid, f"gcs:{s.id}")
+    with membership_card_service._deduct_lock:
+        for s in group_case_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = group_case_session_service._get_chargeable_ids(s)
+                if cid in chargeable:
+                    membership_card_service._do_restore(cid, f"gcs:{s.id}")
 
-    for s in emotional_release_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = emotional_release_session_service._get_chargeable_ids(s)
-            if cid in chargeable:
-                membership_card_service.restore_for_activity(cid, f"ers:{s.id}")
+        for s in emotional_release_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = emotional_release_session_service._get_chargeable_ids(s)
+                if cid in chargeable:
+                    membership_card_service._do_restore(cid, f"ers:{s.id}")
 
-    for s in energy_knot_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if cid in chargeable:
-                membership_card_service.restore_for_activity(cid, f"eks:{s.id}")
+        for s in energy_knot_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = set(s.participant_ids)
+                chargeable.discard(s.owner_id)
+                if cid in chargeable:
+                    membership_card_service._do_restore(cid, f"eks:{s.id}")
 
-    for s in oh_card_reading_session_service.list_sessions():
-        if s.date == date and not s.is_deleted:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if cid in chargeable:
-                membership_card_service.restore_for_activity(cid, f"ocr:{s.id}")
+        for s in oh_card_reading_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = set(s.participant_ids)
+                chargeable.discard(s.owner_id)
+                if cid in chargeable:
+                    membership_card_service._do_restore(cid, f"ocr:{s.id}")
 
-    for cr in class_record_service.list_records():
-        if cr.date == date and not cr.is_public_welfare:
-            chargeable = class_record_service._get_group_member_ids(cr)
-            if cid in chargeable:
-                membership_card_service.restore_for_activity(cid, f"class:{cr.id}")
+        for cr in class_record_service.list_records():
+            if cr.date == date and not cr.is_public_welfare:
+                chargeable = class_record_service._get_group_member_ids(cr)
+                if cid in chargeable:
+                    membership_card_service._do_restore(cid, f"class:{cr.id}")
+
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def _remove_from_parallel_lists(ids: list, names: list, target_id: str):
@@ -688,22 +691,20 @@ def _cleanup_activity_records(customer_id: str, date: str):
         emotional_release_session_service, energy_knot_session_service,
         internal_course_session_service, oh_card_reading_session_service,
     )
+    from app.services import membership_card_service
 
     # 沙龙：teacher_ids, participant_ids, groups
     try:
-        from app.services import membership_card_service
         for cr in class_record_service.list_records(date=date):
             changed = False
             if customer_id in cr.teacher_ids:
                 cr.teacher_ids = [x for x in cr.teacher_ids if x != customer_id]
                 changed = True
             if customer_id in cr.participant_ids:
-                # 退费后再移除
                 if not cr.is_public_welfare:
-                    membership_card_service.restore_for_activity(customer_id, f"class:{cr.id}")
+                    membership_card_service._do_restore(customer_id, f"class:{cr.id}")
                 cr.participant_ids = [x for x in cr.participant_ids if x != customer_id]
                 changed = True
-            # 清理 groups 中的该人员
             if cr.groups:
                 for g in cr.groups:
                     if g.leader_id == customer_id:
@@ -731,7 +732,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service.restore_for_activity(customer_id, f"gcs:{s.id}")
+                    membership_card_service._do_restore(customer_id, f"gcs:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -749,7 +750,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service.restore_for_activity(customer_id, f"ers:{s.id}")
+                    membership_card_service._do_restore(customer_id, f"ers:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -765,7 +766,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service.restore_for_activity(customer_id, f"eks:{s.id}")
+                    membership_card_service._do_restore(customer_id, f"eks:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -780,7 +781,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if customer_id in s.teacher_ids:
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
-                membership_card_service.restore_for_activity(customer_id, f"ics:{s.id}")
+                membership_card_service._do_restore(customer_id, f"ics:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -798,13 +799,17 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service.restore_for_activity(customer_id, f"ocr:{s.id}")
+                    membership_card_service._do_restore(customer_id, f"ocr:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
                 oh_card_reading_session_service._save(s.id)
     except Exception:
         logger.exception("清理OH卡梳理记录失败 customer=%s date=%s", customer_id, date)
+
+    # 统一保存扣费/欠费数据
+    membership_card_service._save_deductions()
+    membership_card_service._save_debts()
 
     # 清理分组
     try:

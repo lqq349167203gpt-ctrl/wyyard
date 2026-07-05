@@ -171,31 +171,53 @@ def get_manual_deductions(customer_id: str) -> int:
 
 
 def get_activity_deductions(customer_id: str) -> int:
-    """活动扣卡次数（仅统计已到场的扣费记录，排除已作废/已删除卡的流水）"""
+    """活动扣卡次数（直接从实际活动参与计算，不依赖 _deductions 流水表）"""
     from app.services import (
         visit_service,
+        class_record_service,
+        group_case_session_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+        oh_card_reading_session_service,
+        internal_course_session_service,
     )
-    active_ids = _get_active_card_ids(customer_id)
-    # 已到场日期集合
     arrived_dates = {v.visit_date for v in visit_service._visits.values()
                      if v.customer_id == customer_id and v.arrived and not v.is_deleted}
-    # 遍历扣费记录，只统计活动日期在已到场日期中的
+    if not arrived_dates:
+        return 0
     count = 0
-    for item in _deductions.get(customer_id, []):
-        # 跳过已作废/已删除卡的流水
-        item_card_id = item.get("card_id") if isinstance(item, dict) else None
-        if item_card_id is not None and item_card_id not in active_ids:
-            continue
-        # 兼容老数据：item 可能是 dict 也可能是裸字符串
-        key = item.get("key") if isinstance(item, dict) else item
-        activity_date = _get_activity_date(key)
-        if activity_date and activity_date in arrived_dates:
-            count += 1
-    # _debt_activities 去重后再过滤到场
-    for key in set(_debt_activities.get(customer_id, [])):
-        activity_date = _get_activity_date(key)
-        if activity_date and activity_date in arrived_dates:
-            count += 1
+    # 沙龙
+    for cr in class_record_service.list_records():
+        if not cr.is_deleted and not cr.is_public_welfare and cr.date in arrived_dates:
+            if customer_id in class_record_service._get_group_member_ids(cr):
+                count += 1
+    # 觉醒游戏
+    for s in group_case_session_service.list_sessions():
+        if not s.is_deleted and s.date in arrived_dates:
+            if customer_id in group_case_session_service._get_chargeable_ids(s):
+                count += 1
+    # 情绪释放
+    for s in emotional_release_session_service.list_sessions():
+        if not s.is_deleted and s.date in arrived_dates:
+            if customer_id in emotional_release_session_service._get_chargeable_ids(s):
+                count += 1
+    # 能量结
+    for s in energy_knot_session_service.list_sessions():
+        if not s.is_deleted and s.date in arrived_dates:
+            chargeable = set(s.participant_ids)
+            chargeable.discard(s.owner_id)
+            if customer_id in chargeable:
+                count += 1
+    # OH卡梳理
+    for s in oh_card_reading_session_service.list_sessions():
+        if not s.is_deleted and s.date in arrived_dates:
+            chargeable = set(s.participant_ids)
+            chargeable.discard(s.owner_id)
+            if customer_id in chargeable:
+                count += 1
+    # 内部课程（内部课程不扣费，排除）
+    # for s in internal_course_session_service.list_sessions():
+    #     ...
     return count
 
 
@@ -494,23 +516,29 @@ def _pick_earliest_expiry_card(countable_cards, customer_id: str):
 
 
 def _get_card_activity_deductions_count(card_id: str) -> int:
-    """统计该卡的活动扣卡次数（仅统计有 card_id 的活动扣卡流水；老数据无 card_id 不计）"""
-    from app.services import visit_service
-    # 通过 card.id 反查 customer_id
+    """统计该卡的活动扣卡次数（按实际活动参与 + 最早到期优先分配，不依赖 _deductions 流水表）"""
+    from app.services import project_deduction_service
     card = _cards.get(card_id)
     if not card:
         return 0
     customer_id = card.customer_id
-    arrived_dates = {v.visit_date for v in visit_service._visits.values()
-                     if v.customer_id == customer_id and v.arrived and not v.is_deleted}
-    count = 0
-    for item in _deductions.get(customer_id, []):
-        if isinstance(item, dict) and item.get("card_id") == card_id:
-            key = item.get("key")
-            activity_date = _get_activity_date(key)
-            if activity_date and activity_date in arrived_dates:
-                count += 1
-    return count
+    total_activities = get_activity_deductions(customer_id)
+    if total_activities <= 0:
+        return 0
+    # 按到期日最早优先分配到各卡
+    countable = [c for c in list_cards()
+                 if c.customer_id == customer_id and c.remaining_count is not None and not c.voided
+                 and (not c.effective_date or c.effective_date <= datetime.now(timezone.utc).strftime("%Y-%m-%d"))]
+    countable.sort(key=lambda c: (c.expiry_date or "9999-12-31", c.created_at or "", c.id))
+    remaining_activities = total_activities
+    for c in countable:
+        manual = project_deduction_service.get_deduction_total_for_project(c.id)
+        available = (c.total_count or 0) - manual
+        allocated = min(remaining_activities, max(0, available))
+        if c.id == card_id:
+            return allocated
+        remaining_activities -= allocated
+    return 0
 
 
 def _restore_one(customer_id: str, card_id: Optional[str] = None) -> bool:
@@ -542,59 +570,66 @@ def _is_activity_already_deducted(customer_id: str, activity_key: str) -> bool:
     return False
 
 
+def _do_deduct(customer_id: str, activity_key: str) -> bool:
+    """内部扣费逻辑（不加锁、不保存），供 deduct_for_activity 和 _deduct_for_record 调用"""
+    if _is_activity_already_deducted(customer_id, activity_key):
+        return True  # 已扣过，跳过
+    from app.services import internal_course_service
+    if internal_course_service.has_active_course(customer_id):
+        return True
+    success, card_id = _deduct_one(customer_id)
+    if success:
+        _deductions.setdefault(customer_id, []).append({"key": activity_key, "card_id": card_id})
+    else:
+        _debt_activities.setdefault(customer_id, []).append(activity_key)
+    return success
+
+
+def _do_restore(customer_id: str, activity_key: str) -> bool:
+    """内部退费逻辑（不加锁、不保存），供 restore_for_activity 和 _restore_for_record 调用"""
+    if customer_id in _deductions:
+        target_idx = None
+        target_card_id = None
+        for i, item in enumerate(_deductions[customer_id]):
+            key = item.get("key") if isinstance(item, dict) else item
+            if key == activity_key:
+                target_idx = i
+                target_card_id = item.get("card_id") if isinstance(item, dict) else None
+                break
+        if target_idx is not None:
+            _restore_one(customer_id, target_card_id)
+            _deductions[customer_id].pop(target_idx)
+            if not _deductions[customer_id]:
+                del _deductions[customer_id]
+            return True
+    if customer_id in _debt_activities and activity_key in _debt_activities[customer_id]:
+        _debt_activities[customer_id].remove(activity_key)
+        if not _debt_activities[customer_id]:
+            del _debt_activities[customer_id]
+        if customer_id in _debts and _debts[customer_id] > 0:
+            _debts[customer_id] -= 1
+            if _debts[customer_id] <= 0:
+                del _debts[customer_id]
+        return True
+    return False
+
+
 def deduct_for_activity(customer_id: str, activity_key: str) -> bool:
     """为指定用户在指定活动中扣费（同一活动同一人只扣一次）"""
     with _deduct_lock:
-        if _is_activity_already_deducted(customer_id, activity_key):
-            return True  # 已扣过，跳过
-        # 在内部课程有效期：会员次数不限，不再扣会员卡、也不记欠费
-        from app.services import internal_course_service
-        if internal_course_service.has_active_course(customer_id):
-            return True
-        success, card_id = _deduct_one(customer_id)
-        if success:
-            _deductions.setdefault(customer_id, []).append({"key": activity_key, "card_id": card_id})
-            _save_deductions()
-        else:
-            # 无卡欠费：记录活动，以便移除时清除欠费
-            _debt_activities.setdefault(customer_id, []).append(activity_key)
-            _save_debts()
+        success = _do_deduct(customer_id, activity_key)
+        _save_deductions()
+        _save_debts()
         return success
 
 
 def restore_for_activity(customer_id: str, activity_key: str) -> bool:
     """返还指定用户在指定活动中的扣费"""
     with _deduct_lock:
-        if customer_id in _deductions:
-            # 找出对应的扣卡记录（dict 或老 str）
-            target_idx = None
-            target_card_id = None
-            for i, item in enumerate(_deductions[customer_id]):
-                key = item.get("key") if isinstance(item, dict) else item
-                if key == activity_key:
-                    target_idx = i
-                    target_card_id = item.get("card_id") if isinstance(item, dict) else None
-                    break
-            if target_idx is not None:
-                success = _restore_one(customer_id, target_card_id)
-                _deductions[customer_id].pop(target_idx)
-                if not _deductions[customer_id]:
-                    del _deductions[customer_id]
-                _save_deductions()
-                return success
-        # 无扣费记录：检查欠费活动表
-        if customer_id in _debt_activities and activity_key in _debt_activities[customer_id]:
-            _debt_activities[customer_id].remove(activity_key)
-            if not _debt_activities[customer_id]:
-                del _debt_activities[customer_id]
-            # 清除一笔欠费
-            if customer_id in _debts and _debts[customer_id] > 0:
-                _debts[customer_id] -= 1
-                if _debts[customer_id] <= 0:
-                    del _debts[customer_id]
-            _save_debts()
-            return True
-        return False
+        success = _do_restore(customer_id, activity_key)
+        _save_deductions()
+        _save_debts()
+        return success
 
 
 def _refresh_member_type(customer_id: str):

@@ -88,8 +88,11 @@ def _deduct_for_record(record):
         return
     chargeable = _get_group_member_ids(record)
     activity_key = f"class:{record.id}"
-    for cid in chargeable:
-        membership_card_service.deduct_for_activity(cid, activity_key)
+    with membership_card_service._deduct_lock:
+        for cid in chargeable:
+            membership_card_service._do_deduct(cid, activity_key)
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def _restore_for_record(record):
@@ -98,8 +101,11 @@ def _restore_for_record(record):
         return
     chargeable = _get_group_member_ids(record)
     activity_key = f"class:{record.id}"
-    for cid in chargeable:
-        membership_card_service.restore_for_activity(cid, activity_key)
+    with membership_card_service._deduct_lock:
+        for cid in chargeable:
+            membership_card_service._do_restore(cid, activity_key)
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def _sync_deduction(record, old_chargeable, new_chargeable):
@@ -107,10 +113,13 @@ def _sync_deduction(record, old_chargeable, new_chargeable):
     if record.is_public_welfare:
         return
     activity_key = f"class:{record.id}"
-    for cid in old_chargeable - new_chargeable:
-        membership_card_service.restore_for_activity(cid, activity_key)
-    for cid in new_chargeable - old_chargeable:
-        membership_card_service.deduct_for_activity(cid, activity_key)
+    with membership_card_service._deduct_lock:
+        for cid in old_chargeable - new_chargeable:
+            membership_card_service._do_restore(cid, activity_key)
+        for cid in new_chargeable - old_chargeable:
+            membership_card_service._do_deduct(cid, activity_key)
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def _refresh_affected_identities(customer_ids: set):
@@ -173,15 +182,16 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
         new_is_public_welfare = record.is_public_welfare
         if old_is_public_welfare != new_is_public_welfare:
             activity_key = f"class:{record.id}"
-            if new_is_public_welfare:
-                # 非公益→公益：退费
-                for cid in old_chargeable:
-                    membership_card_service.restore_for_activity(cid, activity_key)
-            else:
-                # 公益→非公益：扣费
-                new_chargeable = _get_group_member_ids(record)
-                for cid in new_chargeable:
-                    membership_card_service.deduct_for_activity(cid, activity_key)
+            with membership_card_service._deduct_lock:
+                if new_is_public_welfare:
+                    for cid in old_chargeable:
+                        membership_card_service._do_restore(cid, activity_key)
+                else:
+                    new_chargeable = _get_group_member_ids(record)
+                    for cid in new_chargeable:
+                        membership_card_service._do_deduct(cid, activity_key)
+                membership_card_service._save_deductions()
+                membership_card_service._save_debts()
         else:
             # 同步扣费（人员变更）
             new_chargeable = _get_group_member_ids(record)

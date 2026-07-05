@@ -90,8 +90,11 @@ def _deduct_for_session(session):
     from app.services import membership_card_service
     chargeable = _get_chargeable_ids(session)
     activity_key = f"ocr:{session.id}"
-    for cid in chargeable:
-        membership_card_service.deduct_for_activity(cid, activity_key)
+    with membership_card_service._deduct_lock:
+        for cid in chargeable:
+            membership_card_service._do_deduct(cid, activity_key)
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def _restore_for_session(session):
@@ -99,18 +102,24 @@ def _restore_for_session(session):
     from app.services import membership_card_service
     chargeable = _get_chargeable_ids(session)
     activity_key = f"ocr:{session.id}"
-    for cid in chargeable:
-        membership_card_service.restore_for_activity(cid, activity_key)
+    with membership_card_service._deduct_lock:
+        for cid in chargeable:
+            membership_card_service._do_restore(cid, activity_key)
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
     """同步扣费：为新增人员扣费，为移除人员退费"""
     from app.services import membership_card_service
     activity_key = f"ocr:{session.id}"
-    for cid in old_chargeable - new_chargeable:
-        membership_card_service.restore_for_activity(cid, activity_key)
-    for cid in new_chargeable - old_chargeable:
-        membership_card_service.deduct_for_activity(cid, activity_key)
+    with membership_card_service._deduct_lock:
+        for cid in old_chargeable - new_chargeable:
+            membership_card_service._do_restore(cid, activity_key)
+        for cid in new_chargeable - old_chargeable:
+            membership_card_service._do_deduct(cid, activity_key)
+        membership_card_service._save_deductions()
+        membership_card_service._save_debts()
 
 
 def update_session(session_id: str, data: dict):
