@@ -441,10 +441,11 @@ export default function DetailView({
                       const first = memberItems[0]
                       const manual = first?.manual_deductions || 0
                       const activity = first?.activity_deductions || 0
+                      const icDeduct = first?.internal_course_deductions || 0
                       return (
                         <span>
                           {memberHasUnlimited ? "不限次" : (typeof memberTotal === "number" && memberTotal < 0 ? <span className="text-[#c4506a]">剩余{memberTotal}次</span> : `剩余${memberTotal}次`)}
-                          {!memberHasUnlimited && <span className="ml-1 text-[11px] text-[#8f959e]">（总{memberGrandTotal}次/销卡{manual}次/活动扣卡{activity}次）</span>}
+                          {!memberHasUnlimited && <span className="ml-1 text-[11px] text-[#8f959e]">（总{memberGrandTotal}次/销卡{manual}次/活动扣卡{activity}次{icDeduct > 0 ? `/内部课程抵扣${icDeduct}次` : ""}）</span>}
                         </span>
                       )
                     })()}

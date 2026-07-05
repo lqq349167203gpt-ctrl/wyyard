@@ -3,6 +3,7 @@
 汇总单个客户的所有业务数据
 """
 import json
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Request
 from app.services import (
     customer_service,
@@ -79,6 +80,55 @@ def _parse_ek_names(desc) -> str:
     return ""
 
 
+def _count_internal_course_covered(customer_id: str) -> int:
+    """统计该用户在内部课程期间参加的活动场次（不扣卡的场次）"""
+    courses = [c for c in internal_course_service.list_courses() if c.customer_id == customer_id]
+    if not courses:
+        return 0
+    # 构建内部课程日期集合
+    course_dates = set()
+    for c in courses:
+        if c.effective_date and c.expiry_date:
+            d = c.effective_date
+            while d <= c.expiry_date:
+                course_dates.add(d)
+                d = (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    if not course_dates:
+        return 0
+    # 统计落在课程期间内的活动
+    arrived_dates = {v.visit_date for v in visit_service._visits.values()
+                     if v.customer_id == customer_id and v.arrived and not v.is_deleted}
+    relevant_dates = arrived_dates & course_dates
+    if not relevant_dates:
+        return 0
+    count = 0
+    for cr in class_record_service.list_records():
+        if not cr.is_deleted and not cr.is_public_welfare and cr.date in relevant_dates:
+            if customer_id in class_record_service._get_group_member_ids(cr):
+                count += 1
+    for s in group_case_session_service.list_sessions():
+        if not s.is_deleted and s.date in relevant_dates:
+            if customer_id in group_case_session_service._get_chargeable_ids(s):
+                count += 1
+    for s in emotional_release_session_service.list_sessions():
+        if not s.is_deleted and s.date in relevant_dates:
+            if customer_id in emotional_release_session_service._get_chargeable_ids(s):
+                count += 1
+    for s in energy_knot_session_service.list_sessions():
+        if not s.is_deleted and s.date in relevant_dates:
+            chargeable = set(s.participant_ids)
+            chargeable.discard(s.owner_id)
+            if customer_id in chargeable:
+                count += 1
+    for s in oh_card_reading_session_service.list_sessions():
+        if not s.is_deleted and s.date in relevant_dates:
+            chargeable = set(s.participant_ids)
+            chargeable.discard(s.owner_id)
+            if customer_id in chargeable:
+                count += 1
+    return count
+
+
 def _build_purchase_summary(customer_id: str) -> list:
     """构建购买汇总: 每个服务类型的总购买次数/金额和剩余次数"""
     summary = []
@@ -89,6 +139,8 @@ def _build_purchase_summary(customer_id: str) -> list:
     manual_deductions = membership_card_service.get_manual_deductions(customer_id)
     # 活动扣卡 = 已扣卡流水 + 欠费登记流水
     activity_deductions = membership_card_service.get_activity_deductions(customer_id)
+    # 内部课程抵扣：活动日期落在内部课程期间内的场次
+    internal_course_deductions = _count_internal_course_covered(customer_id)
     # 有效剩余次数（None=不限次）；无卡则 0
     effective_remaining = membership_card_service.get_effective_remaining(customer_id)
     # 是否存在未分卡的老扣费记录（card_id=None），决定是否需要聚合分摊
@@ -149,6 +201,7 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "effective_remaining": effective_remaining,
                 "manual_deductions": manual_deductions,
                 "activity_deductions": activity_deductions,
+                "internal_course_deductions": internal_course_deductions,
                 "effective_date": c.effective_date,
                 "expiry_date": c.expiry_date or "",
                 "voided": False,
@@ -166,6 +219,7 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "effective_remaining": effective_remaining,
                 "manual_deductions": manual_deductions,
                 "activity_deductions": activity_deductions,
+                "internal_course_deductions": internal_course_deductions,
                 "effective_date": c.effective_date,
                 "expiry_date": c.expiry_date or "",
                 "voided": True,
@@ -183,6 +237,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "effective_remaining": effective_remaining,
             "manual_deductions": manual_deductions,
             "activity_deductions": activity_deductions,
+            "internal_course_deductions": internal_course_deductions,
             "effective_date": "",
             "expiry_date": "",
             "voided": False,
