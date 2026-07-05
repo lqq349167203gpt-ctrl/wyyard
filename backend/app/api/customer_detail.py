@@ -81,52 +81,21 @@ def _parse_ek_names(desc) -> str:
 
 
 def _count_internal_course_covered(customer_id: str) -> int:
-    """统计该用户在内部课程期间参加的活动场次（不扣卡的场次）"""
-    courses = [c for c in internal_course_service.list_courses() if c.customer_id == customer_id]
-    if not courses:
+    """统计内部课程覆盖的活动场次（卡扣完后多出来的部分）
+
+    逻辑：总活动 - 卡能覆盖的 = 内部课程覆盖的
+    先扣卡，卡扣完后才走内部课程。
+    """
+    if not internal_course_service.has_active_course(customer_id):
         return 0
-    # 构建内部课程日期集合
-    course_dates = set()
-    for c in courses:
-        if c.effective_date and c.expiry_date:
-            d = c.effective_date
-            while d <= c.expiry_date:
-                course_dates.add(d)
-                d = (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-    if not course_dates:
+    total_activities = membership_card_service.get_activity_deductions(customer_id)
+    if total_activities <= 0:
         return 0
-    # 统计落在课程期间内的活动
-    arrived_dates = {v.visit_date for v in visit_service._visits.values()
-                     if v.customer_id == customer_id and v.arrived and not v.is_deleted}
-    relevant_dates = arrived_dates & course_dates
-    if not relevant_dates:
-        return 0
-    count = 0
-    for cr in class_record_service.list_records():
-        if not cr.is_deleted and not cr.is_public_welfare and cr.date in relevant_dates:
-            if customer_id in class_record_service._get_group_member_ids(cr):
-                count += 1
-    for s in group_case_session_service.list_sessions():
-        if not s.is_deleted and s.date in relevant_dates:
-            if customer_id in group_case_session_service._get_chargeable_ids(s):
-                count += 1
-    for s in emotional_release_session_service.list_sessions():
-        if not s.is_deleted and s.date in relevant_dates:
-            if customer_id in emotional_release_session_service._get_chargeable_ids(s):
-                count += 1
-    for s in energy_knot_session_service.list_sessions():
-        if not s.is_deleted and s.date in relevant_dates:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if customer_id in chargeable:
-                count += 1
-    for s in oh_card_reading_session_service.list_sessions():
-        if not s.is_deleted and s.date in relevant_dates:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if customer_id in chargeable:
-                count += 1
-    return count
+    # 卡能覆盖的次数：总购买 - 销卡（不含活动扣卡，因为活动扣卡就是我们要算的）
+    grand_total = membership_card_service.get_grand_total(customer_id)
+    manual = membership_card_service.get_manual_deductions(customer_id)
+    card_available = grand_total - manual
+    return max(0, total_activities - card_available)
 
 
 def _build_purchase_summary(customer_id: str) -> list:

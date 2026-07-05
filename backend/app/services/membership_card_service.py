@@ -574,13 +574,13 @@ def _do_deduct(customer_id: str, activity_key: str) -> bool:
     """内部扣费逻辑（不加锁、不保存），供 deduct_for_activity 和 _deduct_for_record 调用"""
     if _is_activity_already_deducted(customer_id, activity_key):
         return True  # 已扣过，跳过
-    from app.services import internal_course_service
-    if internal_course_service.has_active_course(customer_id):
-        return True
     success, card_id = _deduct_one(customer_id)
     if success:
         _deductions.setdefault(customer_id, []).append({"key": activity_key, "card_id": card_id})
-    else:
+    elif not success:
+        from app.services import internal_course_service
+        if internal_course_service.has_active_course(customer_id):
+            return True  # 卡扣完了，内部课程覆盖，不记欠费
         _debt_activities.setdefault(customer_id, []).append(activity_key)
     return success
 
