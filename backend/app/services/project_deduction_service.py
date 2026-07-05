@@ -121,11 +121,17 @@ def get_available_items(customer_id: str, project_type: str) -> list:
 
     if project_type == "membership-cards":
         cards = membership_card_service.list_cards()
-        # 该用户的有效剩余天数，完全由流水派生，不再读 card.remaining_count 字段
-        effective = membership_card_service.get_effective_remaining(customer_id)
         available = []
-        if effective is None:
-            return []  # 不限次卡不允许走销卡
+        # 检查是否有不限次卡：有不限次卡时不允许销卡（不限次无需销卡）
+        customer_cards = [c for c in cards if c.customer_id == customer_id]
+        has_unlimited = any(
+            c.remaining_count is None and not c.voided
+            and (not c.effective_date or c.effective_date <= today)
+            and (not c.expiry_date or c.expiry_date >= today)
+            for c in customer_cards
+        )
+        if has_unlimited:
+            return []
         for c in cards:
             if c.customer_id != customer_id:
                 continue
@@ -135,11 +141,14 @@ def get_available_items(customer_id: str, project_type: str) -> list:
                 continue
             if c.expiry_date and c.expiry_date < today:
                 continue
+            card_remaining = membership_card_service.get_card_effective_remaining(c.id)
+            if card_remaining is not None and card_remaining <= 0:
+                continue
             available.append({
                 "id": c.id,
                 "name": f"{c.card_type}",
-                "remaining_count": effective,
-                "detail": f"剩余 {effective} 次",
+                "remaining_count": card_remaining or 0,
+                "detail": f"剩余 {card_remaining or 0} 次",
                 "card_type": c.card_type,
                 "expiry_date": c.expiry_date or "",
             })
@@ -285,11 +294,11 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
                 raise ValueError("该会员卡不属于该客户")
             if card.remaining_count is None:
                 raise ValueError("该卡为不限次卡，无法销卡")
-            effective = membership_card_service.get_effective_remaining(data.customer_id)
-            if effective is None:
+            card_remaining = membership_card_service.get_card_effective_remaining(data.project_id)
+            if card_remaining is None:
                 raise ValueError("该卡为不限次卡，无法销卡")
-            if effective < data.count:
-                raise ValueError(f"剩余次数不足（剩余 {effective} 次）")
+            if card_remaining < data.count:
+                raise ValueError(f"剩余次数不足（剩余 {card_remaining} 次）")
             project_name = card.card_type if card else "会员活动"
             card_remaining = membership_card_service.get_card_effective_remaining(data.project_id)
             remaining_after = (card_remaining or 0) - data.count
