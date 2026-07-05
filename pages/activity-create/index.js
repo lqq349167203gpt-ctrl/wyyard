@@ -108,10 +108,7 @@ Page({
       const courseItems = courses.map(c => ({
         value: 'class', label: c.name, isType: false, courseName: c.name,
       }))
-      const unifiedTypes = [
-        ...nonClassTypes.map(t => ({ ...t, isType: true })),
-        ...courseItems,
-      ]
+      const unifiedTypes = nonClassTypes.map(function(t) { return Object.assign({}, t, {isType: true}) }).concat(courseItems)
 
       // 计算 unifiedIndex
       let unifiedIndex = 0
@@ -261,10 +258,7 @@ Page({
 
   // 打开案主选择器（单选）
   onOwnerPickerOpen() {
-    const list = this.getFilteredCustomers('').map(c => ({
-      ...c,
-      _selected: c.id === this.data.ownerId,
-    }))
+    const list = this.getFilteredCustomers('').map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
     this.setData({
       showPicker: true,
       pickerTitle: '案主',
@@ -281,10 +275,7 @@ Page({
     const isSingle = SINGLE_TEACHER_TYPES.includes(activityType)
     const selectedId = isSingle ? this.data.achieverId : null
     const selectedIds = isSingle ? null : this.data.teacherIds
-    const list = this.getFilteredCustomers(position).map(c => ({
-      ...c,
-      _selected: isSingle ? c.id === selectedId : selectedIds.includes(c.id),
-    }))
+    const list = this.getFilteredCustomers(position).map(c => Object.assign({}, c, {_selected: isSingle ? c.id === selectedId : selectedIds.includes(c.id),}))
     this.setData({
       showPicker: true,
       pickerTitle: '老师',
@@ -316,12 +307,13 @@ Page({
         const kw = keyword.toLowerCase()
         return (c.nickname || '').toLowerCase().includes(kw) || (c.name || '').toLowerCase().includes(kw)
       })
-      .map(c => ({
-        ...c,
-        _selected: pickerMode === 'owner' ? c.id === this.data.ownerId
-          : pickerMode === 'achiever' ? c.id === this.data.achieverId
-          : this.data.teacherIds.includes(c.id),
-      }))
+      .map(function(c) {
+        return Object.assign({}, c, {
+          _selected: pickerMode === 'owner' ? c.id === this.data.ownerId
+            : pickerMode === 'achiever' ? c.id === this.data.achieverId
+            : this.data.teacherIds.includes(c.id),
+        })
+      }.bind(this))
     this.setData({ pickerKeyword: keyword, pickerList: list })
   },
 
@@ -355,10 +347,7 @@ Page({
         teacherIds.push(id)
         teacherNames.push(nickname)
       }
-      const pickerList = this.data.pickerList.map(c => ({
-        ...c,
-        _selected: teacherIds.includes(c.id),
-      }))
+      const pickerList = this.data.pickerList.map(c => Object.assign({}, c, {_selected: teacherIds.includes(c.id),}))
       const teacherDisplay = teacherNames.join('、')
       this.setData({ teacherIds, teacherNames, teacherDisplay, pickerList })
     }
@@ -397,16 +386,13 @@ Page({
 
   updateParticipantList() {
     const { dayVisitors, participantIds } = this.data
-    const participantList = dayVisitors.map(c => ({
-      ...c,
-      selected: participantIds.includes(c.id),
-    }))
+    const participantList = dayVisitors.map(c => Object.assign({}, c, {selected: participantIds.includes(c.id),}))
     this.setData({ participantList })
   },
 
   onParticipantToggle(e) {
     const id = e.currentTarget.dataset.id
-    let participantIds = [...this.data.participantIds]
+    let participantIds = this.data.participantIds.slice()
     const idx = participantIds.indexOf(id)
     if (idx >= 0) {
       participantIds.splice(idx, 1)
@@ -465,8 +451,7 @@ Page({
       switch (activityType) {
         case 'class': {
           const course = this.data.courses[this.data.courseIndex]
-          await classRecordApi.create({
-            ...baseFields,
+          await classRecordApi.create(Object.assign({}, baseFields, {
             course_id: '',
             course_name: course.name,
             activity_name: this.data.activityName || '',
@@ -474,12 +459,11 @@ Page({
             course_description: this.data.description,
             teacher_ids: this.data.teacherIds,
             is_public_welfare: this.data.isPublicWelfare,
-          })
+          }))
           break
         }
         case 'gcs':
-          await groupCaseSessionApi.create({
-            ...baseFields,
+          await groupCaseSessionApi.create(Object.assign({}, baseFields, {
             owner_id: this.data.ownerId,
             owner_name: this.data.ownerName,
             name: this.data.activityName,
@@ -487,11 +471,10 @@ Page({
             achiever_id: this.data.achieverId,
             achiever_name: this.data.achieverName,
             teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
-          })
+          }))
           break
         case 'ers':
-          await emotionalReleaseSessionApi.create({
-            ...baseFields,
+          await emotionalReleaseSessionApi.create(Object.assign({}, baseFields, {
             owner_id: this.data.ownerId,
             owner_name: this.data.ownerName,
             name: this.data.activityName,
@@ -499,11 +482,10 @@ Page({
             achiever_id: this.data.achieverId,
             achiever_name: this.data.achieverName,
             teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
-          })
+          }))
           break
         case 'eks':
-          await energyKnotSessionApi.create({
-            ...baseFields,
+          await energyKnotSessionApi.create(Object.assign({}, baseFields, {
             owner_id: this.data.ownerId,
             owner_name: this.data.ownerName,
             name: this.data.activityName,
@@ -511,22 +493,20 @@ Page({
             teacher_ids: this.data.teacherIds,
             host_id: '',
             host_name: '',
-          })
+          }))
           break
         case 'ics':
-          await internalCourseSessionApi.create({
-            ...baseFields,
+          await internalCourseSessionApi.create(Object.assign({}, baseFields, {
             course_name: this.data.activityName || this.data.icsCourseType || '',
             course_type: this.data.icsCourseType || '',
             course_description: this.data.description,
             teacher_ids: this.data.teacherIds,
             host_id: '',
             host_name: '',
-          })
+          }))
           break
         case 'ocr':
-          await ohCardReadingSessionApi.create({
-            ...baseFields,
+          await ohCardReadingSessionApi.create(Object.assign({}, baseFields, {
             owner_id: this.data.ownerId,
             owner_name: this.data.ownerName,
             name: this.data.activityName,
@@ -534,7 +514,7 @@ Page({
             achiever_id: this.data.achieverId,
             achiever_name: this.data.achieverName,
             teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
-          })
+          }))
           break
       }
 

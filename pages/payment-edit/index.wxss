@@ -1,0 +1,56 @@
+.page {
+  min-height: 100vh;
+  background-color: #f7f8fa;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.pe-btns {
+  display: flex;
+  gap: 32rpx;
+  padding: 0 28rpx 20rpx;
+}
+
+.pe-btn-delete {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 32rpx;
+  color: #ff4d4f;
+  background-color: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dee0e3;
+  padding: 0;
+  text-align: center;
+}
+
+.pe-btn-delete::after {
+  border: none;
+}
+
+.pe-btn-save {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 32rpx;
+  color: #ffffff;
+  background-color: #3370ff;
+  border-radius: 12rpx;
+  border: none;
+  padding: 0;
+  text-align: center;
+}
+
+.pe-btn-save::after {
+  border: none;
+}

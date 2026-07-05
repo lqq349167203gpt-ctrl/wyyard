@@ -105,7 +105,7 @@ Component({
       }
 
       // customer 模式：找到最近一条 AI 识别结果
-      const lastAiMsg = [...this.data.messages].reverse().find(m => m.type === 'ai' && m.customerData)
+      const lastAiMsg = this.data.messages.slice().reverse().find(m => m.type === 'ai' && m.customerData)
       console.log('[onTextSend] lastAiMsg found:', !!lastAiMsg, 'id:', lastAiMsg?.customerData?.id, 'messages count:', this.data.messages.length)
 
       if (lastAiMsg) {
@@ -154,8 +154,8 @@ Component({
       if (!msg || !msg.customerData) return
 
       // 标记为保存中
-      const messages = [...this.data.messages]
-      messages[index] = { ...messages[index], status: 'saving' }
+      const messages = this.data.messages.slice()
+      messages[index] = Object.assign({}, messages[index], {status: 'saving'})
       this.setData({ messages })
 
       try {
@@ -179,15 +179,15 @@ Component({
           await customerApi.create(data)
         }
         // 保存成功：清掉 customerData 防止后续输入被当成修改同一个人
-        const msgs = [...this.data.messages]
-        msgs[index] = { ...msgs[index], status: 'saved', _savedCustomerData: msgs[index].customerData, customerData: null }
+        const msgs = this.data.messages.slice()
+        msgs[index] = Object.assign({}, msgs[index], {status: 'saved', _savedCustomerData: msgs[index].customerData, customerData: null})
         this.setData({ messages: msgs })
         this._addMsg({ type: 'ai', text: data.id ? '客户信息已更新！你可以继续录入新客户，或关闭窗口。' : '客户已保存成功！你可以继续录入新客户，或关闭窗口。' })
       } catch (err) {
         console.error('[onDirectSave] 保存失败:', err.message, err)
         // 保存失败，恢复 pending 状态
-        const msgs = [...this.data.messages]
-        msgs[index] = { ...msgs[index], status: 'pending' }
+        const msgs = this.data.messages.slice()
+        msgs[index] = Object.assign({}, msgs[index], {status: 'pending'})
         this.setData({ messages: msgs })
 
         const errorMsg = err.message || '保存失败'
@@ -201,8 +201,8 @@ Component({
       if (!msg || !msg._savedCustomerData) return
 
       // 恢复 customerData 并重置为 pending 状态
-      const messages = [...this.data.messages]
-      messages[index] = { ...messages[index], status: 'pending', customerData: msg._savedCustomerData }
+      const messages = this.data.messages.slice()
+      messages[index] = Object.assign({}, messages[index], {status: 'pending', customerData: msg._savedCustomerData})
       this.setData({ messages })
     },
 
@@ -222,7 +222,7 @@ Component({
 
     _addMsg(msg) {
       const id = 'msg-' + (++_msgId)
-      const messages = [...this.data.messages, { ...msg, id }]
+      const messages = this.data.messages.concat([Object.assign({}, msg, {id})])
       const scrollTop = this.data.scrollTop === 999999 ? 999998 : 999999
       this.setData({ messages, scrollTarget: id, scrollTop })
     },
@@ -234,7 +234,7 @@ Component({
 
     _updateThinking(text) {
       const messages = this.data.messages.map(m =>
-        m.type === 'thinking' ? { ...m, text } : m
+        m.type === 'thinking' ? Object.assign({}, m, {text}) : m
       )
       this.setData({ messages })
     },
@@ -266,7 +266,7 @@ Component({
         }
 
         // 2. customer 模式：判断走修改还是提取
-        const lastAiMsg = [...this.data.messages].reverse().find(m => m.type === 'ai' && m.customerData)
+        const lastAiMsg = this.data.messages.slice().reverse().find(m => m.type === 'ai' && m.customerData)
 
         if (lastAiMsg) {
           // 弹窗内已有客户数据，走修改流程
@@ -408,14 +408,14 @@ Component({
     _showFieldsMsg(fields, data, status, errorMsg) {
       console.log('[_showFieldsMsg] data.id:', data?.id, 'status:', status, 'title:', data?.id ? '已找到客户，修改后信息如下' : '我识别到以下信息')
       const id = 'msg-' + (++_msgId)
-      const messages = [...this.data.messages, {
+      const messages = this.data.messages.concat([{
         id,
         type: 'ai',
         fields,
         customerData: data,
         status,
         errorMsg: errorMsg || '',
-      }]
+      }])
       this.setData({ messages, scrollTarget: id, scrollTop: 999999 })
     },
 

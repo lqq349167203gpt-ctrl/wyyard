@@ -17,7 +17,7 @@ function login() {
               app.globalData.currentUser = data.account
               app.globalData.permissions = data.permissions || []
             }
-            resolve({ bound: true, ...data })
+            resolve(Object.assign({ bound: true }, data))
           }
         }).catch(reject)
       },

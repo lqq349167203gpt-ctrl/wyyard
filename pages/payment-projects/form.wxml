@@ -1,0 +1,176 @@
+<view class="container">
+  <!-- 项目类型标题 -->
+  <view class="form-card">
+    <view class="form-item last">
+      <text class="form-label">项目类型</text>
+      <text class="form-value">{{typeName}}</text>
+    </view>
+  </view>
+
+  <!-- 公共字段：客户 -->
+  <view class="form-card">
+    <view class="form-item" bindtap="onPickerOpen" data-field="customer">
+      <text class="form-label">客户</text>
+      <view class="picker-value-wrap">
+        <text class="{{customerName ? '' : 'placeholder'}}">{{customerName || '选择客户'}}</text>
+        <text class="picker-clear" wx:if="{{customerName}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 会员卡专属字段 -->
+  <view class="form-card" wx:if="{{projectType === 'membership_card'}}">
+    <view class="form-item" bindtap="onPickerOpen" data-field="cardType">
+      <text class="form-label">会员卡类型</text>
+      <view class="picker-value-wrap">
+        <text class="{{cardType ? '' : 'placeholder'}}">{{cardType || '选择类型'}}</text>
+      </view>
+    </view>
+    <view class="form-item">
+      <text class="form-label">费用金额</text>
+      <input class="form-input" type="digit" placeholder="金额" placeholder-class="form-input-placeholder" value="{{price}}" bindinput="onPriceInput" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">生效日期</text>
+      <picker class="form-picker" mode="date" value="{{effectiveDate}}" bindchange="onEffectiveDateChange">
+        <view class="picker-display {{effectiveDate ? '' : 'placeholder'}}">{{effectiveDate || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">时长</text>
+      <view class="duration-wrap">
+        <input class="form-input duration-input" type="number" placeholder="数值" placeholder-class="form-input-placeholder" value="{{durationValue}}" bindinput="onDurationValueInput" />
+        <view class="duration-toggle">
+          <view class="toggle-btn {{durationType === 'month' ? 'active' : ''}}" bindtap="onDurationTypeChange" data-type="month">月</view>
+          <view class="toggle-btn {{durationType === 'day' ? 'active' : ''}}" bindtap="onDurationTypeChange" data-type="day">天</view>
+        </view>
+      </view>
+    </view>
+    <view class="form-item last">
+      <text class="form-label">次数</text>
+      <view class="duration-wrap">
+        <input class="form-input duration-input" type="number" placeholder="次数" placeholder-class="form-input-placeholder" value="{{remainingCount}}" bindinput="onRemainingCountInput" />
+        <view class="toggle-btn {{unlimited ? 'active' : ''}}" bindtap="onToggleUnlimited">不限</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 觉醒游戏/情绪释放/OH卡/能量结专属字段 -->
+  <view class="form-card" wx:if="{{projectType === 'group_case' || projectType === 'emotional_release' || projectType === 'oh_card_reading' || projectType === 'energy_knot'}}">
+    <view class="form-item">
+      <text class="form-label">购买次数</text>
+      <input class="form-input" type="number" placeholder="次数" placeholder-class="form-input-placeholder" value="{{purchaseCount}}" bindinput="onPurchaseCountInput" />
+    </view>
+    <view class="form-item last">
+      <text class="form-label">付费金额</text>
+      <input class="form-input" type="digit" placeholder="金额" placeholder-class="form-input-placeholder" value="{{amount}}" bindinput="onAmountInput" />
+    </view>
+  </view>
+
+  <!-- 内部课程专属字段 -->
+  <view class="form-card" wx:if="{{projectType === 'internal_course'}}">
+    <view class="form-item" bindtap="onPickerOpen" data-field="courseType">
+      <text class="form-label">课程类型</text>
+      <view class="picker-value-wrap">
+        <text class="{{courseType ? '' : 'placeholder'}}">{{courseType || '选择课程'}}</text>
+      </view>
+    </view>
+    <view class="form-item">
+      <text class="form-label">付费金额</text>
+      <input class="form-input" type="digit" placeholder="金额" placeholder-class="form-input-placeholder" value="{{price}}" bindinput="onPriceInput" />
+    </view>
+    <view class="form-item last">
+      <text class="form-label">生效日期</text>
+      <picker class="form-picker" mode="date" value="{{effectiveDate}}" bindchange="onEffectiveDateChange">
+        <view class="picker-display {{effectiveDate ? '' : 'placeholder'}}">{{effectiveDate || '选择日期'}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 其他项目专属字段 -->
+  <view class="form-card" wx:if="{{projectType === 'other'}}">
+    <view class="form-item">
+      <text class="form-label">项目名称</text>
+      <input class="form-input" placeholder="名称" placeholder-class="form-input-placeholder" value="{{projectName}}" bindinput="onProjectNameInput" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">费用</text>
+      <input class="form-input" type="digit" placeholder="金额" placeholder-class="form-input-placeholder" value="{{fee}}" bindinput="onFeeInput" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">生效日期</text>
+      <picker class="form-picker" mode="date" value="{{effectiveDate}}" bindchange="onEffectiveDateChange">
+        <view class="picker-display {{effectiveDate ? '' : 'placeholder'}}">{{effectiveDate || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">时长</text>
+      <view class="duration-wrap">
+        <input class="form-input duration-input" type="number" placeholder="数值" placeholder-class="form-input-placeholder" value="{{durationValue}}" bindinput="onDurationValueInput" />
+        <view class="duration-toggle">
+          <view class="toggle-btn {{durationType === 'month' ? 'active' : ''}}" bindtap="onDurationTypeChange" data-type="month">月</view>
+          <view class="toggle-btn {{durationType === 'day' ? 'active' : ''}}" bindtap="onDurationTypeChange" data-type="day">天</view>
+        </view>
+      </view>
+    </view>
+    <view class="form-item last">
+      <text class="form-label">次数</text>
+      <view class="duration-wrap">
+        <input class="form-input duration-input" type="number" placeholder="次数" placeholder-class="form-input-placeholder" value="{{remainingCount}}" bindinput="onRemainingCountInput" />
+        <view class="toggle-btn {{unlimited ? 'active' : ''}}" bindtap="onToggleUnlimited">不限</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 公共字段：成交日期 & 成交人 -->
+  <view class="form-card">
+    <view class="form-item" bindtap="onPickerOpen" data-field="closer">
+      <text class="form-label">成交人</text>
+      <view class="picker-value-wrap">
+        <text class="{{closerName ? '' : 'placeholder'}}">{{closerName || '选择成交人'}}</text>
+        <text class="picker-clear" wx:if="{{closerName}}" catchtap="onPickerClear" data-field="closer">x</text>
+      </view>
+    </view>
+    <view class="form-item last">
+      <text class="form-label">成交日期</text>
+      <picker class="form-picker" mode="date" value="{{dealDate}}" bindchange="onDealDateChange">
+        <view class="picker-display">{{dealDate}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="actions">
+    <button class="btn-secondary" bindtap="onBack">返    回</button>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">提    交</button>
+  </view>
+
+  <!-- 搜索选择弹窗 -->
+  <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
+  <view class="picker-popup" wx:if="{{showPicker}}">
+    <view class="picker-header">
+      <text class="picker-title">选择{{pickerTitle}}</text>
+      <text class="picker-close" bindtap="onPickerClose">关闭</text>
+    </view>
+    <view class="picker-search" wx:if="{{pickerField !== 'cardType' && pickerField !== 'courseType'}}">
+      <input class="picker-search-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+    </view>
+    <scroll-view class="picker-list" scroll-y>
+      <view
+        class="picker-item"
+        wx:for="{{pickerList}}"
+        wx:key="id"
+        bindtap="onPickerSelect"
+        data-id="{{item.id}}"
+        data-nickname="{{item.nickname || item.name}}"
+        data-extra="{{item.extra || ''}}"
+      >
+        <text class="picker-item-name">{{item.nickname || item.name}}</text>
+        <text class="picker-item-type" wx:if="{{item.extra}}">{{item.extra}}</text>
+      </view>
+      <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
+        <text>无匹配数据</text>
+      </view>
+    </scroll-view>
+  </view>
+</view>

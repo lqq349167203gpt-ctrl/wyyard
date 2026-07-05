@@ -26,6 +26,14 @@
     </view>
   </view>
 
+  <!-- 功能入口 -->
+  <view class="menu-card">
+    <view class="menu-item" bindtap="onPaymentTap">
+      <text class="menu-label">付费项目</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
   <!-- 退出按钮 -->
   <view class="logout-area">
     <view class="logout-btn" bindtap="onLogout">退出登录</view>

@@ -1,0 +1,188 @@
+<view class="pf-container">
+  <view class="pf-card">
+    <view class="pf-row">
+      <text class="pf-label">成交日期</text>
+      <picker class="pf-picker" mode="date" value="{{formData.deal_date}}" bindchange="onFieldChange" data-field="deal_date">
+        <view class="pf-value {{formData.deal_date ? '' : 'pf-placeholder'}}">{{formData.deal_date || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="pf-row pf-row-last">
+      <text class="pf-label">所属组织</text>
+      <picker class="pf-picker" mode="selector" range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrgChange">
+        <view class="pf-value {{organizations.length > 0 ? '' : 'pf-placeholder'}}">{{organizations[orgIndex].name || '暂无组织'}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 会员卡 -->
+  <view class="pf-card" wx:if="{{type === 'membership_card'}}">
+    <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
+      <text class="pf-label">用户</text>
+      <view class="pf-value-wrap">
+        <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">会员卡</text>
+      <picker class="pf-picker" mode="selector" range="{{cardTypes}}" range-key="label" value="{{cardTypeIndex}}" bindchange="onCardTypeChange">
+        <view class="pf-value {{cardTypeIndex >= 0 ? '' : 'pf-placeholder'}}">{{cardTypeIndex >= 0 ? cardTypes[cardTypeIndex].label : '请选择'}}</view>
+      </picker>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">生效日期</text>
+      <picker class="pf-picker" mode="date" value="{{formData.effective_date}}" bindchange="onFieldChange" data-field="effective_date">
+        <view class="pf-value {{formData.effective_date ? '' : 'pf-placeholder'}}">{{formData.effective_date || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">有效期</text>
+      <view class="pf-dur">
+        <input class="pf-input pf-dur-input" type="number" placeholder="数值" placeholder-class="pf-placeholder" value="{{formData.duration_value}}" bindinput="onFieldInput" data-field="duration_value" />
+        <view class="pf-dur-sep"></view>
+        <picker class="pf-picker" mode="selector" range="{{durationTypes}}" range-key="label" value="{{durationTypeIndex}}" bindchange="onDurationTypeChange">
+          <view class="pf-value pf-dur-unit {{durationTypeIndex >= 0 ? '' : 'pf-placeholder'}}">{{durationTypeIndex >= 0 ? durationTypes[durationTypeIndex].label : '单位'}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">卡内次数（次）</text>
+      <input class="pf-input" type="number" placeholder="留空为不限次" placeholder-class="pf-placeholder" value="{{formData.remaining_count}}" bindinput="onFieldInput" data-field="remaining_count" />
+    </view>
+    <view class="pf-row pf-row-last">
+      <text class="pf-label">费用金额（元）</text>
+      <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.price}}" bindinput="onFieldInput" data-field="price" />
+    </view>
+  </view>
+
+  <!-- 觉醒/情绪/OH/能量 -->
+  <view class="pf-card" wx:if="{{type === 'group_case' || type === 'emotional_release' || type === 'oh_card_reading' || type === 'energy_knot'}}">
+    <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
+      <text class="pf-label">用户</text>
+      <view class="pf-value-wrap">
+        <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">购买次数（次）</text>
+      <input class="pf-input" type="number" placeholder="次数" placeholder-class="pf-placeholder" value="{{formData.purchase_count}}" bindinput="onFieldInput" data-field="purchase_count" />
+    </view>
+    <view class="pf-row pf-row-last">
+      <text class="pf-label">付费金额（元）</text>
+      <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.amount}}" bindinput="onFieldInput" data-field="amount" />
+    </view>
+  </view>
+
+  <!-- 内部课程 -->
+  <view class="pf-card" wx:if="{{type === 'internal_course'}}">
+    <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
+      <text class="pf-label">用户</text>
+      <view class="pf-value-wrap">
+        <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">课程类型</text>
+      <picker class="pf-picker" mode="selector" range="{{courseTypes}}" range-key="label" value="{{courseTypeIndex}}" bindchange="onCourseTypeChange">
+        <view class="pf-value {{courseTypeIndex >= 0 ? '' : 'pf-placeholder'}}">{{courseTypeIndex >= 0 ? courseTypes[courseTypeIndex].label : '请选择'}}</view>
+      </picker>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">生效日期</text>
+      <picker class="pf-picker" mode="date" value="{{formData.effective_date}}" bindchange="onFieldChange" data-field="effective_date">
+        <view class="pf-value {{formData.effective_date ? '' : 'pf-placeholder'}}">{{formData.effective_date || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="pf-row pf-row-last">
+      <text class="pf-label">付费金额（元）</text>
+      <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.price}}" bindinput="onFieldInput" data-field="price" />
+    </view>
+  </view>
+
+  <!-- 其他项目 -->
+  <view class="pf-card" wx:if="{{type === 'other'}}">
+    <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
+      <text class="pf-label">用户</text>
+      <view class="pf-value-wrap">
+        <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">项目名称</text>
+      <input class="pf-input" placeholder="项目名称" placeholder-class="pf-placeholder" value="{{formData.project_name}}" bindinput="onFieldInput" data-field="project_name" />
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">费用（元）</text>
+      <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.fee}}" bindinput="onFieldInput" data-field="fee" />
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">生效日期</text>
+      <picker class="pf-picker" mode="date" value="{{formData.effective_date}}" bindchange="onFieldChange" data-field="effective_date">
+        <view class="pf-value {{formData.effective_date ? '' : 'pf-placeholder'}}">{{formData.effective_date || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">有效期</text>
+      <view class="pf-dur">
+        <input class="pf-input pf-dur-input" type="number" placeholder="数值" placeholder-class="pf-placeholder" value="{{formData.duration_value}}" bindinput="onFieldInput" data-field="duration_value" />
+        <view class="pf-dur-sep"></view>
+        <picker class="pf-picker" mode="selector" range="{{durationTypes}}" range-key="label" value="{{durationTypeIndex}}" bindchange="onDurationTypeChange">
+          <view class="pf-value pf-dur-unit {{durationTypeIndex >= 0 ? '' : 'pf-placeholder'}}">{{durationTypeIndex >= 0 ? durationTypes[durationTypeIndex].label : '单位'}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="pf-row pf-row-last">
+      <text class="pf-label">卡内次数（次）</text>
+      <input class="pf-input" type="number" placeholder="留空为不限次" placeholder-class="pf-placeholder" value="{{formData.remaining_count}}" bindinput="onFieldInput" data-field="remaining_count" />
+    </view>
+  </view>
+
+  <!-- 成交人 -->
+  <view class="pf-card">
+    <view class="pf-row" bindtap="onPickerOpen" data-field="closer">
+      <text class="pf-label">成交人</text>
+      <view class="pf-value-wrap">
+        <text class="{{closers.length > 0 ? '' : 'pf-placeholder'}}">{{closers.length > 0 ? '已选' + closers.length + '人' : '选择成交人'}}</text>
+      </view>
+    </view>
+    <view class="pf-closer-item" wx:for="{{closers}}" wx:key="id">
+      <text class="pf-closer-tag">{{item.nickname}}</text>
+      <input class="pf-closer-amount" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{item.amount}}" bindinput="onCloserAmountInput" data-id="{{item.id}}" />
+      <text class="pf-closer-unit">元</text>
+      <text class="pf-closer-del" bindtap="onRemoveCloser" data-id="{{item.id}}">x</text>
+    </view>
+    <view class="pf-closer-total" wx:if="{{closers.length > 1}}">
+      <text>总金额: {{closerTotal}} 元</text>
+    </view>
+  </view>
+
+  <!-- 搜索弹窗 -->
+  <view class="pf-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
+  <view class="pf-popup" wx:if="{{showPicker}}">
+    <view class="pf-popup-head">
+      <text class="pf-popup-title">选择{{pickerTitle}}</text>
+      <text class="pf-popup-close" bindtap="onPickerClose">关闭</text>
+    </view>
+    <view class="pf-popup-search">
+      <input class="pf-popup-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+    </view>
+    <scroll-view class="pf-popup-list" scroll-y>
+      <view class="pf-popup-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
+        <text>{{item.nickname}}</text>
+        <text class="pf-popup-check" wx:if="{{pickerField === 'closer' && closerIdMap[item.id]}}">✓</text>
+      </view>
+      <view class="pf-popup-empty" wx:if="{{pickerList.length === 0}}">
+        <text>无匹配用户</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="pf-btns" wx:if="{{!hideBtn}}">
+    <button class="pf-submit" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting}}">
+      {{isEdit ? '保    存' : '添    加'}}
+    </button>
+  </view>
+</view>

@@ -112,7 +112,7 @@
   border-radius: 8rpx;
 }
 
-.msg-error-reason text {
+.error-reason-text {
   font-size: 24rpx;
   color: #d94040;
 }

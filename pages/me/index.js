@@ -14,6 +14,10 @@ Page({
     })
   },
 
+  onPaymentTap() {
+    wx.navigateTo({ url: '/pages/payment/index' })
+  },
+
   onLogout() {
     wx.showModal({
       title: '退出登录',

@@ -7,10 +7,10 @@
   "setting": {
     "bundle": false,
     "userConfirmedBundleSwitch": false,
-    "urlCheck": true,
+    "urlCheck": false,
     "scopeDataCheck": false,
     "coverView": true,
-    "es6": true,
+    "es6": false,
     "postcss": true,
     "compileHotReLoad": false,
     "lazyloadPlaceholderEnable": false,
@@ -33,7 +33,8 @@
     "babelSetting": {
       "ignore": [],
       "disablePlugins": [],
-      "outputPath": ""
+      "outputPath": "",
+      "disableRuntime": true
     },
     "condition": false,
     "compileWorklet": false,
@@ -44,7 +45,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "3.3.4",
-  "appid": "wx604733eb8d853230",
+  "appid": "wxefe15693e167e37a",
   "projectname": "wyyard-miniprogram",
   "condition": {},
   "editorSetting": {

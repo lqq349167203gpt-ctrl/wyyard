@@ -1,7 +1,6 @@
 {
   "navigationBarTitleText": "课表",
   "usingComponents": {
-    "activity-badge": "/components/activity-badge/index",
     "voice-input-popup": "/components/voice-input-popup/index"
   },
   "enablePullDownRefresh": true

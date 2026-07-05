@@ -16,6 +16,10 @@
     "pages/customers/index",
     "pages/customer-form/index",
     "pages/customer-profile/index",
+    "pages/payment/index",
+    "pages/payment-create/index",
+    "pages/payment-detail/index",
+    "pages/payment-edit/index",
     "pages/me/index"
   ],
   "window": {
@@ -56,6 +60,7 @@
       }
     ]
   },
+  "lazyCodeLoading": "requiredComponents",
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

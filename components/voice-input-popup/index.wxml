@@ -41,7 +41,7 @@
                 </view>
               </view>
               <view class="msg-error-reason" wx:if="{{item.status === 'blocked'}}">
-                <text>{{item.errorMsg}}</text>
+                <text class="error-reason-text">{{item.errorMsg}}</text>
               </view>
               <view class="msg-actions" wx:if="{{item.status === 'pending'}}">
                 <view class="msg-action-btn confirm" bindtap="onDirectSave" data-index="{{index}}">

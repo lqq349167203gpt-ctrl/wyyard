@@ -189,10 +189,7 @@ Page({
       const courseItems = courses.map(c => ({
         value: 'class', label: c.name, isType: false, courseName: c.name,
       }))
-      const unifiedTypes = [
-        ...nonClassTypes.map(t => ({ ...t, isType: true })),
-        ...courseItems,
-      ]
+      const unifiedTypes = nonClassTypes.map(function(t) { return Object.assign({}, t, {isType: true}) }).concat(courseItems)
 
       this.setData({ courses, courseIndex, unifiedTypes })
     } catch (e) {
@@ -296,20 +293,18 @@ Page({
       const course = this.data.courses[courseIndex]
       const typeColor = BADGE_COLORS['沙龙'] || '#3370ff'
       const unifiedIndex = this.data.unifiedTypes.findIndex(t => !t.isType && t.courseName === course.name)
-      this.setData({
-        ...resetFields,
+      this.setData(Object.assign({}, resetFields, {
         activityType: 'class',
         typeLabel: course.name,
         typeColor,
         courseIndex,
         icsCourseType: '',
         unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
-      })
+      }))
     } else if (activityType === 'ics' && icsCourseType) {
       const typeColor = BADGE_COLORS['内部课程'] || '#5ba88a'
       const unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === 'ics')
-      this.setData({
-        ...resetFields,
+      this.setData(Object.assign({}, resetFields, {
         activityType: 'ics',
         typeLabel: icsCourseType,
         typeColor,
@@ -317,20 +312,19 @@ Page({
         icsCourseType,
         activityName: icsCourseType,
         unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
-      })
+      }))
     } else {
       const typeLabel = TYPE_LABELS[activityType] || ''
       const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
       const unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === activityType)
-      this.setData({
-        ...resetFields,
+      this.setData(Object.assign({}, resetFields, {
         activityType,
         typeLabel,
         typeColor,
         courseIndex: -1,
         icsCourseType: '',
         unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
-      })
+      }))
     }
   },
 
@@ -354,16 +348,13 @@ Page({
 
   updateParticipantList() {
     const { dayVisitors, participantIds } = this.data
-    const participantList = dayVisitors.map(c => ({
-      ...c,
-      selected: participantIds.includes(c.id),
-    }))
+    const participantList = dayVisitors.map(c => Object.assign({}, c, {selected: participantIds.includes(c.id),}))
     this.setData({ participantList })
   },
 
   onParticipantToggle(e) {
     const id = e.currentTarget.dataset.id
-    let participantIds = [...this.data.participantIds]
+    let participantIds = this.data.participantIds.slice()
     const idx = participantIds.indexOf(id)
     if (idx >= 0) {
       participantIds.splice(idx, 1)
@@ -383,10 +374,7 @@ Page({
   },
 
   onOwnerPickerOpen() {
-    const list = this.getFilteredCustomers('').map(c => ({
-      ...c,
-      _selected: c.id === this.data.ownerId,
-    }))
+    const list = this.getFilteredCustomers('').map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
     this.setData({
       showPicker: true, pickerTitle: '案主', pickerMode: 'owner',
       pickerKeyword: '', pickerList: list,
@@ -399,10 +387,7 @@ Page({
     const isSingle = SINGLE_TEACHER_TYPES.includes(activityType)
     const selectedId = isSingle ? this.data.achieverId : null
     const selectedIds = isSingle ? null : this.data.teacherIds
-    const list = this.getFilteredCustomers(position).map(c => ({
-      ...c,
-      _selected: isSingle ? c.id === selectedId : selectedIds.includes(c.id),
-    }))
+    const list = this.getFilteredCustomers(position).map(c => Object.assign({}, c, {_selected: isSingle ? c.id === selectedId : selectedIds.includes(c.id),}))
     this.setData({
       showPicker: true, pickerTitle: '老师', pickerMode: isSingle ? 'achiever' : 'teacher',
       pickerKeyword: '', pickerList: list,
@@ -425,12 +410,13 @@ Page({
     }
     const list = baseList
       .filter(c => !keyword || (c.nickname || '').toLowerCase().includes(keyword.toLowerCase()) || (c.name || '').toLowerCase().includes(keyword.toLowerCase()))
-      .map(c => ({
-        ...c,
-        _selected: pickerMode === 'owner' ? c.id === this.data.ownerId
-          : pickerMode === 'achiever' ? c.id === this.data.achieverId
-          : this.data.teacherIds.includes(c.id),
-      }))
+      .map(function(c) {
+        return Object.assign({}, c, {
+          _selected: pickerMode === 'owner' ? c.id === this.data.ownerId
+            : pickerMode === 'achiever' ? c.id === this.data.achieverId
+            : this.data.teacherIds.includes(c.id),
+        })
+      }.bind(this))
     this.setData({ pickerKeyword: keyword, pickerList: list })
   },
 
@@ -441,8 +427,8 @@ Page({
     } else if (this.data.pickerMode === 'achiever') {
       this.setData({ achieverId: id, achieverName: nickname, showPicker: false, pickerKeyword: '' })
     } else {
-      let teacherIds = [...this.data.teacherIds]
-      let teacherNames = [...this.data.teacherNames]
+      let teacherIds = this.data.teacherIds.slice()
+      let teacherNames = this.data.teacherNames.slice()
       const idx = teacherIds.indexOf(id)
       if (idx >= 0) {
         teacherIds.splice(idx, 1)
@@ -451,7 +437,7 @@ Page({
         teacherIds.push(id)
         teacherNames.push(nickname)
       }
-      const pickerList = this.data.pickerList.map(c => ({ ...c, _selected: teacherIds.includes(c.id) }))
+      const pickerList = this.data.pickerList.map(c => Object.assign({}, c, {_selected: teacherIds.includes(c.id)}))
       this.setData({ teacherIds, teacherNames, teacherDisplay: teacherNames.join('、'), pickerList })
     }
   },
@@ -504,8 +490,7 @@ Page({
     switch (activityType) {
       case 'class': {
         const course = this.data.courses[this.data.courseIndex]
-        payload = {
-          ...baseFields,
+        payload = Object.assign({}, baseFields, {
           course_id: '',
           course_name: course.name,
           activity_name: this.data.activityName || '',
@@ -513,14 +498,13 @@ Page({
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
           is_public_welfare: this.data.isPublicWelfare,
-        }
+        })
         break
       }
       case 'gcs':
       case 'ers':
       case 'ocr':
-        payload = {
-          ...baseFields,
+        payload = Object.assign({}, baseFields, {
           owner_id: this.data.ownerId,
           owner_name: this.data.ownerName,
           name: this.data.activityName,
@@ -528,26 +512,24 @@ Page({
           achiever_id: this.data.achieverId,
           achiever_name: this.data.achieverName,
           teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
-        }
+        })
         break
       case 'eks':
-        payload = {
-          ...baseFields,
+        payload = Object.assign({}, baseFields, {
           owner_id: this.data.ownerId,
           owner_name: this.data.ownerName,
           name: this.data.activityName,
           description: this.data.description,
           teacher_ids: this.data.teacherIds,
-        }
+        })
         break
       case 'ics':
-        payload = {
-          ...baseFields,
+        payload = Object.assign({}, baseFields, {
           course_name: this.data.activityName || this.data.icsCourseType || '',
           course_type: this.data.icsCourseType || '',
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
-        }
+        })
         break
     }
 

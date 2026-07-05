@@ -38,9 +38,10 @@ function getWeekDates(centerDate) {
 
 function debounce(fn, delay = 300) {
   let timer = null
-  return function (...args) {
+  return function () {
+    var args = arguments
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => fn.apply(this, args), delay)
+    timer = setTimeout(function() { fn.apply(this, args) }, delay)
   }
 }
 

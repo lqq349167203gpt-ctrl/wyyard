@@ -1,0 +1,125 @@
+<view class="pd-container" wx:if="{{!loading && item}}">
+  <!-- 用户信息 -->
+  <view class="pd-card pd-user">
+    <text class="pd-username">{{item.nickname}}</text>
+    <text class="pd-type-tag">{{typeName}}</text>
+  </view>
+
+  <!-- 基本信息 -->
+  <view class="pd-card">
+    <view class="pd-row">
+      <text class="pd-label">成交日期</text>
+      <text class="pd-value">{{item._dealDate || '-'}}</text>
+    </view>
+    <view class="pd-row" wx:if="{{item._orgName}}">
+      <text class="pd-label">所属组织</text>
+      <text class="pd-value">{{item._orgName}}</text>
+    </view>
+    <view class="pd-row pd-row-last">
+      <text class="pd-label">成交人</text>
+      <text class="pd-value">{{item._closers || '-'}}</text>
+    </view>
+  </view>
+
+  <!-- 会员卡 -->
+  <view class="pd-card" wx:if="{{type === 'membership_card'}}">
+    <view class="pd-row">
+      <text class="pd-label">会员卡类型</text>
+      <text class="pd-value">{{item.card_type || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">费用金额</text>
+      <text class="pd-value pd-price">¥{{item.price || 0}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">生效日期</text>
+      <text class="pd-value">{{item._effectiveDate || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">有效期</text>
+      <text class="pd-value">{{item._duration || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">到期日期</text>
+      <text class="pd-value">{{item._expiryDate || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">总次数</text>
+      <text class="pd-value">{{item._totalCount || '-'}}</text>
+    </view>
+    <view class="pd-row pd-row-last">
+      <text class="pd-label">剩余次数</text>
+      <text class="pd-value">{{item._remaining || '-'}}</text>
+    </view>
+  </view>
+
+  <!-- 觉醒/情绪/OH/能量 -->
+  <view class="pd-card" wx:if="{{type === 'group_case' || type === 'emotional_release' || type === 'oh_card_reading' || type === 'energy_knot'}}">
+    <view class="pd-row">
+      <text class="pd-label">购买次数</text>
+      <text class="pd-value">{{item.purchase_count || '-'}}次</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">剩余次数</text>
+      <text class="pd-value">{{item._remaining || '-'}}</text>
+    </view>
+    <view class="pd-row pd-row-last">
+      <text class="pd-label">付费金额</text>
+      <text class="pd-value pd-price">¥{{item.amount || 0}}</text>
+    </view>
+  </view>
+
+  <!-- 内部课程 -->
+  <view class="pd-card" wx:if="{{type === 'internal_course'}}">
+    <view class="pd-row">
+      <text class="pd-label">课程类型</text>
+      <text class="pd-value">{{item.course_type || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">生效日期</text>
+      <text class="pd-value">{{item._effectiveDate || '-'}}</text>
+    </view>
+    <view class="pd-row pd-row-last">
+      <text class="pd-label">付费金额</text>
+      <text class="pd-value pd-price">¥{{item.price || 0}}</text>
+    </view>
+  </view>
+
+  <!-- 其他项目 -->
+  <view class="pd-card" wx:if="{{type === 'other'}}">
+    <view class="pd-row">
+      <text class="pd-label">项目名称</text>
+      <text class="pd-value">{{item.project_name || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">费用</text>
+      <text class="pd-value pd-price">¥{{item.fee || 0}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">生效日期</text>
+      <text class="pd-value">{{item._effectiveDate || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">有效期</text>
+      <text class="pd-value">{{item._duration || '-'}}</text>
+    </view>
+    <view class="pd-row">
+      <text class="pd-label">到期日期</text>
+      <text class="pd-value">{{item._expiryDate || '-'}}</text>
+    </view>
+    <view class="pd-row pd-row-last">
+      <text class="pd-label">剩余次数</text>
+      <text class="pd-value">{{item._remaining || '-'}}</text>
+    </view>
+  </view>
+
+  <!-- 底部按钮 -->
+  <view class="pd-bottom">
+    <button class="pd-btn-back" bindtap="onBack">返    回</button>
+    <button class="pd-btn-edit" bindtap="onEditTap">编    辑</button>
+  </view>
+</view>
+
+<view class="pd-loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>
