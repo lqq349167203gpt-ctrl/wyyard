@@ -130,12 +130,26 @@ export default function HealingRecordsPage() {
     setSaving(true)
     setSaveError("")
     try {
-      const data = { ...form }
       const range = form.age_range
-      if (range) {
-        data.age = form.age ? `${form.age} (${range})` : range
+      const ageValue = range ? (form.age ? `${form.age} (${range})` : range) : form.age
+
+      // 只发送 CustomerUpdate 允许的字段，StrictBaseModel 会拒绝多余字段
+      const UPDATE_FIELDS = [
+        "nickname", "name", "gender", "phone", "wechat", "age",
+        "service_teacher", "referrer", "referrer_handler",
+        "traffic_source", "traffic_source_detail",
+        "work_status", "work_description",
+        "basic_info", "assessment", "tags", "other_info",
+        "member_type", "paid_content", "visit_count",
+      ]
+      const data: Record<string, any> = {}
+      for (const key of UPDATE_FIELDS) {
+        if (form[key] !== undefined && form[key] !== null) {
+          data[key] = form[key]
+        }
       }
-      delete data.age_range
+      data.age = ageValue
+
       // 新增客户时自动设置当前空间和创建人
       if (!editingId) {
         try {
