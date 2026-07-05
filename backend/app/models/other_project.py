@@ -20,6 +20,7 @@ class OtherProjectBase(SafeBaseModel):
     closers: List[dict] = []  # 多成交人 [{"id": "xxx", "name": "张三", "amount": 100.0}]
     organization_id: Optional[str] = None
     deal_date: Optional[str] = None
+    created_by: str = ""
 
 
 class OtherProjectCreate(OtherProjectBase):

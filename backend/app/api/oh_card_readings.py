@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from app.utils.pagination import paginate
-from app.services import oh_card_reading_service
+from app.services import oh_card_reading_service, oh_card_reading_session_service
 from app.models.oh_card_reading import OhCardReadingCreate
 
 router = APIRouter(prefix="/api/oh-card-readings", tags=["oh-card-readings"])
@@ -20,9 +20,25 @@ def list_readings(page: int | None = Query(None, ge=1), page_size: int | None = 
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
     items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    remaining_cache: dict[str, int] = {}
+    for item in items_dict:
+        cid = item.get("customer_id", "")
+        if cid not in remaining_cache:
+            remaining_cache[cid] = oh_card_reading_session_service.get_remaining_count(cid)
+        item["effective_remaining"] = remaining_cache[cid]
     if page is not None:
         return paginate(items_dict, page, page_size or 10)
     return items_dict
+
+
+@router.get("/{reading_id}")
+def get_reading(reading_id: str):
+    reading = oh_card_reading_service.get_reading(reading_id)
+    if not reading:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    result = reading.model_dump() if hasattr(reading, "model_dump") else reading
+    result["effective_remaining"] = oh_card_reading_session_service.get_remaining_count(reading.customer_id)
+    return result
 
 
 @router.post("")

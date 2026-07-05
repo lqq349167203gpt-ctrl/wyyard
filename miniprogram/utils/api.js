@@ -3,7 +3,7 @@
 // 生产环境: 需要替换为实际域名
 
 // ⚠️ 上线前必须替换为生产域名
-const BASE_URL = 'https://www.wyteahouse.cn'
+const BASE_URL = 'http://localhost:8000'
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
@@ -204,6 +204,11 @@ const spaceApi = {
   list: () => request('/api/spaces'),
 }
 
+// 组织 API
+const organizationApi = {
+  list: () => request('/api/organizations'),
+}
+
 // 会员身份 API
 const memberIdentityApi = {
   list: () => request('/api/member-identities'),
@@ -234,6 +239,7 @@ const PAYMENT_PROJECT_TYPES = [
 // 通用项目 CRUD 工厂
 function _projectApi(basePath) {
   return {
+    get: (id) => request(`${basePath}/${id}`),
     list: (params = {}) => {
       const qs = Object.entries(params)
         .filter(([_, v]) => v !== undefined && v !== null && v !== '')
@@ -333,6 +339,7 @@ module.exports = {
   classRecordApi,
   customerApi,
   spaceApi,
+  organizationApi,
   memberIdentityApi,
   authApi,
   dailyGroupingApi,

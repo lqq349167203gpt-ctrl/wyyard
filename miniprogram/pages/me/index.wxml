@@ -32,14 +32,6 @@
       <text class="menu-label">付费项目</text>
       <text class="menu-arrow">›</text>
     </view>
-    <view class="menu-item" bindtap="onDeductionTap">
-      <text class="menu-label">销卡</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onRefundTap">
-      <text class="menu-label">退费</text>
-      <text class="menu-arrow">›</text>
-    </view>
   </view>
 
   <!-- 退出按钮 -->

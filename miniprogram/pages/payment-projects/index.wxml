@@ -1,0 +1,50 @@
+<view class="container">
+  <!-- Tab 栏 -->
+  <scroll-view class="tab-bar" scroll-x enable-flex>
+    <view
+      class="tab-item {{activeType === item.value ? 'active' : ''}}"
+      wx:for="{{tabs}}"
+      wx:key="value"
+      bindtap="onTabChange"
+      data-value="{{item.value}}"
+    >{{item.label}}</view>
+  </scroll-view>
+
+  <!-- 项目列表 -->
+  <scroll-view class="list-area" scroll-y>
+    <view wx:if="{{loading}}" class="empty-tip">加载中...</view>
+    <view wx:elif="{{items.length === 0}}" class="empty-tip">暂无项目</view>
+    <view wx:else>
+      <view
+        class="project-card"
+        wx:for="{{items}}"
+        wx:key="id"
+        bindtap="onEdit"
+        data-id="{{item.id}}"
+        data-type="{{item._type}}"
+      >
+        <view class="card-main">
+          <view class="card-row">
+            <text class="card-nickname">{{item.nickname || '未知客户'}}</text>
+            <text class="card-amount">¥{{item._amount}}</text>
+          </view>
+          <view class="card-row card-sub">
+            <text class="card-date">{{item.deal_date || '--'}}</text>
+            <text class="card-closer" wx:if="{{item.closer_name}}">成交人：{{item.closer_name}}</text>
+          </view>
+          <view class="card-row card-sub" wx:if="{{item._extra}}">
+            <text class="card-extra">{{item._extra}}</text>
+          </view>
+        </view>
+        <view class="card-delete" catchtap="onDelete" data-id="{{item.id}}" data-type="{{item._type}}">
+          <text class="delete-text">删除</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 悬浮新增按钮 -->
+  <view class="fab" bindtap="onCreate">
+    <text class="fab-text">+</text>
+  </view>
+</view>

@@ -128,11 +128,11 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
     case "emotional_release":
     case "oh_card_reading":
     case "energy_knot":
-      return { ...base, detail: `${item.purchase_count} 次`, price: item.amount, purchase_count: item.purchase_count, amount: item.amount }
+      return { ...base, detail: `${item.purchase_count} 次`, price: item.amount, purchase_count: item.purchase_count, amount: item.amount, effective_remaining: item.effective_remaining, created_by: item.created_by }
     case "internal_course":
-      return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, course_type: item.course_type }
+      return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, course_type: item.course_type, created_by: item.created_by }
     case "other":
-      return { ...base, detail: item.category || "", price: item.fee, effective_date: item.effective_date, remaining_count: item.remaining_count, category: item.category, project_name: item.project_name, duration_type: item.duration_type, duration_value: item.duration_value }
+      return { ...base, detail: item.category || "", price: item.fee, effective_date: item.effective_date, remaining_count: item.remaining_count, category: item.category, project_name: item.project_name, duration_type: item.duration_type, duration_value: item.duration_value, effective_remaining: item.effective_remaining, created_by: item.created_by }
   }
 }
 
@@ -1202,12 +1202,16 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                       })()}
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">
-                      {item.type === "membership_card" && (
+                      {item.type === "membership_card" ? (
                         item.voided
                           ? <span className="text-[#c4506a]">已退费</span>
                           : item.effective_remaining === null || item.effective_remaining === undefined
                             ? "不限"
                             : `${item.effective_remaining} 次`
+                      ) : (
+                        item.effective_remaining !== null && item.effective_remaining !== undefined
+                          ? `${item.effective_remaining} 次`
+                          : "-"
                       )}
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">

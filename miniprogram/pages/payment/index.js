@@ -68,13 +68,17 @@ Page({
       const api = paymentApi.getByType(type)
       const res = await api.listPaginated(1, 100)
       const raw = res.items || res.data || res || []
+      const isHealing = ['group_case', 'emotional_release', 'oh_card_reading', 'energy_knot'].includes(type)
       const items = (Array.isArray(raw) ? raw : []).map(item => ({
         ...item,
         _detail: buildDetail(item, type),
         _price: buildPrice(item, type),
         _effective: formatDate(item.effective_date),
         _expiry: formatDate(item.expiry_date),
-        _remaining: item.remaining_count === null ? '不限' : (item.remaining_count ?? ''),
+        _purchaseCount: isHealing ? (item.purchase_count ?? '') : '',
+        _remaining: isHealing
+          ? (item.effective_remaining != null ? item.effective_remaining : '')
+          : (item.remaining_count === null ? '不限' : (item.remaining_count ?? '')),
       }))
       this.setData({ items, loading: false })
     } catch (e) {
@@ -93,26 +97,7 @@ Page({
   onItemTap(e) {
     const item = e.currentTarget.dataset.item
     const type = TABS[this.data.activeTab].key
-    wx.navigateTo({ url: `/pages/payment-edit/index?type=${type}&id=${item.id}` })
+    wx.navigateTo({ url: `/pages/payment-detail/index?type=${type}&id=${item.id}` })
   },
 
-  onDeleteTap(e) {
-    const item = e.currentTarget.dataset.item
-    const type = TABS[this.data.activeTab].key
-    wx.showModal({
-      title: '确认删除',
-      content: `确定删除 ${item.nickname} 的${TABS[this.data.activeTab].label}记录？`,
-      success: (res) => {
-        if (res.confirm) {
-          const api = paymentApi.getByType(type)
-          api.delete(item.id).then(() => {
-            wx.showToast({ title: '已删除' })
-            this.loadItems()
-          }).catch(err => {
-            wx.showToast({ title: '删除失败', icon: 'none' })
-          })
-        }
-      },
-    })
-  },
 })

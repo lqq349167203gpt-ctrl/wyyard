@@ -31,6 +31,16 @@ def list_cards(page: int | None = Query(None, ge=1), page_size: int | None = Que
     return items_dict
 
 
+@router.get("/{card_id}")
+def get_card(card_id: str):
+    card = membership_card_service.get_card(card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    item = card.model_dump() if hasattr(card, "model_dump") else card
+    item["effective_remaining"] = membership_card_service.get_card_effective_remaining(card_id)
+    return item
+
+
 @router.post("")
 def create_card(data: MembershipCardCreate):
     return membership_card_service.create_card(data)

@@ -26,7 +26,10 @@ _load()
 
 
 def list_organizations() -> List[Organization]:
-    return [v for v in _organizations.values() if not v.is_deleted]
+    return sorted(
+        [v for v in _organizations.values() if not v.is_deleted],
+        key=lambda o: (o.sort_order is None, o.sort_order or 0)
+    )
 
 
 def get_organization(org_id: str) -> Optional[Organization]:

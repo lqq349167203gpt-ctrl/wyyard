@@ -105,19 +105,14 @@
   color: #8f959e;
 }
 
+.card-count {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
 .card-remaining {
   font-size: 24rpx;
   color: #52c41a;
-}
-
-.card-delete {
-  padding: 16rpx 0 16rpx 24rpx;
-  flex-shrink: 0;
-}
-
-.delete-text {
-  font-size: 24rpx;
-  color: #ff4d4f;
 }
 
 /* 空状态 */

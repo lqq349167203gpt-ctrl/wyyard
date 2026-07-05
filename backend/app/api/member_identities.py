@@ -64,7 +64,7 @@ def reorder_identities(data: dict, request: Request = None):
                     from app.services import account_service
                     account = account_service.get_account(user_id)
                     if account:
-                        operator = account.username
+                        operator = account.owner or account.username
                         operator_role = account.role
                 except Exception:
                     pass
@@ -97,7 +97,7 @@ def refresh_all(request: Request):
             from app.services import account_service
             account = account_service.get_account(user_id)
             if account:
-                operator = account.username
+                operator = account.owner or account.username
                 operator_role = account.role
         except Exception:
             pass

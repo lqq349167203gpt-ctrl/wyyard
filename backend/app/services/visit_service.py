@@ -500,6 +500,11 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
 
 
 def create_visit(data: VisitRecordCreate) -> VisitRecord:
+    # 验证客户必须存在于系统中
+    if data.customer_id:
+        from app.services import customer_service
+        if not customer_service.get_customer(data.customer_id):
+            raise ValueError("客户不存在，无法创建到店记录")
     _invalidate_counts_cache()
     with _visit_lock:
         # 检查当天是否已到场（customer_id 为空时跳过检查）

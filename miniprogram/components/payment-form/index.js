@@ -1,25 +1,24 @@
-const { paymentApi } = require('../../utils/api')
+const { paymentApi, customerApi, organizationApi } = require('../../utils/api')
 
 const CARD_TYPES = [
-  { key: '次卡', label: '次卡', price: 198, count: 1, duration_type: 'year', duration_value: 1 },
-  { key: '体验会员', label: '体验会员', price: 398, count: 4, duration_type: 'year', duration_value: 1 },
+  { key: '次卡', label: '次卡', price: 198, count: 1, duration_type: 'month', duration_value: 12 },
+  { key: '体验会员', label: '体验会员', price: 398, count: 4, duration_type: 'month', duration_value: 12 },
   { key: '月卡', label: '月卡', price: 1999, count: null, duration_type: 'month', duration_value: 1 },
   { key: '3月卡', label: '3月卡', price: 3999, count: null, duration_type: 'month', duration_value: 3 },
-  { key: '30次卡', label: '30次卡', price: 3999, count: 30, duration_type: 'year', duration_value: 1 },
+  { key: '30次卡', label: '30次卡', price: 3999, count: 30, duration_type: 'month', duration_value: 12 },
   { key: '半年卡', label: '半年卡', price: 7999, count: null, duration_type: 'month', duration_value: 6 },
-  { key: '年卡', label: '年卡', price: 12800, count: null, duration_type: 'year', duration_value: 1 },
+  { key: '年卡', label: '年卡', price: 12800, count: null, duration_type: 'month', duration_value: 12 },
 ]
 
 const COURSE_TYPES = [
-  { key: '疗愈师课程：自爱力构建', label: '疗愈师课程：自爱力构建', price: 20000, duration_type: 'year', duration_value: 1 },
+  { key: '疗愈师课程：自爱力构建', label: '疗愈师课程：自爱力构建', price: 20000, duration_type: 'month', duration_value: 12 },
   { key: '商业框架陪跑：自觉力提升', label: '商业框架陪跑：自觉力提升', price: 36800, duration_type: 'month', duration_value: 3 },
-  { key: '落地赋能班：自洽力整合', label: '落地赋能班：自洽力整合', price: 58000, duration_type: 'year', duration_value: 2 },
+  { key: '落地赋能班：自洽力整合', label: '落地赋能班：自洽力整合', price: 58000, duration_type: 'month', duration_value: 24 },
 ]
 
 const DURATION_TYPES = [
   { key: 'day', label: '天' },
   { key: 'month', label: '月' },
-  { key: 'year', label: '年' },
 ]
 
 function today() {
@@ -35,13 +34,19 @@ Component({
     type: { type: String, value: '' },
     isEdit: { type: Boolean, value: false },
     editData: { type: Object, value: null },
+    hideBtn: { type: Boolean, value: false },
   },
 
   data: {
-    searchKeyword: '',
-    searchResults: [],
-    showResults: false,
+    showPicker: false,
+    pickerTitle: '',
+    pickerField: '',
+    pickerKeyword: '',
+    pickerList: [],
     selectedCustomer: null,
+    closers: [],
+    closerTotal: 0,
+    closerIdMap: {},
     formData: {},
     cardTypes: CARD_TYPES,
     cardTypeIndex: -1,
@@ -50,11 +55,14 @@ Component({
     durationTypes: DURATION_TYPES,
     durationTypeIndex: -1,
     submitting: false,
+    allCustomers: [],
+    organizations: [],
+    orgIndex: 0,
   },
 
   observers: {
-    'editData, isEdit': function(editData, isEdit) {
-      if (isEdit && editData) {
+    'editData, isEdit, organizations': function(editData, isEdit, organizations) {
+      if (isEdit && editData && organizations.length > 0) {
         this._populateEditData(editData)
       }
     },
@@ -63,20 +71,37 @@ Component({
   lifetimes: {
     attached() {
       if (!this.data.isEdit) {
-        this.setData({
-          formData: { deal_date: today(), effective_date: today() },
-        })
+        this.setData({ formData: { deal_date: today(), effective_date: today() } })
       }
-    },
-    detached() {
-      if (this._searchTimer) clearTimeout(this._searchTimer)
+      this._loadCustomers()
+      this._loadOrganizations()
     },
   },
 
   methods: {
+    _loadCustomers() {
+      customerApi.light(200).then(res => {
+        this.setData({ allCustomers: res || [] })
+      }).catch(() => {})
+    },
+
+    _loadOrganizations() {
+      organizationApi.list().then(res => {
+        const orgs = res || []
+        const defaultIdx = 0
+        const defaultOrgId = orgs.length > 0 ? orgs[0].id : ''
+        this.setData({
+          organizations: orgs,
+          orgIndex: defaultIdx,
+          'formData.organization_id': this.data.formData.organization_id || defaultOrgId,
+        })
+      }).catch(() => {})
+    },
+
     _populateEditData(d) {
       const fd = {
         customer_id: d.customer_id,
+        organization_id: d.organization_id ?? '',
         deal_date: d.deal_date ? d.deal_date.slice(0, 10) : today(),
         effective_date: d.effective_date ? d.effective_date.slice(0, 10) : '',
         duration_type: d.duration_type ?? '',
@@ -91,10 +116,7 @@ Component({
         card_type: d.card_type ?? '',
         course_type: d.course_type ?? '',
       }
-
       const type = this.data.type
-
-      // 匹配 card_type index
       if (type === 'membership_card' && d.card_type) {
         const idx = CARD_TYPES.findIndex(c => c.key === d.card_type)
         if (idx >= 0) {
@@ -102,8 +124,6 @@ Component({
           this.setData({ cardTypeIndex: idx })
         }
       }
-
-      // 匹配 course_type index
       if (type === 'internal_course' && d.course_type) {
         const idx = COURSE_TYPES.findIndex(c => c.key === d.course_type)
         if (idx >= 0) {
@@ -111,65 +131,125 @@ Component({
           this.setData({ courseTypeIndex: idx })
         }
       }
-
-      // 匹配 duration_type index
       if (fd.duration_type) {
         const idx = DURATION_TYPES.findIndex(dt => dt.key === fd.duration_type)
         if (idx >= 0) this.setData({ durationTypeIndex: idx })
       }
+      // 匹配组织 index
+      if (d.organization_id && this.data.organizations.length > 0) {
+        const orgIdx = this.data.organizations.findIndex(o => o.id === d.organization_id)
+        if (orgIdx >= 0) this.setData({ orgIndex: orgIdx })
+      }
+      // 构建成交人数组
+      let closers = []
+      if (d.closers && d.closers.length > 0) {
+        closers = d.closers.map(c => ({ id: c.id || '', nickname: c.name || '', amount: c.amount || 0 }))
+      } else if (d.closer_name) {
+        closers = [{ id: d.closer_id || '', nickname: d.closer_name, amount: 0 }]
+      }
+      const closerTotal = closers.reduce((s, c) => s + (c.amount || 0), 0)
+      const closerIdMap = {}
+      closers.forEach(c => { closerIdMap[c.id] = true })
 
       this.setData({
         formData: fd,
         selectedCustomer: d.nickname ? { id: d.customer_id, nickname: d.nickname } : null,
+        closers,
+        closerTotal,
+        closerIdMap,
       })
     },
 
-    // ---- 客户搜索 ----
+    onPickerOpen(e) {
+      const field = e.currentTarget.dataset.field
+      this.setData({
+        showPicker: true,
+        pickerTitle: field === 'customer' ? '用户' : '选择成交人',
+        pickerField: field,
+        pickerKeyword: '',
+        pickerList: this.data.allCustomers,
+      })
+    },
 
-    onSearchInput(e) {
+    onPickerClose() {
+      this.setData({ showPicker: false, pickerKeyword: '', pickerList: [] })
+    },
+
+    onPickerSearch(e) {
       const keyword = e.detail.value
-      this.setData({ searchKeyword: keyword })
-      if (keyword.length < 1) {
-        this.setData({ searchResults: [], showResults: false })
+      this.setData({ pickerKeyword: keyword })
+      if (!keyword) {
+        this.setData({ pickerList: this.data.allCustomers })
         return
       }
-      this._searchTimer && clearTimeout(this._searchTimer)
-      this._searchTimer = setTimeout(() => {
-        const type = this.data.type
-        const api = paymentApi.getByType(type)
-        api.searchCustomers(keyword).then(res => {
-          this.setData({ searchResults: res || [], showResults: true })
-        }).catch(err => {
-          console.error('搜索客户失败:', err)
-        })
-      }, 300)
+      const q = keyword.toLowerCase()
+      this.setData({
+        pickerList: this.data.allCustomers.filter(c => c.nickname && c.nickname.toLowerCase().includes(q)),
+      })
     },
 
-    onSearchFocus() {
-      if (this.data.searchResults.length > 0) {
-        this.setData({ showResults: true })
+    onPickerSelect(e) {
+      const { id, nickname } = e.currentTarget.dataset
+      const field = this.data.pickerField
+      if (field === 'customer') {
+        this.setData({ selectedCustomer: { id, nickname }, 'formData.customer_id': id })
+        this.onPickerClose()
+      } else {
+        // 成交人：添加到数组，不关闭弹窗
+        const closers = this.data.closers
+        if (closers.some(c => c.id === id)) {
+          wx.showToast({ title: '已选择该成交人', icon: 'none' })
+          return
+        }
+        const newClosers = [...closers, { id, nickname, amount: 0 }]
+        const closerIdMap = {}
+        newClosers.forEach(c => { closerIdMap[c.id] = true })
+        this.setData({
+          closers: newClosers,
+          closerTotal: newClosers.reduce((s, c) => s + (c.amount || 0), 0),
+          closerIdMap,
+        })
+        // 更新列表，排除已选
+        this._updateCloserPickerList('')
       }
     },
 
-    onSelectCustomer(e) {
-      const customer = e.currentTarget.dataset.customer
+    _updateCloserPickerList(keyword) {
+      let list = this.data.allCustomers
+      if (keyword) {
+        const q = keyword.toLowerCase()
+        list = list.filter(c => c.nickname && c.nickname.toLowerCase().includes(q))
+      }
+      this.setData({ pickerKeyword: keyword, pickerList: list })
+    },
+
+    onPickerClear(e) {
+      const field = e.currentTarget.dataset.field
+      if (field === 'customer') {
+        this.setData({ selectedCustomer: null, 'formData.customer_id': '' })
+      }
+    },
+
+    onRemoveCloser(e) {
+      const id = e.currentTarget.dataset.id
+      const closers = this.data.closers.filter(c => c.id !== id)
+      const closerIdMap = {}
+      closers.forEach(c => { closerIdMap[c.id] = true })
       this.setData({
-        selectedCustomer: customer,
-        searchKeyword: '',
-        showResults: false,
-        searchResults: [],
-        'formData.customer_id': customer.id,
+        closers,
+        closerTotal: closers.reduce((s, c) => s + (c.amount || 0), 0),
+        closerIdMap,
       })
     },
 
-    onClearCustomer() {
-      this.setData({
-        selectedCustomer: null,
-        'formData.customer_id': '',
-      })
+    onCloserAmountInput(e) {
+      const id = e.currentTarget.dataset.id
+      const value = e.detail.value
+      const closers = this.data.closers.map(c =>
+        c.id === id ? { ...c, amount: parseFloat(value) || 0 } : c
+      )
+      this.setData({ closers, closerTotal: closers.reduce((s, c) => s + (c.amount || 0), 0) })
     },
-
-    // ---- 表单字段 ----
 
     onFieldInput(e) {
       const field = e.currentTarget.dataset.field
@@ -179,6 +259,14 @@ Component({
     onFieldChange(e) {
       const field = e.currentTarget.dataset.field
       this.setData({ [`formData.${field}`]: e.detail.value })
+    },
+
+    onOrgChange(e) {
+      const idx = parseInt(e.detail.value)
+      this.setData({
+        orgIndex: idx,
+        'formData.organization_id': this.data.organizations[idx].id,
+      })
     },
 
     onCardTypeChange(e) {
@@ -192,7 +280,6 @@ Component({
         'formData.duration_type': ct.duration_type,
         'formData.duration_value': ct.duration_value,
       })
-      // 同步 duration_type picker
       const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === ct.duration_type)
       if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx })
     },
@@ -219,35 +306,25 @@ Component({
       })
     },
 
-    // ---- 提交 ----
-
     _buildPayload() {
-      const { formData, selectedCustomer, type, isEdit } = this.data
+      const { formData, selectedCustomer, closers, type, isEdit } = this.data
       const payload = { ...formData }
-
-      // 客户信息
       payload.customer_id = selectedCustomer.id
       payload.nickname = selectedCustomer.nickname
-
-      // 后端只支持 day/month，年转为月（与 PC 端一致）
-      if (payload.duration_type === 'year') {
-        payload.duration_type = 'month'
-        payload.duration_value = (payload.duration_value || 1) * 12
+      const user = getApp()?.globalData?.currentUser
+      if (user) payload.created_by = user.owner ?? user.username ?? ''
+      if (closers.length > 0) {
+        payload.closer_id = closers[0].id || null
+        payload.closer_name = closers[0].nickname || ''
+        payload.closers = closers.map(c => ({ id: c.id || '', name: c.nickname || '', amount: c.amount || 0 }))
       }
-
-      // 后端限制：编辑时禁止修改特定字段（防止绕过活动扣减恒等式）
       if (isEdit) {
-        if (type === 'membership_card') {
-          delete payload.remaining_count
-        } else if (type === 'other') {
+        if (type === 'membership_card' || type === 'other') {
           delete payload.remaining_count
         } else {
-          // group_case, emotional_release, oh_card_reading, energy_knot
           delete payload.purchase_count
         }
       }
-
-      // 数字字段统一转换
       const floatFields = ['price', 'amount', 'fee']
       const intFields = ['purchase_count', 'duration_value', 'remaining_count']
       floatFields.forEach(f => {
@@ -262,35 +339,57 @@ Component({
           payload[f] = parseInt(payload[f])
         }
       })
-
-      // 清除剩余空字段
       Object.keys(payload).forEach(k => {
         if (payload[k] === '' || payload[k] === undefined || payload[k] === null) {
           delete payload[k]
         }
       })
-
       return payload
     },
 
     onSubmit() {
       if (this._submitting) return
-      const { selectedCustomer, type, isEdit } = this.data
-
+      const { selectedCustomer, closers, type, cardTypeIndex, courseTypeIndex, isEdit } = this.data
       if (!selectedCustomer) {
-        wx.showToast({ title: '请选择客户', icon: 'none' })
+        wx.showToast({ title: '请选择用户', icon: 'none' })
         return
       }
+      if (closers.length === 0) {
+        wx.showToast({ title: '请选择成交人', icon: 'none' })
+        return
+      }
+      if (type === 'membership_card' && cardTypeIndex < 0) {
+        wx.showToast({ title: '请选择会员卡类型', icon: 'none' })
+        return
+      }
+      if (type === 'internal_course' && courseTypeIndex < 0) {
+        wx.showToast({ title: '请选择课程类型', icon: 'none' })
+        return
+      }
+      const { formData, closerTotal } = this.data
+      const feeField = type === 'other' ? 'fee' : (type === 'group_case' || type === 'emotional_release' || type === 'oh_card_reading' || type === 'energy_knot') ? 'amount' : 'price'
+      const fee = parseFloat(formData[feeField]) || 0
+      if (closers.length > 0 && fee > 0 && closerTotal !== fee) {
+        wx.showModal({
+          title: '金额不一致',
+          content: `费用金额 ${fee} 元，成交人总额 ${closerTotal} 元，是否继续提交？`,
+          success: (res) => {
+            if (res.confirm) this._doSubmit()
+          },
+        })
+        return
+      }
+      this._doSubmit()
+    },
 
+    _doSubmit() {
+      if (this._submitting) return
+      const { type, isEdit } = this.data
       const payload = this._buildPayload()
       this._submitting = true
       this.setData({ submitting: true })
-
       const api = paymentApi.getByType(type)
-      const action = isEdit
-        ? api.update(this.data.editData.id, payload)
-        : api.create(payload)
-
+      const action = isEdit ? api.update(this.data.editData.id, payload) : api.create(payload)
       action.then(() => {
         wx.showToast({ title: isEdit ? '已保存' : '已新增' })
         this.triggerEvent('success')

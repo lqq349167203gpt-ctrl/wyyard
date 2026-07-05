@@ -25,6 +25,14 @@ def list_projects(page: int | None = Query(None, ge=1), page_size: int | None = 
     return items
 
 
+@router.get("/{project_id}")
+def get_project(project_id: str):
+    project = other_project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    return project
+
+
 @router.post("")
 def create_project(data: OtherProjectCreate):
     return other_project_service.create_project(data)

@@ -116,7 +116,7 @@ async def customer_chat(req: CustomerChatRequest, request: Request):
     """客户对话：理解意图 → 执行操作 → 返回自然语言回复"""
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="消息为空")
-    operator = getattr(request.state, "user_name", "") or ""
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "") or ""
     result = await customer_chat_service.customer_chat(
         req.message, req.history, operator=operator
     )
@@ -153,7 +153,7 @@ async def visit_chat(req: VisitChatRequest, request: Request):
     """邀约对话：理解意图 → 执行操作 → 返回自然语言回复"""
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="消息为空")
-    operator = getattr(request.state, "user_name", "") or ""
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "") or ""
     result = await visit_chat_service.visit_chat(
         req.message, req.history, req.date, req.space_id, operator=operator
     )
@@ -190,7 +190,7 @@ async def activity_chat(req: ActivityChatRequest, request: Request):
     """课表对话：理解意图 → 执行操作 → 返回自然语言回复"""
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="消息为空")
-    operator = getattr(request.state, "user_name", "") or ""
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "") or ""
     result = await activity_chat_service.activity_chat(
         req.message, req.history, req.date, req.space_id, operator=operator
     )

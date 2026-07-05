@@ -275,11 +275,11 @@ def record_customer_feedback(customer_name: str, feedback: str) -> str:
 
 @tool
 def set_referrer_handler(customer_name: str, referrer_handler: str, visit_date: str = "") -> str:
-    """设置或修改客户的邀约人（承接人）。如不在名单中则自动添加。
+    """设置或修改客户的邀约人（承接人）。客户必须已存在于系统中，如不在到店名单中则自动添加到当天名单。
 
     Args:
-        customer_name: 客户昵称（如"余墨"）
-        referrer_handler: 邀约人昵称（如"小明"）
+        customer_name: 客户昵称（如"余墨"），必须是系统中已有的客户
+        referrer_handler: 邀约人昵称（如"小明"），必须是系统中已有的客户
         visit_date: 到店日期，格式 YYYY-MM-DD，不填则用今天
     """
     date = visit_date or _ctx_var.get()["date"]
@@ -289,6 +289,15 @@ def set_referrer_handler(customer_name: str, referrer_handler: str, visit_date: 
     if not customer:
         suggestions = _search_similar_names(customer_name)
         result = {"ok": False, "reason": "not_found", "name": customer_name}
+        if suggestions:
+            result["suggestions"] = suggestions
+        return json.dumps(result, ensure_ascii=False)
+
+    # 邀约人必须是系统中已有的客户
+    referrer = _find_customer_from_instruction(referrer_handler)
+    if not referrer:
+        suggestions = _search_similar_names(referrer_handler)
+        result = {"ok": False, "reason": "referrer_not_found", "name": referrer_handler}
         if suggestions:
             result["suggestions"] = suggestions
         return json.dumps(result, ensure_ascii=False)
@@ -481,12 +490,12 @@ async def visit_chat(message: str, history: list, date: str, space_id: str, oper
             return {"reply": f"AI 调用失败：{str(e)[:100]}", "action": "error"}
         print(f"[visit_chat] 第{_round+1}轮 LLM 响应: tool_calls={response.tool_calls}, content={response.content[:200] if response.content else 'None'}")
 
-    # 生成回复：优先用 LLM 的内容，如果为空则根据工具结果直接生成
-    if response.content and response.content.strip():
-        reply = response.content.strip()
-    elif tool_call_log:
-        reply = _build_reply_from_tools(tool_call_log)
+    # 生成回复：只有调用了工具才信任 LLM 的文本，否则用工具结果或默认回复
+    if tool_call_log:
+        # 有工具调用：优先用 LLM 文本（更自然），为空则用工具结果
+        reply = response.content.strip() if response.content and response.content.strip() else _build_reply_from_tools(tool_call_log)
     else:
+        # 无工具调用：LLM 的文本不可信（可能是幻觉），强制用默认回复
         reply = "没太听懂，能再说一遍吗？"
 
     # 写对话日志
@@ -559,7 +568,7 @@ def _build_reply_from_tools(tool_call_log: list) -> str:
         else:
             reason = result.get("reason", "")
             name = result.get("name", "")
-            if reason == "not_found":
+            if reason in ("not_found", "referrer_not_found"):
                 suggestions = result.get("suggestions", [])
                 if suggestions:
                     return f"找不到「{name}」，你是不是想说：{'、'.join(suggestions)}？"

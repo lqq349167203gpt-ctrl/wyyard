@@ -21,13 +21,11 @@
           <text class="card-price">¥{{item._price}}</text>
         </view>
         <view class="card-row2">
-          <text class="card-detail" wx:if="{{item._detail}}">{{item._detail}}</text>
+          <text class="card-detail" wx:if="{{item._detail && !item._purchaseCount}}">{{item._detail}}</text>
+          <text class="card-count" wx:if="{{item._purchaseCount !== ''}}">购买: {{item._purchaseCount}}次</text>
+          <text class="card-remaining" wx:if="{{item._remaining !== ''}}">剩余: {{item._remaining}}次</text>
           <text class="card-date" wx:if="{{item._effective}}">{{item._effective}} ~ {{item._expiry}}</text>
-          <text class="card-remaining" wx:if="{{item._remaining !== ''}}">剩余: {{item._remaining}}</text>
         </view>
-      </view>
-      <view class="card-delete" catchtap="onDeleteTap" data-item="{{item}}">
-        <text class="delete-text">删除</text>
       </view>
     </view>
   </view>

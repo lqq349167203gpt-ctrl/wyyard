@@ -2,5 +2,9 @@
   <view class="loading" wx:if="{{loading}}">
     <text class="loading-text">加载中...</text>
   </view>
-  <payment-form wx:if="{{!loading && editData}}" type="{{type}}" is-edit="{{true}}" edit-data="{{editData}}" bind:success="onFormSuccess" />
+  <payment-form id="paymentForm" wx:if="{{!loading && editData}}" type="{{type}}" is-edit="{{true}}" edit-data="{{editData}}" bind:success="onFormSuccess" hide-btn="{{true}}" />
+  <view class="pe-btns" wx:if="{{!loading && editData}}">
+    <button class="pe-btn-delete" bindtap="onDeleteTap">删    除</button>
+    <button class="pe-btn-save" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+  </view>
 </view>

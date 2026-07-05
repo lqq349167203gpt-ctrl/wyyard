@@ -174,6 +174,11 @@ async def analyze_save_error(error: str, previous_data: dict) -> dict:
     return result
 
 
+def _name_match(name: str, instruction: str) -> bool:
+    """名字必须完全一致才匹配。不一致时由 AI 提供可选项。"""
+    return name == instruction
+
+
 def _find_customer_from_instruction(instruction: str) -> dict | None:
     """从用户指令中智能查找客户，按优先级尝试多种匹配方式。"""
     from app.services import customer_service
@@ -187,14 +192,14 @@ def _find_customer_from_instruction(instruction: str) -> dict | None:
             if c.id == candidate:
                 return _customer_to_dict(c)
 
-    # 2. 按昵称精确匹配（优先，最可靠）
+    # 2. 按昵称匹配
     for c in customers:
-        if c.nickname and c.nickname in instruction:
+        if c.nickname and _name_match(c.nickname, instruction):
             return _customer_to_dict(c)
 
-    # 3. 按姓名精确匹配
+    # 3. 按姓名匹配
     for c in customers:
-        if c.name and len(c.name) >= 2 and c.name in instruction:
+        if c.name and len(c.name) >= 2 and _name_match(c.name, instruction):
             return _customer_to_dict(c)
 
     # 4. 按手机号匹配

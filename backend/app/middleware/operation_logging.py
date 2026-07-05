@@ -1109,6 +1109,16 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         except json.JSONDecodeError:
             body = {}
 
+        ip = request.client.host if request.client else ""
+
+        before_data = None
+        if method in ("PUT", "PATCH", "DELETE"):
+            entity_id = get_entity_id(path)
+            before_data = get_before_data(path, entity_id, body)
+
+        response = await call_next(request)
+
+        # AuthMiddleware 在 call_next 中执行，此时才能读到 user_id
         user_id = getattr(request.state, "user_id", "")
         operator = ""
         operator_role = ""
@@ -1121,15 +1131,6 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                     operator_role = account.role
             except Exception:
                 operator = user_id[:8]
-
-        ip = request.client.host if request.client else ""
-
-        before_data = None
-        if method in ("PUT", "PATCH", "DELETE"):
-            entity_id = get_entity_id(path)
-            before_data = get_before_data(path, entity_id, body)
-
-        response = await call_next(request)
 
         # 只记录成功的写操作（跳过 4xx/5xx）
         if response.status_code >= 400:

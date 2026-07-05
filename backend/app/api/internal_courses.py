@@ -25,6 +25,14 @@ def list_courses(page: int | None = Query(None, ge=1), page_size: int | None = Q
     return items_dict
 
 
+@router.get("/{course_id}")
+def get_course(course_id: str):
+    course = internal_course_service.get_course(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    return course
+
+
 @router.post("")
 def create_course(data: InternalCourseCreate):
     return internal_course_service.create_course(data)

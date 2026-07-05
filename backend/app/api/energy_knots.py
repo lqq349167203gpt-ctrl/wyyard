@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from app.utils.pagination import paginate
-from app.services import energy_knot_service
+from app.services import energy_knot_service, energy_knot_session_service
 from app.models.energy_knot import EnergyKnotCreate
 
 router = APIRouter(prefix="/api/energy-knots", tags=["energy-knots"])
@@ -20,9 +20,25 @@ def list_knots(page: int | None = Query(None, ge=1), page_size: int | None = Que
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
     items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    remaining_cache: dict[str, int] = {}
+    for item in items_dict:
+        cid = item.get("customer_id", "")
+        if cid not in remaining_cache:
+            remaining_cache[cid] = energy_knot_session_service.get_remaining_count(cid)
+        item["effective_remaining"] = remaining_cache[cid]
     if page is not None:
         return paginate(items_dict, page, page_size or 10)
     return items_dict
+
+
+@router.get("/{knot_id}")
+def get_knot(knot_id: str):
+    knot = energy_knot_service.get_knot(knot_id)
+    if not knot:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    result = knot.model_dump() if hasattr(knot, "model_dump") else knot
+    result["effective_remaining"] = energy_knot_session_service.get_remaining_count(knot.customer_id)
+    return result
 
 
 @router.post("")

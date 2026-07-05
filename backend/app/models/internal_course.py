@@ -15,6 +15,7 @@ class InternalCourseBase(SafeBaseModel):
     closers: List[dict] = []
     organization_id: Optional[str] = None
     deal_date: Optional[str] = None
+    created_by: str = ""
 
 
 class InternalCourseCreate(InternalCourseBase):
