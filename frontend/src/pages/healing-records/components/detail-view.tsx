@@ -438,15 +438,21 @@ export default function DetailView({
                   <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">会员卡</span>
                   <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
                     {(() => {
-                      const first = memberItems[0]
-                      const manual = first?.manual_deductions || 0
-                      const activity = first?.activity_deductions || 0
-                      const icDeduct = first?.internal_course_deductions || 0
-                      const ulDeduct = first?.unlimited_deductions || 0
+                      const totalManual = memberItems.reduce((sum, s) => sum + (s.manual_deductions || 0), 0)
+                      const icDeduct = memberItems[0]?.internal_course_deductions || 0
+                      const cardDeductions = memberItems
+                        .filter(s => !s.voided && ((s.activity_deductions || 0) + (s.unlimited_deductions || 0)) > 0)
+                        .map(s => `${s.name}扣卡${(s.activity_deductions || 0) + (s.unlimited_deductions || 0)}次`)
+                      const parts: string[] = []
+                      if (!memberHasUnlimited) parts.push(`总${memberGrandTotal}次`)
+                      else parts.push("不限")
+                      parts.push(...cardDeductions)
+                      if (totalManual > 0) parts.push(`销卡${totalManual}次`)
+                      if (icDeduct > 0) parts.push(`内部课程抵扣${icDeduct}次`)
                       return (
                         <span>
                           {memberHasUnlimited ? "不限次" : (typeof memberTotal === "number" && memberTotal < 0 ? <span className="text-[#c4506a]">剩余{memberTotal}次</span> : `剩余${memberTotal}次`)}
-                          <span className="ml-1 text-[11px] text-[#8f959e]">（{memberHasUnlimited ? "不限/" : `总${memberGrandTotal}次/`}销卡{manual}次/{memberHasUnlimited ? `不限次扣卡${ulDeduct}次` : `活动扣卡${activity}次${ulDeduct > 0 ? `/不限次扣卡${ulDeduct}次` : ""}`}{icDeduct > 0 ? `/内部课程抵扣${icDeduct}次` : ""}）</span>
+                          <span className="ml-1 text-[11px] text-[#8f959e]">（{parts.join("/")}）</span>
                         </span>
                       )
                     })()}
