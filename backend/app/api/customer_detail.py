@@ -88,14 +88,13 @@ def _count_internal_course_covered(customer_id: str) -> int:
     """
     if not internal_course_service.has_active_course(customer_id):
         return 0
-    total_activities = membership_card_service.get_activity_deductions(customer_id)
-    if total_activities <= 0:
+    raw_activities = membership_card_service._count_raw_activities(customer_id)
+    if raw_activities <= 0:
         return 0
-    # 卡能覆盖的次数：总购买 - 销卡（不含活动扣卡，因为活动扣卡就是我们要算的）
     grand_total = membership_card_service.get_grand_total(customer_id)
     manual = membership_card_service.get_manual_deductions(customer_id)
-    card_available = grand_total - manual
-    return max(0, total_activities - card_available)
+    card_available = max(0, grand_total - manual)
+    return max(0, raw_activities - card_available)
 
 
 def _build_purchase_summary(customer_id: str) -> list:

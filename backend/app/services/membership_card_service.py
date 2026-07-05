@@ -170,8 +170,8 @@ def get_manual_deductions(customer_id: str) -> int:
     return total
 
 
-def get_activity_deductions(customer_id: str) -> int:
-    """活动扣卡次数（直接从实际活动参与计算，不依赖 _deductions 流水表）"""
+def _count_raw_activities(customer_id: str) -> int:
+    """统计该用户实际参与的活动总数（原始计数，不考虑卡和内部课程）"""
     from app.services import (
         visit_service,
         class_record_service,
@@ -179,49 +179,50 @@ def get_activity_deductions(customer_id: str) -> int:
         emotional_release_session_service,
         energy_knot_session_service,
         oh_card_reading_session_service,
-        internal_course_session_service,
     )
     arrived_dates = {v.visit_date for v in visit_service._visits.values()
                      if v.customer_id == customer_id and v.arrived and not v.is_deleted}
     if not arrived_dates:
         return 0
     count = 0
-    # 沙龙
     for cr in class_record_service.list_records():
         if not cr.is_deleted and not cr.is_public_welfare and cr.date in arrived_dates:
             if customer_id in class_record_service._get_group_member_ids(cr):
                 count += 1
-    # 觉醒游戏
     for s in group_case_session_service.list_sessions():
         if not s.is_deleted and s.date in arrived_dates:
             if customer_id in group_case_session_service._get_chargeable_ids(s):
                 count += 1
-    # 情绪释放
     for s in emotional_release_session_service.list_sessions():
         if not s.is_deleted and s.date in arrived_dates:
             if customer_id in emotional_release_session_service._get_chargeable_ids(s):
                 count += 1
-    # 能量结
     for s in energy_knot_session_service.list_sessions():
         if not s.is_deleted and s.date in arrived_dates:
             chargeable = set(s.participant_ids)
             chargeable.discard(s.owner_id)
             if customer_id in chargeable:
                 count += 1
-    # OH卡梳理
     for s in oh_card_reading_session_service.list_sessions():
         if not s.is_deleted and s.date in arrived_dates:
             chargeable = set(s.participant_ids)
             chargeable.discard(s.owner_id)
             if customer_id in chargeable:
                 count += 1
-    # 内部课程覆盖的活动不计入扣卡（先扣卡，卡扣完后才走内部课程）
+    return count
+
+
+def get_activity_deductions(customer_id: str) -> int:
+    """活动扣卡次数（仅计算实际从卡扣除的，不含内部课程覆盖的）"""
+    count = _count_raw_activities(customer_id)
+    if count <= 0:
+        return 0
     from app.services import internal_course_service
     if internal_course_service.has_active_course(customer_id):
         grand_total = get_grand_total(customer_id)
         manual = get_manual_deductions(customer_id)
         card_available = max(0, grand_total - manual)
-        count = min(count, card_available)
+        return min(count, card_available)
     return count
 
 
