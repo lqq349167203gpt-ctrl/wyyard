@@ -81,15 +81,20 @@ def _parse_ek_names(desc) -> str:
 
 
 def _count_internal_course_covered(customer_id: str) -> int:
-    """统计内部课程覆盖的活动场次（卡扣完后多出来的部分）
+    """统计内部课程覆盖的活动场次（次数卡+不限次卡都扣完后多出来的部分）
 
-    逻辑：总活动 - 卡能覆盖的 = 内部课程覆盖的
-    先扣卡，卡扣完后才走内部课程。
+    逻辑：先扣次数卡 → 次数卡扣完走不限次卡 → 都没有才走内部课程。
     """
     if not internal_course_service.has_active_course(customer_id):
         return 0
     raw_activities = membership_card_service._count_raw_activities(customer_id)
     if raw_activities <= 0:
+        return 0
+    # 有不限次卡时，次数卡扣完后走不限次卡，不会走到内部课程
+    from app.services import membership_card_service as mcs
+    today = __import__('datetime').datetime.now().strftime("%Y-%m-%d")
+    active = mcs._active_cards(customer_id, today)
+    if any(c.remaining_count is None for c in active):
         return 0
     grand_total = membership_card_service.get_grand_total(customer_id)
     manual = membership_card_service.get_manual_deductions(customer_id)
@@ -109,9 +114,12 @@ def _build_purchase_summary(customer_id: str) -> list:
     activity_deductions = membership_card_service.get_activity_deductions(customer_id)
     # 内部课程抵扣：活动日期落在内部课程期间内的场次
     internal_course_deductions = _count_internal_course_covered(customer_id)
-    # 不限次扣卡：通过不限次卡扣除的活动次数
+    # 不限次扣卡：通过不限次卡扣除的活动次数（无不限次卡时为0）
     raw_activities = membership_card_service._count_raw_activities(customer_id)
-    unlimited_deductions = max(0, raw_activities - activity_deductions - internal_course_deductions)
+    today = __import__('datetime').datetime.now().strftime("%Y-%m-%d")
+    active = membership_card_service._active_cards(customer_id, today)
+    has_unlimited = any(c.remaining_count is None for c in active)
+    unlimited_deductions = max(0, raw_activities - activity_deductions - internal_course_deductions) if has_unlimited else 0
     # 有效剩余次数（None=不限次）；无卡则 0
     effective_remaining = membership_card_service.get_effective_remaining(customer_id)
     # 是否存在未分卡的老扣费记录（card_id=None），决定是否需要聚合分摊

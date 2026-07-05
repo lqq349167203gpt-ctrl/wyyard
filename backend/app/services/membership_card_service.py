@@ -213,21 +213,24 @@ def _count_raw_activities(customer_id: str) -> int:
 
 
 def get_activity_deductions(customer_id: str) -> int:
-    """活动扣卡次数（仅计算实际从卡扣除的，不含不限次和内部课程覆盖的）"""
+    """活动扣卡次数（仅计算实际从次数卡扣除的，不含不限次和内部课程覆盖的）"""
     today = datetime.now().strftime("%Y-%m-%d")
     active = _active_cards(customer_id, today)
-    if any(c.remaining_count is None for c in active):
-        return 0  # 有不限次卡，活动走不限次通道
+    countable = [c for c in active if c.remaining_count is not None]
+    if not countable:
+        return 0  # 无次数卡，全部走不限次
     count = _count_raw_activities(customer_id)
     if count <= 0:
         return 0
-    from app.services import internal_course_service
-    if internal_course_service.has_active_course(customer_id):
-        grand_total = get_grand_total(customer_id)
-        manual = get_manual_deductions(customer_id)
-        card_available = max(0, grand_total - manual)
-        return min(count, card_available)
-    return count
+    # 按生效日期排序，计算次数卡总可用量
+    from app.services import project_deduction_service
+    countable.sort(key=lambda c: (c.effective_date or "9999-12-31", c.expiry_date or "9999-12-31", c.id))
+    total_capacity = 0
+    for c in countable:
+        manual = project_deduction_service.get_deduction_total_for_project(c.id)
+        total_capacity += max(0, (c.total_count or 0) - manual)
+    # 次数卡最多扣 total_capacity，剩余的走不限次或内部课程
+    return min(count, total_capacity)
 
 
 def get_card_manual_deductions(card_id: str) -> int:
@@ -477,73 +480,73 @@ def _deduct_one(customer_id: str) -> tuple:
         _debts[customer_id] = _debts.get(customer_id, 0) + 1
         _save_debts()
         return (False, None)
-    # 不限次卡：直接放行，不消耗具体卡
+    # 先试次数卡（按生效日期最早优先），有剩余就扣次数卡
+    countable = [c for c in active_cards if c.remaining_count is not None]
+    if countable:
+        selected = _pick_earliest_expiry_card(countable, customer_id)
+        if selected:
+            from app.services import project_deduction_service
+            manual = project_deduction_service.get_deduction_total_for_project(selected.id)
+            activity = _get_card_activity_deductions_count(selected.id)
+            remaining = (selected.total_count or 0) - manual - activity
+            if remaining > 0:
+                return (True, selected.id)
+    # 次数卡扣完了或没有次数卡，走不限次卡
     if any(c.remaining_count is None for c in active_cards):
         return (True, None)
-    effective = get_effective_remaining(customer_id)
-    if effective is None:
-        return (True, None)
-    if effective <= 0:
-        from app.services import internal_course_service
-        if internal_course_service.has_active_course(customer_id):
-            return (False, None)
-        _debts[customer_id] = _debts.get(customer_id, 0) + 1
-        _save_debts()
+    # 都没有，检查内部课程
+    from app.services import internal_course_service
+    if internal_course_service.has_active_course(customer_id):
         return (False, None)
-    # 有剩余：按到期日最早优先扣那张次数卡
-    countable = [c for c in active_cards if c.remaining_count is not None]
-    selected = _pick_earliest_expiry_card(countable, customer_id)
-    return (True, selected.id if selected else None)
+    _debts[customer_id] = _debts.get(customer_id, 0) + 1
+    _save_debts()
+    return (False, None)
 
 
 def _pick_earliest_expiry_card(countable_cards, customer_id: str):
-    """从可扣次数卡中选出"剩余时间最短"的一张——即到期日最近。
+    """从可扣次数卡中选出优先级最高的一张。
 
+    排序规则（用户明确要求）：先生效的先扣，同日生效按到期日最早的优先。
     规则：
       1. 排除该卡在该用户已被记扣费次数 ≥ total_count 的卡（即该卡按流水已扣完）
-      2. 余下按 expiry_date 升序；无 expiry_date 视为永久，排最后
+      2. 余下按 effective_date 升序；无 effective_date 视为永久，排最后
+      3. 同日生效按 expiry_date 升序；无 expiry_date 视为永久，排最后
     """
     from app.services import project_deduction_service
     if not countable_cards:
         return None
     def remaining_after_water(card):
-        # 该卡已扣次数 = 该卡的销卡流水（按 project_id=card.id）+ 该卡有 card_id 的活动扣卡流水
         manual = project_deduction_service.get_deduction_total_for_project(card.id)
         activity = _get_card_activity_deductions_count(card.id)
         return (card.total_count or 0) - manual - activity
     def sort_key(c):
-        # 优先：到期日最早（"剩余时间最短"）；永久卡无 expiry 排到最后
-        # 永久卡之间：按创建时间最早的优先扣
-        return (c.expiry_date or "9999-12-31", c.created_at or "", c.id)
+        # 优先：生效日期最早；无生效日期视为永久，排最后
+        # 其次：到期日最早；无到期日视为永久，排最后
+        return (c.effective_date or "9999-12-31", c.expiry_date or "9999-12-31", c.created_at or "", c.id)
     with_remaining = [(c, remaining_after_water(c)) for c in countable_cards]
     pool = [c for c, r in with_remaining if r > 0]
     if not pool:
-        # 全部已扣完，但聚合 effective>0 说明 activity_deductions 历史未分卡；取最早到期那张兜底
         pool = list(countable_cards)
     pool.sort(key=sort_key)
     return pool[0] if pool else None
 
 
 def _get_card_activity_deductions_count(card_id: str) -> int:
-    """统计该卡的活动扣卡次数（按实际活动参与 + 最早到期优先分配，不依赖 _deductions 流水表）"""
+    """统计该卡的活动扣卡次数（按实际活动参与 + 生效日期优先分配，不依赖 _deductions 流水表）"""
     from app.services import project_deduction_service
     card = _cards.get(card_id)
     if not card:
         return 0
     customer_id = card.customer_id
-    # 有不限次卡时，活动走不限次通道，次数卡不扣
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    active = _active_cards(customer_id, today)
-    if any(c.remaining_count is None for c in active):
-        return 0
     total_activities = get_activity_deductions(customer_id)
     if total_activities <= 0:
         return 0
-    # 按到期日最早优先分配到各卡
+    # 按生效日期最早优先分配到各次数卡
     countable = [c for c in list_cards()
                  if c.customer_id == customer_id and c.remaining_count is not None and not c.voided
                  and (not c.effective_date or c.effective_date <= today)]
-    countable.sort(key=lambda c: (c.expiry_date or "9999-12-31", c.created_at or "", c.id))
+    countable.sort(key=lambda c: (c.effective_date or "9999-12-31", c.expiry_date or "9999-12-31", c.id))
     remaining_activities = total_activities
     for c in countable:
         manual = project_deduction_service.get_deduction_total_for_project(c.id)

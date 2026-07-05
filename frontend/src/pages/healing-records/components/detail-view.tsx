@@ -441,8 +441,13 @@ export default function DetailView({
                       const totalManual = memberItems.reduce((sum, s) => sum + (s.manual_deductions || 0), 0)
                       const icDeduct = memberItems[0]?.internal_course_deductions || 0
                       const cardDeductions = memberItems
-                        .filter(s => !s.voided && ((s.activity_deductions || 0) + (s.unlimited_deductions || 0)) > 0)
-                        .map(s => `${s.name}扣卡${(s.activity_deductions || 0) + (s.unlimited_deductions || 0)}次`)
+                        .filter(s => !s.voided)
+                        .map(s => {
+                          const isUnlimited = s.remaining === "不限" || s.total_purchased === "不限"
+                          const count = isUnlimited ? (s.unlimited_deductions || 0) : (s.activity_deductions || 0)
+                          return count > 0 ? `${s.name}扣卡${count}次` : ''
+                        })
+                        .filter(Boolean)
                       const parts: string[] = []
                       if (!memberHasUnlimited) parts.push(`总${memberGrandTotal}次`)
                       else parts.push("不限")
