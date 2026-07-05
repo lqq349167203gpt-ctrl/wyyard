@@ -1,6 +1,6 @@
 <view class="page">
   <!-- 底图 -->
-  <image class="bg-image" src="/images/3.png" mode="aspectFill" />
+  <image class="bg-image" src="/images/3.jpg" mode="aspectFill" />
   <view class="bg-mask"></view>
 
   <!-- 蓝色头部 -->
