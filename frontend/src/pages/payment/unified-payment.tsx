@@ -526,12 +526,12 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     const closers = formClosers
     const organization_id = formOrganizationId || null
     const deal_date = formDealDate || null
+    let createdBy = ""
+    try { const u = JSON.parse(localStorage.getItem("currentUser") || "{}"); createdBy = u.owner || u.username || "" } catch {}
 
     switch (formType) {
       case "membership_card": {
         const config = MEMBERSHIP_CARD_TYPES[formCardType]
-        let createdBy = ""
-        try { const u = JSON.parse(localStorage.getItem("currentUser") || "{}"); createdBy = u.owner || u.username || "" } catch {}
         const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname, card_type: formCardType,
           price: formPrice ? parseFloat(formPrice) : config.price,
@@ -563,7 +563,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         return {
           customer_id: formCustomerId, nickname: formNickname,
           // purchase_count 是创建时定，编辑时不发送（后端 PATCH 禁止直接修改）
-          ...(editingItem ? {} : { purchase_count: parseInt(formPurchaseCount) || 0 }),
+          ...(editingItem ? {} : { purchase_count: parseInt(formPurchaseCount) || 0, created_by: createdBy }),
           amount: parseFloat(formAmount) || 0,
           closer_id, closer_name, closers, organization_id, deal_date,
         }
@@ -573,6 +573,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           course_type: formCourseType, price: formCourseAmount,
           effective_date: formEffectiveDate,
           closer_id, closer_name, closers, organization_id, deal_date,
+          ...(!editingItem && { created_by: createdBy }),
         }
       case "other": {
         const payload: Record<string, any> = {
@@ -582,6 +583,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           duration_type: formOtherDurationType,
           duration_value: formOtherDurationValue ? parseInt(formOtherDurationValue) : null,
           closer_id, closer_name, closers, organization_id, deal_date,
+          ...(!editingItem && { created_by: createdBy }),
         }
         if (!editingItem) {
           payload.remaining_count = formOtherUnlimited ? null : (formOtherRemainingCount ? parseInt(formOtherRemainingCount) : null)
