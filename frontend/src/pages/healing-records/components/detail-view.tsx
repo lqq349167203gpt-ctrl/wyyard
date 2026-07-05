@@ -175,7 +175,7 @@ export default function DetailView({
         {/* 左栏：联系方式 + 来源信息 */}
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="px-4 pt-3 pb-3 grid grid-cols-2 gap-y-2 gap-x-6">
-            {[["年龄",c.age],["电话",c.phone],["微信",c.wechat]].map(([l,v])=>(
+            {[["性别",c.gender],["年龄",c.age],["电话",c.phone],["微信",c.wechat]].map(([l,v])=>(
               <div key={l} className="flex items-baseline gap-2">
                 <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">{l}</span>
                 <span className="text-[12px] text-[#2b2f36]">{v || <span className="text-[#d0d3d6]">-</span>}</span>
