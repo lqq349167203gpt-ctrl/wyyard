@@ -120,13 +120,10 @@ def _build_purchase_summary(customer_id: str) -> list:
                 total = c.total_count
                 card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
                 card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
-                if effective_remaining is None:
-                    card_remaining = "不限"
-                    used = "-"
-                elif card_activity > 0 or card_manual > 0:
+                if card_activity > 0 or card_manual > 0:
                     card_remaining = max(0, total - card_manual - card_activity)
                     used = max(0, total - card_remaining)
-                elif has_untracked_deductions and sum_total > 0:
+                elif has_untracked_deductions and sum_total > 0 and effective_remaining is not None:
                     share = round(effective_remaining * (total / sum_total))
                     card_remaining = share
                     used = max(0, total - share)
