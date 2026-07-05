@@ -1543,6 +1543,7 @@ export interface PurchaseSummaryItem {
   manual_deductions?: number
   activity_deductions?: number
   internal_course_deductions?: number
+  unlimited_deductions?: number
   name?: string
   effective_date?: string
   expiry_date?: string

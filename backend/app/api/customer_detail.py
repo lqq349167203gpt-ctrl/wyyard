@@ -109,6 +109,9 @@ def _build_purchase_summary(customer_id: str) -> list:
     activity_deductions = membership_card_service.get_activity_deductions(customer_id)
     # 内部课程抵扣：活动日期落在内部课程期间内的场次
     internal_course_deductions = _count_internal_course_covered(customer_id)
+    # 不限次扣卡：通过不限次卡扣除的活动次数
+    raw_activities = membership_card_service._count_raw_activities(customer_id)
+    unlimited_deductions = max(0, raw_activities - activity_deductions - internal_course_deductions)
     # 有效剩余次数（None=不限次）；无卡则 0
     effective_remaining = membership_card_service.get_effective_remaining(customer_id)
     # 是否存在未分卡的老扣费记录（card_id=None），决定是否需要聚合分摊
@@ -172,6 +175,7 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "manual_deductions": card_manual,
                 "activity_deductions": card_activity,
                 "internal_course_deductions": internal_course_deductions,
+                "unlimited_deductions": unlimited_deductions,
                 "effective_date": c.effective_date,
                 "expiry_date": c.expiry_date or "",
                 "voided": False,
@@ -190,6 +194,7 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "manual_deductions": card_manual,
                 "activity_deductions": card_activity,
                 "internal_course_deductions": internal_course_deductions,
+                "unlimited_deductions": unlimited_deductions,
                 "effective_date": c.effective_date,
                 "expiry_date": c.expiry_date or "",
                 "voided": True,
@@ -208,6 +213,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "manual_deductions": manual_deductions,
             "activity_deductions": activity_deductions,
             "internal_course_deductions": internal_course_deductions,
+                "unlimited_deductions": unlimited_deductions,
             "effective_date": "",
             "expiry_date": "",
             "voided": False,

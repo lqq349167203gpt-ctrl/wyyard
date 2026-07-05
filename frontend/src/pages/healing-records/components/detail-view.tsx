@@ -442,10 +442,11 @@ export default function DetailView({
                       const manual = first?.manual_deductions || 0
                       const activity = first?.activity_deductions || 0
                       const icDeduct = first?.internal_course_deductions || 0
+                      const ulDeduct = first?.unlimited_deductions || 0
                       return (
                         <span>
                           {memberHasUnlimited ? "不限次" : (typeof memberTotal === "number" && memberTotal < 0 ? <span className="text-[#c4506a]">剩余{memberTotal}次</span> : `剩余${memberTotal}次`)}
-                          <span className="ml-1 text-[11px] text-[#8f959e]">（{memberHasUnlimited ? "不限/" : `总${memberGrandTotal}次/`}销卡{manual}次/活动扣卡{activity}次{icDeduct > 0 ? `/内部课程抵扣${icDeduct}次` : ""}）</span>
+                          <span className="ml-1 text-[11px] text-[#8f959e]">（{memberHasUnlimited ? "不限/" : `总${memberGrandTotal}次/`}销卡{manual}次/{memberHasUnlimited ? `不限次扣卡${ulDeduct}次` : `活动扣卡${activity}次${ulDeduct > 0 ? `/不限次扣卡${ulDeduct}次` : ""}`}{icDeduct > 0 ? `/内部课程抵扣${icDeduct}次` : ""}）</span>
                         </span>
                       )
                     })()}
@@ -460,7 +461,7 @@ export default function DetailView({
                             {voided
                               ? " 已退费"
                               : s.remaining === "不限" || s.total_purchased === "不限"
-                                ? ` 不限次（不限/销卡${s.manual_deductions || 0}次/活动扣卡${s.activity_deductions || 0}次${(s.internal_course_deductions || 0) > 0 ? `/内部课程抵扣${s.internal_course_deductions}次` : ""}）`
+                                ? ` 不限次（不限/销卡${s.manual_deductions || 0}次/不限次扣卡${s.unlimited_deductions || 0}次${(s.internal_course_deductions || 0) > 0 ? `/内部课程抵扣${s.internal_course_deductions}次` : ""}）`
                                 : typeof s.remaining === "number" && typeof s.total_purchased === "number"
                                   ? ` ${Math.max(0, s.remaining)}次/${s.total_purchased}次`
                                   : ''}
