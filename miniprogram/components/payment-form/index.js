@@ -201,7 +201,7 @@ Component({
           wx.showToast({ title: '已选择该成交人', icon: 'none' })
           return
         }
-        const newClosers = [...closers, { id, nickname, amount: 0 }]
+        const newClosers = closers.concat([{ id, nickname, amount: 0 }])
         const closerIdMap = {}
         newClosers.forEach(c => { closerIdMap[c.id] = true })
         this.setData({
@@ -245,9 +245,9 @@ Component({
     onCloserAmountInput(e) {
       const id = e.currentTarget.dataset.id
       const value = e.detail.value
-      const closers = this.data.closers.map(c =>
-        c.id === id ? { ...c, amount: parseFloat(value) || 0 } : c
-      )
+      const closers = this.data.closers.map(function(c) {
+        return c.id === id ? Object.assign({}, c, { amount: parseFloat(value) || 0 }) : c
+      })
       this.setData({ closers, closerTotal: closers.reduce((s, c) => s + (c.amount || 0), 0) })
     },
 
@@ -308,7 +308,7 @@ Component({
 
     _buildPayload() {
       const { formData, selectedCustomer, closers, type, isEdit } = this.data
-      const payload = { ...formData }
+      const payload = Object.assign({}, formData)
       payload.customer_id = selectedCustomer.id
       payload.nickname = selectedCustomer.nickname
       const user = getApp()?.globalData?.currentUser

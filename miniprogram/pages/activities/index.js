@@ -298,19 +298,18 @@ Page({
       records.sort((a, b) => (a.time || '').localeCompare(b.time || ''))
 
       // 收集当天所有参与者（去重）
-      const allSources = [
-        ...(dashboard.class_records || []),
-        ...(dashboard.gcs_sessions || []),
-        ...(dashboard.ers_sessions || []),
-        ...(dashboard.eks_sessions || []),
-        ...(dashboard.ics_sessions || []),
-        ...(dashboard.ocr_sessions || []),
-      ]
+      const allSources = (dashboard.class_records || [])
+        .concat(dashboard.gcs_sessions || [])
+        .concat(dashboard.ers_sessions || [])
+        .concat(dashboard.eks_sessions || [])
+        .concat(dashboard.ics_sessions || [])
+        .concat(dashboard.ocr_sessions || [])
       const participantSet = new Set()
       allSources.forEach(r => {
         (r.participant_names || []).forEach(name => { if (name) participantSet.add(name) })
       })
-      const participants = [...participantSet]
+      const participants = []
+      participantSet.forEach(function(v) { participants.push(v) })
 
       // 保存日历计数，供展开时使用
       this._calendarCounts = dashboard.calendar_counts || {}

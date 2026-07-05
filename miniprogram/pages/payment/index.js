@@ -69,17 +69,18 @@ Page({
       const res = await api.listPaginated(1, 100)
       const raw = res.items || res.data || res || []
       const isHealing = ['group_case', 'emotional_release', 'oh_card_reading', 'energy_knot'].includes(type)
-      const items = (Array.isArray(raw) ? raw : []).map(item => ({
-        ...item,
-        _detail: buildDetail(item, type),
-        _price: buildPrice(item, type),
-        _effective: formatDate(item.effective_date),
-        _expiry: formatDate(item.expiry_date),
-        _purchaseCount: isHealing ? (item.purchase_count ?? '') : '',
-        _remaining: isHealing
-          ? (item.effective_remaining != null ? item.effective_remaining : '')
-          : (item.remaining_count === null ? '不限' : (item.remaining_count ?? '')),
-      }))
+      const items = (Array.isArray(raw) ? raw : []).map(function(item) {
+        return Object.assign({}, item, {
+          _detail: buildDetail(item, type),
+          _price: buildPrice(item, type),
+          _effective: formatDate(item.effective_date),
+          _expiry: formatDate(item.expiry_date),
+          _purchaseCount: isHealing ? (item.purchase_count != null ? item.purchase_count : '') : '',
+          _remaining: isHealing
+            ? (item.effective_remaining != null ? item.effective_remaining : '')
+            : (item.remaining_count === null ? '不限' : (item.remaining_count != null ? item.remaining_count : '')),
+        })
+      })
       this.setData({ items, loading: false })
     } catch (e) {
       console.error('加载付费项目失败:', e)

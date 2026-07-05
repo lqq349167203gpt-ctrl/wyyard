@@ -46,15 +46,14 @@ Page({
       const arrivedDates = new Set(arrived.map(v => v.visit_date))
 
       // 活动记录
-      const activities = (detail.activities || []).map(a => ({
-        ...a,
-        notArrived: !arrivedDates.has(a.date),
-      }))
+      const activities = (detail.activities || []).map(function(a) {
+        return Object.assign({}, a, { notArrived: !arrivedDates.has(a.date) })
+      })
 
       // 跟进点
       const healingRecords = visitRecords.map(v => {
         const hr = (detail.healing_records || []).find(r => r.date === v.visit_date)
-        return { ...v, growth_record: hr?.growth_record || v.healing_notes || '' }
+        return Object.assign({}, v, { growth_record: (hr && hr.growth_record) || v.healing_notes || '' })
       })
 
       // 剩余次数

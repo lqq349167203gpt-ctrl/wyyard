@@ -297,7 +297,7 @@ Page({
 
   onMoveUp(e) {
     const visit = e.detail.visit
-    const visits = [...this.data.visits]
+    const visits = this.data.visits.slice()
     const idx = visits.findIndex(v => v.id === visit.id)
     if (idx <= 0) return
     [visits[idx - 1], visits[idx]] = [visits[idx], visits[idx - 1]]
@@ -308,7 +308,7 @@ Page({
 
   onMoveDown(e) {
     const visit = e.detail.visit
-    const visits = [...this.data.visits]
+    const visits = this.data.visits.slice()
     const idx = visits.findIndex(v => v.id === visit.id)
     if (idx < 0 || idx >= visits.length - 1) return
     [visits[idx], visits[idx + 1]] = [visits[idx + 1], visits[idx]]

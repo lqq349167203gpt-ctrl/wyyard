@@ -388,15 +388,13 @@ Page({
         const { cardType, price, effectiveDate, durationType, durationValue, remainingCount, unlimited, isEdit } = this.data
         if (!cardType) { wx.showToast({ title: '请选择会员卡类型', icon: 'none' }); return null }
         if (!effectiveDate) { wx.showToast({ title: '请选择生效日期', icon: 'none' }); return null }
-        return {
-          ...base,
+        return Object.assign({}, base, {
           card_type: cardType,
           price: price ? Number(price) : 0,
           effective_date: effectiveDate,
           duration_type: durationValue ? durationType : undefined,
           duration_value: durationValue ? Number(durationValue) : undefined,
-          ...(isEdit ? {} : { remaining_count: unlimited ? null : (remainingCount ? Number(remainingCount) : 1) }),
-        }
+        }, isEdit ? {} : { remaining_count: unlimited ? null : (remainingCount ? Number(remainingCount) : 1) })
       }
       case 'group_case':
       case 'emotional_release':
@@ -404,36 +402,31 @@ Page({
       case 'energy_knot': {
         const { purchaseCount, amount, isEdit } = this.data
         if (!amount) { wx.showToast({ title: '请填写付费金额', icon: 'none' }); return null }
-        return {
-          ...base,
+        return Object.assign({}, base, {
           amount: Number(amount),
-          ...(isEdit ? {} : { purchase_count: purchaseCount ? Number(purchaseCount) : 1 }),
-        }
+        }, isEdit ? {} : { purchase_count: purchaseCount ? Number(purchaseCount) : 1 })
       }
       case 'internal_course': {
         const { courseType, price, effectiveDate } = this.data
         if (!courseType) { wx.showToast({ title: '请选择课程类型', icon: 'none' }); return null }
         if (!effectiveDate) { wx.showToast({ title: '请选择生效日期', icon: 'none' }); return null }
-        return {
-          ...base,
+        return Object.assign({}, base, {
           course_type: courseType,
           price: price ? Number(price) : 0,
           effective_date: effectiveDate,
-        }
+        })
       }
       case 'other': {
         const { projectName, fee, effectiveDate, durationType, durationValue, remainingCount, unlimited, isEdit } = this.data
         if (!projectName) { wx.showToast({ title: '请填写项目名称', icon: 'none' }); return null }
         if (!effectiveDate) { wx.showToast({ title: '请选择生效日期', icon: 'none' }); return null }
-        return {
-          ...base,
+        return Object.assign({}, base, {
           project_name: projectName,
           fee: fee ? Number(fee) : 0,
           effective_date: effectiveDate,
           duration_type: durationValue ? durationType : undefined,
           duration_value: durationValue ? Number(durationValue) : undefined,
-          ...(isEdit ? {} : { remaining_count: unlimited ? null : (remainingCount ? Number(remainingCount) : null) }),
-        }
+        }, isEdit ? {} : { remaining_count: unlimited ? null : (remainingCount ? Number(remainingCount) : null) })
       }
       default:
         return base

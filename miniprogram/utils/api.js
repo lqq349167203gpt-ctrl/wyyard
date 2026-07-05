@@ -59,10 +59,10 @@ async function request(path, options = {}) {
       method: options.method || 'GET',
       data: options.data,
       timeout: options.timeout || 60000,
-      header: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
+      header: Object.assign(
+        { 'Content-Type': 'application/json' },
+        token ? { 'Authorization': 'Bearer ' + token } : {}
+      ),
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
@@ -268,15 +268,14 @@ const paymentApi = {
   ohCardReadings: _projectApi('/api/oh-card-readings'),
   energyKnots: _projectApi('/api/energy-knots'),
   internalCourses: _projectApi('/api/internal-courses'),
-  otherProjects: {
-    ..._projectApi('/api/other-projects'),
+  otherProjects: Object.assign(_projectApi('/api/other-projects'), {
     getAvailableProjects: (customerId) => request(`/api/other-projects/${customerId}/available-projects`),
     deduct: (data) => request('/api/other-projects/deductions', { method: 'POST', data }),
     listDeductions: (customerId) => {
       const qs = customerId ? `?customer_id=${customerId}` : ''
       return request(`/api/other-projects/deductions${qs}`)
     },
-  },
+  }),
 
   // 项目类型 → API 映射
   getByType(type) {

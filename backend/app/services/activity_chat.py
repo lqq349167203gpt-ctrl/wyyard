@@ -730,12 +730,16 @@ async def activity_chat(message: str, history: list, date: str, space_id: str, o
                 print(f"[activity_chat] 工具调用: {tc['name']}({tc['args']}) => {str(result)[:200]}")
                 tool_call_log.append({"name": tc["name"], "args": tc["args"], "result": str(result)[:500]})
                 messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
-                # not_found 时代码直接生成回复，不走 LLM
+                # 写操作成功后立即返回，防止 LLM 重复调用
                 try:
                     r = json.loads(result) if isinstance(result, str) else result
-                    if isinstance(r, dict) and not r.get("ok") and r.get("reason") in ("not_found", "activity_not_found"):
-                        reply = _build_reply_from_tools(tool_call_log)
-                        return {"reply": reply, "action": "done"}
+                    if isinstance(r, dict):
+                        if r.get("ok") and r.get("action") in ("create", "update", "remove", "add_participant", "set_teacher"):
+                            reply = _build_reply_from_tools(tool_call_log)
+                            return {"reply": reply, "action": "done"}
+                        if not r.get("ok") and r.get("reason") in ("not_found", "activity_not_found"):
+                            reply = _build_reply_from_tools(tool_call_log)
+                            return {"reply": reply, "action": "done"}
                 except (json.JSONDecodeError, TypeError):
                     pass
             else:

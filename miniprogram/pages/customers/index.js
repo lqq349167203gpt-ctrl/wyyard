@@ -100,7 +100,7 @@ Page({
 
       const items = (res && res.items) || (Array.isArray(res) ? res : [])
       const total = (res && res.total) || items.length
-      const customers = reset ? items : [...(this.data.customers || []), ...items]
+      const customers = reset ? items : (this.data.customers || []).concat(items)
 
       // 计算距离上次到店的天数
       const today = new Date()
@@ -181,7 +181,7 @@ Page({
     if (show) {
       // 打开时保存当前状态快照
       this._filterSnapshot = {
-        selectedMemberTypes: [...this.data.selectedMemberTypes],
+        selectedMemberTypes: this.data.selectedMemberTypes.slice(),
         rangeMin: this.data.rangeMin,
         rangeMax: this.data.rangeMax,
       }

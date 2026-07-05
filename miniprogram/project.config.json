@@ -10,7 +10,7 @@
     "urlCheck": false,
     "scopeDataCheck": false,
     "coverView": true,
-    "es6": true,
+    "es6": false,
     "postcss": true,
     "compileHotReLoad": false,
     "lazyloadPlaceholderEnable": false,
@@ -33,7 +33,8 @@
     "babelSetting": {
       "ignore": [],
       "disablePlugins": [],
-      "outputPath": ""
+      "outputPath": "",
+      "disableRuntime": true
     },
     "condition": false,
     "compileWorklet": false,
