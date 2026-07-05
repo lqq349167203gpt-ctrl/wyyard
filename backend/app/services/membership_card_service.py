@@ -215,9 +215,13 @@ def get_activity_deductions(customer_id: str) -> int:
             chargeable.discard(s.owner_id)
             if customer_id in chargeable:
                 count += 1
-    # 内部课程（内部课程不扣费，排除）
-    # for s in internal_course_session_service.list_sessions():
-    #     ...
+    # 内部课程覆盖的活动不计入扣卡（先扣卡，卡扣完后才走内部课程）
+    from app.services import internal_course_service
+    if internal_course_service.has_active_course(customer_id):
+        grand_total = get_grand_total(customer_id)
+        manual = get_manual_deductions(customer_id)
+        card_available = max(0, grand_total - manual)
+        count = min(count, card_available)
     return count
 
 
