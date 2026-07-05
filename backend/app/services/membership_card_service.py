@@ -213,7 +213,11 @@ def _count_raw_activities(customer_id: str) -> int:
 
 
 def get_activity_deductions(customer_id: str) -> int:
-    """活动扣卡次数（仅计算实际从卡扣除的，不含内部课程覆盖的）"""
+    """活动扣卡次数（仅计算实际从卡扣除的，不含不限次和内部课程覆盖的）"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    active = _active_cards(customer_id, today)
+    if any(c.remaining_count is None for c in active):
+        return 0  # 有不限次卡，活动走不限次通道
     count = _count_raw_activities(customer_id)
     if count <= 0:
         return 0
@@ -527,13 +531,18 @@ def _get_card_activity_deductions_count(card_id: str) -> int:
     if not card:
         return 0
     customer_id = card.customer_id
+    # 有不限次卡时，活动走不限次通道，次数卡不扣
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    active = _active_cards(customer_id, today)
+    if any(c.remaining_count is None for c in active):
+        return 0
     total_activities = get_activity_deductions(customer_id)
     if total_activities <= 0:
         return 0
     # 按到期日最早优先分配到各卡
     countable = [c for c in list_cards()
                  if c.customer_id == customer_id and c.remaining_count is not None and not c.voided
-                 and (not c.effective_date or c.effective_date <= datetime.now(timezone.utc).strftime("%Y-%m-%d"))]
+                 and (not c.effective_date or c.effective_date <= today)]
     countable.sort(key=lambda c: (c.expiry_date or "9999-12-31", c.created_at or "", c.id))
     remaining_activities = total_activities
     for c in countable:
