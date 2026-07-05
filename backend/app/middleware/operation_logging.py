@@ -139,6 +139,8 @@ SKIP_PATHS = [
     "/api/system-helper",  # 茶苑助手对话不记录操作日志
     "/api/voice",  # 语音助手对话不记录操作日志（已有独立日志逻辑）
     "/api/wechat",  # 微信登录不记录操作日志
+    "/api/visit-history",  # 撤销/重做历史快照，非业务操作
+    "/api/activity-history",  # 撤销/重做历史快照，非业务操作
 ]
 
 SENSITIVE_FIELDS = {
@@ -1084,6 +1086,20 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             return f"{name}：{desc}"
         return f"保存{name}（无变更）"
     elif method == "DELETE":
+        suffix_parts = []
+        if before_data:
+            if before_data.get("visit_date"):
+                suffix_parts.append(before_data["visit_date"])
+            if before_data.get("space_id"):
+                try:
+                    from app.services import space_service
+                    space = space_service.get_space(before_data["space_id"])
+                    if space:
+                        suffix_parts.append(space.name)
+                except Exception:
+                    pass
+        if suffix_parts:
+            return f"删除{entity_type} {name}（{'，'.join(suffix_parts)}）"
         return f"删除{entity_type} {name}"
     return f"操作 {name}"
 
