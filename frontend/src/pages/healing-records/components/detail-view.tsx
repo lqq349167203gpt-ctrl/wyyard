@@ -461,9 +461,9 @@ export default function DetailView({
                             {voided
                               ? " 已退费"
                               : s.remaining === "不限" || s.total_purchased === "不限"
-                                ? ` 不限次（不限/销卡${s.manual_deductions || 0}次/不限次扣卡${s.unlimited_deductions || 0}次${(s.internal_course_deductions || 0) > 0 ? `/内部课程抵扣${s.internal_course_deductions}次` : ""}）`
+                                ? ` 不限次（销卡${s.manual_deductions || 0}次/不限次扣卡${s.unlimited_deductions || 0}次${(s.internal_course_deductions || 0) > 0 ? `/内部课程抵扣${s.internal_course_deductions}次` : ""}）`
                                 : typeof s.remaining === "number" && typeof s.total_purchased === "number"
-                                  ? ` ${Math.max(0, s.remaining)}次/${s.total_purchased}次`
+                                  ? ` ${Math.max(0, s.remaining)}次/${s.total_purchased}次（销卡${s.manual_deductions || 0}次/活动扣卡${s.activity_deductions || 0}次${(s.unlimited_deductions || 0) > 0 ? `/不限次扣卡${s.unlimited_deductions}次` : ""}${(s.internal_course_deductions || 0) > 0 ? `/内部课程抵扣${s.internal_course_deductions}次` : ""}）`
                                   : ''}
                             {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
                             {expired && "（已过期）"}
