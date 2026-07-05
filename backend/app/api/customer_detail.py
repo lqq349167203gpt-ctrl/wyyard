@@ -126,8 +126,12 @@ def _build_purchase_summary(customer_id: str) -> list:
                 total = c.total_count if c.total_count is not None else "不限"
                 used = total if isinstance(total, int) else "-"
                 card_remaining = "已退费"
-                voided_cards_info.append((c, total, used, card_remaining))
+                card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
+                card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
+                voided_cards_info.append((c, total, used, card_remaining, card_manual, card_activity))
                 continue
+            card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
+            card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
             if c.remaining_count is None:
                 total = "不限"
                 used = "-"
@@ -138,8 +142,6 @@ def _build_purchase_summary(customer_id: str) -> list:
                 card_remaining = "不限"
             else:
                 total = c.total_count
-                card_manual = membership_card_service.get_card_manual_deductions(c.id) if c.id else 0
-                card_activity = membership_card_service.get_card_activity_deductions(c.id) if c.id else 0
                 if card_activity > 0 or card_manual > 0:
                     card_remaining = max(0, total - card_manual - card_activity)
                     used = max(0, total - card_remaining)
@@ -150,14 +152,14 @@ def _build_purchase_summary(customer_id: str) -> list:
                 else:
                     card_remaining = max(0, total - card_manual)
                     used = max(0, total - card_remaining)
-            card_info_list.append((c, total, used, card_remaining))
+            card_info_list.append((c, total, used, card_remaining, card_manual, card_activity))
         # 用各卡 remaining 之和覆盖 effective_remaining，保证全局与单卡一致
         # 但如果存在欠费未分卡的扣费记录（_debt_activities），各卡统计不完整，保留全局值
         has_debt = bool(membership_card_service._debt_activities.get(customer_id))
         numeric_remaining = [info[3] for info in card_info_list if isinstance(info[3], (int, float))]
         if numeric_remaining and not has_debt:
             effective_remaining = sum(numeric_remaining)
-        for c, total, used, card_remaining in card_info_list:
+        for c, total, used, card_remaining, card_manual, card_activity in card_info_list:
             summary.append({
                 "type": "会员活动",
                 "name": c.card_type,
@@ -167,15 +169,15 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "used": used,
                 "remaining": card_remaining,
                 "effective_remaining": effective_remaining,
-                "manual_deductions": manual_deductions,
-                "activity_deductions": activity_deductions,
+                "manual_deductions": card_manual,
+                "activity_deductions": card_activity,
                 "internal_course_deductions": internal_course_deductions,
                 "effective_date": c.effective_date,
                 "expiry_date": c.expiry_date or "",
                 "voided": False,
             })
         # 追加已作废（退费）卡，放在可用卡之后，不参与有效剩余汇总
-        for c, total, used, card_remaining in voided_cards_info:
+        for c, total, used, card_remaining, card_manual, card_activity in voided_cards_info:
             summary.append({
                 "type": "会员活动",
                 "name": c.card_type,
@@ -185,8 +187,8 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "used": used,
                 "remaining": card_remaining,
                 "effective_remaining": effective_remaining,
-                "manual_deductions": manual_deductions,
-                "activity_deductions": activity_deductions,
+                "manual_deductions": card_manual,
+                "activity_deductions": card_activity,
                 "internal_course_deductions": internal_course_deductions,
                 "effective_date": c.effective_date,
                 "expiry_date": c.expiry_date or "",
