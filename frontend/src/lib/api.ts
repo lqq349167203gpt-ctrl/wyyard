@@ -1985,3 +1985,105 @@ export const activityHistoryApi = {
   delete: (id: string) =>
     request<{ message: string }>(`/api/activity-history/${id}`, { method: "DELETE" }),
 }
+
+export interface StatisticsData {
+  date: string
+  invited: number
+  arrived: number
+  converted: number
+}
+
+export interface StatisticsDetail {
+  nickname?: string
+  customer_id?: string
+  date: string
+  status: string
+  arrived?: boolean
+  type?: string
+}
+
+export const statisticsApi = {
+  overview: (params: { date_from?: string; date_to?: string; granularity?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.granularity) searchParams.set("granularity", params.granularity)
+    return request<{ data: StatisticsData[] }>(`/api/statistics/overview?${searchParams.toString()}`)
+  },
+  details: (params: { date_from?: string; date_to?: string; status?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.status) searchParams.set("status", params.status)
+    return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[] }>(`/api/statistics/details?${searchParams.toString()}`)
+  },
+  analysis: (params: { date_from?: string; date_to?: string; granularity?: string; metric?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.granularity) searchParams.set("granularity", params.granularity)
+    if (params.metric) searchParams.set("metric", params.metric)
+    return request<AnalysisOverview>(`/api/statistics/analysis?${searchParams.toString()}`)
+  },
+  frequentVisitors: (params: { date_from?: string; date_to?: string; limit?: number }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.limit) searchParams.set("limit", String(params.limit))
+    return request<{ visitors: FrequentVisitor[] }>(`/api/statistics/frequent-visitors?${searchParams.toString()}`)
+  },
+  churnedVisitors: (params: { date_from?: string; date_to?: string; inactive_days?: number }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.inactive_days) searchParams.set("inactive_days", String(params.inactive_days))
+    return request<{ visitors: ChurnedVisitor[] }>(`/api/statistics/churned-visitors?${searchParams.toString()}`)
+  },
+}
+
+export interface AnalysisDataPoint {
+  date: string
+  value: number
+  benchmark: number
+  deviation: number
+  deviation_rate: number
+  is_anomaly: boolean
+}
+
+export interface WeekdayStat {
+  weekday: number
+  label: string
+  avg: number
+  count: number
+}
+
+export interface AnalysisOverview {
+  data: AnalysisDataPoint[]
+  benchmark: number
+  std_dev: number
+  anomaly_threshold: { upper: number; lower: number }
+  anomaly_count: number
+  trend: string
+  weekday_stats: WeekdayStat[]
+}
+
+export interface FrequentVisitor {
+  customer_id: string
+  nickname: string
+  member_type: string
+  visit_count: number
+  is_new: boolean
+  products: string[]
+  tags: string
+  last_visit: string
+}
+
+export interface ChurnedVisitor {
+  customer_id: string
+  nickname: string
+  total_visits: number
+  last_visit: string
+  days_inactive: number
+  products: string[]
+  tags: string
+}

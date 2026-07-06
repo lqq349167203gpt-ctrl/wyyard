@@ -33,6 +33,10 @@
       <text class="row-label">姓名</text>
       <text class="row-value">{{customer.name}}</text>
     </view>
+    <view class="row" wx:if="{{customer.gender}}">
+      <text class="row-label">性别</text>
+      <text class="row-value">{{customer.gender}}</text>
+    </view>
     <view class="row">
       <text class="row-label">年龄</text>
       <text class="row-value" wx:if="{{customer.age}}">{{customer.age}}</text>

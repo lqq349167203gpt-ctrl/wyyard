@@ -33,6 +33,8 @@ import RemindersPage from "@/pages/reminders"
 import BusinessRemindersPage from "@/pages/business-reminders"
 import DataRecordsPage from "@/pages/data-records"
 import ChatHistoryPage from "@/pages/chat-history"
+import StatisticsPage from "@/pages/statistics"
+import DataAnalysisPage from "@/pages/data-analysis"
 
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
@@ -65,6 +67,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/business-reminders": "business-reminders",
   "/data-records": "data-records",
   "/chat-history": "chat-history",
+  "/statistics": "statistics",
+  "/data-analysis": "data-analysis",
   "/positions/teacher": "position-management",
   "/agents/:id/chat": "agents",
   "/change-password": "change-password",
@@ -180,6 +184,8 @@ function App() {
               <Route path="/business-reminders" element={<BusinessRemindersPage />} />
               <Route path="/data-records" element={<DataRecordsPage />} />
               <Route path="/chat-history" element={<ChatHistoryPage />} />
+              <Route path="/statistics" element={<StatisticsPage />} />
+              <Route path="/data-analysis" element={<DataAnalysisPage />} />
             </Route>
           </Route>
         </Routes>

@@ -48,7 +48,6 @@
   background-color: #f0f1f2;
   padding: 6rpx 20rpx;
   border-radius: 20rpx;
-  margin-top: 12rpx;
 }
 
 .hero-stats {

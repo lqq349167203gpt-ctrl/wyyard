@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 24
+    jwt_expire_hours: int = 168
 
     # 数据库
     database_url: str = ""
