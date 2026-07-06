@@ -15,6 +15,7 @@ interface SelectDropdownSingleProps {
   placeholder?: string
   onChange: (value: string) => void
   className?: string
+  buttonClassName?: string
   rounded?: string
   size?: "default" | "sm"
   disabled?: boolean
@@ -34,6 +35,7 @@ interface SelectDropdownMultiProps {
   placeholder?: string
   onChange: (value: string[]) => void
   className?: string
+  buttonClassName?: string
   rounded?: string
   size?: "default" | "sm"
   disabled?: boolean
@@ -57,6 +59,7 @@ export const SelectDropdown = memo(function SelectDropdown({
   placeholder = "请选择",
   onChange,
   className = "",
+  buttonClassName = "",
   rounded = "[4px]",
   size = "default",
   disabled = false,
@@ -257,7 +260,7 @@ export const SelectDropdown = memo(function SelectDropdown({
     <div ref={rootRef} data-dropdown className={`relative ${className}`}>
       <button type="button"
         style={{ borderRadius: radiusValue }}
-        className={`flex items-center justify-between w-full border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`flex items-center justify-between w-full border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${buttonClassName}`}
         onMouseDown={handleToggle}
         disabled={disabled}
       >
@@ -274,7 +277,7 @@ export const SelectDropdown = memo(function SelectDropdown({
             ))}
           </div>
         ) : (
-          <span className={`truncate ${textColor || (currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : "text-[#8f959e]")}`}>
+          <span className={`truncate ${textColor || (currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : "text-[#c0c4cc] font-normal")}`}>
             {currentLabel || (multi ? placeholder : placeholder)}
           </span>
         )}

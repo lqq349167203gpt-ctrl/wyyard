@@ -22,6 +22,7 @@ import PaymentDeductionsPage from "@/pages/payment-deductions"
 import PaymentRefundsPage from "@/pages/payment-refunds"
 import MemberIdentitiesPage from "@/pages/member-identities"
 import HealingRecordsPage from "@/pages/healing-records"
+import CustomerFormPage from "@/pages/healing-records/customer-form"
 
 import OperationLogsPage from "@/pages/operation-logs"
 import SystemLogsPage from "@/pages/system-logs"
@@ -41,6 +42,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
 
 
   "/healing-records": "healing-records",
+  "/healing-records/new": "healing-records",
+  "/healing-records/:id/edit": "healing-records",
   "/courses/class-records": "class-records",
   "/courses/daily-activities": "class-records-activities",
   "/payment": "payment",
@@ -166,6 +169,8 @@ function App() {
 
               <Route path="/config/member-identities" element={<MemberIdentitiesPage />} />
               <Route path="/healing-records" element={<HealingRecordsPage />} />
+              <Route path="/healing-records/new" element={<CustomerFormPage />} />
+              <Route path="/healing-records/:id/edit" element={<CustomerFormPage />} />
 
               <Route path="/system-logs" element={<SystemLogsPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
