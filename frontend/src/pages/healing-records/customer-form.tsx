@@ -307,12 +307,12 @@ export default function CustomerFormPage() {
               <Input value={form.tags || ""} onChange={(e) => setField("tags", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
             </div>
             <div className="flex items-center gap-2 w-full">
-              <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">当下卡点</label>
-              <Input value={form.assessment || ""} onChange={(e) => setField("assessment", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
-            </div>
-            <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">创伤经历</label>
               <Input value={form.basic_info || ""} onChange={(e) => setField("basic_info", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
+            </div>
+            <div className="flex items-center gap-2 w-full">
+              <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">当下卡点</label>
+              <Input value={form.assessment || ""} onChange={(e) => setField("assessment", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
             </div>
             <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">其他信息</label>
