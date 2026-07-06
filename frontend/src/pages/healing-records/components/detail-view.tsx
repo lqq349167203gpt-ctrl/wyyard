@@ -221,12 +221,12 @@ export default function DetailView({
           </div>
           <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />
           <div className="px-4 pt-2 pb-3 flex items-baseline gap-2">
-            <span className="text-[12px] text-[#8f959e] font-normal shrink-0 w-[56px] text-right tracking-widest">其他信息</span>
-            <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has("其他信息") ? "" : "line-clamp-2 pr-10 h-[36px] overflow-hidden"}`}>
-              {c.other_info || <span className="text-[#d0d3d6]">-</span>}
-              {c.other_info && c.other_info.length > 80 && (
-                <button className="absolute bottom-0 right-0 text-[12px] text-[#8f959e] hover:text-[#4e535a] bg-white pl-1" onClick={() => setExpandedFields(prev => { const n = new Set(prev); n.has("其他信息") ? n.delete("其他信息") : n.add("其他信息"); return n })}>
-                  {expandedFields.has("其他信息") ? "收起" : "展开"}
+            <span className="text-[12px] text-[#8f959e] font-normal shrink-0 w-[56px] text-right tracking-widest">工作情况</span>
+            <span className={`text-[12px] text-[#4e535a] whitespace-pre-wrap relative ${expandedFields.has("工作情况") ? "" : "line-clamp-2 pr-10 h-[36px] overflow-hidden"}`}>
+              {c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "") || <span className="text-[#d0d3d6]">-</span>}
+              {(c.work_status || c.work_description) && (c.work_status + (c.work_description || "")).length > 80 && (
+                <button className="absolute bottom-0 right-0 text-[12px] text-[#8f959e] hover:text-[#4e535a] bg-white pl-1" onClick={() => setExpandedFields(prev => { const n = new Set(prev); n.has("工作情况") ? n.delete("工作情况") : n.add("工作情况"); return n })}>
+                  {expandedFields.has("工作情况") ? "收起" : "展开"}
                 </button>
               )}
             </span>
@@ -236,7 +236,7 @@ export default function DetailView({
         {/* 右栏：背景信息 */}
         <div className="flex-1 min-w-0 flex flex-col relative">
           <div className="absolute left-0 top-[10px] bottom-[10px] w-px bg-[#f0f0f0]" />
-          {[["到访目的",c.tags||""],["创伤经历",c.basic_info||""],["当下卡点",c.assessment||""],["工作情况",c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "")]].map(([l,v], i) => (
+          {[["到访目的",c.tags||""],["创伤经历",c.basic_info||""],["当下卡点",c.assessment||""],["其他信息",c.other_info||""]].map(([l,v], i) => (
             <div key={l}>
               {i > 0 && <div className="border-t-[0.5px] border-[#f0f0f0] mx-4" />}
               <div className="px-4 py-2 flex items-baseline gap-2">
