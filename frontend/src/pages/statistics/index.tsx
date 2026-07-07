@@ -5,6 +5,8 @@ import { ComposedChart, Line, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { statisticsApi, memberIdentityApi, customerDetailApi, type StatisticsData, type StatisticsDetail, type MemberIdentity } from "@/lib/api"
+import { usePagination } from "@/hooks/use-pagination"
+import { PaginationBar } from "@/components/pagination-bar"
 
 const COLORS = {
   invited: "#5b8ff9",
@@ -101,6 +103,8 @@ export default function StatisticsPage() {
       return 0
     })
   }, [details, activeTab, sortField, sortOrder, typeFilter])
+
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDetails, { pageSize: 10 })
 
   // 数字列点击弹窗
   const [popupType, setPopupType] = useState<"invited" | "visits" | "activities" | "payments" | null>(null)
@@ -712,7 +716,7 @@ export default function StatisticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedDetails.map((item, index) => (
+                  {paginatedItems.map((item, index) => (
                     <tr key={index} className="group border-b border-[#f0f0f0] hover:bg-[#f7f8fa]">
                       <td className="py-2 px-3 text-[#4e535a] w-12">{index + 1}</td>
                       <td className="py-2 px-3 text-[#4e535a] w-20 truncate">{item.nickname || item.customer_id || "-"}</td>
@@ -776,6 +780,14 @@ export default function StatisticsPage() {
               </table>
             </div>
           )}
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={goToPage}
+          />
         </div>
       </div>
 
