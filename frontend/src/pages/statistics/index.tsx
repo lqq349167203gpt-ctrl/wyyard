@@ -636,7 +636,7 @@ export default function StatisticsPage() {
         </div>
 
         {/* 人员列表 */}
-        <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4">
+        <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4 min-h-[400px]">
           <div className="mb-3">
             <div className="text-[12px] font-medium text-[#4e535a] mb-2">{LABELS[activeTab]}<span className="font-normal text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
             <div className="flex items-center gap-2">
