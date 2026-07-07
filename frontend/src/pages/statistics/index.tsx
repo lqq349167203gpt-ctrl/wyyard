@@ -729,7 +729,7 @@ export default function StatisticsPage() {
                           <td
                             className={`py-2 px-3 w-20 ${item.activity_count != null && item.activity_count > 0 ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
                             onClick={() => item.customer_id && item.date && item.activity_count != null && item.activity_count > 0 && handleStatClick("day_activities", item.customer_id, item.date)}
-                          >{item.activity_count != null && item.activity_count > 0 ? `${item.activity_count}次` : "-"}</td>
+                          >{item.activity_count != null && item.activity_count > 0 ? `${item.activity_count}场` : "-"}</td>
                           <td className="py-2 px-3 text-[#4e535a] w-24 truncate">{item.type || "-"}</td>
                           <td className="py-2 px-3 text-[#4e535a] w-24 truncate">{item.name || "-"}</td>
                           <td className="py-2 px-3 text-[#4e535a] w-20">{item.quantity !== "" && item.quantity != null ? item.quantity : "-"}</td>

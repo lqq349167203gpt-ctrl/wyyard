@@ -306,6 +306,18 @@ def get_details(
         r["total_consumption"] = stats.get("total_consumption", 0)
         r["visit_interval"] = stats.get("visit_interval", "-")
 
+    # 成交记录：activity_count 改为当天活动次数（与弹窗一致）
+    _daily_activity_cache: dict[str, list] = {}
+    for r in converted_list:
+        cid = r.get("customer_id", "")
+        deal_date = r.get("date", "")
+        if not cid or not deal_date:
+            continue
+        cache_key = f"{cid}|{deal_date}"
+        if cache_key not in _daily_activity_cache:
+            _daily_activity_cache[cache_key] = _build_activities(cid, {deal_date})
+        r["activity_count"] = len(_daily_activity_cache[cache_key])
+
     # 根据状态筛选
     if status == "invited":
         return {"data": invited_list}
