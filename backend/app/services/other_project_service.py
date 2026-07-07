@@ -93,12 +93,16 @@ def update_project(project_id: str, data: dict) -> Optional[OtherProject]:
     for key, value in data.items():
         if hasattr(project, key) and key not in ("id", "created_at", "created_by"):
             setattr(project, key, value)
-    # remaining_count 是派生字段，若前端直接修改了 remaining_count，同步到 total_count
+    # remaining_count 是派生字段：total_count - 销卡流水
     if "remaining_count" in data and "total_count" not in data:
         project.total_count = data["remaining_count"]
-    # total_count 设为 null 表示不限，remaining_count 也要清空
-    if data.get("total_count") is None:
-        project.remaining_count = None
+    if "total_count" in data:
+        if data["total_count"] is None:
+            project.remaining_count = None
+        else:
+            from app.services.project_deduction_service import get_deduction_total_for_project
+            deducted = get_deduction_total_for_project(project_id)
+            project.remaining_count = max(0, data["total_count"] - deducted)
     project.expiry_date = _calc_expiry(
         project.effective_date,
         project.duration_type,

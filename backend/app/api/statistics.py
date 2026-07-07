@@ -270,7 +270,7 @@ def get_details(
                 if type_name == "membership-cards":
                     quantity = "不限" if r.total_count is None else r.total_count
                 elif type_name == "other-projects":
-                    quantity = "不限" if r.remaining_count is None else r.remaining_count
+                    quantity = "不限" if r.total_count is None else r.total_count
                 elif type_name in ("group-cases", "emotional-releases", "energy-knots", "oh-card-readings"):
                     quantity = r.purchase_count
                 else:
