@@ -53,6 +53,8 @@ export default function StatisticsPage() {
 
   // 统计维度：total（总数据）或 range（时间内数据）
   const [statDimension, setStatDimension] = useState<"total" | "range">("range")
+  // 成交金额类型筛选
+  const [typeFilter, setTypeFilter] = useState<string>("全部")
 
   // 排序
   const [sortField, setSortField] = useState<string | null>(null)
@@ -69,7 +71,10 @@ export default function StatisticsPage() {
 
   // 排序后的列表
   const sortedDetails = useMemo(() => {
-    const list = [...(details[detailsKey] || [])]
+    let list = [...(details[detailsKey] || [])]
+    if (activeTab === "converted_amount" && typeFilter !== "全部") {
+      list = list.filter(item => item.type === typeFilter)
+    }
     if (!sortField) return list
     return list.sort((a, b) => {
       let va: any, vb: any
@@ -95,7 +100,7 @@ export default function StatisticsPage() {
       if (va > vb) return sortOrder === "asc" ? 1 : -1
       return 0
     })
-  }, [details, activeTab, sortField, sortOrder])
+  }, [details, activeTab, sortField, sortOrder, typeFilter])
 
   // 数字列点击弹窗
   const [popupType, setPopupType] = useState<"invited" | "visits" | "activities" | "payments" | null>(null)
@@ -648,6 +653,19 @@ export default function StatisticsPage() {
               </div>
               {statDimension === "range" && <span className="text-[11px] text-[#b0b5bd]">统计期间 - 仅统计选择时间范围内的用户相关数据</span>}
               {statDimension === "total" && <span className="text-[11px] text-[#b0b5bd]">总数据 - 统计用户在系统中的所有数据</span>}
+              {activeTab === "converted_amount" && (
+                <div className="flex items-center gap-1 ml-2 pl-2 border-l border-[#e8eaed]">
+                  {["全部", "会员卡", "觉醒游戏", "情绪释放", "OH卡", "其他项目"].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTypeFilter(t)}
+                      className={`px-2 h-[22px] text-[11px] rounded-[2px] transition-all ${typeFilter === t ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
