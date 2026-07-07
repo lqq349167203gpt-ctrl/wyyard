@@ -107,10 +107,11 @@ export default function StatisticsPage() {
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDetails, { pageSize: 10 })
 
   // 数字列点击弹窗
-  const [popupType, setPopupType] = useState<"invited" | "visits" | "activities" | "payments" | null>(null)
+  const [popupType, setPopupType] = useState<"invited" | "visits" | "activities" | "payments" | "day_activities" | null>(null)
   const [popupData, setPopupData] = useState<{ customer?: { nickname?: string }; visit_records?: any[]; activities?: any[]; payment_records?: any[] } | null>(null)
   const [popupLoading, setPopupLoading] = useState(false)
   const [popupCustomerId, setPopupCustomerId] = useState<string | null>(null)
+  const [popupDate, setPopupDate] = useState<string | null>(null)
 
   // 时间维度：year 或 month
   const [timeView, setTimeView] = useState<"year" | "month">("month")
@@ -188,9 +189,10 @@ export default function StatisticsPage() {
   }, [statDimension, fetchDetails])
 
   // 点击数字列加载客户详情
-  const handleStatClick = async (type: "invited" | "visits" | "activities" | "payments", customerId: string) => {
+  const handleStatClick = async (type: "invited" | "visits" | "activities" | "payments" | "day_activities", customerId: string, date?: string) => {
     setPopupType(type)
     setPopupCustomerId(customerId)
+    setPopupDate(date || null)
     setPopupLoading(true)
     try {
       const data = await customerDetailApi.get(customerId)
@@ -687,6 +689,7 @@ export default function StatisticsPage() {
                     <th className="text-left py-2 px-3 text-[#8f959e] font-normal w-20">昵称</th>
                     {(activeTab === "converted_amount" ? [
                       ["member_type", "身份", "w-20"],
+                      ["day_activities", "当日活动", "w-20"],
                       ["type", "项目类型", "w-24"],
                       ["name", "项目名称", "w-24"],
                       ["quantity", "购买次数", "w-20"],
@@ -723,6 +726,10 @@ export default function StatisticsPage() {
                       <td className="py-2 px-3 text-[#4e535a] w-20 truncate">{item.member_type || "-"}</td>
                       {activeTab === "converted_amount" ? (
                         <>
+                          <td
+                            className={`py-2 px-3 w-20 ${item.activity_count != null && item.activity_count > 0 ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
+                            onClick={() => item.customer_id && item.date && item.activity_count != null && item.activity_count > 0 && handleStatClick("day_activities", item.customer_id, item.date)}
+                          >{item.activity_count != null && item.activity_count > 0 ? `${item.activity_count}次` : "-"}</td>
                           <td className="py-2 px-3 text-[#4e535a] w-24 truncate">{item.type || "-"}</td>
                           <td className="py-2 px-3 text-[#4e535a] w-24 truncate">{item.name || "-"}</td>
                           <td className="py-2 px-3 text-[#4e535a] w-20">{item.quantity !== "" && item.quantity != null ? item.quantity : "-"}</td>
@@ -792,7 +799,7 @@ export default function StatisticsPage() {
       </div>
 
       {/* 数字列详情弹窗 */}
-      <Dialog open={popupType !== null} onOpenChange={(open) => { if (!open) { setPopupType(null); setPopupData(null); setPopupCustomerId(null) } }}>
+      <Dialog open={popupType !== null} onOpenChange={(open) => { if (!open) { setPopupType(null); setPopupData(null); setPopupCustomerId(null); setPopupDate(null) } }}>
         <DialogContent className={`${popupType === "payments" ? "max-w-[680px]" : "max-w-[580px]"} max-h-[60vh] overflow-y-auto p-0 gap-0`} initialFocus={false}>
           {popupType === "invited" && (
             <>
@@ -870,6 +877,39 @@ export default function StatisticsPage() {
                     <span className="w-12 shrink-0 text-right">身份</span>
                   </div>
                   {popupData.activities.filter(a => statDimension === "total" || (a.date && dateRange.from <= a.date && a.date <= dateRange.to)).map((a, i) => (
+                    <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
+                      <span className="w-20 shrink-0">{a.date}</span>
+                      <span className="w-16 shrink-0 text-[#8f959e]">{(a.type === "沙龙类型" || a.type === "内部课程") && a.course_type ? a.course_type : a.type || ""}</span>
+                      <span className="flex-1 min-w-0 truncate">{a.name}</span>
+                      <span className="w-20 shrink-0 text-[#8f959e] truncate">{a.host || ""}</span>
+                      <span className="w-12 shrink-0 text-right text-[#8f959e]">{a.role}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          {popupType === "day_activities" && (
+            <>
+              <div className="px-4 py-3 border-b border-[#f0f0f0]">
+                <span className="text-[14px] font-medium text-[#1f2329]">当日活动</span>
+                {popupData?.customer?.nickname && <span className="text-[14px] text-[#8f959e]"> - {popupData.customer.nickname}</span>}
+                {popupDate && <span className="text-[12px] text-[#8f959e] ml-2">{popupDate}</span>}
+              </div>
+              {popupLoading ? (
+                <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">加载中...</div>
+              ) : !popupData?.activities?.filter(a => a.date === popupDate).length ? (
+                <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">当日暂无参与活动</div>
+              ) : (
+                <div>
+                  <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
+                    <span className="w-20 shrink-0">日期</span>
+                    <span className="w-16 shrink-0">类型</span>
+                    <span className="flex-1 min-w-0">活动名称</span>
+                    <span className="w-20 shrink-0">老师</span>
+                    <span className="w-12 shrink-0 text-right">身份</span>
+                  </div>
+                  {popupData.activities.filter(a => a.date === popupDate).map((a, i) => (
                     <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
                       <span className="w-20 shrink-0">{a.date}</span>
                       <span className="w-16 shrink-0 text-[#8f959e]">{(a.type === "沙龙类型" || a.type === "内部课程") && a.course_type ? a.course_type : a.type || ""}</span>
