@@ -96,6 +96,9 @@ def update_project(project_id: str, data: dict) -> Optional[OtherProject]:
     # remaining_count 是派生字段，若前端直接修改了 remaining_count，同步到 total_count
     if "remaining_count" in data and "total_count" not in data:
         project.total_count = data["remaining_count"]
+    # total_count 设为 null 表示不限，remaining_count 也要清空
+    if data.get("total_count") is None:
+        project.remaining_count = None
     project.expiry_date = _calc_expiry(
         project.effective_date,
         project.duration_type,
@@ -127,13 +130,7 @@ def get_effective_remaining(project_id: str) -> Optional[int]:
     if not project:
         return 0
     if project.total_count is None:
-        # 兼容未迁移数据：remaining_count 为 None 表示不限次
-        if project.remaining_count is None:
-            return None
-        # remaining_count 有值但 total_count 未设置，用 remaining_count 作为 total
-        from app.services.project_deduction_service import get_deduction_total_for_project
-        deducted = get_deduction_total_for_project(project_id)
-        return max(0, project.remaining_count - deducted)
+        return None
     from app.services.project_deduction_service import get_deduction_total_for_project
     deducted = get_deduction_total_for_project(project_id)
     return max(0, project.total_count - deducted)
