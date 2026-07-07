@@ -84,13 +84,13 @@ def _aggregate_by_granularity(data: dict[str, dict], granularity: str, date_from
             date_str = current.strftime("%Y-%m-%d")
             result.append({
                 "date": date_str,
-                **data.get(date_str, {"invited": 0, "arrived": 0, "converted": 0}),
+                **data.get(date_str, {"invited": 0, "arrived": 0, "converted": 0, "converted_amount": 0.0}),
             })
             current += timedelta(days=1)
         return result
 
     # 按周或月聚合
-    grouped: dict[str, dict] = defaultdict(lambda: {"invited": 0, "arrived": 0, "converted": 0})
+    grouped: dict[str, dict] = defaultdict(lambda: {"invited": 0, "arrived": 0, "converted": 0, "converted_amount": 0.0})
     for date_str, values in data.items():
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         if granularity == "week":
@@ -102,6 +102,7 @@ def _aggregate_by_granularity(data: dict[str, dict], granularity: str, date_from
         grouped[key]["invited"] += values["invited"]
         grouped[key]["arrived"] += values["arrived"]
         grouped[key]["converted"] += values["converted"]
+        grouped[key]["converted_amount"] += values.get("converted_amount", 0)
 
     result = []
     current = datetime.strptime(date_from, "%Y-%m-%d")
@@ -135,7 +136,7 @@ def get_overview(
     date_from, date_to = _get_date_range(date_from, date_to)
 
     # 按日期聚合数据
-    daily: dict[str, dict] = defaultdict(lambda: {"invited": 0, "arrived": 0, "converted": 0})
+    daily: dict[str, dict] = defaultdict(lambda: {"invited": 0, "arrived": 0, "converted": 0, "converted_amount": 0.0})
 
     # 1. 邀约到访 / 实际到访
     visits = visit_service.list_visits()
@@ -166,6 +167,15 @@ def get_overview(
 
     for date_str, customer_ids in converted_by_date.items():
         daily[date_str]["converted"] = len(customer_ids)
+
+    # 3. 成交金额（按 deal_date 累加 price，排除已作废）
+    for records in services:
+        for r in records:
+            deal_date = getattr(r, "deal_date", None)
+            price = getattr(r, "price", 0) or 0
+            voided = getattr(r, "voided", False)
+            if deal_date and not voided and date_from <= deal_date <= date_to:
+                daily[deal_date]["converted_amount"] += price
 
     data = _aggregate_by_granularity(daily, granularity, date_from, date_to)
     return {"data": data}

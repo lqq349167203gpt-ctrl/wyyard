@@ -10,12 +10,14 @@ const COLORS = {
   invited: "#5b8ff9",
   arrived: "#36cfc9",
   converted: "#faad14",
+  converted_amount: "#f5222d",
 }
 
 const LABELS: Record<string, string> = {
   invited: "邀约到访",
   arrived: "实际到访",
   converted: "成交人数",
+  converted_amount: "成交金额",
 }
 
 // 获取某月的天数
@@ -41,8 +43,9 @@ export default function StatisticsPage() {
   const [data, setData] = useState<StatisticsData[]>([])
   const [details, setDetails] = useState<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[] }>({ invited: [], arrived: [], converted: [] })
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<"invited" | "arrived" | "converted">("invited")
-  const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({ invited: true, arrived: true, converted: true })
+  const [activeTab, setActiveTab] = useState<"invited" | "arrived" | "converted" | "converted_amount">("invited")
+  const detailsKey = activeTab === "converted_amount" ? "converted" : activeTab
+  const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({ invited: true, arrived: true, converted: true, converted_amount: false })
   const [identityOrder, setIdentityOrder] = useState<string[]>([])
   const [identityTypeMap, setIdentityTypeMap] = useState<Record<string, string>>({})
   const [detailOpen, setDetailOpen] = useState(false)
@@ -66,7 +69,7 @@ export default function StatisticsPage() {
 
   // 排序后的列表
   const sortedDetails = useMemo(() => {
-    const list = [...(details[activeTab] || [])]
+    const list = [...(details[detailsKey] || [])]
     if (!sortField) return list
     return list.sort((a, b) => {
       let va: any, vb: any
@@ -266,8 +269,9 @@ export default function StatisticsPage() {
           invited: acc.invited + item.invited,
           arrived: acc.arrived + item.arrived,
           converted: acc.converted + item.converted,
+          converted_amount: (acc.converted_amount ?? 0) + (item.converted_amount || 0),
         }),
-        { date: week.label, invited: 0, arrived: 0, converted: 0 }
+        { date: week.label, invited: 0, arrived: 0, converted: 0, converted_amount: 0 }
       )
       return { ...aggregated, label: week.label }
     })
@@ -284,7 +288,7 @@ export default function StatisticsPage() {
   // 身份分布数据（基于当前数据类型，按身份配置顺序排列）
   const identityData = useMemo(() => {
     const counts: Record<string, number> = {}
-    details[activeTab].forEach((item) => {
+    details[detailsKey].forEach((item) => {
       const type = item.member_type || "未设置"
       counts[type] = (counts[type] || 0) + 1
     })
@@ -316,14 +320,22 @@ export default function StatisticsPage() {
 
   // 计算Y轴刻度
   const yTicks = useMemo(() => {
-    const maxVal = Math.max(...chartData.map(d => Math.max(d.invited, d.arrived, d.converted)), 0)
+    const visibleMax = chartData.map(d => {
+      let m = 0
+      if (visibleLines.invited) m = Math.max(m, d.invited)
+      if (visibleLines.arrived) m = Math.max(m, d.arrived)
+      if (visibleLines.converted) m = Math.max(m, d.converted)
+      if (visibleLines.converted_amount) m = Math.max(m, d.converted_amount || 0)
+      return m
+    })
+    const maxVal = Math.max(...visibleMax, 0)
     const step = Math.ceil(maxVal / 4 / 5) * 5 || 5
     const ticks = []
     for (let i = 0; i <= Math.ceil(maxVal / step) * step + step; i += step) {
       ticks.push(i)
     }
     return ticks
-  }, [chartData])
+  }, [chartData, visibleLines])
 
   return (
     <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
@@ -426,7 +438,7 @@ export default function StatisticsPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>数据类型</span>
               <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
-                {(["invited", "arrived", "converted"] as const).map((tab) => (
+                {(["invited", "arrived", "converted", "converted_amount"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -443,23 +455,29 @@ export default function StatisticsPage() {
         {/* 汇总卡片 */}
         <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
           <div className="flex gap-3">
-            <div className="w-[140px] bg-[#f7f8fa] rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#5b8ff9" }}></span><span className="text-[11px] text-[#4e535a]">邀约到访</span></div>
-              <div className="text-[20px] font-medium text-[#1f2329]">{totals.invited}</div>
+            <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
+              <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#5b8ff9" }}></span><span className="text-[12px] text-[#4e535a]">邀约到访</span></div>
+              <div className="flex items-baseline gap-1"><span className="text-[20px] font-medium text-[#1f2329]">{totals.invited}</span><span className="text-[10px] text-[#8f959e]">人</span></div>
             </div>
-            <div className="w-[180px] bg-[#f7f8fa] rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#36cfc9" }}></span><span className="text-[11px] text-[#4e535a]">实际到访</span></div>
-              <div className="flex items-baseline gap-1.5">
+            <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
+              <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#36cfc9" }}></span><span className="text-[12px] text-[#4e535a]">实际到访</span></div>
+              <div className="flex items-baseline gap-1">
                 <span className="text-[20px] font-medium text-[#1f2329]">{totals.arrived}</span>
-                <span className="text-[10px] text-[#8f959e]">转化 {totals.invited > 0 ? `${Math.round((totals.arrived / totals.invited) * 100)}%` : "-"}</span>
+                <span className="text-[10px] text-[#8f959e]">人</span>
+                <span className="text-[10px] text-[#8f959e] ml-1">转化 {totals.invited > 0 ? `${Math.round((totals.arrived / totals.invited) * 100)}%` : "-"}</span>
               </div>
             </div>
-            <div className="w-[180px] bg-[#f7f8fa] rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#faad14" }}></span><span className="text-[11px] text-[#4e535a]">成交人数</span></div>
-              <div className="flex items-baseline gap-1.5">
+            <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
+              <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#faad14" }}></span><span className="text-[12px] text-[#4e535a]">成交人数</span></div>
+              <div className="flex items-baseline gap-1">
                 <span className="text-[20px] font-medium text-[#1f2329]">{totals.converted}</span>
-                <span className="text-[10px] text-[#8f959e]">转化 {totals.arrived > 0 ? `${Math.round((totals.converted / totals.arrived) * 100)}%` : "-"}</span>
+                <span className="text-[10px] text-[#8f959e]">人</span>
+                <span className="text-[10px] text-[#8f959e] ml-1">转化 {totals.arrived > 0 ? `${Math.round((totals.converted / totals.arrived) * 100)}%` : "-"}</span>
               </div>
+            </div>
+            <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
+              <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#f5222d" }}></span><span className="text-[12px] text-[#4e535a]">成交金额</span></div>
+              <div className="text-[20px] font-medium text-[#1f2329]">¥{Math.round(chartData.reduce((s, d) => s + (d.converted_amount || 0), 0))}</div>
             </div>
           </div>
         </div>
@@ -468,10 +486,10 @@ export default function StatisticsPage() {
         <div className="flex gap-1.5 mt-1.5">
           {/* 左侧：折线图 */}
           <div className="flex-1 min-w-0 bg-white rounded-[4px] px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
-            <div className="flex items-center justify-between mb-[18px]">
-              <span className="text-[12px] text-[#4e535a]"><span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}变化</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></span>
+            <div className="mb-[18px]">
+              <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}变化</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
               <div className="flex items-center gap-4">
-                {(["invited", "arrived", "converted"] as const).map((key) => (
+                {(["invited", "arrived", "converted", "converted_amount"] as const).map((key) => (
                   <label key={key} className="flex items-center gap-1.5 cursor-pointer select-none" onClick={() => setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }))}>
                     <span
                       className="w-3.5 h-3.5 rounded border flex items-center justify-center text-[10px] leading-none"
@@ -508,6 +526,10 @@ export default function StatisticsPage() {
                     <stop offset="0%" stopColor={COLORS.converted} stopOpacity={0.4} />
                     <stop offset="100%" stopColor={COLORS.converted} stopOpacity={0.02} />
                   </linearGradient>
+                  <linearGradient id="gradConvertedAmount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={COLORS.converted_amount} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={COLORS.converted_amount} stopOpacity={0.02} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
                 <XAxis
@@ -529,30 +551,31 @@ export default function StatisticsPage() {
                     return v
                   }}
                 />
-                <YAxis tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }} allowDecimals={false} ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={25} />
+                <YAxis tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }} allowDecimals={false} ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={yTicks[yTicks.length - 1] >= 10000 ? 45 : yTicks[yTicks.length - 1] >= 1000 ? 35 : 25} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null
-                    const order = ["invited", "arrived", "converted"] as const
+                    const order = ["invited", "arrived", "converted", "converted_amount"] as const
                     const seen = new Set<string>()
                     const filtered = payload.filter((item) => {
-                      const key = String(item.dataKey) as "invited" | "arrived" | "converted"
+                      const key = String(item.dataKey) as typeof order[number]
                       if (seen.has(key)) return false
                       seen.add(key)
                       return (order as readonly string[]).includes(key)
                     })
-                    const sorted = filtered.sort((a, b) => order.indexOf(String(a.dataKey) as "invited" | "arrived" | "converted") - order.indexOf(String(b.dataKey) as "invited" | "arrived" | "converted"))
+                    const sorted = filtered.sort((a, b) => order.indexOf(String(a.dataKey) as typeof order[number]) - order.indexOf(String(b.dataKey) as typeof order[number]))
                     return (
                       <div style={{ fontSize: 12, background: "#fff", border: "1px solid #e8eaed", borderRadius: 4, padding: "6px 10px" }}>
                         <div style={{ color: "#8f959e", marginBottom: 4 }}>{label}</div>
                         {sorted.map((item) => {
-                          const key = String(item.dataKey) as "invited" | "arrived" | "converted"
+                          const key = String(item.dataKey) as typeof order[number]
                           const color = COLORS[key]
+                          const val = key === "converted_amount" ? `¥${Math.round(item.value as number)}` : item.value
                           return (
                             <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                               <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
                               <span style={{ color }}>{LABELS[key]}</span>
-                              <span style={{ color, fontWeight: 500, marginLeft: "auto" }}>{item.value}</span>
+                              <span style={{ color, fontWeight: 500, marginLeft: "auto" }}>{val}</span>
                             </div>
                           )
                         })}
@@ -562,7 +585,9 @@ export default function StatisticsPage() {
                 />
                 {visibleLines.invited && <Area type="monotone" dataKey="invited" fill="url(#gradInvited)" stroke="none" tooltipType="none" />}
                 {visibleLines.arrived && <Area type="monotone" dataKey="arrived" fill="url(#gradArrived)" stroke="none" tooltipType="none" />}
+                {visibleLines.converted_amount && <Area type="monotone" dataKey="converted_amount" fill="url(#gradConvertedAmount)" stroke="none" tooltipType="none" />}
                 {visibleLines.converted && <Area type="monotone" dataKey="converted" fill="url(#gradConverted)" stroke="none" tooltipType="none" />}
+                {visibleLines.converted_amount && <Line type="monotone" dataKey="converted_amount" stroke={COLORS.converted_amount} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />}
                 {visibleLines.converted && <Line type="monotone" dataKey="converted" stroke={COLORS.converted} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />}
                 {visibleLines.arrived && <Line type="monotone" dataKey="arrived" stroke={COLORS.arrived} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />}
                 {visibleLines.invited && <Line type="monotone" dataKey="invited" stroke={COLORS.invited} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />}
@@ -573,12 +598,12 @@ export default function StatisticsPage() {
 
           {/* 右侧：身份分布竖向柱状图 */}
           <div className="flex-1 min-w-0 bg-white rounded-[4px] px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
-            <div className="flex items-center justify-between mb-[18px]">
-              <span className="text-[12px] text-[#4e535a]"><span className="font-medium">会员身份人数</span><span className="text-[#8f959e]">（{LABELS[activeTab]}<span className="text-[#c8ccd0]"> · </span>{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></span>
+            <div className="mb-[18px]">
+              <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">会员身份人数</span><span className="text-[#8f959e]">（{LABELS[activeTab]}<span className="text-[#c8ccd0]"> · </span>{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
               <div className="flex items-center gap-3 text-[11px]">
-                <span className="text-[#8f959e]">新人 <span className="text-[#1f2329] font-medium">{details[activeTab].filter((item) => item.member_type && identityTypeMap[item.member_type] === "新人").length}</span></span>
+                <span className="text-[#8f959e]">新人 <span className="text-[#1f2329] font-medium">{details[detailsKey].filter((item) => item.member_type && identityTypeMap[item.member_type] === "新人").length}</span></span>
                 <span className="text-[#c8ccd0]">|</span>
-                <span className="text-[#8f959e]">老人 <span className="text-[#1f2329] font-medium">{details[activeTab].filter((item) => item.member_type && identityTypeMap[item.member_type] === "老人").length}</span></span>
+                <span className="text-[#8f959e]">老人 <span className="text-[#1f2329] font-medium">{details[detailsKey].filter((item) => item.member_type && identityTypeMap[item.member_type] === "老人").length}</span></span>
               </div>
             </div>
             {identityData.length === 0 ? (
@@ -624,7 +649,7 @@ export default function StatisticsPage() {
             </div>
           </div>
 
-          {details[activeTab].length === 0 ? (
+          {details[detailsKey].length === 0 ? (
             <div className="text-center text-[#8f959e] py-8">暂无数据</div>
           ) : (
             <div className="overflow-x-auto">

@@ -1991,6 +1991,7 @@ export interface StatisticsData {
   invited: number
   arrived: number
   converted: number
+  converted_amount?: number
 }
 
 export interface StatisticsDetail {
