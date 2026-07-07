@@ -174,7 +174,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             effective_remaining = sum(numeric_remaining)
         for c, total, used, card_remaining, card_manual, card_activity in card_info_list:
             summary.append({
-                "type": "会员活动",
+                "type": "会员卡",
                 "name": c.card_type,
                 "total_purchased": total,
                 "grand_total": grand_total,
@@ -193,7 +193,7 @@ def _build_purchase_summary(customer_id: str) -> list:
         # 追加已作废（退费）卡，放在可用卡之后，不参与有效剩余汇总
         for c, total, used, card_remaining, card_manual, card_activity in voided_cards_info:
             summary.append({
-                "type": "会员活动",
+                "type": "会员卡",
                 "name": c.card_type,
                 "total_purchased": total,
                 "grand_total": grand_total,
@@ -212,7 +212,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             })
     else:
         summary.append({
-            "type": "会员活动",
+            "type": "会员卡",
             "name": "",
             "total_purchased": 0,
             "grand_total": 0,
@@ -546,7 +546,7 @@ def _build_payment_records(customer_id: str) -> list:
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
     for c in cards:
         records.append({
-            "type": "会员活动",
+            "type": "会员卡",
             "name": c.card_type,
             "quantity": 1,
             "amount": c.price,

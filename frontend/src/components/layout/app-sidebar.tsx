@@ -33,7 +33,7 @@ import {
 const businessItems = [
   { title: "提醒", icon: IconBellRingingFilled, path: "/business-reminders", permission: "business-reminders" },
   { title: "数据记录", icon: IconChartAreaFilled, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
-  { title: "统计", icon: IconChartAreaFilled, path: "/statistics", permission: "statistics" },
+  { title: "销售数据", icon: IconChartAreaFilled, path: "/statistics", permission: "statistics" },
 ]
 
 const courseItems = [
@@ -224,11 +224,11 @@ export function AppSidebar() {
   return (
     <Sidebar style={{ "--sidebar-accent": "#ecedf0", "--sidebar-accent-foreground": "#3370ff" } as React.CSSProperties}>
       <SidebarHeader className="px-5 pt-4 pb-2">
-        <div className="flex items-center gap-2.5.5">
+        <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-[11px] font-semibold text-primary-foreground">
             W
           </div>
-          <span className="text-[13px] font-medium tracking-tight">WYYard</span>
+          <span className="text-[13px] font-medium tracking-tight">无忧茶苑</span>
         </div>
       </SidebarHeader>
       <SidebarContent className="mt-5">

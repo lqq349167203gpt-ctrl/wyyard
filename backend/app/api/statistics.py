@@ -193,7 +193,7 @@ def get_details(
     # 1. 先构建成交人员集合（用于标记邀约/到访记录的成交状态）
     customers_map = {c.id: c for c in customer_service.list_customers()}
     TYPE_LABELS = {
-        "membership-cards": "会员活动",
+        "membership-cards": "会员卡",
         "group-cases": "觉醒游戏",
         "emotional-releases": "情绪释放",
         "energy-knots": "能量结",
@@ -257,13 +257,34 @@ def get_details(
             customer_id = getattr(r, "customer_id", None)
             if deal_date and customer_id and date_from <= deal_date <= date_to:
                 c = customers_map.get(customer_id)
+                # 按类型取项目名称
+                if type_name == "membership-cards":
+                    name = r.card_type
+                elif type_name == "other-projects":
+                    name = r.project_name
+                elif type_name == "internal-courses":
+                    name = r.course_type
+                else:
+                    name = ""
+                # 按类型取购买次数
+                if type_name == "membership-cards":
+                    quantity = "不限" if r.total_count is None else r.total_count
+                elif type_name == "other-projects":
+                    quantity = "不限" if r.remaining_count is None else r.remaining_count
+                elif type_name in ("group-cases", "emotional-releases", "energy-knots", "oh-card-readings"):
+                    quantity = r.purchase_count
+                else:
+                    quantity = ""
                 converted_list.append({
                     "customer_id": customer_id,
                     "nickname": c.nickname if c else "",
                     "date": deal_date,
                     "status": "converted",
                     "type": TYPE_LABELS.get(type_name, type_name),
+                    "name": name,
+                    "quantity": quantity,
                     "member_type": c.member_type if c and c.member_type else "",
+                    "amount": getattr(r, "price", 0) or 0,
                 })
 
     # 补充客户统计信息

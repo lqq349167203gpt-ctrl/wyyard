@@ -36,7 +36,15 @@ def list_deductions(customer_id: Optional[str] = None) -> List[OtherProjectDeduc
     if customer_id:
         results = [d for d in results if d.customer_id == customer_id]
     results.sort(key=lambda d: d.created_at, reverse=True)
+    _fill_current_remaining(results)
     return results
+
+
+def _fill_current_remaining(deductions: List[OtherProjectDeduction]):
+    """为扣减记录填充当前实际剩余次数"""
+    for d in deductions:
+        remaining = other_project_service.get_effective_remaining(d.other_project_id)
+        d.remaining_after = remaining
 
 
 def get_available_projects(customer_id: str) -> list:
@@ -47,8 +55,10 @@ def get_available_projects(customer_id: str) -> list:
     for p in projects:
         if p.customer_id != customer_id:
             continue
-        # remaining_count 为 None 表示不限次，仍可销卡
-        if p.remaining_count is not None and p.remaining_count <= 0:
+        if p.is_deleted:
+            continue
+        effective_remaining = other_project_service.get_effective_remaining(p.id)
+        if effective_remaining is not None and effective_remaining <= 0:
             continue
         if p.expiry_date and p.expiry_date < today:
             continue
@@ -56,7 +66,7 @@ def get_available_projects(customer_id: str) -> list:
             "id": p.id,
             "project_name": p.project_name,
             "activity_mode": p.activity_mode,
-            "remaining_count": p.remaining_count,
+            "remaining_count": effective_remaining,
             "effective_date": p.effective_date,
             "expiry_date": p.expiry_date or "",
             "created_at": p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at),
@@ -71,12 +81,11 @@ def create_deduction(data: OtherProjectDeductionCreate) -> OtherProjectDeduction
             raise ValueError("项目不存在")
         if project.customer_id != data.customer_id:
             raise ValueError("该项目不属于该客户")
-        if project.remaining_count is not None:
-            if project.remaining_count < data.count:
-                raise ValueError(f"剩余次数不足（剩余 {project.remaining_count} 次）")
-            other_project_service.update_project(project.id, {"remaining_count": project.remaining_count - data.count})
-            project = other_project_service.get_project(data.other_project_id)
-        remaining_after = project.remaining_count if project.remaining_count is not None else -1
+        effective_remaining = other_project_service.get_effective_remaining(data.other_project_id)
+        if effective_remaining is not None:
+            if effective_remaining < data.count:
+                raise ValueError(f"剩余次数不足（剩余 {effective_remaining} 次）")
+        remaining_after = (effective_remaining - data.count) if effective_remaining is not None else None
 
         now = datetime.now(timezone.utc)
         deduction = OtherProjectDeduction(

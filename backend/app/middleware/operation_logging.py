@@ -824,7 +824,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             pass
         if not project_name:
             type_labels = {
-                "membership-cards": "会员活动", "group-cases": "觉醒游戏",
+                "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
                 "other-projects": "其他项目",
             }
@@ -886,7 +886,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             pass
         if not project_name:
             type_labels = {
-                "membership-cards": "会员活动", "group-cases": "觉醒游戏",
+                "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
                 "other-projects": "其他项目",
             }

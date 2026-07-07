@@ -341,7 +341,7 @@ export default function StatisticsPage() {
     <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
       <div>
         <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
-          <h1 className="text-[16px] font-medium text-[#1f2329] mb-4">数据统计</h1>
+          <h1 className="text-[16px] font-medium text-[#1f2329] mb-4">销售数据</h1>
 
           {/* 筛选栏 */}
           <div className="flex flex-col gap-2">
@@ -646,6 +646,8 @@ export default function StatisticsPage() {
                   总数据
                 </button>
               </div>
+              {statDimension === "range" && <span className="text-[11px] text-[#b0b5bd]">统计期间 - 仅统计选择时间范围内的用户相关数据</span>}
+              {statDimension === "total" && <span className="text-[11px] text-[#b0b5bd]">总数据 - 统计用户在系统中的所有数据</span>}
             </div>
           </div>
 
@@ -658,7 +660,14 @@ export default function StatisticsPage() {
                   <tr className="border-b border-[#f0f0f0]">
                     <th className="text-left py-2 px-3 text-[#8f959e] font-normal w-12">序号</th>
                     <th className="text-left py-2 px-3 text-[#8f959e] font-normal w-20">昵称</th>
-                    {([
+                    {(activeTab === "converted_amount" ? [
+                      ["member_type", "身份", "w-20"],
+                      ["type", "项目类型", "w-24"],
+                      ["name", "项目名称", "w-24"],
+                      ["quantity", "购买次数", "w-20"],
+                      ["amount", "成交金额", "w-24"],
+                      ["date", "成交日期", "w-24"],
+                    ] : [
                       ["member_type", "身份", "w-20"],
                       ["invited_count", "受邀次数", "w-20"],
                       ["visit_count", "到店次数", "w-20"],
@@ -687,37 +696,49 @@ export default function StatisticsPage() {
                       <td className="py-2 px-3 text-[#4e535a] w-12">{index + 1}</td>
                       <td className="py-2 px-3 text-[#4e535a] w-20 truncate">{item.nickname || item.customer_id || "-"}</td>
                       <td className="py-2 px-3 text-[#4e535a] w-20 truncate">{item.member_type || "-"}</td>
-                      <td
-                        className={`py-2 px-3 w-20 ${item.invited_count != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
-                        onClick={() => item.customer_id && item.invited_count != null && handleStatClick("invited", item.customer_id)}
-                      >{item.invited_count != null ? `${item.invited_count}次` : "-"}</td>
-                      <td
-                        className={`py-2 px-3 w-20 ${item.visit_count != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
-                        onClick={() => item.customer_id && item.visit_count != null && handleStatClick("visits", item.customer_id)}
-                      >{item.visit_count != null ? `${item.visit_count}次` : "-"}</td>
-                      <td className="py-2 px-3 text-[#4e535a] w-20">{item.visit_interval ?? "-"}</td>
-                      <td
-                        className={`py-2 px-3 w-20 ${item.activity_count != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
-                        onClick={() => item.customer_id && item.activity_count != null && handleStatClick("activities", item.customer_id)}
-                      >{item.activity_count != null ? `${item.activity_count}场` : "-"}</td>
-                      <td
-                        className={`py-2 px-3 w-24 ${item.total_consumption != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
-                        onClick={() => item.customer_id && item.total_consumption != null && handleStatClick("payments", item.customer_id)}
-                      >{item.total_consumption != null ? `¥${item.total_consumption}` : "-"}</td>
-                      <td className="py-2 px-3 w-20">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${
-                          item.arrived ? "bg-[#e8f5e9] text-[#2e7d32]" : "bg-[#f0f1f2] text-[#8f959e]"
-                        }`}>
-                          {item.arrived ? "已到店" : "未到店"}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 w-20">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${
-                          item.status === "converted" ? "bg-[#fff7e6] text-[#d48806]" : "bg-[#f0f1f2] text-[#8f959e]"
-                        }`}>
-                          {item.status === "converted" ? "已成交" : "未成交"}
-                        </span>
-                      </td>
+                      {activeTab === "converted_amount" ? (
+                        <>
+                          <td className="py-2 px-3 text-[#4e535a] w-24 truncate">{item.type || "-"}</td>
+                          <td className="py-2 px-3 text-[#4e535a] w-24 truncate">{item.name || "-"}</td>
+                          <td className="py-2 px-3 text-[#4e535a] w-20">{item.quantity !== "" && item.quantity != null ? item.quantity : "-"}</td>
+                          <td className="py-2 px-3 text-[#4e535a] w-24">{item.amount != null ? `¥${item.amount}` : "-"}</td>
+                          <td className="py-2 px-3 text-[#4e535a] w-24">{item.date || "-"}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td
+                            className={`py-2 px-3 w-20 ${item.invited_count != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
+                            onClick={() => item.customer_id && item.invited_count != null && handleStatClick("invited", item.customer_id)}
+                          >{item.invited_count != null ? `${item.invited_count}次` : "-"}</td>
+                          <td
+                            className={`py-2 px-3 w-20 ${item.visit_count != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
+                            onClick={() => item.customer_id && item.visit_count != null && handleStatClick("visits", item.customer_id)}
+                          >{item.visit_count != null ? `${item.visit_count}次` : "-"}</td>
+                          <td className="py-2 px-3 text-[#4e535a] w-20">{item.visit_interval ?? "-"}</td>
+                          <td
+                            className={`py-2 px-3 w-20 ${item.activity_count != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
+                            onClick={() => item.customer_id && item.activity_count != null && handleStatClick("activities", item.customer_id)}
+                          >{item.activity_count != null ? `${item.activity_count}场` : "-"}</td>
+                          <td
+                            className={`py-2 px-3 w-24 ${item.total_consumption != null ? "cursor-pointer hover:text-[#2e7d32]" : "text-[#4e535a]"}`}
+                            onClick={() => item.customer_id && item.total_consumption != null && handleStatClick("payments", item.customer_id)}
+                          >{item.total_consumption != null ? `¥${item.total_consumption}` : "-"}</td>
+                          <td className="py-2 px-3 w-20">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${
+                              item.arrived ? "bg-[#e8f5e9] text-[#2e7d32]" : "bg-[#f0f1f2] text-[#8f959e]"
+                            }`}>
+                              {item.arrived ? "已到店" : "未到店"}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 w-20">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${
+                              item.status === "converted" ? "bg-[#fff7e6] text-[#d48806]" : "bg-[#f0f1f2] text-[#8f959e]"
+                            }`}>
+                              {item.status === "converted" ? "已成交" : "未成交"}
+                            </span>
+                          </td>
+                        </>
+                      )}
                       <td className="py-2 px-3 w-16">
                         {item.customer_id && (
                           <button

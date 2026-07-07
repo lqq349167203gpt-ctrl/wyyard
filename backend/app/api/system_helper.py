@@ -51,7 +51,7 @@ PERMISSION_PAGE_MAP = {
     "class-records-activities": ("活动安排", "/courses/daily-activities"),
     "class-records-arrival": ("到场确认", "/courses/class-records"),
     "daily-activities": ("活动安排", "/courses/daily-activities"),
-    "membership-cards": ("会员活动", "/payment/membership-cards"),
+    "membership-cards": ("会员卡", "/payment/membership-cards"),
     "group-cases": ("觉醒游戏", "/payment/group-cases"),
     "emotional-releases": ("情绪释放", "/payment/emotional-releases"),
     "energy-knots": ("能量结", "/payment/energy-knots"),

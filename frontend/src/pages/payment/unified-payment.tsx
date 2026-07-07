@@ -132,7 +132,7 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
     case "internal_course":
       return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, course_type: item.course_type, created_by: item.created_by }
     case "other":
-      return { ...base, detail: item.category || "", price: item.fee, effective_date: item.effective_date, remaining_count: item.remaining_count, category: item.category, project_name: item.project_name, duration_type: item.duration_type, duration_value: item.duration_value, effective_remaining: item.effective_remaining, created_by: item.created_by }
+      return { ...base, detail: item.category || "", price: item.fee, effective_date: item.effective_date, remaining_count: item.remaining_count, total_count: item.total_count, category: item.category, project_name: item.project_name, duration_type: item.duration_type, duration_value: item.duration_value, effective_remaining: item.effective_remaining, created_by: item.created_by }
   }
 }
 
@@ -487,8 +487,8 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         setFormOtherEffectiveDate(item.effective_date || "")
         setFormOtherDurationType(item.duration_type || "day")
         setFormOtherDurationValue(item.duration_value ? String(item.duration_value) : "")
-        setFormOtherRemainingCount(item.remaining_count !== null && item.remaining_count !== undefined ? String(item.remaining_count) : "")
-        setFormOtherUnlimited(item.remaining_count === null)
+        setFormOtherRemainingCount(item.total_count !== null && item.total_count !== undefined ? String(item.total_count) : (item.remaining_count !== null && item.remaining_count !== undefined ? String(item.remaining_count) : ""))
+        setFormOtherUnlimited(item.total_count === null && item.remaining_count === null)
         break
     }
     setDialogOpen(true)
@@ -585,9 +585,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           closer_id, closer_name, closers, organization_id, deal_date,
           ...(!editingItem && { created_by: createdBy }),
         }
-        if (!editingItem) {
-          payload.remaining_count = formOtherUnlimited ? null : (formOtherRemainingCount ? parseInt(formOtherRemainingCount) : null)
-        }
+        payload.total_count = formOtherUnlimited ? null : (formOtherRemainingCount ? parseInt(formOtherRemainingCount) : null)
         return payload
       }
     }
@@ -1190,6 +1188,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                         if (item.remaining_count === null || item.total_count == null) return "不限"
                         return `${item.total_count} 次`
                       })()}
+                      {item.type === "other" && (
+                        (item.total_count === null || item.total_count === undefined) && item.remaining_count === null ? "不限" : `${(item.total_count ?? item.remaining_count) ?? 0} 次`
+                      )}
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">{item.effective_date || "-"}</TableCell>
                     <TableCell className="text-[#2b2f36]">{item.expiry_date || "-"}</TableCell>
@@ -1210,6 +1211,8 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                           : item.effective_remaining === null || item.effective_remaining === undefined
                             ? "不限"
                             : `${item.effective_remaining} 次`
+                      ) : item.type === "other" ? (
+                        item.remaining_count === null ? "不限" : `${item.remaining_count} 次`
                       ) : (
                         item.effective_remaining !== null && item.effective_remaining !== undefined
                           ? `${item.effective_remaining} 次`

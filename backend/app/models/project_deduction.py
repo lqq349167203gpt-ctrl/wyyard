@@ -1,6 +1,7 @@
 from app.models.base import SafeBaseModel, StrictBaseModel
 from pydantic import Field
 from datetime import datetime
+from typing import Optional
 
 
 class ProjectDeductionBase(SafeBaseModel):
@@ -11,7 +12,7 @@ class ProjectDeductionBase(SafeBaseModel):
     project_name: str
     count: int = Field(default=1, ge=1)
     deduction_date: str  # YYYY-MM-DD
-    remaining_after: int
+    remaining_after: Optional[int] = None
     created_by: str = ""
     updated_by: str = ""
 

@@ -108,7 +108,7 @@ def _format_condition(condition) -> str:
     """将条件格式化为可读文字"""
     op_map = {"gt": "大于", "eq": "等于", "lt": "小于"}
     activity_map = {
-        "membership": "会员活动", "emotional_release": "情绪释放",
+        "membership": "会员卡", "emotional_release": "情绪释放",
         "group_case": "觉醒游戏", "energy_knot": "能量结", "internal_course": "内部课程",
     }
 

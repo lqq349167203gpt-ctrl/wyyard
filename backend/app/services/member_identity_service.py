@@ -146,11 +146,11 @@ def _compare_count(actual, op: str, target) -> bool:
 def _get_payment_categories(condition: IdentityCondition) -> list:
     """获取付费项目类别，兼容旧 card/course 类型"""
     if condition.type == "card":
-        return ["会员活动"]
+        return ["会员卡"]
     if condition.type == "course":
         return ["内部课程"]
     cats = condition.payment_categories or []
-    return ["会员活动" if c == "会员卡" else c for c in cats]
+    return ["会员卡" if c == "会员活动" else c for c in cats]
 
 
 def _check_condition(condition, customer_id: str,
@@ -181,7 +181,7 @@ def _check_condition(condition, customer_id: str,
         cats = _get_payment_categories(condition)
         item_set = set(condition.items) if condition.items else set()
         for cat in cats:
-            if cat == "会员活动":
+            if cat == "会员卡":
                 for c in customer_cards:
                     if c.voided:
                         continue

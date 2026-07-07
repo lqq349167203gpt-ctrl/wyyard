@@ -1,5 +1,6 @@
 from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
+from typing import Optional
 
 
 class OtherProjectDeductionBase(SafeBaseModel):
@@ -11,7 +12,7 @@ class OtherProjectDeductionBase(SafeBaseModel):
     project_created_at: str
     count: int = 1
     deduction_date: str  # YYYY-MM-DD
-    remaining_after: int
+    remaining_after: Optional[int] = None
 
 
 class OtherProjectDeductionCreate(StrictBaseModel):

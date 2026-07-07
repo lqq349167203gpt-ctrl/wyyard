@@ -9,7 +9,12 @@ router = APIRouter(prefix="/api/other-projects", tags=["other-projects"])
 
 @router.get("")
 def list_projects(page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None), nickname: str | None = Query(None), closer_name: str | None = Query(None)):
-    items = [i.model_dump(mode="json") for i in other_project_service.list_projects()]
+    projects = other_project_service.list_projects()
+    items = []
+    for p in projects:
+        d = p.model_dump(mode="json")
+        d["remaining_count"] = other_project_service.get_effective_remaining(p.id)
+        items.append(d)
     if customer_ids:
         allowed = set(customer_ids.split(","))
         items = [i for i in items if i.get("customer_id") in allowed]
@@ -30,7 +35,9 @@ def get_project(project_id: str):
     project = other_project_service.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="记录不存在")
-    return project
+    d = project.model_dump(mode="json")
+    d["remaining_count"] = other_project_service.get_effective_remaining(project_id)
+    return d
 
 
 @router.post("")
@@ -40,14 +47,6 @@ def create_project(data: OtherProjectCreate):
 
 @router.patch("/{project_id}")
 def update_project(project_id: str, data: dict):
-    # 次数字段由销卡流水写，禁止外部 PATCH 直接修改（恒等式：剩余 = 总 - 销卡流水）
-    forbidden = {"remaining_count"}
-    violated = forbidden & set(data.keys())
-    if violated:
-        raise HTTPException(
-            status_code=400,
-            detail=f"不允许直接修改次数字段：{','.join(sorted(violated))}。请通过销卡流水操作。",
-        )
     project = other_project_service.update_project(project_id, data)
     if not project:
         raise HTTPException(status_code=404, detail="记录不存在")

@@ -66,6 +66,8 @@ def get_project(project_id: str) -> Optional[OtherProject]:
 def create_project(data: OtherProjectCreate) -> OtherProject:
     now = datetime.now(timezone.utc)
     project_data = data.model_dump()
+    if project_data.get("total_count") is None:
+        project_data["total_count"] = project_data.get("remaining_count")
     project_data["expiry_date"] = _calc_expiry(
         project_data["effective_date"],
         project_data.get("duration_type"),
@@ -91,6 +93,9 @@ def update_project(project_id: str, data: dict) -> Optional[OtherProject]:
     for key, value in data.items():
         if hasattr(project, key) and key not in ("id", "created_at", "created_by"):
             setattr(project, key, value)
+    # remaining_count 是派生字段，若前端直接修改了 remaining_count，同步到 total_count
+    if "remaining_count" in data and "total_count" not in data:
+        project.total_count = data["remaining_count"]
     project.expiry_date = _calc_expiry(
         project.effective_date,
         project.duration_type,
@@ -114,6 +119,24 @@ def delete_project(project_id: str) -> bool:
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(project.customer_id)
     return True
+
+
+def get_effective_remaining(project_id: str) -> Optional[int]:
+    """该的真实剩余次数：total_count - 销卡流水。None 表示不限次。"""
+    project = _projects.get(project_id)
+    if not project:
+        return 0
+    if project.total_count is None:
+        # 兼容未迁移数据：remaining_count 为 None 表示不限次
+        if project.remaining_count is None:
+            return None
+        # remaining_count 有值但 total_count 未设置，用 remaining_count 作为 total
+        from app.services.project_deduction_service import get_deduction_total_for_project
+        deducted = get_deduction_total_for_project(project_id)
+        return max(0, project.remaining_count - deducted)
+    from app.services.project_deduction_service import get_deduction_total_for_project
+    deducted = get_deduction_total_for_project(project_id)
+    return max(0, project.total_count - deducted)
 
 
 def search_customers(keyword: str) -> list:

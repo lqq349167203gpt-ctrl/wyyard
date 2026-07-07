@@ -83,7 +83,7 @@ export function ProjectDeductionTab() {
   const [customerName, setCustomerName] = useState("")
   const [projectType, setProjectType] = useState("")
   const [cardType, setCardType] = useState("")
-  const [availableItems, setAvailableItems] = useState<{ id: string; name: string; remaining_count: number; detail?: string; card_type?: string; expiry_date?: string }[]>([])
+  const [availableItems, setAvailableItems] = useState<{ id: string; name: string; remaining_count: number | null; detail?: string; card_type?: string; expiry_date?: string }[]>([])
   const [selectedItemId, setSelectedItemId] = useState("")
   const [deductCount, setDeductCount] = useState("1")
   const [deducting, setDeducting] = useState(false)
@@ -371,7 +371,7 @@ export function ProjectDeductionTab() {
     }
 
     // 可用项目缓存：key = "customerId|projectType|nameFilter"
-    const availableCache = new Map<string, { remaining: number; label: string }>()
+    const availableCache = new Map<string, { remaining: number | null; label: string }>()
     const getAvailable = async (nickname: string, projectType: string, nameFilter: string = "") => {
       const customer = customers.find(c => c.nickname === nickname)
       if (!customer) return null
@@ -384,7 +384,8 @@ export function ProjectDeductionTab() {
           if (projectType === "membership-cards") filtered = items.filter(i => i.card_type === nameFilter)
           else if (projectType === "other-projects") filtered = items.filter(i => i.name === nameFilter)
         }
-        const remaining = filtered.reduce((sum, i) => sum + (i.remaining_count || 0), 0)
+        const hasUnlimited = filtered.some(i => i.remaining_count === null)
+        const remaining = hasUnlimited ? null : filtered.reduce((sum, i) => sum + (i.remaining_count || 0), 0)
         const label = nameFilter || PROJECT_TYPE_LABELS[projectType] || projectType
         const result = { remaining, label }
         availableCache.set(cacheKey, result)
@@ -450,7 +451,7 @@ export function ProjectDeductionTab() {
               errors.push(`[${sheetName}] 第${rowNum}行：用户"${nickname}"不存在`)
               continue
             }
-            if (count > avail.remaining) {
+            if (avail.remaining !== null && count > avail.remaining) {
               failed++
               errors.push(`[${sheetName}] 第${rowNum}行 ${nickname}：销卡次数 ${count} 超出可用 ${avail.remaining} 次（${typeLabel}）`)
               continue
@@ -487,7 +488,7 @@ export function ProjectDeductionTab() {
               errors.push(`[${sheetName}] 第${rowNum}行：用户"${nickname}"不存在`)
               continue
             }
-            if (count > avail.remaining) {
+            if (avail.remaining !== null && count > avail.remaining) {
               failed++
               errors.push(`[${sheetName}] 第${rowNum}行 ${nickname}：销卡次数 ${count} 超出可用 ${avail.remaining} 次（${avail.label}）`)
               continue
@@ -616,7 +617,7 @@ export function ProjectDeductionTab() {
                   <TableCell className="text-[#2b2f36]">{d.count} 次</TableCell>
                   <TableCell className="text-[#2b2f36]">{d.deduction_date}</TableCell>
                   <TableCell className="text-[#2b2f36]">
-                    {d.remaining_after < 0 ? <span className="text-[#c4506a]">{d.remaining_after} 次</span> : `${d.remaining_after} 次`}
+                    {d.remaining_after === null || d.remaining_after === undefined ? "不限" : d.remaining_after < 0 ? <span className="text-[#c4506a]">{d.remaining_after} 次</span> : `${d.remaining_after} 次`}
                   </TableCell>
                   <TableCell className="text-[#8f959e]">{d.created_by || "-"}</TableCell>
                   <TableCell>
@@ -715,7 +716,7 @@ export function ProjectDeductionTab() {
                     value={selectedItemId}
                     options={filteredItems.map((i) => ({
                       value: i.id,
-                      label: `${i.name} - ${i.detail || `剩余${i.remaining_count}次`}`,
+                      label: `${i.name} - ${i.detail || (i.remaining_count === null ? "不限" : `剩余${i.remaining_count}次`)}`,
                     }))}
                     placeholder="请选择项目"
                     onChange={setSelectedItemId}
@@ -728,7 +729,7 @@ export function ProjectDeductionTab() {
             {selectedItem && (
               <div className="bg-[#f7f8fa] rounded-md p-3 text-[12px] space-y-1">
                 <div className="flex justify-between"><span className="text-[#8f959e]">项目名称</span><span>{selectedItem.name}</span></div>
-                <div className="flex justify-between"><span className="text-[#8f959e]">剩余次数</span><span>{selectedItem.remaining_count} 次</span></div>
+                <div className="flex justify-between"><span className="text-[#8f959e]">剩余次数</span><span>{selectedItem.remaining_count === null ? "不限" : `${selectedItem.remaining_count} 次`}</span></div>
                 {selectedItem.expiry_date && (
                   <div className="flex justify-between"><span className="text-[#8f959e]">到期日期</span><span>{selectedItem.expiry_date}</span></div>
                 )}

@@ -71,9 +71,8 @@ def _fill_current_remaining(deductions: List[ProjectDeduction]):
         elif project_type == "other-projects":
             from app.services import other_project_service
             for d in items:
-                project = other_project_service.get_project(d.project_id)
-                if project and project.remaining_count is not None:
-                    d.remaining_after = project.remaining_count
+                remaining = other_project_service.get_effective_remaining(d.project_id)
+                d.remaining_after = remaining
             continue
         else:
             from app.services import (
@@ -205,18 +204,24 @@ def get_available_items(customer_id: str, project_type: str) -> list:
     elif project_type == "other-projects":
         from app.services import other_project_service
         projects = other_project_service.list_projects()
-        items = [p for p in projects if p.customer_id == customer_id and not p.is_deleted and p.remaining_count is not None and p.remaining_count > 0]
         available = []
-        for p in items:
+        for p in projects:
+            if p.customer_id != customer_id:
+                continue
+            if p.is_deleted:
+                continue
             if p.effective_date and p.effective_date > today:
                 continue
             if p.expiry_date and p.expiry_date < today:
                 continue
+            effective_remaining = other_project_service.get_effective_remaining(p.id)
+            if effective_remaining is not None and effective_remaining <= 0:
+                continue
             available.append({
                 "id": p.id,
                 "name": p.project_name,
-                "remaining_count": p.remaining_count,
-                "detail": f"剩余 {p.remaining_count} 次",
+                "remaining_count": effective_remaining,
+                "detail": "不限" if effective_remaining is None else f"剩余 {effective_remaining} 次",
                 "category": p.category,
                 "expiry_date": p.expiry_date or "",
             })
@@ -299,7 +304,7 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
                 raise ValueError("该卡为不限次卡，无法销卡")
             if card_remaining < data.count:
                 raise ValueError(f"剩余次数不足（剩余 {card_remaining} 次）")
-            project_name = card.card_type if card else "会员活动"
+            project_name = card.card_type if card else "会员卡"
             card_remaining = membership_card_service.get_card_effective_remaining(data.project_id)
             remaining_after = (card_remaining or 0) - data.count
 
@@ -308,14 +313,13 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
             project = other_project_service.get_project(data.project_id)
             if not project or project.is_deleted:
                 raise ValueError("项目不存在")
-            if project.remaining_count is None:
+            effective_remaining = other_project_service.get_effective_remaining(data.project_id)
+            if effective_remaining is None:
                 raise ValueError("该项目为不限次，无法销卡")
-            if project.remaining_count < data.count:
-                raise ValueError(f"剩余次数不足（剩余 {project.remaining_count} 次）")
-            other_project_service.update_project(project.id, {"remaining_count": project.remaining_count - data.count})
-            project = other_project_service.get_project(data.project_id)
+            if effective_remaining < data.count:
+                raise ValueError(f"剩余次数不足（剩余 {effective_remaining} 次）")
             project_name = project.project_name
-            remaining_after = project.remaining_count
+            remaining_after = effective_remaining - data.count
 
         else:
             from app.services import (
@@ -395,24 +399,14 @@ def update_deduction(deduction_id: str, count: int, updated_by: str = "") -> Pro
 
 
 def delete_deduction(deduction_id: str) -> None:
-    """软删除销卡记录，并恢复对应项目的剩余次数"""
+    """软删除销卡记录"""
     with _deduct_lock:
         deduction = _deductions.get(deduction_id)
         if not deduction or deduction.is_deleted:
             raise ValueError("记录不存在")
 
-        # 会员卡销卡基于流水，软删除即自动从 get_deduction_total 中排除，无需回写 card.remaining_count
-        if deduction.project_type == "membership-cards":
-            pass
-
-        elif deduction.project_type == "other-projects":
-            from app.services import other_project_service
-            project = other_project_service.get_project(deduction.project_id)
-            if project and project.remaining_count is not None:
-                other_project_service.update_project(project.id, {"remaining_count": project.remaining_count + deduction.count})
-
-        # 觉醒/情绪释放/OH卡/能量结：剩余次数由 get_deduction_total 计算，
-        # 软删除后自动排除，无需额外处理
+        # 剩余次数由 total_count - 销卡流水 动态计算，
+        # 软删除后自动排除，无需回写 remaining_count
 
         deduction.is_deleted = True
         _deductions[deduction_id] = deduction

@@ -60,7 +60,7 @@ def get_daily_payment_totals(date: str = Query(...)):
 
 
 TYPE_LABELS = {
-    "membership-cards": "会员活动",
+    "membership-cards": "会员卡",
     "group-cases": "觉醒游戏",
     "emotional-releases": "情绪释放",
     "oh-card-readings": "OH卡梳理",
@@ -83,7 +83,7 @@ def list_payment_records(
         records.append({
             "date": c.deal_date or "",
             "nickname": "",
-            "type": "会员活动",
+            "type": "会员卡",
             "name": c.card_type,
             "quantity": 1,
             "amount": c.price,

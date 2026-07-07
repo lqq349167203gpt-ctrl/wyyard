@@ -1304,7 +1304,7 @@ export interface OtherProjectDeduction {
   project_created_at: string
   count: number
   deduction_date: string
-  remaining_after: number
+  remaining_after: number | null
   created_at: string
 }
 
@@ -1317,7 +1317,7 @@ export interface ProjectDeduction {
   project_name: string
   count: number
   deduction_date: string
-  remaining_after: number
+  remaining_after: number | null
   created_by: string
   updated_by: string
   created_at: string
@@ -2001,12 +2001,16 @@ export interface StatisticsDetail {
   status: string
   arrived?: boolean
   type?: string
+  name?: string
+  quantity?: number | string
+  remaining?: number | string
   member_type?: string
   invited_count?: number
   visit_count?: number
   activity_count?: number
   total_consumption?: number
   visit_interval?: string
+  amount?: number
 }
 
 export const statisticsApi = {
