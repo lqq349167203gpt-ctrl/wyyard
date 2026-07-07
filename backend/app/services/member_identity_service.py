@@ -225,39 +225,46 @@ def _check_condition(condition, customer_id: str,
 
 
 def _count_activity_days(customer_id: str, all_class_records, all_group_cases,
-                         all_emotional_releases, all_energy_knots, all_internal_courses) -> int:
-    """统计客户参与过活动的天数（至少参与1个活动算1天）"""
+                         all_emotional_releases, all_energy_knots, all_internal_courses,
+                         customer_visits=None) -> int:
+    """统计客户参与过活动的天数（至少参与1个活动算1天，必须实际到店）"""
     from app.services import class_record_service
+
+    # 构建已到店日期集合
+    arrived_dates: set[str] = set()
+    if customer_visits:
+        arrived_dates = {v.visit_date for v in customer_visits if v.arrived}
+
     active_dates: set[str] = set()
     for r in all_class_records:
         if customer_id in class_record_service._get_group_member_ids(r):
-            if r.date:
+            if r.date and (not customer_visits or r.date in arrived_dates):
                 active_dates.add(r.date)
     for s in all_group_cases:
         ids = set(s.participant_ids or [])
         if s.owner_id: ids.add(s.owner_id)
         if s.host_id: ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
-        if customer_id in ids and s.date:
+        if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_emotional_releases:
         ids = set(s.participant_ids or [])
         if s.owner_id: ids.add(s.owner_id)
         if s.host_id: ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
-        if customer_id in ids and s.date:
+        if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_energy_knots:
         ids = set(s.participant_ids or [])
         if s.owner_id: ids.add(s.owner_id)
         if s.host_id: ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
-        if customer_id in ids and s.date:
+        if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_internal_courses:
         ids = set(s.participant_ids or [])
         ids.update(s.teacher_ids or [])
-        if customer_id in ids and s.date:
+        if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     return len(active_dates)
 
@@ -320,7 +327,8 @@ def refresh_member_type(customer_id: str):
     all_ek_sessions = energy_knot_session_service.list_sessions()
     all_ic_sessions = internal_course_session_service.list_sessions()
     activity_count = _count_activity_days(customer_id, all_records, all_gc_sessions,
-                                          all_er_sessions, all_ek_sessions, all_ic_sessions)
+                                          all_er_sessions, all_ek_sessions, all_ic_sessions,
+                                          customer_visits)
 
     # 公益活动参与次数
     welfare_count = sum(1 for r in all_records if r.is_public_welfare and customer_id in (r.participant_ids or []))
@@ -429,10 +437,12 @@ def refresh_all():
             arrival_dates_map.setdefault(v.customer_id, set()).add(v.visit_date)
     arrival_map: dict[str, int] = {cid: len(dates) for cid, dates in arrival_dates_map.items()}
 
-    # 从实际活动数据源统计参与天数
+    # 从实际活动数据源统计参与天数（必须实际到店）
     def _add_activity_date(cid: str, date: str):
         if cid and date:
-            activity_dates_map.setdefault(cid, set()).add(date)
+            # 只有实际到店的日期才算活动参与
+            if cid in arrival_dates_map and date in arrival_dates_map[cid]:
+                activity_dates_map.setdefault(cid, set()).add(date)
 
     for r in all_records:
         if r.is_public_welfare:

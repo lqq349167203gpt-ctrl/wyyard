@@ -421,6 +421,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         })
     }
     load()
+    // 重新加载当日数据，确保导出时使用最新数据
+    if (customerListReady) {
+      visitApi.list(selectedDate, undefined, spaceId)
+        .then(setVisits)
+        .catch(() => {})
+    }
   }
   useEffect(() => { if (permReady) refreshCounts() }, [permReady, dateRangeStart, cp])
 
@@ -544,7 +550,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    // 直接从 API 读取最新数据，不依赖状态，确保导出内容是最新的
+    const freshVisits = await visitApi.list(selectedDate, undefined, spaceId).catch(() => filteredVisits)
+    const visibleIdSet = new Set(customerList.map(c => c.id))
+    const latestVisits = freshVisits.filter(v => visibleIdSet.has(v.customer_id))
+
     const customerMap = new Map(customerList.map(c => [c.id, c]))
     // 构建角色映射
     const roleMap = new Map<string, string>()       // id → "组长"/"副组长"/""
@@ -552,8 +563,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       if (g.leader_id) roleMap.set(g.leader_id, "组长")
       if (g.deputy_id) roleMap.set(g.deputy_id, "副组长")
     })
-    // 按后端 sort_order 排序（filteredVisits 已是后端返回顺序）
-    const rows = filteredVisits.map(v => {
+    // 按后端 sort_order 排序（latestVisits 已是后端返回顺序）
+    const rows = latestVisits.map(v => {
       const role = roleMap.get(v.customer_id) || (v.is_leader ? "组长" : "")
       return {
         "引流人": customerMap.get(v.customer_id)?.referrer || "-",

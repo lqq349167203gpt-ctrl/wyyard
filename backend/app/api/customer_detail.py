@@ -45,7 +45,9 @@ def get_customer_detail(customer_id: str, request: Request = None):
     basic["visit_count"] = visit_service.count_customer_visits(customer_id)
 
     purchase_summary = _build_purchase_summary(customer_id)
-    activities = _build_activities(customer_id)
+    # 获取已到店日期集合
+    arrived_dates = {v.visit_date for v in visit_service.list_visits(customer_id=customer_id) if v.arrived}
+    activities = _build_activities(customer_id, arrived_dates)
     healing_records = [
         r.model_dump(mode="json")
         for r in healing_record_service.list_records(customer_id)
@@ -323,12 +325,14 @@ def _build_purchase_summary(customer_id: str) -> list:
     return summary
 
 
-def _build_activities(customer_id: str) -> list:
-    """合并所有活动记录，按日期倒序"""
+def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
+    """合并所有活动记录，按日期倒序（必须实际到店）"""
     activities = []
 
-    # 课程记录 - 作为参与者或老师
+    # 课程记录 - 作为参与者或老师（必须实际到店）
     for r in class_record_service.list_records():
+        if arrived_dates is not None and r.date not in arrived_dates:
+            continue
         teacher_names = []
         for tid in r.teacher_ids:
             t = customer_service.get_customer(tid)
@@ -340,6 +344,7 @@ def _build_activities(customer_id: str) -> list:
                 "type": "沙龙类型",
                 "date": r.date,
                 "name": r.course_name,
+                "course_type": r.course_type or "",
                 "role": "参与者",
                 "host": host,
                 "session_id": r.id,
@@ -350,14 +355,17 @@ def _build_activities(customer_id: str) -> list:
                 "type": "沙龙类型",
                 "date": r.date,
                 "name": r.course_name,
+                "course_type": r.course_type or "",
                 "role": "老师",
                 "host": host,
                 "session_id": r.id,
                 "is_public_welfare": r.is_public_welfare,
             })
 
-    # 觉醒游戏
+    # 觉醒游戏（必须实际到店）
     for s in group_case_session_service.list_sessions():
+        if arrived_dates is not None and s.date not in arrived_dates:
+            continue
         gc_name = f"觉醒游戏【{s.owner_name}】" if s.owner_name else "觉醒游戏"
         if s.owner_id == customer_id:
             activities.append({
@@ -390,8 +398,10 @@ def _build_activities(customer_id: str) -> list:
                 "is_public_welfare": False,
             })
 
-    # 情绪释放
+    # 情绪释放（必须实际到店）
     for s in emotional_release_session_service.list_sessions():
+        if arrived_dates is not None and s.date not in arrived_dates:
+            continue
         er_name = f"情绪释放【{s.owner_name}】" if s.owner_name else "情绪释放"
         if s.owner_id == customer_id:
             activities.append({
@@ -424,8 +434,10 @@ def _build_activities(customer_id: str) -> list:
                 "is_public_welfare": False,
             })
 
-    # 能量结
+    # 能量结（必须实际到店）
     for s in energy_knot_session_service.list_sessions():
+        if arrived_dates is not None and s.date not in arrived_dates:
+            continue
         ek_names = _parse_ek_names(s.description)
         ek_name = f"能量结【{ek_names}】" if ek_names else "能量结"
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
@@ -460,14 +472,17 @@ def _build_activities(customer_id: str) -> list:
                 "is_public_welfare": False,
             })
 
-    # 内部课程
+    # 内部课程（必须实际到店）
     for s in internal_course_session_service.list_sessions():
+        if arrived_dates is not None and s.date not in arrived_dates:
+            continue
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         if customer_id in s.participant_ids:
             activities.append({
                 "type": "内部课程",
                 "date": s.date,
                 "name": s.course_name,
+                "course_type": s.course_type or "",
                 "role": "参与者",
                 "host": host,
                 "session_id": s.id,
@@ -478,6 +493,7 @@ def _build_activities(customer_id: str) -> list:
                 "type": "内部课程",
                 "date": s.date,
                 "name": s.course_name,
+                "course_type": s.course_type or "",
                 "role": "老师",
                 "host": host,
                 "session_id": s.id,

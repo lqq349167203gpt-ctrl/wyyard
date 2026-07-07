@@ -31,10 +31,12 @@ export default function DetailView({
   selectedCustomerId,
   onClearSelection,
   hideSearch = false,
+  defaultTab = "activities",
 }: {
   selectedCustomerId: string | null
   onClearSelection: () => void
   hideSearch?: boolean
+  defaultTab?: "activities" | "healing" | "payment" | "purchase"
 }) {
   const [customerList, setCustomerList] = useState<CustomerLight[]>([])
   const [searchValue, setSearchValue] = useState("")
@@ -42,7 +44,7 @@ export default function DetailView({
   const [loading, setLoading] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editingRec, setEditingRec] = useState<HealingRec | null>(null)
-  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "payment" | "purchase">("activities")
+  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "payment" | "purchase">(defaultTab)
   const [activitiesPage, setActivitiesPage] = useState(1)
   const [healingPage, setHealingPage] = useState(1)
   const [paymentPage, setPaymentPage] = useState(1)

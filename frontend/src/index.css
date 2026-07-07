@@ -164,10 +164,36 @@ input[type="time"].time-no-icon::-webkit-calendar-picker-indicator {
   display: none;
 }
 
+/* 隐藏月份选择框日历图标 */
+input[type="month"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  width: 0;
+}
+
+/* 日期选择框日历图标灰色，缩小间距 */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.4;
+  filter: grayscale(1);
+  margin-left: -4px;
+}
+
 /* 飞书侧边栏：去掉右侧边框 */
 [data-slot="sidebar-container"] {
   border-right: none !important;
   border-left: none !important;
+}
+
+/* 去掉 recharts 点击蓝色轮廓 */
+.recharts-wrapper,
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible,
+.recharts-surface,
+.recharts-surface:focus,
+.recharts-surface:focus-visible,
+.recharts-wrapper svg,
+.recharts-wrapper svg:focus {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* 隐藏滚动条但保留滚动功能 */

@@ -34,7 +34,6 @@ const businessItems = [
   { title: "提醒", icon: IconBellRingingFilled, path: "/business-reminders", permission: "business-reminders" },
   { title: "数据记录", icon: IconChartAreaFilled, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
   { title: "统计", icon: IconChartAreaFilled, path: "/statistics", permission: "statistics" },
-  { title: "数据分析", icon: IconChartAreaFilled, path: "/data-analysis", permission: "data-analysis" },
 ]
 
 const courseItems = [

@@ -2000,6 +2000,12 @@ export interface StatisticsDetail {
   status: string
   arrived?: boolean
   type?: string
+  member_type?: string
+  invited_count?: number
+  visit_count?: number
+  activity_count?: number
+  total_consumption?: number
+  visit_interval?: string
 }
 
 export const statisticsApi = {
@@ -2010,11 +2016,12 @@ export const statisticsApi = {
     if (params.granularity) searchParams.set("granularity", params.granularity)
     return request<{ data: StatisticsData[] }>(`/api/statistics/overview?${searchParams.toString()}`)
   },
-  details: (params: { date_from?: string; date_to?: string; status?: string }) => {
+  details: (params: { date_from?: string; date_to?: string; status?: string; total?: boolean }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.status) searchParams.set("status", params.status)
+    if (params.total) searchParams.set("total", "true")
     return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[] }>(`/api/statistics/details?${searchParams.toString()}`)
   },
   analysis: (params: { date_from?: string; date_to?: string; granularity?: string; metric?: string }) => {
