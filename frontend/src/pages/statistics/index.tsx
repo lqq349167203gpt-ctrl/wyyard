@@ -446,7 +446,7 @@ export default function StatisticsPage() {
                   >
                     {LABELS[tab]}
                   </button>
-                ))}
+                )).reduce((acc, el, i) => i === 2 ? [...acc, <span key="sep" className="w-px h-3 bg-[#d0d3d6]" />, el] : [...acc, el], [] as React.ReactNode[])}
               </div>
             </div>
           </div>
@@ -490,9 +490,9 @@ export default function StatisticsPage() {
               <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}变化</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
               <div className="flex items-center gap-4">
                 {(["invited", "arrived", "converted", "converted_amount"] as const).map((key) => (
-                  <label key={key} className="flex items-center gap-1.5 cursor-pointer select-none" onClick={() => setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                  <label key={key} className="flex items-center gap-1 cursor-pointer select-none" onClick={() => setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }))}>
                     <span
-                      className="w-3.5 h-3.5 rounded border flex items-center justify-center text-[10px] leading-none"
+                      className="w-3.5 h-3.5 rounded border flex items-center justify-center text-[9px] leading-none"
                       style={{
                         borderColor: visibleLines[key] ? COLORS[key] : "#c8ccd0",
                         backgroundColor: visibleLines[key] ? COLORS[key] : "transparent",
@@ -551,7 +551,7 @@ export default function StatisticsPage() {
                     return v
                   }}
                 />
-                <YAxis tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }} allowDecimals={false} ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={yTicks[yTicks.length - 1] >= 10000 ? 45 : yTicks[yTicks.length - 1] >= 1000 ? 35 : 25} />
+                <YAxis tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }} allowDecimals={false} ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={30} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null
@@ -610,10 +610,10 @@ export default function StatisticsPage() {
               <div className="flex items-center justify-center h-[160px] text-[#8f959e] text-[12px]">暂无数据</div>
             ) : (
               <ResponsiveContainer width="100%" height={160} tabIndex={-1}>
-                <BarChart data={identityData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                <BarChart data={identityData} margin={{ top: 10, right: 5, left: 0, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#b0b5bd" }} axisLine={false} tickLine={false} tickFormatter={(v) => v.length > 4 ? v.slice(0, 4) + "..." : v} />
-                  <YAxis tick={{ fontSize: 11, fill: "#b0b5bd" }} axisLine={false} tickLine={false} allowDecimals={false} width={Math.max(20, Math.ceil(Math.log10(Math.max(...identityData.map(d => d.value), 1) + 1)) * 8 + 8)} domain={[0, (dataMax: number) => Math.ceil(dataMax / 4) * 4 + 4]} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#b0b5bd" }} axisLine={false} tickLine={false} height={20} tickFormatter={(v) => v.length > 4 ? v.slice(0, 4) + "..." : v} />
+                  <YAxis tick={{ fontSize: 11, fill: "#b0b5bd" }} axisLine={false} tickLine={false} allowDecimals={false} width={30} domain={[0, (dataMax: number) => Math.ceil(dataMax / 4) * 4 + 4]} />
                   <Tooltip formatter={(value) => [value, "人数"]} contentStyle={{ fontSize: 12, borderRadius: 4 }} cursor={{ fill: "transparent" }} />
                   <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={20} activeBar={false}>
                     {identityData.map((_, index) => (
