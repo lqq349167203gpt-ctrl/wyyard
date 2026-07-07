@@ -637,34 +637,37 @@ export default function StatisticsPage() {
             <div className="text-[12px] font-medium text-[#4e535a] mb-2">{LABELS[activeTab]}<span className="font-normal text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-[#8f959e]">统计维度</span>
-              <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
-                <button
-                  onClick={() => setStatDimension("range")}
-                  className={`px-2 h-[22px] text-[11px] rounded-[2px] transition-all ${statDimension === "range" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  统计期间
-                </button>
-                <button
-                  onClick={() => setStatDimension("total")}
-                  className={`px-2 h-[22px] text-[11px] rounded-[2px] transition-all ${statDimension === "total" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  总数据
-                </button>
-              </div>
-              {statDimension === "range" && <span className="text-[11px] text-[#b0b5bd]">统计期间 - 仅统计选择时间范围内的用户相关数据</span>}
-              {statDimension === "total" && <span className="text-[11px] text-[#b0b5bd]">总数据 - 统计用户在系统中的所有数据</span>}
-              {activeTab === "converted_amount" && (
-                <div className="flex items-center gap-1 ml-2 pl-2 border-l border-[#e8eaed]">
+              {activeTab === "converted_amount" ? (
+                <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
                   {["全部", "会员卡", "觉醒游戏", "情绪释放", "OH卡", "其他项目"].map(t => (
                     <button
                       key={t}
                       onClick={() => setTypeFilter(t)}
-                      className={`px-2 h-[22px] text-[11px] rounded-[2px] transition-all ${typeFilter === t ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                      className={`px-2 h-[22px] text-[11px] rounded-[2px] transition-all ${typeFilter === t ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
                     >
                       {t}
                     </button>
                   ))}
                 </div>
+              ) : (
+                <>
+                  <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
+                    <button
+                      onClick={() => setStatDimension("range")}
+                      className={`px-2 h-[22px] text-[11px] rounded-[2px] transition-all ${statDimension === "range" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    >
+                      统计期间
+                    </button>
+                    <button
+                      onClick={() => setStatDimension("total")}
+                      className={`px-2 h-[22px] text-[11px] rounded-[2px] transition-all ${statDimension === "total" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    >
+                      总数据
+                    </button>
+                  </div>
+                  {statDimension === "range" && <span className="text-[11px] text-[#b0b5bd]">统计期间 - 仅统计选择时间范围内的用户相关数据</span>}
+                  {statDimension === "total" && <span className="text-[11px] text-[#b0b5bd]">总数据 - 统计用户在系统中的所有数据</span>}
+                </>
               )}
             </div>
           </div>
