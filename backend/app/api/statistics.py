@@ -168,11 +168,14 @@ def get_overview(
     for date_str, customer_ids in converted_by_date.items():
         daily[date_str]["converted"] = len(customer_ids)
 
-    # 3. 成交金额（按 deal_date 累加 price，排除已作废）
+    # 3. 成交金额（按 deal_date 累加，排除已作废）
+    def _get_amount(r):
+        return getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0
+
     for records in services:
         for r in records:
             deal_date = getattr(r, "deal_date", None)
-            price = getattr(r, "price", 0) or 0
+            price = _get_amount(r)
             voided = getattr(r, "voided", False)
             if deal_date and not voided and date_from <= deal_date <= date_to:
                 daily[deal_date]["converted_amount"] += price
@@ -284,7 +287,7 @@ def get_details(
                     "name": name,
                     "quantity": quantity,
                     "member_type": c.member_type if c and c.member_type else "",
-                    "amount": getattr(r, "price", 0) or 0,
+                    "amount": getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0,
                 })
 
     # 补充客户统计信息
