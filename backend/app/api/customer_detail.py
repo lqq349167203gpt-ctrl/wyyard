@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
 
 
 @router.get("/{customer_id}")
-def get_customer_detail(customer_id: str, request: Request = None):
+def get_customer_detail(customer_id: str, request: Request = None, date: str | None = None):
     """获取单个客户的完整聚合详情"""
     # 客户角色只能查看自己的数据
     if request:
@@ -45,9 +45,12 @@ def get_customer_detail(customer_id: str, request: Request = None):
     basic["visit_count"] = visit_service.count_customer_visits(customer_id)
 
     purchase_summary = _build_purchase_summary(customer_id)
-    # 获取已到店日期集合
-    arrived_dates = {v.visit_date for v in visit_service.list_visits(customer_id=customer_id) if v.arrived}
-    activities = _build_activities(customer_id, arrived_dates)
+    # date 参数：只返回该日期的活动（与 statistics 逻辑一致）
+    if date:
+        activities = _build_activities(customer_id, {date})
+    else:
+        arrived_dates = {v.visit_date for v in visit_service.list_visits(customer_id=customer_id) if v.arrived}
+        activities = _build_activities(customer_id, arrived_dates)
     healing_records = [
         r.model_dump(mode="json")
         for r in healing_record_service.list_records(customer_id)

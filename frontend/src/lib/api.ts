@@ -1584,7 +1584,7 @@ export interface CustomerDetail {
 }
 
 export const customerDetailApi = {
-  get: (customerId: string) => request<CustomerDetail>(`/api/customer-detail/${customerId}`),
+  get: (customerId: string, date?: string) => request<CustomerDetail>(`/api/customer-detail/${customerId}${date ? `?date=${date}` : ''}`),
 }
 
 // System Logs

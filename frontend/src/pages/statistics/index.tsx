@@ -195,7 +195,7 @@ export default function StatisticsPage() {
     setPopupDate(date || null)
     setPopupLoading(true)
     try {
-      const data = await customerDetailApi.get(customerId)
+      const data = await customerDetailApi.get(customerId, type === "day_activities" ? date : undefined)
       setPopupData(data)
     } catch {
       setPopupData(null)
