@@ -1085,7 +1085,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                         space_name = space.name
                 except Exception:
                     pass
-            suffix_parts = [p for p in [session_date, space_name] if p]
+            referrer = (body or {}).get("referrer_handler", "") if "/api/visits" in path else ""
+            suffix_parts = [p for p in [session_date, space_name, referrer] if p]
         if summary:
             if suffix_parts:
                 return f"新增{entity_type} {name}（{'，'.join(suffix_parts)}）：{summary}"
@@ -1114,7 +1115,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                             space_name = space.name
                     except Exception:
                         pass
-                suffix_parts = [p for p in [session_date, space_name] if p]
+                referrer = before.get("referrer_handler", "")
+                suffix_parts = [p for p in [session_date, space_name, referrer] if p]
                 if suffix_parts:
                     return f"{name}：{desc}（{'，'.join(suffix_parts)}）"
             return f"{name}：{desc}"
@@ -1132,6 +1134,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                         suffix_parts.append(space.name)
                 except Exception:
                     pass
+            if before.get("referrer_handler"):
+                suffix_parts.append(before["referrer_handler"])
         if suffix_parts:
             return f"删除{entity_type} {name}（{'，'.join(suffix_parts)}）"
         return f"删除{entity_type} {name}"
@@ -1199,6 +1203,13 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             section = get_section(path)
             content = build_log_content(method, path, body, before_data)
             entity_id = get_entity_id(path)
+
+            # 邀约编辑：仅活动参与字段变更时，section 改为"活动参与"
+            if section == "邀约" and method in ("PUT", "PATCH") and before_data:
+                activity_keys = {"activity_participation", "activity_id", "activity_type", "experience"}
+                changed_keys = {k for k in body if k not in ("id", "created_at", "updated_at") and body.get(k) != before_data.get(k)}
+                if changed_keys and changed_keys <= activity_keys:
+                    section = "活动参与"
 
             # 特殊处理：position-permissions/full 端点使用 body 中的 position 作为 entity_id
             if "/api/position-permissions/full" in path:
