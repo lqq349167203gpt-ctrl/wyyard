@@ -4,9 +4,21 @@ from app.models.base import StrictBaseModel
 from typing import List, Optional
 from app.utils.pagination import paginate
 from app.services import class_record_service
-from app.services.customer_service import list_customers
+from app.services.customer_service import list_customers, get_customer
 
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
+
+
+def _fill_visit_nicknames(visits):
+    """为到访记录注入客户昵称"""
+    result = []
+    for v in visits:
+        data = v.model_dump(mode="json")
+        customer = get_customer(v.customer_id) if v.customer_id else None
+        data["nickname"] = customer.nickname if customer else ""
+        data["member_type"] = customer.member_type if customer else ""
+        result.append(data)
+    return result
 
 
 def _fill_names(items: list) -> list:
@@ -359,7 +371,7 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         "eks_sessions": eks_dicts,
         "ics_sessions": ics_dicts,
         "ocr_sessions": ocr_dicts,
-        "visits": visit_service.list_visits(date, space_id=space_id if space_id else None),
+        "visits": _fill_visit_nicknames(visit_service.list_visits(date, space_id=space_id if space_id else None)),
         "visit_counts": visit_service.get_date_counts(start_date=start_date, end_date=end_date, space_id=space_id if space_id else None),
         "calendar_counts": dict(cal_counts),
         "groupings": daily_grouping_service.get_grouping(date) or {"date": date, "groups": []},

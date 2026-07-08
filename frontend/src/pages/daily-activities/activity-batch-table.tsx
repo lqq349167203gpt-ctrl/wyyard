@@ -655,6 +655,7 @@ export function ActivityBatchTable({
           } catch {}
           return next
         })
+        setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
         return result
       } else {
         // 更新已有记录

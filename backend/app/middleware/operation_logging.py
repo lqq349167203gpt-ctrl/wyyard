@@ -26,7 +26,7 @@ SECTION_MAP = {
     "/api/internal-course-sessions": "课表",
     "/api/agents": "AI 配置",
     "/api/ai-configs": "AI 配置",
-    "/api/class-records": "邀约",
+    "/api/class-records": "课表",
     "/api/accounts": "账号管理",
     "/api/positions": "账号管理",
     "/api/healing-identities": "疗愈老师",
@@ -66,7 +66,7 @@ GETTER_MAP = {
     "/api/internal-course-sessions": ("课表", "internal_course_session_service", "get_session"),
     "/api/agents": ("AI 配置", "agent_service", "get_agent"),
     "/api/ai-configs": ("AI 配置", "ai_config_service", "get_config"),
-    "/api/class-records": ("邀约", "class_record_service", "get_record"),
+    "/api/class-records": ("课表", "class_record_service", "get_record"),
     "/api/accounts": ("账号管理", "account_service", "get_account"),
     "/api/visits": ("邀约", "visit_service", "get_visit"),
     "/api/daily-groupings": ("邀约", "daily_grouping_service", "get_grouping"),
@@ -1041,7 +1041,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         date_space_prefixes = [
             "/api/group-case-sessions", "/api/emotional-release-sessions",
             "/api/energy-knot-sessions", "/api/internal-course-sessions",
-            "/api/oh-card-reading-sessions", "/api/visits",
+            "/api/oh-card-reading-sessions", "/api/visits", "/api/class-records",
         ]
         suffix_parts = []
         if any(path.startswith(p) for p in date_space_prefixes):
@@ -1067,36 +1067,39 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         return f"新增{entity_type} {name}"
     elif method in ("PUT", "PATCH"):
         desc = build_change_description(before or {}, body)
+        # 课表场次 / 邀约 编辑：补充日期和空间信息
+        date_space_prefixes = [
+            "/api/group-case-sessions", "/api/emotional-release-sessions",
+            "/api/energy-knot-sessions", "/api/internal-course-sessions",
+            "/api/oh-card-reading-sessions", "/api/visits", "/api/class-records",
+        ]
+        suffix_parts = []
+        if any(path.startswith(p) for p in date_space_prefixes) and before:
+            session_date = before.get("visit_date") or before.get("date", "")
+            space_id = before.get("space_id", "")
+            space_name = ""
+            if space_id:
+                try:
+                    from app.services import space_service
+                    space = space_service.get_space(space_id)
+                    if space:
+                        space_name = space.name
+                except Exception:
+                    pass
+            referrer = before.get("referrer_handler", "")
+            suffix_parts = [p for p in [session_date, space_name, referrer] if p]
         if desc:
-            # 课表场次 / 邀约 编辑：补充日期和空间信息
-            date_space_prefixes = [
-                "/api/group-case-sessions", "/api/emotional-release-sessions",
-                "/api/energy-knot-sessions", "/api/internal-course-sessions",
-                "/api/oh-card-reading-sessions", "/api/visits",
-            ]
-            if any(path.startswith(p) for p in date_space_prefixes) and before:
-                session_date = before.get("visit_date") or before.get("date", "")
-                space_id = before.get("space_id", "")
-                space_name = ""
-                if space_id:
-                    try:
-                        from app.services import space_service
-                        space = space_service.get_space(space_id)
-                        if space:
-                            space_name = space.name
-                    except Exception:
-                        pass
-                referrer = before.get("referrer_handler", "")
-                suffix_parts = [p for p in [session_date, space_name, referrer] if p]
-                if suffix_parts:
-                    return f"{name}：{desc}（{'，'.join(suffix_parts)}）"
+            if suffix_parts:
+                return f"{name}：{desc}（{'，'.join(suffix_parts)}）"
             return f"{name}：{desc}"
+        if suffix_parts:
+            return f"保存{name}（{'，'.join(suffix_parts)}，无变更）"
         return f"保存{name}（无变更）"
     elif method == "DELETE":
         suffix_parts = []
         if before:
-            if before.get("visit_date"):
-                suffix_parts.append(before["visit_date"])
+            if before.get("visit_date") or before.get("date"):
+                suffix_parts.append(before.get("visit_date") or before.get("date"))
             if before.get("space_id"):
                 try:
                     from app.services import space_service
