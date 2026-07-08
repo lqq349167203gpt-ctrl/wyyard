@@ -44,8 +44,8 @@ const PROJECT_TYPES = {
 type ProjectTypeKey = keyof typeof PROJECT_TYPES
 
 const MEMBERSHIP_CARD_TYPES: Record<string, { price: number; defaultCount?: number; unlimited?: boolean; duration?: string }> = {
-  "次卡": { price: 198, defaultCount: 1, duration: "1 年" },
-  "体验会员": { price: 398, defaultCount: 4, duration: "1 年" },
+  "次卡": { price: 198, defaultCount: 1, duration: "1 个月" },
+  "体验会员": { price: 398, defaultCount: 4, duration: "1 个月" },
   "月卡": { price: 1999, unlimited: true, duration: "1 个月" },
   "3月卡": { price: 3999, unlimited: true, duration: "3 个月" },
   "30次卡": { price: 3999, defaultCount: 30, duration: "1 年" },

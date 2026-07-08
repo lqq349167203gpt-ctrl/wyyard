@@ -237,7 +237,7 @@ def get_section(path: str) -> str:
 
 
 def get_entity_name(body: dict) -> str:
-    for key in ["nickname", "name", "title", "content", "section", "username", "course_name", "owner_name", "date", "position", "member_type"]:
+    for key in ["nickname", "name", "title", "content", "section", "username", "course_name", "owner_name", "date", "position"]:
         if key in body and body[key]:
             return str(body[key])[:20]
     return ""
@@ -716,8 +716,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     if not entity_name and before:
         entity_name = get_entity_name(before)
 
-    # 邀约：从 customer_id 反查昵称（始终执行，覆盖 member_type/date 等误匹配）
-    if "/api/visits" in path:
+    # 邀约：从 customer_id 反查昵称（覆盖 member_type/date 等误匹配）
+    if "/api/visits" in path and not entity_name:
         customer_id = (body or {}).get("customer_id") or (before or {}).get("customer_id", "")
         if customer_id:
             try:
