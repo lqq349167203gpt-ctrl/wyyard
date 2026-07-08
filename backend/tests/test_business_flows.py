@@ -112,20 +112,6 @@ class TestVisitBusinessLogic:
         assert data["feedback"] == "感谢您的反馈"
         assert data["healing_notes"] == "肩颈有改善"
 
-    def test_visit_with_activity_participation(self, client, created_customer):
-        """到访记录：活动参与情况"""
-        resp = client.post("/api/visits", json={
-            "visit_date": "2026-05-29",
-            "customer_id": created_customer["id"],
-            "nickname": created_customer["nickname"],
-            "activity_participation": [
-                {"name": "晨间沙龙", "role": "组员", "participated": True},
-                {"name": "情绪释放", "role": "案主", "participated": True},
-            ],
-        })
-        assert resp.status_code == 200
-        assert len(resp.json()["activity_participation"]) == 2
-
     def test_visit_search_customers(self, client, created_customer):
         """到访记录：搜索客户"""
         resp = client.get(f"/api/visits/search-customers?q={created_customer['nickname']}")

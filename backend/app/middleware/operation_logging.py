@@ -187,7 +187,7 @@ FIELD_NAMES = {
     "price": "价格", "amount": "金额", "count": "次数", "total": "总计",
     "sort_order": "排序", "is_public_welfare": "公益",
     "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "疗愈师回复",
-    "needs": "需求", "activity_participation": "活动参与", "visit_date": "到访日期",
+    "needs": "需求", "visit_date": "到访日期",
     "visit_time": "预计时间", "customer_id": "客户",
     "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "角色", "permissions": "权限",
     "groups": "分组", "materials": "资料", "images": "图片",
@@ -219,7 +219,7 @@ FIELD_NAMES = {
     "position_sort_orders": "排序顺序",
     "effective_date": "生效日期", "organization_id": "组织", "rooms": "房间", "teachers": "老师", "themes": "主题",
     "enabled": "启用状态", "is_system": "系统角色",
-    "daily_card_usage": "日卡使用", "activity_id": "活动ID", "activity_type": "活动类型",
+    "daily_card_usage": "日卡使用",
     "healing_notes": "疗愈笔记", "activity_count": "活动次数", "welfare_count": "公益次数",
     "activities": "活动记录",
     "provider": "模型供应商", "model": "模型", "api_key": "API密钥", "base_url": "接口地址",
@@ -473,30 +473,6 @@ def _format_value(val, field_name: str = "") -> str:
     return str(val)[:30]
 
 
-def _diff_activity_participation(before: list, after: list) -> str:
-    """逐项比较 activity_participation，只输出参与状态有变化的项。"""
-    before_map = {(a.get("name", ""), a.get("role", ""), a.get("type", "")): a.get("participated", False) for a in before}
-    after_map = {(a.get("name", ""), a.get("role", ""), a.get("type", "")): a.get("participated", False) for a in after}
-    changes = []
-    all_keys = set(before_map.keys()) | set(after_map.keys())
-    for key in all_keys:
-        old_p = before_map.get(key)
-        new_p = after_map.get(key)
-        if old_p == new_p:
-            continue
-        name, role = key[0], key[1]
-        label = f"{name}" + (f"({role})" if role else "")
-        if old_p is None:
-            changes.append(f"{label}新增")
-        elif new_p is None:
-            changes.append(f"{label}移除")
-        elif new_p:
-            changes.append(f"{label}未参与→已参与")
-        else:
-            changes.append(f"{label}已参与→未参与")
-    return "，".join(changes)
-
-
 def _diff_groups(before: list, after: list) -> str:
     """逐项比较 groups 变更，输出具体调整内容。"""
     parts = []
@@ -605,11 +581,6 @@ def build_change_description(before: dict, after: dict) -> str:
             continue
         old_val = before.get(key)
         if old_val == new_val:
-            continue
-        if key == "activity_participation" and isinstance(old_val, list) and isinstance(new_val, list):
-            diff = _diff_activity_participation(old_val, new_val)
-            if diff:
-                changes.append(f"活动参与：{diff}")
             continue
         if key == "groups" and isinstance(old_val, list) and isinstance(new_val, list):
             diff = _diff_groups(old_val, new_val)
@@ -1203,13 +1174,6 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             section = get_section(path)
             content = build_log_content(method, path, body, before_data)
             entity_id = get_entity_id(path)
-
-            # 邀约编辑：仅活动参与字段变更时，section 改为"课表"
-            if section == "邀约" and method in ("PUT", "PATCH") and before_data:
-                activity_keys = {"activity_participation", "activity_id", "activity_type", "experience"}
-                changed_keys = {k for k in body if k not in ("id", "created_at", "updated_at") and body.get(k) != before_data.get(k)}
-                if changed_keys and changed_keys <= activity_keys:
-                    section = "课表"
 
             # 特殊处理：position-permissions/full 端点使用 body 中的 position 作为 entity_id
             if "/api/position-permissions/full" in path:

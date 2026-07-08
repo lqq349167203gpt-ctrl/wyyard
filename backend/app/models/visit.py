@@ -21,22 +21,19 @@ class VisitRecordBase(SafeBaseModel):
     daily_card_usage: int = 0
     needs: str = ""
     referrer_handler: str = ""  # 承接人
-    activity_id: str = ""
-    activity_type: str = ""
     space_id: str = ""  # 所属空间
     is_leader: bool = False  # 是否组长
     arrived: bool = False  # 是否到店
     arrival_time: str = ""  # 实际到场时间 HH:MM
-    activity_participation: list = []  # [{name, role, participated}]
-    experience: str = ""  # 活动参与体验
-    feedback: str = ""  # 客户反馈
+    experience: str = ""  # 客户反馈
+    feedback: str = ""  # 疗愈师回复
     healing_notes: str = ""  # 跟进记录
     group_leader_feedback: str = ""  # 组长反馈
     sort_order: int = 0  # 排序权重，越小越靠前
 
     @field_validator(
         "visit_time", "member_type", "needs", "referrer_handler",
-        "activity_id", "activity_type", "space_id", "arrival_time",
+        "space_id", "arrival_time",
         "experience", "feedback", "healing_notes", "group_leader_feedback",
         mode="before",
     )

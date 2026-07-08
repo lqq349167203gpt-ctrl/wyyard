@@ -45,8 +45,6 @@ FIELD_LABELS = {
     "wechat": "微信",
     "visit_date": "到访日期",
     "visit_time": "到访时间",
-    "activity_type": "活动类型",
-    "activity_id": "活动ID",
     "space_id": "空间",
     "needs": "需求",
     "arrived": "已到场",
@@ -92,7 +90,6 @@ ENTRY_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 数据录入助�
 - nickname（必填）— 客户昵称
 - visit_date（必填）— 到访日期，格式 YYYY-MM-DD，默认今天
 - visit_time（可选）— 到访时间，格式 HH:MM
-- activity_type（可选）— 活动类型
 - needs（可选）— 需求
 - arrived（可选）— 是否已到场，默认 true
 
@@ -358,10 +355,8 @@ def _execute_create_customer(data: Dict[str, Any]) -> Dict[str, Any]:
 def _execute_create_visit(data: Dict[str, Any]) -> Dict[str, Any]:
     create_data = VisitRecordCreate(
         customer_id=data["customer_id"],
-        nickname=data["nickname"],
         visit_date=data.get("visit_date", date.today().isoformat()),
         visit_time=data.get("visit_time", "09:00"),
-        activity_type=data.get("activity_type", ""),
         needs=data.get("needs", ""),
         arrived=data.get("arrived", True),
         arrival_time=data.get("arrival_time", ""),

@@ -465,8 +465,6 @@ export interface VisitRecord {
   daily_card_usage: number
   needs: string
   referrer_handler: string
-  activity_id: string
-  activity_type: string
   space_id: string
   is_leader: boolean
   arrived: boolean
@@ -476,7 +474,6 @@ export interface VisitRecord {
   welfare_count: number
   remaining_count: number | null  // 0=无卡, -1=不限次, >0=剩余次数, null=无卡/未计算
   activities: ActivityInfo[]
-  activity_participation: { name: string; role: string; participated: boolean }[]
   experience: string
   feedback: string
   group_leader_feedback: string
@@ -493,8 +490,6 @@ export interface VisitRecordCreate {
   daily_card_usage?: number
   needs?: string
   referrer_handler?: string
-  activity_id?: string
-  activity_type?: string
   space_id?: string
   is_leader?: boolean
   arrived?: boolean
@@ -533,7 +528,7 @@ export const visitApi = {
   },
   get: (id: string) => request<VisitRecord>(`/api/visits/${id}`),
   create: (data: VisitRecordCreate) => request<VisitRecord>("/api/visits", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<VisitRecordCreate> & { activity_participation?: { name: string; role: string; participated: boolean }[]; experience?: string; feedback?: string; group_leader_feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<VisitRecordCreate> & { experience?: string; feedback?: string; group_leader_feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/visits/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/visits/search-customers?q=${encodeURIComponent(keyword)}`),
   counts: (params?: { customerIds?: string; startDate?: string; endDate?: string; memberTypes?: string; spaceId?: string }) => {

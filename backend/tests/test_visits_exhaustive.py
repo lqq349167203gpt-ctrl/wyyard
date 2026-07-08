@@ -78,23 +78,6 @@ class TestVisitCreate:
         assert resp.status_code == 200
         assert resp.json()["healing_notes"] == "肩颈改善"
 
-    def test_activity_participation(self, client, created_customer):
-        """活动参与情况"""
-        participation = [
-            {"name": "晨间沙龙", "role": "组员", "participated": True},
-            {"name": "情绪释放", "role": "案主", "participated": True},
-            {"name": "能量结", "role": "参与者", "participated": False},
-        ]
-        resp = self._make(client, created_customer, activity_participation=participation)
-        assert resp.status_code == 200
-        assert len(resp.json()["activity_participation"]) == 3
-
-    def test_activity_participation_empty(self, client, created_customer):
-        """空活动参与"""
-        resp = self._make(client, created_customer, activity_participation=[])
-        assert resp.status_code == 200
-        assert resp.json()["activity_participation"] == []
-
     def test_member_type_field(self, client, created_customer):
         """会员类型 — 后端自动从客户获取，不使用传入值"""
         resp = self._make(client, created_customer, member_type="体验会员")
@@ -181,14 +164,6 @@ class TestVisitUpdate:
         resp = client.patch(f"/api/visits/{vid}", json={"visit_time": "15:30"})
         assert resp.status_code == 200
         assert resp.json()["visit_time"] == "15:30"
-
-    def test_update_activity_participation(self, client, created_customer):
-        vid = self._create(client, created_customer)
-        resp = client.patch(f"/api/visits/{vid}", json={
-            "activity_participation": [{"name": "新活动", "role": "主持人", "participated": True}]
-        })
-        assert resp.status_code == 200
-        assert len(resp.json()["activity_participation"]) == 1
 
     def test_update_nonexistent(self, client):
         resp = client.patch("/api/visits/nonexistent", json={"needs": "x"})

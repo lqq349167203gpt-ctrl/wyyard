@@ -120,18 +120,6 @@ class TestVisitSearch:
 class TestVisitEdgeCases:
     """边界情况"""
 
-    def test_create_visit_with_activity_participation(self, client, created_customer):
-        resp = client.post("/api/visits", json={
-            "visit_date": "2026-05-27",
-            "customer_id": created_customer["id"],
-            "nickname": created_customer["nickname"],
-            "activity_participation": [
-                {"name": "觉醒游戏", "role": "组长", "participated": True},
-            ],
-        })
-        assert resp.status_code == 200
-        assert len(resp.json()["activity_participation"]) == 1
-
     def test_create_visit_with_feedback_fields(self, client, created_customer):
         """测试 experience 和 feedback 字段"""
         resp = client.post("/api/visits", json={

@@ -74,7 +74,7 @@ const FIELD_CN: Record<string, string> = {
   price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
   sort_order: "排序", is_public_welfare: "公益", category: "分类",
   arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "疗愈师回复",
-  needs: "需求", activity_participation: "活动参与",
+  needs: "需求",
   visit_date: "到访日期", visit_time: "预计时间", visit_count: "到店次数",
   referrer: "引流人", traffic_source: "流量来源", paid_content: "付费内容",
   basic_info: "基础信息", assessment: "客户评估", tags: "标签", self_tags: "个人标签",
@@ -100,7 +100,7 @@ const FIELD_CN: Record<string, string> = {
   effective_date: "生效日期", themes: "主题",
   duration_type: "时长类型", duration_value: "时长", expiry_date: "到期日期",
   fee: "费用金额", project_name: "项目名称",
-  daily_card_usage: "每日扣费", activity_id: "活动", activity_type: "活动类型",
+  daily_card_usage: "每日扣费",
 }
 
 const SECTION_OPTIONS = [
