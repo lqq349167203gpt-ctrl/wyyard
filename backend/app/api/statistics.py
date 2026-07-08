@@ -233,13 +233,11 @@ def get_details(
         cid = v.customer_id or ""
         if not cid:
             continue
-        # nickname 为空时从 customer_id 反查
-        nick = v.nickname
-        if not nick:
-            if cid not in _nick_cache:
-                c = customers_map.get(cid) or customer_service.get_customer(cid)
-                _nick_cache[cid] = c.nickname if c else cid
-            nick = _nick_cache[cid]
+        # 从 customer_id 反查 nickname
+        if cid not in _nick_cache:
+            c = customers_map.get(cid) or customer_service.get_customer(cid)
+            _nick_cache[cid] = c.nickname if c else cid
+        nick = _nick_cache[cid]
         if visit_date and date_from <= visit_date <= date_to:
             # 如果该客户在时间范围内有成交，状态标记为已成交
             is_converted = cid in converted_customer_ids

@@ -430,7 +430,14 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
 
     if records:
         sample = records[0]
-        print(f"[list_visits] sample: {sample.nickname}, is_leader={sample.is_leader}, activities={[(a.name, a.role) for a in sample.activities]}", flush=True)
+        sample_nick = ""
+        try:
+            from app.services import customer_service
+            sc = customer_service.get_customer(sample.customer_id)
+            sample_nick = sc.nickname if sc else ""
+        except Exception:
+            pass
+        print(f"[list_visits] sample: {sample_nick}, is_leader={sample.is_leader}, activities={[(a.name, a.role) for a in sample.activities]}", flush=True)
 
     return sorted(records, key=lambda r: (r.sort_order, -r.created_at.timestamp()))
 
@@ -455,12 +462,11 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
     today = datetime.now().strftime("%Y-%m-%d")
     for r in sorted(records, key=lambda r: (r.sort_order, -r.created_at.timestamp())):
         try:
-            # member_type
+            # 从客户表获取 member_type 和 nickname
+            customer = get_customer(r.customer_id)
             member_type = r.member_type or ""
-            if not member_type:
-                customer = get_customer(r.customer_id)
-                if customer:
-                    member_type = customer.member_type or ""
+            if not member_type and customer:
+                member_type = customer.member_type or ""
 
             # remaining_count：唯一真理由流水派生（总-销卡-活动扣卡）
             remaining_count = 0
@@ -480,7 +486,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
             result.append({
                 "id": r.id,
                 "customer_id": r.customer_id,
-                "nickname": r.nickname,
+                "nickname": customer.nickname if customer else "",
                 "phone": getattr(r, 'phone', '') or "",
                 "visit_date": r.visit_date,
                 "arrived": r.arrived,
@@ -511,7 +517,8 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
         if data.customer_id:
             for v in _visits.values():
                 if v.customer_id == data.customer_id and v.visit_date == data.visit_date and not v.is_deleted:
-                    raise ValueError(f"{data.nickname} 当天已经到场")
+                    c = customer_service.get_customer(data.customer_id)
+                    raise ValueError(f"{c.nickname if c else '该客户'} 当天已经到场")
         now = datetime.now(timezone.utc)
         # 自动分配 sort_order：追加到当天末尾
         dump = data.model_dump()

@@ -17,7 +17,6 @@ class VisitRecordBase(SafeBaseModel):
     visit_date: str  # YYYY-MM-DD
     visit_time: str = "09:00"  # HH:MM
     customer_id: str
-    nickname: str
     member_type: str = ""
     daily_card_usage: int = 0
     needs: str = ""

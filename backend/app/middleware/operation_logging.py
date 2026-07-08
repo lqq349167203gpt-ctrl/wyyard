@@ -978,17 +978,24 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         return "批量操作"
 
     name = entity_name or get_entity_id(path) or "记录"
-    # 邀约：entity_id 是 visit_id，尝试从 visit 反查客户昵称
-    if not entity_name and "/api/visits" in path and name and name != "记录":
+    # 邀约：entity_id 是 visit_id，从 customer_id 反查客户昵称；找不到则标注"人员为空"
+    if "/api/visits" in path and name and name != "记录":
         try:
             from app.services import visit_service
             visit = visit_service.get_visit(name)
-            if visit and visit.nickname:
-                name = visit.nickname
+            if visit:
+                if visit.customer_id:
+                    from app.services import customer_service
+                    c = customer_service.get_customer(visit.customer_id)
+                    name = c.nickname if c and c.nickname else "（人员为空）"
+                else:
+                    name = "（人员为空）"
+            else:
+                name = "（人员为空）"
         except Exception:
-            pass
-    # 邀约：客户名仍为空时标注"人员为空"
-    if "/api/visits" in path and (not name or name == "记录"):
+            name = "（人员为空）"
+    # 邀约 POST 创建：无 visit_id 可查
+    if "/api/visits" in path and name == "记录":
         name = "（人员为空）"
 
     # 空间房间排序：直接解析 room_ids 为房间名

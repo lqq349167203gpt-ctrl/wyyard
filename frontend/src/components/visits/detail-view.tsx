@@ -478,7 +478,6 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         visit_date: selectedDate,
         visit_time: visitTime,
         customer_id: selectedCustomer.id,
-        nickname: selectedCustomer.nickname,
         member_type: selectedCustomer.member_type,
         needs,
         referrer_handler: selectedReferrerHandler?.nickname || referrerHandler || "",

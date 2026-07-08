@@ -71,9 +71,13 @@ def _find_visit(customer_name: str, date: str, space_id: str = ""):
     for v in visits:
         if v.is_deleted:
             continue
-        if v.nickname and (v.nickname in customer_name or customer_name in v.nickname):
+        nick = ""
+        if v.customer_id:
+            c = customer_service.get_customer(v.customer_id)
+            nick = c.nickname if c else ""
+        if nick and (nick in customer_name or customer_name in nick):
             return v
-        if customer_name and len(customer_name) >= 2 and customer_name in (v.nickname or ""):
+        if customer_name and len(customer_name) >= 2 and customer_name in nick:
             return v
     return None
 
@@ -108,7 +112,7 @@ def add_to_visit_list(customer_name: str, visit_date: str = "") -> str:
 
     visit_service.create_visit(VisitRecordCreate(
         visit_date=date, visit_time=_now_hm(),
-        customer_id=customer["id"], nickname=customer["nickname"],
+        customer_id=customer["id"],
         space_id=space_id, arrived=False,
     ))
     _log_visit(f"新增邀约 {customer['nickname']}（{date}）")
@@ -145,7 +149,7 @@ def set_arrival(customer_name: str, time: str = "", arrived: bool = True) -> str
             time_str = time or _now_hm()
             visit_service.create_visit(VisitRecordCreate(
                 visit_date=date, visit_time=_now_hm(),
-                customer_id=customer["id"], nickname=customer["nickname"],
+                customer_id=customer["id"],
                 space_id=space_id, arrived=True, arrival_time=time_str,
             ))
             _log_visit(f"新增邀约 {customer['nickname']}（{date}）并标记到店（{time_str}）")
@@ -153,7 +157,7 @@ def set_arrival(customer_name: str, time: str = "", arrived: bool = True) -> str
         else:
             visit_service.create_visit(VisitRecordCreate(
                 visit_date=date, visit_time=time or "09:00",
-                customer_id=customer["id"], nickname=customer["nickname"],
+                customer_id=customer["id"],
                 space_id=space_id, arrived=False,
             ))
             _log_visit(f"新增邀约 {customer['nickname']}（{date}）")
@@ -234,7 +238,7 @@ def record_customer_needs(customer_name: str, needs: str) -> str:
     if not visit:
         visit_service.create_visit(VisitRecordCreate(
             visit_date=date, visit_time=_now_hm(),
-            customer_id=customer["id"], nickname=customer["nickname"],
+            customer_id=customer["id"],
             space_id=space_id, needs=needs,
         ))
         _log_visit(f"新增邀约 {customer['nickname']}（{date}）并记录需求：{needs}")
@@ -306,7 +310,7 @@ def set_referrer_handler(customer_name: str, referrer_handler: str, visit_date: 
     if not visit:
         visit_service.create_visit(VisitRecordCreate(
             visit_date=date, visit_time=_now_hm(),
-            customer_id=customer["id"], nickname=customer["nickname"],
+            customer_id=customer["id"],
             space_id=space_id, referrer_handler=referrer_handler,
         ))
         _log_visit(f"新增邀约 {customer['nickname']}（{date}）邀约人：{referrer_handler}")
@@ -413,9 +417,12 @@ def query_visit_list(visit_date: str = "") -> str:
     space_id = _ctx_var.get()["space_id"]
 
     visits = visit_service.list_visits(date=date, space_id=space_id)
-    arrived = [{"name": v.nickname, "time": v.arrival_time, "leader": v.is_leader, "needs": v.needs}
+    def _nick(v):
+        c = customer_service.get_customer(v.customer_id) if v.customer_id else None
+        return c.nickname if c else ""
+    arrived = [{"name": _nick(v), "time": v.arrival_time, "leader": v.is_leader, "needs": v.needs}
                for v in visits if v.arrived and not v.is_deleted]
-    not_arrived = [{"name": v.nickname, "visit_time": v.visit_time, "leader": v.is_leader}
+    not_arrived = [{"name": _nick(v), "visit_time": v.visit_time, "leader": v.is_leader}
                    for v in visits if not v.arrived and not v.is_deleted]
     return json.dumps({"ok": True, "action": "query", "date": date, "arrived": arrived, "not_arrived": not_arrived}, ensure_ascii=False)
 

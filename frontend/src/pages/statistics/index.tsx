@@ -57,6 +57,8 @@ export default function StatisticsPage() {
   const [statDimension, setStatDimension] = useState<"total" | "range">("range")
   // 成交金额类型筛选
   const [typeFilter, setTypeFilter] = useState<string>("全部")
+  // 同一客户去重模式
+  const [customerDedup, setCustomerDedup] = useState<"all" | "unique">("all")
 
   // 排序
   const [sortField, setSortField] = useState<string | null>(null)
@@ -71,13 +73,32 @@ export default function StatisticsPage() {
     }
   }
 
+  // 同一客户去重：按 customer_id 去重，保留最新日期（已排序）
+  const dedupedDetails = useMemo(() => {
+    if (customerDedup === "all") return details
+    const dedupList = (list: StatisticsDetail[]) => {
+      const seen = new Set<string>()
+      return list.filter(item => {
+        if (!item.customer_id) return true
+        if (seen.has(item.customer_id)) return false
+        seen.add(item.customer_id)
+        return true
+      })
+    }
+    return {
+      invited: dedupList(details.invited),
+      arrived: dedupList(details.arrived),
+      converted: dedupList(details.converted),
+    }
+  }, [details, customerDedup])
+
   // 排序后的列表
   const sortedDetails = useMemo(() => {
-    let list = [...(details[detailsKey] || [])]
+    let list = [...(dedupedDetails[detailsKey] || [])]
     if (activeTab === "converted_amount" && typeFilter !== "全部") {
       list = list.filter(item => item.type === typeFilter)
     }
-    if (!sortField) return list
+    if (!sortField) return list.sort((a, b) => (b.date || "").localeCompare(a.date || ""))
     return list.sort((a, b) => {
       let va: any, vb: any
       if (sortField === "member_type") {
@@ -102,7 +123,8 @@ export default function StatisticsPage() {
       if (va > vb) return sortOrder === "asc" ? 1 : -1
       return 0
     })
-  }, [details, activeTab, sortField, sortOrder, typeFilter])
+    return list
+  }, [dedupedDetails, activeTab, sortField, sortOrder, typeFilter])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDetails, { pageSize: 10 })
 
@@ -291,15 +313,15 @@ export default function StatisticsPage() {
   const chartData = rawChartData
 
   const totals = {
-    invited: details.invited.length,
-    arrived: details.arrived.length,
-    converted: details.converted.length,
+    invited: dedupedDetails.invited.length,
+    arrived: dedupedDetails.arrived.length,
+    converted: dedupedDetails.converted.length,
   }
 
   // 身份分布数据（基于当前数据类型，按身份配置顺序排列）
   const identityData = useMemo(() => {
     const counts: Record<string, number> = {}
-    details[detailsKey].forEach((item) => {
+    dedupedDetails[detailsKey].forEach((item) => {
       const type = item.member_type || "未设置"
       counts[type] = (counts[type] || 0) + 1
     })
@@ -314,7 +336,7 @@ export default function StatisticsPage() {
       })
     }
     return entries
-  }, [details, activeTab, identityOrder])
+  }, [dedupedDetails, activeTab, identityOrder])
 
   const IDENTITY_COLORS = useMemo(() => {
     const n = identityData.length
@@ -459,6 +481,27 @@ export default function StatisticsPage() {
                   </button>
                 )).reduce((acc, el, i) => i === 2 ? [...acc, <span key="sep" className="w-px h-3 bg-[#d0d3d6]" />, el] : [...acc, el], [] as React.ReactNode[])}
               </div>
+            </div>
+
+            {/* 第四行：同一客户 */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>同一客户</span>
+              <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
+                <button
+                  onClick={() => setCustomerDedup("all")}
+                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${customerDedup === "all" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                >
+                  全部记录
+                </button>
+                <button
+                  onClick={() => setCustomerDedup("unique")}
+                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${customerDedup === "unique" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                >
+                  显示一次
+                </button>
+              </div>
+              {customerDedup === "all" && <span className="text-[11px] text-[#b0b5bd]">全部记录 - 在统计时间范围内，来几次记作几人，重复统计</span>}
+              {customerDedup === "unique" && <span className="text-[11px] text-[#b0b5bd]">显示一次 - 在统计时间范围内，不管来几次，都只记作1人</span>}
             </div>
           </div>
         </div>
@@ -612,9 +655,9 @@ export default function StatisticsPage() {
             <div className="mb-[18px]">
               <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">会员身份人数</span><span className="text-[#8f959e]">（{LABELS[activeTab]}<span className="text-[#c8ccd0]"> · </span>{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
               <div className="flex items-center gap-3 text-[11px]">
-                <span className="text-[#8f959e]">新人 <span className="text-[#1f2329] font-medium">{details[detailsKey].filter((item) => item.member_type && identityTypeMap[item.member_type] === "新人").length}</span></span>
+                <span className="text-[#8f959e]">新人 <span className="text-[#1f2329] font-medium">{dedupedDetails[detailsKey].filter((item) => item.member_type && identityTypeMap[item.member_type] === "新人").length}</span></span>
                 <span className="text-[#c8ccd0]">|</span>
-                <span className="text-[#8f959e]">老人 <span className="text-[#1f2329] font-medium">{details[detailsKey].filter((item) => item.member_type && identityTypeMap[item.member_type] === "老人").length}</span></span>
+                <span className="text-[#8f959e]">老人 <span className="text-[#1f2329] font-medium">{dedupedDetails[detailsKey].filter((item) => item.member_type && identityTypeMap[item.member_type] === "老人").length}</span></span>
               </div>
             </div>
             {identityData.length === 0 ? (
@@ -678,7 +721,7 @@ export default function StatisticsPage() {
             </div>
           </div>
 
-          {details[detailsKey].length === 0 ? (
+          {dedupedDetails[detailsKey].length === 0 ? (
             <div className="text-center text-[#8f959e] py-8">暂无数据</div>
           ) : (
             <div className="overflow-x-auto">
@@ -704,6 +747,7 @@ export default function StatisticsPage() {
                       ["total_consumption", "消费总额", "w-24"],
                       ["arrived", "是否到店", "w-20"],
                       ["status", "是否成交", "w-20"],
+                      ["date", "日期", "w-24"],
                     ] as const).map(([field, label, w]) => (
                       <th key={field} className={`text-left py-2 px-3 text-[#8f959e] font-normal ${w}`}>
                         <span className="inline-flex items-center gap-0.5">
@@ -769,6 +813,7 @@ export default function StatisticsPage() {
                               {item.status === "converted" ? "已成交" : "未成交"}
                             </span>
                           </td>
+                          <td className="py-2 px-3 text-[#4e535a] w-24">{item.date || "-"}</td>
                         </>
                       )}
                       <td className="py-2 px-3 w-16">

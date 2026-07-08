@@ -10,10 +10,11 @@ router = APIRouter(prefix="/api/visits", tags=["visits"])
 
 
 def _fill_member_type(record):
-    """从客户信息实时填充会员身份"""
+    """从客户信息实时填充会员身份和昵称"""
     data = record.model_dump(mode="json")
     customer = get_customer(record.customer_id)
     data["member_type"] = customer.member_type if customer else ""
+    data["nickname"] = customer.nickname if customer else ""
     return data
 
 

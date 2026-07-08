@@ -672,9 +672,12 @@ async def activity_chat(message: str, history: list, date: str, space_id: str, o
     activity_context = _format_activity_detail(all_activities)
 
     # 预加载当天到店名单
-    from app.services import visit_service
+    from app.services import visit_service, customer_service
     visits = visit_service.list_visits(date, space_id=space_id if space_id else None)
-    visit_names = [v.nickname for v in visits if v.nickname]
+    def _nick(v):
+        c = customer_service.get_customer(v.customer_id) if v.customer_id else None
+        return c.nickname if c else ""
+    visit_names = [n for v in visits if (n := _nick(v))]
     visit_context = "、".join(visit_names) if visit_names else "暂无到店人员"
 
     if not api_key:

@@ -489,7 +489,6 @@ export interface VisitRecordCreate {
   visit_date: string
   visit_time?: string
   customer_id: string
-  nickname: string
   member_type?: string
   daily_card_usage?: number
   needs?: string

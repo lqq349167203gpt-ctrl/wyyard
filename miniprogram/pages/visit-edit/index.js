@@ -193,7 +193,6 @@ Page({
         visit_date: this.data.visitDate,
         visit_time: this.data.visitTime,
         customer_id: this.data.customerId,
-        nickname: this.data.nickname,
         referrer_handler: this.data.referrerHandler,
         referrer_handler_id: this.data.referrerHandlerId || '',
         is_leader: this.data.isLeader,

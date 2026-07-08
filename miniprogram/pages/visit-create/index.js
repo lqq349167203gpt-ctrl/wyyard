@@ -184,7 +184,6 @@ Page({
         visit_date: this.data.date,
         visit_time: this.data.time,
         customer_id: this.data.customerId,
-        nickname: this.data.customerName,
         needs: this.data.needs,
         feedback: this.data.feedback,
         healing_notes: this.data.healingNotes,

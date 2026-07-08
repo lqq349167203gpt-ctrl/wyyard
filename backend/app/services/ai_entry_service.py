@@ -367,9 +367,12 @@ def _execute_create_visit(data: Dict[str, Any]) -> Dict[str, Any]:
         arrival_time=data.get("arrival_time", ""),
     )
     visit = visit_service.create_visit(create_data)
+    from app.services import customer_service
+    c = customer_service.get_customer(visit.customer_id) if visit.customer_id else None
+    nick = c.nickname if c else ""
     return {
         "success": True,
-        "message": f"已录入到访记录：{visit.nickname} {visit.visit_date}",
+        "message": f"已录入到访记录：{nick} {visit.visit_date}",
         "id": visit.id,
     }
 
