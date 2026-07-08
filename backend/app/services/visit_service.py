@@ -513,11 +513,20 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
                 if v.customer_id == data.customer_id and v.visit_date == data.visit_date and not v.is_deleted:
                     raise ValueError(f"{data.nickname} 当天已经到场")
         now = datetime.now(timezone.utc)
+        # 自动分配 sort_order：追加到当天末尾
+        dump = data.model_dump()
+        if not dump.get("sort_order"):
+            max_order = max(
+                (v.sort_order for v in _visits.values()
+                 if v.visit_date == data.visit_date and not v.is_deleted),
+                default=-1,
+            )
+            dump["sort_order"] = max_order + 1
         record = VisitRecord(
             id=str(uuid.uuid4())[:12],
             created_at=now,
             updated_at=now,
-            **data.model_dump(),
+            **dump,
         )
         _visits[record.id] = record
         try:

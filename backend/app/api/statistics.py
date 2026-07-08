@@ -226,17 +226,26 @@ def get_details(
     invited_list = []
     arrived_list = []
     visits = visit_service.list_visits()
+    # nickname 缓存：customer_id → nickname，避免重复查库
+    _nick_cache: dict[str, str] = {}
     for v in visits:
         visit_date = v.visit_date
         cid = v.customer_id or ""
         if not cid:
             continue
+        # nickname 为空时从 customer_id 反查
+        nick = v.nickname
+        if not nick:
+            if cid not in _nick_cache:
+                c = customers_map.get(cid) or customer_service.get_customer(cid)
+                _nick_cache[cid] = c.nickname if c else cid
+            nick = _nick_cache[cid]
         if visit_date and date_from <= visit_date <= date_to:
             # 如果该客户在时间范围内有成交，状态标记为已成交
             is_converted = cid in converted_customer_ids
             invited_list.append({
                 "customer_id": cid,
-                "nickname": v.nickname,
+                "nickname": nick,
                 "date": visit_date,
                 "status": "converted" if is_converted else "invited",
                 "arrived": v.arrived,
@@ -245,7 +254,7 @@ def get_details(
             if v.arrived:
                 arrived_list.append({
                     "customer_id": cid,
-                    "nickname": v.nickname,
+                    "nickname": nick,
                     "date": visit_date,
                     "status": "converted" if is_converted else "arrived",
                     "arrived": True,

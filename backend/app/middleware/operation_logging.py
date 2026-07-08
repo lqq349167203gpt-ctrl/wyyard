@@ -987,6 +987,9 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                 name = visit.nickname
         except Exception:
             pass
+    # 邀约：客户名仍为空时标注"人员为空"
+    if "/api/visits" in path and (not name or name == "记录"):
+        name = "（人员为空）"
 
     # 空间房间排序：直接解析 room_ids 为房间名
     if "/rooms-order" in path and method == "PATCH":
@@ -1056,8 +1059,32 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
 
     if method == "POST":
         summary = _build_create_summary(body)
+        # 邀约/课表场次：补充日期和空间信息
+        date_space_prefixes = [
+            "/api/group-case-sessions", "/api/emotional-release-sessions",
+            "/api/energy-knot-sessions", "/api/internal-course-sessions",
+            "/api/oh-card-reading-sessions", "/api/visits",
+        ]
+        suffix_parts = []
+        if any(path.startswith(p) for p in date_space_prefixes):
+            session_date = (body or {}).get("visit_date") or (body or {}).get("date", "")
+            space_id = (body or {}).get("space_id", "")
+            space_name = ""
+            if space_id:
+                try:
+                    from app.services import space_service
+                    space = space_service.get_space(space_id)
+                    if space:
+                        space_name = space.name
+                except Exception:
+                    pass
+            suffix_parts = [p for p in [session_date, space_name] if p]
         if summary:
+            if suffix_parts:
+                return f"新增{entity_type} {name}（{'，'.join(suffix_parts)}）：{summary}"
             return f"新增{entity_type} {name}：{summary}"
+        if suffix_parts:
+            return f"新增{entity_type} {name}（{'，'.join(suffix_parts)}）"
         return f"新增{entity_type} {name}"
     elif method in ("PUT", "PATCH"):
         desc = build_change_description(before or {}, body)
