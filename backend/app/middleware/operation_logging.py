@@ -1204,12 +1204,12 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             content = build_log_content(method, path, body, before_data)
             entity_id = get_entity_id(path)
 
-            # 邀约编辑：仅活动参与字段变更时，section 改为"活动参与"
+            # 邀约编辑：仅活动参与字段变更时，section 改为"课表"
             if section == "邀约" and method in ("PUT", "PATCH") and before_data:
                 activity_keys = {"activity_participation", "activity_id", "activity_type", "experience"}
                 changed_keys = {k for k in body if k not in ("id", "created_at", "updated_at") and body.get(k) != before_data.get(k)}
                 if changed_keys and changed_keys <= activity_keys:
-                    section = "活动参与"
+                    section = "课表"
 
             # 特殊处理：position-permissions/full 端点使用 body 中的 position 作为 entity_id
             if "/api/position-permissions/full" in path:
