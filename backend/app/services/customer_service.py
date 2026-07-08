@@ -133,6 +133,61 @@ def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer
     return customer
 
 
+def _cleanup_customer_from_activities(customer_id: str):
+    """从所有活动记录中移除指定客户的 ID"""
+    from app.services.storage import load_data, save_item
+
+    activity_files = [
+        "class_records.json",
+        "group_case_sessions.json",
+        "emotional_release_sessions.json",
+        "energy_knot_sessions.json",
+        "internal_course_sessions.json",
+        "oh_card_reading_sessions.json",
+    ]
+
+    for filename in activity_files:
+        try:
+            records = load_data(filename)
+            for record_id, data in records.items():
+                changed = False
+                if customer_id in (data.get("participant_ids") or []):
+                    data["participant_ids"] = [pid for pid in data["participant_ids"] if pid != customer_id]
+                    changed = True
+                if customer_id in (data.get("teacher_ids") or []):
+                    data["teacher_ids"] = [tid for tid in data["teacher_ids"] if tid != customer_id]
+                    changed = True
+                if data.get("host_id") == customer_id:
+                    data["host_id"] = ""
+                    changed = True
+                if data.get("owner_id") == customer_id:
+                    data["owner_id"] = ""
+                    data["owner_name"] = ""
+                    changed = True
+                for g in (data.get("groups") or []):
+                    if g.get("leader_id") == customer_id:
+                        g["leader_id"] = ""
+                        changed = True
+                    if g.get("deputy_id") == customer_id:
+                        g["deputy_id"] = ""
+                        changed = True
+                    if customer_id in (g.get("member_ids") or []):
+                        g["member_ids"] = [mid for mid in g["member_ids"] if mid != customer_id]
+                        changed = True
+                if changed:
+                    save_item(filename, record_id, data)
+        except Exception:
+            pass
+
+
+def cleanup_all_deleted_customers():
+    """清理所有已删除客户在活动记录中的引用（一次性修复）"""
+    deleted_ids = [cid for cid, c in _customers.items() if c.is_deleted]
+    for cid in deleted_ids:
+        _cleanup_customer_from_activities(cid)
+    return len(deleted_ids)
+
+
 def delete_customer(customer_id: str) -> bool:
     with _customer_lock:
         customer = _customers.get(customer_id)
@@ -144,6 +199,7 @@ def delete_customer(customer_id: str) -> bool:
         customer.deleted_at = datetime.now(timezone.utc)
         _save(customer_id)
     # 锁外调用，避免死锁
+    _cleanup_customer_from_activities(customer_id)
     try:
         from app.services.member_identity_service import refresh_member_type
         refresh_member_type(customer_id)

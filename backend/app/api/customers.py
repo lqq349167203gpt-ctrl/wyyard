@@ -256,6 +256,13 @@ async def restore_customer(customer_id: str, _admin: str = Depends(require_admin
     return _fill_visit_count(customer)
 
 
+@router.post("/cleanup-deleted")
+async def cleanup_deleted_customers():
+    """清理所有已删除客户在活动记录中的引用"""
+    count = customer_service.cleanup_all_deleted_customers()
+    return {"message": f"已清理 {count} 个已删除客户的引用"}
+
+
 @router.post("/parse-chat")
 @limiter.limit("10/minute")
 async def parse_chat(data: ChatLogParseRequest, request: StarletteRequest):
