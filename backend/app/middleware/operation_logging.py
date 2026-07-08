@@ -1087,13 +1087,13 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         return f"保存{name}（无变更）"
     elif method == "DELETE":
         suffix_parts = []
-        if before_data:
-            if before_data.get("visit_date"):
-                suffix_parts.append(before_data["visit_date"])
-            if before_data.get("space_id"):
+        if before:
+            if before.get("visit_date"):
+                suffix_parts.append(before["visit_date"])
+            if before.get("space_id"):
                 try:
                     from app.services import space_service
-                    space = space_service.get_space(before_data["space_id"])
+                    space = space_service.get_space(before["space_id"])
                     if space:
                         suffix_parts.append(space.name)
                 except Exception:
