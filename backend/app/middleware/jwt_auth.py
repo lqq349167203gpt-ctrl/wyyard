@@ -37,6 +37,11 @@ ADMIN_PATHS = (
     "/api/uploads",
 )
 
+# 允许系统 API Key 访问的路径（仅限系统级操作）
+SYSTEM_KEY_PATHS = (
+    "/api/system-logs",
+)
+
 JWT_ISSUER = "wyyard-backend"
 JWT_AUDIENCE = "wyyard-frontend"
 
@@ -101,6 +106,18 @@ def _parse_auth_header(scope) -> str:
     return ""
 
 
+def _parse_api_key(scope) -> str:
+    """从 ASGI scope 中提取 API Key（支持 X-API-Key 或 Authorization: ApiKey xxx）"""
+    for key, value in scope.get("headers", []):
+        if key == b"x-api-key":
+            return value.decode("utf-8", errors="ignore")
+        if key == b"authorization":
+            auth = value.decode("utf-8", errors="ignore")
+            if auth.startswith("ApiKey "):
+                return auth[7:]
+    return ""
+
+
 class AuthMiddleware:
     """纯 ASGI 认证中间件 — 只检查 header，不消费 request body，不破坏 SSE/streaming"""
 
@@ -132,6 +149,21 @@ class AuthMiddleware:
         if method == "GET":
             for public in PUBLIC_GET_PATHS:
                 if path == public or path.startswith(public + "/"):
+                    await self.app(scope, receive, send)
+                    return
+
+        # 系统 API Key 认证（用于自动化任务）
+        api_key = _parse_api_key(scope)
+        if api_key and settings.system_api_key:
+            if api_key == settings.system_api_key:
+                # 检查路径是否在允许列表内
+                allowed = any(path == p or path.startswith(p + "/") for p in SYSTEM_KEY_PATHS)
+                if allowed:
+                    state = scope.setdefault("state", {})
+                    state["user_id"] = "system"
+                    state["user_name"] = "系统任务"
+                    state["user_owner"] = ""
+                    state["user_role"] = "system"
                     await self.app(scope, receive, send)
                     return
 

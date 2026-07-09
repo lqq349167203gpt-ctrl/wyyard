@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 168
 
+    # 系统 API Key
+    system_api_key: str = ""
+
     # 数据库
     database_url: str = ""
 

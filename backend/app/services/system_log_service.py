@@ -1,9 +1,12 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.system_log import SystemLog, SystemLogCreate
 from app.services.storage import load_data, save_data, save_item
+
+logger = logging.getLogger(__name__)
 
 FILENAME = "system_logs.json"
 _logs: Dict[str, SystemLog] = {}
@@ -14,7 +17,23 @@ def _load():
     data = load_data(FILENAME)
     _logs = {}
     for k, v in data.items():
-        _logs[k] = SystemLog(**v)
+        try:
+            _logs[k] = SystemLog(**v)
+        except Exception:
+            # 修复 created_at 格式问题（空格替换为 T，+08 补全为 +08:00）
+            if "created_at" in v and isinstance(v["created_at"], str):
+                ca = v["created_at"]
+                if " " in ca and "T" not in ca:
+                    ca = ca.replace(" ", "T", 1)
+                if ca.endswith("+08"):
+                    ca = ca + ":00"
+                elif ca.endswith("-08"):
+                    ca = ca + ":00"
+                v["created_at"] = ca
+            try:
+                _logs[k] = SystemLog(**v)
+            except Exception as e:
+                logger.warning("跳过无效日志 %s: %s", k, e)
 
 
 def _save(log_id: str = ""):
