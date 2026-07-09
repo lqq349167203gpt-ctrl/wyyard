@@ -55,6 +55,7 @@ wyyard/
 | 付费 | 付费项目 | /payment |
 | 付费 | 销卡 | /payment-deductions |
 | 付费 | 退费 | /payment-refunds |
+| 数据 | 产品数据 | /product-statistics |
 | 信息配置 | 会员身份 | /config/member-identities |
 | 信息配置 | 疗愈老师 | /healing-identities |
 | 信息配置 | 组织管理 | /organizations |

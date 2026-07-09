@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['www.wyteahouse.cn'],
     proxy: {
       '/api': 'http://localhost:8000',
     },

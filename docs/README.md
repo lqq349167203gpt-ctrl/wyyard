@@ -70,7 +70,10 @@ uvicorn app.main:app --reload --port 8000
 - **知识库**：管理知识库内容
 - **业务数据**：管理业务数据
 - **操作日志**：查看每个账号对系统的操作记录
-- **系统日志**：查看系统运行事件
+- **系统日志**：查看系统运行事件（支持 API Key 写入）
+
+### 数据统计
+- **产品销售**：各产品类型（会员卡/觉醒游戏/情绪释放等）的销售统计和趋势分析
 
 ### 客户端小程序
 - **首页**：活动列表，按日期分组，无需登录即可浏览
@@ -138,7 +141,7 @@ API 接口统一以 `/api/` 开头，每个资源一个路由文件，位于 `ba
 - `/api/accounts` - 账号管理
 - `/api/positions` - 角色管理
 - `/api/operation-logs` - 操作日志
-- `/api/system-logs` - 系统日志
+- `/api/system-logs` - 系统日志（支持 API Key 认证写入）
 - `/api/statistics` - 数据统计（含 `daily_table`、`chart_*` 等字段）
 - `/api/statistics/products` - 产品数据统计（按产品类型：会员卡/觉醒游戏/情绪释放/OH卡梳理/能量结/内部课程/其他项目，支持 `name_filter` 筛选其他项目）
 - `/api/statistics/products/details` - 产品成交详情（支持 `product_type` 参数，返回含 `purchase_count` 的明细）
