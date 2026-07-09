@@ -139,6 +139,9 @@ API 接口统一以 `/api/` 开头，每个资源一个路由文件，位于 `ba
 - `/api/positions` - 角色管理
 - `/api/operation-logs` - 操作日志
 - `/api/system-logs` - 系统日志
+- `/api/statistics` - 数据统计（含 `daily_table`、`chart_*` 等字段）
+- `/api/statistics/products` - 产品数据统计（按产品类型：会员卡/觉醒游戏/情绪释放/OH卡梳理/能量结/内部课程/其他项目，支持 `name_filter` 筛选其他项目）
+- `/api/statistics/products/details` - 产品成交详情（支持 `product_type` 参数，返回含 `purchase_count` 的明细）
 
 ## 开发规范
 

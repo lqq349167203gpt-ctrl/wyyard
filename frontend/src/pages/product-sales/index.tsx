@@ -33,7 +33,7 @@ function generateColors(n: number, hueStart = 0): string[] {
   })
 }
 
-export default function ProductStatisticsPage() {
+export default function ProductSalesPage() {
   const [productData, setProductData] = useState<StatisticsProducts | null>(null)
   const [loading, setLoading] = useState(false)
   const [productType, setProductType] = useState<string>("全部")
@@ -204,7 +204,7 @@ export default function ProductStatisticsPage() {
     <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
       <div>
         <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
-          <h1 className="text-[16px] font-medium text-[#1f2329] mb-4">产品数据</h1>
+          <h1 className="text-[16px] font-medium text-[#1f2329] mb-4">产品销售</h1>
 
           {/* 筛选栏 */}
           <div className="flex flex-col gap-2">

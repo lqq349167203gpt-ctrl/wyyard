@@ -65,6 +65,8 @@ wyyard/
 | 系统配置 | AI 配置 | /agents |
 | 系统配置 | 沟通记录 | /chat-history |
 | 系统配置 | 系统日志 | /system-logs |
+| 数据 | 数据统计 | /statistics |
+| 数据 | 产品数据 | /product-statistics |
 | 系统配置 | 操作日志 | /operation-logs |
 | **小程序（员工）** | 客户列表 | /pages/customers/index |
 | **小程序（员工）** | 邀约 | /pages/visits/index |
