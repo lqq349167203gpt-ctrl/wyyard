@@ -72,6 +72,12 @@ uvicorn app.main:app --reload --port 8000
 - **操作日志**：查看每个账号对系统的操作记录
 - **系统日志**：查看系统运行事件
 
+### 客户端小程序
+- **首页**：活动列表，按日期分组，无需登录即可浏览
+- **活动详情**：查看活动信息，需手机号登录后报名
+- **我的**：手机号快捷登录（`getPhoneNumber`），查看个人信息
+- 后端 API：`/api/client/`（活动列表 GET 公开，报名 POST 需客户 JWT）
+
 ### 公开页面
 - **H5 到场反馈**：`/arrival-feedback/:visitId`，无需登录，手机和桌面自适应
 
@@ -96,6 +102,7 @@ uvicorn app.main:app --reload --port 8000
 - `daily_groupings` - 每日人员分组
 - `operation_logs` - 操作日志
 - `system_logs` - 系统日志
+- `client_signups` - 客户端活动报名记录
 
 ## API 接口
 
@@ -107,7 +114,7 @@ API 接口统一以 `/api/` 开头，每个资源一个路由文件，位于 `ba
 - `/api/visits` - 到场记录（支持 `?date=` 和 `?customer_id=` 筛选）
 - `/api/visits/{visit_id}` - 获取单个到场记录（H5 反馈页使用）
 - `/api/healing-records` - 疗愈记录
-- `/api/courses` - 沙龙类型
+- `/api/course-types` - 课程类型（含 `show_in_client` 控制客户端可见性）
 - `/api/spaces` - 疗愈空间
 - `/api/member-identities` - 会员身份
 - `/api/membership-cards` - 会员活动
@@ -122,6 +129,11 @@ API 接口统一以 `/api/` 开头，每个资源一个路由文件，位于 `ba
 - `/api/oh-card-readings` - OH卡梳理
 - `/api/oh-card-reading-sessions` - OH卡梳理场次
 - `/api/class-records` - 活动日历
+- `/api/class-records/unified` - 聚合全部 6 种活动类型
+- `/api/client/activities` - 客户端活动列表（公开 GET，按 `show_in_client` 过滤）
+- `/api/client/activities/{id}` - 客户端活动详情（公开 GET）
+- `/api/client/activities/{id}/signup` - 客户端活动报名（需客户 JWT）
+- `/api/wechat/customer-login` - 客户端手机号登录（返回客户 JWT）
 - `/api/daily-groupings` - 每日人员分组
 - `/api/accounts` - 账号管理
 - `/api/positions` - 角色管理

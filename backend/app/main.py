@@ -63,6 +63,7 @@ from app.api.wechat import router as wechat_router
 from app.api.voice import router as voice_router
 from app.api.chat_logs import router as chat_logs_router
 from app.api.statistics import router as statistics_router
+from app.api.client import router as client_router
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
@@ -135,6 +136,7 @@ app.include_router(voice_router)
 app.include_router(chat_logs_router)
 app.include_router(activity_registrations_router)
 app.include_router(statistics_router)
+app.include_router(client_router)
 
 
 @app.get("/api/health")

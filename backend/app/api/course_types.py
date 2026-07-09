@@ -9,6 +9,7 @@ router = APIRouter(prefix="/api/course-types", tags=["course-types"])
 class CourseTypeCreate(StrictBaseModel):
     name: str
     organization_id: Optional[str] = ""
+    show_in_client: Optional[bool] = False
 
 
 class CourseTypeRename(StrictBaseModel):
@@ -17,6 +18,7 @@ class CourseTypeRename(StrictBaseModel):
 
 class CourseTypeUpdate(StrictBaseModel):
     organization_id: Optional[str] = None
+    show_in_client: Optional[bool] = None
 
 
 @router.get("")
@@ -29,14 +31,14 @@ def create_type(data: CourseTypeCreate):
     if not data.name.strip():
         raise HTTPException(status_code=400, detail="类型名称不能为空")
     try:
-        return course_type_service.create_course_type(data.name.strip(), data.organization_id or "")
+        return course_type_service.create_course_type(data.name.strip(), data.organization_id or "", data.show_in_client or False)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.patch("/{name}")
 def update_type(name: str, data: CourseTypeUpdate):
-    if not course_type_service.update_course_type(name, data.organization_id):
+    if not course_type_service.update_course_type(name, data.organization_id, data.show_in_client):
         raise HTTPException(status_code=404, detail="类型不存在")
     return {"message": "更新成功"}
 

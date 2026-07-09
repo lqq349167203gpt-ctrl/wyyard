@@ -1,0 +1,63 @@
+<view class="page">
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:elif="{{activity}}">
+    <!-- 活动名称 -->
+    <view class="header">
+      <text class="title">{{activity.name}}</text>
+      <view class="tags">
+        <text wx:if="{{activity.activity_mode === '线上'}}" class="tag tag-online">线上</text>
+        <text wx:if="{{activity.activity_mode === '线下'}}" class="tag tag-offline">线下</text>
+        <text wx:if="{{activity.is_public_welfare}}" class="tag tag-welfare">公益</text>
+      </view>
+    </view>
+
+    <!-- 信息列表 -->
+    <view class="info-card">
+      <view class="info-item">
+        <text class="info-label">日期</text>
+        <text class="info-value">{{activity.date}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">时间</text>
+        <text class="info-value">{{activity.start_time || '待定'}}{{activity.end_time ? ' - ' + activity.end_time : ''}}</text>
+      </view>
+      <view wx:if="{{activity.teacher_names.length > 0}}" class="info-item">
+        <text class="info-label">老师</text>
+        <text class="info-value">{{activity.teacher_names[0]}}</text>
+      </view>
+      <view wx:if="{{activity.location}}" class="info-item">
+        <text class="info-label">地点</text>
+        <text class="info-value">{{activity.location}}</text>
+      </view>
+      <view wx:if="{{activity.course_type}}" class="info-item">
+        <text class="info-label">类型</text>
+        <text class="info-value">{{activity.course_type}}</text>
+      </view>
+      <view class="info-item" wx:if="{{activity.signup_count > 0}}">
+        <text class="info-label">已报名</text>
+        <text class="info-value">{{activity.signup_count}} 人</text>
+      </view>
+    </view>
+
+    <!-- 活动简介 -->
+    <view wx:if="{{activity.description}}" class="desc-card">
+      <text class="desc-title">活动简介</text>
+      <text class="desc-content">{{activity.description}}</text>
+    </view>
+  </block>
+
+  <!-- 底部报名按钮 -->
+  <view wx:if="{{activity}}" class="bottom-bar">
+    <button
+      class="signup-btn {{signedUp ? 'signup-btn-done' : ''}}"
+      bindtap="onSignup"
+      disabled="{{signingUp || signedUp}}"
+    >
+      {{signingUp ? '报名中...' : signedUp ? '已报名' : '立即报名'}}
+    </button>
+  </view>
+</view>

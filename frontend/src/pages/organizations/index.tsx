@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { organizationApi, customerApi, courseTypeApi, type Organization, type Customer, type CourseType } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { SelectDropdown } from "@/components/select-dropdown"
 
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
@@ -42,6 +43,7 @@ export default function OrganizationsPage() {
   const [actDialogOpen, setActDialogOpen] = useState(false)
   const [actEditingType, setActEditingType] = useState<string | null>(null)
   const [actFormName, setActFormName] = useState("")
+  const [actFormShowInClient, setActFormShowInClient] = useState(true)
   const [actFormError, setActFormError] = useState("")
   const [actDeleteDialogOpen, setActDeleteDialogOpen] = useState(false)
   const [actDeletingType, setActDeletingType] = useState<string | null>(null)
@@ -246,6 +248,7 @@ export default function OrganizationsPage() {
   const handleOpenActCreate = () => {
     setActEditingType(null)
     setActFormName("")
+    setActFormShowInClient(true)
     setActFormError("")
     setActDialogOpen(true)
   }
@@ -253,6 +256,7 @@ export default function OrganizationsPage() {
   const handleOpenActEdit = (type: CourseType) => {
     setActEditingType(type.name)
     setActFormName(type.name)
+    setActFormShowInClient(type.show_in_client || false)
     setActFormError("")
     setActDialogOpen(true)
   }
@@ -265,9 +269,9 @@ export default function OrganizationsPage() {
         if (actFormName.trim() !== actEditingType) {
           await courseTypeApi.rename(actEditingType, actFormName.trim())
         }
-        await courseTypeApi.update(actFormName.trim(), { organization_id: activeOrgId })
+        await courseTypeApi.update(actFormName.trim(), { organization_id: activeOrgId, show_in_client: actFormShowInClient })
       } else {
-        await courseTypeApi.create(actFormName.trim(), activeOrgId)
+        await courseTypeApi.create(actFormName.trim(), activeOrgId, actFormShowInClient)
       }
       setActDialogOpen(false)
       const types = await courseTypeApi.list().catch(() => [] as CourseType[])
@@ -553,6 +557,7 @@ export default function OrganizationsPage() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-[40px] pl-4"></TableHead>
                       <TableHead className="text-xs font-medium">类型名称</TableHead>
+                      <TableHead className="text-xs font-medium w-[80px]">前端显示</TableHead>
                       <TableHead className="text-xs text-right pr-4">操作</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -571,6 +576,9 @@ export default function OrganizationsPage() {
                         </TableCell>
                         <TableCell>
                           <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[12px] text-[#2b2f36]">{type.show_in_client ? "是" : "否"}</span>
                         </TableCell>
                         <TableCell className="text-right pr-4">
                           <div className="flex items-center justify-end gap-1">
@@ -710,6 +718,19 @@ export default function OrganizationsPage() {
               <div>
                 <Input value={actFormName} onChange={(e) => { setActFormName(e.target.value); setActFormError("") }} placeholder="如：冥想、瑜伽、疗愈" />
                 {actFormError && <p className="text-xs text-destructive mt-1">{actFormError}</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">前端显示</span>
+              <div>
+                <SelectDropdown
+                  value={actFormShowInClient ? "true" : "false"}
+                  options={[{ value: "true", label: "是" }, { value: "false", label: "否" }]}
+                  onChange={(v) => setActFormShowInClient(v === "true")}
+                  rounded="[2px]"
+                  className="border-[#e8eaed]"
+                />
+                <p className="text-[11px] text-[#c9cdd4] mt-1.5">勾选后，用户可在客户端查看到课程，自主报名</p>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">

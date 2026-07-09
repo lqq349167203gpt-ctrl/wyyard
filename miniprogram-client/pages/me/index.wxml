@@ -1,0 +1,35 @@
+<view class="page">
+  <!-- 已登录 -->
+  <block wx:if="{{isLoggedIn && customer}}">
+    <view class="profile-card">
+      <view class="avatar">
+        <text class="avatar-text">{{customer.nickname[0] || '用'}}</text>
+      </view>
+      <view class="profile-info">
+        <text class="nickname">{{customer.nickname}}</text>
+        <text wx:if="{{customer.member_type}}" class="member-type">{{customer.member_type}}</text>
+      </view>
+    </view>
+
+    <view class="menu-card">
+      <button class="menu-item" bindtap="onLogout">
+        <text class="menu-text menu-text-danger">退出登录</text>
+      </button>
+    </view>
+  </block>
+
+  <!-- 未登录 -->
+  <block wx:else>
+    <view class="login-card">
+      <text class="login-title">欢迎使用无忧茶苑</text>
+      <text class="login-hint">请使用手机号登录</text>
+      <button
+        class="login-btn"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onGetPhoneNumber"
+      >
+        手机号快捷登录
+      </button>
+    </view>
+  </block>
+</view>

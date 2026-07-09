@@ -7,7 +7,7 @@
 - **前端**：React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS
 - **后端**：Python 3.11+ + FastAPI
 - **数据持久化**：PostgreSQL（psycopg2），连接串通过 `DATABASE_URL` 环境变量配置
-- **小程序**：微信小程序原生框架，自定义 tabBar 实现员工/客户角色切换
+- **小程序**：微信小程序原生框架，员工端与客户端为独立小程序（不同 appid，不同二维码入口）
 
 ## 目录结构
 ```
@@ -22,11 +22,16 @@ wyyard/
 │   │   └── types/            # TypeScript 类型定义
 │   ├── public/
 │   └── package.json
-├── miniprogram/              # 微信小程序（员工端 + 客户端，同一 appid 角色切换）
-│   ├── pages/                # 页面（员工 pages/ + 客户端 client-*）
-│   ├── components/           # 组件（含 custom-tab-bar 角色切换）
+├── miniprogram/              # 微信小程序（员工端，独立 appid）
+│   ├── pages/                # 页面（客户/邀约/课表/我的）
+│   ├── components/           # 组件
 │   ├── utils/                # API 封装、活动常量
-│   └── app.js                # 角色判断、登录管理
+│   └── app.js                # 登录管理
+├── miniprogram-client/       # 微信小程序（客户端，独立 appid，不同二维码入口）
+│   ├── pages/                # 页面（首页/我的）
+│   ├── components/           # 组件
+│   ├── utils/                # API 封装
+│   └── app.js                # 登录管理
 ├── backend/                  # FastAPI 后端
 │   ├── app/
 │   │   ├── api/              # API 路由（每个资源一个文件）
@@ -65,11 +70,9 @@ wyyard/
 | **小程序（员工）** | 邀约 | /pages/visits/index |
 | **小程序（员工）** | 课表 | /pages/activities/index |
 | **小程序（员工）** | 我的 | /pages/me/index |
-| **小程序（客户）** | 首页 | /pages/client-home/index |
-| **小程序（客户）** | 活动 | /pages/client-activities/index |
-| **小程序（客户）** | 活动详情 | /pages/client-activity-detail/index |
-| **小程序（客户）** | 我的 | /pages/client-profile/index |
-| **小程序（客户）** | 到店记录 | /pages/client-visit-history/index |
+| **小程序（客户端）** | 首页 | miniprogram-client /pages/home/index |
+| **小程序（客户端）** | 活动详情 | miniprogram-client /pages/activity-detail/index |
+| **小程序（客户端）** | 我的 | miniprogram-client /pages/me/index |
 
 ## 开发规范
 

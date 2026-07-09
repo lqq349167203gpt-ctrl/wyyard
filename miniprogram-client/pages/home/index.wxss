@@ -1,0 +1,153 @@
+.page {
+  min-height: 100vh;
+  background: #f7f8fa;
+  padding-bottom: 20rpx;
+}
+
+.loading, .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.empty-text {
+  font-size: 30rpx;
+  color: #2b2f36;
+  margin-bottom: 12rpx;
+}
+
+.empty-hint {
+  font-size: 26rpx;
+  color: #8f959e;
+}
+
+.list {
+  padding: 24rpx 32rpx;
+}
+
+.date-group {
+  margin-bottom: 32rpx;
+}
+
+.date-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+  padding: 0 4rpx;
+}
+
+.date-text {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #2b2f36;
+}
+
+.date-weekday {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 12rpx;
+  padding: 28rpx 32rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.card-name {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #2b2f36;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-tags {
+  display: flex;
+  gap: 8rpx;
+  margin-left: 16rpx;
+  flex-shrink: 0;
+}
+
+.tag {
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 4rpx;
+}
+
+.tag-online {
+  background: #e8f3ff;
+  color: #3370ff;
+}
+
+.tag-welfare {
+  background: #fff2e8;
+  color: #f5a623;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  font-size: 26rpx;
+}
+
+.info-label {
+  color: #8f959e;
+  width: 72rpx;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: #2b2f36;
+  flex: 1;
+}
+
+.card-desc {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.desc-text {
+  font-size: 24rpx;
+  color: #8f959e;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.loading-more, .no-more {
+  text-align: center;
+  padding: 32rpx 0;
+}
+
+.no-more-text {
+  font-size: 24rpx;
+  color: #c9cdd4;
+}

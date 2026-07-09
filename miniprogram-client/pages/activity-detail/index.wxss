@@ -1,0 +1,142 @@
+.page {
+  min-height: 100vh;
+  background: #f7f8fa;
+  padding-bottom: 160rpx;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.header {
+  background: #ffffff;
+  padding: 40rpx 32rpx 32rpx;
+}
+
+.title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #2b2f36;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.tags {
+  display: flex;
+  gap: 12rpx;
+}
+
+.tag {
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 6rpx;
+}
+
+.tag-online {
+  background: #e8f3ff;
+  color: #3370ff;
+}
+
+.tag-offline {
+  background: #f0f1f2;
+  color: #4e535a;
+}
+
+.tag-welfare {
+  background: #fff2e8;
+  color: #f5a623;
+}
+
+.info-card {
+  background: #ffffff;
+  margin: 24rpx 0;
+  padding: 8rpx 32rpx;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 28rpx;
+  color: #8f959e;
+  width: 120rpx;
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-size: 28rpx;
+  color: #2b2f36;
+  flex: 1;
+}
+
+.desc-card {
+  background: #ffffff;
+  padding: 32rpx;
+}
+
+.desc-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #2b2f36;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.desc-content {
+  font-size: 26rpx;
+  color: #4e535a;
+  line-height: 1.8;
+}
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  padding: 24rpx 32rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.signup-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #3370ff;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 500;
+  border-radius: 12rpx;
+  border: none;
+}
+
+.signup-btn::after {
+  border: none;
+}
+
+.signup-btn[disabled] {
+  background: #a8c4ff;
+  color: #ffffff;
+}
+
+.signup-btn-done {
+  background: #f0f1f2;
+  color: #8f959e;
+}

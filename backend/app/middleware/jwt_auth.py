@@ -13,6 +13,11 @@ SKIP_PATHS = (
     "/api/wechat/",
 )
 
+# 仅 GET 公开的路径前缀（不需要 token 即可访问）
+PUBLIC_GET_PATHS = (
+    "/api/client/activities",
+)
+
 # 客户角色可访问的路径前缀
 CUSTOMER_ALLOWED_PATHS = (
     "/api/class-records/unified",
@@ -22,6 +27,7 @@ CUSTOMER_ALLOWED_PATHS = (
     "/api/activity-registrations",
     "/api/spaces",
     "/api/course-types",
+    "/api/client/",
 )
 
 # 需要管理员权限的路径前缀（POST/PUT/PATCH/DELETE 自动拦截非管理员）
@@ -121,6 +127,13 @@ class AuthMiddleware:
             if path == skip or path.startswith(skip):
                 await self.app(scope, receive, send)
                 return
+
+        # GET 公开端点（活动列表/详情，无需 token）
+        if method == "GET":
+            for public in PUBLIC_GET_PATHS:
+                if path == public or path.startswith(public + "/"):
+                    await self.app(scope, receive, send)
+                    return
 
         token = _parse_auth_header(scope)
         if token:
