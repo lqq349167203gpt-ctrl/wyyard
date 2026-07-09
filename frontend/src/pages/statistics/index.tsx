@@ -7,6 +7,7 @@ import DetailView from "@/pages/healing-records/components/detail-view"
 import { statisticsApi, memberIdentityApi, customerDetailApi, type StatisticsData, type StatisticsDetail, type MemberIdentity } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { calcYAxisWidth } from "@/lib/utils"
 
 const COLORS = {
   invited: "#5b8ff9",
@@ -370,6 +371,10 @@ export default function StatisticsPage() {
     return ticks
   }, [chartData, visibleLines])
 
+  // 动态 YAxis 宽度
+  const lineYAxisWidth = useMemo(() => calcYAxisWidth(chartData, ["invited", "arrived", "converted", "converted_amount"]), [chartData])
+  const barYAxisWidth = useMemo(() => calcYAxisWidth(identityData, ["value"]), [identityData])
+
   return (
     <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
       <div>
@@ -605,7 +610,7 @@ export default function StatisticsPage() {
                     return v
                   }}
                 />
-                <YAxis tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }} allowDecimals={false} ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={30} />
+                <YAxis tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }} allowDecimals={false} ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={lineYAxisWidth} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null
@@ -667,7 +672,7 @@ export default function StatisticsPage() {
                 <BarChart data={identityData} margin={{ top: 10, right: 5, left: 0, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#b0b5bd" }} axisLine={false} tickLine={false} height={20} tickFormatter={(v) => v.length > 4 ? v.slice(0, 4) + "..." : v} />
-                  <YAxis tick={{ fontSize: 11, fill: "#b0b5bd" }} axisLine={false} tickLine={false} allowDecimals={false} width={30} domain={[0, (dataMax: number) => Math.ceil(dataMax / 4) * 4 + 4]} />
+                  <YAxis tick={{ fontSize: 11, fill: "#b0b5bd" }} axisLine={false} tickLine={false} allowDecimals={false} width={barYAxisWidth} domain={[0, (dataMax: number) => Math.ceil(dataMax / 4) * 4 + 4]} />
                   <Tooltip formatter={(value) => [value, "人数"]} contentStyle={{ fontSize: 12, borderRadius: 4 }} cursor={{ fill: "transparent" }} />
                   <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={20} activeBar={false}>
                     {identityData.map((_, index) => (
@@ -683,7 +688,7 @@ export default function StatisticsPage() {
         {/* 人员列表 */}
         <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4 min-h-[400px]">
           <div className="mb-3">
-            <div className="text-[12px] font-medium text-[#4e535a] mb-2">{LABELS[activeTab]}<span className="font-normal text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
+            <div className="text-[12px] font-medium text-[#4e535a] mb-2">{{ invited: "邀约到访列表", arrived: "实际到访列表", converted: "成交人员列表", converted_amount: "成交账单列表" }[activeTab]}<span className="font-normal text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-[#8f959e]">统计维度</span>
               {activeTab === "converted_amount" ? (

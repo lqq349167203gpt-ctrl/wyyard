@@ -33,7 +33,8 @@ import {
 const businessItems = [
   { title: "提醒", icon: IconBellRingingFilled, path: "/business-reminders", permission: "business-reminders" },
   { title: "数据记录", icon: IconChartAreaFilled, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
-  { title: "销售数据", icon: IconChartAreaFilled, path: "/statistics", permission: "statistics" },
+  { title: "产品数据", icon: IconChartAreaFilled, path: "/product-statistics", permission: "statistics" },
+  { title: "服务数据", icon: IconChartAreaFilled, path: "/statistics", permission: "statistics" },
 ]
 
 const courseItems = [

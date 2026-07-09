@@ -2008,6 +2008,41 @@ export interface StatisticsDetail {
   amount?: number
 }
 
+export interface StatisticsProducts {
+  total_amount: number
+  type_amounts: Record<string, number>
+  total_count: number
+  type_counts: Record<string, number>
+  total_purchase_count: number
+  total_persons: number
+  type_persons: Record<string, number>
+  chart_amount: Record<string, string | number>[]
+  chart_count: Record<string, string | number>[]
+  chart_persons: Record<string, string | number>[]
+  daily_table: { date: string; invited: number; arrived: number; converted_persons: number; converted_amount: number; converted_count: number; purchase_count: number }[]
+  card_type_names: string[]
+  card_type_amounts: Record<string, number>
+  card_type_counts: Record<string, number>
+  card_type_persons: Record<string, number>
+  card_type_chart_amount: Record<string, string | number>[]
+  card_type_chart_count: Record<string, string | number>[]
+  card_type_chart_persons: Record<string, string | number>[]
+  course_type_names: string[]
+  course_type_amounts: Record<string, number>
+  course_type_counts: Record<string, number>
+  course_type_persons: Record<string, number>
+  course_type_chart_amount: Record<string, string | number>[]
+  course_type_chart_count: Record<string, string | number>[]
+  course_type_chart_persons: Record<string, string | number>[]
+  other_project_names: string[]
+  other_project_amounts: Record<string, number>
+  other_project_counts: Record<string, number>
+  other_project_persons: Record<string, number>
+  other_project_chart_amount: Record<string, string | number>[]
+  other_project_chart_count: Record<string, string | number>[]
+  other_project_chart_persons: Record<string, string | number>[]
+}
+
 export const statisticsApi = {
   overview: (params: { date_from?: string; date_to?: string; granularity?: string }) => {
     const searchParams = new URLSearchParams()
@@ -2023,5 +2058,19 @@ export const statisticsApi = {
     if (params.status) searchParams.set("status", params.status)
     if (params.total) searchParams.set("total", "true")
     return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[] }>(`/api/statistics/details?${searchParams.toString()}`)
+  },
+  products: (params: { date_from?: string; date_to?: string; product_type?: string; name_filter?: string; granularity?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.product_type) searchParams.set("product_type", params.product_type)
+    if (params.name_filter) searchParams.set("name_filter", params.name_filter)
+    if (params.granularity) searchParams.set("granularity", params.granularity)
+    return request<StatisticsProducts>(`/api/statistics/products?${searchParams.toString()}`)
+  },
+  productDetails: (params: { date: string; type: string; product_type?: string }) => {
+    const searchParams = new URLSearchParams({ date: params.date, type: params.type })
+    if (params.product_type) searchParams.set("product_type", params.product_type)
+    return request<{ data: Record<string, unknown>[] }>(`/api/statistics/products/details?${searchParams.toString()}`)
   },
 }
