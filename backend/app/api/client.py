@@ -237,4 +237,23 @@ def signup_activity(activity_id: str, request: Request):
     }
     save_item(SIGNUPS_FILE, signup_id, signup)
 
+    # 同步到邀约页面
+    activity_date = item["data"].get("date", "")
+    space_id = item["data"].get("space_id", "")
+    if activity_date:
+        from app.services import visit_service
+        from app.models.visit import VisitRecordCreate
+        existing = visit_service.list_visits(date=activity_date, customer_id=customer_id)
+        if existing:
+            visit = existing[0]
+            if space_id and visit.space_id != space_id:
+                visit_service.update_visit(visit.id, {"space_id": space_id})
+        else:
+            visit_data = VisitRecordCreate(
+                visit_date=activity_date,
+                customer_id=customer_id,
+                space_id=space_id,
+            )
+            visit_service.create_visit(visit_data)
+
     return {"message": "报名成功", "signup_id": signup_id}
