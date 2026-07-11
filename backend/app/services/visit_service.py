@@ -36,8 +36,13 @@ _load()
 
 def count_customer_visits(customer_id: str) -> int:
     """统计某个客户的到访天数（同一天只算一次，仅计已到店）"""
-    dates = {v.visit_date for v in _visits.values() if v.customer_id == customer_id and v.arrived}
+    dates = {v.visit_date for v in _visits.values() if v.customer_id == customer_id and v.arrived and not v.is_deleted}
     return len(dates)
+
+
+def count_customer_invitations(customer_id: str) -> int:
+    """统计某个客户的受邀次数（所有邀约记录，不含已删除）"""
+    return sum(1 for v in _visits.values() if v.customer_id == customer_id and not v.is_deleted)
 
 
 def get_last_visit_date(customer_id: str) -> str:
@@ -406,8 +411,19 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         if not c.is_deleted:
             all_cards_map.setdefault(c.customer_id, []).append(c)
 
+    # 批量构建每个客户的到店次数和受邀次数
+    all_arrived_counts: dict[str, int] = {}
+    all_invitation_counts: dict[str, int] = {}
+    for v in _visits.values():
+        if not v.is_deleted:
+            all_invitation_counts[v.customer_id] = all_invitation_counts.get(v.customer_id, 0) + 1
+            if v.arrived:
+                all_arrived_counts[v.customer_id] = all_arrived_counts.get(v.customer_id, 0) + 1
+
     for r in records:
         r.visit_count = count_customer_visits(r.customer_id)
+        r.arrived_count = all_arrived_counts.get(r.customer_id, 0)
+        r.invitation_count = all_invitation_counts.get(r.customer_id, 0)
         if not r.member_type:
             customer = get_customer(r.customer_id)
             if customer:

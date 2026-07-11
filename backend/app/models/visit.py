@@ -48,7 +48,9 @@ class VisitRecordCreate(VisitRecordBase):
 
 class VisitRecord(VisitRecordBase):
     id: str
-    visit_count: int = 0  # 自动统计：该客户历史到访总次数
+    visit_count: int = 0  # 自动统计：该客户历史到店天数（同一天只算一次）
+    arrived_count: int = 0  # 自动统计：该客户历史到店总次数
+    invitation_count: int = 0  # 自动统计：该客户历史受邀总次数
     activity_count: int = 0  # 自动统计：参与活动总次数
     welfare_count: int = 0  # 自动统计：其中公益活动次数
     remaining_count: Optional[int] = None  # 会员活动剩余次数（null 表示不限次或无卡）

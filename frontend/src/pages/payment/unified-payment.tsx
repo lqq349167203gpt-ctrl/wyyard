@@ -82,6 +82,7 @@ interface UnifiedItem {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   // 会员卡专属
   card_type?: string
@@ -118,6 +119,7 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
     closer_id: item.closer_id,
     closer_name: item.closer_name,
     closers: item.closers || [],
+    payment_method: item.payment_method,
     organization_id: item.organization_id,
     _raw: item,
   }
@@ -171,6 +173,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
   const [formDealDate, setFormDealDate] = useState(today)
   const [formClosers, setFormClosers] = useState<Closer[]>([])
   const [formOrganizationId, setFormOrganizationId] = useState("")
+  const [formPaymentMethod, setFormPaymentMethod] = useState("")
   const [closerError, setCloserError] = useState(false)
 
   // 会员卡表单
@@ -419,6 +422,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     setFormDealDate(today)
     setFormClosers([])
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
+    setFormPaymentMethod("")
     setCloserError(false)
     // 会员卡
     setFormCardType("")
@@ -455,6 +459,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     setFormDealDate(item.deal_date || "")
     setFormClosers(item.closers?.length ? item.closers : (item.closer_id ? [{ id: item.closer_id, name: item.closer_name || "", amount: 0 }] : []))
     setFormOrganizationId(item.organization_id || "")
+    setFormPaymentMethod(item.payment_method || "")
     setCloserError(false)
 
     switch (item.type) {
@@ -538,6 +543,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           effective_date: formEffectiveDate, duration_type: formDurationType,
           duration_value: formDurationValue ? parseInt(formDurationValue) : null,
           closer_id, closer_name, closers, organization_id, deal_date,
+          payment_method: formPaymentMethod || null,
           created_by: createdBy,
         }
         // 仅新建卡时才允许带 remaining_count；编辑卡时 PATCH 端点拒绝修改次数字段，
@@ -566,6 +572,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           ...(editingItem ? {} : { purchase_count: parseInt(formPurchaseCount) || 0, created_by: createdBy }),
           amount: parseFloat(formAmount) || 0,
           closer_id, closer_name, closers, organization_id, deal_date,
+          payment_method: formPaymentMethod || null,
         }
       case "internal_course":
         return {
@@ -573,6 +580,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           course_type: formCourseType, price: formCourseAmount,
           effective_date: formEffectiveDate,
           closer_id, closer_name, closers, organization_id, deal_date,
+          payment_method: formPaymentMethod || null,
           ...(!editingItem && { created_by: createdBy }),
         }
       case "other": {
@@ -583,6 +591,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           duration_type: formOtherDurationType,
           duration_value: formOtherDurationValue ? parseInt(formOtherDurationValue) : null,
           closer_id, closer_name, closers, organization_id, deal_date,
+          payment_method: formPaymentMethod || null,
           ...(!editingItem && { created_by: createdBy }),
         }
         payload.total_count = formOtherUnlimited ? null : (formOtherRemainingCount ? parseInt(formOtherRemainingCount) : null)
@@ -1163,6 +1172,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                   <TableHead>状态</TableHead>
                   <TableHead>剩余次数</TableHead>
                   <TableHead>成交人</TableHead>
+                  <TableHead>支付方式</TableHead>
                   <TableHead>创建人</TableHead>
                   <TableHead className="text-right pr-4">操作</TableHead>
                 </TableRow>
@@ -1224,6 +1234,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                         ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、")
                         : (item.closer_name || "-")}
                     </TableCell>
+                    <TableCell className="text-[#2b2f36]">{item.payment_method || "-"}</TableCell>
                     <TableCell className="text-[#8f959e]">{item.created_by || "-"}</TableCell>
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1493,6 +1504,21 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                   <span className="text-[11px] text-[#f54a45] mt-0.5 block">成交人总金额与付费金额不一致</span>
                 )}
               </div>
+            </div>
+
+            {/* ===== 公共字段：支付方式 ===== */}
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">支付方式</span>
+              <select
+                className="h-7 border border-[#e8eaed] rounded-[2px] px-2 text-[12px] text-[#1f2329] bg-white outline-none focus:border-[#3370ff]"
+                value={formPaymentMethod}
+                onChange={(e) => setFormPaymentMethod(e.target.value)}
+              >
+                <option value="">请选择</option>
+                <option value="支付宝">支付宝</option>
+                <option value="微信">微信</option>
+                <option value="其他">其他</option>
+              </select>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

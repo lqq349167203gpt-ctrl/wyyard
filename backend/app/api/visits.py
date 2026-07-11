@@ -10,12 +10,67 @@ router = APIRouter(prefix="/api/visits", tags=["visits"])
 
 
 def _fill_member_type(record):
-    """从客户信息实时填充会员身份和昵称"""
+    """从客户信息实时填充会员身份、昵称和引流来源"""
     data = record.model_dump(mode="json")
     customer = get_customer(record.customer_id)
     data["member_type"] = customer.member_type if customer else ""
     data["nickname"] = customer.nickname if customer else ""
+    data["referrer"] = customer.referrer if customer else ""
     return data
+
+
+def _fill_daily_amount(items: list, date: str):
+    """汇总每个客户当日成交金额，注入 daily_amount 字段"""
+    if not date:
+        return
+    from app.services import (
+        membership_card_service,
+        group_case_service,
+        emotional_release_service,
+        energy_knot_service,
+        internal_course_service,
+        oh_card_reading_service,
+        other_project_service,
+    )
+
+    def _get_amount(r):
+        return getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0
+
+    def _get_date(r):
+        d = getattr(r, "deal_date", None)
+        if d:
+            return d
+        ca = getattr(r, "created_at", None)
+        if ca:
+            if hasattr(ca, "strftime"):
+                return ca.strftime("%Y-%m-%d")
+            return str(ca)[:10]
+        return ""
+
+    # 按 customer_id 汇总当日金额
+    amount_map: dict[str, float] = {}
+    services = [
+        membership_card_service.list_cards(),
+        group_case_service.list_cases(),
+        emotional_release_service.list_releases(),
+        energy_knot_service.list_knots(),
+        internal_course_service.list_courses(),
+        oh_card_reading_service.list_readings(),
+        other_project_service.list_projects(),
+    ]
+    for records in services:
+        for r in records:
+            if getattr(r, "voided", False):
+                continue
+            if getattr(r, "is_deleted", False):
+                continue
+            if _get_date(r) == date:
+                cid = getattr(r, "customer_id", "")
+                if cid:
+                    amount_map[cid] = amount_map.get(cid, 0) + _get_amount(r)
+
+    for item in items:
+        item["daily_amount"] = amount_map.get(item.get("customer_id", ""), 0)
 
 
 @router.get("")
@@ -28,6 +83,8 @@ async def list_visits(
 ):
     records = visit_service.list_visits(date, customer_id, space_id)
     items = [_fill_member_type(r) for r in records]
+    if date:
+        _fill_daily_amount(items, date)
     if page is not None:
         return paginate(items, page, page_size or 10)
     return items

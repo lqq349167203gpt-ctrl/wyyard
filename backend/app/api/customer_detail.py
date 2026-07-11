@@ -45,12 +45,11 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
     basic["visit_count"] = visit_service.count_customer_visits(customer_id)
 
     purchase_summary = _build_purchase_summary(customer_id)
-    # date 参数：只返回该日期的活动（与 statistics 逻辑一致）
+    # date 参数：只返回该日期的活动
     if date:
         activities = _build_activities(customer_id, {date})
     else:
-        arrived_dates = {v.visit_date for v in visit_service.list_visits(customer_id=customer_id) if v.arrived}
-        activities = _build_activities(customer_id, arrived_dates)
+        activities = _build_activities(customer_id)
     healing_records = [
         r.model_dump(mode="json")
         for r in healing_record_service.list_records(customer_id)

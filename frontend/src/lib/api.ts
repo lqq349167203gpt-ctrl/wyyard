@@ -462,6 +462,7 @@ export interface VisitRecord {
   customer_id: string
   nickname: string
   member_type: string
+  referrer: string
   daily_card_usage: number
   needs: string
   referrer_handler: string
@@ -470,6 +471,8 @@ export interface VisitRecord {
   arrived: boolean
   arrival_time?: string
   visit_count: number
+  arrived_count: number
+  invitation_count: number
   activity_count: number
   welfare_count: number
   remaining_count: number | null  // 0=无卡, -1=不限次, >0=剩余次数, null=无卡/未计算
@@ -478,6 +481,7 @@ export interface VisitRecord {
   feedback: string
   group_leader_feedback: string
   healing_notes: string
+  daily_amount: number
   created_at: string
   updated_at: string
 }
@@ -729,6 +733,7 @@ export interface GroupCase {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   deal_date: string | null
   created_at: string
@@ -825,6 +830,7 @@ export interface OhCardReading {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   deal_date: string | null
   created_at: string
@@ -912,6 +918,7 @@ export interface EnergyKnot {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   deal_date: string | null
   created_at: string
@@ -948,6 +955,7 @@ export interface EmotionalRelease {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   deal_date: string | null
   created_at: string
@@ -1160,6 +1168,7 @@ export interface InternalCourse {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   deal_date: string | null
   created_at: string
@@ -1203,6 +1212,7 @@ export interface MembershipCard {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   deal_date: string | null
   created_at: string
@@ -1253,6 +1263,7 @@ export interface OtherProject {
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
   organization_id: string | null
   deal_date: string | null
   created_at: string

@@ -39,6 +39,10 @@ const businessItems = [
   { title: "服务数据", icon: IconStarFilled, path: "/statistics", permission: "statistics" },
 ]
 
+const reportItems = [
+  { title: "每日报表", icon: IconClipboardTextFilled, path: "/daily-report", permission: "statistics" },
+]
+
 const courseItems = [
   { title: "客户资料", icon: IconUserFilled, path: "/healing-records", permission: "healing-records" },
   { title: "邀约", icon: IconCalendarEventFilled, path: "/courses/class-records", permission: "class-records" },
@@ -236,6 +240,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="mt-5">
         <FixedGroup label="数据" items={businessItems} />
+        <FixedGroup label="报表" items={reportItems} />
         <FixedGroup label="业务" items={courseItems} />
         <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCardFilled, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "", icon: IconClipboardTextFilled }, { title: "退费", path: "/payment-refunds", permission: "", icon: IconFileTextFilled }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />

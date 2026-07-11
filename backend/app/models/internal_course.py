@@ -13,6 +13,7 @@ class InternalCourseBase(SafeBaseModel):
     closer_id: Optional[str] = None
     closer_name: Optional[str] = None
     closers: List[dict] = []
+    payment_method: Optional[str] = None  # 支付宝 / 微信 / 其他
     organization_id: Optional[str] = None
     deal_date: Optional[str] = None
     created_by: str = ""
