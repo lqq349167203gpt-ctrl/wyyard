@@ -4,6 +4,7 @@ import { visitApi, classRecordApi, customerApi, memberIdentityApi, membershipCar
 import { Download } from "lucide-react"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import DetailView from "@/pages/healing-records/components/detail-view"
 
 const today = new Date().toISOString().split("T")[0]
 
@@ -46,12 +47,24 @@ export default function DailyReportPage() {
     item_type: string
     purchase_count: number | null
     amount: number
-    deduction_count: number | null
     remaining_count: number | null
     closer_name: string
     payment_method: string
   }
   const [financeRows, setFinanceRows] = useState<FinanceRow[]>([])
+
+  interface DeductionRow {
+    id: string
+    customer_id: string
+    nickname: string
+    card_type: string
+    has_card: boolean
+    manual_count: number
+    activity_count: number
+    remaining_count: number | null
+  }
+  const [deductionRows, setDeductionRows] = useState<DeductionRow[]>([])
+  const [hasCardSet, setHasCardSet] = useState<Set<string>>(new Set())
 
   // 详情弹窗
   const [detailOpen, setDetailOpen] = useState(false)
@@ -59,6 +72,10 @@ export default function DailyReportPage() {
   const [detailNickname, setDetailNickname] = useState("")
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+
+  // 客户详情弹窗
+  const [customerDetailOpen, setCustomerDetailOpen] = useState(false)
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
 
   const openDetail = async (type: "visit" | "invited" | "activity_all" | "activity_today" | "payment", customerId: string, nickname: string) => {
     setDetailType(type)
@@ -101,7 +118,7 @@ export default function DailyReportPage() {
         <td>${v.arrived_count}次</td>
         <td>${v.activity_count}场</td>
         <td>${todayActivityCountMap[v.customer_id] || 0}场</td>
-        <td>${v.remaining_count != null ? (v.remaining_count < 0 ? "不限次" : v.remaining_count + "次") : "-"}</td>
+        <td>${!hasCardSet.has(v.customer_id) ? "未办卡" : v.remaining_count == null || v.remaining_count === -999 ? "不限" : v.remaining_count + "次"}</td>
         <td class="wrap">${esc(v.needs || "-")}</td>
         <td class="wrap">${esc(v.feedback || v.experience || "-")}</td>
         <td class="wrap">${esc(customers.find(c => c.id === v.customer_id)?.follow_up_node || "-")}</td>
@@ -144,7 +161,7 @@ export default function DailyReportPage() {
     const totalAmount = financeRows.reduce((s, r) => s + r.amount, 0)
     html += `<table><colgroup><col width="60"><col width="80"><col width="70"><col width="100"><col width="60"><col width="60"><col width="60"><col width="70"><col width="80"><col width="80"></colgroup>`
     html += `<tr class="section"><td colspan="10">当日财务报表</td></tr>`
-    html += `<tr><th>引流人</th><th>昵称</th><th>项目类型</th><th>项目名称</th><th>购买次数</th><th>销卡次数</th><th>剩余卡次</th><th>成交人</th><th>小计</th><th>付费方式</th></tr>`
+    html += `<tr><th>引流</th><th>昵称</th><th>项目类型</th><th>项目名称</th><th>购买次数</th><th>剩余卡次</th><th>成交人</th><th>付费方式</th><th>小计</th><th></th></tr>`
     for (const r of financeRows) {
       html += `<tr>
         <td>${esc(r.referrer || "-")}</td>
@@ -152,15 +169,32 @@ export default function DailyReportPage() {
         <td>${esc(r.item_type)}</td>
         <td>${esc(r.item_name)}</td>
         <td>${r.purchase_count != null ? r.purchase_count + "次" : "-"}</td>
-        <td>${r.deduction_count != null ? r.deduction_count + "次" : "-"}</td>
-        <td>${r.remaining_count != null ? r.remaining_count + "次" : "-"}</td>
+        <td>${r.remaining_count == null || r.remaining_count === -999 ? "不限" : r.remaining_count + "次"}</td>
         <td>${esc(r.closer_name || "-")}</td>
-        <td>¥${r.amount.toLocaleString()}</td>
         <td>${esc(r.payment_method || "-")}</td>
+        <td>¥${r.amount.toLocaleString()}</td>
+        <td></td>
       </tr>`
     }
-    html += `<tr style="background:#f7f8fa;font-weight:bold"><td colspan="8">合计</td><td>¥${totalAmount.toLocaleString()}</td><td></td></tr>`
-    html += `</table></body></html>`
+    html += `<tr style="background:#f7f8fa;font-weight:bold"><td colspan="8">合计</td><td></td><td>¥${totalAmount.toLocaleString()}</td></tr>`
+    html += `</table><br>`
+    // 第四部分：当日销卡
+    if (deductionRows.length > 0) {
+      html += `<table><colgroup><col width="80"><col width="80"><col width="70"><col width="70"><col width="70"></colgroup>`
+      html += `<tr class="section"><td colspan="5">当日销卡</td></tr>`
+      html += `<tr><th>昵称</th><th>卡类型</th><th>人工销卡</th><th>活动销卡</th><th>剩余卡次</th></tr>`
+      for (const r of deductionRows) {
+        html += `<tr>
+          <td>${esc(r.nickname)}</td>
+          <td>${esc(r.card_type || "未办卡")}</td>
+          <td>${r.manual_count > 0 ? r.manual_count + "次" : "-"}</td>
+          <td>${r.activity_count > 0 ? r.activity_count + "次" : "-"}</td>
+          <td>${!r.has_card ? "未办卡" : r.remaining_count == null || r.remaining_count === -999 ? "不限" : r.remaining_count + "次"}</td>
+        </tr>`
+      }
+      html += `</table>`
+    }
+    html += `</body></html>`
     const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -272,10 +306,17 @@ export default function DailyReportPage() {
           deductionMap[d.project_id] = (deductionMap[d.project_id] || 0) + (d.count || 1)
         }
       }
-      // 每个客户的当日活动销卡次数
-      const visitCardUsageMap: Record<string, number> = {}
-      for (const v of todayVisits as any[]) {
-        if (v.daily_card_usage > 0) visitCardUsageMap[v.customer_id] = v.daily_card_usage
+      // 每个客户的当日活动销卡次数（公益活动不扣卡）
+      const activityDeductionMap: Record<string, number> = {}
+      for (const a of activities) {
+        if (a.is_public_welfare) continue
+        const allIds = [
+          ...(a.participant_ids || []),
+          ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
+        ]
+        for (const id of [...new Set(allIds)]) {
+          activityDeductionMap[id] = (activityDeductionMap[id] || 0) + 1
+        }
       }
 
       const rows: FinanceRow[] = []
@@ -288,7 +329,6 @@ export default function DailyReportPage() {
         let itemType = ""
         let amount = 0
         let purchaseCount: number | null = null
-        let deductionCount: number | null = null
         let remainingCount: number | null = null
         switch (type) {
           case "membership_card":
@@ -296,7 +336,6 @@ export default function DailyReportPage() {
             itemName = item.card_type || ""
             amount = item.price || 0
             purchaseCount = item.total_count ?? null
-            deductionCount = (deductionMap[item.id] || 0) + (visitCardUsageMap[item.customer_id] || 0) || null
             remainingCount = item.remaining_count
             break
           case "group_case":
@@ -333,7 +372,6 @@ export default function DailyReportPage() {
             itemName = item.project_name || item.category || ""
             amount = item.fee || 0
             purchaseCount = item.total_count ?? null
-            deductionCount = (deductionMap[item.id] || 0) + (visitCardUsageMap[item.customer_id] || 0) || null
             remainingCount = item.remaining_count
             break
         }
@@ -348,7 +386,6 @@ export default function DailyReportPage() {
           item_type: itemType,
           purchase_count: purchaseCount,
           amount,
-          deduction_count: deductionCount,
           remaining_count: remainingCount,
           closer_name: closerNames,
           payment_method: item.payment_method || "",
@@ -362,6 +399,52 @@ export default function DailyReportPage() {
       for (const item of courses as any[]) addItem(item, "internal_course")
       for (const item of others as any[]) addItem(item, "other")
       setFinanceRows(rows)
+
+      // 构建当日销卡数据
+      // 客户→会员卡映射
+      const customerCardMap: Record<string, any> = {}
+      const cardSet = new Set<string>()
+      for (const c of cards as any[]) {
+        if (!c.is_deleted && !c.voided) {
+          customerCardMap[c.customer_id] = customerCardMap[c.customer_id] || c
+          cardSet.add(c.customer_id)
+        }
+      }
+      // 有内部课程（含疗愈师卡）的客户也算有卡
+      for (const c of courses as any[]) {
+        if (!c.is_deleted && !c.voided && (!c.expiry_date || c.expiry_date >= detailDate)) {
+          cardSet.add(c.customer_id)
+        }
+      }
+      setHasCardSet(cardSet)
+      // 合并所有有销卡的客户
+      const deductionCustomerIds = new Set([
+        ...Object.keys(deductionMap).map(id => (cards as any[]).find(c => c.id === id)?.customer_id).filter(Boolean),
+        ...Object.keys(activityDeductionMap),
+      ])
+      const dRows: DeductionRow[] = []
+      for (const cid of deductionCustomerIds) {
+        const customer = customerMap[cid]
+        const card = customerCardMap[cid]
+        // 人工销卡：该客户所有当日项目的人工销卡总和
+        let manualCount = 0
+        for (const c of cards as any[]) {
+          if (c.customer_id === cid && deductionMap[c.id]) manualCount += deductionMap[c.id]
+        }
+        const activityCount = activityDeductionMap[cid] || 0
+        if (manualCount === 0 && activityCount === 0) continue
+        dRows.push({
+          id: cid,
+          customer_id: cid,
+          nickname: customer?.nickname || "",
+          card_type: card?.card_type || "",
+          has_card: !!card,
+          manual_count: manualCount,
+          activity_count: activityCount,
+          remaining_count: card?.remaining_count ?? null,
+        })
+      }
+      setDeductionRows(dRows)
     })
   }, [detailDate, customers])
 
@@ -460,13 +543,13 @@ export default function DailyReportPage() {
                   <tr key={v.id} className={i % 2 === 0 ? "bg-white hover:bg-[#f7f8fa]" : "bg-[#fcfcfd] hover:bg-[#f0f1f3]"}>
                     <td className="px-[5px] py-2 text-[#8b9198] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#92989e] text-center border-b-[0.5px] border-[#e8eaed]">{v.visit_time || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className="px-[5px] py-2 text-black truncate border-b-[0.5px] border-[#e8eaed]">{v.nickname}</td>
+                    <td className="px-[5px] py-2 text-black truncate border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => { setSelectedCustomerId(v.customer_id); setCustomerDetailOpen(true) }}>{v.nickname}</td>
                     <td className="px-[5px] py-2 text-[#8b9198] truncate border-b-[0.5px] border-[#e8eaed]">{v.member_type || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("invited", v.customer_id, v.nickname)}>{v.invitation_count}次</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("visit", v.customer_id, v.nickname)}>{v.arrived_count}次</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_all", v.customer_id, v.nickname)}>{v.activity_count}场</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_today", v.customer_id, v.nickname)}>{todayActivityCountMap[v.customer_id] || 0}场</td>
-                    <td className="px-[5px] py-2 text-[#4e535a] text-center border-b-[0.5px] border-[#e8eaed]">{v.remaining_count != null ? (v.remaining_count < 0 ? "不限次" : `${v.remaining_count}次`) : <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-normal break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-normal break-words"}`}>{v.feedback || v.experience || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-normal break-words"}`}>{customers.find(c => c.id === v.customer_id)?.follow_up_node || <span className="text-[#c9cdd4]">-</span>}</td>
@@ -555,16 +638,15 @@ export default function DailyReportPage() {
             <table className="text-[12px] w-full" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
               <thead>
                 <tr className="bg-[#f7f8fa] text-[#8f959e]">
-                  <th className="px-[5px] py-2 text-left font-normal w-[50px] border-b-[0.5px] border-[#e8eaed]">引流人</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[50px] border-b-[0.5px] border-[#e8eaed]">引流</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">昵称</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">项目类型</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[90px] border-b-[0.5px] border-[#e8eaed]">项目名称</th>
                   <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">购买次数</th>
-                  <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">销卡次数</th>
                   <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">剩余卡次</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">成交人</th>
-                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">小计</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[100px] border-b-[0.5px] border-[#e8eaed]">付费方式</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">小计</th>
                 </tr>
               </thead>
               <tbody>
@@ -575,17 +657,15 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.item_type}</td>
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.item_name}</td>
                     <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.purchase_count != null ? `${r.purchase_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.deduction_count != null ? `${r.deduction_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.remaining_count != null ? `${r.remaining_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{r.remaining_count == null || r.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{r.remaining_count}次</span>}</td>
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.closer_name || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className="px-[5px] py-2 text-left text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">¥{r.amount.toLocaleString()}</td>
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.payment_method || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-left text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">¥{r.amount.toLocaleString()}</td>
                   </tr>
                 ))}
                 {/* 汇总行 */}
                 <tr className="bg-[#f7f8fa] font-medium">
-                  <td colSpan={8} className="px-[5px] py-2 text-left text-[#1f2329] border-b-[0.5px] border-[#e8eaed]">合计</td>
-                  <td className="px-[5px] py-2 text-left text-[#1f2329] border-b-[0.5px] border-[#e8eaed]">¥{financeRows.reduce((s, r) => s + r.amount, 0).toLocaleString()}</td>
+                  <td colSpan={7} className="px-[5px] py-2 text-left text-[#1f2329] border-b-[0.5px] border-[#e8eaed]">合计</td>
                   <td className="px-[5px] py-2 text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">
                     {(() => {
                       const methodTotals: Record<string, number> = {}
@@ -597,7 +677,41 @@ export default function DailyReportPage() {
                       return Object.entries(methodTotals).map(([m, v]) => `${m} ¥${v.toLocaleString()}`).join("、") || "-"
                     })()}
                   </td>
+                  <td className="px-[5px] py-2 text-left text-[#1f2329] border-b-[0.5px] border-[#e8eaed]">¥{financeRows.reduce((s, r) => s + r.amount, 0).toLocaleString()}</td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* 第四部分：当日销卡 */}
+      <div className="min-w-0 mt-4">
+        <div className="text-[13px] font-medium text-[#1f2329] mb-3">当日销卡</div>
+        {deductionRows.length === 0 ? (
+          <div className="text-[12px] text-[#8f959e] py-8 text-center">当日无销卡记录</div>
+        ) : (
+          <div className="overflow-x-auto scrollbar-visible">
+            <table className="text-[12px] w-full" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
+              <thead>
+                <tr className="bg-[#f7f8fa] text-[#8f959e]">
+                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">昵称</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">卡类型</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">人工销卡</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">活动销卡</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">剩余卡次</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deductionRows.map((r, i) => (
+                  <tr key={r.id} className={i % 2 === 0 ? "bg-white hover:bg-[#f7f8fa]" : "bg-[#fcfcfd] hover:bg-[#f0f1f3]"}>
+                    <td className="px-[5px] py-2 text-[#1f2329] truncate border-b-[0.5px] border-[#e8eaed]">{r.nickname}</td>
+                    <td className="px-[5px] py-2 truncate border-b-[0.5px] border-[#e8eaed]">{r.card_type ? <span className="text-[#4e535a]">{r.card_type}</span> : <span className="text-[#c9cdd4]">未办卡</span>}</td>
+                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.manual_count > 0 ? `${r.manual_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.activity_count > 0 ? `${r.activity_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!r.has_card ? <span className="text-[#c9cdd4]">未办卡</span> : r.remaining_count == null || r.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{r.remaining_count}次</span>}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -719,6 +833,17 @@ export default function DailyReportPage() {
               </>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* 客户详情弹窗 */}
+      <Dialog open={customerDetailOpen} onOpenChange={(open) => { setCustomerDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>
+        <DialogContent className="max-w-[1000px] max-h-[85vh] overflow-y-auto p-0 gap-0">
+          <DetailView
+            selectedCustomerId={selectedCustomerId}
+            onClearSelection={() => setCustomerDetailOpen(false)}
+            hideSearch
+          />
         </DialogContent>
       </Dialog>
     </div>

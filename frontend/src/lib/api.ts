@@ -475,7 +475,7 @@ export interface VisitRecord {
   invitation_count: number
   activity_count: number
   welfare_count: number
-  remaining_count: number | null  // 0=无卡, -1=不限次, >0=剩余次数, null=无卡/未计算
+  remaining_count: number | null  // -999=不限次, null=不限次, 0=无卡/已用完, >0=剩余次数
   activities: ActivityInfo[]
   experience: string
   feedback: string
