@@ -417,6 +417,13 @@ export default function DailyReportPage() {
         }
       }
       setHasCardSet(cardSet)
+      // 内部课程客户 ID 集合
+      const courseCustomerIds = new Set<string>()
+      for (const c of courses as any[]) {
+        if (!c.is_deleted && !c.voided && (!c.expiry_date || c.expiry_date >= detailDate)) {
+          courseCustomerIds.add(c.customer_id)
+        }
+      }
       // 合并所有有销卡的客户
       const deductionCustomerIds = new Set([
         ...Object.keys(deductionMap).map(id => (cards as any[]).find(c => c.id === id)?.customer_id).filter(Boolean),
@@ -437,8 +444,8 @@ export default function DailyReportPage() {
           id: cid,
           customer_id: cid,
           nickname: customer?.nickname || "",
-          card_type: card?.card_type || "",
-          has_card: !!card,
+          card_type: card?.card_type || (courseCustomerIds.has(cid) ? "疗愈师" : ""),
+          has_card: !!card || courseCustomerIds.has(cid),
           manual_count: manualCount,
           activity_count: activityCount,
           remaining_count: card?.remaining_count ?? null,
