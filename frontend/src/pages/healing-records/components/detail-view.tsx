@@ -330,7 +330,7 @@ export default function DetailView({
                           )
                         })()}
                         <div className="flex items-start gap-2">
-                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户收获</span>
+                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户信息</span>
                           <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.feedback || v.experience || <span className="text-[#8f959e]">-</span>}</p>
                         </div>
                       </div>
