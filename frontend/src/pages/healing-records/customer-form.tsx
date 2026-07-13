@@ -175,9 +175,9 @@ export default function CustomerFormPage() {
   }
 
   return (
-    <div className="min-h-full bg-white">
+    <div className="h-full bg-white flex flex-col">
       {/* 顶栏 */}
-      <div className="sticky top-0 z-10 bg-white border-b border-[#f0f0f0]">
+      <div className="shrink-0 bg-white border-b border-[#f0f0f0]">
         <div className="px-6 h-12 flex items-center gap-3">
           <button onClick={() => navigate("/healing-records")} className="flex items-center gap-1 text-[13px] text-[#4e535a] hover:text-[#1f2329] transition-colors">
             <ArrowLeft className="h-4 w-4" />
@@ -191,7 +191,7 @@ export default function CustomerFormPage() {
       </div>
 
       {/* 表单 */}
-      <div className="px-6 py-5 space-y-5" {...enterToNext}>
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 pb-20" {...enterToNext}>
         {/* 基本信息 */}
         <div className="space-y-3">
           <h2 className="text-[13px] font-normal text-[#1f2329]">基本信息</h2>
@@ -320,8 +320,11 @@ export default function CustomerFormPage() {
             </div>
           </div>
         </div>
-        {/* 保存按钮 */}
-        <div className="flex flex-col items-center gap-2 py-4">
+      </div>
+
+      {/* 底部固定按钮栏 */}
+      <div className="fixed bottom-0 left-[var(--sidebar-width)] right-0 bg-white border-t border-[#f0f0f0] px-6 py-3 z-50">
+        <div className="flex flex-col items-center gap-2">
           {fieldErrors._general && <p className="text-[12px] text-[#f54a45]">{fieldErrors._general}</p>}
           <div className="flex items-center gap-[18px]">
             <Button variant="outline" size="sm" className="h-[34px] text-xs w-[140px]" onClick={() => navigate("/healing-records")}>
