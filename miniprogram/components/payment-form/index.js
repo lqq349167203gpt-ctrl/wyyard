@@ -169,10 +169,12 @@ Component({
         pickerKeyword: '',
         pickerList: this.data.allCustomers,
       })
+      this.triggerEvent('pickerstate', { open: true })
     },
 
     onPickerClose() {
       this.setData({ showPicker: false, pickerKeyword: '', pickerList: [] })
+      this.triggerEvent('pickerstate', { open: false })
     },
 
     onPickerSearch(e) {

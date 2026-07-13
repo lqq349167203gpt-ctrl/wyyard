@@ -10,6 +10,7 @@ Page({
     editData: null,
     loading: true,
     saving: false,
+    pickerOpen: false,
   },
 
   async onLoad(options) {
@@ -71,6 +72,10 @@ Page({
   onSave() {
     const form = this.selectComponent('#paymentForm')
     if (form) form.onSubmit()
+  },
+
+  onPickerState(e) {
+    this.setData({ pickerOpen: e.detail.open })
   },
 
   onFormSuccess() {

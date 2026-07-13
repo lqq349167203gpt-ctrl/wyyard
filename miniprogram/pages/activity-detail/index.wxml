@@ -1,3 +1,4 @@
+<page-meta page-style="{{showPicker || showTypePicker ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="container">
   <view class="loading-wrap" wx:if="{{loading}}">
     <text class="loading-text">加载中...</text>
@@ -189,7 +190,7 @@
       <text class="picker-close" bindtap="onPickerClose">关闭</text>
     </view>
     <view class="picker-search">
-      <input class="picker-search-input" placeholder="搜索" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+      <input class="picker-search-input" placeholder="搜索" value="{{pickerKeyword}}" bindinput="onPickerSearch" />
     </view>
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item {{item._selected ? 'selected' : ''}}" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">

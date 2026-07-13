@@ -1,9 +1,5 @@
 // API 请求封装
-// 本地开发: http://localhost:8000
-// 生产环境: 需要替换为实际域名
-
-// ⚠️ 上线前必须替换为生产域名
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = 'https://www.wyteahouse.cn'
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
