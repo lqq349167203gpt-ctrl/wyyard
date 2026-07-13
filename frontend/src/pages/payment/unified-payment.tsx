@@ -47,6 +47,7 @@ const MEMBERSHIP_CARD_TYPES: Record<string, { price: number; defaultCount?: numb
   "次卡": { price: 198, defaultCount: 1, duration: "1 个月" },
   "体验会员": { price: 398, defaultCount: 4, duration: "1 个月" },
   "月卡": { price: 1999, unlimited: true, duration: "1 个月" },
+  "12次卡": { price: 1800, defaultCount: 12, duration: "1 年" },
   "3月卡": { price: 3999, unlimited: true, duration: "3 个月" },
   "30次卡": { price: 3999, defaultCount: 30, duration: "1 年" },
   "半年卡": { price: 7999, unlimited: true, duration: "6 个月" },

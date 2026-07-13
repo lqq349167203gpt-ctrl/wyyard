@@ -20,7 +20,7 @@ import { ActivityConfigContent } from "@/pages/activity-config"
 import { HEALING_POSITIONS } from "@/lib/positions"
 
 // 与 membership_card.card_type 实际值对齐；新增卡类型时需同步更新
-const CARD_TYPES = ["次卡", "体验会员", "月卡", "3月卡", "30次卡", "半年卡", "年卡"]
+const CARD_TYPES = ["次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "半年卡", "年卡"]
 const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
 const PAYMENT_CATEGORIES = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "内部课程", "其他项目"]
 

@@ -43,6 +43,7 @@ const CARD_TYPE_OPTIONS = [
   { value: "次卡", label: "次卡" },
   { value: "体验会员", label: "体验会员" },
   { value: "月卡", label: "月卡" },
+  { value: "12次卡", label: "12次卡" },
   { value: "3月卡", label: "3月卡" },
   { value: "30次卡", label: "30次卡" },
   { value: "半年卡", label: "半年卡" },
