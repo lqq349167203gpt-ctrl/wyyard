@@ -70,8 +70,10 @@ Page({
   onTextSend() {
     const text = (this.data.inputText || '').trim()
     if (!text) return
-    this._addMsg({ type: 'user', text })
-    this.setData({ inputText: '' })
+    const id = 'msg-' + (++_msgId)
+    const messages = this.data.messages.concat([{ type: 'user', text, id }])
+    const scrollTop = this.data.scrollTop === 999999 ? 999998 : 999999
+    this.setData({ inputText: '', messages, scrollTarget: id, scrollTop })
     this._handleMessage(text)
   },
 
