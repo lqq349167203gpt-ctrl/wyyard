@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.models.customer import CustomerCreate
 from app.services.customer_ai_config_service import get_config as get_customer_ai_config
+from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
 from app.config.settings import settings
 
 
@@ -25,8 +26,9 @@ def transcribe_audio(audio_base64: str, audio_format: str = "mp3") -> str:
     """调用 Zhipu ASR 将音频转为文字"""
     import base64
 
-    api_key = settings.llm_api_key
-    base_url = settings.llm_base_url or "https://open.bigmodel.cn/api/paas/v4"
+    model_config = get_miniapp_ai_config()
+    api_key = model_config.api_key or settings.llm_api_key
+    base_url = model_config.base_url or settings.llm_base_url or "https://open.bigmodel.cn/api/paas/v4"
 
     if not api_key:
         raise HTTPException(status_code=500, detail="系统未配置 LLM API Key，请在 AI 配置中设置")
@@ -54,10 +56,11 @@ def transcribe_audio(audio_base64: str, audio_format: str = "mp3") -> str:
 
 async def parse_voice_input(text: str) -> dict:
     """从语音识别文字中提取客户信息，返回与 CustomerCreate 一致的 dict"""
-    config = get_customer_ai_config()
-    api_key = config.api_key or settings.llm_api_key
-    base_url = config.base_url or settings.llm_base_url
-    model = config.model or settings.llm_model
+    prompt_config = get_customer_ai_config()
+    model_config = get_miniapp_ai_config()
+    api_key = model_config.api_key or settings.llm_api_key
+    base_url = model_config.base_url or settings.llm_base_url
+    model = model_config.model or settings.llm_model
 
     if not api_key:
         raise HTTPException(status_code=500, detail="未配置 AI API Key，请在「小程序语音 AI 配置」中设置")
@@ -66,8 +69,8 @@ async def parse_voice_input(text: str) -> dict:
         model=model,
         api_key=api_key,
         base_url=base_url,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
+        temperature=model_config.temperature,
+        max_tokens=model_config.max_tokens,
     )
 
     escaped = _escape_xml(text)
@@ -77,7 +80,7 @@ async def parse_voice_input(text: str) -> dict:
         f"<user_input>\n{escaped}\n</user_input>"
     )
 
-    messages = [SystemMessage(content=config.system_prompt), HumanMessage(content=user_message)]
+    messages = [SystemMessage(content=prompt_config.system_prompt), HumanMessage(content=user_message)]
     response = await asyncio.to_thread(llm.invoke, messages)
 
     content = response.content
@@ -111,10 +114,10 @@ async def analyze_save_error(error: str, previous_data: dict) -> dict:
     """分析保存失败的原因，给出修改建议和修正后的数据"""
     existing_id = previous_data.get("id", "")
 
-    config = get_customer_ai_config()
-    api_key = config.api_key or settings.llm_api_key
-    base_url = config.base_url or settings.llm_base_url
-    model = config.model or settings.llm_model
+    model_config = get_miniapp_ai_config()
+    api_key = model_config.api_key or settings.llm_api_key
+    base_url = model_config.base_url or settings.llm_base_url
+    model = model_config.model or settings.llm_model
 
     if not api_key:
         raise HTTPException(status_code=500, detail="未配置 AI API Key")
@@ -123,8 +126,8 @@ async def analyze_save_error(error: str, previous_data: dict) -> dict:
         model=model,
         api_key=api_key,
         base_url=base_url,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
+        temperature=model_config.temperature,
+        max_tokens=model_config.max_tokens,
     )
 
     data_str = json.dumps(previous_data, ensure_ascii=False, indent=2)
@@ -259,10 +262,10 @@ async def modify_customer_data(current_data: dict, instruction: str) -> dict:
             # 指令中提到了不同的客户，切换过去
             current_data = other
 
-    config = get_customer_ai_config()
-    api_key = config.api_key or settings.llm_api_key
-    base_url = config.base_url or settings.llm_base_url
-    model = config.model or settings.llm_model
+    model_config = get_miniapp_ai_config()
+    api_key = model_config.api_key or settings.llm_api_key
+    base_url = model_config.base_url or settings.llm_base_url
+    model = model_config.model or settings.llm_model
 
     if not api_key:
         raise HTTPException(status_code=500, detail="未配置 AI API Key")
@@ -271,8 +274,8 @@ async def modify_customer_data(current_data: dict, instruction: str) -> dict:
         model=model,
         api_key=api_key,
         base_url=base_url,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
+        temperature=model_config.temperature,
+        max_tokens=model_config.max_tokens,
     )
 
     # 保存 id，LLM 可能会丢掉
