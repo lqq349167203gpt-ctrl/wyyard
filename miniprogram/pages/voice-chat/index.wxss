@@ -15,6 +15,7 @@
   flex-direction: column;
   gap: 24rpx;
   padding: 24rpx;
+  padding-bottom: 120rpx;
 }
 
 .msg-row {
@@ -176,6 +177,10 @@
 
 /* 输入区域 */
 .input-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   gap: 16rpx;
@@ -183,6 +188,7 @@
   padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
   background: #fff;
   border-top: 2rpx solid #e8eaed;
+  z-index: 100;
 }
 
 .mode-btn {

@@ -57,6 +57,10 @@ Page({
 
   onInputFocus(e) {
     this.setData({ kbHeight: e.detail.height || 0 })
+    wx.nextTick(() => {
+      const scrollTop = this.data.scrollTop === 999999 ? 999998 : 999999
+      this.setData({ scrollTop })
+    })
   },
 
   onInputBlur() {
