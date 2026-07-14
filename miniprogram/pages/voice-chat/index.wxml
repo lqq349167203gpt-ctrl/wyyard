@@ -87,7 +87,7 @@
   </scroll-view>
 
   <!-- 输入区域 -->
-  <view class="input-bar" style="bottom: {{kbHeight}}px;">
+  <view class="input-bar" style="margin-bottom: {{kbHeight}}px;">
     <input
       wx:if="{{inputMode === 'text'}}"
       class="text-input"
