@@ -16,6 +16,7 @@ Component({
     messages: [],
     scrollTarget: '',
     scrollTop: 0,
+    kbHeight: 0,
   },
 
   lifetimes: {
@@ -54,7 +55,9 @@ Component({
           messages: saved,
           scrollTarget: '',
           scrollTop: 0,
+          kbHeight: 0,
         })
+        this.triggerEvent('popupstate', { open: true })
         if (saved.length) {
           wx.nextTick(() => {
             this.setData({ scrollTop: 999999 })
@@ -71,6 +74,7 @@ Component({
         }
       } else {
         this._stopRecord()
+        this.triggerEvent('popupstate', { open: false })
       }
     },
   },
@@ -78,6 +82,15 @@ Component({
   methods: {
     onOverlayTap() { this._close() },
     onContentTap() {},
+    onOverlayTouchMove() {},
+
+    onInputFocus(e) {
+      this.setData({ kbHeight: e.detail.height || 0 })
+    },
+
+    onInputBlur() {
+      this.setData({ kbHeight: 0 })
+    },
 
     onSwitchToVoice() {
       this.setData({ inputMode: 'voice' })

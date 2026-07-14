@@ -20,7 +20,8 @@
     "pages/payment-create/index",
     "pages/payment-detail/index",
     "pages/payment-edit/index",
-    "pages/me/index"
+    "pages/me/index",
+    "pages/voice-chat/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",

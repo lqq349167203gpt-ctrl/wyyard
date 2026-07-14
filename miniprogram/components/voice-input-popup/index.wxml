@@ -1,5 +1,5 @@
-<view class="voice-overlay" wx:if="{{show}}" catchtap="onOverlayTap">
-  <view class="voice-panel" catchtap="onContentTap">
+<view class="voice-overlay" wx:if="{{show}}" catchtap="onOverlayTap" catchtouchmove="onOverlayTouchMove">
+  <view class="voice-panel" style="bottom: {{kbHeight}}px" catchtap="onContentTap" catchtouchmove>
     <!-- 顶部标题栏 -->
     <view class="voice-header">
       <text class="voice-title">{{mode === 'visit' ? '邀约' : mode === 'activity' ? '课表' : '客户'}}</text>
@@ -109,6 +109,9 @@
         bindinput="onTextInput"
         confirm-type="send"
         bindconfirm="onTextSend"
+        adjust-position="{{false}}"
+        bindfocus="onInputFocus"
+        bindblur="onInputBlur"
       />
       <view wx:if="{{inputMode === 'text' && !inputText}}" class="voice-mode-btn" bindtap="onSwitchToVoice">
         <image class="voice-mode-img" src="data:image/svg+xml;base64,PHN2ZyB0PSIxNzgzMDExNjIwOTQyIiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yNTYgMzg0YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3IDQyLjY2NjY2N3YxNzAuNjY2NjY2YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAxIDEtODUuMzMzMzM0IDB2LTE3MC42NjY2NjZhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDAgMSA0Mi42NjY2NjctNDIuNjY2NjY3eiBtMTcwLjY2NjY2Ny0xNzAuNjY2NjY3YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY2IDQyLjY2NjY2N3Y1MTJhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDEgMS04NS4zMzMzMzMgMFYyNTZhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDAgMSA0Mi42NjY2NjctNDIuNjY2NjY3eiBtMTcwLjY2NjY2NiAxMDYuNjY2NjY3YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3IDQyLjY2NjY2N3YyOTguNjY2NjY2YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAxIDEtODUuMzMzMzMzIDBWMzYyLjY2NjY2N2E0Mi42NjY2NjcgNDIuNjY2NjY3IDAgMCAxIDQyLjY2NjY2Ni00Mi42NjY2Njd6IG0xNzAuNjY2NjY3IDY0YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3IDQyLjY2NjY2N3YxOTJhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDEgMS04NS4zMzMzMzQgMHYtMTkyYTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3LTQyLjY2NjY2N3oiIGZpbGw9IiMzMzMiPjwvcGF0aD48L3N2Zz4=" mode="aspectFit" />

@@ -1,0 +1,120 @@
+<view class="page">
+  <!-- 消息区域 -->
+  <scroll-view class="messages" scroll-y scroll-top="{{scrollTop}}" scroll-into-view="{{scrollTarget}}">
+    <view class="msg-list">
+      <!-- 引导消息 -->
+      <view class="msg-row bot" id="msg-guide">
+        <view class="msg-bubble bot">
+          <text wx:if="{{mode === 'visit'}}">告诉我你需要什么，比如：</text>
+          <text wx:elif="{{mode === 'activity'}}">告诉我你需要什么，比如：</text>
+          <text wx:else>告诉我你需要什么，比如：</text>
+          <text class="msg-example" wx:if="{{mode === 'visit'}}">"余墨今天来" / "余墨到了" / "今天谁来了"</text>
+          <text class="msg-example" wx:elif="{{mode === 'activity'}}">"下午2点加个颂钵" / "今天有什么课" / "把觉醒改到3点"</text>
+          <text class="msg-example" wx:else>"加一个张三，女，28岁" / "张三的电话改成138xxx" / "张三的信息"</text>
+        </view>
+      </view>
+
+      <!-- 消息列表 -->
+      <block wx:for="{{messages}}" wx:key="id">
+        <view class="msg-row user" wx:if="{{item.type === 'user'}}" id="{{item.id}}">
+          <view class="msg-bubble user">
+            <text>{{item.text}}</text>
+          </view>
+        </view>
+
+        <view class="msg-row bot" wx:if="{{item.type === 'ai'}}" id="{{item.id}}">
+          <view class="msg-bubble bot">
+            <text class="msg-ai-title" wx:if="{{item.status !== 'saved'}}">{{item.customerData.id ? '已找到客户，修改后信息如下：' : '我识别到以下信息，请确认是否正确：'}}</text>
+            <view class="msg-fields">
+              <view class="msg-field" wx:for="{{item.fields}}" wx:for-item="f" wx:key="key" wx:if="{{f.value}}">
+                <text class="msg-field-label">{{f.label}}</text>
+                <text class="msg-field-value">{{f.value}}</text>
+              </view>
+            </view>
+            <view class="msg-error-reason" wx:if="{{item.status === 'blocked'}}">
+              <text class="error-reason-text">{{item.errorMsg}}</text>
+            </view>
+            <view class="msg-actions" wx:if="{{item.status === 'pending'}}">
+              <view class="msg-action-btn confirm" bindtap="onDirectSave" data-index="{{index}}">
+                <text>{{item.customerData.id ? '确认修改' : '直接保存'}}</text>
+              </view>
+              <view class="msg-action-btn edit" bindtap="onEditResult" data-index="{{index}}">
+                <text>有误，前往修改</text>
+              </view>
+            </view>
+            <view class="msg-actions" wx:if="{{item.status === 'blocked'}}">
+              <view class="msg-action-btn edit" bindtap="onEditResult" data-index="{{index}}">
+                <text>前往修改</text>
+              </view>
+            </view>
+            <text class="msg-hint" wx:if="{{item.status === 'pending'}}">如果部分信息有误，你也可以继续在下方描述来补充</text>
+            <view class="msg-status" wx:if="{{item.status === 'saving'}}">
+              <view class="spinner-sm"></view>
+              <text class="msg-status-text">正在保存...</text>
+            </view>
+            <view class="msg-status" wx:if="{{item.status === 'saved'}}">
+              <text class="msg-status-text">已保存</text>
+              <view class="msg-action-btn confirm" style="margin-top: 12rpx;" bindtap="onContinueEdit" data-index="{{index}}">
+                <text>继续修改此客户</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="msg-row bot" wx:if="{{item.type === 'ai-text'}}" id="{{item.id}}">
+          <view class="msg-bubble bot">
+            <text>{{item.text}}</text>
+          </view>
+        </view>
+
+        <view class="msg-row bot" wx:if="{{item.type === 'error'}}" id="{{item.id}}">
+          <view class="msg-bubble bot error">
+            <text>{{item.text}}</text>
+          </view>
+        </view>
+
+        <view class="msg-row bot" wx:if="{{item.type === 'thinking'}}" id="{{item.id}}">
+          <view class="msg-bubble bot thinking">
+            <view class="msg-loading">
+              <view class="spinner-sm"></view>
+              <text>{{item.text}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <!-- 输入区域 -->
+  <view class="input-bar">
+    <input
+      wx:if="{{inputMode === 'text'}}"
+      class="text-input"
+      placeholder="{{mode === 'activity' ? '输入课表指令...' : mode === 'customer' ? '输入客户指令...' : '输入邀约人员信息...'}}"
+      placeholder-style="color: #b0b5bb;"
+      value="{{inputText}}"
+      bindinput="onTextInput"
+      confirm-type="send"
+      bindconfirm="onTextSend"
+    />
+    <view wx:if="{{inputMode === 'text' && !inputText}}" class="mode-btn" bindtap="onSwitchToVoice">
+      <image class="mode-img" src="data:image/svg+xml;base64,PHN2ZyB0PSIxNzgzMDExNjIwOTQyIiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yNTYgMzg0YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3IDQyLjY2NjY2N3YxNzAuNjY2NjY2YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAxIDEtODUuMzMzMzM0IDB2LTE3MC42NjY2NjZhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDAgMSA0Mi42NjY2NjctNDIuNjY2NjY3eiBtMTcwLjY2NjY2Ny0xNzAuNjY2NjY3YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY2IDQyLjY2NjY2N3Y1MTJhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDEgMS04NS4zMzMzMzMgMFYyNTZhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDAgMSA0Mi42NjY2NjctNDIuNjY2NjY3eiBtMTcwLjY2NjY2NiAxMDYuNjY2NjY3YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3IDQyLjY2NjY2N3YyOTguNjY2NjY2YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAxIDEtODUuMzMzMzMzIDBWMzYyLjY2NjY2N2E0Mi42NjY2NjcgNDIuNjY2NjY3IDAgMCAxIDQyLjY2NjY2Ni00Mi42NjY2Njd6IG0xNzAuNjY2NjY3IDY0YTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3IDQyLjY2NjY2N3YxOTJhNDIuNjY2NjY3IDQyLjY2NjY2NyAwIDEgMS04NS4zMzMzMzQgMHYtMTkyYTQyLjY2NjY2NyA0Mi42NjY2NjcgMCAwIDEgNDIuNjY2NjY3LTQyLjY2NjY2N3oiIGZpbGw9IiMzMzMiPjwvcGF0aD48L3N2Zz4=" mode="aspectFit" />
+    </view>
+    <view wx:if="{{inputMode === 'text' && inputText}}" class="send-btn" bindtap="onTextSend">
+      <image class="send-icon" src="data:image/svg+xml;base64,PHN2ZyB0PSIxNzgzMDExMTAyMzUzIiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0zMjkuMzc2IDUzNC42MjRsMTU5Ljk2OCAxNTkuOTY4YzUuNzk3IDUuOCAxMy44MDggOS4zODggMjIuNjU2IDkuMzg4czE2Ljg1OS0zLjU4OCAyMi42NTYtOS4zODhsMTU5Ljk2OC0xNTkuOTY0YzUuNzktNS43OSA5LjM3MS0xMy43ODkgOS4zNzEtMjIuNjI0IDAtMTcuNjcxLTE0LjMyNS0zMS45OTUtMzEuOTk1LTMxLjk5NS04LjgzNSAwLTE2LjgzNCAzLjU4MS0yMi42MjQgOS4zNzFsLTEwNS4zNzYgMTA1LjM3NnYtMjQyLjc1M2MwLTE3LjY3My0xNC4zMjctMzItMzItMzJzLTMyIDE0LjMyNy0zMiAzMnYyNDIuNzUzbC0xMDUuMzc2LTEwNS4zNzZjLTUuNzgtNS44MTItMTMuNzgyLTkuNDA5LTIyLjYyNC05LjQwOXMtMTYuODQ0IDMuNTk3LTIyLjYyMiA5LjQwOGMtNS43OTggNS43ODgtOS4zODQgMTMuNzg4LTkuMzg0IDIyLjYyNSAwIDguODM3IDMuNTg2IDE2LjgzNyA5LjM4MiAyMi42MjV6IiB0cmFuc2Zvcm09InJvdGF0ZSgxODAgNTEyIDUxMikiIGZpbGw9IiNmZmYiPjwvcGF0aD48L3N2Zz4=" mode="aspectFit" />
+    </view>
+
+    <view
+      wx:if="{{inputMode === 'voice'}}"
+      class="press-btn {{isRecording ? 'recording' : ''}}"
+      bindtouchstart="onRecordStart"
+      bindtouchend="onRecordStop"
+      bindtouchcancel="onRecordCancel"
+    >
+      <text class="press-text">{{isRecording ? '松开发送' : '按住说话'}}</text>
+    </view>
+    <view wx:if="{{inputMode === 'voice'}}" class="mode-btn" bindtap="onSwitchToText">
+      <image class="mode-img" src="data:image/svg+xml;base64,PHN2ZyB0PSIxNzgzMDExNTQ2MTk0IiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik03NTUuMiA3NDAuODY0YzIzLjU1MiAwIDQzLjAwOCAxOC45NDQgNDMuMDA4IDQzLjAwOCAwIDIzLjU1Mi0xOC45NDQgNDMuMDA4LTQzLjAwOCA0My4wMDhoLTQ4Ni40Yy0yMy41NTIgMC00My4wMDgtMTguOTQ0LTQzLjAwOC00My4wMDggMC0yMy41NTIgMTguOTQ0LTQzLjAwOCA0My4wMDgtNDMuMDA4aDQ4Ni40ek0yNTQuNDY0IDQ1NC42NTZjNDcuNjE2IDAgODYuMDE2IDM4LjQgODYuMDE2IDg1LjUwNCAwIDQ3LjYxNi0zOC40IDg2LjAxNi04NS41MDQgODYuMDE2LTQ3LjYxNiAwLTg1LjUwNC0zOC40LTg1LjUwNC04NS41MDRzMzcuODg4LTg2LjAxNiA4NC45OTItODYuMDE2eiBtMjU3LjUzNiAwYzQ3LjYxNiAwIDg2LjAxNiAzOC40IDg2LjAxNiA4NS41MDQgMCA0Ny42MTYtMzguNCA4Ni4wMTYtODUuNTA0IDg2LjAxNi00Ny42MTYgMC04NS41MDQtMzguNC04NS41MDQtODUuNTA0czM3LjM3Ni04Ni4wMTYgODQuOTkyLTg2LjAxNnogbTI1Ny4wMjQgMGM0Ny42MTYgMCA4Ni4wMTYgMzguNCA4Ni4wMTYgODUuNTA0IDAgNDcuNjE2LTM4LjQgODYuMDE2LTg1LjUwNCA4Ni4wMTYtNDcuNjE2IDAtODUuNTA0LTM4LjQtODUuNTA0LTg1LjUwNHMzNy44ODgtODYuMDE2IDg0Ljk5Mi04Ni4wMTZ6TTI1NC40NjQgMTk3LjYzMmM0Ny42MTYgMCA4NS41MDQgMzguNCA4NS41MDQgODUuNTA0UzMwMi4wOCAzNjkuMTUyIDI1NC40NjQgMzY5LjE1MmMtNDcuNjE2IDAtODUuNTA0LTM4LjQtODUuNTA0LTg1LjUwNHMzOC40LTg2LjAxNiA4NS41MDQtODYuMDE2eiBtMjU3LjUzNiAwYzQ3LjYxNiAwIDg1LjUwNCAzOC40IDg1LjUwNCA4NS41MDRTNTU5LjEwNCAzNjguNjQgNTEyIDM2OC42NHMtODUuNTA0LTM4LjQtODUuNTA0LTg1LjUwNCAzNy44ODgtODUuNTA0IDg1LjUwNC04NS41MDR6IG0yNTcuMDI0IDBjNDcuNjE2IDAgODUuNTA0IDM4LjQgODUuNTA0IDg1LjUwNFM4MTYuMTI4IDM2OC42NCA3NjkuMDI0IDM2OC42NHMtODUuNTA0LTM4LjQtODUuNTA0LTg1LjUwNCAzOC40LTg1LjUwNCA4NS41MDQtODUuNTA0eiIgZmlsbD0iIzMzMyI+PC9wYXRoPjwvc3ZnPg==" mode="aspectFit" />
+    </view>
+  </view>
+</view>

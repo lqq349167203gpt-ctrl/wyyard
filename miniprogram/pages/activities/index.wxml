@@ -84,13 +84,4 @@
     <text class="fab-icon">+</text>
   </view>
 
-  <!-- 语音对话弹窗 -->
-  <voice-input-popup
-    class="voice-popup"
-    show="{{showVoicePopup}}"
-    mode="activity"
-    bind:close="onVoiceClose"
-    bind:chat="onVoiceChat"
-    wx:if="{{showVoicePopup}}"
-  />
 </view>

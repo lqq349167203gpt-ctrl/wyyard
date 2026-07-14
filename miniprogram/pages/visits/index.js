@@ -1,4 +1,4 @@
-const { visitApi, spaceApi, request } = require('../../utils/api')
+const { visitApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -64,7 +64,6 @@ Page({
     loading: true,
     leaderMap: {},
     editMode: false,
-    showVoicePopup: false,
   },
 
   async onLoad() {
@@ -91,6 +90,11 @@ Page({
 
   onShow() {
     if (!getApp().checkLogin()) return
+    if (this._needRefresh) {
+      this._needRefresh = false
+      this.loadData()
+      return
+    }
     if (!this._initialized) {
       this._pendingShowLoad = true
       return
@@ -324,34 +328,7 @@ Page({
   },
 
   onFabLongPress() {
-    this.setData({ showVoicePopup: true })
-  },
-
-  onVoiceClose() {
-    this.setData({ showVoicePopup: false })
-    // 关闭后刷新列表
-    this.loadData()
-  },
-
-  async onVoiceChat(e) {
-    const { message, history } = e.detail
-    try {
-      const res = await request('/api/voice/visit-chat', {
-        method: 'POST',
-        data: {
-          message,
-          history: history || [],
-          date: this.data.currentDate,
-          space_id: this.data.spaceId,
-        },
-      })
-      const popup = this.selectComponent('.voice-popup')
-      if (popup) popup.setReply(res.reply || '操作完成')
-    } catch (err) {
-      console.error('[onVoiceChat] 错误:', err)
-      const popup = this.selectComponent('.voice-popup')
-      if (popup) popup.setError(err.message || '请求失败')
-    }
+    wx.navigateTo({ url: `/pages/voice-chat/index?mode=visit&date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
   },
 
   onVisitTap(e) {

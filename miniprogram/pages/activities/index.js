@@ -1,4 +1,4 @@
-const { classRecordApi, spaceApi, request } = require('../../utils/api')
+const { classRecordApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
 
@@ -64,7 +64,6 @@ Page({
     participants: [],
     participantText: '',
     loading: true,
-    showVoicePopup: false,
   },
 
   async onLoad(options) {
@@ -84,6 +83,10 @@ Page({
 
   onShow() {
     if (!getApp().checkLogin()) return
+    if (this._needRefresh) {
+      this._needRefresh = false
+      this.loadData()
+    }
   },
 
   onPullDownRefresh() {
@@ -338,33 +341,6 @@ Page({
   },
 
   onFabLongPress() {
-    this.setData({ showVoicePopup: true })
-  },
-
-  onVoiceClose() {
-    this.setData({ showVoicePopup: false })
-    this.loadData()
-  },
-
-  async onVoiceChat(e) {
-    const { message, history } = e.detail
-    try {
-      const res = await request('/api/voice/activity-chat', {
-        method: 'POST',
-        timeout: 120000,
-        data: {
-          message,
-          history: history || [],
-          date: this.data.currentDate,
-          space_id: this.data.spaceId,
-        },
-      })
-      const popup = this.selectComponent('.voice-popup')
-      if (popup) popup.setReply(res.reply || '操作完成')
-    } catch (err) {
-      console.error('[onVoiceChat] 错误:', err)
-      const popup = this.selectComponent('.voice-popup')
-      if (popup) popup.setError(err.message || '请求失败')
-    }
+    wx.navigateTo({ url: `/pages/voice-chat/index?mode=activity&date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
   },
 })

@@ -129,13 +129,4 @@
     <text class="fab-icon">+</text>
   </view>
 
-  <!-- 语音录入弹窗 -->
-  <voice-input-popup
-    class="voice-popup"
-    show="{{showVoicePopup}}"
-    mode="customer"
-    bind:close="onVoiceClose"
-    bind:chat="onVoiceChat"
-    wx:if="{{showVoicePopup}}"
-  />
 </view>

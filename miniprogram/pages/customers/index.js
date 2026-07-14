@@ -1,4 +1,4 @@
-const { customerApi, memberIdentityApi, request } = require('../../utils/api')
+const { customerApi, memberIdentityApi } = require('../../utils/api')
 
 Page({
   data: {
@@ -7,7 +7,6 @@ Page({
     loading: false,
     initialized: false,
     keyword: '',
-    showVoicePopup: false,
     // 筛选相关
     showFilterPanel: false,
     filterCount: 0,
@@ -68,7 +67,10 @@ Page({
 
   onShow() {
     if (!getApp().checkLogin()) return
-    if (this.data.initialized && !this.data.loading) {
+    if (this._needRefresh) {
+      this._needRefresh = false
+      this.loadData(true)
+    } else if (this.data.initialized && !this.data.loading) {
       this.loadData(true)
     }
   },
@@ -299,27 +301,6 @@ Page({
   // ---------- 语音录入 ----------
 
   onFabLongPress() {
-    this.setData({ showVoicePopup: true })
-  },
-
-  onVoiceClose() {
-    this.setData({ showVoicePopup: false })
-    this.loadData(true)
-  },
-
-  async onVoiceChat(e) {
-    const { message, history } = e.detail
-    try {
-      const res = await request('/api/voice/customer-chat', {
-        method: 'POST',
-        data: { message, history: history || [] },
-      })
-      const popup = this.selectComponent('.voice-popup')
-      if (popup) popup.setReply(res.reply || '操作完成')
-    } catch (err) {
-      console.error('[onVoiceChat] 错误:', err)
-      const popup = this.selectComponent('.voice-popup')
-      if (popup) popup.setError(err.message || '请求失败')
-    }
+    wx.navigateTo({ url: '/pages/voice-chat/index?mode=customer' })
   },
 })
