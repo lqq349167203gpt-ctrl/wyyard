@@ -48,15 +48,18 @@ def create_card(data: MembershipCardCreate):
 
 @router.patch("/{card_id}")
 def update_card(card_id: str, data: dict):
-    # remaining_count 是流水派生的缓存，禁止直接修改
-    # total_count 是原始购买次数，允许修正
-    forbidden = {"remaining_count"}
-    violated = forbidden & set(data.keys())
-    if violated:
-        raise HTTPException(
-            status_code=400,
-            detail=f"不允许直接修改次数字段：{','.join(sorted(violated))}。请通过销卡或活动扣卡流水操作。",
-        )
+    # remaining_count 正常情况下禁止直接修改（由流水派生）
+    # 但卡类型变更时需要重置 remaining_count / total_count
+    old_card = membership_card_service.get_card(card_id)
+    card_type_changed = "card_type" in data and old_card and data["card_type"] != old_card.card_type
+    if not card_type_changed:
+        forbidden = {"remaining_count"}
+        violated = forbidden & set(data.keys())
+        if violated:
+            raise HTTPException(
+                status_code=400,
+                detail=f"不允许直接修改次数字段：{','.join(sorted(violated))}。请通过销卡或活动扣卡流水操作。",
+            )
     card = membership_card_service.update_card(card_id, data)
     if not card:
         raise HTTPException(status_code=404, detail="记录不存在")

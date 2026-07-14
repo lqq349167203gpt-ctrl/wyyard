@@ -389,8 +389,8 @@ export default function DetailView({
           {activeTab === "purchase" && (() => {
             const today = new Date().toLocaleDateString("sv-SE")
             const allItems = detail?.purchase_summary || []
-            const memberItems = allItems.filter(s => s.type === "会员活动")
-            const otherItems = allItems.filter(s => s.type !== "会员活动")
+            const memberItems = allItems.filter(s => s.type === "会员卡")
+            const otherItems = allItems.filter(s => s.type !== "会员卡")
 
             // 会员卡：未过期在前，已过期在后
             const memberSorted = [...memberItems].sort((a, b) => {

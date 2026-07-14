@@ -69,6 +69,9 @@ Page({
     this.setData({ loading: true, error: '' })
 
     authApi.passwordLogin(username, password).then((data) => {
+      if (data && data.success === false) {
+        throw new Error(data.message || '用户名或密码错误')
+      }
       this._saveLogin(data)
       wx.switchTab({ url: '/pages/customers/index' })
     }).catch((err) => {

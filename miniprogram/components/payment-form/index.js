@@ -111,6 +111,7 @@ Component({
         fee: d.fee ?? '',
         purchase_count: d.purchase_count ?? '',
         remaining_count: d.remaining_count ?? '',
+        total_count: d.total_count ?? '',
         category: d.category ?? '',
         project_name: d.project_name ?? '',
         card_type: d.card_type ?? '',
@@ -279,6 +280,7 @@ Component({
         'formData.card_type': ct.key,
         'formData.price': ct.price,
         'formData.remaining_count': ct.count === null ? '' : ct.count,
+        'formData.total_count': ct.count === null ? '' : ct.count,
         'formData.duration_type': ct.duration_type,
         'formData.duration_value': ct.duration_value,
       })
@@ -322,13 +324,18 @@ Component({
       }
       if (isEdit) {
         if (type === 'membership_card' || type === 'other') {
-          delete payload.remaining_count
+          // 卡类型变更时保留 remaining_count（后端允许），否则删除（由流水派生）
+          const cardTypeChanged = this.data.editData && payload.card_type !== this.data.editData.card_type
+          if (!cardTypeChanged) {
+            delete payload.remaining_count
+            delete payload.total_count
+          }
         } else {
           delete payload.purchase_count
         }
       }
       const floatFields = ['price', 'amount', 'fee']
-      const intFields = ['purchase_count', 'duration_value', 'remaining_count']
+      const intFields = ['purchase_count', 'duration_value', 'remaining_count', 'total_count']
       floatFields.forEach(f => {
         if (payload[f] !== '' && payload[f] !== undefined && payload[f] !== null) {
           payload[f] = parseFloat(payload[f])

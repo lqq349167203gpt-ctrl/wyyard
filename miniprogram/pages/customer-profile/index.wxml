@@ -177,7 +177,7 @@
           <text class="pur-name">{{item.name || ''}}</text>
         </view>
         <view class="pur-info">
-          <text class="pur-remaining" wx:if="{{item.type === '会员活动'}}">
+          <text class="pur-remaining" wx:if="{{item.type === '会员卡'}}">
             剩余{{item.effective_remaining !== undefined && item.effective_remaining !== null ? item.effective_remaining : item.remaining}}次
             <text class="pur-deductions">（总{{item.grand_total || 0}}次/销卡{{item.manual_deductions || 0}}次/活动扣卡{{item.activity_deductions || 0}}次）</text>
           </text>
