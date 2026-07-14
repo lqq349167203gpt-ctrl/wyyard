@@ -72,8 +72,7 @@ Page({
     if (!text) return
     const id = 'msg-' + (++_msgId)
     const messages = this.data.messages.concat([{ type: 'user', text, id }])
-    const scrollTop = this.data.scrollTop === 999999 ? 999998 : 999999
-    this.setData({ inputText: '', messages, scrollTarget: id, scrollTop })
+    this.setData({ inputText: '', messages })
     this._handleMessage(text)
   },
 
@@ -177,8 +176,7 @@ Page({
   _addMsg(msg) {
     const id = 'msg-' + (++_msgId)
     const messages = this.data.messages.concat([Object.assign({}, msg, { id })])
-    const scrollTop = this.data.scrollTop === 999999 ? 999998 : 999999
-    this.setData({ messages, scrollTarget: id, scrollTop })
+    this.setData({ messages, scrollTarget: id })
   },
 
   _removeThinking() {
