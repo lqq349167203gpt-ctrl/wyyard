@@ -12,6 +12,7 @@ Page({
     messages: [],
     scrollTarget: '',
     scrollTop: 0,
+    kbHeight: 0,
   },
 
   onLoad(options) {
@@ -52,6 +53,14 @@ Page({
 
   onTextInput(e) {
     this.setData({ inputText: e.detail.value })
+  },
+
+  onInputFocus(e) {
+    this.setData({ kbHeight: e.detail.height || 0 })
+  },
+
+  onInputBlur() {
+    this.setData({ kbHeight: 0 })
   },
 
   onTextSend() {
