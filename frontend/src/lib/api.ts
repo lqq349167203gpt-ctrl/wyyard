@@ -2054,6 +2054,25 @@ export interface StatisticsProducts {
   other_project_chart_persons: Record<string, string | number>[]
 }
 
+export interface MemberStatistics {
+  total_members: number
+  type_totals: Record<string, number>
+  type_names: string[]
+  chart_new: Record<string, string | number>[]
+  chart_total: Record<string, string | number>[]
+  members: Array<{
+    id: string
+    nickname: string
+    member_type: string
+    first_visit_date: string
+    invited_count: number
+    visit_count: number
+    visit_interval: string
+    activity_count: number
+    total_consumption: number
+  }>
+}
+
 export const statisticsApi = {
   overview: (params: { date_from?: string; date_to?: string; granularity?: string }) => {
     const searchParams = new URLSearchParams()
@@ -2083,5 +2102,12 @@ export const statisticsApi = {
     const searchParams = new URLSearchParams({ date: params.date, type: params.type })
     if (params.product_type) searchParams.set("product_type", params.product_type)
     return request<{ data: Record<string, unknown>[] }>(`/api/statistics/products/details?${searchParams.toString()}`)
+  },
+  members: (params: { date_from?: string; date_to?: string; granularity?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.granularity) searchParams.set("granularity", params.granularity)
+    return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
   },
 }

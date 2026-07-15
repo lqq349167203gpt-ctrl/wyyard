@@ -11,6 +11,7 @@ import {
   IconShieldCheckFilled,
   IconSparklesFilled,
   IconUserFilled,
+  IconUsersGroup,
   IconSettingsFilled,
   IconBellFilled,
   IconLockFilled,
@@ -35,6 +36,7 @@ import {
 const businessItems = [
   { title: "提醒", icon: IconBellRingingFilled, path: "/business-reminders", permission: "business-reminders" },
   { title: "数据记录", icon: IconChartAreaFilled, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
+  { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "statistics" },
   { title: "产品销售", icon: IconBasketFilled, path: "/product-sales", permission: "statistics" },
   { title: "服务数据", icon: IconStarFilled, path: "/statistics", permission: "statistics" },
 ]

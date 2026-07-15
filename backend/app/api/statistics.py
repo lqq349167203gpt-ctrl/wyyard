@@ -1,4 +1,4 @@
-"""统计 API — 邀约到访 / 实际到访 / 成交人数"""
+"""统计 API — 邀约到访 / 实际到访 / 成交人数 / 会员情况"""
 from datetime import datetime, timedelta
 from collections import defaultdict
 from fastapi import APIRouter, Query
@@ -12,6 +12,7 @@ from app.services import (
     internal_course_service,
     oh_card_reading_service,
     other_project_service,
+    member_identity_service,
 )
 from app.api.customer_detail import _build_activities, _build_payment_records
 
@@ -35,7 +36,7 @@ def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to:
     """获取客户统计：受邀次数、到店次数、参与活动次数、消费总额（与详情页一致）"""
     c = customer_service.get_customer(customer_id)
     if not c:
-        return {"invited_count": 0, "visit_count": 0, "activity_count": 0, "total_consumption": 0.0, "visit_interval": "-"}
+        return {"invited_count": 0, "visit_count": 0, "activity_count": 0, "total_consumption": 0.0, "visit_interval": "-", "first_visit_date": "-"}
 
     # 所有邀约记录
     all_visits = visit_service.list_visits(customer_id=customer_id)
@@ -60,11 +61,16 @@ def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to:
         payment_records = [r for r in payment_records if r.get("effective_date") and date_from <= r["effective_date"] <= date_to]
     total_consumption = sum(r["amount"] for r in payment_records if not r.get("voided", False))
 
+    # 首次到店日期
+    first_visit_date = "-"
+    if arrived_dates:
+        first_visit_date = min(arrived_dates)
+
     # 到店间隔：(今天 - 第一次到店日期) / 到店次数
     visit_interval = "-"
     if visit_count > 0 and arrived_dates:
-        first_visit_date = min(arrived_dates)
-        days_since_first = (datetime.now() - datetime.strptime(first_visit_date, "%Y-%m-%d")).days
+        first_visit = min(arrived_dates)
+        days_since_first = (datetime.now() - datetime.strptime(first_visit, "%Y-%m-%d")).days
         visit_interval = f"{round(days_since_first / visit_count)}天"
 
     return {
@@ -73,6 +79,7 @@ def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to:
         "activity_count": activity_count,
         "total_consumption": round(total_consumption, 2),
         "visit_interval": visit_interval,
+        "first_visit_date": first_visit_date,
     }
 
 
@@ -871,3 +878,216 @@ def _aggregate_product_count_by_granularity(daily_count_by_type: dict[str, dict[
             else:
                 current = current.replace(month=current.month + 1, day=1)
     return result
+
+
+# ============ 会员情况统计 ============
+
+def _aggregate_member_by_granularity(daily_data: dict[str, dict[str, int]], granularity: str, date_from: str, date_to: str, types: list[str]):
+    """按粒度聚合会员新增人数折线图数据"""
+    if granularity == "day":
+        result = []
+        current = datetime.strptime(date_from, "%Y-%m-%d")
+        end = datetime.strptime(date_to, "%Y-%m-%d")
+        while current <= end:
+            date_str = current.strftime("%Y-%m-%d")
+            row = {"date": date_str, "total": 0}
+            for t in types:
+                val = daily_data.get(date_str, {}).get(t, 0)
+                row[t] = val
+                row["total"] += val
+            result.append(row)
+            current += timedelta(days=1)
+        return result
+
+    grouped: dict[str, dict[str, int]] = defaultdict(lambda: {t: 0 for t in types})
+    for date_str, type_vals in daily_data.items():
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        if granularity == "week":
+            key = f"{dt.isocalendar()[0]}-W{dt.isocalendar()[1]:02d}"
+        else:
+            key = dt.strftime("%Y-%m")
+        for t in types:
+            grouped[key][t] += type_vals.get(t, 0)
+
+    result = []
+    current = datetime.strptime(date_from, "%Y-%m-%d")
+    end = datetime.strptime(date_to, "%Y-%m-%d")
+    seen = set()
+    while current <= end:
+        if granularity == "week":
+            key = f"{current.isocalendar()[0]}-W{current.isocalendar()[1]:02d}"
+        else:
+            key = current.strftime("%Y-%m")
+        if key not in seen:
+            seen.add(key)
+            row = {"date": key, "total": 0}
+            for t in types:
+                val = grouped[key].get(t, 0)
+                row[t] = val
+                row["total"] += val
+            result.append(row)
+        if granularity == "week":
+            current += timedelta(days=7 - current.weekday())
+        else:
+            if current.month == 12:
+                current = current.replace(year=current.year + 1, month=1, day=1)
+            else:
+                current = current.replace(month=current.month + 1, day=1)
+    return result
+
+
+def _aggregate_member_cumulative(cumulative_by_date: dict[str, dict[str, int]], granularity: str, date_from: str, date_to: str, types: list[str]):
+    """按粒度聚合会员累计总数折线图数据"""
+    if granularity == "day":
+        result = []
+        current = datetime.strptime(date_from, "%Y-%m-%d")
+        end = datetime.strptime(date_to, "%Y-%m-%d")
+        # 找到最早的会员注册日期
+        all_dates = sorted(cumulative_by_date.keys()) if cumulative_by_date else []
+        earliest_date = all_dates[0] if all_dates else date_from
+        while current <= end:
+            date_str = current.strftime("%Y-%m-%d")
+            # 使用该日期的累计数据，如果没有则用最早的累计数据
+            if date_str in cumulative_by_date:
+                cumulative = cumulative_by_date[date_str]
+            elif earliest_date < date_str:
+                # 找到小于等于当前日期的最新累计数据
+                latest_before = max([d for d in cumulative_by_date.keys() if d <= date_str], default=earliest_date)
+                cumulative = cumulative_by_date[latest_before]
+            else:
+                cumulative = {t: 0 for t in types}
+            row = {"date": date_str, "total": 0}
+            for t in types:
+                val = cumulative.get(t, 0)
+                row[t] = val
+                row["total"] += val
+            result.append(row)
+            current += timedelta(days=1)
+        return result
+
+    # 按周或月聚合
+    grouped: dict[str, dict[str, int]] = {}
+    for date_str, cumulative in cumulative_by_date.items():
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        if granularity == "week":
+            key = f"{dt.isocalendar()[0]}-W{dt.isocalendar()[1]:02d}"
+        else:
+            key = dt.strftime("%Y-%m")
+        # 每个周期使用该周期最后一天的累计数据
+        if key not in grouped or date_str > max(grouped.keys(), default=""):
+            grouped[key] = cumulative
+
+    result = []
+    current = datetime.strptime(date_from, "%Y-%m-%d")
+    end = datetime.strptime(date_to, "%Y-%m-%d")
+    seen = set()
+    while current <= end:
+        if granularity == "week":
+            key = f"{current.isocalendar()[0]}-W{current.isocalendar()[1]:02d}"
+        else:
+            key = current.strftime("%Y-%m")
+        if key not in seen:
+            seen.add(key)
+            cumulative = grouped.get(key, {t: 0 for t in types})
+            row = {"date": key, "total": 0}
+            for t in types:
+                val = cumulative.get(t, 0)
+                row[t] = val
+                row["total"] += val
+            result.append(row)
+        if granularity == "week":
+            current += timedelta(days=7 - current.weekday())
+        else:
+            if current.month == 12:
+                current = current.replace(year=current.year + 1, month=1, day=1)
+            else:
+                current = current.replace(month=current.month + 1, day=1)
+    return result
+
+
+@router.get("/members")
+def get_member_statistics(
+    date_from: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
+    granularity: str = Query("day", description="聚合粒度: day/week/month"),
+):
+    """获取会员情况统计：各类型会员人数 + 新增人数变化趋势"""
+    date_from, date_to = _get_date_range(date_from, date_to)
+
+    # 获取所有会员身份类型（倒序）
+    identities = member_identity_service.list_identities()
+    type_names = [identity.name for identity in reversed(identities)]
+
+    # 获取所有客户
+    customers = customer_service.list_customers()
+
+    # 1. 统计当前各类型会员总人数
+    type_totals: dict[str, int] = {name: 0 for name in type_names}
+    total_members = 0
+    for c in customers:
+        mt = c.member_type or ""
+        if mt in type_totals:
+            type_totals[mt] += 1
+            total_members += 1
+
+    # 2. 统计所有会员的注册日期（用于累计总数计算）
+    all_members_by_date: dict[str, dict[str, int]] = defaultdict(lambda: {name: 0 for name in type_names})
+    for c in customers:
+        created_at = c.created_at
+        if isinstance(created_at, datetime):
+            date_str = created_at.strftime("%Y-%m-%d")
+        elif created_at:
+            date_str = str(created_at)[:10]
+        else:
+            continue
+
+        mt = c.member_type or ""
+        if mt in type_totals:
+            all_members_by_date[date_str][mt] += 1
+
+    # 3. 按时间范围统计新增人数（用于新增模式）
+    daily_new_by_type: dict[str, dict[str, int]] = defaultdict(lambda: {name: 0 for name in type_names})
+    for date_str, types in all_members_by_date.items():
+        if date_from <= date_str <= date_to:
+            daily_new_by_type[date_str] = types
+
+    # 4. 计算累计总数（从最早会员到每一天）
+    sorted_dates = sorted(all_members_by_date.keys())
+    cumulative_by_date: dict[str, dict[str, int]] = {}
+    cumulative = {name: 0 for name in type_names}
+    for date_str in sorted_dates:
+        for name in type_names:
+            cumulative[name] += all_members_by_date[date_str].get(name, 0)
+        cumulative_by_date[date_str] = dict(cumulative)
+
+    # 5. 按粒度聚合折线图数据
+    chart_data_new = _aggregate_member_by_granularity(daily_new_by_type, granularity, date_from, date_to, type_names)
+    chart_data_total = _aggregate_member_cumulative(cumulative_by_date, granularity, date_from, date_to, type_names)
+
+    # 6. 获取所有客户的详细统计信息（用于人员列表）
+    members_list = []
+    for c in customers:
+        mt = c.member_type or ""
+        if mt not in type_totals:
+            continue
+        stats = _get_customer_stats(c.id, None, None)
+        members_list.append({
+            "id": c.id,
+            "nickname": c.nickname or "",
+            "member_type": mt,
+            "first_visit_date": stats.get("first_visit_date", "-"),
+            "invited_count": stats.get("invited_count", 0),
+            "visit_count": stats.get("visit_count", 0),
+            "visit_interval": stats.get("visit_interval", "-"),
+            "activity_count": stats.get("activity_count", 0),
+            "total_consumption": stats.get("total_consumption", 0),
+        })
+
+    return {
+        "total_members": total_members,
+        "type_totals": type_totals,
+        "type_names": type_names,
+        "chart_new": chart_data_new,
+        "chart_total": chart_data_total,
+        "members": members_list,
+    }
