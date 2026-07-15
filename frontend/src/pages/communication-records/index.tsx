@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react"
-import { Plus } from "lucide-react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { Plus, X } from "lucide-react"
 import { communicationRecordApi, type CommunicationRecord, type CommunicationRecordCreate } from "@/lib/api"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { usePagination } from "@/hooks/use-pagination"
@@ -11,6 +11,7 @@ export default function CommunicationRecordsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<CommunicationRecordCreate>({ customer_nickname: "", content: "" })
   const [saving, setSaving] = useState(false)
+  const [searchNickname, setSearchNickname] = useState("")
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -28,7 +29,12 @@ export default function CommunicationRecordsPage() {
     fetchData()
   }, [fetchData])
 
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(records, { pageSize: 10 })
+  const filteredRecords = useMemo(() => {
+    if (!searchNickname.trim()) return records
+    return records.filter(r => r.customer_nickname.includes(searchNickname.trim()))
+  }, [records, searchNickname])
+
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredRecords, { pageSize: 10 })
 
   const handleSave = async () => {
     if (!form.customer_nickname.trim() || !form.content.trim()) return
@@ -53,6 +59,25 @@ export default function CommunicationRecordsPage() {
       </div>
 
       <div className="flex items-end gap-3 flex-wrap">
+        <div className="w-44">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchNickname}
+              onChange={(e) => setSearchNickname(e.target.value)}
+              placeholder="搜索昵称"
+              className="h-8 w-full px-3 pr-8 text-[12px] border border-[#e0e0e0] rounded-md outline-none focus:border-[#3370ff]"
+            />
+            {searchNickname && (
+              <button
+                onClick={() => setSearchNickname("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8f959e] hover:text-[#4e535a]"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex-1" />
         <button
           onClick={() => setDialogOpen(true)}
