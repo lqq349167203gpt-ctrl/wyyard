@@ -46,7 +46,7 @@ export default function CommunicationRecordsPage() {
   }
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="min-h-full px-2.5 pt-2.5 pb-6">
       <div>
         <h1 className="text-lg font-semibold">沟通记录</h1>
         <p className="text-xs text-muted-foreground mt-0.5">管理与查看沟通记录</p>
