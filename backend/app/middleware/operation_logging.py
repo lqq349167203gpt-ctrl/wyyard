@@ -46,6 +46,7 @@ SECTION_MAP = {
     "/api/organizations": "组织管理",
     "/api/activity-history": "邀约",
     "/api/visit-history": "邀约",
+    "/api/communication-records": "沟通记录",
 }
 
 # 路径前缀 → (section, service_module, get_function_name)
@@ -195,7 +196,7 @@ FIELD_NAMES = {
     "start_date": "开始日期", "end_date": "结束日期",
     "owner_id": "案主", "space_name": "空间名",
     "card_type": "卡类型", "remaining_count": "剩余次数", "total_count": "总次数", "effective_date": "生效日期", "expiry_date": "到期日期", "voided": "退费状态", "voided_at": "退费时间",
-    "customer_name": "用户",
+    "customer_name": "用户", "customer_nickname": "用户昵称",
     "password": "密码", "old_password": "旧密码", "new_password": "新密码",
     "positions": "疗愈老师",
     "referrer": "引流人", "traffic_source": "流量来源", "age": "年龄",
@@ -686,6 +687,12 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     entity_name = get_entity_name(body) if body else ""
     if not entity_name and before:
         entity_name = get_entity_name(before)
+
+    # 沟通记录：用客户昵称作为实体名
+    if "/api/communication-records" in path:
+        nickname = (body or {}).get("customer_nickname") or (before or {}).get("customer_nickname", "")
+        if nickname:
+            entity_name = nickname
 
     # 邀约：从 customer_id 反查昵称（覆盖 member_type/date 等误匹配）
     if "/api/visits" in path and not entity_name:

@@ -2127,6 +2127,8 @@ export interface CommunicationRecordCreate {
 }
 
 export const communicationRecordApi = {
-  list: () => request<CommunicationRecord[]>("/api/communication-records"),
+  list: (customer_nickname?: string) => request<CommunicationRecord[]>(`/api/communication-records${customer_nickname ? `?customer_nickname=${encodeURIComponent(customer_nickname)}` : ""}`),
   create: (data: CommunicationRecordCreate) => request<CommunicationRecord>("/api/communication-records", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: CommunicationRecordCreate) => request<CommunicationRecord>(`/api/communication-records/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/api/communication-records/${id}`, { method: "DELETE" }),
 }

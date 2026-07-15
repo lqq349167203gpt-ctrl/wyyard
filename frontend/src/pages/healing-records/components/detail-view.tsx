@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { uploadApi, customerApi, healingRecordApi, customerDetailApi, type Customer, type CustomerLight, type Material, type CustomerDetail } from "@/lib/api"
+import { uploadApi, customerApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type Material, type CustomerDetail, type CommunicationRecord } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { HEALING_POSITIONS } from "@/lib/positions"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -31,7 +31,7 @@ export default function DetailView({
   selectedCustomerId,
   onClearSelection,
   hideSearch = false,
-  defaultTab = "activities",
+  defaultTab = "healing",
 }: {
   selectedCustomerId: string | null
   onClearSelection: () => void
@@ -44,7 +44,7 @@ export default function DetailView({
   const [loading, setLoading] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editingRec, setEditingRec] = useState<HealingRec | null>(null)
-  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "payment" | "purchase">(defaultTab)
+  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "communication" | "payment" | "purchase">(defaultTab)
   const [activitiesPage, setActivitiesPage] = useState(1)
   const [healingPage, setHealingPage] = useState(1)
   const [paymentPage, setPaymentPage] = useState(1)
@@ -53,6 +53,8 @@ export default function DetailView({
   const [copied, setCopied] = useState(false)
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set())
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [commRecords, setCommRecords] = useState<CommunicationRecord[]>([])
+  const [commPage, setCommPage] = useState(1)
   const loadSeqRef = useRef(0)
 
   useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
@@ -68,8 +70,13 @@ export default function DetailView({
     setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1)
     try {
       const data = await customerDetailApi.get(cid)
-      if (seq !== loadSeqRef.current) return // 过期请求，丢弃
+      if (seq !== loadSeqRef.current) return
       setDetail(data)
+      // 加载沟通记录
+      const nickname = data.customer?.nickname
+      if (nickname) {
+        communicationRecordApi.list(nickname).then(setCommRecords).catch(() => setCommRecords([]))
+      }
     } catch (e) {
       if (seq !== loadSeqRef.current) return
       setLoadError("加载失败，请重试")
@@ -263,6 +270,7 @@ export default function DetailView({
         <div className="px-4 pt-2.5 flex gap-0 border-b-[0.5px] border-[#f0f0f0] shrink-0">
           {[
             { key: "healing" as const, label: "跟进点" },
+            { key: "communication" as const, label: "沟通记录" },
             { key: "activities" as const, label: "活动记录" },
             { key: "purchase" as const, label: "剩余次数" },
             { key: "payment" as const, label: "交易记录" },
@@ -270,7 +278,7 @@ export default function DetailView({
             <button
               key={tab.key}
               onClick={() => {
-                setActiveTab(tab.key)
+                setActiveTab(tab.key as any)
                 setActivitiesPage(1)
                 setHealingPage(1)
                 setPaymentPage(1)
@@ -288,58 +296,96 @@ export default function DetailView({
         </div>
 
         {/* 标签页内容 */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-[10px] pb-4">
-          {/* 疗愈记录 — 到店记录 */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-[10px] pb-4">
+          {/* 跟进点 */}
           {activeTab === "healing" && (() => {
-            const visitRecords = (detail?.visit_records || []).sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.arrival_time || "").localeCompare(a.arrival_time || ""))
+            const records = (detail?.visit_records || []).sort((a, b) => b.visit_date.localeCompare(a.visit_date))
             const pageSize = 8
-            const totalPages = Math.ceil(visitRecords.length / pageSize)
-            const paginatedRecords = visitRecords.slice((healingPage - 1) * pageSize, healingPage * pageSize)
-            return visitRecords.length===0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
+            const totalPages = Math.ceil(records.length / pageSize)
+            const paginatedRecords = records.slice((healingPage - 1) * pageSize, healingPage * pageSize)
+            return records.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
+            ) : (
               <div>
-                <div>
-                  {paginatedRecords.map((v, idx) => (
-                    <div key={v.id} className={`flex gap-4 py-2 ${idx > 0 ? "border-t border-[#f0f0f0]" : ""}`}>
-                      <div className="w-[100px] shrink-0 pt-0.5">
-                        <div className="text-[12px] text-[#4e535a]">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{v.arrival_time && ` ${v.arrival_time}`}</div>
-                        <div className="mt-0.5">
-                          {v.arrived ? (
-                            <span className="text-[11px] text-[#3370ff] bg-[#f0f4ff] px-1.5 py-0.5 rounded">已到店</span>
-                          ) : (
-                            <span className="text-[11px] text-[#8f959e] bg-[#f0f0f0] px-1.5 py-0.5 rounded">未到店</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-2">
-                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">当日需求</span>
-                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.needs || <span className="text-[#8f959e]">-</span>}</p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">组长反馈</span>
-                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.group_leader_feedback || <span className="text-[#8f959e]">-</span>}</p>
-                        </div>
-                        {(() => {
-                          const hr = detail?.healing_records.find(r => r.date === v.visit_date)
-                          const record = hr?.growth_record || v.healing_notes
-                          return (
-                            <div className="flex items-start gap-2">
-                              <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">跟进点</span>
-                              <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{record || <span className="text-[#8f959e]">-</span>}</p>
-                            </div>
-                          )
-                        })()}
-                        <div className="flex items-start gap-2">
-                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户信息</span>
-                          <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.feedback || v.experience || <span className="text-[#8f959e]">-</span>}</p>
-                        </div>
+                {paginatedRecords.map((v, idx) => (
+                  <div key={v.id} className={`flex gap-4 py-2 ${idx > 0 ? "border-t border-[#f0f0f0]" : ""}`}>
+                    <div className="w-[100px] shrink-0 pt-0.5">
+                      <div className="text-[12px] text-[#4e535a]">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{v.arrival_time && ` ${v.arrival_time}`}</div>
+                      <div className="mt-0.5">
+                        {v.arrived ? (
+                          <span className="text-[11px] text-[#3370ff] bg-[#f0f4ff] px-1.5 py-0.5 rounded">已到店</span>
+                        ) : (
+                          <span className="text-[11px] text-[#8f959e] bg-[#f0f0f0] px-1.5 py-0.5 rounded">未到店</span>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-2">
+                        <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">当日需求</span>
+                        <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.needs || <span className="text-[#8f959e]">-</span>}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">组长反馈</span>
+                        <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.group_leader_feedback || <span className="text-[#8f959e]">-</span>}</p>
+                      </div>
+                      {(() => {
+                        const hr = detail?.healing_records.find(r => r.date === v.visit_date)
+                        const record = hr?.growth_record || v.healing_notes
+                        return (
+                          <div className="flex items-start gap-2">
+                            <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">跟进点</span>
+                            <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{record || <span className="text-[#8f959e]">-</span>}</p>
+                          </div>
+                        )
+                      })()}
+                      <div className="flex items-start gap-2">
+                        <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[56px] text-right">客户信息</span>
+                        <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{v.feedback || v.experience || <span className="text-[#8f959e]">-</span>}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
                 {totalPages > 1 && (
-                  <div className="mt-1.5 pt-1.5">
-                    <PaginationBar currentPage={healingPage} totalPages={totalPages} totalItems={visitRecords.length} startIndex={(healingPage-1)*pageSize+1} endIndex={Math.min(healingPage*pageSize, visitRecords.length)} onPageChange={setHealingPage} />
+                  <div className="px-4 py-2 border-t border-[#f0f0f0]">
+                    <PaginationBar currentPage={healingPage} totalPages={totalPages} totalItems={records.length} startIndex={(healingPage-1)*pageSize+1} endIndex={Math.min(healingPage*pageSize, records.length)} onPageChange={setHealingPage} />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* 沟通记录 */}
+          {activeTab === "communication" && (() => {
+            const sorted = [...commRecords].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+            const pageSize = 8
+            const totalPages = Math.ceil(sorted.length / pageSize)
+            const paginatedRecords = sorted.slice((commPage - 1) * pageSize, commPage * pageSize)
+            return sorted.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
+            ) : (
+              <div>
+                {paginatedRecords.map((r, idx) => {
+                  const createdTime = r.created_at ? new Date(r.created_at) : null
+                  const dateStr = createdTime ? `${createdTime.getFullYear()}/${createdTime.getMonth()+1}/${createdTime.getDate()}` : ""
+                  const timeStr = createdTime ? ` ${createdTime.getHours().toString().padStart(2,"0")}:${createdTime.getMinutes().toString().padStart(2,"0")}` : ""
+                  return (
+                    <div key={r.id} className={`flex gap-4 py-2 ${idx > 0 ? "border-t border-[#f0f0f0]" : ""}`}>
+                      <div className="w-[100px] shrink-0 pt-0.5">
+                        <div className="text-[12px] text-[#8f959e]">{dateStr}{timeStr}</div>
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <p className="text-[12px] text-[#4e535a] whitespace-pre-wrap">{r.content}</p>
+                      </div>
+                      <div className="shrink-0 pt-0.5">
+                        <span className="text-[11px] text-[#8f959e]">{r.creator || ""}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+                {totalPages > 1 && (
+                  <div className="px-4 py-2 border-t border-[#f0f0f0]">
+                    <PaginationBar currentPage={commPage} totalPages={totalPages} totalItems={sorted.length} startIndex={(commPage-1)*pageSize+1} endIndex={Math.min(commPage*pageSize, sorted.length)} onPageChange={setCommPage} />
                   </div>
                 )}
               </div>
@@ -595,6 +641,7 @@ export default function DetailView({
 
       {/* 弹窗 */}
       <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec} customers={customerList} saving={saving}/>
+      </div>
     </div>
   )
 }

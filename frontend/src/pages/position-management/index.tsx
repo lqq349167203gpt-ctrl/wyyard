@@ -21,6 +21,7 @@ const ALL_PAGES = [
   { key: "healing-records", label: "客户资料" },
   { key: "class-records", label: "邀约" },
   { key: "daily-activities", label: "课表" },
+  { key: "communication-records", label: "沟通记录" },
   // 付费项目
   { key: "payment", label: "付费项目" },
   { key: "membership-cards", label: "会员卡" },
@@ -48,7 +49,7 @@ const ALL_PAGES = [
 
 const PERMISSION_GROUPS = [
   { label: "数据", keys: ["business-reminders", "data-records"] },
-  { label: "业务", keys: ["healing-records", "class-records", "daily-activities"] },
+  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "communication-records"] },
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects"] },
   { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password"] },
