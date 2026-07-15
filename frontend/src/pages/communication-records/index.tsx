@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
-import { Plus, X } from "lucide-react"
-import { communicationRecordApi, type CommunicationRecord, type CommunicationRecordCreate } from "@/lib/api"
+import { useState, useEffect, useCallback } from "react"
+import { Plus } from "lucide-react"
+import { communicationRecordApi, customerApi, type CommunicationRecord, type CommunicationRecordCreate, type Customer } from "@/lib/api"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 
 export default function CommunicationRecordsPage() {
   const [records, setRecords] = useState<CommunicationRecord[]>([])
@@ -11,7 +12,7 @@ export default function CommunicationRecordsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<CommunicationRecordCreate>({ customer_nickname: "", content: "" })
   const [saving, setSaving] = useState(false)
-  const [searchNickname, setSearchNickname] = useState("")
+  const [customers, setCustomers] = useState<Customer[]>([])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -27,14 +28,10 @@ export default function CommunicationRecordsPage() {
 
   useEffect(() => {
     fetchData()
+    customerApi.list().then(setCustomers).catch(() => setCustomers([]))
   }, [fetchData])
 
-  const filteredRecords = useMemo(() => {
-    if (!searchNickname.trim()) return records
-    return records.filter(r => r.customer_nickname.includes(searchNickname.trim()))
-  }, [records, searchNickname])
-
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredRecords, { pageSize: 10 })
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(records, { pageSize: 10 })
 
   const handleSave = async () => {
     if (!form.customer_nickname.trim() || !form.content.trim()) return
@@ -59,25 +56,6 @@ export default function CommunicationRecordsPage() {
       </div>
 
       <div className="flex items-end gap-3 flex-wrap">
-        <div className="w-44">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchNickname}
-              onChange={(e) => setSearchNickname(e.target.value)}
-              placeholder="搜索昵称"
-              className="h-8 w-full px-3 pr-8 text-[12px] border border-[#e0e0e0] rounded-md outline-none focus:border-[#3370ff]"
-            />
-            {searchNickname && (
-              <button
-                onClick={() => setSearchNickname("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8f959e] hover:text-[#4e535a]"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
         <div className="flex-1" />
         <button
           onClick={() => setDialogOpen(true)}
@@ -138,13 +116,15 @@ export default function CommunicationRecordsPage() {
           <div className="px-5 py-4">
             <div className="grid grid-cols-[80px_1fr] gap-3 items-start mb-4">
               <label className="text-[12px] text-[#646a73] pt-1.5">用户昵称</label>
-              <input
-                type="text"
-                value={form.customer_nickname}
-                onChange={(e) => setForm({ ...form, customer_nickname: e.target.value })}
-                placeholder="请输入用户昵称"
-                className="h-8 px-3 text-[12px] border border-[#e8eaed] rounded-[2px] outline-none focus:border-[#3370ff]"
-              />
+              <div className="w-full">
+                <CustomerSearchInput
+                  customers={customers}
+                  value={form.customer_nickname}
+                  onChange={(v) => setForm({ ...form, customer_nickname: typeof v === "string" ? v : "" })}
+                  placeholder="搜索昵称"
+                  filterSelected={false}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-[80px_1fr] gap-3 items-start">
               <label className="text-[12px] text-[#646a73] pt-1.5">沟通记录</label>
