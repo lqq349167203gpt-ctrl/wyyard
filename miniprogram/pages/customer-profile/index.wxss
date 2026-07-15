@@ -173,6 +173,11 @@
   overflow-x: auto;
   white-space: nowrap;
   background-color: #fafbfc;
+  scrollbar-width: none;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-item {
@@ -268,6 +273,40 @@
   min-width: 0;
   word-break: break-all;
   line-height: 1.6;
+}
+
+/* 沟通记录 */
+.comm-item {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f7f8fa;
+}
+
+.comm-item:last-child {
+  border-bottom: none;
+}
+
+.comm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.comm-date {
+  font-size: 24rpx;
+  color: #8f959e;
+}
+
+.comm-creator {
+  font-size: 22rpx;
+  color: #8f959e;
+}
+
+.comm-content {
+  font-size: 26rpx;
+  color: #4e535a;
+  line-height: 1.6;
+  word-break: break-all;
 }
 
 /* 活动记录 */

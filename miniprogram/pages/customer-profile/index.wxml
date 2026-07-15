@@ -151,6 +151,20 @@
       </view>
     </view>
 
+    <!-- 沟通记录 -->
+    <view class="tab-content" wx:if="{{activeTab === 'communication'}}">
+      <view wx:if="{{commRecords.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="comm-item" wx:for="{{commRecords}}" wx:key="id">
+        <view class="comm-header">
+          <text class="comm-date">{{item._dateStr}}</text>
+          <text class="comm-creator">{{item.creator || ''}}</text>
+        </view>
+        <view class="comm-content">
+          <text>{{item.content}}</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 活动记录 -->
     <view class="tab-content" wx:if="{{activeTab === 'activities'}}">
       <view wx:if="{{activities.length === 0}}" class="empty-hint">暂无记录</view>

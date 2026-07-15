@@ -32,6 +32,10 @@
       <text class="menu-label">付费项目</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onCommRecordsTap">
+      <text class="menu-label">沟通记录</text>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
 
   <!-- 退出按钮 -->

@@ -18,6 +18,10 @@ Page({
     wx.navigateTo({ url: '/pages/payment/index' })
   },
 
+  onCommRecordsTap() {
+    wx.navigateTo({ url: '/pages/communication-records/index' })
+  },
+
   onLogout() {
     wx.showModal({
       title: '退出登录',

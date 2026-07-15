@@ -328,6 +328,17 @@ const paymentApi = {
   },
 }
 
+// 沟通记录
+const communicationRecordApi = {
+  list: (customerNickname) => {
+    const qs = customerNickname ? `?customer_nickname=${encodeURIComponent(customerNickname)}` : ''
+    return request(`/api/communication-records${qs}`)
+  },
+  create: (data) => request('/api/communication-records', { method: 'POST', data }),
+  update: (id, data) => request(`/api/communication-records/${id}`, { method: 'PUT', data }),
+  delete: (id) => request(`/api/communication-records/${id}`, { method: 'DELETE' }),
+}
+
 module.exports = {
   request,
   visitApi,
@@ -346,4 +357,5 @@ module.exports = {
   internalCourseSessionApi,
   ohCardReadingSessionApi,
   paymentApi,
+  communicationRecordApi,
 }

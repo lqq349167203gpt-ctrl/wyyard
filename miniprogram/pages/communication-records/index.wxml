@@ -1,0 +1,77 @@
+<view class="page">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrap">
+      <input
+        class="search-input"
+        placeholder="搜索昵称"
+        placeholder-class="placeholder"
+        value="{{keyword}}"
+        bindinput="onSearchInput"
+      />
+    </view>
+    <view class="filter-btn {{selectedIdentity ? 'active' : ''}}" bindtap="onToggleIdentityPicker">
+      <text>{{selectedIdentity || '身份'}}</text>
+      <text class="filter-arrow">▾</text>
+    </view>
+  </view>
+
+  <!-- 身份下拉 -->
+  <view class="dropdown-mask" wx:if="{{showIdentityPicker}}" bindtap="onToggleIdentityPicker"></view>
+  <view class="dropdown-panel" wx:if="{{showIdentityPicker}}">
+    <view class="dropdown-item {{selectedIdentity === '' ? 'active' : ''}}" bindtap="onSelectIdentity" data-value="">
+      <text>全部身份</text>
+      <text class="check" wx:if="{{selectedIdentity === ''}}">✓</text>
+    </view>
+    <view
+      class="dropdown-item {{selectedIdentity === item ? 'active' : ''}}"
+      wx:for="{{identityNames}}"
+      wx:key="*this"
+      bindtap="onSelectIdentity"
+      data-value="{{item}}"
+    >
+      <text>{{item}}</text>
+      <text class="check" wx:if="{{selectedIdentity === item}}">✓</text>
+    </view>
+  </view>
+
+  <!-- 列表 -->
+  <view class="list-area" wx:if="{{!loading && filtered.length > 0}}">
+    <view
+      class="record-item"
+      wx:for="{{filtered}}"
+      wx:key="id"
+      bindtap="onEdit"
+      bindlongpress="onLongPress"
+      data-id="{{item.id}}"
+      data-index="{{index}}"
+    >
+      <view class="item-body">
+        <view class="item-header">
+          <text class="item-nickname">{{item.customer_nickname}}</text>
+          <view class="item-meta">
+            <text class="item-creator">{{item.creator || ''}}</text>
+            <text class="item-date">{{item._dateStr}}</text>
+            <text class="item-arrow">›</text>
+          </view>
+        </view>
+        <text class="item-content">{{item.content}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && filtered.length === 0}}">
+    <text class="empty-text">暂无记录</text>
+  </view>
+
+  <!-- 浮动添加按钮 -->
+  <view class="fab" bindtap="onCreate">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

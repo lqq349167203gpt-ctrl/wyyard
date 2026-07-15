@@ -1,0 +1,210 @@
+.container {
+  padding: 24rpx 32rpx;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.placeholder {
+  color: #b0b5bb;
+}
+
+.form-card {
+  background-color: #fff;
+  border-radius: 12rpx;
+  padding: 8rpx 32rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.form-item.last {
+  border-bottom: none;
+  align-items: flex-start;
+}
+
+.form-item-content {
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.form-item-content.last {
+  border-bottom: none;
+}
+
+.form-label-block {
+  font-size: 28rpx;
+  color: #8f959e;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.form-label {
+  font-size: 28rpx;
+  color: #8f959e;
+  width: 160rpx;
+  flex-shrink: 0;
+}
+
+.form-textarea {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2329;
+  min-height: 160rpx;
+  line-height: 1.6;
+}
+
+.form-textarea-placeholder {
+  color: #b0b5bb;
+}
+
+.picker-value-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-clear {
+  font-size: 30rpx;
+  color: #b0b5bb;
+  padding: 8rpx 16rpx;
+  flex-shrink: 0;
+}
+
+/* 弹窗 */
+.picker-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.picker-popup {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 96rpx;
+  bottom: 0;
+  background-color: #ffffff;
+  border-radius: 0 0 24rpx 24rpx;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.picker-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1f2329;
+}
+
+.picker-close {
+  font-size: 28rpx;
+  color: #8f959e;
+  padding: 8rpx;
+}
+
+.picker-search {
+  padding: 16rpx 32rpx;
+}
+
+.picker-search-input {
+  height: 72rpx;
+  background-color: #f2f3f5;
+  border-radius: 12rpx;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+}
+
+.picker-list {
+  flex: 1;
+  height: 0;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f5f6f7;
+}
+
+.picker-item:active {
+  background-color: #f7f8fa;
+}
+
+.picker-item-name {
+  font-size: 30rpx;
+  color: #1f2329;
+}
+
+.picker-empty {
+  display: flex;
+  justify-content: center;
+  padding: 80rpx 0;
+  color: #b0b5bb;
+  font-size: 28rpx;
+}
+
+/* 操作按钮 */
+.actions {
+  display: flex;
+  gap: 32rpx;
+  margin-top: 48rpx;
+  padding: 0 28rpx 20rpx;
+}
+
+.submit-btn {
+  flex: 1;
+  font-size: 32rpx;
+  padding: 0 8rpx !important;
+}
+
+.btn-secondary {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 32rpx;
+  color: #1f2329;
+  background-color: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dee0e3;
+  padding: 0 8rpx !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-delete {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 32rpx;
+  color: #e02020;
+  background-color: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #fce4e4;
+  padding: 0 8rpx !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

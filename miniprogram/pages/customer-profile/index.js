@@ -1,4 +1,4 @@
-const { customerApi } = require('../../utils/api')
+const { customerApi, communicationRecordApi } = require('../../utils/api')
 
 Page({
   data: {
@@ -9,12 +9,14 @@ Page({
     firstVisit: '',
     totalPayment: 0,
     activities: [],
+    commRecords: [],
     healingRecords: [],
     purchaseSummary: [],
     paymentRecords: [],
     activeTab: 'healing',
     tabs: [
       { key: 'healing', label: '跟进点' },
+      { key: 'communication', label: '沟通记录' },
       { key: 'activities', label: '活动记录' },
       { key: 'purchase', label: '剩余次数' },
       { key: 'payment', label: '交易记录' },
@@ -63,6 +65,23 @@ Page({
       const paymentRecords = (detail.payment_records || []).sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''))
 
       this.setData({ customer: c, healerText, firstVisit, totalPayment, activities, healingRecords, purchaseSummary, paymentRecords, loading: false })
+
+      // 加载沟通记录
+      if (c.nickname) {
+        communicationRecordApi.list(c.nickname).then(res => {
+          const list = Array.isArray(res) ? res : []
+          list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          list.forEach(item => {
+            if (item.created_at) {
+              const d = new Date(item.created_at)
+              item._dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+            } else {
+              item._dateStr = ''
+            }
+          })
+          this.setData({ commRecords: list })
+        }).catch(() => {})
+      }
     } catch (e) {
       console.error('加载客户资料失败:', e)
       this.setData({ loading: false })
