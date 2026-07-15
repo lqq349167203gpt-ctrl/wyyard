@@ -49,6 +49,7 @@ const courseItems = [
   { title: "客户资料", icon: IconUserFilled, path: "/healing-records", permission: "healing-records" },
   { title: "邀约", icon: IconCalendarEventFilled, path: "/courses/class-records", permission: "class-records" },
   { title: "课表", icon: IconCalendarFilled, path: "/courses/daily-activities", permission: "daily-activities" },
+  { title: "沟通记录", icon: IconMessageCircleFilled, path: "/communication-records", permission: "communication-records" },
 ]
 
 const configItems = [

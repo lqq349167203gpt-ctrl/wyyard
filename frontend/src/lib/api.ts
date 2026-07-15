@@ -2111,3 +2111,22 @@ export const statisticsApi = {
     return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
   },
 }
+
+// Communication Records
+export interface CommunicationRecord {
+  id: string
+  customer_nickname: string
+  content: string
+  creator: string
+  created_at: string
+}
+
+export interface CommunicationRecordCreate {
+  customer_nickname: string
+  content: string
+}
+
+export const communicationRecordApi = {
+  list: () => request<CommunicationRecord[]>("/api/communication-records"),
+  create: (data: CommunicationRecordCreate) => request<CommunicationRecord>("/api/communication-records", { method: "POST", body: JSON.stringify(data) }),
+}

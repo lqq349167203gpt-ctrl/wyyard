@@ -37,6 +37,7 @@ import StatisticsPage from "@/pages/statistics"
 import ProductSalesPage from "@/pages/product-sales"
 import DailyReportPage from "@/pages/daily-report"
 import MemberStatisticsPage from "@/pages/member-statistics"
+import CommunicationRecordsPage from "@/pages/communication-records"
 
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
 const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
@@ -72,6 +73,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/statistics": "statistics",
   "/product-sales": "statistics",
   "/member-statistics": "statistics",
+  "/communication-records": "communication-records",
   "/daily-report": "statistics",
   "/positions/teacher": "position-management",
   "/agents/:id/chat": "agents",
@@ -191,6 +193,7 @@ function App() {
               <Route path="/statistics" element={<StatisticsPage />} />
               <Route path="/product-sales" element={<ProductSalesPage />} />
               <Route path="/member-statistics" element={<MemberStatisticsPage />} />
+              <Route path="/communication-records" element={<CommunicationRecordsPage />} />
               <Route path="/daily-report" element={<DailyReportPage />} />
             </Route>
           </Route>
