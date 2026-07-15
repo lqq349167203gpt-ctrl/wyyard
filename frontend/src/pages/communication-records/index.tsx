@@ -46,58 +46,63 @@ export default function CommunicationRecordsPage() {
   }
 
   return (
-    <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
-      <div className="bg-white rounded-[4px] px-[22px] py-4">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-[16px] font-medium text-[#1f2329]">沟通记录</h1>
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="h-8 px-4 bg-[#3370ff] text-white text-[12px] rounded-[2px] hover:bg-[#2860e1] flex items-center gap-1.5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            新增
-          </button>
-        </div>
+    <div className="p-6 space-y-5">
+      <div>
+        <h1 className="text-lg font-semibold">沟通记录</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">管理与查看沟通记录</p>
+      </div>
+
+      <div className="flex items-end gap-3 flex-wrap">
+        <div className="flex-1" />
+        <button
+          onClick={() => setDialogOpen(true)}
+          className="h-8 px-4 bg-[#3370ff] text-white text-[12px] rounded-[2px] hover:bg-[#2860e1] flex items-center gap-1.5"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          新增
+        </button>
+      </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-[200px] text-[#8f959e] text-[12px]">加载中...</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
         ) : records.length === 0 ? (
-          <div className="flex items-center justify-center h-[200px] text-[#8f959e] text-[12px]">暂无数据</div>
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="text-sm text-muted-foreground">暂无数据</div>
+          </div>
         ) : (
-          <div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
-                <thead>
-                  <tr className="border-b border-[#e8eaed]">
-                    <th className="text-left py-2 px-3 font-medium text-[#646a73] w-[120px]">用户昵称</th>
-                    <th className="text-left py-2 px-3 font-medium text-[#646a73]">沟通记录</th>
-                    <th className="text-left py-2 px-3 font-medium text-[#646a73] w-[100px]">创建人</th>
-                    <th className="text-left py-2 px-3 font-medium text-[#646a73] w-[160px]">创建日期</th>
+          <div className="border rounded-md">
+            <table className="w-full caption-bottom text-sm">
+              <thead className="border-b">
+                <tr className="border-b transition-colors hover:bg-muted/50">
+                  <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground w-[120px]">用户昵称</th>
+                  <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">沟通记录</th>
+                  <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground w-[100px]">创建人</th>
+                  <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground w-[160px]">创建日期</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedItems.map((record) => (
+                  <tr key={record.id} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="p-4 align-middle">{record.customer_nickname}</td>
+                    <td className="p-4 align-middle">{record.content}</td>
+                    <td className="p-4 align-middle text-muted-foreground">{record.creator || "-"}</td>
+                    <td className="p-4 align-middle text-muted-foreground">{record.created_at ? new Date(record.created_at).toLocaleString("zh-CN") : "-"}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {paginatedItems.map((record) => (
-                    <tr key={record.id} className="border-b border-[#f0f1f3] hover:bg-[#f7f8fa]">
-                      <td className="py-2 px-3 text-[#4e535a]">{record.customer_nickname}</td>
-                      <td className="py-2 px-3 text-[#4e535a]">{record.content}</td>
-                      <td className="py-2 px-3 text-[#4e535a]">{record.creator || "-"}</td>
-                      <td className="py-2 px-3 text-[#4e535a]">{record.created_at ? new Date(record.created_at).toLocaleString("zh-CN") : "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex items-center justify-end space-x-2 py-4 px-4">
+              <PaginationBar
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                onPageChange={goToPage}
+              />
             </div>
-            <PaginationBar
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              startIndex={startIndex}
-              endIndex={endIndex}
-              onPageChange={goToPage}
-            />
           </div>
         )}
-      </div>
 
       {/* 新增弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setForm({ customer_nickname: "", content: "" }) }}>

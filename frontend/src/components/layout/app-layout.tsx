@@ -82,7 +82,7 @@ export function AppLayout() {
             </Button>
           </div>
         </header>
-        <main className="flex-1 min-w-0 overflow-y-auto bg-white">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           <Outlet />
         </main>
       </SidebarInset>
