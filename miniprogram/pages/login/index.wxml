@@ -69,4 +69,9 @@
   <view class="dev-toggle" wx:if="{{isDev}}" bindtap="onToggleDev">
     <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回登录' : '开发模式'}}</text>
   </view>
+
+  <!-- 构建标记：核对当前包版本，排查提审包是否为最新代码 -->
+  <view class="version-tag">
+    <text class="version-tag-text">{{versionTag}}</text>
+  </view>
 </view>

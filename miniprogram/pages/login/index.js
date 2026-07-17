@@ -1,4 +1,5 @@
 const { authApi } = require('../../utils/api')
+const { APP_VERSION, BUILD_TAG } = require('../../utils/version')
 
 const DEV_ACCOUNTS = [
   { username: 'admin', label: '管理员' },
@@ -16,6 +17,7 @@ Page({
     devAccounts: DEV_ACCOUNTS,
     devIndex: 0,
     isDev: false, // 仅开发版显示「开发模式」入口，体验版/正式版隐藏（过审要求）
+    versionTag: `v${APP_VERSION} (${BUILD_TAG})`, // 构建标记，用于核对审核包内容
   },
 
   onLoad() {
