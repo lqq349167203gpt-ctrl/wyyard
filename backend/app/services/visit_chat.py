@@ -1,20 +1,20 @@
 import asyncio
 import contextvars
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
 
-from app.services import visit_service
-from app.services import operation_log_service
-from app.services.visit_ai_config_service import get_config as get_visit_ai_config
-from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
-from app.services.voice_parser import _find_customer_from_instruction
-from app.models.visit import VisitRecordCreate
-from app.models.operation_log import OperationLogCreate
 from app.config.settings import settings
+from app.models.operation_log import OperationLogCreate
+from app.models.visit import VisitRecordCreate
+from app.services import customer_service, operation_log_service, visit_service
+from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
+from app.services.visit_ai_config_service import get_config as get_visit_ai_config
+from app.services.voice_parser import _find_customer_from_instruction, render_prompt, search_customer_candidates
+from app.utils.cn_datetime import date_context_block, normalize_time, parse_anchor, resolve_date
 
 TZ = timezone(timedelta(hours=8))
 
@@ -51,19 +51,25 @@ def _log_visit(content: str, method: str = "POST"):
 
 
 def _search_similar_names(keyword: str, limit: int = 5) -> list:
-    """模糊搜索客户昵称，返回相似名字列表"""
-    from app.services import customer_service
-    customers = customer_service.list_customers()
-    keyword_lower = keyword.lower()
-    results = []
-    for c in customers:
-        nick = c.nickname or ""
-        name = c.name or ""
-        if keyword_lower in nick.lower() or keyword_lower in name.lower() or nick.lower() in keyword_lower:
-            results.append(nick)
-            if len(results) >= limit:
-                break
-    return results
+    """模糊搜索客户昵称（拼音 + 字面相似度），返回相似名字列表"""
+    return search_customer_candidates(keyword, limit)
+
+
+def _resolve_ctx_date(raw: str) -> str | None:
+    """解析工具收到的日期参数：空则用上下文锚点日期；
+    原始表达（如「上周五」「7月20号」）由确定性解析器换算，非法返回 None。"""
+    ctx = _ctx_var.get()
+    raw = (raw or "").strip()
+    if not raw:
+        return ctx.get("date") or None
+    return resolve_date(raw, parse_anchor(ctx.get("date")))
+
+
+def _invalid_date_json(raw: str) -> str:
+    return json.dumps(
+        {"ok": False, "reason": "invalid_date", "value": raw, "anchor": _ctx_var.get().get("date", "")},
+        ensure_ascii=False,
+    )
 
 
 def _find_visit(customer_name: str, date: str, space_id: str = ""):
@@ -91,10 +97,12 @@ def add_to_visit_list(customer_name: str, visit_date: str = "") -> str:
 
     Args:
         customer_name: 客户昵称（如"余墨"）
-        visit_date: 到店日期，格式 YYYY-MM-DD，不填则用今天
+        visit_date: 到店日期，可传用户原话（如"上周五""7月20号"）或 YYYY-MM-DD，不填则用当前选中日期
     """
     ctx = _ctx_var.get()
-    date = visit_date or ctx["date"]
+    date = _resolve_ctx_date(visit_date)
+    if not date:
+        return _invalid_date_json(visit_date)
     space_id = ctx["space_id"]
     print(f"[tool] add_to_visit_list: customer={customer_name}, date={date}, space_id={space_id}")
 
@@ -128,11 +136,17 @@ def set_arrival(customer_name: str, time: str = "", arrived: bool = True) -> str
 
     Args:
         customer_name: 客户昵称（如"余墨"）
-        time: 时间，格式 HH:MM（如"09:00"），不填则用当前时间
+        time: 时间，可传用户原话（如"下午3点"）或 HH:MM，不填则用当前时间
         arrived: true 表示用户说了"到了/来了"，false 表示只是改时间
     """
     date = _ctx_var.get()["date"]
     space_id = _ctx_var.get()["space_id"]
+
+    if time:
+        normalized = normalize_time(time)
+        if not normalized:
+            return json.dumps({"ok": False, "reason": "invalid_time", "value": time}, ensure_ascii=False)
+        time = normalized
 
     customer = _find_customer_from_instruction(customer_name)
     if not customer:
@@ -284,9 +298,11 @@ def set_referrer_handler(customer_name: str, referrer_handler: str, visit_date: 
     Args:
         customer_name: 客户昵称（如"余墨"），必须是系统中已有的客户
         referrer_handler: 邀约人昵称（如"小明"），必须是系统中已有的客户
-        visit_date: 到店日期，格式 YYYY-MM-DD，不填则用今天
+        visit_date: 到店日期，可传用户原话或 YYYY-MM-DD，不填则用当前选中日期
     """
-    date = visit_date or _ctx_var.get()["date"]
+    date = _resolve_ctx_date(visit_date)
+    if not date:
+        return _invalid_date_json(visit_date)
     space_id = _ctx_var.get()["space_id"]
 
     customer = _find_customer_from_instruction(customer_name)
@@ -411,9 +427,11 @@ def query_visit_list(visit_date: str = "") -> str:
     """查询某天的到店人员名单。
 
     Args:
-        visit_date: 查询日期，格式 YYYY-MM-DD，不填则用今天
+        visit_date: 查询日期，可传用户原话（如"上周五"）或 YYYY-MM-DD，不填则用当前选中日期
     """
-    date = visit_date or _ctx_var.get()["date"]
+    date = _resolve_ctx_date(visit_date)
+    if not date:
+        return _invalid_date_json(visit_date)
     space_id = _ctx_var.get()["space_id"]
 
     visits = visit_service.list_visits(date=date, space_id=space_id)
@@ -436,7 +454,9 @@ _ctx_var = contextvars.ContextVar("visit_chat_ctx", default={"date": "", "space_
 
 async def visit_chat(message: str, history: list, date: str, space_id: str, operator: str = "") -> dict:
     """邀约对话主入口。使用 LLM tool calling 理解意图并执行操作。"""
-    _ctx_var.set({"date": date, "space_id": space_id, "operator": operator})
+    anchor = parse_anchor(date)
+    anchor_iso = anchor.isoformat()
+    _ctx_var.set({"date": anchor_iso, "space_id": space_id, "operator": operator})
 
     prompt_config = get_visit_ai_config()
     model_config = get_miniapp_ai_config()
@@ -455,7 +475,8 @@ async def visit_chat(message: str, history: list, date: str, space_id: str, oper
         max_tokens=model_config.max_tokens,
     ).bind_tools(TOOLS)
 
-    system_text = prompt_config.system_prompt.format(date=date)
+    system_text = render_prompt(prompt_config.system_prompt, {"date": anchor_iso})
+    system_text += "\n\n" + date_context_block(anchor)
 
     messages = [SystemMessage(content=system_text)]
     for item in (history or [])[-10:]:
@@ -497,25 +518,27 @@ async def visit_chat(message: str, history: list, date: str, space_id: str, oper
             return {"reply": f"AI 调用失败：{str(e)[:100]}", "action": "error"}
         print(f"[visit_chat] 第{_round+1}轮 LLM 响应: tool_calls={response.tool_calls}, content={response.content[:200] if response.content else 'None'}")
 
-    # 生成回复：只有调用了工具才信任 LLM 的文本，否则用工具结果或默认回复
-    if tool_call_log:
-        # 有工具调用：优先用 LLM 文本（更自然），为空则用工具结果
-        reply = response.content.strip() if response.content and response.content.strip() else _build_reply_from_tools(tool_call_log)
+    # 生成回复：优先采用 LLM 的文本（可能是澄清反问，也可能是结果汇总），
+    # 为空时用工具结果兜底。不要丢弃无工具调用的回复——那往往是 AI 在向用户确认，
+    # 强制覆盖成「没太听懂」会让助手显得完全不理解用户。
+    if response.content and response.content.strip():
+        reply = response.content.strip()
+    elif tool_call_log:
+        reply = _build_reply_from_tools(tool_call_log)
     else:
-        # 无工具调用：LLM 的文本不可信（可能是幻觉），强制用默认回复
         reply = "没太听懂，能再说一遍吗？"
 
     # 写对话日志
     try:
-        from app.services import chat_log_service
         from app.models.chat_log import ChatLogCreate, ToolCall
+        from app.services import chat_log_service
         chat_log_service.create_log(ChatLogCreate(
             user_message=message,
             tool_calls=[ToolCall(**tc) for tc in tool_call_log],
             ai_reply=reply,
             mode="visit",
             space_id=space_id,
-            date=date,
+            date=anchor_iso,
         ))
     except Exception as e:
         print(f"[visit_chat] 写对话日志失败: {e}")
@@ -588,5 +611,9 @@ def _build_reply_from_tools(tool_call_log: list) -> str:
                 return f"{name}还不在今天的名单里。"
             if reason == "not_leader":
                 return f"{name}还不是组长，需要先设为组长。"
+            if reason == "invalid_date":
+                return f"没听懂这个日期「{result.get('value', '')}」，换个说法试试？比如「明天」「周五」或「7月20号」。"
+            if reason == "invalid_time":
+                return f"没听懂这个时间「{result.get('value', '')}」，换个说法试试？比如「下午3点」或「15:00」。"
 
     return "操作完成。"

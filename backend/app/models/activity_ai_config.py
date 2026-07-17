@@ -1,7 +1,7 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
 
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 DEFAULT_ACTIVITY_PROMPT = """你是课表，正在和同事用语音沟通活动管理。像同事之间说话一样自然。
 当前日历选中的日期是 {date}（这是用户在界面上选择的日期，不一定是实际的今天）。
@@ -53,10 +53,15 @@ DEFAULT_ACTIVITY_PROMPT = """你是课表，正在和同事用语音沟通活动
 - 如果工具返回 teacher_not_found 并带有 suggestions，告诉用户「找不到这个名字，你是不是想说：XXX？」
 
 日期规则（极其重要）：
-- 当前日历选中的日期是 {date}，这是用户界面上选择的日期
-- 如果用户提到了具体日期（如「6月30号」「上周五」），必须将该日期转换为 YYYY-MM-DD 格式作为 activity_date 参数传给工具，不要使用日历日期
+- 提示词末尾的【日期基准】给出了今天/明天/昨天/本周/上周/下周的准确换算表，直接查表使用，禁止自己推算
+- 换算表里没有的日期（如「7月25号」），把用户的原话作为 activity_date 参数传给工具，工具会自动换算
 - 只有用户完全没有提到日期时，才不传 activity_date（默认使用日历日期 {date}）
 - 绝对不要把「今天」理解为实际的今天的日期，「今天」指的是用户日历上选中的 {date}
+
+时间规则：
+- 时间参数可以传 HH:MM，也可以直接传用户原话（如「下午3点」），工具会自动归一化
+- 工具返回 missing_start_time / missing_teacher / missing_owner / missing_course_type 时，按提示词规则向用户追问对应信息
+- 工具返回 invalid_time 或 invalid_date 时，把你理解的内容告诉用户并请他换个说法，不要自己编造一个时间或日期
 
 回复规则：
 - 只根据工具返回的结果回复，绝对不要编造

@@ -1,15 +1,16 @@
 import asyncio
 import json
 import re
+
 import httpx
 from fastapi import HTTPException
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
+from app.config.settings import settings
 from app.models.customer import CustomerCreate
 from app.services.customer_ai_config_service import get_config as get_customer_ai_config
 from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
-from app.config.settings import settings
 
 
 def _escape_xml(text: str) -> str:
@@ -177,15 +178,69 @@ async def analyze_save_error(error: str, previous_data: dict) -> dict:
     return result
 
 
-def _name_match(name: str, instruction: str) -> bool:
-    """名字必须完全一致才匹配。不一致时由 AI 提供可选项。"""
-    return name == instruction
+# ── 客户名模糊匹配 ─────────────────────────────────────────
+# 语音识别同音字极常见（如「于墨」应为「余墨」），精确匹配必然频繁失败。
+# 这里用 字面编辑距离 + 拼音 双重相似度打分：唯一高分自动采用，多个高分返回候选让用户选。
+
+try:
+    from pypinyin import lazy_pinyin as _lazy_pinyin
+except ImportError:  # 缺库时退化为仅字面匹配
+    _lazy_pinyin = None
+
+_pinyin_cache: dict = {}
 
 
-def _find_customer_from_instruction(instruction: str) -> dict | None:
-    """从用户指令中智能查找客户，按优先级尝试多种匹配方式。"""
+def _pinyin(s: str) -> str:
+    if not s:
+        return ""
+    cached = _pinyin_cache.get(s)
+    if cached is not None:
+        return cached
+    if _lazy_pinyin is None:
+        py = s
+    else:
+        try:
+            py = "".join(_lazy_pinyin(s))
+        except Exception:
+            py = s
+    _pinyin_cache[s] = py
+    return py
+
+
+def _name_score(query: str, candidate: str) -> float:
+    """0~1 的名字相似度，综合字面与拼音两个维度。"""
+    from difflib import SequenceMatcher
+    q, c = (query or "").strip(), (candidate or "").strip()
+    if not q or not c:
+        return 0.0
+    if q == c:
+        return 1.0
+    score = 0.0
+    # 包含关系（按长度比打折，避免单字「余」直接命中「余墨」）
+    if q in c or c in q:
+        score = max(score, 0.55 + 0.35 * min(len(q), len(c)) / max(len(q), len(c)))
+    # 字面编辑相似度
+    score = max(score, SequenceMatcher(None, q, c).ratio() * 0.9)
+    # 拼音（同音字识别：于墨 ≈ 余墨）
+    qpy, cpy = _pinyin(q), _pinyin(c)
+    if qpy and cpy:
+        if qpy == cpy:
+            score = max(score, 0.95)
+        elif qpy in cpy or cpy in qpy:
+            score = max(score, 0.8)
+        else:
+            score = max(score, SequenceMatcher(None, qpy, cpy).ratio() * 0.85)
+    return score
+
+
+def _find_customer_with_candidates(instruction: str) -> tuple:
+    """查找客户，返回 (customer_dict | None, 候选昵称列表)。
+
+    匹配优先级：id > 手机号 > 微信号 > 名字相似度打分。
+    唯一高分（≥0.85 且与第二名拉开差距）自动采用；多个高分返回候选。
+    """
     from app.services import customer_service
-    customers = customer_service.list_customers()
+    customers = [c for c in customer_service.list_customers() if not c.is_deleted]
 
     # 1. 按 id 匹配（指令中可能包含 id）
     id_match = re.search(r'[0-9a-f]{12}', instruction)
@@ -193,32 +248,76 @@ def _find_customer_from_instruction(instruction: str) -> dict | None:
         candidate = id_match.group()
         for c in customers:
             if c.id == candidate:
-                return _customer_to_dict(c)
+                return _customer_to_dict(c), []
 
-    # 2. 按昵称匹配
-    for c in customers:
-        if c.nickname and _name_match(c.nickname, instruction):
-            return _customer_to_dict(c)
-
-    # 3. 按姓名匹配
-    for c in customers:
-        if c.name and len(c.name) >= 2 and _name_match(c.name, instruction):
-            return _customer_to_dict(c)
-
-    # 4. 按手机号匹配
+    # 2. 按手机号匹配
     phone_match = re.search(r'1[3-9]\d{9}', instruction)
     if phone_match:
         phone = phone_match.group()
         for c in customers:
             if c.phone == phone:
-                return _customer_to_dict(c)
+                return _customer_to_dict(c), []
 
-    # 5. 按微信号匹配（至少 6 字符）
+    # 3. 按微信号匹配（至少 6 字符）
     for c in customers:
         if c.wechat and len(c.wechat) >= 6 and c.wechat in instruction:
-            return _customer_to_dict(c)
+            return _customer_to_dict(c), []
 
-    return None
+    # 4. 名字相似度打分（昵称 + 姓名取最高分）
+    scored = []
+    for c in customers:
+        best = 0.0
+        for field in (c.nickname, c.name):
+            if field:
+                best = max(best, _name_score(instruction, field))
+        if best > 0:
+            scored.append((best, c))
+    if not scored:
+        return None, []
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best_score = scored[0][0]
+    if best_score >= 0.85:
+        top = [c for s, c in scored if s >= best_score - 0.05]
+        if len(top) == 1:
+            return _customer_to_dict(top[0]), []
+        return None, [c.nickname for c in top[:5]]
+    candidates = [c.nickname for s, c in scored if s >= 0.5][:5]
+    return None, candidates
+
+
+def _find_customer_from_instruction(instruction: str) -> dict | None:
+    """从用户指令中智能查找客户。找不到返回 None。"""
+    found, _ = _find_customer_with_candidates(instruction)
+    return found
+
+
+def search_customer_candidates(keyword: str, limit: int = 5) -> list:
+    """按相似度搜索候选客户昵称，用于「找不到时」给用户可选项。"""
+    from app.services import customer_service
+    scored = []
+    for c in customer_service.list_customers():
+        if c.is_deleted:
+            continue
+        best = 0.0
+        for field in (c.nickname, c.name):
+            if field:
+                best = max(best, _name_score(keyword, field))
+        if best >= 0.4:
+            scored.append((best, c.nickname))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [n for _, n in scored[:limit]]
+
+
+def render_prompt(template: str, mapping: dict) -> str:
+    """安全的提示词变量替换：只替换给定变量，模板里其他花括号原样保留。
+
+    替代 str.format()——后台可编辑的提示词若含 JSON 示例等花括号，
+    .format() 会直接抛 KeyError 导致整个助手 500。
+    """
+    out = template or ""
+    for k, v in mapping.items():
+        out = out.replace("{" + k + "}", str(v))
+    return out
 
 
 def _customer_to_dict(c) -> dict:

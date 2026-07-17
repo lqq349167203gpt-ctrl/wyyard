@@ -2,38 +2,60 @@ import asyncio
 import contextvars
 import json
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
 
-from app.services import customer_service
-from app.services import operation_log_service
-from app.services import visit_service
-from app.services import membership_card_service
-from app.services import project_deduction_service
-from app.services.customer_ai_config_service import get_config as get_customer_ai_config
-from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
-from app.services.voice_parser import _find_customer_from_instruction
+from app.config.settings import settings
 from app.models.customer import CustomerCreate, CustomerUpdate
 from app.models.operation_log import OperationLogCreate
-from app.config.settings import settings
+from app.services import (
+    customer_service,
+    membership_card_service,
+    operation_log_service,
+    project_deduction_service,
+    visit_service,
+)
+from app.services.customer_ai_config_service import get_config as get_customer_ai_config
+from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
+from app.services.voice_parser import _find_customer_from_instruction, search_customer_candidates
+from app.utils.normalize import (
+    normalize_gender,
+    normalize_phone,
+    normalize_traffic_source,
+    normalize_work_status,
+)
+
+
+def _normalize_customer_fields(fields: dict) -> tuple:
+    """对客户字段做确定性归一化与校验。
+    返回 (fields, error_json)：有错时 error_json 为 ok:False 的 JSON 字符串。"""
+    if fields.get("gender"):
+        gender, err = normalize_gender(fields["gender"])
+        if err:
+            return fields, json.dumps(
+                {"ok": False, "reason": "invalid_field", "field": "gender", "error": err},
+                ensure_ascii=False,
+            )
+        fields["gender"] = gender
+    if fields.get("phone"):
+        phone, err = normalize_phone(fields["phone"])
+        if err:
+            return fields, json.dumps(
+                {"ok": False, "reason": "invalid_field", "field": "phone", "error": err},
+                ensure_ascii=False,
+            )
+        fields["phone"] = phone
+    if fields.get("traffic_source"):
+        fields["traffic_source"] = normalize_traffic_source(fields["traffic_source"])
+    if fields.get("work_status"):
+        fields["work_status"] = normalize_work_status(fields["work_status"])
+    return fields, None
 
 
 def _search_similar_names(keyword: str, limit: int = 5) -> list:
-    """模糊搜索客户昵称，返回相似名字列表"""
-    customers = customer_service.list_customers()
-    keyword_lower = keyword.lower()
-    results = []
-    for c in customers:
-        if c.is_deleted:
-            continue
-        nick = c.nickname or ""
-        name = c.name or ""
-        if keyword_lower in nick.lower() or keyword_lower in name.lower() or nick.lower() in keyword_lower:
-            results.append(nick)
-            if len(results) >= limit:
-                break
-    return results
+    """模糊搜索客户昵称（拼音 + 字面相似度），返回相似名字列表"""
+    return search_customer_candidates(keyword, limit)
 
 
 def _log_customer(content: str, method: str = "POST"):
@@ -100,11 +122,19 @@ def create_customer(nickname: str, gender: str = "", age: str = "", phone: str =
     # 只保留非空字段
     clean = {k: v for k, v in fields.items() if v}
 
+    # 确定性归一化与校验（性别/手机号/流量来源/工作情况），不合法不入库
+    clean, err_json = _normalize_customer_fields(clean)
+    if err_json:
+        return err_json
+
     try:
         data = CustomerCreate(**clean)
         customer = customer_service.create_customer(data)
         _log_customer(f"新建客户 {nickname}")
-        return json.dumps({"ok": True, "action": "create", "name": nickname, "id": customer.id}, ensure_ascii=False)
+        return json.dumps(
+            {"ok": True, "action": "create", "name": data.nickname, "id": customer.id, "values": clean},
+            ensure_ascii=False,
+        )
     except Exception as e:
         return json.dumps({"ok": False, "reason": "error", "name": nickname, "error": str(e)[:200]}, ensure_ascii=False)
 
@@ -163,6 +193,11 @@ def update_customer_fields(customer_name: str, nickname: str = "", gender: str =
     if not update_data:
         return json.dumps({"ok": False, "reason": "no_fields", "name": customer["nickname"]}, ensure_ascii=False)
 
+    # 确定性归一化与校验（性别/手机号/流量来源/工作情况），不合法不入库
+    update_data, err_json = _normalize_customer_fields(update_data)
+    if err_json:
+        return err_json
+
     try:
         data = CustomerUpdate(**update_data)
         updated = customer_service.update_customer(customer["id"], data)
@@ -178,7 +213,11 @@ def update_customer_fields(customer_name: str, nickname: str = "", gender: str =
             }
             changed = "、".join(FIELD_LABELS.get(k, k) for k in update_data.keys())
             _log_customer(f"修改客户 {customer['nickname']}：{changed}", method="PATCH")
-            return json.dumps({"ok": True, "action": "update", "name": customer["nickname"], "fields": list(update_data.keys())}, ensure_ascii=False)
+            return json.dumps(
+                {"ok": True, "action": "update", "name": customer["nickname"],
+                 "fields": list(update_data.keys()), "values": update_data},
+                ensure_ascii=False,
+            )
         return json.dumps({"ok": False, "reason": "update_failed", "name": customer["nickname"]}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"ok": False, "reason": "error", "name": customer["nickname"], "error": str(e)[:200]}, ensure_ascii=False)
@@ -436,8 +475,8 @@ async def customer_chat(message: str, history: list, operator: str = "") -> dict
 
     # 写对话日志
     try:
-        from app.services import chat_log_service
         from app.models.chat_log import ChatLogCreate, ToolCall
+        from app.services import chat_log_service
         chat_log_service.create_log(ChatLogCreate(
             user_message=message,
             tool_calls=[ToolCall(**tc) for tc in tool_call_log],
@@ -488,6 +527,8 @@ def _build_reply_from_tools(tool_call_log: list) -> str:
                 return f"「{name}」已存在，需要修改吗？"
             if reason == "no_fields":
                 return f"没有需要修改的内容。"
+            if reason == "invalid_field":
+                return f"{result.get('error', '字段格式不对')}"
             if reason == "error":
                 return f"操作失败：{result.get('error', '未知错误')[:100]}"
 

@@ -1,26 +1,27 @@
 import asyncio
 import contextvars
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
 
+from app.config.settings import settings
+from app.models.operation_log import OperationLogCreate
 from app.services import (
     class_record_service,
-    group_case_session_service,
     emotional_release_session_service,
     energy_knot_session_service,
+    group_case_session_service,
     internal_course_session_service,
     oh_card_reading_session_service,
     operation_log_service,
 )
-from app.services.voice_parser import _find_customer_from_instruction
 from app.services.activity_ai_config_service import get_config as get_activity_ai_config
 from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
-from app.models.operation_log import OperationLogCreate
-from app.config.settings import settings
+from app.services.voice_parser import _find_customer_from_instruction, render_prompt, search_customer_candidates
+from app.utils.cn_datetime import date_context_block, normalize_time, parse_anchor, resolve_date
 
 TZ = timezone(timedelta(hours=8))
 
@@ -176,19 +177,29 @@ def _find_all_activities(date: str, space_id: str = ""):
 
 
 def _search_similar_names(keyword: str, limit: int = 5) -> list:
-    """模糊搜索客户昵称，返回相似名字列表"""
-    from app.services import customer_service
-    customers = customer_service.list_customers()
-    keyword_lower = keyword.lower()
-    results = []
-    for c in customers:
-        nick = c.nickname or ""
-        name = c.name or ""
-        if keyword_lower in nick.lower() or keyword_lower in name.lower() or nick.lower() in keyword_lower:
-            results.append(nick)
-            if len(results) >= limit:
-                break
-    return results
+    """模糊搜索客户昵称（拼音 + 字面相似度），返回相似名字列表"""
+    return search_customer_candidates(keyword, limit)
+
+
+def _resolve_ctx_date(raw: str) -> str | None:
+    """解析工具收到的日期参数：空则用上下文锚点日期；
+    原始表达（如「上周五」「7月20号」）由确定性解析器换算，非法返回 None。"""
+    ctx = _ctx_var.get()
+    raw = (raw or "").strip()
+    if not raw:
+        return ctx.get("date") or None
+    return resolve_date(raw, parse_anchor(ctx.get("date")))
+
+
+def _invalid_date_json(raw: str) -> str:
+    return json.dumps(
+        {"ok": False, "reason": "invalid_date", "value": raw, "anchor": _ctx_var.get().get("date", "")},
+        ensure_ascii=False,
+    )
+
+
+def _invalid_time_json(raw: str) -> str:
+    return json.dumps({"ok": False, "reason": "invalid_time", "value": raw}, ensure_ascii=False)
 
 
 def _find_activity_by_name(name: str, date: str, space_id: str = ""):
@@ -313,18 +324,48 @@ def create_activity(
         teacher_name: 老师/主持人昵称（如"小明"），必须提供
         owner_name: 案主昵称（觉醒、情绪释放、OH卡、能量结类型需要）
         is_public_welfare: 是否公益（沙龙类型可选，默认否）
-        activity_date: 活动日期，格式 YYYY-MM-DD，不填则用今天
+        activity_date: 活动日期，可传用户原话（如"上周五"）或 YYYY-MM-DD，不填则用当前选中日期
     """
     ctx = _ctx_var.get()
-    date = activity_date or ctx["date"]
+    date = _resolve_ctx_date(activity_date)
+    if not date:
+        return _invalid_date_json(activity_date)
     space_id = ctx["space_id"]
 
     if activity_type not in TYPE_MAP:
         return json.dumps({"ok": False, "reason": "invalid_type", "type": activity_type}, ensure_ascii=False)
 
+    # ── 必填校验与格式归一化（代码强制，不依赖 LLM 自觉）──
+    if not (start_time or "").strip():
+        return json.dumps({"ok": False, "reason": "missing_start_time", "name": name}, ensure_ascii=False)
+    normalized_start = normalize_time(start_time)
+    if not normalized_start:
+        return _invalid_time_json(start_time)
+    start_time = normalized_start
+
+    if (end_time or "").strip():
+        normalized_end = normalize_time(end_time)
+        if not normalized_end:
+            return _invalid_time_json(end_time)
+        end_time = normalized_end
+
+    if not (teacher_name or "").strip():
+        return json.dumps({"ok": False, "reason": "missing_teacher", "name": name}, ensure_ascii=False)
+
+    if activity_type in ("gcs", "ers", "eks", "ocr") and not (owner_name or "").strip():
+        return json.dumps(
+            {"ok": False, "reason": "missing_owner", "name": name, "type": TYPE_MAP[activity_type]["label"]},
+            ensure_ascii=False,
+        )
+
+    if activity_type in ("class", "ics") and not (course_type or "").strip():
+        return json.dumps(
+            {"ok": False, "reason": "missing_course_type", "name": name, "type": TYPE_MAP[activity_type]["label"]},
+            ensure_ascii=False,
+        )
+
     # 查找老师
     teacher_ids = []
-    teacher_names_resolved = []
     if teacher_name:
         teacher = _find_customer_from_instruction(teacher_name)
         if not teacher:
@@ -335,7 +376,6 @@ def create_activity(
                 result["suggestions"] = suggestions
             return json.dumps(result, ensure_ascii=False)
         teacher_ids = [teacher["id"]]
-        teacher_names_resolved = [teacher["nickname"]]
 
     # 查找案主（如有）
     owner_id = ""
@@ -364,7 +404,7 @@ def create_activity(
             record = class_record_service.create_record(
                 __import__("app.models.class_record", fromlist=["ClassRecordCreate"]).ClassRecordCreate(
                     date=date, start_time=start_time or None, end_time=end_time or None,
-                    course_id="", course_name=name, course_type=course_type or "沙龙",
+                    course_id="", course_name=name, course_type=course_type,
                     activity_name=name, teacher_ids=teacher_ids,
                     is_public_welfare=is_public_welfare,
                     space_id=space_id, space_name=space_name,
@@ -443,9 +483,11 @@ def query_activities(activity_date: str = "") -> str:
     """查询某天的所有活动安排。
 
     Args:
-        activity_date: 查询日期，格式 YYYY-MM-DD，不填则用今天
+        activity_date: 查询日期，可传用户原话（如"上周五"）或 YYYY-MM-DD，不填则用当前选中日期
     """
-    date = activity_date or _ctx_var.get()["date"]
+    date = _resolve_ctx_date(activity_date)
+    if not date:
+        return _invalid_date_json(activity_date)
     space_id = _ctx_var.get()["space_id"]
     activities = _find_all_activities(date, space_id)
     return json.dumps({"ok": True, "action": "query", "date": date, "count": len(activities), "text": _format_activity_list(activities)}, ensure_ascii=False)
@@ -480,7 +522,12 @@ def update_activity(activity_name: str, field: str, value: str) -> str:
     service = type_info["service"]
     update_data = {}
 
-    if field in ("start_time", "end_time", "name"):
+    if field in ("start_time", "end_time"):
+        normalized = normalize_time(value)
+        if not normalized:
+            return _invalid_time_json(value)
+        update_data[field] = normalized
+    elif field == "name":
         update_data[field] = value
     elif field == "teacher":
         teacher = _find_customer_from_instruction(value)
@@ -569,7 +616,6 @@ def add_participant(activity_name: str, customer_name: str) -> str:
 
     # 获取当天到店名单
     visits = visit_service.list_visits(date, space_id=space_id if space_id else None)
-    visit_customer_ids = {v.customer_id for v in visits}
     visit_customer_names = {v.nickname: v.customer_id for v in visits if v.nickname}
 
     # 从到店名单里找人（不是从客户库找）
@@ -659,7 +705,9 @@ _ctx_var = contextvars.ContextVar("activity_chat_ctx", default={"date": "", "spa
 
 async def activity_chat(message: str, history: list, date: str, space_id: str, operator: str = "") -> dict:
     """课表对话主入口。使用 LLM tool calling 理解意图并执行操作。"""
-    _ctx_var.set({"date": date, "space_id": space_id, "operator": operator})
+    anchor = parse_anchor(date)
+    anchor_iso = anchor.isoformat()
+    _ctx_var.set({"date": anchor_iso, "space_id": space_id, "operator": operator})
 
     prompt_config = get_activity_ai_config()
     model_config = get_miniapp_ai_config()
@@ -668,12 +716,12 @@ async def activity_chat(message: str, history: list, date: str, space_id: str, o
     model = model_config.model or settings.llm_model
 
     # 预加载当天活动数据（含参与者姓名），注入系统提示词
-    all_activities = _find_all_activities(date, space_id)
+    all_activities = _find_all_activities(anchor_iso, space_id)
     activity_context = _format_activity_detail(all_activities)
 
     # 预加载当天到店名单
-    from app.services import visit_service, customer_service
-    visits = visit_service.list_visits(date, space_id=space_id if space_id else None)
+    from app.services import customer_service, visit_service
+    visits = visit_service.list_visits(anchor_iso, space_id=space_id if space_id else None)
     def _nick(v):
         c = customer_service.get_customer(v.customer_id) if v.customer_id else None
         return c.nickname if c else ""
@@ -692,12 +740,13 @@ async def activity_chat(message: str, history: list, date: str, space_id: str, o
     ).bind_tools(ACTIVITY_CHAT_TOOLS)
 
     # 基础提示词从配置读取，动态数据在代码中追加
-    system_text = prompt_config.system_prompt.format(date=date)
+    system_text = render_prompt(prompt_config.system_prompt, {"date": anchor_iso})
+    system_text += "\n\n" + date_context_block(anchor)
     system_text += (
-        f"\n\n当天活动数据（{date}）：\n{activity_context}\n"
-        f"\n当天到店名单（{date}）：{visit_context}\n"
+        f"\n\n当天活动数据（{anchor_iso}）：\n{activity_context}\n"
+        f"\n当天到店名单（{anchor_iso}）：{visit_context}\n"
         f"添加参与者时只能从上面的到店名单里选人。如果用户名字不在到店名单里，不能添加。\n"
-        f"\n以上数据仅限 {date}。如果用户提到其他日期，必须调用 query_activities 查询该日期的数据，不要用上面的数据回答其他日期的问题。\n"
+        f"\n以上数据仅限 {anchor_iso}。如果用户提到其他日期，必须调用 query_activities 查询该日期的数据，不要用上面的数据回答其他日期的问题。\n"
         f"注意：老师和参与者是两个不同的角色。「老师」是活动的授课/主持老师，「参与者」是参加活动的客户。添加参与者时只能添加到参与者列表，不能把老师当作参与者。用户说的名字如果在老师列表里出现但不在参与者列表里，说明这个人是老师而不是参与者。"
     )
 
@@ -719,6 +768,11 @@ async def activity_chat(message: str, history: list, date: str, space_id: str, o
     print(f"[activity_chat] LLM 响应: tool_calls={response.tool_calls}, content={response.content[:200] if response.content else 'None'}")
 
     # 执行工具调用（多轮）
+    # 注意：不能在一次成功后提前 return——同一批里可能还有其它工具调用
+    # （如「加个颂钵下午2点，再把觉醒改到3点」），提前返回会把后续指令丢掉。
+    # 防重复用签名去重实现：同名+同参数的写操作在整个请求内只执行一次。
+    WRITE_TOOLS = {"create_activity", "update_activity", "remove_activity", "add_participant", "set_teacher"}
+    executed_writes = set()
     tool_call_log = []
     for _round in range(5):
         if not response.tool_calls:
@@ -726,25 +780,20 @@ async def activity_chat(message: str, history: list, date: str, space_id: str, o
         for tc in response.tool_calls:
             tool_fn = ACTIVITY_CHAT_TOOL_MAP.get(tc["name"])
             if tool_fn:
-                try:
-                    result = await asyncio.to_thread(tool_fn.invoke, tc["args"])
-                except Exception as e:
-                    result = json.dumps({"ok": False, "error": str(e)[:100]}, ensure_ascii=False)
+                sig = tc["name"] + "|" + json.dumps(tc["args"], sort_keys=True, ensure_ascii=False)
+                if tc["name"] in WRITE_TOOLS and sig in executed_writes:
+                    result = json.dumps({"ok": True, "action": "duplicate_skipped"}, ensure_ascii=False)
+                    print(f"[activity_chat] 跳过重复写操作: {sig}")
+                else:
+                    if tc["name"] in WRITE_TOOLS:
+                        executed_writes.add(sig)
+                    try:
+                        result = await asyncio.to_thread(tool_fn.invoke, tc["args"])
+                    except Exception as e:
+                        result = json.dumps({"ok": False, "error": str(e)[:100]}, ensure_ascii=False)
                 print(f"[activity_chat] 工具调用: {tc['name']}({tc['args']}) => {str(result)[:200]}")
                 tool_call_log.append({"name": tc["name"], "args": tc["args"], "result": str(result)[:500]})
                 messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
-                # 写操作成功后立即返回，防止 LLM 重复调用
-                try:
-                    r = json.loads(result) if isinstance(result, str) else result
-                    if isinstance(r, dict):
-                        if r.get("ok") and r.get("action") in ("create", "update", "remove", "add_participant", "set_teacher"):
-                            reply = _build_reply_from_tools(tool_call_log)
-                            return {"reply": reply, "action": "done"}
-                        if not r.get("ok") and r.get("reason") in ("not_found", "activity_not_found"):
-                            reply = _build_reply_from_tools(tool_call_log)
-                            return {"reply": reply, "action": "done"}
-                except (json.JSONDecodeError, TypeError):
-                    pass
             else:
                 print(f"[activity_chat] 未知工具: {tc['name']}")
         try:
@@ -829,5 +878,17 @@ def _build_reply_from_tools(tool_call_log: list) -> str:
                 return f"「{name}」不在今天的到店名单里，今天还没有配置到店人员。"
             if reason == "invalid_type":
                 return f"不支持的活动类型：{result.get('type', '')}。"
+            if reason == "missing_start_time":
+                return f"创建「{result.get('name', '')}」需要开始时间，几点开始？"
+            if reason == "missing_teacher":
+                return f"创建「{result.get('name', '')}」需要指定老师，哪位老师带？"
+            if reason == "missing_owner":
+                return f"「{result.get('type', '')}」需要案主，案主是谁？"
+            if reason == "missing_course_type":
+                return f"「{result.get('name', '')}」属于{result.get('type', '')}的哪种具体类型？"
+            if reason == "invalid_date":
+                return f"没听懂这个日期「{result.get('value', '')}」，换个说法试试？比如「明天」「周五」或「7月20号」。"
+            if reason == "invalid_time":
+                return f"没听懂这个时间「{result.get('value', '')}」，换个说法试试？比如「下午3点」或「15:00」。"
 
     return "操作完成。"
