@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { X, MessageSquare } from "lucide-react"
-import { chatHistoryApi, accountApi, type ChatRecord, type Account } from "@/lib/api"
+import { chatHistoryApi, accountApi, type ChatRecord, type AccountLight } from "@/lib/api"
 
 const PAGE_SIZE = 100
 
@@ -35,7 +35,7 @@ interface UserEntry {
 
 export default function ChatHistoryPage() {
   const [modeFilter, setModeFilter] = useState("customer")
-  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accounts, setAccounts] = useState<AccountLight[]>([])
   const [allRecords, setAllRecords] = useState<ChatRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState("")
@@ -45,7 +45,7 @@ export default function ChatHistoryPage() {
 
   // 加载账号列表
   useEffect(() => {
-    accountApi.list().then(setAccounts).catch(() => {})
+    accountApi.listLight().then(setAccounts).catch(() => {})
   }, [])
 
   // 加载各模块记录数

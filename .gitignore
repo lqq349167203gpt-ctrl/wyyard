@@ -21,5 +21,6 @@ dist/
 # 通用
 .DS_Store
 *.log
+*.sql
 *.sql.gz
 backend/uploads/materials/

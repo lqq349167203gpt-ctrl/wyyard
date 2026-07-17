@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.middleware.jwt_auth import require_admin
 from app.models.base import StrictBaseModel
 from app.services import position_permission_service, position_customer_permission_service, position_page_permission_service
 
@@ -42,13 +43,13 @@ async def get_permissions(position: str):
 
 
 @router.put("")
-async def set_permissions(data: PermissionUpdate):
+async def set_permissions(data: PermissionUpdate, _admin: str = Depends(require_admin)):
     position_permission_service.set_permissions(data.position, data.pages)
     return {"message": "已保存"}
 
 
 @router.put("/full")
-async def set_full_permissions(data: FullPermissionUpdate):
+async def set_full_permissions(data: FullPermissionUpdate, _admin: str = Depends(require_admin)):
     position_permission_service.set_permissions(data.position, data.pages)
     # 无条件写入三块客户权限；空列表表示"该 position 不可见任何身份"，必须落盘
     position_customer_permission_service.set_customer_permissions("customers", data.position, data.customers)
@@ -62,7 +63,7 @@ async def set_full_permissions(data: FullPermissionUpdate):
 
 
 @router.put("/page-permissions")
-async def set_page_permissions(data: dict):
+async def set_page_permissions(data: dict, _admin: str = Depends(require_admin)):
     for page_key, positions in data.items():
         for position, member_types in positions.items():
             position_page_permission_service.set_page_permissions(page_key, position, member_types)

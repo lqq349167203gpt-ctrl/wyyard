@@ -29,7 +29,8 @@ export default function LoginPage() {
 
     try {
       const result = await accountApi.login(username, password)
-      if (result.success) {
+      // 写入加固：只有真正拿到 token 才写入登录态，避免无 token 也标记已登录的边缘情况
+      if (result.success && result.token) {
         const permissions = result.permissions || []
         if (permissions.length === 0 && result.account?.role !== "超级管理员") {
           setError("当前账号未配置系统权限")
@@ -37,7 +38,7 @@ export default function LoginPage() {
           return
         }
         localStorage.setItem("isLoggedIn", "true")
-        if (result.token) localStorage.setItem("authToken", result.token)
+        localStorage.setItem("authToken", result.token)
         localStorage.setItem("currentUser", JSON.stringify(result.account))
         localStorage.setItem("userPermissions", JSON.stringify(permissions))
         localStorage.setItem("userCustomerPermissions", JSON.stringify(result.customer_permissions || []))
@@ -49,6 +50,9 @@ export default function LoginPage() {
           localStorage.removeItem("rememberedUsername")
         }
         navigate("/")
+      } else if (result.success) {
+        // 接口返回成功但缺少 token，视为登录失败，不写入任何登录态
+        setError(result.message || "登录失败，请重试")
       } else {
         setError(result.message || "账号或密码错误")
       }

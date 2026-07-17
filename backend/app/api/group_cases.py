@@ -32,6 +32,11 @@ def list_cases(page: int | None = Query(None, ge=1), page_size: int | None = Que
     return items_dict
 
 
+@router.get("/search-customers")
+def search_customers(q: str = ""):
+    return group_case_service.search_customers(q)
+
+
 @router.get("/{case_id}")
 def get_case(case_id: str):
     case = group_case_service.get_case(case_id)
@@ -67,8 +72,3 @@ def delete_case(case_id: str):
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"message": message}
-
-
-@router.get("/search-customers")
-def search_customers(q: str = ""):
-    return group_case_service.search_customers(q)

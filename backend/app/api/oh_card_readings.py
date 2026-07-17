@@ -31,6 +31,11 @@ def list_readings(page: int | None = Query(None, ge=1), page_size: int | None = 
     return items_dict
 
 
+@router.get("/search-customers")
+def search_customers(q: str = ""):
+    return oh_card_reading_service.search_customers(q)
+
+
 @router.get("/{reading_id}")
 def get_reading(reading_id: str):
     reading = oh_card_reading_service.get_reading(reading_id)
@@ -66,8 +71,3 @@ def delete_reading(reading_id: str):
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"message": message}
-
-
-@router.get("/search-customers")
-def search_customers(q: str = ""):
-    return oh_card_reading_service.search_customers(q)

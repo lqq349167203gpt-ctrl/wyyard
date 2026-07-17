@@ -143,6 +143,14 @@ class CustomerUpdate(StrictBaseModel):
     position_sort_orders: Optional[Dict[str, int]] = None
     space_id: Optional[str] = Field(default=None, max_length=50)
 
+    @field_validator("nickname")
+    @classmethod
+    def validate_nickname_not_blank(cls, v: Optional[str]) -> Optional[str]:
+        # 若显式传了昵称则不允许空白，防止置空绕过创建时的非空约束（空值也不参与查重）
+        if v is not None and not v.strip():
+            raise ValueError("昵称不能为空")
+        return v
+
     @field_validator("position_sort_orders")
     @classmethod
     def validate_position_sort_orders(cls, v: Optional[Dict[str, int]]) -> Optional[Dict[str, int]]:

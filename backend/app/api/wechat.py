@@ -96,9 +96,8 @@ async def wechat_login(data: WechatLoginRequest):
 @router.post("/bind")
 async def wechat_bind(data: WechatBindRequest):
     """绑定微信账号：验证用户名密码，将 openid 关联到账号"""
-    # 验证 token 存在且未过期
-    from app.services.wechat_service import _sessions
-    session = _sessions.get(data.token)
+    # 验证 token 存在且未过期（直查数据库，多实例下立即可见）
+    session = wechat_service.get_session(data.token)
     if not session:
         raise HTTPException(status_code=400, detail="token 无效或已过期")
 
@@ -111,10 +110,9 @@ async def wechat_bind(data: WechatBindRequest):
     if not account:
         raise HTTPException(status_code=401, detail="账号或密码错误")
 
-    # 绑定
+    # 绑定（写穿到数据库）
     session.account_id = account.id
-    from app.services.wechat_service import _save_session
-    _save_session(data.token)
+    wechat_service.save_session(session)
 
     resp = _build_login_response(account)
     resp["token"] = _make_jwt_token(account)
@@ -128,10 +126,12 @@ class DevLoginRequest(StrictBaseModel):
 
 @router.post("/dev-login")
 async def dev_login(data: DevLoginRequest, request: Request):
-    """开发环境登录：直接用用户名登录，不需要密码（仅 debug 模式可用）"""
-    if not settings.debug:
+    """开发环境登录：直接用用户名登录，不需要密码（需 debug 且显式开启 enable_dev_login）"""
+    # 双闸：反代后客户端 IP 恒为 127.0.0.1，仅靠 debug 配置防线过薄，
+    # 必须同时显式开启 ENABLE_DEV_LOGIN 才暴露此端点，否则按 404 隐藏
+    if not (settings.debug and settings.enable_dev_login):
         raise HTTPException(status_code=404, detail="Not found")
-    # 仅允许本地/局域网访问
+    # 保留原 IP 白名单作为额外一层（仅在本机/无反代直连时有效）
     client_ip = request.client.host if request.client else ""
     if client_ip not in ("127.0.0.1", "::1", "localhost") and not client_ip.startswith("192.168."):
         raise HTTPException(status_code=403, detail="仅允许本地访问")

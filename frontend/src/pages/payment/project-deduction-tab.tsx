@@ -2,8 +2,8 @@ import { useEffect, useState, useRef, useCallback } from "react"
 import { CreditCard, Download, Pencil, Trash2, Upload } from "lucide-react"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
-import * as XLSX from "xlsx-js-style"
 import ExcelJS from "exceljs"
+import { sheetToRows } from "@/lib/excel"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -398,19 +398,21 @@ export function ProjectDeductionTab() {
 
     try {
       const data = await file.arrayBuffer()
-      const wb = XLSX.read(data, { type: "array" })
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.load(data)
       let success = 0
       let failed = 0
       const errors: string[] = []
 
       let processedSheets = 0
-      for (const sheetName of wb.SheetNames) {
+      for (const ws of wb.worksheets) {
+        const sheetName = ws.name
         const mappedType = SHEET_TYPE_MAP[sheetName]
         if (!mappedType) continue
         processedSheets++
 
-        const ws = wb.Sheets[sheetName]
-        const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 })
+        // 等价于原 XLSX.utils.sheet_to_json(ws, { header: 1 })
+        const rows = sheetToRows(ws)
         if (rows.length < 2) continue
 
         // 跳过提示文字行（第一行不是表头时）
@@ -506,7 +508,7 @@ export function ProjectDeductionTab() {
       }
 
       if (processedSheets === 0) {
-        errors.push(`未找到有效的 sheet（需要：${Object.keys(SHEET_TYPE_MAP).join("、")}），当前文件 sheet：${wb.SheetNames.join("、")}`)
+        errors.push(`未找到有效的 sheet（需要：${Object.keys(SHEET_TYPE_MAP).join("、")}），当前文件 sheet：${wb.worksheets.map(w => w.name).join("、")}`)
       }
 
       setImportResult({ success, failed, errors })

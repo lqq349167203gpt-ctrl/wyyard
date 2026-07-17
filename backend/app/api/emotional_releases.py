@@ -31,6 +31,11 @@ def list_releases(page: int | None = Query(None, ge=1), page_size: int | None = 
     return items_dict
 
 
+@router.get("/search-customers")
+def search_customers(q: str = ""):
+    return emotional_release_service.search_customers(q)
+
+
 @router.get("/{release_id}")
 def get_release(release_id: str):
     release = emotional_release_service.get_release(release_id)
@@ -66,8 +71,3 @@ def delete_release(release_id: str):
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"message": message}
-
-
-@router.get("/search-customers")
-def search_customers(q: str = ""):
-    return emotional_release_service.search_customers(q)

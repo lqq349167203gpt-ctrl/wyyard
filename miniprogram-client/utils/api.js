@@ -1,6 +1,10 @@
 // API 请求封装 — 客户端小程序
 
-const BASE_URL = 'http://localhost:8000'
+// 按小程序环境自动切换后端地址：开发版连本地，体验版/正式版连生产
+const { miniProgram: { envVersion } } = wx.getAccountInfoSync()
+const BASE_URL = envVersion === 'develop'
+  ? 'http://localhost:8000'
+  : 'https://www.wyteahouse.cn'
 
 function request(options) {
   return new Promise((resolve, reject) => {

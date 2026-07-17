@@ -7,6 +7,40 @@ def _unique(suffix=""):
     return f"{uuid.uuid4().hex[:12]}{suffix}"
 
 
+def _password(u):
+    """符合密码策略（≥8 位且必须含字母+数字）的测试密码"""
+    return f"pw{u}9"
+
+
+def _login(client, username, password):
+    return client.post("/api/accounts/login", json={
+        "username": username, "password": password,
+    })
+
+
+@pytest.fixture
+def make_account(client):
+    """创建测试账号（唯一后缀），用例结束后统一清理，避免污染共用库"""
+    created_ids = []
+
+    def _create(password=None):
+        u = _unique()
+        pwd = password or _password(u)
+        resp = client.post("/api/accounts", json={
+            "owner": f"owner_{u}", "role": "管理员",
+            "username": f"user_{u}", "password": pwd, "enabled": True,
+        })
+        assert resp.status_code == 200, resp.text
+        account = resp.json()
+        created_ids.append(account["id"])
+        return account, u, pwd
+
+    yield _create
+    for aid in created_ids:
+        # 用例自身可能已删除（404 忽略）
+        client.delete(f"/api/accounts/{aid}")
+
+
 class TestAccountCRUD:
     """账号增删改查"""
 
@@ -15,45 +49,41 @@ class TestAccountCRUD:
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
-    def test_create_account(self, client):
-        u = _unique()
+    def test_create_account(self, client, make_account):
+        account, u, _ = make_account()
+        assert account["id"] is not None
+
+    def test_create_duplicate_account(self, client, make_account):
+        """重复用户名应报错"""
+        account, u, pwd = make_account()
         resp = client.post("/api/accounts", json={
             "owner": f"owner_{u}", "role": "管理员",
-            "username": f"user_{u}", "password": "123", "enabled": True,
+            "username": f"user_{u}", "password": pwd, "enabled": True,
         })
-        assert resp.status_code == 200
-        assert resp.json()["id"] is not None
-
-    def test_create_duplicate_account(self, client):
-        """重复用户名应报错"""
-        u = _unique()
-        data = {"owner": f"dup_{u}", "role": "管理员", "username": f"dup_{u}", "password": "123", "enabled": True}
-        client.post("/api/accounts", json=data)
-        resp = client.post("/api/accounts", json=data)
         assert resp.status_code == 400
 
-    def test_update_account(self, client):
+    def test_create_account_weak_password(self, client):
+        """密码策略：过短或缺少字母/数字应报 400"""
         u = _unique()
-        resp = client.post("/api/accounts", json={
-            "owner": f"upd_{u}", "role": "管理员",
-            "username": f"upd_{u}", "password": "123", "enabled": True,
-        })
-        aid = resp.json()["id"]
-        resp = client.patch(f"/api/accounts/{aid}", json={"owner": f"new_{u}"})
+        for bad in ("123", "onlyletters", "12345678"):
+            resp = client.post("/api/accounts", json={
+                "owner": f"weak_{u}", "role": "管理员",
+                "username": f"weak_{u}", "password": bad, "enabled": True,
+            })
+            assert resp.status_code == 400
+
+    def test_update_account(self, client, make_account):
+        account, u, _ = make_account()
+        resp = client.patch(f"/api/accounts/{account['id']}", json={"owner": f"new_{u}"})
         assert resp.status_code == 200
 
     def test_update_account_not_found(self, client):
         resp = client.patch("/api/accounts/nonexistent-id", json={"owner": "x"})
         assert resp.status_code == 404
 
-    def test_delete_account(self, client):
-        u = _unique()
-        resp = client.post("/api/accounts", json={
-            "owner": f"del_{u}", "role": "管理员",
-            "username": f"del_{u}", "password": "123", "enabled": True,
-        })
-        aid = resp.json()["id"]
-        resp = client.delete(f"/api/accounts/{aid}")
+    def test_delete_account(self, client, make_account):
+        account, _, _ = make_account()
+        resp = client.delete(f"/api/accounts/{account['id']}")
         assert resp.status_code == 200
 
     def test_delete_account_not_found(self, client):
@@ -64,75 +94,67 @@ class TestAccountCRUD:
 class TestLogin:
     """登录"""
 
-    def test_login_success(self, client):
-        u = _unique()
-        client.post("/api/accounts", json={
-            "owner": f"login_{u}", "role": "管理员",
-            "username": f"login_{u}", "password": "loginpass", "enabled": True,
-        })
-        resp = client.post("/api/accounts/login", json={
-            "username": f"login_{u}", "password": "loginpass",
-        })
+    def test_login_success(self, client, make_account):
+        account, u, pwd = make_account()
+        resp = _login(client, f"user_{u}", pwd)
         assert resp.status_code == 200
         assert resp.json()["success"] is True
         assert "permissions" in resp.json()
 
-    def test_login_wrong_password(self, client):
-        u = _unique()
-        client.post("/api/accounts", json={
-            "owner": f"loginerr_{u}", "role": "管理员",
-            "username": f"loginerr_{u}", "password": "correctpass", "enabled": True,
-        })
-        resp = client.post("/api/accounts/login", json={
-            "username": f"loginerr_{u}", "password": "wrong_password",
-        })
+    def test_login_wrong_password(self, client, make_account):
+        account, u, _ = make_account()
+        resp = _login(client, f"user_{u}", f"wrong{u}9")
         assert resp.status_code == 200
         assert resp.json()["success"] is False
 
     def test_login_nonexistent_user(self, client):
-        resp = client.post("/api/accounts/login", json={
-            "username": f"nobody_{_unique()}", "password": "nopass",
-        })
+        resp = _login(client, f"nobody_{_unique()}", "nopass123")
         assert resp.status_code == 200
         assert resp.json()["success"] is False
 
 
 class TestPasswordChange:
-    """密码修改"""
+    """密码修改（自助改密，仅本人可操作）"""
 
-    def test_change_password(self, client):
-        u = _unique()
-        resp = client.post("/api/accounts", json={
-            "owner": f"pwd_{u}", "role": "管理员",
-            "username": f"pwd_{u}", "password": "oldpass", "enabled": True,
-        })
-        aid = resp.json()["id"]
-        resp = client.post(f"/api/accounts/{aid}/change-password", json={
-            "old_password": "oldpass", "new_password": "newpass123",
-        })
+    def _self_headers(self, client, username, password):
+        """以目标账号本人身份登录，返回其 Authorization header"""
+        resp = _login(client, username, password)
+        assert resp.json()["success"] is True
+        return {"Authorization": f"Bearer {resp.json()['token']}"}
+
+    def test_change_password(self, client, make_account):
+        account, u, old_pwd = make_account()
+        new_pwd = f"new{u}9"
+        headers = self._self_headers(client, f"user_{u}", old_pwd)
+        resp = client.post(f"/api/accounts/{account['id']}/change-password", json={
+            "old_password": old_pwd, "new_password": new_pwd,
+        }, headers=headers)
         assert resp.status_code == 200
-        resp = client.post("/api/accounts/login", json={
-            "username": f"pwd_{u}", "password": "newpass123",
-        })
+        resp = _login(client, f"user_{u}", new_pwd)
         assert resp.json()["success"] is True
 
-    def test_change_password_wrong_old(self, client):
-        u = _unique()
-        resp = client.post("/api/accounts", json={
-            "owner": f"pwderr_{u}", "role": "管理员",
-            "username": f"pwderr_{u}", "password": "correctpass", "enabled": True,
-        })
-        aid = resp.json()["id"]
-        resp = client.post(f"/api/accounts/{aid}/change-password", json={
-            "old_password": "wrong_old", "new_password": "newpass123",
-        })
+    def test_change_password_wrong_old(self, client, make_account):
+        account, u, pwd = make_account()
+        headers = self._self_headers(client, f"user_{u}", pwd)
+        resp = client.post(f"/api/accounts/{account['id']}/change-password", json={
+            "old_password": f"wrong{u}9", "new_password": f"new{u}9",
+        }, headers=headers)
         assert resp.status_code == 400
 
-    def test_change_password_account_not_found(self, client):
+    def test_change_password_nonexistent_not_found(self, client):
+        """自助改密先查账号存在性：不存在的账号返回 404"""
         resp = client.post("/api/accounts/nonexistent/change-password", json={
-            "old_password": "x", "new_password": "y",
+            "old_password": "x1234567", "new_password": "y1234567",
         })
         assert resp.status_code == 404
+
+    def test_change_password_other_account_forbidden(self, client, make_account):
+        """账号存在但非本人（当前登录为管理员）时返回 403"""
+        account, _, _ = make_account()
+        resp = client.post(f"/api/accounts/{account['id']}/change-password", json={
+            "old_password": "x1234567", "new_password": "y1234567",
+        })
+        assert resp.status_code == 403
 
 
 class TestRoles:

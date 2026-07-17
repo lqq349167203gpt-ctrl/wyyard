@@ -31,6 +31,11 @@ def list_cards(page: int | None = Query(None, ge=1), page_size: int | None = Que
     return items_dict
 
 
+@router.get("/search-customers")
+def search_customers(q: str = ""):
+    return membership_card_service.search_customers(q)
+
+
 @router.get("/{card_id}")
 def get_card(card_id: str):
     card = membership_card_service.get_card(card_id)
@@ -71,8 +76,3 @@ def delete_card(card_id: str):
     if not membership_card_service.delete_card(card_id):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "删除成功"}
-
-
-@router.get("/search-customers")
-def search_customers(q: str = ""):
-    return membership_card_service.search_customers(q)

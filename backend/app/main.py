@@ -71,15 +71,18 @@ app = FastAPI(title=settings.app_name, version="0.1.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# 中间件顺序：后 add 的在更外层。CORSMiddleware 最后 add（最外层），
+# 保证 AuthMiddleware 直接返回的 401 也带 CORS 头；X-New-Token 需暴露给前端读取。
+app.add_middleware(OperationLogMiddleware)
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-New-Token"],
 )
-app.add_middleware(AuthMiddleware)
-app.add_middleware(OperationLogMiddleware)
 
 
 app.include_router(agents_router)

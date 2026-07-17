@@ -1,48 +1,43 @@
+"""微信小程序会话（token）服务
+
+读取每次直查 PostgreSQL，不使用进程内存缓存：
+多实例/多进程部署时，import 时加载的内存快照会导致 token 互认失败/误踢。
+写入保持同步落库（save_item / delete_item），过期删除同样写穿到 DB。
+（模式比照 session_service.py）
+"""
 import uuid
 import json
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict
+from typing import Optional
 from urllib.request import urlopen, Request
 from urllib.parse import urlencode
 
 from app.models.wechat_session import WechatSession
-from app.services.storage import load_data, save_item, save_data
+from app.services.storage import delete_item, load_data, load_item, save_item
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 SESSIONS_FILE = "wechat_sessions.json"
-_sessions: Dict[str, WechatSession] = {}
 
 EXPIRE_DAYS = 30
 
 
-def _load_sessions():
-    global _sessions
-    data = load_data(SESSIONS_FILE)
-    _sessions = {k: WechatSession(**v) for k, v in data.items()}
+def get_session(token: str) -> Optional[WechatSession]:
+    """按 token 直查数据库，保证多实例下读取立即一致"""
+    data = load_item(SESSIONS_FILE, token)
+    return WechatSession(**data) if data else None
 
 
-def _save_session(token: str):
-    session = _sessions.get(token)
-    if session:
-        save_item(SESSIONS_FILE, token, session.model_dump(mode="json"))
+def save_session(session: WechatSession):
+    """写穿到数据库（upsert 单条记录）"""
+    save_item(SESSIONS_FILE, session.token, session.model_dump(mode="json"))
 
 
-_load_sessions()
-
-
-def _clean_expired():
-    now = datetime.now(timezone.utc)
-    expired = [t for t, s in _sessions.items() if now - s.created_at > timedelta(days=EXPIRE_DAYS)]
-    for t in expired:
-        del _sessions[t]
-    if expired:
-        save_data(SESSIONS_FILE, {k: v.model_dump(mode="json") for k, v in _sessions.items()})
-
-
-_clean_expired()
+def delete_session(token: str):
+    """删除单条会话，写穿到数据库"""
+    delete_item(SESSIONS_FILE, token)
 
 
 def jscode2session(code: str) -> dict:
@@ -71,7 +66,10 @@ def jscode2session(code: str) -> dict:
 
 
 def find_session_by_openid(openid: str) -> Optional[WechatSession]:
-    for session in _sessions.values():
+    # 每次直查数据库，保证其他实例写入的绑定关系立即可见
+    data = load_data(SESSIONS_FILE) or {}
+    for v in data.values():
+        session = WechatSession(**v)
         if session.openid == openid:
             return session
     return None
@@ -85,18 +83,18 @@ def create_session(openid: str, account_id: str) -> WechatSession:
         account_id=account_id,
         created_at=datetime.now(timezone.utc),
     )
-    _sessions[token] = session
-    _save_session(token)
+    save_session(session)
     return session
 
 
 def validate_token(token: str) -> Optional[str]:
     """校验 token，返回 account_id 或 None"""
-    session = _sessions.get(token)
+    session = get_session(token)
     if not session:
         return None
     if datetime.now(timezone.utc) - session.created_at > timedelta(days=EXPIRE_DAYS):
-        del _sessions[token]
+        # 过期删除写穿到 DB，避免多实例下旧 token 仍被其他实例认账
+        delete_session(token)
         return None
     return session.account_id
 

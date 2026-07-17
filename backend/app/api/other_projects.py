@@ -30,6 +30,16 @@ def list_projects(page: int | None = Query(None, ge=1), page_size: int | None = 
     return items
 
 
+@router.get("/search-customers")
+def search_customers(q: str = ""):
+    return other_project_service.search_customers(q)
+
+
+@router.get("/deductions")
+def list_deductions(customer_id: str | None = Query(None)):
+    return [d.model_dump(mode="json") for d in other_project_deduction_service.list_deductions(customer_id)]
+
+
 @router.get("/{project_id}")
 def get_project(project_id: str):
     project = other_project_service.get_project(project_id)
@@ -58,16 +68,6 @@ def delete_project(project_id: str):
     if not other_project_service.delete_project(project_id):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "删除成功"}
-
-
-@router.get("/search-customers")
-def search_customers(q: str = ""):
-    return other_project_service.search_customers(q)
-
-
-@router.get("/deductions")
-def list_deductions(customer_id: str | None = Query(None)):
-    return [d.model_dump(mode="json") for d in other_project_deduction_service.list_deductions(customer_id)]
 
 
 @router.post("/deductions")

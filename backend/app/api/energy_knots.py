@@ -31,6 +31,11 @@ def list_knots(page: int | None = Query(None, ge=1), page_size: int | None = Que
     return items_dict
 
 
+@router.get("/search-customers")
+def search_customers(q: str = ""):
+    return energy_knot_service.search_customers(q)
+
+
 @router.get("/{knot_id}")
 def get_knot(knot_id: str):
     knot = energy_knot_service.get_knot(knot_id)
@@ -66,8 +71,3 @@ def delete_knot(knot_id: str):
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"message": message}
-
-
-@router.get("/search-customers")
-def search_customers(q: str = ""):
-    return energy_knot_service.search_customers(q)

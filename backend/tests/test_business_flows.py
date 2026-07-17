@@ -15,11 +15,13 @@ class TestCustomerLifecycle:
     def test_create_customer_with_all_fields(self, client):
         """创建客户：所有字段都填写"""
         u = _u()
+        # 手机号加唯一后缀，避免与历史残留数据冲突（409 手机号已存在）
+        digits = "".join(c for c in u if c.isdigit())[:8].ljust(8, "0")
         resp = client.post("/api/customers", json={
             "nickname": f"完整客户_{u}",
             "name": "李四",
             "gender": "女",
-            "phone": "13900001111",
+            "phone": f"139{digits}",
             "wechat": f"wechat_{u}",
             "age": "28",
             "traffic_source": "小红书",
@@ -507,24 +509,28 @@ class TestPermissionFlows:
     def test_account_login_with_permissions(self, client):
         """账号登录：验证返回权限信息"""
         u = _u()
-        # 创建账号
-        client.post("/api/accounts", json={
+        # 创建账号（密码需 >=8 位且含字母+数字）
+        resp = client.post("/api/accounts", json={
             "owner": f"perm_{u}",
             "role": "超级管理员",
             "username": f"perm_{u}",
-            "password": "pass123",
+            "password": "pass1234",
             "enabled": True,
         })
+        assert resp.status_code == 200
+        account_id = resp.json()["id"]
         # 登录
         resp = client.post("/api/accounts/login", json={
             "username": f"perm_{u}",
-            "password": "pass123",
+            "password": "pass1234",
         })
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
         assert "permissions" in data
         assert "account" in data
+        # 清理，避免残留账号
+        client.delete(f"/api/accounts/{account_id}")
 
     def test_role_crud_flow(self, client):
         """角色管理：创建 → 查询 → 更新 → 删除"""
@@ -707,13 +713,19 @@ class TestOperationLogs:
         resp = client.get("/api/operation-logs")
         initial_count = len(resp.json())
 
-        # 执行一个创建操作
-        client.post("/api/spaces", json={"name": "日志测试空间"})
+        # 执行一个创建操作（唯一命名，避免与历史残留冲突导致创建失败、无日志产生）
+        space_name = f"日志测试空间_{_u()}"
+        resp = client.post("/api/spaces", json={"name": space_name})
+        assert resp.status_code == 200
+        space_id = resp.json()["id"]
 
         # 检查日志是否增加
         resp = client.get("/api/operation-logs")
         new_count = len(resp.json())
         assert new_count > initial_count
+
+        # 清理，避免残留
+        client.delete(f"/api/spaces/{space_id}")
 
     def test_operation_log_filter(self, client):
         """操作日志：按条件筛选"""
@@ -834,12 +846,17 @@ class TestEdgeCases:
             "/api/visits/search-customers?q=",
             "/api/class-records/search-customers?q=",
             "/api/healing-records/search-customers?q=",
-            "/api/membership-cards/search-customers?q=",
         ]
         for ep in endpoints:
             resp = client.get(ep)
             assert resp.status_code == 200
             assert resp.json() == [], f"{ep} 空搜索应返回空列表"
+
+    def test_membership_cards_empty_search_returns_empty_list(self, client):
+        """付费卡空搜索应返回空列表"""
+        resp = client.get("/api/membership-cards/search-customers?q=")
+        assert resp.status_code == 200
+        assert resp.json() == []
 
     def test_nonexistent_search_returns_empty(self, client):
         """搜索不存在的关键词应返回空列表"""

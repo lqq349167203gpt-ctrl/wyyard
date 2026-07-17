@@ -463,11 +463,10 @@ class TestEnergyKnotSessionFull:
             "date": "2026-08-03",
             "owner_id": created_customer["id"],
             "owner_name": created_customer["nickname"],
-            "host_ids": ["h1", "h2"],
-            "host_names": ["老师A", "老师B"],
+            "teacher_ids": ["t1", "t2"],
         })
         assert resp.status_code == 200
-        assert len(resp.json()["host_ids"]) == 2
+        assert len(resp.json()["teacher_ids"]) == 2
 
     def test_create_with_participants(self, client, created_customer):
         resp = client.post("/api/energy-knot-sessions", json={

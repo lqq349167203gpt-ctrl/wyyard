@@ -2,8 +2,8 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, CreditCard, X, Wallet, Heart, Layers, Zap, GraduationCap, Package, Download, Upload } from "lucide-react"
-import * as XLSX from "xlsx-js-style"
 import ExcelJS from "exceljs"
+import { sheetToRows } from "@/lib/excel"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -954,18 +954,20 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
 
     try {
       const data = await file.arrayBuffer()
-      const wb = XLSX.read(data, { type: "array" })
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.load(data)
 
       // 第一轮：校验所有行
       const validRows: { sheetName: string; type: ProjectTypeKey; payload: any; dupKey: string }[] = []
       const allErrors: string[] = []
 
-      for (const sheetName of wb.SheetNames) {
+      for (const ws of wb.worksheets) {
+        const sheetName = ws.name
         const type = SHEET_TYPE_MAP[sheetName]
         if (!type) continue
 
-        const ws = wb.Sheets[sheetName]
-        const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 })
+        // 等价于原 XLSX.utils.sheet_to_json(ws, { header: 1 })
+        const rows = sheetToRows(ws)
         if (rows.length < 2) continue
 
         const headers = rows[0] as string[]

@@ -1,5 +1,26 @@
 """付费项目 + 疗愈空间 API 测试"""
 import pytest
+import uuid
+
+
+def _u():
+    return uuid.uuid4().hex[:8]
+
+
+@pytest.fixture
+def created_space(client):
+    """创建唯一名称的测试空间，用后连同其房间一起清理（空间有活动房间时禁止删除）"""
+    resp = client.post("/api/spaces", json={"name": f"测试空间_{_u()}"})
+    assert resp.status_code == 200
+    space = resp.json()
+    yield space
+    # 清理：先删本空间下的房间，再删空间（只动自己创建的数据）
+    spaces = client.get("/api/spaces").json()
+    mine = next((s for s in spaces if s["id"] == space["id"]), None)
+    if mine:
+        for room in mine.get("rooms", []):
+            client.delete(f"/api/spaces/{space['id']}/rooms/{room['id']}")
+        client.delete(f"/api/spaces/{space['id']}")
 
 
 # ===== 会员卡 (Membership Cards) =====
@@ -113,36 +134,37 @@ class TestSpaces:
         assert isinstance(resp.json(), list)
 
     def test_create(self, client):
-        resp = client.post("/api/spaces", json={"name": "测试空间"})
+        # 空间名称全局唯一（重名 400），用唯一后缀避免与残留/并发数据冲突
+        name = f"测试空间_{_u()}"
+        resp = client.post("/api/spaces", json={"name": name})
         assert resp.status_code == 200
-        assert resp.json()["name"] == "测试空间"
+        assert resp.json()["name"] == name
         assert resp.json()["id"] is not None
+        client.delete(f"/api/spaces/{resp.json()['id']}")  # 用完清理
 
-    def test_update(self, client):
-        resp = client.post("/api/spaces", json={"name": "待更新空间"})
-        sid = resp.json()["id"]
-        resp = client.patch(f"/api/spaces/{sid}", json={"name": "已更新空间"})
+    def test_update(self, client, created_space):
+        sid = created_space["id"]
+        new_name = f"已更新空间_{_u()}"
+        resp = client.patch(f"/api/spaces/{sid}", json={"name": new_name})
         assert resp.status_code == 200
-        assert resp.json()["name"] == "已更新空间"
+        assert resp.json()["name"] == new_name
 
     def test_delete(self, client):
-        resp = client.post("/api/spaces", json={"name": "待删除空间"})
+        resp = client.post("/api/spaces", json={"name": f"待删除空间_{_u()}"})
         sid = resp.json()["id"]
         resp = client.delete(f"/api/spaces/{sid}")
         assert resp.status_code == 200
 
-    def test_add_room(self, client):
-        resp = client.post("/api/spaces", json={"name": "房间测试空间"})
+    def test_add_room(self, client, created_space):
+        # 房间名称全局唯一（跨空间，重名 400），用唯一后缀
+        room_name = f"A101_{_u()}"
+        resp = client.post(f"/api/spaces/{created_space['id']}/rooms", json={"name": room_name})
         assert resp.status_code == 200
-        sid = resp.json()["id"]
-        resp = client.post(f"/api/spaces/{sid}/rooms", json={"name": "A101"})
-        assert resp.status_code == 200
-        assert resp.json()["name"] == "A101"
+        assert resp.json()["name"] == room_name
 
-    def test_delete_room(self, client):
-        resp = client.post("/api/spaces", json={"name": "删房间测试空间"})
-        sid = resp.json()["id"]
-        resp = client.post(f"/api/spaces/{sid}/rooms", json={"name": "B201"})
+    def test_delete_room(self, client, created_space):
+        sid = created_space["id"]
+        resp = client.post(f"/api/spaces/{sid}/rooms", json={"name": f"B201_{_u()}"})
         assert resp.status_code == 200
         rid = resp.json()["id"]
         resp = client.delete(f"/api/spaces/{sid}/rooms/{rid}")

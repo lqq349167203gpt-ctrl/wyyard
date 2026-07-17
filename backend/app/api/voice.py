@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+from starlette.requests import Request as StarletteRequest
 
+from app.middleware.rate_limit import limiter
 from app.services import voice_parser
 from app.services import visit_chat as visit_chat_service
 from app.services import activity_chat as activity_chat_service
@@ -22,6 +24,17 @@ class VoiceAudioRequest(BaseModel):
     format: str = "mp3"
 
 
+# 音频 base64 长度上限：base64 开销约 33%，14MB 音频 ≈ 1870 万字符，取 1900 万封顶
+# （对齐 system_helper.py 图片上传 14MB 量级，防止超大音频刷 ASR/LLM 费用）
+MAX_AUDIO_BASE64_LEN = 19_000_000
+
+
+def _check_audio_size(audio_base64: str) -> None:
+    """校验音频 base64 长度，超限返回 413"""
+    if len(audio_base64) > MAX_AUDIO_BASE64_LEN:
+        raise HTTPException(status_code=413, detail="音频数据过大，请缩短录音时长后重试")
+
+
 class SaveErrorRequest(BaseModel):
     error: str
     previous_data: dict = {}
@@ -37,10 +50,12 @@ async def parse_customer_voice(req: VoiceParseRequest):
 
 
 @router.post("/transcribe")
-async def transcribe_audio(req: VoiceAudioRequest):
+@limiter.limit("10/minute")
+async def transcribe_audio(req: VoiceAudioRequest, request: StarletteRequest):
     """纯 ASR：音频转文字，不做提取"""
     if not req.audio_base64:
         raise HTTPException(status_code=400, detail="音频数据为空")
+    _check_audio_size(req.audio_base64)
     text = voice_parser.transcribe_audio(req.audio_base64, req.format)
     if not text:
         raise HTTPException(status_code=400, detail="语音识别为空，请重新录音")
@@ -48,10 +63,12 @@ async def transcribe_audio(req: VoiceAudioRequest):
 
 
 @router.post("/parse-customer-audio")
-async def parse_customer_audio(req: VoiceAudioRequest):
+@limiter.limit("10/minute")
+async def parse_customer_audio(req: VoiceAudioRequest, request: StarletteRequest):
     """从音频中提取客户信息（ASR + LLM）"""
     if not req.audio_base64:
         raise HTTPException(status_code=400, detail="音频数据为空")
+    _check_audio_size(req.audio_base64)
     # 1. 音频转文字
     text = voice_parser.transcribe_audio(req.audio_base64, req.format)
     if not text:

@@ -99,7 +99,7 @@ export default function RemindersPage() {
 
   useEffect(() => {
     positionApi.list().then(list => setRoles(list.map((p: { name: string }) => p.name))).catch(() => {})
-    accountApi.list().then((list: { id: string; username: string }[]) => setAccounts(list)).catch(() => {})
+    accountApi.listLight().then((list: { id: string; username: string }[]) => setAccounts(list)).catch(() => {})
   }, [])
 
   const accountMap = Object.fromEntries(accounts.map(a => [a.id, a.username]))

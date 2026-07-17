@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { ChevronLeft, ChevronRight, ChevronDown, Edit, Trash2, Download, Clock, Undo2, Redo2 } from "lucide-react"
-import * as XLSX from "xlsx-js-style"
+import ExcelJS from "exceljs"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -339,7 +339,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     if (!referrerHandler) {
       const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
       if (cu.id) {
-        accountApi.list().then(accounts => {
+        accountApi.listLight().then(accounts => {
           const me = accounts.find((a: any) => a.id === cu.id)
           if (me?.owner) setReferrerHandler(me.owner)
         }).catch(() => {})
@@ -578,65 +578,63 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       }
     })
     if (!rows.length) return
-    const ws = XLSX.utils.json_to_sheet(rows, { cellStyles: true })
-    ws['!cols'] = [
-      { wch: 10 }, // 引流人
-      { wch: 12 }, // 客户昵称
-      { wch: 10 }, // 预计时间
-      { wch: 10 }, // 参与次数
-      { wch: 12 }, // 会员身份
-      { wch: 40 }, // 当日需求
-      { wch: 10 }, // 组长情况
-      { wch: 30 }, // 组长获得的信息
-      { wch: 10 }, // 邀约人
-    ]
-    ws['!sheetPr'] = { showGridLines: false }
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-    // 按内容自动计算行高
-    const colWidths = ws['!cols']?.map(c => c.wch || 10) || []
-    ws['!rows'] = Array.from({ length: range.e.r + 1 }, (_, row) => {
+
+    const headers = Object.keys(rows[0])
+    const colWidths = [10, 12, 10, 10, 12, 40, 10, 30, 10]
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet("邀约到场", { views: [{ showGridLines: false }] })
+    ws.columns = headers.map((h, i) => ({ header: h, key: h, width: colWidths[i] }))
+    rows.forEach(r => ws.addRow(r))
+
+    // 按内容自动计算行高（估算每行能放的字符数，中文约 2 字符宽度）
+    const calcLines = (text: string, wch: number) => {
+      let lineLen = 0, lines = 1
+      for (const ch of text) {
+        lineLen += ch.charCodeAt(0) > 127 ? 2 : 1
+        if (lineLen > wch) { lines++; lineLen = ch.charCodeAt(0) > 127 ? 2 : 1 }
+      }
+      return lines
+    }
+    ws.eachRow((row) => {
       let maxLines = 1
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
-        const cell = ws[cellRef]
-        if (!cell?.v) continue
-        const text = String(cell.v)
-        const wch = colWidths[col] || 10
-        // 估算每行能放的字符数（中文约2字符宽度）
-        let lineLen = 0, lines = 1
-        for (const ch of text) {
-          lineLen += ch.charCodeAt(0) > 127 ? 2 : 1
-          if (lineLen > wch) { lines++; lineLen = ch.charCodeAt(0) > 127 ? 2 : 1 }
-        }
-        if (lines > maxLines) maxLines = lines
+      for (let i = 0; i < headers.length; i++) {
+        const v = row.getCell(i + 1).value
+        if (v == null || v === "") continue
+        maxLines = Math.max(maxLines, calcLines(String(v), colWidths[i]))
       }
-      return { hpt: Math.max(30, maxLines * 18) }
+      row.height = Math.max(30, maxLines * 18)
     })
-    const thinBorder = { style: "thin", color: { rgb: "C0C4CC" } }
-    const baseStyle = {
-      alignment: { vertical: "center", wrapText: true },
-      border: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+
+    // 全表细边框 + 垂直居中 + 自动换行
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top: { style: "thin", color: { argb: "FFC0C4CC" } },
+      bottom: { style: "thin", color: { argb: "FFC0C4CC" } },
+      left: { style: "thin", color: { argb: "FFC0C4CC" } },
+      right: { style: "thin", color: { argb: "FFC0C4CC" } },
     }
-    for (let row = 0; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
-        if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...baseStyle }
+    ws.eachRow((row, rowNumber) => {
+      for (let c = 1; c <= headers.length; c++) {
+        const cell = row.getCell(c)
+        cell.border = thinBorder
+        // 参与次数列（第 4 列）数据行内容左对齐
+        const alignLeft = rowNumber > 1 && c === 4
+        cell.alignment = { vertical: "middle", wrapText: true, ...(alignLeft ? { horizontal: "left" as const } : {}) }
       }
-    }
-    // 参与次数列（第3列）内容左对齐
-    const countColStyle = { alignment: { vertical: "center", horizontal: "left", wrapText: true } }
-    for (let row = 1; row <= range.e.r; row++) {
-      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 })
-      if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...countColStyle }
-    }
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "D0D3D6" } } }
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
-      if (ws[cellRef]) ws[cellRef].s = { ...ws[cellRef].s, ...headerStyle }
-    }
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "邀约到场")
-    XLSX.writeFile(wb, `邀约到场_${selectedDate}.xlsx`)
+    })
+    // 表头加粗 + 灰底
+    ws.getRow(1).eachCell(cell => {
+      cell.font = { bold: true }
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D3D6" } }
+    })
+
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `邀约到场_${selectedDate}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (

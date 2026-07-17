@@ -3,7 +3,7 @@ import { X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { operationLogApi, accountApi, customerApi, organizationApi, positionPermissionApi, positionCustomerPermissionApi, memberIdentityApi } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
-import type { OperationLog, Account, Customer, Organization } from "@/lib/api"
+import type { OperationLog, AccountLight, Customer, Organization } from "@/lib/api"
 import {
   Dialog,
   DialogContent,
@@ -161,7 +161,7 @@ export default function OperationLogsPage() {
   const [dateTo, setDateTo] = useState("")
   const [keywordFilter, setKeywordFilter] = useState("")
   const [selectedLog, setSelectedLog] = useState<OperationLog | null>(null)
-  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accounts, setAccounts] = useState<AccountLight[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, dateFrom, dateTo, keywordFilter })
@@ -194,7 +194,7 @@ export default function OperationLogsPage() {
   } = useServerPagination<OperationLog>(fetchLogs, { pageSize: PAGE_SIZE })
 
   useEffect(() => {
-    accountApi.list().then(setAccounts).catch(() => {})
+    accountApi.listLight().then(setAccounts).catch(() => {})
     customerApi.list().then(setCustomers).catch(() => {})
     organizationApi.list().then(setOrganizations).catch(() => {})
   }, [])

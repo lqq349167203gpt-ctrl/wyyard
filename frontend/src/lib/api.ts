@@ -18,6 +18,14 @@ function handle401() {
   window.location.href = "/login"
 }
 
+// 滑动续期：后端在 token 剩余有效期不足一半时，通过响应头 X-New-Token 下发新 token
+// （新 token 与原 token 仅 exp 不同，jti 不变）。每个响应拿到后都检查一次，
+// 有则更新本地 authToken；401 响应仍走 handle401 清空逻辑，不受影响。
+function applyNewToken(res: Response) {
+  const newToken = res.headers.get("X-New-Token")
+  if (newToken) localStorage.setItem("authToken", newToken)
+}
+
 export interface PaginatedResponse<T> {
   items: T[]
   total: number
@@ -41,6 +49,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { ...authHeaders, ...options?.headers },
   })
+  applyNewToken(res)
   if (res.status === 401) { handle401(); throw new Error("登录已过期") }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
@@ -134,6 +143,7 @@ export const systemHelperApi = {
       signal,
     })
 
+    applyNewToken(res)
     if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -173,6 +183,7 @@ export const systemHelperApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ message, history }),
     })
+    applyNewToken(res)
     if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error(`请求失败: ${res.status}`)
     return res.json()
@@ -184,6 +195,7 @@ export const systemHelperApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ action, data }),
     })
+    applyNewToken(res)
     if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error(`请求失败: ${res.status}`)
     return res.json()
@@ -195,6 +207,7 @@ export const systemHelperApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ image, text, history }),
     })
+    applyNewToken(res)
     if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error(`请求失败: ${res.status}`)
     return res.json()
@@ -633,6 +646,7 @@ export const uploadApi = {
     const uploadHeaders: Record<string, string> = {}
     if (token) uploadHeaders["Authorization"] = `Bearer ${token}`
     const res = await fetch(`${API_BASE}/api/uploads/materials`, { method: "POST", headers: uploadHeaders, body: formData })
+    applyNewToken(res)
     if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) throw new Error("上传失败")
     return res.json()
@@ -1705,6 +1719,13 @@ export interface Account {
   is_system?: boolean
 }
 
+// 轻量账号名单：供非管理员页面的选择器使用（对应 GET /api/accounts/light）
+export interface AccountLight {
+  id: string
+  username: string
+  owner: string
+}
+
 export interface AccountCreate {
   owner: string
   role: string
@@ -1727,6 +1748,7 @@ export interface RoleCreate {
 
 export const accountApi = {
   list: () => request<Account[]>("/api/accounts"),
+  listLight: () => request<AccountLight[]>("/api/accounts/light"),
   create: (data: AccountCreate) => request<Account>("/api/accounts", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<AccountCreate>) => request<Account>(`/api/accounts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/accounts/${id}`, { method: "DELETE" }),

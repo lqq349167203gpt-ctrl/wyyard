@@ -100,7 +100,9 @@ class TestMembershipCardCreate:
             "duration_value": 3,
         })
         assert resp.status_code == 200
-        assert resp.json()["expiry_date"] == "2026-08-01"
+        # 到期日语义（f496338「会员卡到期日修正」起生效）：含生效日当天，
+        # 到期日 = 生效日 + 时长 - 1 天，即 2026-05-01 起 3 个月 → 2026-07-31
+        assert resp.json()["expiry_date"] == "2026-07-31"
 
     def test_with_duration_type(self, client, created_customer):
         """带有效期类型"""

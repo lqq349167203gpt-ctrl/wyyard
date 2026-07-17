@@ -98,6 +98,21 @@ def load_data(filename: str) -> Dict[str, Any]:
         _put_conn(conn)
 
 
+def load_item(filename: str, item_id: str) -> Any:
+    """按 id 读取单条记录，避免整表加载（供高频鉴权路径使用）"""
+    _validate_filename(filename)
+    table = _table_name(filename)
+    conn = _get_conn()
+    try:
+        _ensure_table(table)
+        with conn.cursor() as cur:
+            cur.execute(f'SELECT data FROM "{table}" WHERE id = %s', (item_id,))
+            row = cur.fetchone()
+        return json.loads(row[0]) if row else None
+    finally:
+        _put_conn(conn)
+
+
 def save_data(filename: str, data: Dict[str, Any]):
     _validate_filename(filename)
     table = _table_name(filename)

@@ -1,5 +1,10 @@
 """权限 + 提醒 + 课程类型 API 测试"""
 import pytest
+import uuid
+
+
+def _u(suffix=""):
+    return f"{uuid.uuid4().hex[:12]}{suffix}"
 
 
 # ===== 角色 (Positions) =====
@@ -11,19 +16,23 @@ class TestPositions:
         assert isinstance(resp.json(), list)
 
     def test_create(self, client):
-        resp = client.post("/api/positions", json={"name": "测试角色Pos"})
+        # 唯一后缀命名，避免与历史残留数据冲突（400 名称已存在）
+        name = f"测试角色Pos_{_u()}"
+        resp = client.post("/api/positions", json={"name": name})
         assert resp.status_code == 200
-        assert resp.json()["name"] == "测试角色Pos"
+        assert resp.json()["name"] == name
         assert resp.json()["id"] is not None
 
     def test_update(self, client):
-        resp = client.post("/api/positions", json={"name": "待更新Pos"})
+        resp = client.post("/api/positions", json={"name": f"待更新Pos_{_u()}"})
         pid = resp.json()["id"]
-        resp = client.patch(f"/api/positions/{pid}", json={"name": "已更新Pos"})
+        resp = client.patch(f"/api/positions/{pid}", json={"name": f"已更新Pos_{_u()}"})
         assert resp.status_code == 200
+        # 清理，避免残留
+        client.delete(f"/api/positions/{pid}")
 
     def test_delete(self, client):
-        resp = client.post("/api/positions", json={"name": "待删除Pos"})
+        resp = client.post("/api/positions", json={"name": f"待删除Pos_{_u()}"})
         pid = resp.json()["id"]
         resp = client.delete(f"/api/positions/{pid}")
         assert resp.status_code == 200
@@ -37,19 +46,24 @@ class TestPositionPermissions:
         assert resp.status_code == 200
 
     def test_get_by_position(self, client):
-        resp = client.post("/api/positions", json={"name": "PermTestRole"})
+        # 唯一后缀命名，避免与历史残留数据冲突
+        resp = client.post("/api/positions", json={"name": f"PermTestRole_{_u()}"})
         pid = resp.json()["id"]
         resp = client.get(f"/api/position-permissions/{pid}")
         assert resp.status_code == 200
+        # 清理，避免残留
+        client.delete(f"/api/positions/{pid}")
 
     def test_set_permissions(self, client):
-        resp = client.post("/api/positions", json={"name": "PermSetRole"})
+        resp = client.post("/api/positions", json={"name": f"PermSetRole_{_u()}"})
         pid = resp.json()["id"]
         resp = client.put("/api/position-permissions", json={
             "position": pid,
             "pages": ["healing-records", "class-records"],
         })
         assert resp.status_code == 200
+        # 清理，避免残留
+        client.delete(f"/api/positions/{pid}")
 
 
 # ===== 提醒配置 (Reminders) =====
@@ -104,12 +118,16 @@ class TestCourseTypes:
         assert isinstance(resp.json(), list)
 
     def test_create(self, client):
-        resp = client.post("/api/course-types", json={"name": "测试课程类型"})
+        # 唯一后缀命名，避免与历史残留数据冲突（409 类型名称已存在）
+        name = f"测试课程类型_{_u()}"
+        resp = client.post("/api/course-types", json={"name": name})
         assert resp.status_code == 200
-        assert resp.json()["name"] == "测试课程类型"
+        assert resp.json()["name"] == name
+        # 清理，避免残留
+        client.delete(f"/api/course-types/{name}")
 
     def test_delete(self, client):
-        resp = client.post("/api/course-types", json={"name": "待删除课程类型"})
+        resp = client.post("/api/course-types", json={"name": f"待删除课程类型_{_u()}"})
         name = resp.json()["name"]
         resp = client.delete(f"/api/course-types/{name}")
         assert resp.status_code == 200

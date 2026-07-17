@@ -5,6 +5,9 @@ from pydantic import model_validator
 class Settings(BaseSettings):
     app_name: str = "wyyard-backend"
     debug: bool = False
+    # dev-login 独立开关：反代后客户端 IP 恒为 127.0.0.1，IP 白名单形同虚设，
+    # 因此除 debug 外还需显式开启本开关才允许免密登录（环境变量 ENABLE_DEV_LOGIN）
+    enable_dev_login: bool = False
 
     # LLM（默认智谱 GLM-5）
     llm_api_key: str = ""
@@ -25,7 +28,8 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 168
+    # 默认 720h（30 天），配合滑动续期减少被迫重新登录
+    jwt_expire_hours: int = 720
 
     # 系统 API Key
     system_api_key: str = ""

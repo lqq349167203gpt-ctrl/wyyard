@@ -11,34 +11,51 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from fastapi.testclient import TestClient
 from app.main import app
-from app.middleware.jwt_auth import create_access_token
-from app.services import account_service
+from app.middleware.jwt_auth import create_access_token, decode_token
+from app.models.account import AccountCreate, AccountUpdate
+from app.services import account_service, session_service
 
 client = TestClient(app)
 
-# ─── 用真实账号 ID 生成 token ─────────────────────────────────────────────────
+# ─── 种子账号：不存在则自动创建（测试专用，密码统一） ──────────────────────────
 
+TEST_PASSWORD = "Test@12345"
+
+# agent 名 -> (username, owner, role)；角色按各 Agent 职责设定
 ROLE_MAP = {
-    "A1_管理者": "test_mgr",
-    "A2_课程老师": "test_teacher",
-    "A3_数据统计": "test_stats",
-    "A4_邀约人员": "test_invite",
-    "A5_付费销卡": "test_payment",
-    "A6_配置提醒": "test_config",
+    "A1_管理者": ("test_mgr", "测试管理者", "超级管理员"),
+    "A2_课程老师": ("test_teacher", "测试课程老师", "课程部"),
+    "A3_数据统计": ("test_stats", "测试数据统计", "数据部"),
+    "A4_邀约人员": ("test_invite", "测试邀约专员", "邀约部"),
+    "A5_付费销卡": ("test_payment", "测试付费销卡", "销售部"),
+    "A6_配置提醒": ("test_config", "测试配置提醒", "运营部"),
 }
 
 TOKENS = {}
-for agent_name, username in ROLE_MAP.items():
+for agent_name, (username, owner, role) in ROLE_MAP.items():
     acc = account_service.get_by_username(username)
     if not acc:
-        print(f"WARNING: account {username} not found!")
-        continue
-    TOKENS[agent_name] = create_access_token(
+        acc = account_service.create_account(
+            AccountCreate(owner=owner, role=role, username=username,
+                          password=TEST_PASSWORD, enabled=True)
+        )
+    elif not acc.enabled:
+        account_service.update_account(acc.id, AccountUpdate(enabled=True))
+    # 种子账号密码必须可知：若已有账号密码不是测试密码，则重置为测试密码
+    if account_service.login(username, TEST_PASSWORD) is None:
+        account_service.admin_reset_password(acc.id, TEST_PASSWORD)
+        acc = account_service.get_by_username(username)
+    token = create_access_token(
         account_id=acc.id,
         username=acc.username,
         owner=acc.owner,
         role=acc.role,
     )
+    # 登记 session：账号一旦有活跃 session，中间件会校验 jti，不登记会被当作「已踢出」返回 401
+    jti = decode_token(token).get("jti", "")
+    if jti:
+        session_service.create_session(jti, account_id=acc.id, device_info="pytest-agent-test")
+    TOKENS[agent_name] = token
 
 today = date.today().isoformat()
 results = {}  # {agent_name: [{status, desc, detail}]}
@@ -64,8 +81,8 @@ def test_a1_manager():
     A = "A1_管理者"
     print(f"\n{'='*60}\n  Agent 1：管理者\n{'='*60}")
 
-    # 1. 登录验证
-    resp = client.post("/api/accounts/login", json={"username": "wy_admin", "password": "wy123456"})
+    # 1. 登录验证（使用种子账号，不使用真实凭据）
+    resp = client.post("/api/accounts/login", json={"username": "test_mgr", "password": TEST_PASSWORD})
     if resp.status_code == 200 and resp.json().get("success"):
         report(A, "ok", "登录成功", f"权限页面 {len(resp.json().get('permissions', []))} 个")
     else:
@@ -312,14 +329,14 @@ def test_a3_stats():
     else:
         report(A, "fail", "会员卡列表失败", f"{resp.status_code}")
 
-    # 11. 分页边界测试
+    # 11. 分页边界测试（paginate 会将超出范围的页码钳制到最后一页）
     resp = api(A, "get", "/api/customers?page=9999&page_size=100")
     if resp.status_code == 200:
         data = resp.json()
-        if data.get("items") == []:
-            report(A, "ok", "分页边界(超大页码)", "返回空列表")
+        if data.get("page") == data.get("total_pages"):
+            report(A, "ok", "分页边界(超大页码)", f"钳制到第 {data.get('page')}/{data.get('total_pages')} 页，返回 {len(data.get('items', []))} 条")
         else:
-            report(A, "warn", "分页边界", f"返回 {len(data.get('items', []))} 条，预期空")
+            report(A, "fail", "分页边界", f"页码未钳制: page={data.get('page')}, total_pages={data.get('total_pages')}")
     else:
         report(A, "fail", "分页边界失败", f"{resp.status_code}")
 
@@ -405,12 +422,12 @@ def test_a4_invite():
         else:
             report(A, "fail", "修改拜访记录失败", f"{resp.status_code}: {resp.text[:100]}")
 
-    # 7. 查看客户疗愈记录
-    resp = api(A, "get", f"/api/customers/{customer_id}/detail")
+    # 7. 查看客户疗愈记录（接口已迁移至 /api/customer-detail/{id}）
+    resp = api(A, "get", f"/api/customer-detail/{customer_id}")
     if resp.status_code == 200:
         report(A, "ok", "查看客户疗愈记录详情")
     else:
-        report(A, "warn", "查看客户疗愈记录详情", f"{resp.status_code} — 接口可能不存在")
+        report(A, "fail", "查看客户疗愈记录详情失败", f"{resp.status_code}")
 
     # 8. 查看拜访列表
     resp = api(A, "get", f"/api/visits?date={today}")
@@ -446,10 +463,12 @@ def test_a5_payment():
     report(A, "ok", "获取测试客户", f"{customer_name} ({customer_id})")
 
     # 1. 购买会员活动套餐
+    unique = datetime.now().strftime("%H%M%S%f")
+    card_type = f"Agent测试卡_{unique}"
     card_data = {
         "customer_id": customer_id,
         "nickname": customer_name,
-        "card_type": "Agent测试卡",
+        "card_type": card_type,
         "price": 1000,
         "total_count": 10,
         "remaining_count": 10,
@@ -470,7 +489,7 @@ def test_a5_payment():
     resp = api(A, "get", "/api/consumption-records/payments?page=1&page_size=5")
     if resp.status_code == 200:
         records = resp.json().get("items", [])
-        found = any(r.get("name") == "Agent测试卡" for r in records)
+        found = any(r.get("name") == card_type for r in records)
         if found:
             report(A, "ok", "付费记录同步", "新购买记录已出现")
         else:
@@ -490,12 +509,12 @@ def test_a5_payment():
         else:
             report(A, "fail", "销卡失败", f"{resp.status_code}: {resp.text[:100]}")
 
-        # 4. 验证剩余次数
+        # 4. 验证剩余次数（销卡只写流水，真实剩余看接口派生的 effective_remaining）
         resp = api(A, "get", f"/api/membership-cards/{card_id}")
         if resp.status_code == 200:
-            remaining = resp.json().get("remaining_count")
+            remaining = resp.json().get("effective_remaining")
             if remaining == 8:
-                report(A, "ok", "剩余次数验证", f"remaining={remaining}")
+                report(A, "ok", "剩余次数验证", f"effective_remaining={remaining}")
             else:
                 report(A, "fail", "剩余次数不对", f"预期8, 实际{remaining}")
 

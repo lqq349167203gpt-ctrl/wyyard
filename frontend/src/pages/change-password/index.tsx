@@ -54,8 +54,8 @@ export default function ChangePasswordPage() {
 
   useEffect(() => {
     fetchSessions()
-    // 从 token 中解析当前 session 的 jti
-    const token = localStorage.getItem("token")
+    // 从 token 中解析当前 session 的 jti（登录态统一存 authToken，原键名 token 为笔误）
+    const token = localStorage.getItem("authToken")
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]))

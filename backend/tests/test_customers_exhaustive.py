@@ -28,18 +28,31 @@ class TestCustomerCreateFields:
             assert resp.status_code == 200
 
     def test_phone_field(self, client):
-        """手机号：正常/空/格式各异"""
-        for phone in ["13800001111", "18612345678", "", "021-12345678", "+8613800001111"]:
-            resp = client.post("/api/customers", json={"nickname": f"电话_{_u()}", "phone": phone})
-            assert resp.status_code == 200
-            assert resp.json()["phone"] == phone
+        """手机号：正常/空/格式各异（手机号全局唯一，需用唯一值；用后清理）"""
+        digits = "".join(c for c in _u() if c.isdigit()).ljust(8, "0")[:8]
+        created_ids = []
+        try:
+            for phone in [f"138{digits}", f"186{digits}", "", f"021-{digits}", f"+86138{digits}"]:
+                resp = client.post("/api/customers", json={"nickname": f"电话_{_u()}", "phone": phone})
+                assert resp.status_code == 200
+                assert resp.json()["phone"] == phone
+                created_ids.append(resp.json()["id"])
+        finally:
+            for cid in created_ids:
+                client.delete(f"/api/customers/{cid}")
 
     def test_wechat_field(self, client):
-        """微信号：正常/空/特殊字符"""
-        for wechat in ["wxid_abc123", "", "微信号-测试_123"]:
-            resp = client.post("/api/customers", json={"nickname": f"微信_{_u()}", "wechat": wechat})
-            assert resp.status_code == 200
-            assert resp.json()["wechat"] == wechat
+        """微信号：正常/空/特殊字符（微信号全局唯一，需用唯一值；用后清理）"""
+        created_ids = []
+        try:
+            for wechat in [f"wxid_{_u()}", "", f"微信号-测试_{_u()}"]:
+                resp = client.post("/api/customers", json={"nickname": f"微信_{_u()}", "wechat": wechat})
+                assert resp.status_code == 200
+                assert resp.json()["wechat"] == wechat
+                created_ids.append(resp.json()["id"])
+        finally:
+            for cid in created_ids:
+                client.delete(f"/api/customers/{cid}")
 
     def test_age_field(self, client):
         """年龄字段：数字字符串/空"""
@@ -140,9 +153,13 @@ class TestCustomerUpdate:
 
     def test_update_nickname(self, client):
         cid = self._create(client)
-        resp = client.patch(f"/api/customers/{cid}", json={"nickname": "新昵称"})
-        assert resp.status_code == 200
-        assert resp.json()["nickname"] == "新昵称"
+        try:
+            new_name = f"新昵称_{_u()}"
+            resp = client.patch(f"/api/customers/{cid}", json={"nickname": new_name})
+            assert resp.status_code == 200
+            assert resp.json()["nickname"] == new_name
+        finally:
+            client.delete(f"/api/customers/{cid}")
 
     def test_update_name(self, client):
         cid = self._create(client)
@@ -158,15 +175,24 @@ class TestCustomerUpdate:
 
     def test_update_phone(self, client):
         cid = self._create(client)
-        resp = client.patch(f"/api/customers/{cid}", json={"phone": "13999998888"})
-        assert resp.status_code == 200
-        assert resp.json()["phone"] == "13999998888"
+        try:
+            digits = "".join(c for c in _u() if c.isdigit()).ljust(8, "0")[:8]
+            new_phone = f"139{digits}"
+            resp = client.patch(f"/api/customers/{cid}", json={"phone": new_phone})
+            assert resp.status_code == 200
+            assert resp.json()["phone"] == new_phone
+        finally:
+            client.delete(f"/api/customers/{cid}")
 
     def test_update_wechat(self, client):
         cid = self._create(client)
-        resp = client.patch(f"/api/customers/{cid}", json={"wechat": "new_wechat"})
-        assert resp.status_code == 200
-        assert resp.json()["wechat"] == "new_wechat"
+        try:
+            new_wechat = f"new_wechat_{_u()}"
+            resp = client.patch(f"/api/customers/{cid}", json={"wechat": new_wechat})
+            assert resp.status_code == 200
+            assert resp.json()["wechat"] == new_wechat
+        finally:
+            client.delete(f"/api/customers/{cid}")
 
     def test_update_traffic_source(self, client):
         cid = self._create(client)
@@ -393,17 +419,28 @@ class TestCustomerEdgeCases:
     """客户模块边界情况"""
 
     def test_special_characters_in_nickname(self, client):
-        """昵称含特殊字符"""
-        for name in ["测试（VIP）", "客户-A", "张三/B组", "测试@123", "emoji测试"]:
-            resp = client.post("/api/customers", json={"nickname": name})
-            assert resp.status_code == 200
-            assert resp.json()["nickname"] == name
+        """昵称含特殊字符（昵称全局唯一，需加唯一后缀；用后清理）"""
+        created_ids = []
+        try:
+            for name in ["测试（VIP）", "客户-A", "张三/B组", "测试@123", "emoji测试"]:
+                unique_name = f"{name}_{_u()}"
+                resp = client.post("/api/customers", json={"nickname": unique_name})
+                assert resp.status_code == 200
+                assert resp.json()["nickname"] == unique_name
+                created_ids.append(resp.json()["id"])
+        finally:
+            for cid in created_ids:
+                client.delete(f"/api/customers/{cid}")
 
     def test_long_nickname(self, client):
-        """超长昵称"""
-        long_name = "很长的昵称" * 20
-        resp = client.post("/api/customers", json={"nickname": long_name})
+        """超长昵称：nickname 上限 50 字符，恰好 50 可创建，超限应 422"""
+        ok_name = "很长的昵称" * 9 + _u()[:5]  # 恰好 50 字符
+        resp = client.post("/api/customers", json={"nickname": ok_name})
         assert resp.status_code == 200
+        client.delete(f"/api/customers/{resp.json()['id']}")
+        long_name = "很长的昵称" * 20  # 100 字符，超限
+        resp = client.post("/api/customers", json={"nickname": long_name})
+        assert resp.status_code == 422
 
     def test_unicode_fields(self, client):
         """Unicode 字符"""
@@ -415,9 +452,9 @@ class TestCustomerEdgeCases:
         assert resp.status_code == 200
 
     def test_empty_body(self, client):
-        """空请求体 — 所有字段有默认值，后端接受"""
+        """空请求体 — 昵称是必填字段，后端应拒绝（与 test_nickname_required 一致）"""
         resp = client.post("/api/customers", json={})
-        assert resp.status_code == 200
+        assert resp.status_code == 422
 
     def test_null_nickname(self, client):
         """昵称为 null"""
@@ -427,15 +464,21 @@ class TestCustomerEdgeCases:
     def test_multiple_customers_independent(self, client):
         """多个客户互相独立"""
         ids = []
-        for i in range(5):
-            resp = client.post("/api/customers", json={"nickname": f"独立客户_{i}_{_u()}"})
-            ids.append(resp.json()["id"])
-        # 所有 ID 唯一
-        assert len(set(ids)) == 5
-        # 修改一个不影响其他
-        client.patch(f"/api/customers/{ids[0]}", json={"nickname": "已修改"})
-        resp = client.get(f"/api/customers/{ids[1]}")
-        assert resp.json()["nickname"] != "已修改"
+        try:
+            for i in range(5):
+                resp = client.post("/api/customers", json={"nickname": f"独立客户_{i}_{_u()}"})
+                ids.append(resp.json()["id"])
+            # 所有 ID 唯一
+            assert len(set(ids)) == 5
+            # 修改一个不影响其他（昵称需唯一后缀，避免与历史数据冲突）
+            changed = f"已修改_{_u()}"
+            resp = client.patch(f"/api/customers/{ids[0]}", json={"nickname": changed})
+            assert resp.status_code == 200
+            resp = client.get(f"/api/customers/{ids[1]}")
+            assert resp.json()["nickname"] != changed
+        finally:
+            for cid in ids:
+                client.delete(f"/api/customers/{cid}")
 
     def test_traffic_source_detail_without_source(self, client):
         """有详情但无来源"""

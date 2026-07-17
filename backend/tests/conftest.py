@@ -1,8 +1,14 @@
+import jwt
 import uuid
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.middleware.jwt_auth import create_access_token
+from app.middleware.rate_limit import limiter
+from app.services import session_service
+
+# 测试环境关闭限流，避免批量用例互相触发 429
+limiter.enabled = False
 
 
 @pytest.fixture(scope="session")
@@ -14,9 +20,16 @@ def client():
         owner="不闹",
         role="超级管理员",
     )
+    # 登记 session：中间件会校验 jti 对应的 session，不登记会被当作「已踢出」返回 401
+    jti = jwt.decode(token, options={"verify_signature": False}).get("jti", "")
+    if jti:
+        session_service.create_session(jti, account_id="wy_admin", device_info="pytest")
     c = TestClient(app)
     c.headers["Authorization"] = f"Bearer {token}"
-    return c
+    yield c
+    # 收尾清理 session，避免测试 session 堆积
+    if jti:
+        session_service.delete_session(jti)
 
 
 @pytest.fixture
@@ -38,10 +51,13 @@ def sample_customer():
 
 @pytest.fixture
 def created_customer(client, sample_customer):
-    """创建并返回一个测试客户，测试后不删除（可污染）"""
+    """创建并返回一个测试客户，用后删除避免污染数据库"""
     resp = client.post("/api/customers", json=sample_customer)
     assert resp.status_code == 200
-    return resp.json()
+    customer = resp.json()
+    yield customer
+    # 用后清理（测试自身已删除时 404，忽略）
+    client.delete(f"/api/customers/{customer['id']}")
 
 
 @pytest.fixture

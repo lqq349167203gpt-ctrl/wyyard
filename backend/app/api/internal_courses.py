@@ -25,6 +25,11 @@ def list_courses(page: int | None = Query(None, ge=1), page_size: int | None = Q
     return items_dict
 
 
+@router.get("/search-customers")
+def search_customers(q: str = ""):
+    return internal_course_service.search_customers(q)
+
+
 @router.get("/{course_id}")
 def get_course(course_id: str):
     course = internal_course_service.get_course(course_id)
@@ -51,8 +56,3 @@ def delete_course(course_id: str):
     if not internal_course_service.delete_course(course_id):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "删除成功"}
-
-
-@router.get("/search-customers")
-def search_customers(q: str = ""):
-    return internal_course_service.search_customers(q)

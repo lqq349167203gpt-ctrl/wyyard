@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request as StarletteRequest
 
-from app.middleware.jwt_auth import create_access_token, decode_token
+from app.middleware.jwt_auth import create_access_token, decode_token, require_admin
 from app.middleware.rate_limit import limiter
 from app.models.account import AccountCreate, AccountUpdate, RoleCreate, RoleUpdate
 from app.models.base import StrictBaseModel
@@ -32,14 +32,21 @@ class AdminResetPasswordRequest(StrictBaseModel):
 # ===== 账号 =====
 
 @router.get("")
-async def list_accounts():
+async def list_accounts(_admin: str = Depends(require_admin)):
     accounts = account_service.list_accounts()
     return [acc.model_dump(exclude={"password"}) for acc in accounts]
 
 
+@router.get("/light")
+async def list_accounts_light():
+    # 轻量名单：登录即可访问，仅返回选择器所需的最小字段，供非管理员页面使用
+    accounts = account_service.list_accounts()
+    return [{"id": acc.id, "username": acc.username, "owner": acc.owner} for acc in accounts]
+
+
 @router.post("")
 @limiter.limit("3/minute")
-async def create_account(data: AccountCreate, request: StarletteRequest):
+async def create_account(data: AccountCreate, request: StarletteRequest, _admin: str = Depends(require_admin)):
     if len(data.password) < 8:
         raise HTTPException(status_code=400, detail="密码至少8位")
     if len(data.password) > 128:
@@ -124,7 +131,8 @@ async def login(data: LoginRequest, request: StarletteRequest):
 
 
 @router.patch("/{account_id}")
-async def update_account(account_id: str, data: AccountUpdate, request: StarletteRequest):
+async def update_account(account_id: str, data: AccountUpdate, request: StarletteRequest, _admin: str = Depends(require_admin)):
+    # 仅管理员可改账号资料（role/enabled/owner 等）；自助改密走 POST /{id}/change-password
     # 改密码必须走 POST /{id}/change-password，需要验证旧密码
     if data.password is not None:
         raise HTTPException(status_code=400, detail="修改密码请使用专门的密码修改接口")
@@ -138,7 +146,8 @@ async def update_account(account_id: str, data: AccountUpdate, request: Starlett
 
 
 @router.delete("/{account_id}")
-async def delete_account(account_id: str):
+async def delete_account(account_id: str, _admin: str = Depends(require_admin)):
+    # 仅管理员可删除账号
     if not account_service.delete_account(account_id):
         raise HTTPException(status_code=404, detail="账号不存在")
     return {"message": "已删除"}
@@ -147,6 +156,9 @@ async def delete_account(account_id: str):
 @router.post("/{account_id}/change-password")
 @limiter.limit("3/minute")
 async def change_password(account_id: str, data: ChangePasswordRequest, request: StarletteRequest):
+    # 先校验账号存在：不存在的账号返回 404（账号本就可通过 /api/accounts/light 枚举，无额外泄露）
+    if not account_service.get_account(account_id):
+        raise HTTPException(status_code=404, detail="账号不存在")
     # 所有权检查：只能改自己的密码
     current_user_id = getattr(request.state, "user_id", "")
     if account_id != current_user_id:
@@ -168,7 +180,7 @@ async def change_password(account_id: str, data: ChangePasswordRequest, request:
 
 @router.post("/{account_id}/reset-password")
 @limiter.limit("3/minute")
-async def admin_reset_password(account_id: str, data: AdminResetPasswordRequest, request: StarletteRequest):
+async def admin_reset_password(account_id: str, data: AdminResetPasswordRequest, request: StarletteRequest, _admin: str = Depends(require_admin)):
     """管理员重置密码（不需要旧密码，仅管理员可用）"""
     current_user_id = getattr(request.state, "user_id", "")
     if account_id == current_user_id:
@@ -205,6 +217,10 @@ async def delete_my_session(session_id: str, request: StarletteRequest):
     session = session_service.get_session(session_id)
     if not session or session.get("account_id") != user_id:
         raise HTTPException(status_code=404, detail="session 不存在")
+    # 保护：目标是当前请求 token 的 jti 时拒绝，防止误踢自己正在使用的设备
+    current_jti = getattr(request.state, "token_jti", "")
+    if current_jti and session_id == current_jti:
+        raise HTTPException(status_code=400, detail="不能退出当前登录设备")
     session_service.delete_session(session_id)
     return {"message": "已退出"}
 
@@ -217,12 +233,14 @@ async def list_roles():
 
 
 @router.post("/roles")
-async def create_role(data: RoleCreate):
+async def create_role(data: RoleCreate, _admin: str = Depends(require_admin)):
+    # 仅管理员可新增角色
     return account_service.create_role(data)
 
 
 @router.patch("/roles/{role_id}")
-async def update_role(role_id: str, data: RoleUpdate):
+async def update_role(role_id: str, data: RoleUpdate, _admin: str = Depends(require_admin)):
+    # 仅管理员可修改角色
     result = account_service.update_role(role_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="角色不存在")
@@ -230,7 +248,8 @@ async def update_role(role_id: str, data: RoleUpdate):
 
 
 @router.delete("/roles/{role_id}")
-async def delete_role(role_id: str):
+async def delete_role(role_id: str, _admin: str = Depends(require_admin)):
+    # 仅管理员可删除角色
     if not account_service.delete_role(role_id):
         raise HTTPException(status_code=404, detail="角色不存在")
     return {"message": "已删除"}
