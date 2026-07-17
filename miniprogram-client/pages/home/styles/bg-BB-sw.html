@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 — StressWatch 风格复刻</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    /* StressWatch 配色系统 — 从文章描述反推 */
+    --bg: #f5f7fa;           /* 极淡灰蓝底（清爽干净） */
+    --card-bg: #ffffff;      /* 纯白卡片 */
+    --ink: #2c3442;          /* 深墨灰文字（不是纯黑） */
+    --ink-sec: #6b7686;      /* 次要文字 */
+    --ink-weak: #a0a8b4;     /* 弱化文字 */
+    --line: #eef1f5;
+
+    /* 四个状态色 — StressWatch 压力等级色 */
+    --excellent: #5ecfa8;   /* 优秀 — 薄荷绿 */
+    --normal: #5ba8d8;       /* 正常 — 天蓝 */
+    --warning: #f0b86b;      /* 注意 — 暖橙 */
+    --overload: #e87a7a;     /* 过载 — 珊瑚红 */
+
+    /* 辅助色 */
+    --accent-green: #4ade9e;
+    --accent-blue: #60a6f6;
+    --accent-coral: #f58a7a;
+  }
+  body{font-family:'Inter','-apple-system','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);padding:44px 16px;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' 1}
+  .hand{font-family:'Caveat',cursive;font-weight:700}
+  .wrap{max-width:980px;margin:0 auto}
+  .title{text-align:center;margin-bottom:6px}
+  .title h1{font-size:20px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+  .title p{font-size:12px;color:var(--ink-sec);margin-top:7px;line-height:1.75;max-width:720px;margin-left:auto;margin-right:auto}
+  .title p b{color:var(--ink)}
+
+  .row{display:flex;gap:36px;align-items:flex-start;justify-content:center;margin-top:32px;flex-wrap:wrap}
+
+  /* 手机框 */
+  .phone{width:356px;height:720px;border-radius:32px;overflow:hidden;box-shadow:0 20px 55px rgba(18,28,40,.14);border:8px solid #14171a;position:relative;background:#fff;flex-shrink:0}
+  .sb{height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#14171a;z-index:10;background:#fff}
+  .content{height:calc(100% - 36px);overflow-y:auto;background:var(--bg)}
+  .content::-webkit-scrollbar{display:none}
+
+  .page{min-height:100%;padding:14px 16px 20px}
+
+  /* ====== 泡泡角色区域 — SW风格 ====== */
+  .bubble-section{display:flex;align-items:center;justify-content:center;padding:24px 0 18px;position:relative}
+  .bubble-wrap{position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center}
+
+  /* 核心泡泡 — 扁平纯色 + 微妙的光泽感（不是渐变高光！）*/
+  .sw-bubble{width:90px;height:90px;border-radius:50%;background:var(--normal);position:relative;
+    /* 非常微妙的光泽 — 只是一个偏上的半透明椭圆，不是强烈高光 */
+    box-shadow:
+      0 4px 16px rgba(91,168,216,.25),
+      inset 0 -8px 16px rgba(255,255,255,.15),
+      inset 0 8px 16px rgba(0,60,120,.08);
+  }
+
+  /* 泡泡脸 — 可爱简单 */
+  .sw-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:20px}
+  .sw-eyes{display:flex;gap:18px;margin-bottom:4px}
+  .sw-eye{width:8px;height:10px;background:var(--ink);border-radius:50%;position:relative;
+    /* 眼神光 — 一个小白点 */
+  }
+  .sw-eye::after{content:'';position:absolute;width:3px;height:3px;background:#fff;border-radius:50%;top:2px;right:1.5px}
+  .sw-mouth{width:14px;height:6px;border-bottom:2.5px solid var(--ink);border-radius:0 0 8px 8px}
+
+  /* 小泡装饰 — 围绕主泡泡 */
+  .mini-bubble{position:absolute;border-radius:50%;opacity:.7}
+  .mini-bubble:nth-child(1){width:18px;height:18px;background:var(--accent-green);top:0;right:8px}
+  .mini-bubble:nth-child(2){width:10px;height:10px;background:var(--normal);top:8px;left:4px}
+  .mini-bubble:nth-child(3){width:13px;height:13px;background:var(--accent-coral);bottom:12px;right:0}
+
+  /* 状态文字 */
+  .status-text{margin-top:10px;text-align:center}
+  .status-text .label{font-size:11px;color:var(--ink-weak);letter-spacing:.8px;text-transform:uppercase;font-weight:600}
+  .status-text .value{font-size:20px;font-weight:800;color:var(--ink);letter-spacing:-.5px;margin-top:2px}
+  .status-text .sub{font-size:11px;color:var(--ink-sec);margin-top:2px}
+
+  /* ====== 活动列表 — SW的舒服色块风 ====== */
+  .section-label{font-size:10px;font-weight:700;color:var(--ink-weak);letter-spacing:1.5px;text-transform:uppercase;margin:16px 0 10px;padding-left:2px}
+
+  .card{background:var(--card-bg);border-radius:16px;padding:14px 16px;margin-bottom:10px;min-height:96px;display:flex;flex-direction:column;
+    /* SW式极轻阴影 — 不是硬边框！ */
+    box-shadow:0 1px 3px rgba(44,62,80,.04), 0 4px 12px rgba(44,62,80,.03);
+  }
+
+  .card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:7px}
+  .card .name{font-size:15px;font-weight:700;line-height:1.35;color:var(--ink);letter-spacing:-.05px}
+  .tag{font-size:9.5px;font-weight:650;letter-spacing:.5px;padding:4px 10px;border-radius:999px;flex-shrink:0;line-height:1.4}
+  /* 标签用 SW 的状态色 — 但更淡更柔和 */
+  .tag.g{background:rgba(94,207,168,.12);color:#2a9d6f}
+  .tag.c{background:rgba(91,168,216,.12);color:#3a8cc4}
+  .tag.b{background:rgba(240,184,107,.12);color:#c98a3e}
+  .tag.o{background:rgba(232,138,122,.12);color:#d56a5a}
+
+  .card .when{font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:6px;letter-spacing:.06px}
+  .card .when .d{color:var(--ink-sec);font-weight:500;margin-left:4px;opacity:.75}
+  .card .meta{font-size:11px;color:var(--ink-sec);line-height:1.5;letter-spacing:.06px}
+  .card .meta .lab{font-size:10.5px;margin-right:4px;font-weight:500;opacity:.65}
+  .card .meta .sep{margin:0 4px;opacity:.38}
+  .card .desc{margin-top:auto;padding-top:8px;font-size:11px;line-height:1.55;color:var(--ink-sec);letter-spacing:.06px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* 左侧色点 — 用 SW 状态色的柔和圆点 */
+  .name-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0}
+
+  /* 底部 */
+  .nomore{text-align:center;padding:12px 0 4px;font-size:10px;color:var(--ink-weak);letter-spacing:1.5px}
+  .nomore .hw{display:block;margin-top:4px;font-size:17px;color:var(--normal);line-height:1}
+
+  /* 说明面板 */
+  .spec{width:300px;flex-shrink:0}
+  .spec h3{font-size:14px;color:var(--ink);margin-bottom:12px}
+  .blk{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+  .blk b{font-size:11.5px;color:var(--ink);display:block;margin-bottom:8px}
+  .kv{font-size:11px;color:var(--ink-sec);line-height:1.9}
+  .kv span{color:var(--ink-weak)}
+  .kv em{font-style:normal;color:var(--normal)}
+  .foot{text-align:center;margin-top:24px;font-size:11px;color:var(--ink-sec);line-height:1.8;max-width:300px;margin-left:auto;margin-right:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">
+    <h1>无忧茶苑首页 — StressWatch 风格</h1>
+    <p>基于从少数派/网易/小红书等多源收集的 <b>StressWatch 文字描述</b> 复刻：<br>①<strong>「清爽可爱」「轻量」「温柔治愈」</strong>的视觉基调；②<strong>屏幕上方的压力泡泡</strong>（会变色+有表情）；③<strong>弱化数字、强调温度</strong>；④四个压力等级色作为UI色板来源。<br><br>⚠️ 注意：因 Cloudflare 拦截无法获取SW真实截图，此版为<b>文字描述→视觉翻译</b>。如需精准复刻请发SW截图。</p>
+  </div>
+
+  <div class="row">
+    <!-- 手机预览 -->
+    <div class="phone">
+      <div class="sb"><span>02:19</span><span></span></div>
+      <div class="content"><div class="page">
+
+        <!-- StressWatch 风格的泡泡角色区域 -->
+        <div class="bubble-section">
+          <div class="bubble-wrap">
+            <!-- 迷你小泡装饰 -->
+            <div class="mini-bubble"></div>
+            <div class="mini-bubble"></div>
+            <div class="mini-bubble"></div>
+
+            <!-- 主泡泡 — 天蓝色(正常状态) -->
+            <div class="sw-bubble">
+              <div class="sw-face">
+                <div class="sw-eyes">
+                  <div class="sw-eye"></div>
+                  <div class="sw-eye"></div>
+                </div>
+                <div class="sw-mouth"></div>
+              </div>
+            </div>
+          </div>
+          <div class="status-text">
+            <div class="label">今日状态</div>
+            <div class="value">正常放松</div>
+            <div class="sub">2 场活动待参加</div>
+          </div>
+        </div>
+
+        <div class="section-label">近期活动</div>
+
+        <!-- 活动1 — 绿(优秀) -->
+        <div class="card">
+          <div class="top">
+            <div class="name"><span class="name-dot" style="background:var(--excellent)"></span>夏日品茶会</div>
+            <span class="tag g">公益</span>
+          </div>
+          <div class="when">19:00 – 21:00<span class="d">· 周四</span></div>
+          <div class="meta"><span class="lab">老师</span>张老师<span class="sep">·</span><span class="lab">地点</span>一楼大厅</div>
+          <div class="desc">带你了解龙井的冲泡与品鉴</div>
+        </div>
+
+        <!-- 活动2 — 蓝(正常) -->
+        <div class="card">
+          <div class="top">
+            <div class="name"><span class="name-dot" style="background:var(--normal)"></span>茶艺基础课程</div>
+            <span class="tag c">课程</span>
+          </div>
+          <div class="when">14:00 – 16:00<span class="d">· 周四</span></div>
+          <div class="meta"><span class="lab">地点</span>二楼教室</div>
+        </div>
+
+        <!-- 活动3 — 橙(注意) -->
+        <div class="card">
+          <div class="top">
+            <div class="name"><span class="name-dot" style="background:var(--warning)"></span>普洱茶专题讲座</div>
+            <span class="tag b">线上</span>
+          </div>
+          <div class="when">20:00 – 21:30<span class="d">· 周五</span></div>
+          <div class="meta"><span class="lab">老师</span>李老师</div>
+          <div class="desc">深入了解普洱的分类与存储</div>
+        </div>
+
+        <!-- 活动4 — 红(过载/体验) -->
+        <div class="card">
+          <div class="top">
+            <div class="name"><span class="name-dot" style="background:var(--overload)"></span>冥想放松沙龙</div>
+            <span class="tag o">体验</span>
+          </div>
+          <div class="when">10:00 – 11:30<span class="d">· 周六</span></div>
+          <div class="meta"><span class="lab">老师</span>王老师<span class="sep">·</span><span class="lab">地点</span>三楼</div>
+        </div>
+
+        <div class="nomore">— 没有更多了 —<span class="hw">慢一点 🫧</span></div>
+      </div></div>
+    </div>
+
+    <!-- 说明 -->
+    <div class="spec">
+      <h3>从 StressWatch 提取的设计语言</h3>
+      <div class="blk">
+        <b>① 「清爽可爱」的整体基调</b>
+        <div class="kv">背景 <em>#f5f7fa</em> 极淡灰蓝<br>卡片 <em>#ffffff</em> 纯白<br>文字 <em>#2c3442</em> 深墨灰（非纯黑）<br><span>轻量、温柔、治愈</span></div>
+      </div>
+      <div class="blk">
+        <b>② 压力泡泡角色</b>
+        <div class="kv">圆形扁平泡泡 + 微妙光泽（非渐变高光）<br>有表情（眼+嘴+眼神光）<br>周围迷你小泡装饰<br>会随状态变色</div>
+      </div>
+      <div class="blk">
+        <b>③ 四色状态系统</b>
+        <div class="kv">优秀 <span style="color:#5ecfa8">#5ecfa8</span> 薄荷绿<br>正常 <span style="color:#5ba8d8">#5ba8d8</span> 天蓝<br>注意 <span style="color:#f0b86b">#f0b86b</span> 暖橙<br>过载 <span style="color:#e87a7a">#e87a7a</span> 珊瑚红<br><em>标签用对应色的极淡底</em></div>
+      </div>
+      <div class="blk">
+        <b>④ 卡片风格</b>
+        <div class="kv">16px 大圆角（软）<br>极轻阴影（几乎无感）<br>白色底 + 充足留白<br>左侧彩色小圆点做节奏</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    这版是基于多篇文字描述复刻的 <b>StressWatch 设计语言</b>。<br><br>
+    如果还是不对味，最有效的方式：<br>
+    👉 <b>直接发一张 StressWatch 的截图给我</b><br>
+    我就能 1:1 对齐配色/插图/布局/间距。
+  </div>
+</div>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
-  "libVersion": "3.16.1",
-  "projectname": "miniprogram",
+  "libVersion": "3.16.2",
+  "projectname": "miniprogram-client",
   "condition": {},
   "setting": {
     "urlCheck": false,

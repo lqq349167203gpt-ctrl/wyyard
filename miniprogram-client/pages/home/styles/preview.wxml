@@ -1,0 +1,114 @@
+<!-- 风格预览页面 -->
+<view class="preview-container">
+  <view class="preview-header">
+    <text class="preview-title">首页活动页风格设计</text>
+    <text class="preview-subtitle">请选择您喜欢的风格</text>
+  </view>
+
+  <!-- 风格选择器 -->
+  <view class="style-selector">
+    <view 
+      wx:for="{{styles}}" 
+      wx:key="id"
+      class="style-option {{selectedStyle === item.id ? 'active' : ''}}"
+      bindtap="selectStyle"
+      data-id="{{item.id}}"
+    >
+      <view class="style-preview" style="background: {{item.color}}"></view>
+      <text class="style-name">{{item.name}}</text>
+      <text class="style-desc">{{item.description}}</text>
+    </view>
+  </view>
+
+  <!-- 风格预览区域 -->
+  <view class="preview-area">
+    <view class="preview-frame">
+      <!-- 模拟手机状态栏 -->
+      <view class="phone-status-bar">
+        <text class="status-time">16:06</text>
+        <view class="status-icons">
+          <text class="status-icon">📶</text>
+          <text class="status-icon">🔋</text>
+        </view>
+      </view>
+      
+      <!-- 模拟导航栏 -->
+      <view class="phone-nav-bar">
+        <text class="nav-title">活动平台</text>
+      </view>
+      
+      <!-- 内容预览区域 -->
+      <view class="phone-content" style="background: {{currentStyle.background}}">
+        <!-- 日期分组 -->
+        <view class="preview-date-group">
+          <view class="preview-date-header" style="background: {{currentStyle.dateHeaderBg}}; color: {{currentStyle.dateHeaderColor}}">
+            <text class="preview-date-text">2026年7月15日</text>
+            <text class="preview-date-weekday">周三</text>
+          </view>
+          
+          <!-- 活动卡片 -->
+          <view class="preview-card" style="background: {{currentStyle.cardBg}}; border-radius: {{currentStyle.cardRadius}}; box-shadow: {{currentStyle.cardShadow}}">
+            <view wx:if="{{currentStyle.showImage}}" class="preview-card-image" style="background: {{currentStyle.imageBg}}">
+              <text class="preview-card-image-text">活动图片</text>
+            </view>
+            <view class="preview-card-content" style="padding: {{currentStyle.cardPadding}}">
+              <view class="preview-card-top">
+                <text class="preview-card-name" style="color: {{currentStyle.textColor}}; font-size: {{currentStyle.titleSize}}">夏日音乐节</text>
+                <view class="preview-card-tags">
+                  <text class="preview-tag" style="background: {{currentStyle.tagOnlineBg}}; color: {{currentStyle.tagOnlineColor}}">线上</text>
+                </view>
+              </view>
+              <view class="preview-card-info">
+                <view class="preview-info-row">
+                  <text class="preview-info-label" style="color: {{currentStyle.labelColor}}">时间</text>
+                  <text class="preview-info-value" style="color: {{currentStyle.textColor}}">19:00 - 21:00</text>
+                </view>
+                <view class="preview-info-row">
+                  <text class="preview-info-label" style="color: {{currentStyle.labelColor}}">老师</text>
+                  <text class="preview-info-value" style="color: {{currentStyle.textColor}}">张老师</text>
+                </view>
+              </view>
+              <view class="preview-card-desc" style="border-top: {{currentStyle.descBorder}}">
+                <text class="preview-desc-text" style="color: {{currentStyle.descColor}}">享受现场音乐表演，感受夏日的热情与活力。</text>
+              </view>
+            </view>
+          </view>
+          
+          <!-- 第二个活动卡片 -->
+          <view class="preview-card" style="background: {{currentStyle.cardBg}}; border-radius: {{currentStyle.cardRadius}}; box-shadow: {{currentStyle.cardShadow}}">
+            <view class="preview-card-content" style="padding: {{currentStyle.cardPadding}}">
+              <view class="preview-card-top">
+                <text class="preview-card-name" style="color: {{currentStyle.textColor}}; font-size: {{currentStyle.titleSize}}">当代艺术展览</text>
+                <view class="preview-card-tags">
+                  <text class="preview-tag" style="background: {{currentStyle.tagWelfareBg}}; color: {{currentStyle.tagWelfareColor}}">公益</text>
+                </view>
+              </view>
+              <view class="preview-card-info">
+                <view class="preview-info-row">
+                  <text class="preview-info-label" style="color: {{currentStyle.labelColor}}">时间</text>
+                  <text class="preview-info-value" style="color: {{currentStyle.textColor}}">10:00 - 18:00</text>
+                </view>
+                <view class="preview-info-row">
+                  <text class="preview-info-label" style="color: {{currentStyle.labelColor}}">地点</text>
+                  <text class="preview-info-value" style="color: {{currentStyle.textColor}}">市美术馆</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 风格说明 -->
+  <view class="style-description">
+    <text class="description-title">{{currentStyle.name}}风格特点</text>
+    <text class="description-content">{{currentStyle.fullDescription}}</text>
+  </view>
+
+  <!-- 应用按钮 -->
+  <view class="action-buttons">
+    <button class="apply-btn" bindtap="applyStyle">应用此风格</button>
+    <button class="reset-btn" bindtap="resetStyle">重置为默认</button>
+  </view>
+</view>

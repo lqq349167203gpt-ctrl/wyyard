@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 - 背景图形方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #eceef0; color: #333; padding: 40px 16px; }
+  .page-title { text-align: center; margin-bottom: 28px; }
+  .page-title h1 { font-size: 25px; font-weight: 700; color: #2b2f36; margin-bottom: 8px; }
+  .page-title p { font-size: 13.5px; color: #8f959e; max-width: 760px; margin: 0 auto; line-height: 1.7; }
+
+  .styles-row { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; max-width: 1600px; margin: 0 auto; }
+  .style-wrapper { display: flex; flex-direction: column; align-items: center; width: 300px; }
+  .style-label { margin-bottom: 14px; text-align: center; min-height: 56px; }
+  .style-label .name { font-size: 16.5px; font-weight: 700; color: #2b2f36; display: block; margin-bottom: 4px; }
+  .style-label .desc { font-size: 11.5px; color: #8f959e; line-height: 1.5; display: block; }
+
+  .phone { width: 300px; height: 600px; border-radius: 26px; overflow: hidden; box-shadow: 0 12px 44px rgba(0,0,0,0.16); border: 7px solid #161616; position: relative; background: #fff; }
+  .phone-statusbar { height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 12px; font-weight: 600; color: #1a1a1a; position: relative; z-index: 10; }
+  .phone-content { height: calc(100% - 36px); overflow-y: auto; position: relative; }
+  .phone-content::-webkit-scrollbar { display: none; }
+  .fun { font-family: 'ZCOOL KuaiLe', 'Yuanti SC', sans-serif; }
+
+  /* 通用软卡片 */
+  .page { padding: 20px 14px 16px; min-height: 100%; position: relative; background: #f2f4f6; }
+  .page .bg-shapes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .greet { position: relative; z-index: 1; margin-bottom: 18px; }
+  .greet h2 { font-size: 22px; line-height: 1.3; color: #2b3138; }
+  .greet p { font-size: 11.5px; margin-top: 4px; color: #8b94a0; }
+  .date-group { position: relative; z-index: 1; margin-bottom: 16px; }
+  .date-header { display: inline-block; transform: rotate(-1.6deg); font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 4px; margin-bottom: 11px; letter-spacing: 0.5px; background: #e4e8ec; color: #4a545e; box-shadow: 0 2px 5px rgba(60,70,80,0.10); }
+  .card-soft { position: relative; z-index: 1; margin-bottom: 11px; border-radius: 4px; padding: 18px 16px 16px; background: #ffffff; border: 1px solid rgba(60,70,80,0.05); box-shadow: 0 4px 18px rgba(40,50,60,0.07); }
+  .card-soft .ct { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-soft .nm { font-size: 16px; font-weight: 600; line-height: 1.5; letter-spacing: 0.2px; color: #2b3138; }
+  .card-soft .tg { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; background: #eaeef2; color: #5b6670; }
+  .card-soft .info { margin-top: 14px; display: flex; flex-direction: column; gap: 9px; }
+  .card-soft .row { font-size: 13px; display: flex; line-height: 1.5; }
+  .card-soft .lab { width: 34px; flex-shrink: 0; color: #aab2bc; }
+  .card-soft .val { flex: 1; color: #4c5560; }
+  .card-soft .desc { margin-top: 15px; padding-top: 14px; border-top: 1px solid #eaeef2; font-size: 12.5px; line-height: 1.75; color: #888f99; }
+  .no-more { position: relative; z-index: 1; text-align: center; padding: 14px 0 22px; font-size: 11px; color: #bcc3cc; }
+
+  /* ====== 1. 细圆环（描边圆，非实心） ====== */
+  .s-rings .bg-shapes span { position: absolute; border-radius: 50%; background: transparent; }
+  .s-rings .bg-shapes span:nth-child(1) { width: 170px; height: 170px; top: -55px; right: -45px; border: 2px solid rgba(61,90,128,0.11); }
+  .s-rings .bg-shapes span:nth-child(2) { width: 120px; height: 120px; bottom: 70px; left: -35px; border: 2px solid rgba(91,140,200,0.10); }
+  .s-rings .bg-shapes span:nth-child(3) { width: 64px; height: 64px; top: 46%; right: 24px; border: 2px solid rgba(61,90,128,0.09); }
+
+  /* ====== 2. 点阵（小圆点网格） ====== */
+  .s-dots .bg-shapes { background-image: radial-gradient(rgba(61,90,128,0.14) 1.6px, transparent 1.7px); background-size: 20px 20px; background-position: 0 0; }
+
+  /* ====== 3. 波浪线（顶部柔和曲线） ====== */
+  .s-waves .bg-shapes svg { position: absolute; top: 0; left: 0; width: 100%; height: 150px; display: block; }
+  .s-waves .bg-shapes .blob { position: absolute; bottom: 90px; left: -30px; width: 130px; height: 130px; border-radius: 50%; background: rgba(91,140,200,0.06); }
+
+  /* ====== 4. 几何碎片（小三角/菱形） ====== */
+  .s-shards .bg-shapes span { position: absolute; background: rgba(61,90,128,0.08); }
+  .s-shards .bg-shapes span:nth-child(1) { width: 90px; height: 90px; top: -30px; right: -20px; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .s-shards .bg-shapes span:nth-child(2) { width: 64px; height: 64px; bottom: 120px; left: -18px; clip-path: polygon(50% 0, 100% 100%, 0 100%); transform: rotate(180deg); background: rgba(91,140,200,0.07); }
+  .s-shards .bg-shapes span:nth-child(3) { width: 46px; height: 46px; top: 52%; right: 18px; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); background: rgba(61,90,128,0.07); }
+
+  /* ====== 5. 加号网格 ====== */
+  .s-plus .bg-shapes {
+    background:
+      linear-gradient(rgba(61,90,128,0.13), rgba(61,90,128,0.13)) center / 7px 1.6px no-repeat,
+      linear-gradient(rgba(61,90,128,0.13), rgba(61,90,128,0.13)) center / 1.6px 7px no-repeat;
+    background-size: 26px 26px;
+  }
+
+  /* ====== 6. 斜向细纹（极淡纹理） ====== */
+  .s-diag .bg-shapes { background-image: repeating-linear-gradient(60deg, rgba(61,90,128,0.05) 0 1px, transparent 1px 14px); }
+
+  .apply-hint { max-width: 1080px; margin: 40px auto 0; background: #fff; border-radius: 14px; padding: 20px 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); font-size: 12.5px; color: #8f959e; line-height: 1.8; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="page-title">
+    <h1>无忧茶苑 — 背景图形方案（替换模糊圆斑）</h1>
+    <p>原背景是模糊实心圆斑，发糊没精神。下面 6 种图形统一冷色、只变形状，方便你专心挑图形。卡片、留白、4px 圆角都不变。</p>
+  </div>
+
+  <div class="styles-row">
+    <!-- 1 细圆环 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">1 · 细圆环</span><span class="desc">描边空心圆，比实心斑更利落精致</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page s-rings">
+          <div class="bg-shapes"><span></span><span></span><span></span></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 2 点阵 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">2 · 点阵</span><span class="desc">规律小圆点网格，干净有秩序感</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page s-dots">
+          <div class="bg-shapes"></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 3 波浪 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">3 · 波浪线</span><span class="desc">顶部柔和曲线，自然但比圆斑更有形</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page s-waves">
+          <div class="bg-shapes">
+            <svg viewBox="0 0 300 150" preserveAspectRatio="none"><path d="M0,60 C50,20 100,100 150,60 C200,20 250,100 300,60 L300,0 L0,0 Z" fill="rgba(61,90,128,0.07)"/><path d="M0,80 C50,40 100,120 150,80 C200,40 250,120 300,80" fill="none" stroke="rgba(91,140,200,0.12)" stroke-width="2"/></svg>
+            <div class="blob"></div>
+          </div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 4 几何碎片 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">4 · 几何碎片</span><span class="desc">三角/菱形点缀，带点趣味几何感</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page s-shards">
+          <div class="bg-shapes"><span></span><span></span><span></span></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 5 加号网格 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">5 · 加号网格</span><span class="desc">细加号阵列，轻巧有呼吸的节奏感</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page s-plus">
+          <div class="bg-shapes"></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 6 斜向细纹 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">6 · 斜向细纹</span><span class="desc">极淡斜纹理，几乎看不见但去死板</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page s-diag">
+          <div class="bg-shapes"></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="apply-hint">
+    6 种背景图形（均已去掉模糊实心圆斑）：细圆环 / 点阵 / 波浪线 / 几何碎片 / 加号网格 / 斜向细纹。<br>
+    图形统一冷色，只变形状。挑一个告诉我，我会把它和之前选定的冷色方向一起写进 <code>index.wxss</code>。
+  </div>
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg: #f0f4f9;
+    --card-bg: #ffffff;
+    --ink: #2d3748;
+    --ink-mid: #5a6677;
+    --ink-light: #9aa5b4;
+    --ink-faint: #c0c8d2;
+    --line: rgba(45,55,72,.05);
+    --sw-green: #5ecfa8;
+    --sw-blue: #5b9cf6;
+    --sw-orange: #f29b6b;
+    --sw-red: #ef7670;
+    --sw-purple: #a78bfa;
+    --sw-teal: #5eead4;
+    --sw-green-t: #2da082;
+    --sw-blue-t: #3a7bd5;
+    --sw-orange-t: #d4834f;
+    --sw-red-t: #d45a54;
+    --sw-purple-t: #8b63e0;
+    --sw-green-bg: rgba(94,207,168,.12);
+    --sw-blue-bg: rgba(91,156,246,.12);
+    --sw-orange-bg: rgba(242,155,107,.12);
+    --sw-purple-bg: rgba(167,139,250,.12);
+    --accent-bar: 4px;
+  }
+  body{
+    font-family:'Inter','Noto Sans SC','-apple-system','PingFang SC',sans-serif;
+    background:#e8eaed;padding:36px 14px;color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1020px;margin:0 auto}
+  .title{text-align:center;margin-bottom:28px}
+  .title h1{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+  .title p{font-size:11px;color:var(--ink-mid);margin-top:8px;line-height:1.75;max-width:660px;margin-left:auto;margin-right:auto}
+
+  .row{display:flex;gap:40px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+
+  .phone{
+    width:365px;height:780px;border-radius:38px;overflow:hidden;
+    box-shadow:0 28px 65px rgba(20,35,25,.14),0 0 0 1px rgba(255,255,255,.5) inset;
+    border:7px solid #1c1f22;position:relative;background:#fff;flex-shrink:0;
+    display:flex;flex-direction:column;
+  }
+
+  /* ====== 顶部小程序导航栏 ====== */
+  .nav-bar{
+    flex-shrink:0;background:#fff;
+    padding-top:calc(env(safe-area-inset-top, 44px) + 4px);
+  }
+  .nav-status{
+    height:20px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 18px;font-size:12px;font-weight:600;color:#000;
+  }
+  .nav-capsule{
+    display:flex;align-items:center;gap:6px;margin:4px 0 8px;padding-right:16px;justify-content:flex-end;
+  }
+  .nav-dot{
+    width:10px;height:10px;border-radius:50%;background:#000;
+  }
+  .nav-capsule-line{
+    width:52px;height:24px;border-radius:12px;
+    border:.5px solid rgba(0,0,0,.15);
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    background:rgba(255,255,255,.85);backdrop-filter:blur(8px);
+  }
+  .nav-capsule-line .dot{
+    width:7px;height:7px;border-radius:50%;
+  }
+  .nav-capsule-line .dot-black{background:#000;}
+  .nav-capsule-line .dot-gray{background:rgba(0,0,0,.25);}
+
+  /* ====== 内容区（可滚动）===== */
+  .content{
+    flex:1;overflow-y:auto;position:relative;
+    background: #f0f4f9;
+  }
+  .content::-webkit-scrollbar{display:none}
+
+  /* ====== 云朵装饰层（实心色块，无渐变）===== */
+  .content::before{
+    content:'';
+    position:absolute;
+    top:0;height:55%;
+    left:0;right:0;
+    z-index:0;
+    pointer-events:none;
+    background: #fff;
+    clip-path: path(
+      'M260,8 Q275,-2 295,6 Q315,-4 335,8 Q355,-2 365,16 Q380,10 385,28
+      Q370,40 340,38 Q310,46 280,36 Q250,42 230,30 Q215,18 230,8 Z'
+    );
+    opacity: .88;
+  }
+  .content::after{
+    content:'';
+    position:absolute;
+    top:2%;height:45%;
+    left:0;right:0;
+    z-index:0;
+    pointer-events:none;
+    background: #fff;
+    clip-path: path(
+      'M20,22 Q32,12 48,18 Q62,8 76,20 Q86,14 90,28
+      Q78,38 56,36 Q34,44 18,34 Q6,24 18,18 Z'
+    );
+    opacity: .80;
+  }
+
+  /* ====== 底部 tabBar ====== */
+  .tab-bar{
+    flex-shrink:0;display:flex;align-items:center;justify-content:space-around;
+    background:#fff;height:56px;border-top:.5px solid rgba(0,0,0,.06);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .tab-item{
+    display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;
+  }
+  .tab-icon{
+    width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+    font-size:19px;line-height:1;
+  }
+  .tab-label{
+    font-size:9.5px;color:var(--ink-light);font-weight:500;
+  }
+  .tab-item.active .tab-label{color:var(--sw-green);font-weight:650}
+  .page{min-height:100%;padding:0 14px 18px;position:relative;z-index:1}
+
+  /* ====== 日历 ====== */
+  .date-header{padding:13px 0 10px}
+  .date-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+  .date-big{font-size:22px;font-weight:900;color:var(--ink);letter-spacing:-.5px}
+  .date-tag{font-size:10px;font-weight:650;color:var(--sw-green-t);background:var(--sw-green-bg);padding:3px 10px;border-radius:999px}
+  .week-picker{
+    display:flex;justify-content:space-between;background:rgba(255,255,255,.65);
+    border-radius:12px;padding:8px 11px;
+  }
+  .wk-day{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:28px}
+  .wk-name{font-size:9.5px;color:var(--ink-light);font-weight:500}
+  .wk-num{font-size:12px;font-weight:700;color:var(--ink-mid);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+  .wk-day.active .wk-num{background:var(--sw-green);color:#fff}
+
+  /* ====== 卡片 ====== */
+  .card{
+    background:var(--card-bg);
+    border-radius:14px;padding:10px 13px;margin-bottom:8px;
+    box-shadow:0 1px 2px rgba(30,50,40,.03),0 2px 6px rgba(30,50,40,.02);
+    position:relative;overflow:hidden;
+    min-height:86px;display:grid;grid-template-rows:auto 1fr auto;gap:4px;
+  }
+  .card::before{
+    content:'';position:absolute;left:14px;top:13px;
+    width:6px;height:6px;border-radius:50%;flex-shrink:0;
+  }
+  .card::before{background:var(--sw-blue)}
+  .card.type-welfare::before{background:var(--sw-green)}
+  .card.type-online::before{background:var(--sw-orange)}
+  .card.type-experience::before{background:var(--sw-purple)}
+
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding-left:16px}
+  .card-name{font-size:14px;font-weight:700;line-height:1.25;color:var(--ink);letter-spacing:-.02px;flex:1;min-width:0}
+  .card-tags{display:flex;gap:4px;flex-shrink:0}
+
+  .tag{
+    font-size:9.5px;font-weight:650;letter-spacing:.3px;
+    padding:2.5px 7.5px;border-radius:999px;flex-shrink:0;line-height:1.4;
+  }
+  .tag-welfare{background:var(--sw-green-bg);color:var(--sw-green-t)}
+  .tag-online{background:var(--sw-orange-bg);color:var(--sw-orange-t)}
+  .tag-course{background:var(--sw-blue-bg);color:var(--sw-blue-t)}
+  .tag-exp{background:var(--sw-purple-bg);color:var(--sw-purple-t)}
+
+  .card-info{display:flex;flex-direction:column;gap:2px}
+  .info-row{
+    display:flex;align-items:baseline;gap:5px;
+    font-size:11.5px;line-height:1.4;padding-left:8px;min-height:18px;
+  }
+  .info-label{color:var(--ink-light);font-weight:550;flex-shrink:0;font-size:10.5px;min-width:26px}
+  .info-value{color:var(--ink-mid);font-weight:500}
+  .info-row:first-of-type .info-value{color:var(--ink);font-weight:650}
+  .time-hint{color:var(--ink-light);font-weight:400;font-size:10.5px}
+
+  .card-desc{
+    margin-top:1px;padding-top:5px;
+    border-top:1px solid var(--line);padding-left:8px;
+    min-height:24px;max-height:24px;
+  }
+  .desc-text{font-size:10.5px;color:var(--ink-mid);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  .date-group-title{display:flex;align-items:center;gap:7px;padding:10px 0 6px}
+  .dt-date{font-size:13.5px;font-weight:800;color:var(--ink)}
+  .dt-week{font-size:10px;color:var(--ink-light);font-weight:550;padding:2px 7px;background:rgba(0,0,0,.04);border-radius:5px}
+  .end-note{text-align:center;padding:10px 0 4px;font-size:10px;color:var(--ink-faint);letter-spacing:1.5px}
+</style>
+</head>
+<body>
+
+  <!-- 手绘水彩滤镜 -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <filter id="watercolor" x="-20%" y="-20%" width="140%" height="140%">
+        <!-- 噪点生成不规则边缘 -->
+        <feTurbulence type="fractalNoise" baseFrequency=".025" numOctaves="3" result="noise" />
+        <!-- 扰动光晕边缘 -->
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="18" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+        <!-- 模糊柔化 -->
+        <feGaussianBlur in="displaced" stdDeviation="2.5" result="blurred" />
+        <!-- 轻微二次扰动增加笔触感 -->
+        <feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="1" result="noise2" />
+        <feDisplacementMap in="blurred" in2="noise2" scale="4" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+<div class="wrap">
+  <div class="phone">
+    <!-- 顶部导航栏 -->
+    <div class="nav-bar">
+      <div class="nav-status">
+        <span>11:06</span>
+        <span>&#128247; &#128267; 64%</span>
+      </div>
+      <div class="nav-capsule">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <!-- 返回按钮 -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+          <!-- 分割线 -->
+          <div style="width:.5px;height:14px;background:rgba(0,0,0,.12)"></div>
+          <!-- 首页按钮 -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <div class="nav-capsule-line">
+          <div class="dot dot-black"></div>
+          <div class="dot dot-black"></div>
+          <div class="dot dot-gray"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content"><div class="page">
+
+      <div class="date-header">
+        <div class="date-row">
+          <div class="date-big">7月16日</div>
+          <div class="date-tag">&#8635; 今天</div>
+        </div>
+        <div class="week-picker">
+          <div class="wk-day"><span class="wk-name">一</span><span class="wk-num">14</span></div>
+          <div class="wk-day"><span class="wk-name">二</span><span class="wk-num">15</span></div>
+          <div class="wk-day active"><span class="wk-name">三</span><span class="wk-num">16</span></div>
+          <div class="wk-day"><span class="wk-name">四</span><span class="wk-num">17</span></div>
+          <div class="wk-day"><span class="wk-name">五</span><span class="wk-num">18</span></div>
+          <div class="wk-day"><span class="wk-name">六</span><span class="wk-num">19</span></div>
+          <div class="wk-day"><span class="wk-name">日</span><span class="wk-num">20</span></div>
+        </div>
+      </div>
+
+      <div class="date-group-title">
+        <span class="dt-date">本周活动</span>
+        <span class="dt-week">周三 &ndash; 周六</span>
+      </div>
+
+      <div class="card type-welfare">
+        <div class="card-top">
+          <text class="card-name">夏日品茶会</text>
+          <view class="card-tags"><text class="tag tag-welfare">公益</text></view>
+        </div>
+        <view class="info-row">
+          <text class="info-label">时间</text>
+          <text class="info-value">19:00 – 21:00<span class="time-hint"> · 周四</span></text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">老师</text>
+          <text class="info-value">张老师</text>
+        </view>
+        <view class="card-desc">
+          <text class="desc-text">带你了解龙井的冲泡与品鉴技巧</text>
+        </view>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <text class="card-name">茶艺基础课程</text>
+          <view class="card-tags"><text class="tag tag-course">课程</text></view>
+        </div>
+        <view class="info-row">
+          <text class="info-label">时间</text>
+          <text class="info-value">14:00 – 16:00<span class="time-hint"> · 周四</span></text>
+        </view>
+        <view class="info-row" style="visibility:hidden"><text class="info-label">-</text><text class="info-value">&nbsp;</text></view>
+        <view class="card-desc"><text class="desc-text"></text></view>
+      </div>
+
+      <div class="card type-online">
+        <div class="card-top">
+          <text class="card-name">普洱茶专题讲座</text>
+          <view class="card-tags"><text class="tag tag-online">线上</text></view>
+        </div>
+        <view class="info-row">
+          <text class="info-label">时间</text>
+          <text class="info-value">20:00 – 21:30<span class="time-hint"> · 周五</span></text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">老师</text>
+          <text class="info-value">李老师</text>
+        </view>
+        <view class="card-desc">
+          <text class="desc-text">深入了解普洱的分类与存储方法</text>
+        </view>
+      </div>
+
+      <div class="card type-experience">
+        <div class="card-top">
+          <text class="card-name">冥想放松沙龙</text>
+          <view class="card-tags"><text class="tag tag-exp">体验</text></view>
+        </div>
+        <view class="info-row">
+          <text class="info-label">时间</text>
+          <text class="info-value">10:00 – 11:30<span class="time-hint"> · 周六</span></text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">老师</text>
+          <text class="info-value">王老师</text>
+        </view>
+        <view class="card-desc" style="min-height:24px;max-height:24px"><text class="desc-text">&nbsp;</text></view>
+      </div>
+
+      <div class="end-note">— 已显示全部活动 —</div>
+    </div></div>
+
+    <!-- 底部 tabBar -->
+    <div class="tab-bar">
+      <div class="tab-item active">
+        <div class="tab-icon">&#127968;</div>
+        <span class="tab-label">首页</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon">&#128214;</div>
+        <span class="tab-label">课程</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon">&#128172;</div>
+        <span class="tab-label">活动</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon">&#128100;</div>
+        <span class="tab-label">我的</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

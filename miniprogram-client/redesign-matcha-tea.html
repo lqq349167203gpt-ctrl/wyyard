@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>改版 — 抹茶清茶</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#f1f4ee;            /* 页面底:浅抹茶灰绿,安静雅致 */
+    --ink:#26332b;           /* 主文字:带茶意的深灰绿,替代纯黑 */
+    --ink-2:#6b7a6e;
+    --ink-3:#a3ada2;
+    --tea:#3f6b4f;           /* 主强调色:深茶绿 */
+    --tea-ink:#2e5240;       /* chip 上的深茶绿文字 */
+    --matcha:#dcebc8;        /* 浅抹茶 chip 色:点缀/选中数字/公益标签 */
+    --card:#ffffff;
+  }
+  body{font-family:'Inter','Noto Sans SC','-apple-system','PingFang SC',sans-serif;background:#e4e8e0;padding:36px 14px;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1020px;margin:0 auto}
+  .phone{width:365px;height:780px;border-radius:38px;overflow:hidden;box-shadow:0 24px 55px rgba(45,70,52,.13);border:7px solid #2a332c;background:var(--bg);display:flex;flex-direction:column}
+  .nav-bar{flex-shrink:0;background:var(--bg);padding-top:calc(env(safe-area-inset-top,44px)+4px)}
+  .nav-status{height:20px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#000}
+  .nav-capsule{display:flex;align-items:center;gap:6px;margin:4px 0 6px;padding-right:16px;justify-content:flex-end}
+  .nav-capsule-line{width:52px;height:24px;border-radius:12px;border:.5px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.85)}
+  .nav-capsule-line .dot{width:7px;height:7px;border-radius:50%}.nav-capsule-line .dot-black{background:#000}.nav-capsule-line .dot-gray{background:rgba(0,0,0,.25)}
+  .content{flex:1;overflow-y:auto;background:var(--bg)}
+  .content::-webkit-scrollbar{display:none}
+  .tab-bar{flex-shrink:0;display:flex;align-items:center;justify-content:space-around;background:#fff;height:58px;border-top:.5px solid rgba(63,107,79,.10)}
+  .tab-item{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;cursor:pointer}
+  .tab-label{font-size:10px;color:var(--ink-3);font-weight:500}
+  .tab-item.active .tab-label{color:var(--tea);font-weight:700}
+  .tab-item .tdot{width:4px;height:4px;border-radius:50%;background:transparent}
+  .tab-item.active .tdot{background:var(--tea);box-shadow:0 0 0 2px rgba(63,107,79,.18)}
+  .page{min-height:100%;padding:2px 16px 20px;position:relative}
+
+  /* ===== 顶部:日期胶囊 + 一句概览 ===== */
+  .hero{padding:10px 2px 14px}
+  .hero-date{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--tea-ink);background:var(--matcha);padding:4px 11px;border-radius:999px;margin-bottom:10px}
+  .hero-sub{font-size:12px;color:var(--ink-2);font-weight:500}
+
+  /* ===== 周日历:胶囊式,选中=深茶绿底+浅抹茶数字 ===== */
+  .week-picker{display:flex;justify-content:space-between;margin-bottom:14px}
+  .wk-day{display:flex;flex-direction:column;align-items:center;gap:4px;width:42px;padding:8px 0 9px;border-radius:12px;background:#fff;border:1px solid rgba(63,107,79,.08);cursor:pointer}
+  .wk-name{font-size:10px;color:var(--ink-3);font-weight:600}
+  .wk-num{font-size:14px;font-weight:800;color:var(--ink)}
+  .wk-day.active{background:var(--tea);border-color:var(--tea)}
+  .wk-day.active .wk-name{color:rgba(220,235,200,.6)}
+  .wk-day.active .wk-num{color:var(--matcha)}
+  .wk-today-dot{width:4px;height:4px;border-radius:50%;background:var(--ink-3)}
+  .wk-day.active .wk-today-dot{background:var(--matcha)}
+
+  .group-title{display:flex;align-items:baseline;gap:8px;padding:2px 2px 10px}
+  .gt-main{font-size:16px;font-weight:900}
+  .gt-sub{font-size:11px;color:var(--ink-3);font-weight:600}
+
+  /* ===== 活动卡片:细描边替代阴影,边界更清晰 ===== */
+  .card{background:var(--card);border-radius:16px;padding:14px 14px 13px;margin-bottom:12px;border:1px solid rgba(63,107,79,.12)}
+  .card-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+  .card-titles{flex:1;min-width:0}
+  .tagline{display:flex;gap:5px;margin-bottom:3px}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:7px;line-height:1.5}
+  /* 三类标签:类型=草木系 pastel 实心(颜色随类型) / 线上线下=中性描边 / 公益=浅抹茶 chip+深茶绿 */
+  .t-mint{background:#dde8d0;color:#4a6b38}.t-blue{background:#dee8e9;color:#48707a}.t-peach{background:#f2e5cf;color:#8a6134}.t-lav{background:#eddfde;color:#8a5a52}
+  .t-mode{background:transparent;color:var(--ink-2);box-shadow:inset 0 0 0 1px rgba(38,51,43,.20)}
+  .t-welfare{background:var(--matcha);color:var(--tea-ink)}
+  .card-name{font-size:16px;font-weight:800;line-height:1.3;letter-spacing:-.01px}
+  .card-meta{margin-top:4px;font-size:11.5px;color:var(--ink-2);font-weight:500;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-meta .sep{color:var(--ink-3)}
+  .card-time{flex-shrink:0;text-align:right;line-height:1.1}
+  .ct-day{font-size:10px;font-weight:700;color:var(--ink-3);letter-spacing:.5px}
+  .ct-time{font-size:17px;font-weight:900;letter-spacing:-.3px;margin-top:2px}
+  .ct-end{font-size:10.5px;font-weight:600;color:var(--ink-3)}
+  .card-desc{margin-top:9px;font-size:12px;color:var(--ink-2);line-height:1.55}
+  .card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:11px;padding-top:11px;border-top:.5px solid rgba(63,107,79,.14)}
+  .loc{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--ink-2);min-width:0}
+  .loc .sdot{width:6px;height:6px;border-radius:50%;background:#6ba37a;flex-shrink:0}
+  .loc.muted{color:var(--ink-3)}
+  .loc.muted .sdot{background:var(--ink-3)}
+  .btn{flex-shrink:0;font-size:12.5px;font-weight:800;padding:8px 20px;border-radius:10px;background:var(--tea);color:#fff;cursor:pointer;border:none}
+  .btn-lime{background:var(--matcha);color:var(--tea-ink)}
+  .btn-ghost{background:#ecefe7;color:var(--ink-3);cursor:default}
+
+  .end-note{text-align:center;padding:14px 0 6px;font-size:10.5px;color:var(--ink-3);letter-spacing:1px}
+
+  .color-label{position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:20;background:#2a332c;color:var(--matcha);font-size:10px;font-weight:700;padding:3px 14px;border-radius:99px;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="phone">
+    <div class="color-label">改版 · 抹茶清茶</div>
+    <div class="nav-bar">
+      <div class="nav-status"><span>11:06</span><span>&#128247; &#128267; 64%</span></div>
+      <div class="nav-capsule">
+        <div style="display:flex;gap:8px;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg><div style="width:.5px;height:14px;background:rgba(0,0,0,.12)"></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+        <div class="nav-capsule-line"><div class="dot dot-black"></div><div class="dot dot-black"></div><div class="dot dot-gray"></div></div>
+      </div>
+    </div>
+    <div class="content"><div class="page">
+
+      <div class="hero">
+        <div class="hero-date">7月16日 · 周三 · 今天</div>
+        <div class="hero-sub">本周 4 场活动</div>
+      </div>
+
+      <div class="week-picker">
+        <div class="wk-day"><span class="wk-name">一</span><span class="wk-num">14</span><span class="wk-today-dot" style="opacity:0"></span></div>
+        <div class="wk-day"><span class="wk-name">二</span><span class="wk-num">15</span><span class="wk-today-dot" style="opacity:0"></span></div>
+        <div class="wk-day active"><span class="wk-name">三</span><span class="wk-num">16</span><span class="wk-today-dot"></span></div>
+        <div class="wk-day"><span class="wk-name">四</span><span class="wk-num">17</span><span class="wk-today-dot" style="opacity:0"></span></div>
+        <div class="wk-day"><span class="wk-name">五</span><span class="wk-num">18</span><span class="wk-today-dot" style="opacity:0"></span></div>
+        <div class="wk-day"><span class="wk-name">六</span><span class="wk-num">19</span><span class="wk-today-dot" style="opacity:0"></span></div>
+        <div class="wk-day"><span class="wk-name">日</span><span class="wk-num">20</span><span class="wk-today-dot" style="opacity:0"></span></div>
+      </div>
+
+      <div class="group-title"><span class="gt-main">本周活动</span><span class="gt-sub">周三 — 周六</span></div>
+
+      <!-- 卡片 1:类型+线下+公益,三标签齐全 -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-titles">
+            <div class="tagline"><span class="tag t-mint">茶会</span><span class="tag t-mode">线下</span><span class="tag t-welfare">公益</span></div>
+            <div class="card-name">夏日品茶会</div>
+            <div class="card-meta">张老师<span class="sep">·</span>龙井冲泡品鉴入门</div>
+          </div>
+          <div class="card-time"><div class="ct-day">周四</div><div class="ct-time">19:00</div><div class="ct-end">21:00 结束</div></div>
+        </div>
+        <div class="card-foot">
+          <div class="loc"><span class="sdot"></span>望京茶室 · 3 楼</div>
+          <button class="btn">报名</button>
+        </div>
+      </div>
+
+      <!-- 卡片 2:类型+线下 -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-titles">
+            <div class="tagline"><span class="tag t-blue">课程</span><span class="tag t-mode">线下</span></div>
+            <div class="card-name">茶艺基础课程</div>
+            <div class="card-meta">8 人小班<span class="sep">·</span>零基础可参加</div>
+          </div>
+          <div class="card-time"><div class="ct-day">周四</div><div class="ct-time">14:00</div><div class="ct-end">16:00 结束</div></div>
+        </div>
+        <div class="card-foot">
+          <div class="loc"><span class="sdot"></span>你已报名，记得准时来</div>
+          <button class="btn btn-lime">已报名 ✓</button>
+        </div>
+      </div>
+
+      <!-- 卡片 3:类型+线上 -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-titles">
+            <div class="tagline"><span class="tag t-peach">讲座</span><span class="tag t-mode">线上</span></div>
+            <div class="card-name">普洱茶专题讲座</div>
+            <div class="card-meta">李老师<span class="sep">·</span>普洱的分类与存储方法</div>
+          </div>
+          <div class="card-time"><div class="ct-day">周五</div><div class="ct-time">20:00</div><div class="ct-end">21:30 结束</div></div>
+        </div>
+        <div class="card-foot">
+          <div class="loc"><span class="sdot"></span>线上直播 · 腾讯会议</div>
+          <button class="btn">报名</button>
+        </div>
+      </div>
+
+      <!-- 卡片 4:类型+线下,已结束 -->
+      <div class="card" style="opacity:.72">
+        <div class="card-head">
+          <div class="card-titles">
+            <div class="tagline"><span class="tag t-lav">体验</span><span class="tag t-mode">线下</span></div>
+            <div class="card-name">冥想放松沙龙</div>
+            <div class="card-meta">王老师<span class="sep">·</span>90 分钟深度放松</div>
+          </div>
+          <div class="card-time"><div class="ct-day">周六</div><div class="ct-time">10:00</div><div class="ct-end">11:30 结束</div></div>
+        </div>
+        <div class="card-foot">
+          <div class="loc muted"><span class="sdot"></span>活动已结束，感谢参与</div>
+          <button class="btn btn-ghost">已结束</button>
+        </div>
+      </div>
+
+      <div class="end-note">· 到底啦，共 4 场活动 ·</div>
+    </div></div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#26332b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        <span class="tab-label">首页</span><span class="tdot"></span>
+      </div>
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a3ada2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+        <span class="tab-label">课程</span><span class="tdot"></span>
+      </div>
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a3ada2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>
+        <span class="tab-label">活动</span><span class="tdot"></span>
+      </div>
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a3ada2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
+        <span class="tab-label">我的</span><span class="tdot"></span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

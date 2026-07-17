@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 - 带图活动卡片</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #e8eaed; color: #333; padding: 40px 16px; }
+  .page-title { text-align: center; margin-bottom: 28px; }
+  .page-title h1 { font-size: 25px; font-weight: 700; color: #2b2f36; margin-bottom: 8px; }
+  .page-title p { font-size: 13.5px; color: #8f959e; max-width: 780px; margin: 0 auto; line-height: 1.7; }
+  .fun { font-family: 'ZCOOL KuaiLe', 'Yuanti SC', sans-serif; }
+
+  .styles-row { display: flex; justify-content: center; gap: 26px; flex-wrap: wrap; max-width: 1500px; margin: 0 auto; }
+  .style-wrapper { display: flex; flex-direction: column; align-items: center; width: 300px; }
+  .style-label { margin-bottom: 14px; text-align: center; min-height: 56px; }
+  .style-label .name { font-size: 16.5px; font-weight: 700; color: #2b2f36; display: block; margin-bottom: 4px; }
+  .style-label .desc { font-size: 11.5px; color: #8f959e; line-height: 1.5; display: block; }
+
+  .phone { width: 300px; height: 640px; border-radius: 26px; overflow: hidden; box-shadow: 0 12px 44px rgba(0,0,0,0.16); border: 7px solid #161616; position: relative; background: #fff; }
+  .phone-statusbar { height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 12px; font-weight: 600; color: #1a1a1a; position: relative; z-index: 10; }
+  .phone-content { height: calc(100% - 36px); overflow-y: auto; position: relative; }
+  .phone-content::-webkit-scrollbar { display: none; }
+
+  .page { padding: 20px 16px 16px; min-height: 100%; position: relative; background: #f1f3f5; }
+  .page::before { content:''; position:absolute; inset:0; background-image: radial-gradient(rgba(91,110,130,0.05) 1.4px, transparent 1.5px); background-size: 22px 22px; pointer-events:none; }
+  .greet { position: relative; z-index: 1; margin-bottom: 18px; }
+  .greet h2 { font-size: 22px; line-height: 1.3; color: #2b3138; }
+  .greet p { font-size: 11.5px; margin-top: 4px; color: #8b94a0; }
+  .date-group { position: relative; z-index: 1; margin-bottom: 16px; }
+  .date-header { display: inline-block; transform: rotate(-1.6deg); font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 4px; margin-bottom: 11px; letter-spacing: 0.5px; background: #e2e7ec; color: #465560; box-shadow: 0 2px 5px rgba(60,70,80,0.10); }
+
+  /* 通用软卡底 */
+  .card { position: relative; z-index: 1; margin-bottom: 13px; border-radius: 4px; background: #ffffff; border: 1px solid rgba(60,70,80,0.05); box-shadow: 0 4px 18px rgba(40,50,60,0.07); overflow: hidden; }
+  .card .nm { font-size: 16px; font-weight: 600; line-height: 1.5; letter-spacing: 0.2px; color: #2b3138; }
+  .card .tg { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; background: #e9eef3; color: #51677e; }
+  .card .row { font-size: 12.5px; display: flex; line-height: 1.5; }
+  .card .lab { width: 32px; flex-shrink: 0; color: #aab2bc; }
+  .card .val { flex: 1; color: #4c5560; }
+  .card .desc { margin-top: 0; padding-top: 12px; border-top: 1px solid #eef1f4; font-size: 12px; line-height: 1.7; color: #8a929c; }
+
+  .img { display: block; }
+  .img svg { display: block; width: 100%; height: 100%; }
+
+  /* 变体 A：左图右文 */
+  .v-left .card { display: flex; gap: 12px; padding: 12px; align-items: stretch; }
+  .v-left .card .thumb { width: 84px; height: 84px; border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+  .v-left .card .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .v-left .card .ct { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .v-left .card .info { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+
+  /* 变体 B：上图下文 */
+  .v-cover .card .cover { width: 100%; height: 128px; }
+  .v-cover .card .body { padding: 13px 15px 15px; }
+  .v-cover .card .ct { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .v-cover .card .info { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .v-cover .card .desc { margin-top: 11px; }
+
+  .no-more { position: relative; z-index: 1; text-align: center; padding: 14px 0 18px; font-size: 11px; color: #bcc3cc; }
+  .apply-hint { max-width: 1080px; margin: 40px auto 0; background: #fff; border-radius: 14px; padding: 20px 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); font-size: 12.5px; color: #8f959e; line-height: 1.85; text-align: center; }
+  .apply-hint b { color: #51677e; }
+</style>
+</head>
+<body>
+  <div class="page-title">
+    <h1>无忧茶苑 — 给每个活动加一张图</h1>
+    <p>纯文字卡片容易显空、像模板。这版给每个活动配一张<b>冷色调抽象占位图</b>（上线时换成真实活动照片），气质立刻不一样。两种排版：左图右文 / 上图下文，都用冷灰底 + 软卡片 + 4px 圆角。</p>
+  </div>
+
+  <div class="styles-row">
+    <!-- A 左图右文 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">A · 左图右文</span><span class="desc">紧凑列表感，图片做 84px 缩略图，适合活动多的信息流</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page v-left">
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card">
+              <div class="thumb img"><svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#3d5a80"/><circle cx="32" cy="36" r="22" fill="none" stroke="#8fb0d6" stroke-width="3" opacity="0.7"/><circle cx="70" cy="64" r="14" fill="#5b8bc0" opacity="0.6"/><path d="M8 82 Q50 56 92 82" stroke="#bcd2ee" stroke-width="3" fill="none" opacity="0.6"/></svg></div>
+              <div class="body"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00</span></div><div class="row"><span class="lab">地点</span><span class="val">一楼大厅</span></div></div></div>
+            </div>
+            <div class="card">
+              <div class="thumb img"><svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#4f8a73"/><path d="M0 42 Q25 27 50 42 T100 42 V100 H0 Z" fill="#6fae93" opacity="0.85"/><path d="M0 62 Q25 47 50 62 T100 62 V100 H0 Z" fill="#3f735c" opacity="0.85"/></svg></div>
+              <div class="body"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+            </div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card">
+              <div class="thumb img"><svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#5b6670"/><path d="M0 100 L35 46 L60 100 Z" fill="#7d8893"/><path d="M40 100 L76 34 L100 100 Z" fill="#aab3bc"/><circle cx="80" cy="24" r="9" fill="#d3d9df"/></svg></div>
+              <div class="body"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div></div>
+            </div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- B 上图下文 -->
+    <div class="style-wrapper">
+      <div class="style-label"><span class="name">B · 上图下文</span><span class="desc">杂志感封面图，视觉更丰富，适合活动少、想突出氛围</span></div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page v-cover">
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card">
+              <div class="cover img"><svg viewBox="0 0 300 128" preserveAspectRatio="xMidYMid slice"><rect width="300" height="128" fill="#465a78"/><g fill="#cdd9ec"><circle cx="60" cy="44" r="6"/><circle cx="120" cy="30" r="4"/><circle cx="160" cy="70" r="7"/><circle cx="210" cy="44" r="5"/><circle cx="250" cy="90" r="6"/><circle cx="90" cy="96" r="4"/><circle cx="180" cy="100" r="3"/></g><circle cx="235" cy="36" r="20" fill="none" stroke="#9bb4d6" stroke-width="3" opacity="0.6"/></svg></div>
+              <div class="body"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            </div>
+            <div class="card">
+              <div class="cover img"><svg viewBox="0 0 300 128" preserveAspectRatio="xMidYMid slice"><rect width="300" height="128" fill="#4f8a73"/><path d="M0 56 Q75 36 150 56 T300 56 V128 H0 Z" fill="#6fae93" opacity="0.85"/><path d="M0 84 Q75 64 150 84 T300 84 V128 H0 Z" fill="#3f735c" opacity="0.85"/></svg></div>
+              <div class="body"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+            </div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card">
+              <div class="cover img"><svg viewBox="0 0 300 128" preserveAspectRatio="xMidYMid slice"><rect width="300" height="128" fill="#3d5a80"/><circle cx="80" cy="50" r="40" fill="none" stroke="#8fb0d6" stroke-width="4" opacity="0.6"/><circle cx="200" cy="86" r="26" fill="#5b8bc0" opacity="0.55"/><path d="M20 110 Q150 70 300 110" stroke="#bcd2ee" stroke-width="4" fill="none" opacity="0.5"/></svg></div>
+              <div class="body"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+            </div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="apply-hint">
+    两种带图排版：<b>A 左图右文</b>（紧凑、信息流友好）/ <b>B 上图下文</b>（封面感、氛围强）。图片目前是<b>冷色调抽象占位图</b>，上线时替换为真实活动照片即可。<br>
+    注意：加图需要动 WXML（卡片里加 <code>&lt;image&gt;</code> 节点）+ JS 数据（每条活动加 <code>image</code> 字段）。你定版式后我一并改好。
+  </div>
+</body>
+</html>

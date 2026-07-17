@@ -1,0 +1,170 @@
+/* 方案A：暖茶米白 — 温暖的纸质质感 */
+/* 背景：暖米色 + 微妙点阵纹理，卡片纯白小圆角 */
+
+.page {
+  min-height: 100vh;
+  background-color: #faf8f3;
+  background-image: radial-gradient(circle, #e8e2d4 1rpx, transparent 1rpx);
+  background-size: 40rpx 40rpx;
+  background-position: 0 0;
+  padding-bottom: 20rpx;
+}
+
+.loading, .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #a89e8a;
+}
+
+.empty-text {
+  font-size: 30rpx;
+  color: #3d3528;
+  margin-bottom: 12rpx;
+}
+
+.empty-hint {
+  font-size: 26rpx;
+  color: #a89e8a;
+}
+
+.list {
+  padding: 20rpx 28rpx;
+}
+
+.date-group {
+  margin-bottom: 28rpx;
+}
+
+.date-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 14rpx;
+  padding: 0 4rpx;
+}
+
+.date-header::before {
+  content: '';
+  width: 8rpx;
+  height: 8rpx;
+  background: #c4a35a;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.date-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #3d3528;
+}
+
+.date-weekday {
+  font-size: 24rpx;
+  color: #a89e8a;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 4rpx;
+  padding: 28rpx 28rpx;
+  margin-bottom: 14rpx;
+  box-shadow: 0 1rpx 6rpx rgba(180, 165, 130, 0.12);
+  border: 1rpx solid #f0ebe0;
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.card-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #3d3528;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-tags {
+  display: flex;
+  gap: 8rpx;
+  margin-left: 16rpx;
+  flex-shrink: 0;
+}
+
+.tag {
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 2rpx;
+  font-weight: 500;
+}
+
+.tag-online {
+  background: #e8f3ff;
+  color: #3370ff;
+}
+
+.tag-welfare {
+  background: #fdf0e0;
+  color: #c47d20;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  font-size: 26rpx;
+}
+
+.info-label {
+  color: #a89e8a;
+  width: 72rpx;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: #5a5040;
+  flex: 1;
+}
+
+.card-desc {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #f5f1e8;
+}
+
+.desc-text {
+  font-size: 24rpx;
+  color: #8a7e68;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.loading-more, .no-more {
+  text-align: center;
+  padding: 32rpx 0;
+}
+
+.no-more-text {
+  font-size: 24rpx;
+  color: #c9c0ae;
+}

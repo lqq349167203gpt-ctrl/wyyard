@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 — 干净白卡 · 等高</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --paper:#e7f2ec;
+    --card:#ffffff;
+    --ink:#1f2730;
+    --ink2:#56636d;
+    --ink3:#97a2ac;
+    --line:#e6ece8;
+    --green:#2f9e74;
+    --blue:#3a6fb0;
+    --purple:#6d5fd0;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#cfd6cf;padding:44px 16px;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .hand{font-family:'Caveat',cursive;font-weight:700}
+  .wrap{max-width:940px;margin:0 auto}
+  .title{text-align:center;margin-bottom:6px}
+  .title h1{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+  .title p{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.75;max-width:700px;margin-left:auto;margin-right:auto}
+  .title p b{color:var(--ink)}
+
+  .row{display:flex;gap:32px;align-items:flex-start;justify-content:center;margin-top:36px;flex-wrap:wrap}
+  .phone{width:340px;height:680px;border-radius:30px;overflow:hidden;box-shadow:0 18px 50px rgba(20,30,40,.18);border:8px solid #14171a;position:relative;background:#fff;flex-shrink:0}
+  .sb{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#14171a;position:relative;z-index:10;background:#fff}
+  .content{height:calc(100% - 38px);overflow-y:auto;position:relative;background:var(--paper)}
+  .content::-webkit-scrollbar{display:none}
+
+  .page{min-height:100%;padding:16px 14px 22px;position:relative}
+  .bg-doodles{position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5}
+  .bg-doodles svg{position:absolute}
+
+  .topbar{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .brand{display:flex;align-items:center;gap:7px}
+  .brand .mk{width:11px;height:11px;background:var(--ink)}
+  .brand .nm{font-size:13px;font-weight:800;letter-spacing:.5px}
+  .count{font-size:11px;color:var(--ink2);display:inline-flex;align-items:baseline;gap:4px}
+  .count .hw{font-size:17px;color:var(--purple);line-height:1}
+
+  .date-row{position:relative;z-index:1;display:flex;align-items:baseline;gap:9px;margin:14px 0 11px}
+  .date-row .sq{width:9px;height:9px;flex-shrink:0;align-self:center}
+  .date-row .day{font-size:30px;font-weight:800;line-height:1;color:var(--ink);letter-spacing:-1px}
+  .date-row .md{font-size:11px;color:var(--ink2);line-height:1.45}
+  .date-row .md b{color:var(--ink);font-weight:700}
+  .date-row .rule{flex:1;height:1px;background:var(--line);margin-left:4px;align-self:center}
+
+  /* 等高白卡：min-height + flex列 + 描述顶到底 */
+  .card{position:relative;z-index:1;background:var(--card);border-radius:4px;padding:14px 15px 13px;margin-bottom:10px;min-height:124px;display:flex;flex-direction:column}
+  .card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
+  .card .name{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;line-height:1.35;color:var(--ink);letter-spacing:.2px}
+  .card .name .dot{width:9px;height:9px;flex-shrink:0;border-radius:1px}
+  .tag{font-size:10px;font-weight:800;letter-spacing:.3px;color:#fff;padding:2px 7px;border-radius:2px;flex-shrink:0;line-height:1.7}
+  .tag.g{background:var(--green)} .tag.p{background:var(--purple)} .tag.b{background:var(--blue)}
+  .card .when{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:7px}
+  .card .when .d{color:var(--ink3);font-weight:600;margin-left:4px}
+  .card .meta{font-size:12px;color:var(--ink2);line-height:1.5}
+  .card .meta .lab{color:var(--ink3);font-size:11px;margin-right:5px}
+  .card .meta .sep{color:var(--ink3);margin:0 6px}
+  .card .desc{margin-top:auto;padding-top:9px;border-top:1px dashed var(--line);font-size:12px;line-height:1.55;color:var(--ink2);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  /* 无描述时占位，保持等高底部线 */
+  .card .desc-ph{margin-top:auto;padding-top:9px;border-top:1px dashed var(--line);height:0}
+
+  .nomore{position:relative;z-index:1;text-align:center;padding:14px 0 6px;font-size:10.5px;color:var(--ink3);letter-spacing:1px}
+  .nomore .hw{display:block;margin-top:4px;font-size:18px;color:var(--green);line-height:1}
+
+  .spec{width:300px;flex-shrink:0}
+  .spec h3{font-size:14px;color:var(--ink);margin-bottom:12px}
+  .blk{background:#fff;border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:12px}
+  .blk b{font-size:12px;color:var(--ink);display:block;margin-bottom:9px}
+  .kv{font-size:11.5px;color:var(--ink2);line-height:1.95}
+  .kv span{color:var(--ink3)}
+  .foot{text-align:center;margin-top:28px;font-size:11.5px;color:var(--ink2);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">
+    <h1>无忧茶苑首页 — 干净白卡 · 等高</h1>
+    <p>每张活动卡<b>等高</b>：固定最小高度 + 描述用 margin-top:auto 顶到底 + 老师/地点合并一行保证行数一致。无描述的卡底部留白，高度仍齐。</p>
+  </div>
+
+  <div class="row">
+    <div class="phone">
+      <div class="sb"><span>01:53</span><span></span></div>
+      <div class="content"><div class="page">
+        <div class="bg-doodles">
+          <svg width="26" height="26" viewBox="0 0 26 26" style="top:48px;right:14px;transform:rotate(-12deg)"><g stroke="#2a3036" stroke-width="1.3" stroke-linecap="round" fill="none"><path d="M13 3 L13 23"/><path d="M3 13 L23 13"/><path d="M6 6 L20 20"/><path d="M6 20 L20 6"/></g></svg>
+          <svg width="34" height="12" viewBox="0 0 34 12" style="top:96px;left:6px;transform:rotate(-10deg)"><path d="M2 6 Q8 1 14 6 T26 6 T32 6" stroke="#6d5fd0" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+          <svg width="22" height="14" viewBox="0 0 22 14" style="top:300px;right:10px;transform:rotate(8deg)"><g stroke="#3a6fb0" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7 Q10 1 18 7"/><path d="M15 3 L18 7 L15 11"/></g></svg>
+          <svg width="28" height="28" viewBox="0 0 28 28" style="bottom:90px;left:6px;transform:rotate(-15deg)"><g stroke="#2a3036" stroke-width="1.2" stroke-linecap="round"><path d="M14 4 L14 24"/><path d="M4 14 L24 14"/><path d="M7 7 L21 21"/><path d="M7 21 L21 7"/></g><circle cx="14" cy="14" r="2" fill="#2a3036"/></svg>
+          <svg width="22" height="8" viewBox="0 0 22 8" style="bottom:50px;right:18px;transform:rotate(-8deg)"><g fill="#2f9e74"><circle cx="3" cy="4" r="1.7"/><circle cx="11" cy="4" r="1.7"/><circle cx="19" cy="4" r="1.7"/></g></svg>
+        </div>
+
+        <div class="topbar">
+          <div class="brand"><span class="mk"></span><span class="nm">无忧茶苑</span></div>
+          <span class="count"><span class="hand">3</span> 场活动</span>
+        </div>
+
+        <div class="date-row">
+          <span class="sq" style="background:var(--green)"></span>
+          <span class="day">16</span>
+          <span class="md"><b>07月 · 周四</b><br>2 场活动</span>
+          <span class="rule"></span>
+        </div>
+
+        <!-- 卡1：有描述 -->
+        <div class="card">
+          <div class="top">
+            <div class="name"><span class="dot" style="background:var(--green)"></span>夏日品茶会</div>
+            <span class="tag g">公益</span>
+          </div>
+          <div class="when">19:00 - 21:00<span class="d">· 周四</span></div>
+          <div class="meta"><span class="lab">老师</span>张老师<span class="sep">·</span><span class="lab">地点</span>茶苑一楼大厅</div>
+          <div class="desc">带你了解龙井的冲泡与品鉴，新手友好。</div>
+        </div>
+
+        <!-- 卡2：无描述，等高留白 -->
+        <div class="card">
+          <div class="top">
+            <div class="name"><span class="dot" style="background:var(--purple)"></span>茶艺基础课程</div>
+            <span class="tag p">课程</span>
+          </div>
+          <div class="when">14:00 - 16:00<span class="d">· 周四</span></div>
+          <div class="meta"><span class="lab">地点</span>二楼教室</div>
+          <div class="desc-ph"></div>
+        </div>
+
+        <div class="date-row">
+          <span class="sq" style="background:var(--blue)"></span>
+          <span class="day">17</span>
+          <span class="md"><b>07月 · 周五</b><br>1 场活动</span>
+          <span class="rule"></span>
+        </div>
+
+        <!-- 卡3：有描述 -->
+        <div class="card">
+          <div class="top">
+            <div class="name"><span class="dot" style="background:var(--blue)"></span>普洱茶专题讲座</div>
+            <span class="tag b">线上</span>
+          </div>
+          <div class="when">20:00 - 21:30<span class="d">· 周五</span></div>
+          <div class="meta"><span class="lab">老师</span>李老师</div>
+          <div class="desc">深入了解普洱的分类、存储与品鉴。</div>
+        </div>
+
+        <div class="nomore">— 没有更多了 —<span class="hw">see you ✦</span></div>
+      </div></div>
+    </div>
+
+    <div class="spec">
+      <h3>等高实现</h3>
+      <div class="blk">
+        <b>每张卡等高</b>
+        <div class="kv">
+          min-height <span>124px</span><br>
+          flex 列布局<br>
+          描述 margin-top:auto<span> 顶到底</span><br>
+          无描述卡<span> 底部留白仍等高</span>
+        </div>
+      </div>
+      <div class="blk">
+        <b>行数一致</b>
+        <div class="kv">
+          老师/地点合并一行<span> 不拆两行</span><br>
+          每卡 = 名+标签 / 时间 / 地点行 / 描述<br>
+          行数固定<span> 高度自然齐</span>
+        </div>
+      </div>
+      <div class="blk">
+        <b>保留</b>
+        <div class="kv">淡薄荷底 · 白卡 · 小色点 · 彩标签<br>页面手绘 · 大日期 · 4px 圆角 · 无chrome</div>
+      </div>
+      <div class="blk">
+        <b>落地</b>
+        <div class="kv">WXML 用固定结构，flex 布局即可等高</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    觉得这版等高干净白卡对路就说一声，我落进 <code style="background:#fff;padding:1px 5px;border-radius:3px">index.wxss</code>。<br>
+    卡片高度想再高/再矮，一句话。
+  </div>
+</div>
+</body>
+</html>

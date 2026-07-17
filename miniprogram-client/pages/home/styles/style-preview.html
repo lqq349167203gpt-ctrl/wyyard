@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首页活动页风格预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        .header h1 {
+            font-size: 48px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header p {
+            font-size: 20px;
+            color: #64748b;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .styles-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+        
+        .style-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .style-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        .style-preview {
+            height: 300px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .style1-preview {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        }
+        
+        .style2-preview {
+            background: #ffffff;
+        }
+        
+        .style3-preview {
+            background: #f8fafc;
+        }
+        
+        .style4-preview {
+            background: #ffffff;
+        }
+        
+        .preview-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .style-info {
+            padding: 30px;
+        }
+        
+        .style-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+        
+        .style-description {
+            font-size: 16px;
+            color: #64748b;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .style-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-tag {
+            background: #f1f5f9;
+            color: #475569;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .style-colors {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .color-swatch {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .apply-btn {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .apply-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        .features-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            margin-bottom: 40px;
+        }
+        
+        .features-section h2 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+        }
+        
+        .feature-item {
+            text-align: center;
+            padding: 30px;
+            background: #f8fafc;
+            border-radius: 16px;
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+        
+        .feature-desc {
+            font-size: 16px;
+            color: #64748b;
+            line-height: 1.6;
+        }
+        
+        .action-section {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 20px;
+            color: white;
+        }
+        
+        .action-section h2 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        
+        .action-section p {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .btn-primary {
+            background: white;
+            color: #3b82f6;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: white;
+            color: #3b82f6;
+        }
+        
+        /* 手机预览模拟 */
+        .phone-preview {
+            width: 200px;
+            height: 350px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin: 0 auto;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .phone-status-bar {
+            height: 30px;
+            background: #1e293b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .phone-content {
+            height: 320px;
+            padding: 15px;
+            overflow: hidden;
+        }
+        
+        .mini-card {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .mini-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        
+        .mini-card-info {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+        
+        .mini-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        
+        .tag-online {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .tag-welfare {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .styles-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .header h1 {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>首页活动页风格设计</h1>
+            <p>为您的首页活动页设计了4种不同风格，每种风格都有独特的视觉特点和适用场景</p>
+        </div>
+        
+        <div class="styles-grid">
+            <!-- 风格1：现代卡片式 -->
+            <div class="style-card">
+                <div class="style-preview style1-preview">
+                    <div class="preview-content">
+                        <div class="phone-preview">
+                            <div class="phone-status-bar">
+                                <span>16:06</span>
+                                <span>📶 🔋</span>
+                            </div>
+                            <div class="phone-content" style="background: linear-gradient(180deg, #f8fafc, #f1f5f9);">
+                                <div class="mini-card" style="border-left: 4px solid #3b82f6;">
+                                    <div class="mini-card-title">夏日音乐节</div>
+                                    <div class="mini-card-info">时间: 19:00 - 21:00</div>
+                                    <span class="mini-tag tag-online">线上</span>
+                                </div>
+                                <div class="mini-card" style="border-left: 4px solid #8b5cf6;">
+                                    <div class="mini-card-title">当代艺术展览</div>
+                                    <div class="mini-card-info">地点: 市美术馆</div>
+                                    <span class="mini-tag tag-welfare">公益</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="style-info">
+                    <div class="style-name">现代卡片式设计</div>
+                    <div class="style-description">清晰的卡片层次结构、圆角设计、微妙的阴影效果，营造现代而精致的视觉体验。</div>
+                    <div class="style-features">
+                        <span class="feature-tag">圆角设计</span>
+                        <span class="feature-tag">阴影效果</span>
+                        <span class="feature-tag">渐变装饰</span>
+                        <span class="feature-tag">层次分明</span>
+                    </div>
+                    <div class="style-colors">
+                        <div class="color-swatch" style="background: #3b82f6;"></div>
+                        <div class="color-swatch" style="background: #8b5cf6;"></div>
+                        <div class="color-swatch" style="background: #f8fafc;"></div>
+                        <div class="color-swatch" style="background: #ffffff;"></div>
+                    </div>
+                    <button class="apply-btn">应用此风格</button>
+                </div>
+            </div>
+            
+            <!-- 风格2：简约列表式 -->
+            <div class="style-card">
+                <div class="style-preview style2-preview">
+                    <div class="preview-content">
+                        <div class="phone-preview">
+                            <div class="phone-status-bar">
+                                <span>16:06</span>
+                                <span>📶 🔋</span>
+                            </div>
+                            <div class="phone-content" style="background: #ffffff;">
+                                <div style="background: #f8f9fa; padding: 8px 12px; margin-bottom: 10px; border-radius: 4px;">
+                                    <div style="font-size: 12px; font-weight: 600; color: #2b2f36;">2026年7月15日 周三</div>
+                                </div>
+                                <div class="mini-card" style="box-shadow: none; border-bottom: 1px solid #f0f0f0; border-radius: 0;">
+                                    <div class="mini-card-title">夏日音乐节</div>
+                                    <div class="mini-card-info">时间: 19:00 - 21:00</div>
+                                    <span class="mini-tag tag-online">线上</span>
+                                </div>
+                                <div class="mini-card" style="box-shadow: none; border-bottom: 1px solid #f0f0f0; border-radius: 0;">
+                                    <div class="mini-card-title">当代艺术展览</div>
+                                    <div class="mini-card-info">地点: 市美术馆</div>
+                                    <span class="mini-tag tag-welfare">公益</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="style-info">
+                    <div class="style-name">简约列表式设计</div>
+                    <div class="style-description">简洁的线条分隔、清晰的排版、高效的空间利用，让信息更加突出和易于阅读。</div>
+                    <div class="style-features">
+                        <span class="feature-tag">极简设计</span>
+                        <span class="feature-tag">线条分隔</span>
+                        <span class="feature-tag">高效空间</span>
+                        <span class="feature-tag">粘性头部</span>
+                    </div>
+                    <div class="style-colors">
+                        <div class="color-swatch" style="background: #2b2f36;"></div>
+                        <div class="color-swatch" style="background: #8f959e;"></div>
+                        <div class="color-swatch" style="background: #ffffff;"></div>
+                        <div class="color-swatch" style="background: #f8f9fa;"></div>
+                    </div>
+                    <button class="apply-btn">应用此风格</button>
+                </div>
+            </div>
+            
+            <!-- 风格3：时间轴式 -->
+            <div class="style-card">
+                <div class="style-preview style3-preview">
+                    <div class="preview-content">
+                        <div class="phone-preview">
+                            <div class="phone-status-bar">
+                                <span>16:06</span>
+                                <span>📶 🔋</span>
+                            </div>
+                            <div class="phone-content" style="background: #f8fafc; padding-left: 30px;">
+                                <div style="position: absolute; left: 25px; top: 30px; bottom: 15px; width: 4px; background: linear-gradient(180deg, #3b82f6, #8b5cf6, #ec4899); border-radius: 2px;"></div>
+                                <div style="position: relative; margin-bottom: 20px;">
+                                    <div style="position: absolute; left: -20px; top: 10px; width: 12px; height: 12px; background: white; border: 3px solid #3b82f6; border-radius: 50%; z-index: 2;"></div>
+                                    <div class="mini-card" style="margin-left: 10px;">
+                                        <div class="mini-card-title">夏日音乐节</div>
+                                        <div class="mini-card-info">时间: 19:00 - 21:00</div>
+                                        <span class="mini-tag tag-online">线上</span>
+                                    </div>
+                                </div>
+                                <div style="position: relative;">
+                                    <div style="position: absolute; left: -20px; top: 10px; width: 12px; height: 12px; background: white; border: 3px solid #8b5cf6; border-radius: 50%; z-index: 2;"></div>
+                                    <div class="mini-card" style="margin-left: 10px;">
+                                        <div class="mini-card-title">当代艺术展览</div>
+                                        <div class="mini-card-info">地点: 市美术馆</div>
+                                        <span class="mini-tag tag-welfare">公益</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="style-info">
+                    <div class="style-name">时间轴式设计</div>
+                    <div class="style-description">垂直时间线连接活动，突出时间顺序和活动流程，让时间脉络清晰可见。</div>
+                    <div class="style-features">
+                        <span class="feature-tag">时间线连接</span>
+                        <span class="feature-tag">渐变色彩</span>
+                        <span class="feature-tag">节点突出</span>
+                        <span class="feature-tag">流程清晰</span>
+                    </div>
+                    <div class="style-colors">
+                        <div class="color-swatch" style="background: #3b82f6;"></div>
+                        <div class="color-swatch" style="background: #8b5cf6;"></div>
+                        <div class="color-swatch" style="background: #ec4899;"></div>
+                        <div class="color-swatch" style="background: #f8fafc;"></div>
+                    </div>
+                    <button class="apply-btn">应用此风格</button>
+                </div>
+            </div>
+            
+            <!-- 风格4：杂志式 -->
+            <div class="style-card">
+                <div class="style-preview style4-preview">
+                    <div class="preview-content">
+                        <div class="phone-preview">
+                            <div class="phone-status-bar">
+                                <span>16:06</span>
+                                <span>📶 🔋</span>
+                            </div>
+                            <div class="phone-content" style="background: #ffffff; padding: 0;">
+                                <div style="background: #2b2f36; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="font-size: 12px; font-weight: 600; color: white;">2026年7月15日</div>
+                                    <div style="font-size: 10px; color: #a0a4ab; letter-spacing: 1px;">周三</div>
+                                </div>
+                                <div style="height: 60px; background: linear-gradient(135deg, #667eea, #764ba2); margin: 10px 15px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                                    <div style="color: white; font-size: 10px; font-weight: 600; letter-spacing: 1px;">活动图片</div>
+                                </div>
+                                <div style="padding: 0 15px;">
+                                    <div class="mini-card" style="box-shadow: none; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+                                        <div class="mini-card-title" style="font-size: 16px; font-weight: 700;">夏日音乐节</div>
+                                        <div class="mini-card-info">时间: 19:00 - 21:00</div>
+                                        <span class="mini-tag" style="background: #2b2f36; color: white;">线上</span>
+                                    </div>
+                                    <div class="mini-card" style="box-shadow: none; padding: 10px 0;">
+                                        <div class="mini-card-title" style="font-size: 16px; font-weight: 700;">当代艺术展览</div>
+                                        <div class="mini-card-info">地点: 市美术馆</div>
+                                        <span class="mini-tag" style="background: #ff6b6b; color: white;">公益</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="style-info">
+                    <div class="style-name">杂志式设计</div>
+                    <div class="style-description">大胆的排版、图片占位、编辑式布局，增强视觉吸引力和品牌冲击力。</div>
+                    <div class="style-features">
+                        <span class="feature-tag">大胆排版</span>
+                        <span class="feature-tag">图片占位</span>
+                        <span class="feature-tag">编辑布局</span>
+                        <span class="feature-tag">视觉冲击</span>
+                    </div>
+                    <div class="style-colors">
+                        <div class="color-swatch" style="background: #2b2f36;"></div>
+                        <div class="color-swatch" style="background: #ff6b6b;"></div>
+                        <div class="color-swatch" style="background: #ffd166;"></div>
+                        <div class="color-swatch" style="background: #ffffff;"></div>
+                    </div>
+                    <button class="apply-btn">应用此风格</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="features-section">
+            <h2>设计特点对比</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">🎨</div>
+                    <div class="feature-title">视觉层次</div>
+                    <div class="feature-desc">通过卡片、阴影、颜色等元素创造清晰的视觉层次，引导用户注意力。</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📱</div>
+                    <div class="feature-title">响应式设计</div>
+                    <div class="feature-desc">所有风格都适配不同屏幕尺寸，确保在各种设备上都有良好的显示效果。</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-title">交互体验</div>
+                    <div class="feature-desc">精心设计的交互动画和反馈，提升用户操作的愉悦感和满意度。</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">信息架构</div>
+                    <div class="feature-desc">合理的布局和排版，让重要信息突出，次要信息有序组织。</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🌈</div>
+                    <div class="feature-title">色彩系统</div>
+                    <div class="feature-desc">科学的色彩搭配，既美观又符合无障碍设计标准，确保良好的可读性。</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">✨</div>
+                    <div class="feature-title">微交互</div>
+                    <div class="feature-desc">精心设计的微交互效果，让界面更加生动有趣，提升用户体验。</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="action-section">
+            <h2>选择您喜欢的风格</h2>
+            <p>每种风格都有其独特的魅力和适用场景，选择最符合您产品定位和用户偏好的设计。</p>
+            <div class="action-buttons">
+                <button class="btn-primary">查看详细说明</button>
+                <button class="btn-secondary">联系我们</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 为按钮添加点击效果
+        document.querySelectorAll('.apply-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const styleName = this.closest('.style-card').querySelector('.style-name').textContent;
+                alert(`已选择：${styleName}\n\n此风格已保存到您的偏好设置中。`);
+            });
+        });
+        
+        // 为主要按钮添加点击效果
+        document.querySelectorAll('.btn-primary, .btn-secondary').forEach(btn => {
+            btn.addEventListener('click', function() {
+                alert('功能开发中，敬请期待！');
+            });
+        });
+    </script>
+</body>
+</html>

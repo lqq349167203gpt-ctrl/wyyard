@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 — 左花纹底图 + 右白底详情</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --paper:#ffffff;
+    --ink:#1f2730;
+    --ink2:#5b6873;
+    --ink3:#9aa4ae;
+    --line:#eceff3;
+    --green:#2f9e74;
+    --blue:#3a6fb0;
+    --purple:#6d5fd0;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#d9dfe5;padding:44px 16px;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .hand{font-family:'Caveat',cursive;font-weight:700}
+  .wrap{max-width:940px;margin:0 auto}
+  .title{text-align:center;margin-bottom:6px}
+  .title h1{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+  .title p{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.75;max-width:700px;margin-left:auto;margin-right:auto}
+  .title p b{color:var(--ink)}
+
+  .row{display:flex;gap:32px;align-items:flex-start;justify-content:center;margin-top:36px;flex-wrap:wrap}
+  .phone{width:340px;height:680px;border-radius:30px;overflow:hidden;box-shadow:0 18px 50px rgba(20,30,40,.18);border:8px solid #14171a;position:relative;background:#fff;flex-shrink:0}
+  .sb{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#14171a;position:relative;z-index:10}
+  .content{height:calc(100% - 38px);overflow-y:auto;position:relative;background:var(--paper)}
+  .content::-webkit-scrollbar{display:none}
+
+  .page{min-height:100%;padding:16px 14px 22px;position:relative}
+  /* 页面背景极少量手绘标记 */
+  .bg-doodles{position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.45}
+  .bg-doodles svg{position:absolute}
+
+  .topbar{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .brand{display:flex;align-items:center;gap:7px}
+  .brand .mk{width:11px;height:11px;background:var(--ink)}
+  .brand .nm{font-size:13px;font-weight:800;letter-spacing:.5px}
+  .count{font-size:11px;color:var(--ink2);display:inline-flex;align-items:baseline;gap:4px}
+  .count .hw{font-size:17px;color:var(--purple);line-height:1}
+
+  .date-row{position:relative;z-index:1;display:flex;align-items:baseline;gap:9px;margin:14px 0 11px}
+  .date-row .sq{width:9px;height:9px;flex-shrink:0;align-self:center}
+  .date-row .day{font-size:30px;font-weight:800;line-height:1;color:var(--ink);letter-spacing:-1px}
+  .date-row .md{font-size:11px;color:var(--ink2);line-height:1.45}
+  .date-row .md b{color:var(--ink);font-weight:700}
+  .date-row .rule{flex:1;height:1px;background:var(--line);margin-left:4px;align-self:center}
+
+  /* 卡片：左花纹底图 + 右白底详情，小圆角，无chrome */
+  .card{position:relative;z-index:1;display:flex;background:#fff;border-radius:4px;overflow:hidden;margin-bottom:10px}
+  .pic{width:132px;flex-shrink:0;position:relative;display:flex;align-items:center;padding:12px 11px;color:#fff;min-height:104px}
+  .pic .nm{font-size:17px;font-weight:800;line-height:1.3;letter-spacing:.3px;position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.18)}
+  /* 花纹：按类型 CSS 几何图案 */
+  .pic.g{background:var(--green);background-image:radial-gradient(rgba(255,255,255,.28) 1.6px,transparent 1.7px);background-size:13px 13px}
+  .pic.p{background:var(--purple);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.22) 0 2px,transparent 2px 9px)}
+  .pic.b{background:var(--blue);background-image:linear-gradient(rgba(255,255,255,.20) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.20) 1px,transparent 1px);background-size:13px 13px}
+
+  .info{flex:1;padding:12px 13px 12px 14px;display:flex;flex-direction:column;justify-content:center;min-width:0}
+  .info .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+  .info .top .when{font-size:12.5px;font-weight:700;color:var(--ink)}
+  .info .top .when .d{color:var(--ink3);font-weight:600;margin-left:4px}
+  .tag{font-size:10px;font-weight:800;letter-spacing:.3px;color:#fff;padding:2px 7px;border-radius:2px;flex-shrink:0}
+  .tag.g{background:var(--green)} .tag.p{background:var(--purple)} .tag.b{background:var(--blue)}
+  .rows{display:flex;flex-direction:column;gap:4px}
+  .ir{font-size:11.5px;display:flex;line-height:1.5}
+  .ir .lab{width:30px;flex-shrink:0;color:var(--ink3);font-size:10.5px}
+  .ir .val{flex:1;color:var(--ink2)}
+  .desc{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);font-size:11.5px;line-height:1.55;color:var(--ink2);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+  .nomore{position:relative;z-index:1;text-align:center;padding:14px 0 6px;font-size:10.5px;color:var(--ink3);letter-spacing:1px}
+  .nomore .hw{display:block;margin-top:4px;font-size:18px;color:var(--green);line-height:1}
+
+  .spec{width:300px;flex-shrink:0}
+  .spec h3{font-size:14px;color:var(--ink);margin-bottom:12px}
+  .blk{background:#fff;border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:12px}
+  .blk b{font-size:12px;color:var(--ink);display:block;margin-bottom:9px}
+  .kv{font-size:11.5px;color:var(--ink2);line-height:1.95}
+  .kv span{color:var(--ink3)}
+  .pat{display:flex;gap:8px;margin-top:4px}
+  .pat i{width:34px;height:34px;border-radius:4px;display:block}
+  .pat .g{background:var(--green);background-image:radial-gradient(rgba(255,255,255,.3) 1.6px,transparent 1.7px);background-size:8px 8px}
+  .pat .p{background:var(--purple);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.25) 0 2px,transparent 2px 7px)}
+  .pat .b{background:var(--blue);background-image:linear-gradient(rgba(255,255,255,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.22) 1px,transparent 1px);background-size:8px 8px}
+  .foot{text-align:center;margin-top:28px;font-size:11.5px;color:var(--ink2);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">
+    <h1>无忧茶苑首页 — 左花纹底图 + 右白底详情</h1>
+    <p>按你说的：<b>左图右文</b>，左边一块生成的底图（有<b>花纹</b> + <b>活动名压上</b>，非真实照片），右边白底放详情；页面<b>底色白</b>；整卡<b>小圆角</b>（不再 0 锐角）、<b>无边框无阴影</b>。花纹按类型分（点/斜线/网格）。</p>
+  </div>
+
+  <div class="row">
+    <div class="phone">
+      <div class="sb"><span>01:37</span><span></span></div>
+      <div class="content"><div class="page">
+        <div class="bg-doodles">
+          <svg width="24" height="24" viewBox="0 0 24 24" style="top:50px;right:14px;transform:rotate(-12deg)"><g stroke="#2a3036" stroke-width="1.2" stroke-linecap="round" fill="none"><path d="M12 3 L12 21"/><path d="M3 12 L21 12"/><path d="M6 6 L18 18"/><path d="M6 18 L18 6"/></g></svg>
+          <svg width="32" height="12" viewBox="0 0 32 12" style="bottom:70px;left:8px;transform:rotate(-10deg)"><path d="M2 6 Q8 1 14 6 T26 6 T30 6" stroke="#6d5fd0" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>
+        </div>
+
+        <div class="topbar">
+          <div class="brand"><span class="mk"></span><span class="nm">无忧茶苑</span></div>
+          <span class="count"><span class="hand">3</span> 场活动</span>
+        </div>
+
+        <div class="date-row">
+          <span class="sq" style="background:var(--green)"></span>
+          <span class="day">16</span>
+          <span class="md"><b>07月 · 周四</b><br>2 场活动</span>
+          <span class="rule"></span>
+        </div>
+
+        <div class="card">
+          <div class="pic g"><div class="nm">夏日品茶会</div></div>
+          <div class="info">
+            <div class="top"><span class="when">19:00 - 21:00<span class="d">· 周四</span></span><span class="tag g">公益</span></div>
+            <div class="rows">
+              <div class="ir"><span class="lab">老师</span><span class="val">张老师</span></div>
+              <div class="ir"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div>
+            </div>
+            <div class="desc">带你了解龙井的冲泡与品鉴，新手友好。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="pic p"><div class="nm">茶艺基础课程</div></div>
+          <div class="info">
+            <div class="top"><span class="when">14:00 - 16:00<span class="d">· 周四</span></span><span class="tag p">课程</span></div>
+            <div class="rows">
+              <div class="ir"><span class="lab">地点</span><span class="val">二楼教室</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="date-row">
+          <span class="sq" style="background:var(--blue)"></span>
+          <span class="day">17</span>
+          <span class="md"><b>07月 · 周五</b><br>1 场活动</span>
+          <span class="rule"></span>
+        </div>
+
+        <div class="card">
+          <div class="pic b"><div class="nm">普洱茶专题讲座</div></div>
+          <div class="info">
+            <div class="top"><span class="when">20:00 - 21:30<span class="d">· 周五</span></span><span class="tag b">线上</span></div>
+            <div class="rows">
+              <div class="ir"><span class="lab">老师</span><span class="val">李老师</span></div>
+            </div>
+            <div class="desc">深入了解普洱的分类、存储与品鉴。</div>
+          </div>
+        </div>
+
+        <div class="nomore">— 没有更多了 —<span class="hw">see you ✦</span></div>
+      </div></div>
+    </div>
+
+    <div class="spec">
+      <h3>设计语言</h3>
+      <div class="blk">
+        <b>左花纹底图（生成的"图片"）</b>
+        <div class="pat"><i class="g"></i><i class="p"></i><i class="b"></i></div>
+        <div class="kv" style="margin-top:9px">
+          绿=点阵花纹 · 紫=斜线花纹 · 蓝=网格花纹<br>
+          活动名白字压上<span> + text-shadow</span><br>
+          非真实照片<span> 解决没法配图</span>
+        </div>
+      </div>
+      <div class="blk">
+        <b>右白底详情</b>
+        <div class="kv">时间(粗) + 标签<br>老师/地点 行<br>描述(虚线分隔)</div>
+      </div>
+      <div class="blk">
+        <b>对齐你的反馈</b>
+        <div class="kv">✓ 左图右文<span> 非整块大色块</span><br>✓ 底色白<span> 不阴森不重</span><br>✓ 小圆角4px<span> 不锐利不臃肿</span><br>✓ 无边框无阴影</div>
+      </div>
+      <div class="blk">
+        <b>花纹可换</b>
+        <div class="kv">点/斜线/网格 → 可换波纹/十字/圆环等；颜色可调</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    花纹样式/颜色、左图宽度、圆角大小都能一句话调。<br>
+    觉得这版"左花纹底图+右白底详情"对路就说一声，我落进 <code style="background:#fff;padding:1px 5px;border-radius:3px">index.wxss</code>。
+  </div>
+</div>
+</body>
+</html>

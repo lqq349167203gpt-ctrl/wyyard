@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 — 清爽多色 · 明亮自由</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#f5f8fc;
+    --card:#ffffff;
+    --ink:#3a4452;
+    --ink2:#79848f;
+    --ink3:#a8b2be;
+    --line:#eef1f5;
+    --green:#1fb281; --green-s:#e7f7f0; --green-i:#159e6c;
+    --blue:#3b82f6;  --blue-s:#e9f1fe; --blue-i:#2f6fe0;
+    --lav:#7c6ff0;   --lav-s:#efeafb;  --lav-i:#6654e0;
+    --shadow:0 2px 14px rgba(40,60,90,.06);
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#e6eaef;padding:44px 16px;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:940px;margin:0 auto}
+  .title{text-align:center;margin-bottom:6px}
+  .title h1{font-size:23px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+  .title p{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.75;max-width:700px;margin-left:auto;margin-right:auto}
+  .title p b{color:var(--ink)}
+
+  .row{display:flex;gap:32px;align-items:flex-start;justify-content:center;margin-top:36px;flex-wrap:wrap}
+  .phone{width:340px;height:680px;border-radius:30px;overflow:hidden;box-shadow:0 18px 50px rgba(20,40,60,.18);border:8px solid #14171a;position:relative;background:#fff;flex-shrink:0}
+  .sb{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#14171a;position:relative;z-index:10}
+  .content{height:calc(100% - 38px);overflow-y:auto;position:relative}
+  .content::-webkit-scrollbar{display:none}
+
+  .page{background:var(--bg);min-height:100%;padding:22px 18px 24px}
+  /* 顶部极淡多色光晕：明亮、不阴森 */
+  .page::before{content:'';position:absolute;top:-40px;left:-30px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(31,178,129,.10),transparent 70%);pointer-events:none}
+  .page::after{content:'';position:absolute;top:-20px;right:-50px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(124,111,240,.10),transparent 70%);pointer-events:none}
+
+  .greet{position:relative;z-index:1;margin-bottom:22px}
+  .greet .dots{display:flex;gap:5px;margin-bottom:10px}
+  .greet .dots i{width:7px;height:7px;border-radius:50%;display:block}
+  .greet h2{font-size:25px;line-height:1.25;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+  .greet h2 em{font-style:normal;color:var(--green-i)}
+  .greet p{font-size:12px;color:var(--ink2);margin-top:8px}
+
+  .dg{position:relative;z-index:1;margin-bottom:20px}
+  .dh{display:flex;align-items:center;gap:8px;margin-bottom:13px}
+  .chip{font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:4px;line-height:1.4}
+  .chip.g{background:var(--green-s);color:var(--green-i)}
+  .chip.b{background:var(--blue-s);color:var(--blue-i)}
+  .dh .cnt{font-size:11px;color:var(--ink3)}
+
+  .card{display:flex;gap:13px;background:var(--card);border-radius:4px;padding:13px;box-shadow:var(--shadow);margin-bottom:11px;align-items:stretch;position:relative;z-index:1}
+  .thumb{width:84px;height:84px;border-radius:4px;overflow:hidden;flex-shrink:0;background:#e9edf2}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .body{flex:1;min-width:0;display:flex;flex-direction:column}
+  .ct{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .nm{font-size:15.5px;font-weight:700;line-height:1.4;color:var(--ink);letter-spacing:.1px}
+  .tags{display:flex;gap:5px;flex-shrink:0}
+  .tag{font-size:10px;padding:2px 7px;border-radius:3px;white-space:nowrap;line-height:1.7;font-weight:600}
+  .tag.g{background:var(--green-s);color:var(--green-i)}
+  .tag.b{background:var(--blue-s);color:var(--blue-i)}
+  .tag.l{background:var(--lav-s);color:var(--lav-i)}
+  .info{margin-top:9px;display:flex;flex-direction:column;gap:4px}
+  .ir{font-size:12px;display:flex;line-height:1.45}
+  .lab{width:30px;flex-shrink:0;color:var(--ink3)}
+  .val{flex:1;color:var(--ink2)}
+  .desc{margin-top:9px;font-size:11.5px;line-height:1.55;color:var(--ink2);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+  .nomore{text-align:center;padding:16px 0 8px;font-size:11px;color:var(--ink3);position:relative;z-index:1}
+
+  /* 侧说明 */
+  .spec{width:300px;flex-shrink:0}
+  .spec h3{font-size:14px;color:var(--ink);margin-bottom:12px}
+  .blk{background:#fff;border-radius:8px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .blk b{font-size:12px;color:var(--ink);display:block;margin-bottom:9px}
+  .sw{display:flex;gap:8px;flex-wrap:wrap}
+  .sw i{width:26px;height:26px;border-radius:6px;display:block;border:1px solid rgba(0,0,0,.06)}
+  .kv{font-size:11.5px;color:var(--ink2);line-height:1.95}
+  .kv span{color:var(--ink3)}
+  .foot{text-align:center;margin-top:28px;font-size:11.5px;color:var(--ink2);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">
+    <h1>无忧茶苑首页 — 清爽多色 · 明亮自由</h1>
+    <p>针对上一版"阴森/全是近似色"重做：<b>多色冷调</b>（绿/蓝/紫三独立色相做节奏）+ <b>明亮底</b> + <b>柔和石板灰文字</b> + <b>彩色真实照片</b>，字体换干净无衬线强对比，告别圆体与单色绿。</p>
+  </div>
+
+  <div class="row">
+    <div class="phone">
+      <div class="sb"><span>01:16</span><span></span></div>
+      <div class="content"><div class="page">
+        <div class="greet">
+          <div class="dots"><i style="background:var(--green)"></i><i style="background:var(--blue)"></i><i style="background:var(--lav)"></i></div>
+          <h2>嘿，今天去哪儿<em>放松</em></h2>
+          <p>07/16 周四 · 3 场活动正在等你</p>
+        </div>
+
+        <div class="dg">
+          <div class="dh"><span class="chip g">07-16 周四</span><span class="cnt">2 场</span></div>
+          <div class="card">
+            <div class="thumb"><img src="https://picsum.photos/seed/cm-tea-a/200/200" alt=""></div>
+            <div class="body">
+              <div class="ct"><span class="nm">夏日品茶会</span><span class="tags"><span class="tag g">公益</span></span></div>
+              <div class="info">
+                <div class="ir"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div>
+                <div class="ir"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div>
+              </div>
+              <div class="desc">带你了解龙井的冲泡与品鉴，新手友好。</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="thumb"><img src="https://picsum.photos/seed/cm-class-b/200/200" alt=""></div>
+            <div class="body">
+              <div class="ct"><span class="nm">茶艺基础课程</span><span class="tags"><span class="tag l">课程</span></span></div>
+              <div class="info">
+                <div class="ir"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div>
+                <div class="ir"><span class="lab">地点</span><span class="val">二楼教室</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dg">
+          <div class="dh"><span class="chip b">07-17 周五</span><span class="cnt">1 场</span></div>
+          <div class="card">
+            <div class="thumb"><img src="https://picsum.photos/seed/cm-puer-c/200/200" alt=""></div>
+            <div class="body">
+              <div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tags"><span class="tag b">线上</span></span></div>
+              <div class="info">
+                <div class="ir"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div>
+                <div class="ir"><span class="lab">老师</span><span class="val">李老师</span></div>
+              </div>
+              <div class="desc">深入了解普洱的分类、存储与品鉴。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nomore">— 没有更多了 —</div>
+      </div></div>
+    </div>
+
+    <div class="spec">
+      <h3>设计语言</h3>
+      <div class="blk">
+        <b>多色冷调 · 三独立色相</b>
+        <div class="sw">
+          <i style="background:#f5f8fc" title="明亮底"></i>
+          <i style="background:#ffffff" title="卡片白"></i>
+          <i style="background:#1fb281" title="绿"></i>
+          <i style="background:#3b82f6" title="蓝"></i>
+          <i style="background:#7c6ff0" title="紫"></i>
+          <i style="background:#3a4452" title="石板灰"></i>
+        </div>
+        <div class="kv" style="margin-top:9px">
+          明亮底 <span>#f5f8fc</span><br>
+          绿 <span>#1fb281</span> · 蓝 <span>#3b82f6</span> · 紫 <span>#7c6ff0</span><br>
+          文字石板灰 <span>#3a4452</span>（不再深墨绿）<br>
+          各色浅底用于标签/日期
+        </div>
+      </div>
+      <div class="blk">
+        <b>色彩节奏（不再近似色）</b>
+        <div class="kv">
+          · 日期色块<span> 绿→蓝 轮换</span><br>
+          · 标签按类型<span> 公益绿/课程紫/线上蓝</span><br>
+          · 真实彩色照片<span> 带来自然多色</span><br>
+          · 顶部双光晕<span> 绿+紫 极淡</span>
+        </div>
+      </div>
+      <div class="blk">
+        <b>字体重做</b>
+        <div class="kv">
+          干净无衬线（PingFang）<br>
+          强对比层级<span> 800 标题 / 700 卡名 / 400 正文</span><br>
+          去掉圆体<span> 不再稚气</span><br>
+          关键词"放松"用主色<span> 提气</span>
+        </div>
+      </div>
+      <div class="blk">
+        <b>守住硬条件</b>
+        <div class="kv">浅色 · 4px 小圆角 · 紧凑右边距 · 无暖色 · 无具象装饰</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    封面为真实彩色照片，上线替换为活动照片即可。<br>
+    觉得方向对就说一声，我落进 <code style="background:#fff;padding:1px 5px;border-radius:3px">index.wxss</code>；想加/换某个色、或调照片大小，一句话。
+  </div>
+</div>
+</body>
+</html>

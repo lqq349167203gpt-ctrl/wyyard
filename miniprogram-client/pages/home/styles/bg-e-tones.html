@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无忧茶苑 - 主色调候选</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #eef0f2; color: #333; padding: 40px 16px;
+        }
+
+        .page-title { text-align: center; margin-bottom: 36px; }
+        .page-title h1 { font-size: 26px; font-weight: 700; color: #2b2f36; margin-bottom: 8px; }
+        .page-title p { font-size: 14px; color: #8f959e; }
+
+        .styles-row {
+            display: flex; justify-content: center; gap: 28px;
+            flex-wrap: wrap; max-width: 1500px; margin: 0 auto;
+        }
+
+        .style-wrapper { display: flex; flex-direction: column; align-items: center; width: 280px; }
+        .style-label { margin-bottom: 14px; text-align: center; min-height: 92px; }
+        .style-label .name { font-size: 17px; font-weight: 700; color: #2b2f36; display: block; margin-bottom: 5px; }
+        .style-label .desc { font-size: 12px; color: #8f959e; line-height: 1.5; display: block; }
+        .style-label .colors { display: flex; gap: 5px; justify-content: center; margin-top: 10px; }
+        .style-label .color-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.08); }
+
+        .phone {
+            width: 280px; height: 580px; border-radius: 24px; overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15); border: 6px solid #1a1a1a;
+            position: relative; background: #fff;
+        }
+        .phone-statusbar {
+            height: 38px; background: #fff; display: flex; align-items: center;
+            justify-content: space-between; padding: 0 14px; font-size: 12px;
+            font-weight: 600; color: #1a1a1a; position: relative; z-index: 10;
+        }
+        .phone-navbar {
+            height: 40px; background: #fff; display: flex; align-items: center;
+            justify-content: center; border-bottom: 0.5px solid #ececec;
+            font-size: 15px; font-weight: 600; color: #1a1a1a; letter-spacing: 1px;
+        }
+        .phone-content { height: calc(100% - 78px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .phone-content::-webkit-scrollbar { display: none; }
+
+        /* 通用卡片结构 */
+        .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .card-tags { display: flex; gap: 4px; margin-left: 6px; flex-shrink: 0; }
+        .card-info { display: flex; flex-direction: column; gap: 4px; }
+        .card-name { font-size: 14px; font-weight: 600; color: #2b2f36; line-height: 1.4; }
+        .info-row { font-size: 12px; display: flex; }
+        .info-label { color: #b0b4ba; width: 30px; flex-shrink: 0; }
+        .info-value { color: #5a6068; flex: 1; }
+        .card-desc { margin-top: 7px; padding-top: 7px; border-top: 0.5px solid #f0f0f0; }
+        .desc-text { font-size: 11px; color: #9aa0a8; line-height: 1.5;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .no-more { text-align: center; padding: 14px 0; font-size: 11px; color: #c4c8ce; }
+
+        /* ===================== 1. 暖白奶油 ===================== */
+        .tone-cream { background: #faf8f3; padding: 10px 11px 14px; min-height: 100%; }
+        .tone-cream .date-group { margin-bottom: 12px; }
+        .tone-cream .date-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; padding: 0 2px; }
+        .tone-cream .date-header::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d4a04b; flex-shrink: 0; }
+        .tone-cream .date-text { font-size: 14px; font-weight: 600; color: #3d3528; }
+        .tone-cream .date-weekday { font-size: 11px; color: #a89e8a; }
+        .tone-cream .card { background: #fff; border-radius: 4px; padding: 12px; margin-bottom: 7px;
+            box-shadow: 0 1px 3px rgba(180, 165, 130, 0.08); border: 0.5px solid #f0ebe0; }
+        .tone-cream .tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: 500; }
+        .tone-cream .tag-online { background: #eaf1fd; color: #3a6fc4; }
+        .tone-cream .tag-welfare { background: #fff1e3; color: #c47d20; }
+
+        /* ===================== 2. 蓝晒靛蓝 ===================== */
+        .tone-indigo { background: #f0f4fa; padding: 10px 11px 14px; min-height: 100%; }
+        .tone-indigo .date-group { margin-bottom: 12px; }
+        .tone-indigo .date-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; padding: 0 2px; }
+        .tone-indigo .date-header::before { content: ''; width: 4px; height: 11px; border-radius: 2px; background: #3d5a80; flex-shrink: 0; }
+        .tone-indigo .date-text { font-size: 14px; font-weight: 600; color: #2c3e50; }
+        .tone-indigo .date-weekday { font-size: 11px; color: #8595a7; }
+        .tone-indigo .card { background: #fff; border-radius: 4px; padding: 12px; margin-bottom: 7px;
+            box-shadow: 0 1px 3px rgba(61, 90, 128, 0.08); border: 0.5px solid #e6edf5; }
+        .tone-indigo .tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: 500; }
+        .tone-indigo .tag-online { background: #e8f0fb; color: #3d5a80; }
+        .tone-indigo .tag-welfare { background: #fdecec; color: #c44536; }
+
+        /* ===================== 3. 柔烟粉 ===================== */
+        .tone-blush { background: #fbf5f5; padding: 10px 11px 14px; min-height: 100%; }
+        .tone-blush .date-group { margin-bottom: 12px; }
+        .tone-blush .date-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; padding: 0 2px; }
+        .tone-blush .date-header::before { content: ''; width: 6px; height: 6px; border-radius: 50% 50% 50% 0; background: #c4787a; transform: rotate(45deg); flex-shrink: 0; }
+        .tone-blush .date-text { font-size: 14px; font-weight: 600; color: #4a3f3f; }
+        .tone-blush .date-weekday { font-size: 11px; color: #b89a9a; }
+        .tone-blush .card { background: #fff; border-radius: 4px; padding: 12px; margin-bottom: 7px;
+            box-shadow: 0 1px 3px rgba(196, 120, 122, 0.08); border: 0.5px solid #f3e6e6; }
+        .tone-blush .tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: 500; }
+        .tone-blush .tag-online { background: #eef2f7; color: #5c7a9c; }
+        .tone-blush .tag-welfare { background: #fdecec; color: #c4787a; }
+
+        /* ===================== 4. 鼠尾草绿 ===================== */
+        .tone-sage { background: #f2f6f3; padding: 10px 11px 14px; min-height: 100%; }
+        .tone-sage .date-group { margin-bottom: 12px; }
+        .tone-sage .date-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; padding: 0 2px; }
+        .tone-sage .date-header::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #6b9080; flex-shrink: 0; }
+        .tone-sage .date-text { font-size: 14px; font-weight: 600; color: #2f3d35; }
+        .tone-sage .date-weekday { font-size: 11px; color: #8da392; }
+        .tone-sage .card { background: #fff; border-radius: 4px; padding: 12px; margin-bottom: 7px;
+            box-shadow: 0 1px 3px rgba(107, 144, 128, 0.08); border: 0.5px solid #e5ebe7; }
+        .tone-sage .tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: 500; }
+        .tone-sage .tag-online { background: #e8f4ed; color: #4a7c6b; }
+        .tone-sage .tag-welfare { background: #fff7e6; color: #b3862f; }
+
+        /* 对比说明 */
+        .comparison {
+            max-width: 1100px; margin: 56px auto 0; background: #fff; border-radius: 14px;
+            padding: 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+        .comparison h2 { font-size: 19px; font-weight: 700; color: #2b2f36; margin-bottom: 18px; text-align: center; }
+        .comparison table { width: 100%; border-collapse: collapse; }
+        .comparison th, .comparison td { padding: 11px 14px; text-align: left; border-bottom: 1px solid #f2f2f2; font-size: 13.5px; }
+        .comparison th { font-weight: 700; color: #2b2f36; background: #fafafa; }
+        .comparison td { color: #5f6672; }
+        .comparison tr:last-child td { border-bottom: none; }
+        .apply-hint { text-align: center; margin-top: 26px; padding: 18px; background: #f8f9fa; border-radius: 8px; font-size: 13px; color: #8f959e; line-height: 1.8; }
+    </style>
+</head>
+<body>
+    <div class="page-title">
+        <h1>无忧茶苑 — 主色调候选</h1>
+        <p>D1 太乱 → 减到 1 主色 + 1 点缀；D2 看不清 → 纯白卡片 + 正常日期 + 清晰标题</p>
+    </div>
+
+    <div class="styles-row">
+        <!-- 暖白奶油 -->
+        <div class="style-wrapper">
+            <div class="style-label">
+                <span class="name">1 · 暖白奶油</span>
+                <span class="desc">最安全通用，温暖不抢戏，适合任何活动类型</span>
+                <div class="colors">
+                    <div class="color-dot" style="background:#faf8f3;"></div>
+                    <div class="color-dot" style="background:#d4a04b;"></div>
+                    <div class="color-dot" style="background:#3d3528;"></div>
+                </div>
+            </div>
+            <div class="phone">
+                <div class="phone-statusbar"><span>16:47</span><span></span></div>
+                <div class="phone-navbar">无忧茶苑</div>
+                <div class="phone-content">
+                    <div class="tone-cream">
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-15</span><span class="date-weekday">周三</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">夏日品茶会</span><div class="card-tags"><span class="tag tag-online">线上</span><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">19:00 - 21:00</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">张老师</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">茶苑一楼大厅</span></div></div>
+                                <div class="card-desc"><span class="desc-text">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法。</span></div>
+                            </div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">茶艺基础课程</span><div class="card-tags"><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">14:00 - 16:00</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">二楼教室</span></div></div>
+                            </div>
+                        </div>
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-16</span><span class="date-weekday">周四</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">普洱茶专题讲座</span><div class="card-tags"><span class="tag tag-online">线上</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">20:00 - 21:30</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">李老师</span></div></div>
+                                <div class="card-desc"><span class="desc-text">深入了解普洱茶的分类、存储和品鉴。</span></div>
+                            </div>
+                        </div>
+                        <div class="no-more">已显示全部活动</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 蓝晒靛蓝 -->
+        <div class="style-wrapper">
+            <div class="style-label">
+                <span class="name">2 · 蓝晒靛蓝</span>
+                <span class="desc">来自图3蓝晒。安静、文艺、东方感，红只做标签点缀</span>
+                <div class="colors">
+                    <div class="color-dot" style="background:#f0f4fa;"></div>
+                    <div class="color-dot" style="background:#3d5a80;"></div>
+                    <div class="color-dot" style="background:#c44536;"></div>
+                </div>
+            </div>
+            <div class="phone">
+                <div class="phone-statusbar"><span>16:47</span><span></span></div>
+                <div class="phone-navbar">无忧茶苑</div>
+                <div class="phone-content">
+                    <div class="tone-indigo">
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-15</span><span class="date-weekday">周三</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">夏日品茶会</span><div class="card-tags"><span class="tag tag-online">线上</span><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">19:00 - 21:00</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">张老师</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">茶苑一楼大厅</span></div></div>
+                                <div class="card-desc"><span class="desc-text">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法。</span></div>
+                            </div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">茶艺基础课程</span><div class="card-tags"><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">14:00 - 16:00</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">二楼教室</span></div></div>
+                            </div>
+                        </div>
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-16</span><span class="date-weekday">周四</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">普洱茶专题讲座</span><div class="card-tags"><span class="tag tag-online">线上</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">20:00 - 21:30</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">李老师</span></div></div>
+                                <div class="card-desc"><span class="desc-text">深入了解普洱茶的分类、存储和品鉴。</span></div>
+                            </div>
+                        </div>
+                        <div class="no-more">已显示全部活动</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 柔烟粉 -->
+        <div class="style-wrapper">
+            <div class="style-label">
+                <span class="name">3 · 柔烟粉</span>
+                <span class="desc">温柔疗愈，不娘气。适合情绪/身心类活动</span>
+                <div class="colors">
+                    <div class="color-dot" style="background:#fbf5f5;"></div>
+                    <div class="color-dot" style="background:#c4787a;"></div>
+                    <div class="color-dot" style="background:#d4a373;"></div>
+                </div>
+            </div>
+            <div class="phone">
+                <div class="phone-statusbar"><span>16:47</span><span></span></div>
+                <div class="phone-navbar">无忧茶苑</div>
+                <div class="phone-content">
+                    <div class="tone-blush">
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-15</span><span class="date-weekday">周三</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">夏日品茶会</span><div class="card-tags"><span class="tag tag-online">线上</span><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">19:00 - 21:00</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">张老师</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">茶苑一楼大厅</span></div></div>
+                                <div class="card-desc"><span class="desc-text">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法。</span></div>
+                            </div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">茶艺基础课程</span><div class="card-tags"><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">14:00 - 16:00</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">二楼教室</span></div></div>
+                            </div>
+                        </div>
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-16</span><span class="date-weekday">周四</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">普洱茶专题讲座</span><div class="card-tags"><span class="tag tag-online">线上</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">20:00 - 21:30</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">李老师</span></div></div>
+                                <div class="card-desc"><span class="desc-text">深入了解普洱茶的分类、存储和品鉴。</span></div>
+                            </div>
+                        </div>
+                        <div class="no-more">已显示全部活动</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 鼠尾草绿 -->
+        <div class="style-wrapper">
+            <div class="style-label">
+                <span class="name">4 · 鼠尾草绿</span>
+                <span class="desc">自然、呼吸感强。适合茶/自然/户外类活动</span>
+                <div class="colors">
+                    <div class="color-dot" style="background:#f2f6f3;"></div>
+                    <div class="color-dot" style="background:#6b9080;"></div>
+                    <div class="color-dot" style="background:#d4a373;"></div>
+                </div>
+            </div>
+            <div class="phone">
+                <div class="phone-statusbar"><span>16:47</span><span></span></div>
+                <div class="phone-navbar">无忧茶苑</div>
+                <div class="phone-content">
+                    <div class="tone-sage">
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-15</span><span class="date-weekday">周三</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">夏日品茶会</span><div class="card-tags"><span class="tag tag-online">线上</span><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">19:00 - 21:00</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">张老师</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">茶苑一楼大厅</span></div></div>
+                                <div class="card-desc"><span class="desc-text">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法。</span></div>
+                            </div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">茶艺基础课程</span><div class="card-tags"><span class="tag tag-welfare">公益</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">14:00 - 16:00</span></div><div class="info-row"><span class="info-label">地点</span><span class="info-value">二楼教室</span></div></div>
+                            </div>
+                        </div>
+                        <div class="date-group">
+                            <div class="date-header"><span class="date-text">07-16</span><span class="date-weekday">周四</span></div>
+                            <div class="card">
+                                <div class="card-top"><span class="card-name">普洱茶专题讲座</span><div class="card-tags"><span class="tag tag-online">线上</span></div></div>
+                                <div class="card-info"><div class="info-row"><span class="info-label">时间</span><span class="info-value">20:00 - 21:30</span></div><div class="info-row"><span class="info-label">老师</span><span class="info-value">李老师</span></div></div>
+                                <div class="card-desc"><span class="desc-text">深入了解普洱茶的分类、存储和品鉴。</span></div>
+                            </div>
+                        </div>
+                        <div class="no-more">已显示全部活动</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="comparison">
+        <h2>修正点说明</h2>
+        <table>
+            <thead><tr><th>问题</th><th>之前</th><th>现在</th></tr></thead>
+            <tbody>
+                <tr><td>颜色太乱</td><td>D1 顶部 5 色条 + 卡片左条 + 彩标签</td><td>每个方案只保留 1 主色 + 1 点缀色</td></tr>
+                <tr><td>看不清内容</td><td>D2 日期 22px 太抢眼，卡片半透明</td><td>日期恢复 14px，卡片纯白不透明，标题清晰</td></tr>
+                <tr><td>趣味来源</td><td>依赖颜色 / 几何</td><td>保留小几何日期头 + 有色标签，但极克制</td></tr>
+                <tr><td>主色选择</td><td>只有暖白</td><td>暖白 / 靛蓝 / 烟粉 / 鼠尾草绿</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="apply-hint">
+        选一个主色调，我直接写成 <code>index.wxss</code>。<br>
+        如果选完还想加点"好玩"，可以只加一个小元素：比如日期头的小几何旋转、或卡片 hover 时的轻微弹性动效，绝不加多。
+    </div>
+</body>
+</html>

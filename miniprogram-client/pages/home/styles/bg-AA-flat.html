@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 — 扁平色块·四卡·无渐变</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --ink:#252d38;
+    --ink2:#5a6573;
+    --ink3:#8e98a4;
+    --line:#e2e8ef;
+
+    /* 纯色扁平 — 无渐变 */
+    --green:#3ecf8e;
+    --green-bg:#e8f5ee;
+    --cyan:#22c9d6;
+    --cyan-bg:#e6f7f9;
+    --blue:#5a9cf2;
+    --blue-bg:#eef4fd;
+    --coral:#f07a6a;
+    --coral-bg:#fdf0ee;
+
+    /* 页底 */
+    --page-bg:#f4f7fb;
+  }
+  body{font-family:'Inter','-apple-system','PingFang SC','Microsoft YaHei',sans-serif;background:var(--page-bg);padding:44px 16px;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' 1}
+  .hand{font-family:'Caveat',cursive;font-weight:700}
+  .wrap{max-width:980px;margin:0 auto}
+  .title{text-align:center;margin-bottom:6px}
+  .title h1{font-size:21px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+  .title p{font-size:12px;color:var(--ink2);margin-top:7px;line-height:1.75;max-width:740px;margin-left:auto;margin-right:auto}
+  .title p b{color:var(--ink)}
+
+  .row{display:flex;gap:36px;align-items:flex-start;justify-content:center;margin-top:32px;flex-wrap:wrap}
+
+  /* 手机框 */
+  .phone{width:356px;height:720px;border-radius:32px;overflow:hidden;box-shadow:0 20px 55px rgba(18,28,40,.16);border:8px solid #14171a;position:relative;background:#fff;flex-shrink:0}
+  .sb{height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#14171a;z-index:10;background:#fff}
+  .content{height:calc(100% - 36px);overflow-y:auto;background:var(--page-bg)}
+  .content::-webkit-scrollbar{display:none}
+
+  .page{min-height:100%;padding:14px 14px 20px;position:relative}
+
+  /* ====== 顶栏：纯色扁平泡泡（无渐变无高光）====== */
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .mascot{width:38px;height:38px;flex-shrink:0}
+  .nm{font-size:13.5px;font-weight:700;letter-spacing:.4px;color:var(--ink)}
+  .nm .sub{display:block;font-size:9px;font-weight:500;color:var(--ink3);letter-spacing:.3px;margin-top:1px}
+  .count{font-size:11px;color:var(--ink2);display:inline-flex;align-items:baseline;gap:4px;letter-spacing:.2px}
+  .count .hw{font-size:17px;color:var(--cyan);line-height:1}
+
+  /* ====== 日期行 ====== */
+  .date-row{display:flex;align-items:center;gap:8px;margin:12px 0 10px}
+  .date-row .sq{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+  .date-row .day{font-size:28px;font-weight:800;line-height:1;color:var(--ink);letter-spacing:-1.2px}
+  .date-row .md{font-size:10.5px;color:var(--ink2);line-height:1.4;letter-spacing:.2px}
+  .date-row .md b{color:var(--ink);font-weight:600}
+  .date-row .rule{flex:1;height:1px;background:var(--line);margin-left:6px}
+
+  /* ====== 活动卡片：左侧大色块 + 右侧信息 ====== */
+  .card{background:#fff;border-radius:14px;padding:0;margin-bottom:10px;display:flex;min-height:104px;overflow:hidden;box-shadow:0 1px 4px rgba(30,50,80,.04)}
+
+  /* 左侧大色块区域 — 纯色扁平 */
+  .card .art{
+    width:96px;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden
+  }
+  .card.g .art{background:var(--green)}
+  .card.c .art{background:var(--cyan)}
+  .card.b .art{background:var(--blue)}
+  .card.o .art{background:var(--coral)}
+
+  /* 色块里的扁平图形（纯色、无渐变、无光影）*/
+  .flat-icon{width:52px;height:52px;opacity:.95}
+  .flat-icon svg{width:100%;height:100%}
+
+  /* 右侧内容区 */
+  .card .body{flex:1;padding:12px 14px 10px;display:flex;flex-direction:column;min-width:0}
+  .card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+  .card .name{font-size:15px;font-weight:700;line-height:1.3;color:var(--ink);letter-spacing:-.05px;display:flex;align-items:center;gap:7px}
+  .card .name .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .tag{font-size:9.5px;font-weight:600;letter-spacing:.4px;padding:3px 9px;border-radius:999px;flex-shrink:0;line-height:1.5}
+  .tag.g{background:var(--green-bg);color:#1a9d60}
+  .tag.c{background:var(--cyan-bg);color:#17a2ad}
+  .tag.b{background:var(--blue-bg);color:#3a7bd4}
+  .tag.o{background:var(--coral-bg);color:#d56254}
+  .card .when{font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:5px;letter-spacing:.08px}
+  .card .when .d{color:var(--ink2);font-weight:500;margin-left:4px;opacity:.78}
+  .card .meta{font-size:11px;color:var(--ink2);line-height:1.45;letter-spacing:.08px}
+  .card .meta .lab{font-size:10.5px;margin-right:4px;font-weight:500;opacity:.68}
+  .card .meta .sep{margin:0 4px;opacity:.42}
+  .card .desc{margin-top:auto;padding-top:7px;font-size:11px;line-height:1.55;color:var(--ink2);letter-spacing:.08px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* 底部提示 */
+  .nomore{text-align:center;padding:12px 0 4px;font-size:10px;color:var(--ink3);letter-spacing:1.5px}
+  .nomore .hw{display:block;margin-top:4px;font-size:17px;color:var(--green);line-height:1}
+
+  /* ====== 说明面板 ====== */
+  .spec{width:300px;flex-shrink:0}
+  .spec h3{font-size:14px;color:var(--ink);margin-bottom:12px}
+  .blk{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+  .blk b{font-size:11.5px;color:var(--ink);display:block;margin-bottom:8px}
+  .kv{font-size:11px;color:var(--ink2);line-height:1.9}
+  .kv span{color:var(--ink3)}
+  .kv em{font-style:normal;color:var(--green)}
+  .foot{text-align:center;margin-top:24px;font-size:11px;color:var(--ink2);line-height:1.8;max-width:300px;margin-left:auto;margin-right:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">
+    <h1>无忧茶苑首页 — 扁平色块 · 四活动 · 纯色无渐变</h1>
+    <p><b>核心改动：</b>①每个活动左侧一个<b>纯色大色块</b>（参考情绪实验室/SW 的扁平色块风，无渐变无光影）；②一屏展示 <b>4 个活动</b>；③泡泡角色改为<b>纯色扁平</b>（无渐变无高光）。灵感来自你给的图4那种红绿纯色blob角色+星芒。</p>
+  </div>
+
+  <div class="row">
+    <!-- 手机预览 -->
+    <div class="phone">
+      <div class="sb"><span>02:19</span><span></span></div>
+      <div class="content"><div class="page">
+
+        <!-- 顶栏：纯色扁平泡泡 -->
+        <div class="topbar">
+          <div class="brand">
+            <!-- 纯色扁平泡泡 — 无渐变无高光 -->
+            <svg class="mascot" viewBox="0 0 64 64">
+              <!-- 小泡顶上 — 纯色 -->
+              <circle cx="34" cy="10" r="4" fill="#c8f0ed"/>
+              <!-- 身体 — 单一纯色，无linearGradient -->
+              <ellipse cx="32" cy="39" rx="24" ry="22" fill="#22c9d6"/>
+              <!-- 眼睛 — 简单圆点 -->
+              <circle cx="24" cy="37" r="2.5" fill="#252d38"/>
+              <circle cx="40" cy="37" r="2.5" fill="#252d38"/>
+              <!-- 嘴 — 简单弧线 -->
+              <path d="M26 46 Q33 51 40 46" stroke="#252d38" stroke-width="2" fill="none" stroke-linecap="round"/>
+            </svg>
+            <span class="nm">无忧茶苑<span class="sub">放松一下</span></span>
+          </div>
+          <span class="count"><span class="hand">4</span> 场活动</span>
+        </div>
+
+        <!-- 日期 -->
+        <div class="date-row">
+          <span class="sq" style="background:var(--green)"></span>
+          <span class="day">16</span>
+          <span class="md"><b>07月 · 周四</b></span>
+          <span class="rule"></span>
+        </div>
+
+        <!-- 活动1：品茶会 — 绿色块 + 叶子图标 -->
+        <div class="card g">
+          <div class="art">
+            <!-- 扁平叶子图标 — 纯色无渐变 -->
+            <div class="flat-icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <path d="M26 6 C38 6 46 16 46 28 C46 40 36 48 24 46 C14 44 8 34 10 22 C12 12 18 6 26 6Z" fill="#fff" opacity=".25"/>
+                <path d="M26 10 C36 10 42 18 42 28 C42 38 34 44 24 42" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+                <path d="M26 44 L26 18" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M19 28 L26 22 L33 28" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="body">
+            <div class="top">
+              <div class="name">夏日品茶会</div>
+              <span class="tag g">公益</span>
+            </div>
+            <div class="when">19:00 – 21:00<span class="d">· 周四</span></div>
+            <div class="meta"><span class="lab">老师</span>张老师<span class="sep">·</span><span class="lab">地点</span>一楼大厅</div>
+            <div class="desc">带你了解龙井的冲泡与品鉴</div>
+          </div>
+        </div>
+
+        <!-- 活动2：茶艺课 — 青色块 + 书本图标 -->
+        <div class="card c">
+          <div class="art">
+            <div class="flat-icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <rect x="13" y="10" width="26" height="32" rx="3" fill="#fff" opacity=".22"/>
+                <line x1="19" y1="18" x2="33" y2="18" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                <line x1="19" y1="24" x2="33" y2="24" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                <line x1="19" y1="30" x2="28" y2="30" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="34" cy="38" r="8" fill="#fff" opacity=".15"/>
+              </svg>
+            </div>
+          </div>
+          <div class="body">
+            <div class="top">
+              <div class="name">茶艺基础课程</div>
+              <span class="tag c">课程</span>
+            </div>
+            <div class="when">14:00 – 16:00<span class="d">· 周四</span></div>
+            <div class="meta"><span class="lab">地点</span>二楼教室</div>
+          </div>
+        </div>
+
+        <!-- 活动3：讲座 — 蓝色块 + 播放图标 -->
+        <div class="card b">
+          <div class="art">
+            <div class="flat-icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <circle cx="26" cy="26" r="16" fill="#fff" opacity=".2"/>
+                <polygon points="22,17 22,35 37,26" fill="#fff" opacity=".85"/>
+              </svg>
+            </div>
+          </div>
+          <div class="body">
+            <div class="top">
+              <div class="name">普洱茶专题讲座</div>
+              <span class="tag b">线上</span>
+            </div>
+            <div class="when">20:00 – 21:30<span class="d">· 周五</span></div>
+            <div class="meta"><span class="lab">老师</span>李老师</div>
+            <div class="desc">深入了解普洱的分类与存储</div>
+          </div>
+        </div>
+
+        <!-- 活动4：珊瑚色块 + 心/放松图标 -->
+        <div class="card o">
+          <div class="art">
+            <div class="flat-icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <path d="M26 38 C18 38 12 32 12 24 C12 17 18 12 26 12 C34 12 40 18 40 26 C38 32 34 38 26 38Z" fill="#fff" opacity=".2"/>
+                <path d="M26 18 C29 18 31 20 31 23 C31 26 28 28 26 30 C24 28 21 26 21 23 C21 20 23 18 26 18Z" fill="#fff" opacity=".7"/>
+              </svg>
+            </div>
+          </div>
+          <div class="body">
+            <div class="top">
+              <div class="name">冥想放松沙龙</div>
+              <span class="tag o">体验</span>
+            </div>
+            <div class="when">10:00 – 11:30<span class="d">· 周六</span></div>
+            <div class="meta"><span class="lab">老师</span>王老师<span class="sep">·</span><span class="lab">地点</span>三楼</div>
+          </div>
+        </div>
+
+        <div class="nomore">— 没有更多了 —<span class="hw">see you ✦</span></div>
+      </div></div>
+    </div>
+
+    <!-- 说明 -->
+    <div class="spec">
+      <h3>本次改动要点</h3>
+      <div class="blk">
+        <b>① 左侧大色块（纯色扁平）</b>
+        <div class="kv">每张卡左侧 96px 宽的<br><em>纯色色块 + 白色半透明图标</em><br>绿/青/蓝/珊瑚 四色轮换<br><span>无渐变、无光影、无光泽</span><br>参考：情绪实验室那张图的<br>红绿扁平角色 + 星芒</div>
+      </div>
+      <div class="blk">
+        <b>② 一屏四张活动</b>
+        <div class="kv">卡片高度压缩到 ~104px<br>左色块 + 右信息紧凑排列<br>一屏完整展示 4 张<br><em>更精致、不滚动太多</em></div>
+      </div>
+      <div class="blk">
+        <b>③ 泡泡角色：纯色扁平</b>
+        <div class="kv">去掉了所有 linearGradient<br>身体 = 单一纯色 #22c9d6<br>眼睛 = 实心圆点<br>嘴 = 简单线条<br><span>零渐变 零高光</span></div>
+      </div>
+      <div class="blk">
+        <b>④ 配色</b>
+        <div class="kv">页底 <span>#f4f7fb</span> 冷灰白<br>文字 <span>#252d38</span> 柔墨<br>绿 <span>#3ecf8e</span> · 青 <span>#22c9d6</span><br>蓝 <span>#5a9cf2</span> · 珊瑚 <span>#f07a6a</span><br>全部纯色 <em>无渐变</em></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    这版的核心变化：<br>
+    • 插图 = 纯色色块（不是照片不是花纹不是渐变）<br>
+    • 一屏 4 张（紧凑精致）<br>
+    • 泡泡 = 纯色扁平（零光影）
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方向 D1 · 薄荷清新</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --mint-bg:#d9efe3;        /* 页面底:淡薄荷绿,空气清新感 */
+    --ink:#1e2b24;            /* 主文字:带绿调的近黑 */
+    --ink-2:#5c6f63;          /* 次要文字:灰绿 */
+    --ink-3:#9db1a4;          /* 弱化文字 */
+    --card:#ffffff;
+    --mint-chip:#b9e8cd;      /* 周日历选中胶囊 */
+    --mint-deep:#1d7a4f;      /* 主按钮深绿 */
+    --mint-btn:#a3ddba;       /* 已报名薄荷实心 */
+    --mint-btn-ink:#14543a;
+    --hair:rgba(30,60,45,.07);
+  }
+  body{font-family:'Inter','Noto Sans SC','-apple-system','PingFang SC',sans-serif;background:#e6ece8;padding:36px 14px;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1020px;margin:0 auto}
+  .phone{width:365px;height:780px;border-radius:38px;overflow:hidden;box-shadow:0 28px 65px rgba(25,70,50,.18);border:7px solid #1c1f22;background:var(--mint-bg);display:flex;flex-direction:column}
+  .nav-bar{flex-shrink:0;background:var(--mint-bg);padding-top:calc(env(safe-area-inset-top,44px)+4px)}
+  .nav-status{height:20px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#000}
+  .nav-capsule{display:flex;align-items:center;gap:6px;margin:2px 0 4px;padding-right:16px;justify-content:flex-end}
+  .nav-capsule-line{width:52px;height:24px;border-radius:12px;border:.5px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.85)}
+  .nav-capsule-line .dot{width:7px;height:7px;border-radius:50%}.nav-capsule-line .dot-black{background:#000}.nav-capsule-line .dot-gray{background:rgba(0,0,0,.25)}
+  .content{flex:1;overflow-y:auto;background:var(--mint-bg)}
+  .content::-webkit-scrollbar{display:none}
+  .tab-bar{flex-shrink:0;display:flex;align-items:center;justify-content:space-around;background:#fff;height:58px;border-top:.5px solid rgba(29,122,79,.08)}
+  .tab-item{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;cursor:pointer}
+  .tab-label{font-size:10px;color:var(--ink-3);font-weight:500}
+  .tab-item.active .tab-label{color:var(--mint-deep);font-weight:700}
+  .tab-item .tdot{width:4px;height:4px;border-radius:50%;background:transparent}
+  .tab-item.active .tdot{background:var(--mint-deep);box-shadow:0 0 0 2.5px rgba(29,122,79,.18)}
+  .page{min-height:100%;padding:0 16px 12px;position:relative}
+
+  /* ===== 顶部:大字日期标题 + 右侧胶囊(StressWatch 今日页骨架) ===== */
+  .hero{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 2px 9px}
+  .hero-date{font-size:20px;font-weight:900;letter-spacing:.2px;line-height:1.1}
+  .hero-date em{font-style:normal;font-size:13px;font-weight:700;color:var(--ink-2);margin-left:7px;letter-spacing:0}
+  .hero-pill{font-size:11px;font-weight:700;color:var(--mint-btn-ink);background:rgba(255,255,255,.72);padding:5px 11px;border-radius:999px;box-shadow:0 1px 3px rgba(30,70,50,.06)}
+
+  /* ===== 周日历:选中=柔和薄荷绿胶囊,无黑底 ===== */
+  .week-picker{display:flex;justify-content:space-between;margin-bottom:9px}
+  .wk-day{display:flex;flex-direction:column;align-items:center;gap:3px;width:40px;padding:7px 0 6px;border-radius:15px;cursor:pointer}
+  .wk-name{font-size:10.5px;color:#7d9384;font-weight:600}
+  .wk-num{font-size:15px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .wk-dot{width:4px;height:4px;border-radius:50%;background:transparent}
+  .wk-day.has-dot .wk-dot{background:var(--mint-deep)}
+  .wk-day.active{background:var(--mint-chip)}
+  .wk-day.active .wk-name{color:#4f7a62}
+  .wk-day.active .wk-num{color:var(--mint-btn-ink)}
+  .wk-day.active .wk-dot{background:var(--mint-deep)}
+
+  /* ===== 活动卡片:纯白大圆角 + 大留白,一组信息一张卡 ===== */
+  .card{background:var(--card);border-radius:22px;padding:13px 15px;margin-bottom:9px;box-shadow:0 6px 18px rgba(35,90,60,.07)}
+  .card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .time-chip{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:11.5px;font-weight:800;color:var(--mint-btn-ink);background:#e7f6ec;padding:4px 10px;border-radius:999px;letter-spacing:.2px}
+  .tagline{display:flex;gap:4px;min-width:0;overflow:hidden;white-space:nowrap}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;line-height:1.5;flex-shrink:0}
+  /* 三类标签:类型=pastel 实心 / 线上线下=薄荷描边 / 公益=暖杏实心 */
+  .t-mint{background:#d9f2e2;color:#1a7a44}.t-blue{background:#e2edfb;color:#3a6aa8}.t-peach{background:#fdeeda;color:#b0722a}.t-rose{background:#fbe9ef;color:#b0526e}
+  .t-mode{background:transparent;color:#4f7a62;box-shadow:inset 0 0 0 1px rgba(29,122,79,.35)}
+  .t-welfare{background:#fceccc;color:#9a6a1f}
+  /* 名称:最多 2 行截断 */
+  .card-name{margin-top:9px;font-size:15.5px;font-weight:800;line-height:1.38;letter-spacing:-.01px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* 老师·简介:单行省略号 */
+  .card-meta{display:block;margin-top:6px;font-size:11px;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-meta .sep{color:var(--ink-3);margin:0 3px}
+  .card-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--hair)}
+  .loc{display:flex;align-items:center;gap:4px;flex:1;min-width:0;font-size:11px;font-weight:600;color:var(--ink-2)}
+  .loc svg{flex-shrink:0}
+  .ltxt{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .loc.muted{color:var(--ink-3)}
+  .btn{flex-shrink:0;font-size:11.5px;font-weight:800;padding:7px 16px;border-radius:999px;background:var(--mint-deep);color:#fff;cursor:pointer;border:none;letter-spacing:.3px}
+  .btn-mint{background:var(--mint-btn);color:var(--mint-btn-ink)}
+  .btn-ghost{background:#eef2ee;color:#93a79a;cursor:default}
+  .card.done{opacity:.68}
+
+  .color-label{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:20;background:#1c1f22;color:#d9efe3;font-size:10px;font-weight:700;padding:4px 14px;border-radius:99px;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="phone">
+    <div class="color-label">方向 D1 · 薄荷清新</div>
+    <div class="nav-bar">
+      <div class="nav-status"><span>11:06</span><span>&#128247; &#128267; 64%</span></div>
+      <div class="nav-capsule">
+        <div style="display:flex;gap:8px;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg><div style="width:.5px;height:14px;background:rgba(0,0,0,.12)"></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+        <div class="nav-capsule-line"><div class="dot dot-black"></div><div class="dot dot-black"></div><div class="dot dot-gray"></div></div>
+      </div>
+    </div>
+    <div class="content"><div class="page">
+
+      <div class="hero">
+        <div class="hero-date">7月16日<em>周三 · 今天</em></div>
+        <div class="hero-pill">本周 4 场</div>
+      </div>
+
+      <div class="week-picker">
+        <div class="wk-day"><span class="wk-name">一</span><span class="wk-num">14</span><span class="wk-dot"></span></div>
+        <div class="wk-day"><span class="wk-name">二</span><span class="wk-num">15</span><span class="wk-dot"></span></div>
+        <div class="wk-day active"><span class="wk-name">三</span><span class="wk-num">16</span><span class="wk-dot"></span></div>
+        <div class="wk-day"><span class="wk-name">四</span><span class="wk-num">17</span><span class="wk-dot"></span></div>
+        <div class="wk-day"><span class="wk-name">五</span><span class="wk-num">18</span><span class="wk-dot"></span></div>
+        <div class="wk-day"><span class="wk-name">六</span><span class="wk-num">19</span><span class="wk-dot"></span></div>
+        <div class="wk-day"><span class="wk-name">日</span><span class="wk-num">20</span><span class="wk-dot"></span></div>
+      </div>
+
+      <!-- 卡片 1:茶会+线下+公益,三标签齐全;地点长文案验证截断;状态=可报名 -->
+      <div class="card">
+        <div class="card-top">
+          <span class="time-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周四 19:00–21:00</span>
+          <div class="tagline"><span class="tag t-mint">茶会</span><span class="tag t-mode">线下</span><span class="tag t-welfare">公益</span></div>
+        </div>
+        <div class="card-name">夏日品茶会</div>
+        <div class="card-meta">张老师<span class="sep">·</span>龙井冲泡品鉴入门</div>
+        <div class="card-foot">
+          <div class="loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg><span class="ltxt">梧桐空间 · 一楼茶室（东门进入后上电梯左转）</span></div>
+          <button class="btn">报名</button>
+        </div>
+      </div>
+
+      <!-- 卡片 2:课程+线下;状态=已报名(演示) -->
+      <div class="card">
+        <div class="card-top">
+          <span class="time-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周四 14:00–16:00</span>
+          <div class="tagline"><span class="tag t-blue">课程</span><span class="tag t-mode">线下</span></div>
+        </div>
+        <div class="card-name">茶艺基础课程</div>
+        <div class="card-meta">8 人小班<span class="sep">·</span>零基础可参加</div>
+        <div class="card-foot">
+          <div class="loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg><span class="ltxt">你已报名，记得准时来</span></div>
+          <button class="btn btn-mint">已报名 ✓</button>
+        </div>
+      </div>
+
+      <!-- 卡片 3:讲座+线上;名称与简介长文案验证截断;状态=线上可报名 -->
+      <div class="card">
+        <div class="card-top">
+          <span class="time-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周五 20:00–21:30</span>
+          <div class="tagline"><span class="tag t-peach">讲座</span><span class="tag t-mode">线上</span></div>
+        </div>
+        <div class="card-name">普洱茶专题讲座：生熟分类与家庭仓储方法</div>
+        <div class="card-meta">李老师、王老师<span class="sep">·</span>从入门到精通系列分享第一场，适合零基础参加</div>
+        <div class="card-foot">
+          <div class="loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z"/></svg><span class="ltxt">线上进行 · 无需到场</span></div>
+          <button class="btn">报名</button>
+        </div>
+      </div>
+
+      <!-- 卡片 4:体验+线下;状态=已结束(演示) -->
+      <div class="card done">
+        <div class="card-top">
+          <span class="time-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周六 10:00–11:30</span>
+          <div class="tagline"><span class="tag t-rose">体验</span><span class="tag t-mode">线下</span></div>
+        </div>
+        <div class="card-name">冥想放松沙龙</div>
+        <div class="card-meta">王老师<span class="sep">·</span>90 分钟深度放松</div>
+        <div class="card-foot">
+          <div class="loc muted"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg><span class="ltxt">活动已结束，感谢参与</span></div>
+          <button class="btn btn-ghost">已结束</button>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1d7a4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        <span class="tab-label">首页</span><span class="tdot"></span>
+      </div>
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9db1a4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+        <span class="tab-label">课程</span><span class="tdot"></span>
+      </div>
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9db1a4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>
+        <span class="tab-label">活动</span><span class="tdot"></span>
+      </div>
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9db1a4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
+        <span class="tab-label">我的</span><span class="tdot"></span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

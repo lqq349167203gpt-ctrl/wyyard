@@ -1,0 +1,326 @@
+/* 风格预览页面样式 */
+.preview-container {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 40rpx 32rpx;
+}
+
+/* 预览头部 */
+.preview-header {
+  text-align: center;
+  margin-bottom: 48rpx;
+}
+
+.preview-title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #1e293b;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+.preview-subtitle {
+  font-size: 28rpx;
+  color: #64748b;
+  font-weight: 400;
+}
+
+/* 风格选择器 */
+.style-selector {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24rpx;
+  margin-bottom: 48rpx;
+}
+
+.style-option {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  border: 2rpx solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.style-option.active {
+  border-color: #3b82f6;
+  box-shadow: 0 4rpx 20rpx rgba(59, 130, 246, 0.2);
+}
+
+.style-preview {
+  width: 100%;
+  height: 80rpx;
+  border-radius: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.style-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1e293b;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.style-desc {
+  font-size: 22rpx;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+/* 预览区域 */
+.preview-area {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 48rpx;
+}
+
+.preview-frame {
+  width: 640rpx;
+  background: #ffffff;
+  border-radius: 40rpx;
+  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  border: 8rpx solid #1e293b;
+}
+
+/* 手机状态栏 */
+.phone-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 32rpx;
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.status-time {
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.status-icons {
+  display: flex;
+  gap: 12rpx;
+}
+
+.status-icon {
+  font-size: 20rpx;
+}
+
+/* 手机导航栏 */
+.phone-nav-bar {
+  padding: 24rpx 32rpx;
+  background: #ffffff;
+  border-bottom: 1rpx solid #e2e8f0;
+  text-align: center;
+}
+
+.nav-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* 手机内容区域 */
+.phone-content {
+  padding: 24rpx;
+  min-height: 600rpx;
+}
+
+/* 预览日期分组 */
+.preview-date-group {
+  margin-bottom: 32rpx;
+}
+
+.preview-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 24rpx;
+  border-radius: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.preview-date-text {
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.preview-date-weekday {
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
+/* 预览卡片 */
+.preview-card {
+  margin-bottom: 16rpx;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.preview-card-image {
+  width: 100%;
+  height: 160rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-card-image-text {
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+.preview-card-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.preview-card-name {
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-card-tags {
+  display: flex;
+  gap: 8rpx;
+  margin-left: 12rpx;
+}
+
+.preview-tag {
+  font-size: 18rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  font-weight: 600;
+}
+
+/* 预览卡片信息 */
+.preview-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.preview-info-row {
+  display: flex;
+  align-items: center;
+  font-size: 22rpx;
+}
+
+.preview-info-label {
+  width: 64rpx;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.preview-info-value {
+  flex: 1;
+  font-weight: 400;
+}
+
+/* 预览卡片描述 */
+.preview-card-desc {
+  padding-top: 16rpx;
+}
+
+.preview-desc-text {
+  font-size: 20rpx;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 风格说明 */
+.style-description {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 32rpx;
+  margin-bottom: 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.description-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1e293b;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.description-content {
+  font-size: 26rpx;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  display: flex;
+  gap: 24rpx;
+}
+
+.apply-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #ffffff;
+  border: none;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+}
+
+.apply-btn:active {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+.reset-btn {
+  flex: 1;
+  background: #ffffff;
+  color: #64748b;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.reset-btn:active {
+  background: #f8fafc;
+}
+
+/* 响应式调整 */
+@media (max-width: 750rpx) {
+  .preview-container {
+    padding: 24rpx 16rpx;
+  }
+  
+  .style-selector {
+    grid-template-columns: 1fr;
+  }
+  
+  .preview-frame {
+    width: 100%;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+}

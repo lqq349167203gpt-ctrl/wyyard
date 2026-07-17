@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无忧茶苑 - 趣味简约风预览</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Baloo+2:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #eef0f2;
+            color: #333;
+            padding: 40px 16px;
+        }
+
+        .page-title { text-align: center; margin-bottom: 36px; }
+        .page-title h1 { font-size: 26px; font-weight: 700; color: #2b2f36; margin-bottom: 8px; }
+        .page-title p { font-size: 14px; color: #8f959e; }
+
+        .styles-row {
+            display: flex; justify-content: center; gap: 40px;
+            flex-wrap: wrap; max-width: 1300px; margin: 0 auto;
+        }
+
+        .style-wrapper { display: flex; flex-direction: column; align-items: center; }
+
+        .style-label { margin-bottom: 16px; text-align: center; max-width: 340px; }
+        .style-label .name { font-size: 18px; font-weight: 700; color: #2b2f36; display: block; margin-bottom: 4px; }
+        .style-label .desc { font-size: 13px; color: #8f959e; line-height: 1.5; }
+
+        .style-label .colors { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+        .style-label .color-dot { width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.08); }
+
+        .phone {
+            width: 360px; height: 700px; border-radius: 28px; overflow: hidden;
+            box-shadow: 0 10px 44px rgba(0,0,0,0.16); border: 7px solid #1a1a1a;
+            position: relative; background: #fff;
+        }
+        .phone-statusbar {
+            height: 42px; background: #fff; display: flex; align-items: center;
+            justify-content: space-between; padding: 0 18px; font-size: 13px;
+            font-weight: 600; color: #1a1a1a; position: relative; z-index: 10;
+        }
+        .phone-navbar {
+            height: 44px; background: #fff; display: flex; align-items: center;
+            justify-content: center; border-bottom: 0.5px solid #ececec;
+            font-size: 16px; font-weight: 600; color: #1a1a1a; letter-spacing: 1px;
+        }
+        .phone-content { height: calc(100% - 86px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .phone-content::-webkit-scrollbar { display: none; }
+
+        /* 通用卡片结构 */
+        .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+        .card-tags { display: flex; gap: 5px; margin-left: 8px; flex-shrink: 0; }
+        .card-info { display: flex; flex-direction: column; gap: 5px; }
+        .card-name { font-size: 15px; font-weight: 600; color: #2b2f36; line-height: 1.4; }
+        .info-row { font-size: 12.5px; display: flex; }
+        .info-label { color: #b0b4ba; width: 32px; flex-shrink: 0; }
+        .info-value { color: #5a6068; flex: 1; }
+        .card-desc { margin-top: 8px; padding-top: 8px; border-top: 0.5px solid #f0f0f0; }
+        .desc-text { font-size: 12px; color: #9aa0a8; line-height: 1.6;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .no-more { text-align: center; padding: 16px 0; font-size: 12px; color: #c4c8ce; }
+
+        /* ===================== 变体D1：糖果撞色 ===================== */
+        .style-d1 {
+            background: #fafaf8;
+            padding: 12px 12px 16px;
+            min-height: 100%;
+            position: relative;
+        }
+        /* 顶部多色细条 = 好玩的信号 */
+        .style-d1::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, #ff9aa2 0%, #ffd166 28%, #8ecae6 55%, #a7d49b 80%, #c8a2e0 100%);
+        }
+        .style-d1 .date-group { margin-bottom: 14px; margin-top: 6px; }
+        .style-d1 .date-header {
+            display: flex; align-items: center; gap: 7px; margin-bottom: 8px; padding: 0 2px;
+        }
+        /* 手绘感小圆点 */
+        .style-d1 .date-header::before {
+            content: ''; width: 9px; height: 9px; border-radius: 50% 50% 50% 0;
+            background: #ff9aa2; transform: rotate(45deg); flex-shrink: 0;
+        }
+        .style-d1 .date-text {
+            font-family: 'Baloo 2', 'ZCOOL KuaiLe', sans-serif;
+            font-size: 17px; font-weight: 700; color: #2b2f36; letter-spacing: 0.5px;
+        }
+        .style-d1 .date-weekday { font-size: 12px; color: #b0b4ba; }
+
+        .style-d1 .card {
+            background: #ffffff; border-radius: 4px; padding: 13px;
+            margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            border: 0.5px solid #f0f0ee; position: relative; overflow: hidden;
+        }
+        /* 左侧撞色细条，颜色随类型变化 */
+        .style-d1 .card.type-course { border-left: 3px solid #8ecae6; }
+        .style-d1 .card.type-talk   { border-left: 3px solid #ff9aa2; }
+        .style-d1 .card.type-taste  { border-left: 3px solid #ffd166; }
+        .style-d1 .card.type-default{ border-left: 3px solid #a7d49b; }
+
+        .style-d1 .tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 600; }
+        .style-d1 .tag-online  { background: #eaf1fd; color: #3a6fc4; }
+        .style-d1 .tag-welfare { background: #fff1e3; color: #e8862a; }
+
+        .style-d1 .info-label { color: #c2c6cc; }
+
+        /* ===================== 变体D2：几何呼吸 ===================== */
+        .style-d2 {
+            background: #fcfcfa; padding: 12px 12px 16px; min-height: 100%;
+            position: relative; overflow: hidden;
+        }
+        /* 极淡几何漂浮，不抢眼 */
+        .style-d2::before {
+            content: ''; position: absolute; width: 180px; height: 180px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(142,202,230,0.10), transparent 70%);
+            top: -30px; right: -50px;
+        }
+        .style-d2::after {
+            content: ''; position: absolute; width: 140px; height: 140px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,209,102,0.10), transparent 70%);
+            bottom: 80px; left: -50px;
+        }
+        .style-d2 .date-group { margin-bottom: 14px; position: relative; z-index: 1; }
+        .style-d2 .date-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; padding: 0 2px; }
+        /* 大号圆体日期 + 小半圆 */
+        .style-d2 .date-text {
+            font-family: 'Baloo 2', 'ZCOOL KuaiLe', sans-serif;
+            font-size: 22px; font-weight: 700; color: #2b2f36; letter-spacing: 0.5px;
+        }
+        .style-d2 .date-header::before {
+            content: ''; width: 14px; height: 7px; border-radius: 14px 14px 0 0;
+            background: #ffd166; align-self: flex-end; margin-bottom: 4px; flex-shrink: 0;
+        }
+        .style-d2 .date-weekday { font-size: 12px; color: #b0b4ba; }
+
+        .style-d2 .card {
+            background: rgba(255,255,255,0.92); backdrop-filter: blur(2px);
+            border-radius: 4px; padding: 13px; margin-bottom: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 0.5px solid #f0f0ee;
+            position: relative; z-index: 1;
+        }
+        .style-d2 .tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 600; }
+        .style-d2 .tag-online  { background: #eef2f5; color: #5a6b7a; }
+        .style-d2 .tag-welfare { background: #eef2f5; color: #5a6b7a; }
+
+        /* 对比表 */
+        .comparison {
+            max-width: 1100px; margin: 56px auto 0; background: #fff; border-radius: 14px;
+            padding: 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+        .comparison h2 { font-size: 19px; font-weight: 700; color: #2b2f36; margin-bottom: 18px; text-align: center; }
+        .comparison table { width: 100%; border-collapse: collapse; }
+        .comparison th, .comparison td { padding: 11px 14px; text-align: left; border-bottom: 1px solid #f2f2f2; font-size: 13.5px; }
+        .comparison th { font-weight: 700; color: #2b2f36; background: #fafafa; }
+        .comparison td { color: #5f6672; }
+        .comparison tr:last-child td { border-bottom: none; }
+        .apply-hint { text-align: center; margin-top: 26px; padding: 18px; background: #f8f9fa; border-radius: 8px; font-size: 13px; color: #8f959e; line-height: 1.8; }
+    </style>
+</head>
+<body>
+    <div class="page-title">
+        <h1>无忧茶苑 — 趣味简约风</h1>
+        <p>不要茶具插画 · 用色彩与几何制造好玩感 · 画面保持干净</p>
+    </div>
+
+    <div class="styles-row">
+        <!-- D1 糖果撞色 -->
+        <div class="style-wrapper">
+            <div class="style-label">
+                <span class="name">D1 · 糖果撞色</span>
+                <span class="desc">顶部多色条 + 卡片左侧随类型变色的细条 + 彩色标签。趣味来自"颜色节奏"</span>
+                <div class="colors">
+                    <div class="color-dot" style="background:#8ecae6;"></div>
+                    <div class="color-dot" style="background:#ff9aa2;"></div>
+                    <div class="color-dot" style="background:#ffd166;"></div>
+                    <div class="color-dot" style="background:#a7d49b;"></div>
+                    <div class="color-dot" style="background:#fafaf8;"></div>
+                </div>
+            </div>
+            <div class="phone">
+                <div class="phone-statusbar"><span>16:42</span><span></span></div>
+                <div class="phone-navbar">无忧茶苑</div>
+                <div class="phone-content">
+                    <div class="style-d1">
+                        <div class="date-group">
+                            <div class="date-header">
+                                <span class="date-text">07-15</span><span class="date-weekday">周三</span>
+                            </div>
+                            <div class="card type-taste">
+                                <div class="card-top">
+                                    <span class="card-name">夏日品茶会</span>
+                                    <div class="card-tags">
+                                        <span class="tag tag-online">线上</span>
+                                        <span class="tag tag-welfare">公益</span>
+                                    </div>
+                                </div>
+                                <div class="card-info">
+                                    <div class="info-row"><span class="info-label">时间</span><span class="info-value">19:00 - 21:00</span></div>
+                                    <div class="info-row"><span class="info-label">老师</span><span class="info-value">张老师</span></div>
+                                    <div class="info-row"><span class="info-label">地点</span><span class="info-value">茶苑一楼大厅</span></div>
+                                </div>
+                                <div class="card-desc"><span class="desc-text">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎茶友报名参加。</span></div>
+                            </div>
+                            <div class="card type-course">
+                                <div class="card-top">
+                                    <span class="card-name">茶艺基础课程</span>
+                                    <div class="card-tags"><span class="tag tag-welfare">公益</span></div>
+                                </div>
+                                <div class="card-info">
+                                    <div class="info-row"><span class="info-label">时间</span><span class="info-value">14:00 - 16:00</span></div>
+                                    <div class="info-row"><span class="info-label">地点</span><span class="info-value">二楼教室</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="date-group">
+                            <div class="date-header">
+                                <span class="date-text">07-16</span><span class="date-weekday">周四</span>
+                            </div>
+                            <div class="card type-talk">
+                                <div class="card-top">
+                                    <span class="card-name">普洱茶专题讲座</span>
+                                    <div class="card-tags"><span class="tag tag-online">线上</span></div>
+                                </div>
+                                <div class="card-info">
+                                    <div class="info-row"><span class="info-label">时间</span><span class="info-value">20:00 - 21:30</span></div>
+                                    <div class="info-row"><span class="info-label">老师</span><span class="info-value">李老师</span></div>
+                                </div>
+                                <div class="card-desc"><span class="desc-text">深入了解普洱茶的分类、存储和品鉴，适合有一定基础的茶友。</span></div>
+                            </div>
+                        </div>
+                        <div class="no-more">已显示全部活动</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- D2 几何呼吸 -->
+        <div class="style-wrapper">
+            <div class="style-label">
+                <span class="name">D2 · 几何呼吸</span>
+                <span class="desc">极淡几何漂浮 + 大号圆体日期 + 单色标签。趣味来自"几何与字体节奏"，更安静</span>
+                <div class="colors">
+                    <div class="color-dot" style="background:#fcfcfa;"></div>
+                    <div class="color-dot" style="background:#8ecae6;"></div>
+                    <div class="color-dot" style="background:#ffd166;"></div>
+                    <div class="color-dot" style="background:#2b2f36;"></div>
+                </div>
+            </div>
+            <div class="phone">
+                <div class="phone-statusbar"><span>16:42</span><span></span></div>
+                <div class="phone-navbar">无忧茶苑</div>
+                <div class="phone-content">
+                    <div class="style-d2">
+                        <div class="date-group">
+                            <div class="date-header">
+                                <span class="date-text">07-15</span><span class="date-weekday">周三</span>
+                            </div>
+                            <div class="card">
+                                <div class="card-top">
+                                    <span class="card-name">夏日品茶会</span>
+                                    <div class="card-tags">
+                                        <span class="tag tag-online">线上</span>
+                                        <span class="tag tag-welfare">公益</span>
+                                    </div>
+                                </div>
+                                <div class="card-info">
+                                    <div class="info-row"><span class="info-label">时间</span><span class="info-value">19:00 - 21:00</span></div>
+                                    <div class="info-row"><span class="info-label">老师</span><span class="info-value">张老师</span></div>
+                                    <div class="info-row"><span class="info-label">地点</span><span class="info-value">茶苑一楼大厅</span></div>
+                                </div>
+                                <div class="card-desc"><span class="desc-text">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎茶友报名参加。</span></div>
+                            </div>
+                            <div class="card">
+                                <div class="card-top">
+                                    <span class="card-name">茶艺基础课程</span>
+                                    <div class="card-tags"><span class="tag tag-welfare">公益</span></div>
+                                </div>
+                                <div class="card-info">
+                                    <div class="info-row"><span class="info-label">时间</span><span class="info-value">14:00 - 16:00</span></div>
+                                    <div class="info-row"><span class="info-label">地点</span><span class="info-value">二楼教室</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="date-group">
+                            <div class="date-header">
+                                <span class="date-text">07-16</span><span class="date-weekday">周四</span>
+                            </div>
+                            <div class="card">
+                                <div class="card-top">
+                                    <span class="card-name">普洱茶专题讲座</span>
+                                    <div class="card-tags"><span class="tag tag-online">线上</span></div>
+                                </div>
+                                <div class="card-info">
+                                    <div class="info-row"><span class="info-label">时间</span><span class="info-value">20:00 - 21:30</span></div>
+                                    <div class="info-row"><span class="info-label">老师</span><span class="info-value">李老师</span></div>
+                                </div>
+                                <div class="card-desc"><span class="desc-text">深入了解普洱茶的分类、存储和品鉴，适合有一定基础的茶友。</span></div>
+                            </div>
+                        </div>
+                        <div class="no-more">已显示全部活动</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="comparison">
+        <h2>两个变体对比</h2>
+        <table>
+            <thead>
+                <tr><th>维度</th><th>D1 · 糖果撞色</th><th>D2 · 几何呼吸</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>好玩的来源</td><td>颜色节奏（撞色条 + 彩标签）</td><td>几何形状 + 圆体大日期</td></tr>
+                <tr><td>背景</td><td>极浅暖白 #fafaf8</td><td>极浅白 + 淡几何漂浮</td></tr>
+                <tr><td>卡片</td><td>白底 4px 圆角 + 左侧色条</td><td>半透白 4px 圆角</td></tr>
+                <tr><td>字体</td><td>日期用圆体 Baloo 2</td><td>日期用大号圆体</td></tr>
+                <tr><td>观感</td><td>活泼、年轻、有跳动感</td><td>安静、留白、有呼吸感</td></tr>
+                <tr><td>适合</td><td>想更热闹一点</td><td>想更克制一点</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="apply-hint">
+        两个都只改 <code>index.wxss</code>，WXML 结构不动；选好后我直接写进去<br>
+        第 4 张参考图（PNG）之前没存下来，方便的话重发一下，我看看是否还要融合别的调性
+    </div>
+</body>
+</html>

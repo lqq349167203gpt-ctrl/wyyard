@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 - 卡片柔化对比</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #eceef0; color: #333; padding: 40px 16px; }
+  .page-title { text-align: center; margin-bottom: 30px; }
+  .page-title h1 { font-size: 25px; font-weight: 700; color: #2b2f36; margin-bottom: 8px; }
+  .page-title p { font-size: 13.5px; color: #8f959e; max-width: 720px; margin: 0 auto; line-height: 1.7; }
+
+  /* ===== 顶部：旧 vs 新 卡片直接对比（放大） ===== */
+  .compare { max-width: 760px; margin: 0 auto 44px; display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; }
+  .compare-col { width: 340px; }
+  .compare-col .cap { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 7px; }
+  .cap.old { color: #b06a6a; }
+  .cap.new { color: #3d8a5e; }
+  .cap .pill { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .cap.old .pill { background: #fbeaea; color: #b06a6a; }
+  .cap.new .pill { background: #e7f5ee; color: #3d8a5e; }
+
+  /* 旧卡片：硬边框 + 紧内边距 */
+  .card-old { background: #fff; border: 0.5px solid #f0ebe0; border-radius: 4px; padding: 12px; box-shadow: 0 1px 3px rgba(180,165,130,0.10); }
+  .card-old .ct { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .card-old .nm { font-size: 14px; font-weight: 600; color: #2b2f36; }
+  .card-old .tg { font-size: 10px; padding: 2px 5px; border-radius: 3px; background: #fff1e3; color: #c47d20; }
+  .card-old .info { display: flex; flex-direction: column; gap: 3px; }
+  .card-old .row { font-size: 12px; display: flex; }
+  .card-old .lab { color: #b0b4ba; width: 30px; flex-shrink: 0; }
+  .card-old .val { color: #5a6068; flex: 1; }
+  .card-old .desc { margin-top: 7px; padding-top: 7px; border-top: 0.5px solid #f0f0f0; font-size: 11px; color: #9aa0a8; line-height: 1.5; }
+
+  /* 新卡片：软阴影 + 大留白 + 宽松奏 */
+  .card-new { background: #fffdf9; border-radius: 4px; padding: 18px 16px 16px; box-shadow: 0 4px 18px rgba(90,70,40,0.07); border: 1px solid rgba(180,160,120,0.06); }
+  .card-new .ct { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 0; }
+  .card-new .nm { font-size: 16px; font-weight: 600; color: #2b2f36; line-height: 1.5; letter-spacing: 0.2px; }
+  .card-new .tg { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; background: #f3e6cf; color: #a9792f; white-space: nowrap; flex-shrink: 0; }
+  .card-new .info { margin-top: 14px; display: flex; flex-direction: column; gap: 9px; }
+  .card-new .row { font-size: 13px; display: flex; line-height: 1.5; }
+  .card-new .lab { color: #a8adb5; width: 34px; flex-shrink: 0; }
+  .card-new .val { color: #4a5159; flex: 1; }
+  .card-new .desc { margin-top: 15px; padding-top: 14px; border-top: 1px solid #f1ece2; font-size: 12.5px; color: #8b8378; line-height: 1.75; }
+
+  /* ===== 下方：新卡片放回整页（暖纸背景 + 胶带日期） ===== */
+  .phone { width: 300px; height: 600px; border-radius: 26px; overflow: hidden; box-shadow: 0 12px 44px rgba(0,0,0,0.16); border: 7px solid #161616; position: relative; background: #fff; margin: 0 auto; }
+  .phone-statusbar { height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 12px; font-weight: 600; color: #1a1a1a; }
+  .phone-content { height: calc(100% - 36px); overflow-y: auto; position: relative; }
+  .phone-content::-webkit-scrollbar { display: none; }
+  .fun { font-family: 'ZCOOL KuaiLe', 'Yuanti SC', sans-serif; }
+
+  .page { background: #faf8f3; padding: 20px 14px 16px; min-height: 100%; position: relative; }
+  .page .bg-shapes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .page .bg-shapes span { position: absolute; border-radius: 50%; filter: blur(2px); }
+  .page .bg-shapes span:nth-child(1) { width: 150px; height: 150px; top: -40px; right: -50px; background: rgba(212,160,75,0.12); }
+  .page .bg-shapes span:nth-child(2) { width: 120px; height: 120px; bottom: 60px; left: -50px; background: rgba(196,120,122,0.09); }
+  .greet { position: relative; z-index: 1; margin-bottom: 18px; }
+  .greet h2 { font-size: 22px; color: #4a3f2c; line-height: 1.3; }
+  .greet p { font-size: 11.5px; color: #b0997a; margin-top: 4px; }
+  .date-group { position: relative; z-index: 1; margin-bottom: 16px; }
+  .date-header { display: inline-block; transform: rotate(-1.6deg); background: #f4e3c2; color: #6e5733; font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 4px; box-shadow: 0 2px 5px rgba(180,150,90,0.18); margin-bottom: 11px; letter-spacing: 0.5px; }
+  /* 新卡片（同上方 .card-new，但在 page 内） */
+  .page .card-new { position: relative; z-index: 1; margin-bottom: 11px; }
+  .page .card-new .ct { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .page .card-new .nm { font-size: 16px; font-weight: 600; color: #2b2f36; line-height: 1.5; letter-spacing: 0.2px; }
+  .page .card-new .tg { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; background: #f3e6cf; color: #a9792f; white-space: nowrap; flex-shrink: 0; }
+  .page .card-new .info { margin-top: 14px; display: flex; flex-direction: column; gap: 9px; }
+  .page .card-new .row { font-size: 13px; display: flex; line-height: 1.5; }
+  .page .card-new .lab { color: #a8adb5; width: 34px; flex-shrink: 0; }
+  .page .card-new .val { color: #4a5159; flex: 1; }
+  .page .card-new .desc { margin-top: 15px; padding-top: 14px; border-top: 1px solid #f1ece2; font-size: 12.5px; color: #8b8378; line-height: 1.75; }
+  .no-more { position: relative; z-index: 1; text-align: center; padding: 14px 0 22px; font-size: 11px; color: #c4c8ce; }
+
+  .spec { max-width: 760px; margin: 46px auto 0; background: #fff; border-radius: 14px; padding: 26px 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+  .spec h2 { font-size: 18px; font-weight: 700; color: #2b2f36; margin-bottom: 16px; text-align: center; }
+  .spec table { width: 100%; border-collapse: collapse; }
+  .spec th, .spec td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #f2f2f2; font-size: 13px; }
+  .spec th { font-weight: 700; color: #2b2f36; background: #fafafa; }
+  .spec td { color: #5f6672; }
+  .spec tr:last-child td { border-bottom: none; }
+  .spec .old-v { color: #b06a6a; }
+  .spec .new-v { color: #3d8a5e; font-weight: 600; }
+  .apply-hint { text-align: center; margin-top: 22px; padding: 16px; background: #f8f9fa; border-radius: 8px; font-size: 12.5px; color: #8f959e; line-height: 1.8; }
+</style>
+</head>
+<body>
+  <div class="page-title">
+    <h1>活动卡片柔化 — 旧 vs 新</h1>
+    <p>你的反馈：显示框<b>太硬</b>、内间距<b>太紧</b>、留白<b>太少</b>。这版只改卡片单元——去掉硬描边、换成柔和弥散阴影、内边距和行距大幅放开。背景/日期头沿用之前的方向不动。</p>
+  </div>
+
+  <!-- 旧 vs 新 直接对比 -->
+  <div class="compare">
+    <div class="compare-col">
+      <div class="cap old">旧卡片 <span class="pill">硬 · 挤</span></div>
+      <div class="card-old">
+        <div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div>
+        <div class="info">
+          <div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div>
+          <div class="row"><span class="lab">老师</span><span class="val">张老师</span></div>
+          <div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div>
+        </div>
+        <div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div>
+      </div>
+    </div>
+    <div class="compare-col">
+      <div class="cap new">新卡片 <span class="pill">柔 · 透气</span></div>
+      <div class="card-new">
+        <div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div>
+        <div class="info">
+          <div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div>
+          <div class="row"><span class="lab">老师</span><span class="val">张老师</span></div>
+          <div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div>
+        </div>
+        <div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新卡片放回整页 -->
+  <div class="phone">
+    <div class="phone-statusbar"><span>16:47</span><span></span></div>
+    <div class="phone-content">
+      <div class="page">
+        <div class="bg-shapes"><span></span><span></span></div>
+        <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+        <div class="date-group">
+          <div class="date-header">07-15 周三</div>
+          <div class="card-new">
+            <div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div>
+            <div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div>
+            <div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div>
+          </div>
+          <div class="card-new">
+            <div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div>
+            <div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div>
+          </div>
+        </div>
+        <div class="date-group">
+          <div class="date-header">07-16 周四</div>
+          <div class="card-new">
+            <div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div>
+            <div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div>
+            <div class="desc">深入了解普洱茶的分类、存储和品鉴。</div>
+          </div>
+        </div>
+        <div class="no-more">— 已显示全部活动 —</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spec">
+    <h2>卡片参数对照</h2>
+    <table>
+      <thead><tr><th>参数</th><th>旧</th><th>新</th><th>效果</th></tr></thead>
+      <tbody>
+        <tr><td>边框</td><td class="old-v">0.5px 硬描边 #f0ebe0</td><td class="new-v">无硬边，1px 极淡色 + 柔阴影</td><td>去掉“盒子感”</td></tr>
+        <tr><td>阴影</td><td class="old-v">0 1px 3px 实边</td><td class="new-v">0 4px 18px 弥散低透明</td><td>卡片“浮”起来，不硬</td></tr>
+        <tr><td>内边距</td><td class="old-v">12px</td><td class="new-v">18 / 16px（上下/左右）</td><td>内部留白增加 50%</td></tr>
+        <tr><td>信息行间距</td><td class="old-v">3–4px</td><td class="new-v">9px</td><td>每行喘得过气</td></tr>
+        <tr><td>标题字号</td><td class="old-v">14px</td><td class="new-v">16px + 行高 1.5</td><td>更醒目、不挤</td></tr>
+        <tr><td>描述上方间距</td><td class="old-v">7px</td><td class="new-v">15px + 14px 上边距</td><td>描述成独立区块</td></tr>
+        <tr><td>卡片底色</td><td class="old-v">纯白 #fff</td><td class="new-v">暖白 #fffdf9</td><td>比纯白柔，不刺眼</td></tr>
+        <tr><td>圆角</td><td class="old-v">4px</td><td class="new-v">4px（守住你的偏好）</td><td>没动，软感来自阴影/留白</td></tr>
+      </tbody>
+    </table>
+    <div class="apply-hint">
+      圆角仍守住你之前定的 4px（小圆角偏好）；"软"靠<b>去掉硬描边 + 弥散阴影 + 放大留白</b>实现，不靠加大圆角。<br>
+      如果你觉得边角还是硬，可把 4px 调到 8–10px 会更柔——告诉我即可。
+    </div>
+  </div>
+</body>
+</html>

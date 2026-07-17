@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 — 手绘涂鸦背景 · 散落标记</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --paper:#eef2f6;
+    --card:#ffffff;
+    --border:#dde3e9;
+    --ink:#222a33;
+    --ink2:#5b6873;
+    --ink3:#94a0ab;
+    --green:#2f9e74;
+    --blue:#3a6fb0;
+    --purple:#6d5fd0;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#dde2e7;padding:44px 16px;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .hand{font-family:'Caveat',cursive;font-weight:700}
+  .wrap{max-width:940px;margin:0 auto}
+  .title{text-align:center;margin-bottom:6px}
+  .title h1{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+  .title p{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.75;max-width:700px;margin-left:auto;margin-right:auto}
+  .title p b{color:var(--ink)}
+
+  .row{display:flex;gap:32px;align-items:flex-start;justify-content:center;margin-top:36px;flex-wrap:wrap}
+  .phone{width:340px;height:680px;border-radius:30px;overflow:hidden;box-shadow:0 18px 50px rgba(20,30,40,.18);border:8px solid #14171a;position:relative;background:#fff;flex-shrink:0}
+  .sb{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#14171a;position:relative;z-index:10}
+  .content{height:calc(100% - 38px);overflow-y:auto;position:relative}
+  .content::-webkit-scrollbar{display:none}
+
+  .page{background:var(--paper);min-height:100%;padding:18px 16px 24px;position:relative;overflow:hidden}
+  /* 手绘涂鸦背景层：散落的小标记（线稿，非插画） */
+  .doodles{position:absolute;inset:0;pointer-events:none;z-index:0}
+  .doodles svg{position:absolute;display:block}
+  /* 卡片与文字要浮在涂鸦之上 */
+  .topbar,.date-row,.card,.nomore{position:relative;z-index:1}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .brand{display:flex;align-items:center;gap:7px}
+  .brand .mk{width:11px;height:11px;background:var(--ink)}
+  .brand .nm{font-size:13px;font-weight:800;letter-spacing:.5px}
+  .count{font-size:10.5px;color:var(--ink2);border:1px solid var(--border);padding:2px 8px;border-radius:2px;background:#fff;display:inline-flex;align-items:baseline;gap:4px}
+  .count .hw{font-size:14px;color:var(--purple);line-height:1}
+
+  .date-row{display:flex;align-items:baseline;gap:9px;margin-bottom:13px}
+  .date-row .sq{width:9px;height:9px;flex-shrink:0;align-self:center}
+  .date-row .day{font-size:30px;font-weight:800;line-height:1;color:var(--ink);letter-spacing:-1px}
+  .date-row .md{font-size:11px;color:var(--ink2);line-height:1.45}
+  .date-row .md b{color:var(--ink);font-weight:700}
+  .date-row .rule{flex:1;height:1px;background:var(--border);margin-left:4px;align-self:center}
+
+  .card{display:flex;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:10px;align-items:stretch;box-shadow:1px 1px 0 rgba(34,42,51,.05)}
+  .thumb{width:82px;height:82px;border-radius:3px;overflow:hidden;flex-shrink:0;background:#e3e7ec}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.82) contrast(1.04) brightness(1.02)}
+  .body{flex:1;min-width:0;display:flex;flex-direction:column}
+  .ct{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .nm{font-size:15px;font-weight:700;line-height:1.4;color:var(--ink);letter-spacing:.1px}
+  .tag{font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;line-height:1.7;font-weight:800;color:#fff;letter-spacing:.3px}
+  .tag.g{background:var(--green)} .tag.b{background:var(--blue)} .tag.p{background:var(--purple)}
+  .info{margin-top:9px;display:flex;flex-direction:column;gap:4px}
+  .ir{font-size:11.5px;display:flex;line-height:1.5}
+  .lab{width:30px;flex-shrink:0;color:var(--ink3);font-size:10.5px}
+  .val{flex:1;color:var(--ink2)}
+  .desc{margin-top:9px;padding-top:9px;border-top:1px dashed var(--border);font-size:11.5px;line-height:1.55;color:var(--ink2);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+  .nomore{text-align:center;padding:16px 0 8px;font-size:10.5px;color:var(--ink3);letter-spacing:1px}
+  .hw-note{margin-top:6px;font-size:18px;color:var(--green);line-height:1}
+
+  .spec{width:300px;flex-shrink:0}
+  .spec h3{font-size:14px;color:var(--ink);margin-bottom:12px}
+  .blk{background:#fff;border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:12px}
+  .blk b{font-size:12px;color:var(--ink);display:block;margin-bottom:9px}
+  .sw{display:flex;gap:8px;flex-wrap:wrap}
+  .sw i{width:26px;height:26px;border-radius:4px;display:block;border:1px solid rgba(0,0,0,.06)}
+  .kv{font-size:11.5px;color:var(--ink2);line-height:1.95}
+  .kv span{color:var(--ink3)}
+  .foot{text-align:center;margin-top:28px;font-size:11.5px;color:var(--ink2);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">
+    <h1>无忧茶苑首页 — 手绘涂鸦背景 · 散落标记</h1>
+    <p>对照参考海报（特别是即兴沟通戏剧那张拼贴 zine）的"在底色上散落手绘小标记"做法：<b>干净冷底</b> + <b>细线手绘标记散落</b>（sparkle/squiggle/arrow/星芒/loop）+ <b>Caveat 手写拉丁字</b>给活人味，去掉颗粒和衬线（不再 00 年代）。</p>
+  </div>
+
+  <div class="row">
+    <div class="phone">
+      <div class="sb"><span>01:26</span><span></span></div>
+      <div class="content"><div class="page">
+        <!-- 手绘涂鸦背景层 -->
+        <div class="doodles">
+          <!-- 左上 sparkle -->
+          <svg width="28" height="28" viewBox="0 0 28 28" style="top:48px;left:8px;transform:rotate(-8deg);opacity:.85">
+            <g stroke="#3a6fb0" stroke-width="1.6" stroke-linecap="round" fill="none">
+              <path d="M14 3 L14 25"/><path d="M3 14 L25 14"/>
+              <path d="M7 7 L21 21"/><path d="M7 21 L21 7"/>
+            </g>
+          </svg>
+          <!-- 右上 squiggle -->
+          <svg width="40" height="14" viewBox="0 0 40 14" style="top:42px;right:14px;transform:rotate(12deg);opacity:.8">
+            <path d="M2 7 Q8 1 14 7 T26 7 T38 7" stroke="#222a33" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          </svg>
+          <!-- 中右 arrow -->
+          <svg width="34" height="18" viewBox="0 0 34 18" style="top:170px;right:10px;transform:rotate(-10deg);opacity:.75">
+            <g stroke="#2f9e74" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 9 Q14 2 28 9"/><path d="M24 5 L28 9 L24 13"/>
+            </g>
+          </svg>
+          <!-- 中左 plus -->
+          <svg width="16" height="16" viewBox="0 0 16 16" style="top:210px;left:6px;transform:rotate(15deg);opacity:.7">
+            <g stroke="#6d5fd0" stroke-width="1.8" stroke-linecap="round">
+              <path d="M8 2 L8 14"/><path d="M2 8 L14 8"/>
+            </g>
+          </svg>
+          <!-- 中右 small loop -->
+          <svg width="22" height="22" viewBox="0 0 22 22" style="top:300px;right:12px;transform:rotate(8deg);opacity:.7">
+            <path d="M11 3 C16 3 18 8 14 12 C10 16 4 15 4 10 C4 6 8 5 11 7" stroke="#3a6fb0" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          </svg>
+          <!-- 左中 starburst -->
+          <svg width="26" height="26" viewBox="0 0 26 26" style="top:370px;left:4px;transform:rotate(-15deg);opacity:.65">
+            <g stroke="#222a33" stroke-width="1.3" stroke-linecap="round">
+              <path d="M13 3 L13 23"/><path d="M3 13 L23 13"/>
+              <path d="M6 6 L20 20"/><path d="M6 20 L20 6"/>
+              <circle cx="13" cy="13" r="2" fill="#222a33" stroke="none"/>
+            </g>
+          </svg>
+          <!-- 右下 dots -->
+          <svg width="22" height="8" viewBox="0 0 22 8" style="bottom:120px;right:14px;transform:rotate(-8deg);opacity:.8">
+            <g fill="#2f9e74"><circle cx="3" cy="4" r="1.6"/><circle cx="11" cy="4" r="1.6"/><circle cx="19" cy="4" r="1.6"/></g>
+          </svg>
+          <!-- 左下 squiggle 2 -->
+          <svg width="36" height="12" viewBox="0 0 36 12" style="bottom:90px;left:8px;transform:rotate(-12deg);opacity:.75">
+            <path d="M2 6 Q8 1 14 6 T26 6 T34 6" stroke="#6d5fd0" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          </svg>
+          <!-- 右下 small arrow -->
+          <svg width="26" height="14" viewBox="0 0 26 14" style="bottom:50px;right:20px;transform:rotate(8deg);opacity:.7">
+            <g stroke="#3a6fb0" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 7 Q12 1 22 7"/><path d="M19 3 L22 7 L19 11"/>
+            </g>
+          </svg>
+        </div>
+
+        <div class="topbar">
+          <div class="brand"><span class="mk"></span><span class="nm">无忧茶苑</span></div>
+          <span class="count"><span class="hand">3</span> 场活动</span>
+        </div>
+
+        <div class="date-row">
+          <span class="sq" style="background:var(--green)"></span>
+          <span class="day">16</span>
+          <span class="md"><b>07月 · 周四</b><br>2 场活动</span>
+          <span class="rule"></span>
+        </div>
+
+        <div class="card">
+          <div class="thumb"><img src="https://picsum.photos/seed/d1-tea/200/200" alt=""></div>
+          <div class="body">
+            <div class="ct"><span class="nm">夏日品茶会</span><span class="tag g">公益</span></div>
+            <div class="info">
+              <div class="ir"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div>
+              <div class="ir"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div>
+            </div>
+            <div class="desc">带你了解龙井的冲泡与品鉴，新手友好。</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="thumb"><img src="https://picsum.photos/seed/d2-class/200/200" alt=""></div>
+          <div class="body">
+            <div class="ct"><span class="nm">茶艺基础课程</span><span class="tag p">课程</span></div>
+            <div class="info">
+              <div class="ir"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div>
+              <div class="ir"><span class="lab">地点</span><span class="val">二楼教室</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="date-row" style="margin-top:18px">
+          <span class="sq" style="background:var(--blue)"></span>
+          <span class="day">17</span>
+          <span class="md"><b>07月 · 周五</b><br>1 场活动</span>
+          <span class="rule"></span>
+        </div>
+        <div class="card">
+          <div class="thumb"><img src="https://picsum.photos/seed/d3-puer/200/200" alt=""></div>
+          <div class="body">
+            <div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tag b">线上</span></div>
+            <div class="info">
+              <div class="ir"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div>
+              <div class="ir"><span class="lab">老师</span><span class="val">李老师</span></div>
+            </div>
+            <div class="desc">深入了解普洱的分类、存储与品鉴。</div>
+          </div>
+        </div>
+
+        <div class="nomore">— 没有更多了 —<div class="hw-note hand">see you ✦</div></div>
+      </div></div>
+    </div>
+
+    <div class="spec">
+      <h3>设计语言</h3>
+      <div class="blk">
+        <b>手绘涂鸦背景（对标参考海报）</b>
+        <div class="kv">
+          散落 10 个细线小标记：<br>
+          · sparkle(十字闪光) · squiggle 涂鸦线<br>
+          · arrow 箭头 · plus 加号 · loop 小环<br>
+          · starburst 星芒 · dots 三点<br>
+          冷色调：<span>墨/蓝/绿/紫</span>，低-中透明度<br>
+          各角度旋转<span> 不齐</span>，密度低不抢戏
+        </div>
+      </div>
+      <div class="blk">
+        <b>去掉"00 年代"的元凶</b>
+        <div class="kv">✗ 纸面颗粒 (feTurbulence)<br>✗ 衬线大日期 (Noto Serif SC)<br>→ 改干净无衬线粗体 + Caveat 手写拉丁字</div>
+      </div>
+      <div class="blk">
+        <b>活人味的来源</b>
+        <div class="kv">· 背景散落手绘小标记<br>· Caveat 手写体<span> "3 场活动" + "see you"</span><br>· 卡片硬边 + 扁平印章 + 哑光照片</div>
+      </div>
+      <div class="blk">
+        <b>关键区分</b>
+        <div class="kv">手绘涂鸦当<b>背景小标记</b>=好品味<br>手绘涂鸦当<b>封面插画</b>=low clipart</div>
+      </div>
+      <div class="blk">
+        <b>守住硬条件</b>
+        <div class="kv">浅色 · 4px 小圆角 · 紧凑右边距 · 无暖色</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    涂鸦的密度/大小/颜色都可以一句话调（要更疏/更密/加暖色点缀）。<br>
+    觉得这股"散落手绘"对路就说一声，我落进 <code style="background:#fff;padding:1px 5px;border-radius:3px">index.wxss</code>。
+  </div>
+</div>
+</body>
+</html>

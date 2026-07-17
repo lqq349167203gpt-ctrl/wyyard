@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 — 基于真实截图复刻</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    /* ====== 从 StressWatch 真实截图提取 ====== */
+
+    /* 背景 — 极淡薄荷绿（截图中的底色！） */
+    --bg: #eef6f2;
+    --bg-warm: #f0f7f3;
+
+    /* 卡片 */
+    --card-bg: #ffffff;
+
+    /* 文字 */
+    --ink: #2d3748;
+    --ink-mid: #5a6677;
+    --ink-light: #9aa5b4;
+    --ink-faint: #c0c8d2;
+
+    /* ====== SW 截图中的实际色彩系统 ====== */
+    /* 绿色系 — 正面/优秀 */
+    --sw-green: #5ecfa8;           /* 主绿色 */
+    --sw-green-light: rgba(94,207,168,.14);
+    --sw-green-text: #2da082;
+
+    /* 蓝色系 — 中性/正常信息 */
+    --sw-blue: #5b9cf6;
+    --sw-blue-light: rgba(91,156,246,.13);
+    --sw-blue-text: #3a7bd5;
+
+    /* 橙/红色系 — 活动/注意 */
+    --sw-orange: #f29b6b;
+    --sw-orange-light: rgba(242,155,107,.14);
+    --sw-orange-text: #d4834f;
+
+    /* 红色系 — 过载/重要 */
+    --sw-red: #ef7670;
+    --sw-red-light: rgba(239,118,112,.13);
+    --sw-red-text: #d45a54;
+
+    /* 紫色系 — 睡眠/放松 */
+    --sw-purple: #a78bfa;
+    --sw-purple-light: rgba(167,139,250,.13);
+    --sw-purple-text: #8b63e0;
+
+    /* 青色系 — 呼吸/正念 */
+    --sw-teal: #5eead4;
+    --sw-teal-light: rgba(94,234,212,.15);
+    --sw-teal-text: #2ac4a6;
+
+    /* 黄色系 — 晒太阳等温暖活动 */
+    --sw-yellow: #fbbf24;
+    --sw-yellow-light: rgba(251,191,36,.16);
+    --sw-yellow-text: #c9910a;
+
+    /* 圆环彩虹 */
+    --ring-1: var(--sw-blue);     /* 外圈 */
+    --ring-2: var(--sw-purple);   /* 中圈 */
+    --ring-3: var(--sw-green);    /* 内圈 */
+  }
+  body{
+    font-family:'Inter','Noto Sans SC','-apple-system','PingFang SC',sans-serif;
+    background:#e8eaed;padding:36px 14px;color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1020px;margin:0 auto}
+  .title{text-align:center;margin-bottom:28px}
+  .title h1{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+  .title p{font-size:11px;color:var(--ink-mid);margin-top:8px;line-height:1.7;max-width:660px;margin-left:auto;margin-right:auto}
+
+  .row{display:flex;gap:40px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+
+  /* ====== 手机框 ====== */
+  .phone{
+    width:365px;height:750px;border-radius:38px;overflow:hidden;
+    box-shadow:
+      0 28px 65px rgba(20,35,25,.14),
+      0 0 0 1px rgba(255,255,255,.5) inset;
+    border:7px solid #1c1f22;
+    position:relative;background:var(--bg);flex-shrink:0;
+  }
+  .sb{
+    height:38px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;font-size:12.5px;font-weight:600;color:#1c1f22;z-index:10;background:transparent;
+    position:absolute;top:0;left:0;right:0;
+  }
+  .content{height:100%;overflow-y:auto;background:var(--bg);padding-top:38px}
+  .content::-webkit-scrollbar{display:none}
+
+  .page{min-height:100%;padding:0 16px 24px}
+
+  /* ====== 日期头部区域（SW风格） ====== */
+  .date-header{
+    padding:18px 0 12px;
+  }
+  .date-row{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:12px;
+  }
+  .date-big{
+    font-size:26px;font-weight:900;color:var(--ink);
+    letter-spacing:-.5px;
+  }
+  .date-tag{
+    font-size:11px;font-weight:650;
+    color:var(--sw-green);background:var(--sw-green-light);
+    padding:4px 12px;border-radius:999px;
+  }
+
+  /* 周历选择器 */
+  .week-picker{
+    display:flex;justify-content:space-between;
+    background:rgba(255,255,255,.55);
+    border-radius:14px;padding:10px 14px;
+  }
+  .wk-day{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    min-width:30px;
+  }
+  .wk-name{
+    font-size:10px;color:var(--ink-light);font-weight:500;
+  }
+  .wk-num{
+    font-size:13px;font-weight:700;color:var(--ink-mid);
+    width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+    border-radius:50%;
+  }
+  .wk-day.active .wk-num{
+    background:var(--sw-green);color:#fff;
+  }
+
+  /* ====== 卡片 — 白色大圆角（SW截图原样） ====== */
+  .card{
+    background:var(--card-bg);
+    border-radius:20px;
+    padding:16px 18px;
+    margin-bottom:11px;
+    box-shadow:
+      0 1px 2px rgba(30,50,40,.03),
+      0 4px 14px rgba(30,50,40,.025);
+  }
+
+  /* ---- 卡片头部：图标+标题+跳转箭头 ---- */
+  .card-header{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:12px;
+  }
+  .card-title-row{
+    display:flex;align-items:center;gap:8px;
+  }
+  .card-icon{
+    width:22px;height:22px;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;
+  }
+  .ci-green{background:var(--sw-green-light);color:var(--sw-green-text)}
+  .ci-red{background:var(--sw-red-light);color:var(--sw-red-text)}
+  .ci-orange{background:var(--sw-orange-light);color:var(--sw-orange-text)}
+  .ci-teal{background:var(--sw-teal-light);color:var(--sw-teal-text)}
+  .ci-yellow{background:var(--sw-yellow-light);color:var(--sw-yellow-text)}
+
+  .card-title{
+    font-size:15px;font-weight:700;color:var(--ink);
+  }
+  .card-arrow{
+    font-size:11px;color:var(--ink-light);
+    display:flex;align-items:center;gap:3px;
+  }
+
+  /* ---- 数据分栏（SW风格） ---- */
+  .data-grid{
+    display:flex;gap:4px;
+  }
+  .data-item{
+    flex:1;display:flex;flex-direction:column;gap:3px;
+  }
+  .data-label{
+    font-size:10.5px;color:var(--ink-light);font-weight:500;
+  }
+  .data-value{
+    font-size:20px;font-weight:800;color:var(--ink);
+    letter-spacing:-.5px;line-height:1.15;
+  }
+  .data-unit{
+    font-size:11px;font-weight:600;margin-left:1px;
+  }
+  .data-sub{
+    font-size:11.5px;font-weight:650;
+  }
+  .ds-green{color:var(--sw-green-text)}
+  .ds-red{color:var(--sw-red-text)}
+  .ds-blue{color:var(--sw-blue-text)}
+  .ds-orange{color:var(--sw-orange-text)}
+
+  /* 右侧圆环 */
+  .ring-area{
+    width:52px;height:52px;flex-shrink:0;position:relative;
+  }
+  .ring-svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .ring-track{fill:none;stroke:rgba(0,0,0,.05);stroke-width:5}
+  .ring-fill{fill:none;stroke-width:5;stroke-linecap:round}
+
+  /* ---- 输入框样式（感受记录） ----= */
+  .input-hint{
+    font-size:13px;color:var(--ink-faint);
+    padding:12px 0 2px;
+  }
+  .input-link{
+    float:right;font-size:11.5px;color:var(--ink-light);font-weight:500;
+  }
+
+  /* ---- 双列小卡片 ---- */
+  .dual-cards{display:flex;gap:10px}
+  .mini-card{
+    flex:1;background:var(--card-bg);
+    border-radius:18px;padding:14px;
+    box-shadow:0 2px 8px rgba(30,50,40,.025);
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .mc-header{
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .mc-title{
+    font-size:12.5px;font-weight:700;color:var(--ink);
+    display:flex;align-items:center;gap:5px;
+  }
+  .mc-arrow{font-size:10px;color:var(--ink-faint)}
+  .mc-value{
+    font-size:22px;font-weight:900;color:var(--ink);
+    letter-spacing:-.5px;
+  }
+  .mc-unit{
+    font-size:10.5px;color:var(--ink-light);font-weight:500;
+  }
+  .mc-circle{
+    width:44px;height:44px;border-radius:50%;
+    margin-top:auto;align-self:center;
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;
+  }
+  .mc-circle.orange{
+    background:linear-gradient(135deg, #fef3c7, #fde68a);
+  }
+  .mc-circle.gray{
+    background:rgba(240,245,245,.7);
+    opacity:.5;
+  }
+
+  /* ====== 底部导航 ====== */
+  .bottom-nav{
+    display:flex;justify-content:space-around;
+    padding:10px 0 18px;margin-top:4px;
+    border-top:1px solid rgba(0,0,0,.04);
+  }
+  .nav-item{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    min-width:48px;
+  }
+  .nav-icon{
+    width:26px;height:26px;border-radius:8px;
+    background:rgba(140,160,170,.12);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;
+  }
+  .nav-icon.active{
+    background:var(--ink);
+    color:#fff;
+  }
+  .nav-label{
+    font-size:9.5px;color:var(--ink-light);font-weight:550;
+  }
+
+  /* ====== 说明面板 ====== */
+  .spec{width:300px;flex-shrink:0}
+  .spec h3{font-size:14px;color:var(--ink);margin-bottom:14px;font-weight:700}
+  .blk{
+    background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;
+    border:1px solid rgba(0,0,0,.04);
+    box-shadow:0 1px 3px rgba(0,0,0,.02);
+  }
+  .blk b{font-size:11.5px;color:var(--ink);display:block;margin-bottom:8px;font-weight:700}
+  .blk .kv{font-size:11px;color:var(--ink-mid);line-height:1.95}
+  .blk .kv span{color:var(--ink-light)}
+  .blk .kv em{font-style:normal;font-weight:600}
+  .swatch{display:inline-block;width:13px;height:13px;border-radius:50%;vertical-align:middle;margin-right:4px;border:1px solid rgba(0,0,0,.06)}
+
+  .foot{
+    text-align:center;margin-top:24px;
+    font-size:10.5px;color:var(--ink-light);
+    line-height:1.85;max-width:360px;margin-left:auto;margin-right:auto;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">
+    <h1>无忧茶苑 — 基于 StressWatch 真实截图复刻</h1>
+    <p>从你发的 4 张截图中精确提取设计语言。核心修正：<b>背景色=极淡薄荷绿</b>（之前错用了灰蓝色）；<b>卡片=白色大圆角+分栏数据</b>；<b>多彩图标+彩色标签</b></p>
+  </div>
+
+  <div class="row">
+    <!-- 手机预览 -->
+    <div class="phone">
+      <div class="sb"><span>11:06</span><span>&#128247; &#128267; 64%</span></div>
+      <div class="content"><div class="page">
+
+        <!-- ====== 日期头部 ====== -->
+        <div class="date-header">
+          <div class="date-row">
+            <div class="date-big">7月16日</div>
+            <div class="date-tag">&#8635; 今天</div>
+          </div>
+
+          <!-- 周历选择器 -->
+          <div class="week-picker">
+            <div class="wk-day"><span class="wk-name">一</span><span class="wk-num">14</span></div>
+            <div class="wk-day"><span class="wk-name">二</span><span class="wk-num">15</span></div>
+            <div class="wk-day active"><span class="wk-name">三</span><span class="wk-num">16</span></div>
+            <div class="wk-day"><span class="wk-name">四</span><span class="wk-num">17</span></div>
+            <div class="wk-day"><span class="wk-name">五</span><span class="wk-num">18</span></div>
+            <div class="wk-day"><span class="wk-name">六</span><span class="wk-num">19</span></div>
+            <div class="wk-day"><span class="wk-name">日</span><span class="wk-num">20</span></div>
+          </div>
+        </div>
+
+        <!-- ====== 活动1 — 公益品茶会（类似睡眠卡片） ====== -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <div class="card-icon ci-green">&#9733;</div>
+              <div class="card-title">夏日品茶会</div>
+            </div>
+            <div class="card-arrow">查看详情 &rsaquo;</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="data-grid">
+              <div class="data-item">
+                <span class="data-label">时间</span>
+                <span class="data-value">19<span class="data-unit">:</span>00<span class="data-unit ds-green">&ndash;21:00</span></span>
+              </div>
+              <div class="data-item">
+                <span class="data-label">类型</span>
+                <span class="data-value ds-green">公益</span>
+              </div>
+              <div class="data-item">
+                <span class="data-label">老师</span>
+                <span class="data-sub ds-blue">张老师</span>
+              </div>
+            </div>
+            <div class="ring-area">
+              <svg class="ring-svg" viewBox="0 0 44 44">
+                <circle class="ring-track" cx="22" cy="22" r="17"/>
+                <circle class="ring-fill" cx="22" cy="22" r="17"
+                  stroke="#5ecfa8" stroke-dasharray="80 107" stroke-dashoffset="0"/>
+                <circle class="ring-fill" cx="22" cy="22" r="13"
+                  stroke="#5b9cf6" stroke-dasharray="62 82" stroke-dashoffset="15"/>
+                <circle class="ring-fill" cx="22" cy="22" r="9"
+                  stroke="#f29b6b" stroke-dasharray="42 57" stroke-dashoffset="10"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== 活动2 — 茶艺课程（类似健身卡片） ====== -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <div class="card-icon ci-red">&#127891;</div>
+              <div class="card-title">茶艺基础课程</div>
+            </div>
+            <div class="card-arrow">查看详情 &rsaquo;</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="data-grid">
+              <div class="data-item">
+                <span class="data-label">时长</span>
+                <span class="data-value ds-red">2<span class="data-unit">小时</span></span>
+              </div>
+              <div class="data-item">
+                <span class="data-label">时段</span>
+                <span class="data-value ds-green">14<span class="data-unit">:00</span></span>
+              </div>
+              <div class="data-item">
+                <span class="data-label">地点</span>
+                <span class="data-sub ds-blue">二楼教室</span>
+              </div>
+            </div>
+            <div class="ring-area">
+              <svg class="ring-svg" viewBox="0 0 44 44">
+                <circle class="ring-track" cx="22" cy="22" r="17"/>
+                <circle class="ring-fill" cx="22" cy="22" r="17"
+                  stroke="#ef7670" stroke-dasharray="70 107" stroke-dashoffset="0"/>
+                <circle class="ring-fill" cx="22" cy="22" r="13"
+                  stroke="#f29b6b" stroke-dasharray="75 82" stroke-dashoffset="0"/>
+                <circle class="ring-fill" cx="22" cy="22" r="9"
+                  stroke="#5ecfa8" stroke-dasharray="50 57" stroke-dashoffset="0"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== 活动3 — 普洱讲座（感受记录风格） ====== -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <div class="card-icon ci-orange">&#128214;</div>
+              <div class="card-title">普洱茶专题讲座</div>
+            </div>
+            <div class="card-arrow">线上参与 &rsaquo;</div>
+          </div>
+          <div class="data-grid">
+            <div class="data-item">
+              <span class="data-label">时间</span>
+              <span class="data-value ds-orange">20<span class="data-unit">:00&ndash;21:30</span></span>
+            </div>
+            <div class="data-item">
+              <span class="data-label">讲师</span>
+              <span class="data-sub">李老师</span>
+            </div>
+          </div>
+          <div class="input-hint">
+            深入了解普洱的分类与存储
+            <span class="input-link">&#9998; 了解更多</span>
+          </div>
+        </div>
+
+        <!-- ====== 双列小卡片 — 冥想 + 呼吸（晒太阳/呼吸正念风格） ====== -->
+        <div class="dual-cards">
+          <div class="mini-card">
+            <div class="mc-header">
+              <div class="mc-title"><span style="color:var(--sw-orange)">&#127777;</span> 冥想沙龙</div>
+              <span class="mc-arrow">&rsaquo;</span>
+            </div>
+            <div class="mc-value">32<span class="mc-unit">人已报名</span></div>
+            <div class="mc-circle orange">&#128150;</div>
+          </div>
+          <div class="mini-card">
+            <div class="mc-header">
+              <div class="mc-title"><span style="color:var(--sw-teal)">&#128420;</span> 呼吸正念</div>
+              <span class="mc-arrow">&rsaquo;</span>
+            </div>
+            <div class="mc-value">0<span class="mc-unit">/5分钟</span></div>
+            <div class="mc-circle gray">&#128170;</div>
+          </div>
+        </div>
+
+        <!-- ====== 底部导航 ====== -->
+        <div class="bottom-nav">
+          <div class="nav-item">
+            <div class="nav-icon">&#128197;</div>
+            <span class="nav-label">今日</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon active">&#9654;</div>
+            <span class="nav-label" style="color:var(--ink)">行动</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">&#128202;</div>
+            <span class="nav-label">趋势</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">&#9881;</div>
+            <span class="nav-label">设置</span>
+          </div>
+        </div>
+
+      </div></div>
+    </div>
+
+    <!-- 设计说明 -->
+    <div class="spec">
+      <h3>从真实截图提取的设计元素</h3>
+
+      <div class="blk">
+        <b>&#127775; 最大发现：背景色！</b>
+        <div class="kv">
+          <span class="swatch" style="background:#eef6f2"></span>背景 <em>#eef6f2</em> 极淡薄荷绿<br>
+          之前用的灰蓝 <s>#f5f7fa</s> 完全不对<br>
+          整页有清新的绿色调，<br>
+          不是冷灰也不是纯白<br>
+          <span>这是「清爽治愈」的根源</span>
+        </div>
+      </div>
+
+      <div class="blk">
+        <b>卡片结构（完全对齐截图）</b>
+        <div class="kv">
+          白色底 + <em>20px 大圆角</em><br>
+          头部：图标(圆角方块) + 标题 + 箭头<br>
+          数据区：<em>分栏布局</em><br>
+          &nbsp;&nbsp;每列：label(小灰) + value(大黑)<br>
+          右侧：<em>彩色圆环装饰</em><br>
+          内边距 16-18px 不拥挤
+        </div>
+      </div>
+
+      <div class="blk">
+        <b>色彩分布（截图实测）</b>
+        <div class="kv">
+          <span class="swatch" style="background:#5ecfa8"></span><em>#5ecfa8</em> 绿 — 优秀/正面<br>
+          <span class="swatch" style="background:#5b9cf6"></span><em>#5b9cf6</em> 蓝 — 中性/正常<br>
+          <span class="swatch" style="background:#f29b6b"></span><em>#f29b6b</em> 橙 — 活动/注意<br>
+          <span class="swatch" style="background:#ef7670"></span><em>#ef7670</em> 红 — 过载/热量<br>
+          <span class="swatch" style="background:#a78bfa"></span><em>#a78bfa</em> 紫 — 睡眠/放松<br>
+          <span>每个数据项用自己的颜色</span>
+        </div>
+      </div>
+
+      <div class="blk">
+        <b>其他细节</b>
+        <div class="kv">
+          日历选择器：白底圆角条<br>
+          当前日期绿色圆形高亮<br>
+          双列小卡片并排显示<br>
+          图标用淡色圆角方块底<br>
+          底部 Tab 导航栏<br>
+          极轻阴影（几乎无感）
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    这版是从你发的 <b>StressWatch 真实截图</b> 中逐像素提取的设计语言。<br><br>
+    最大的修正：<b>背景色从灰蓝改为极淡薄荷绿</b>。<br>
+    卡片结构也完全按截图的分栏+圆环模式重构了。
+  </div>
+</div>
+</body>
+</html>

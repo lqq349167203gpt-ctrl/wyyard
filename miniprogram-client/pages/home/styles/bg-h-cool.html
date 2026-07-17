@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无忧茶苑 - 冷色软卡片</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #eceef0; color: #333; padding: 40px 16px; }
+  .page-title { text-align: center; margin-bottom: 12px; }
+  .page-title h1 { font-size: 25px; font-weight: 700; color: #2b2f36; margin-bottom: 8px; }
+  .page-title p { font-size: 13.5px; color: #8f959e; max-width: 720px; margin: 0 auto; line-height: 1.7; }
+  .warn { text-align: center; font-size: 12.5px; color: #b06a6a; background: #fbeaea; display: inline-block; padding: 6px 14px; border-radius: 20px; margin: 0 auto 30px; }
+  .warn-wrap { text-align: center; }
+
+  .styles-row { display: flex; justify-content: center; gap: 26px; flex-wrap: wrap; max-width: 1500px; margin: 0 auto; }
+  .style-wrapper { display: flex; flex-direction: column; align-items: center; width: 300px; }
+  .style-label { margin-bottom: 14px; text-align: center; min-height: 70px; }
+  .style-label .name { font-size: 17px; font-weight: 700; color: #2b2f36; display: block; margin-bottom: 5px; }
+  .style-label .desc { font-size: 12px; color: #8f959e; line-height: 1.5; display: block; }
+  .style-label .colors { display: flex; gap: 5px; justify-content: center; margin-top: 9px; }
+  .style-label .color-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.08); }
+
+  .phone { width: 300px; height: 600px; border-radius: 26px; overflow: hidden; box-shadow: 0 12px 44px rgba(0,0,0,0.16); border: 7px solid #161616; position: relative; background: #fff; }
+  .phone-statusbar { height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 12px; font-weight: 600; color: #1a1a1a; position: relative; z-index: 10; }
+  .phone-content { height: calc(100% - 36px); overflow-y: auto; position: relative; }
+  .phone-content::-webkit-scrollbar { display: none; }
+  .fun { font-family: 'ZCOOL KuaiLe', 'Yuanti SC', sans-serif; }
+
+  /* 通用软卡片（结构+留白，颜色由各主题定） */
+  .page { padding: 20px 14px 16px; min-height: 100%; position: relative; }
+  .page .bg-shapes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .page .bg-shapes span { position: absolute; border-radius: 50%; filter: blur(2px); }
+  .greet { position: relative; z-index: 1; margin-bottom: 18px; }
+  .greet h2 { font-size: 22px; line-height: 1.3; }
+  .greet p { font-size: 11.5px; margin-top: 4px; }
+  .date-group { position: relative; z-index: 1; margin-bottom: 16px; }
+  .date-header { display: inline-block; transform: rotate(-1.6deg); font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 4px; margin-bottom: 11px; letter-spacing: 0.5px; }
+  .card-soft { position: relative; z-index: 1; margin-bottom: 11px; border-radius: 4px; padding: 18px 16px 16px; border: 1px solid transparent; }
+  .card-soft .ct { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-soft .nm { font-size: 16px; font-weight: 600; line-height: 1.5; letter-spacing: 0.2px; }
+  .card-soft .tg { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+  .card-soft .info { margin-top: 14px; display: flex; flex-direction: column; gap: 9px; }
+  .card-soft .row { font-size: 13px; display: flex; line-height: 1.5; }
+  .card-soft .lab { width: 34px; flex-shrink: 0; }
+  .card-soft .val { flex: 1; }
+  .card-soft .desc { margin-top: 15px; padding-top: 14px; border-top: 1px solid; font-size: 12.5px; line-height: 1.75; }
+  .no-more { position: relative; z-index: 1; text-align: center; padding: 14px 0 22px; font-size: 11px; }
+
+  /* ====== 1. 雾蓝靛 ====== */
+  .t-indigo { background: #eef3fa; }
+  .t-indigo .bg-shapes span:nth-child(1) { width: 150px; height: 150px; top: -40px; right: -50px; background: rgba(61,90,128,0.10); }
+  .t-indigo .bg-shapes span:nth-child(2) { width: 120px; height: 120px; bottom: 60px; left: -50px; background: rgba(91,140,200,0.08); }
+  .t-indigo .greet h2 { color: #2c3e50; } .t-indigo .greet p { color: #8595a7; }
+  .t-indigo .date-header { background: #dde7f4; color: #34557e; box-shadow: 0 2px 5px rgba(61,90,128,0.15); }
+  .t-indigo .card-soft { background: #ffffff; border-color: rgba(61,90,128,0.06); box-shadow: 0 4px 18px rgba(61,90,128,0.08); }
+  .t-indigo .nm { color: #233144; } .t-indigo .lab { color: #a3b0c0; } .t-indigo .val { color: #475264; }
+  .t-indigo .tg { background: #e3edf9; color: #3d5a80; }
+  .t-indigo .desc { border-top-color: #e6ecf4; color: #828ea0; }
+  .t-indigo .no-more { color: #b9c4d2; }
+
+  /* ====== 2. 冷灰中性 ====== */
+  .t-neutral { background: #f2f4f6; }
+  .t-neutral .bg-shapes span:nth-child(1) { width: 150px; height: 150px; top: -40px; right: -50px; background: rgba(90,100,110,0.07); }
+  .t-neutral .bg-shapes span:nth-child(2) { width: 120px; height: 120px; bottom: 60px; left: -50px; background: rgba(120,130,140,0.06); }
+  .t-neutral .greet h2 { color: #2b3138; } .t-neutral .greet p { color: #8b94a0; }
+  .t-neutral .date-header { background: #e4e8ec; color: #4a545e; box-shadow: 0 2px 5px rgba(60,70,80,0.10); }
+  .t-neutral .card-soft { background: #ffffff; border-color: rgba(60,70,80,0.05); box-shadow: 0 4px 18px rgba(40,50,60,0.07); }
+  .t-neutral .nm { color: #2b3138; } .t-neutral .lab { color: #aab2bc; } .t-neutral .val { color: #4c5560; }
+  .t-neutral .tg { background: #eaeef2; color: #5b6670; }
+  .t-neutral .desc { border-top-color: #eaeef2; color: #888f99; }
+  .t-neutral .no-more { color: #bcc3cc; }
+
+  /* ====== 3. 薄荷青 ====== */
+  .t-mint { background: #eef5f1; }
+  .t-mint .bg-shapes span:nth-child(1) { width: 150px; height: 150px; top: -40px; right: -50px; background: rgba(79,138,115,0.09); }
+  .t-mint .bg-shapes span:nth-child(2) { width: 120px; height: 120px; bottom: 60px; left: -50px; background: rgba(120,180,150,0.08); }
+  .t-mint .greet h2 { color: #243a32; } .t-mint .greet p { color: #7d9a8c; }
+  .t-mint .date-header { background: #dcebe3; color: #3f735c; box-shadow: 0 2px 5px rgba(79,138,115,0.15); }
+  .t-mint .card-soft { background: #ffffff; border-color: rgba(79,138,115,0.06); box-shadow: 0 4px 18px rgba(60,120,90,0.07); }
+  .t-mint .nm { color: #21352d; } .t-mint .lab { color: #9bb5a8; } .t-mint .val { color: #42584d; }
+  .t-mint .tg { background: #e3f1ea; color: #4f8a73; }
+  .t-mint .desc { border-top-color: #e2efe8; color: #7c9488; }
+  .t-mint .no-more { color: #a9c2b5; }
+
+  .apply-hint { max-width: 1080px; margin: 44px auto 0; background: #fff; border-radius: 14px; padding: 22px 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); font-size: 12.5px; color: #8f959e; line-height: 1.8; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="page-title">
+    <h1>无忧茶苑 — 冷色软卡片（已去掉暖色）</h1>
+    <p>软卡片的结构与留白不变（去硬边 + 弥散阴影 + 大留白），只把配色从暖色换成冷色 / 中性。三个方向均无暖黄、奶油、琥珀。</p>
+  </div>
+  <div class="warn-wrap"><span class="warn">已移除所有暖色（奶油底 / 琥珀点缀 / 暖白卡片）</span></div>
+
+  <div class="styles-row">
+    <!-- 雾蓝 -->
+    <div class="style-wrapper">
+      <div class="style-label">
+        <span class="name">1 · 雾蓝靛</span>
+        <span class="desc">蓝晒调，安静文艺，来自你参考图里的蓝白</span>
+        <div class="colors"><div class="color-dot" style="background:#eef3fa;"></div><div class="color-dot" style="background:#3d5a80;"></div><div class="color-dot" style="background:#ffffff;"></div></div>
+      </div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page t-indigo">
+          <div class="bg-shapes"><span></span><span></span></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 冷灰 -->
+    <div class="style-wrapper">
+      <div class="style-label">
+        <span class="name">2 · 冷灰中性</span>
+        <span class="desc">几乎无彩色，最干净克制，像系统原生质感</span>
+        <div class="colors"><div class="color-dot" style="background:#f2f4f6;"></div><div class="color-dot" style="background:#5b6670;"></div><div class="color-dot" style="background:#ffffff;"></div></div>
+      </div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page t-neutral">
+          <div class="bg-shapes"><span></span><span></span></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- 薄荷青 -->
+    <div class="style-wrapper">
+      <div class="style-label">
+        <span class="name">3 · 薄荷青</span>
+        <span class="desc">清新冷绿，有生气但不暖，自然呼吸感</span>
+        <div class="colors"><div class="color-dot" style="background:#eef5f1;"></div><div class="color-dot" style="background:#4f8a73;"></div><div class="color-dot" style="background:#ffffff;"></div></div>
+      </div>
+      <div class="phone">
+        <div class="phone-statusbar"><span>16:47</span><span></span></div>
+        <div class="phone-content"><div class="page t-mint">
+          <div class="bg-shapes"><span></span><span></span></div>
+          <div class="greet"><h2 class="fun">今天，去哪儿放松？</h2><p>07/15 周三 · 3 个活动等你</p></div>
+          <div class="date-group"><div class="date-header">07-15 周三</div>
+            <div class="card-soft"><div class="ct"><span class="nm">夏日品茶会</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">19:00 - 21:00</span></div><div class="row"><span class="lab">老师</span><span class="val">张老师</span></div><div class="row"><span class="lab">地点</span><span class="val">茶苑一楼大厅</span></div></div><div class="desc">本次品茶会将带大家了解龙井茶的冲泡技巧和品鉴方法，欢迎新手参加。</div></div>
+            <div class="card-soft"><div class="ct"><span class="nm">茶艺基础课程</span><span class="tg">公益</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">14:00 - 16:00</span></div><div class="row"><span class="lab">地点</span><span class="val">二楼教室</span></div></div></div>
+          </div>
+          <div class="date-group"><div class="date-header">07-16 周四</div>
+            <div class="card-soft"><div class="ct"><span class="nm">普洱茶专题讲座</span><span class="tg">线上</span></div><div class="info"><div class="row"><span class="lab">时间</span><span class="val">20:00 - 21:30</span></div><div class="row"><span class="lab">老师</span><span class="val">李老师</span></div></div><div class="desc">深入了解普洱茶的分类、存储和品鉴。</div></div>
+          </div>
+          <div class="no-more">— 已显示全部活动 —</div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="apply-hint">
+    三个方向均无暖色：雾蓝（蓝晒文艺）/ 冷灰（最干净）/ 薄荷青（清新冷绿）。软卡片结构统一：去硬边 + 弥散阴影 + 内边距 18/16px + 行距 9px + 标题 16px，圆角守住 4px。<br>
+    挑一个，我直接写成 <code>index.wxss</code>。
+  </div>
+</body>
+</html>

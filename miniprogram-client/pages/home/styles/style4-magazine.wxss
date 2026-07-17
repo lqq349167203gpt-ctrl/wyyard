@@ -1,0 +1,289 @@
+/* 风格四：杂志式设计 */
+/* 特点：大胆的排版、图片占位、编辑式布局、视觉吸引力强 */
+
+.page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding-bottom: 20rpx;
+}
+
+/* 加载和空状态 */
+.loading, .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #8f959e;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+  text-transform: uppercase;
+}
+
+.empty-text {
+  font-size: 36rpx;
+  color: #2b2f36;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+  letter-spacing: 1rpx;
+}
+
+.empty-hint {
+  font-size: 26rpx;
+  color: #8f959e;
+  font-style: italic;
+}
+
+/* 列表容器 */
+.list {
+  padding: 0;
+}
+
+/* 日期分组 */
+.date-group {
+  margin-bottom: 0;
+}
+
+.date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 40rpx;
+  background: #2b2f36;
+  color: #ffffff;
+  position: relative;
+}
+
+.date-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 40rpx;
+  right: 40rpx;
+  height: 4rpx;
+  background: linear-gradient(90deg, #ff6b6b, #ffd166, #4ecdc4);
+}
+
+.date-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 1rpx;
+}
+
+.date-weekday {
+  font-size: 24rpx;
+  color: #a0a4ab;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+  text-transform: uppercase;
+}
+
+/* 杂志式卡片 */
+.card {
+  background: #ffffff;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1rpx solid #f0f0f0;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.card:active {
+  background-color: #fafafa;
+}
+
+/* 卡片图片占位区域 */
+.card-image {
+  width: 100%;
+  height: 200rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-image::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.card-image-text {
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+/* 卡片内容区域 */
+.card-content {
+  padding: 32rpx 40rpx;
+}
+
+/* 卡片头部 */
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.card-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2b2f36;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+  letter-spacing: 0.5rpx;
+}
+
+.card-tags {
+  display: flex;
+  gap: 12rpx;
+  margin-left: 20rpx;
+  flex-shrink: 0;
+}
+
+.tag {
+  font-size: 20rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 4rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  text-transform: uppercase;
+}
+
+.tag-online {
+  background: #2b2f36;
+  color: #ffffff;
+}
+
+.tag-welfare {
+  background: #ff6b6b;
+  color: #ffffff;
+}
+
+/* 卡片信息区域 */
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  font-size: 26rpx;
+}
+
+.info-label {
+  color: #8f959e;
+  width: 80rpx;
+  flex-shrink: 0;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  text-transform: uppercase;
+  font-size: 20rpx;
+}
+
+.info-value {
+  color: #2b2f36;
+  flex: 1;
+  font-weight: 500;
+}
+
+/* 卡片描述 */
+.card-desc {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 2rpx solid #2b2f36;
+}
+
+.desc-text {
+  font-size: 24rpx;
+  color: #5f6672;
+  line-height: 1.8;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
+}
+
+/* 加载更多 */
+.loading-more, .no-more {
+  text-align: center;
+  padding: 40rpx 0;
+}
+
+.no-more-text {
+  font-size: 24rpx;
+  color: #c9cdd4;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+  text-transform: uppercase;
+}
+
+/* 响应式调整 */
+@media (max-width: 750rpx) {
+  .date-header {
+    padding: 24rpx 32rpx;
+  }
+  
+  .card-content {
+    padding: 24rpx 32rpx;
+  }
+  
+  .card-name {
+    font-size: 32rpx;
+  }
+  
+  .card-image {
+    height: 160rpx;
+  }
+  
+  .desc-text {
+    -webkit-line-clamp: 2;
+  }
+}
+
+/* 特殊样式：大卡片变体 */
+.card.featured {
+  border-bottom: 4rpx solid #2b2f36;
+}
+
+.card.featured .card-image {
+  height: 300rpx;
+}
+
+.card.featured .card-name {
+  font-size: 40rpx;
+}
+
+.card.featured .desc-text {
+  -webkit-line-clamp: 4;
+  font-size: 26rpx;
+}
