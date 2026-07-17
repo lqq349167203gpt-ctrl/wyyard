@@ -1,8 +1,7 @@
 {
   "navigationBarTitleText": "邀约",
   "usingComponents": {
-    "visit-card": "/components/visit-card/index",
-    "voice-input-popup": "/components/voice-input-popup/index"
+    "visit-card": "/components/visit-card/index"
   },
   "enablePullDownRefresh": true
 }
