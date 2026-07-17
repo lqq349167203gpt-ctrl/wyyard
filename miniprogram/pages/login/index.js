@@ -1,5 +1,6 @@
 const { authApi } = require('../../utils/api')
 const { APP_VERSION, BUILD_TAG } = require('../../utils/version')
+const { DEV } = require('../../utils/config')
 
 const DEV_ACCOUNTS = [
   { username: 'admin', label: '管理员' },
@@ -16,20 +17,11 @@ Page({
     saveAccount: false,
     devAccounts: DEV_ACCOUNTS,
     devIndex: 0,
-    isDev: false, // 仅开发版显示「开发模式」入口，体验版/正式版隐藏（过审要求）
+    isDev: DEV, // 「开发模式」入口由 DEV 总开关控制，提审前切 false 自动隐藏
     versionTag: `v${APP_VERSION} (${BUILD_TAG})`, // 构建标记，用于核对审核包内容
   },
 
   onLoad() {
-    // 环境判断：仅 develop（开发者工具/开发版）允许 dev 登录入口
-    let isDev = false
-    try {
-      isDev = wx.getAccountInfoSync().miniProgram.envVersion === 'develop'
-    } catch (e) {
-      isDev = false
-    }
-    this.setData({ isDev })
-
     // 恢复保存的账号
     const savedAccount = wx.getStorageSync('login_save_account')
     if (savedAccount) {

@@ -1,22 +1,16 @@
 console.log('[app.js] 文件已加载')
 
-// devMode 环境守卫：仅当小程序环境版本为 develop（开发者工具/开发版）时派生为 true，
-// 体验版（trial）/正式版（release）自动关闭，避免调试逻辑随提审包发布
-let DEV_MODE = false
-try {
-  DEV_MODE = wx.getAccountInfoSync().miniProgram.envVersion === 'develop'
-} catch (e) {
-  // 基础库 < 2.2.2 无 wx.getAccountInfoSync，兜底保持关闭
-  console.warn('[app.js] 无法获取小程序环境版本，devMode 保持关闭:', e)
-}
+// 开发模式总开关：由 utils/config.js 的 DEV 决定。
+// 提审前 DEV 切为 false 后，dev 自动登录等全部调试逻辑随之关闭。
+const { DEV } = require('./utils/config')
 
 App({
   globalData: {
     token: '',
     currentUser: null,
     permissions: [],
-    // 开发模式开关：由上方环境版本派生，仅开发版生效，体验版/正式版自动关闭
-    devMode: DEV_MODE,
+    // 开发模式开关：手动维护，提审前必须为 false（check-release.sh 强制拦截）
+    devMode: DEV,
     _selectedActivity: null,
     _loginReady: null, // Promise，登录完成后 resolve
   },

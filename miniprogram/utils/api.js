@@ -1,15 +1,6 @@
 // API 请求封装
-// 按小程序环境自动切换后端地址：开发版连本地，体验版/正式版连生产
-// 注意：环境探测失败时默认按正式环境处理（fail-safe 方向必须倒向生产，绝不误入开发模式）
-let ENV_VERSION = 'release'
-try {
-  ENV_VERSION = wx.getAccountInfoSync().miniProgram.envVersion || 'release'
-} catch (e) {
-  console.warn('[api.js] 无法获取小程序环境版本，按 release 处理:', e)
-}
-const BASE_URL = ENV_VERSION === 'develop'
-  ? 'http://localhost:8000'
-  : 'https://www.wyteahouse.cn'
+// 后端地址由 utils/config.js 的 DEV 总开关决定（上线/提审前切为 false 即指向生产）
+const { BASE_URL } = require('./config')
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
