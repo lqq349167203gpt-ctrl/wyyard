@@ -1,9 +1,4 @@
 {
-  "permission": {
-    "scope.record": {
-      "desc": "用于语音录入客户信息"
-    }
-  },
   "pages": [
     "pages/login/index",
     "pages/visits/index",

@@ -1,8 +1,78 @@
 // API 请求封装
-const BASE_URL = 'https://www.wyteahouse.cn'
+// 按小程序环境自动切换后端地址：开发版连本地，体验版/正式版连生产
+const { miniProgram: { envVersion } } = wx.getAccountInfoSync()
+const BASE_URL = envVersion === 'develop'
+  ? 'http://localhost:8000'
+  : 'https://www.wyteahouse.cn'
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
+
+// base64 字符表（JWT 使用 base64url，解码前需先替换 -/_ 并补齐 padding）
+const _B64_TABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+// base64url 解码为字符串：纯 JS 实现，不依赖 atob / wx.base64ToArrayBuffer（小程序 JSCore 通用）
+function _base64UrlDecode(input) {
+  // base64url -> base64：恢复标准字符集
+  let b64 = String(input).replace(/-/g, '+').replace(/_/g, '/')
+  // 补齐 padding；长度 mod 4 === 1 在 base64 中不可能出现，直接判非法
+  const remainder = b64.length % 4
+  if (remainder === 1) return null
+  if (remainder === 2) b64 += '=='
+  else if (remainder === 3) b64 += '='
+
+  // 每 4 个字符解出最多 3 个字节
+  const bytes = []
+  for (let i = 0; i < b64.length; i += 4) {
+    const c1 = _B64_TABLE.indexOf(b64[i])
+    const c2 = _B64_TABLE.indexOf(b64[i + 1])
+    const c3 = b64[i + 2] === '=' ? -1 : _B64_TABLE.indexOf(b64[i + 2])
+    const c4 = b64[i + 3] === '=' ? -1 : _B64_TABLE.indexOf(b64[i + 3])
+    if (c1 < 0 || c2 < 0) return null
+    const n = (c1 << 18) | (c2 << 12) | ((c3 < 0 ? 0 : c3) << 6) | (c4 < 0 ? 0 : c4)
+    bytes.push((n >> 16) & 0xff)
+    if (c3 >= 0) bytes.push((n >> 8) & 0xff)
+    if (c4 >= 0) bytes.push(n & 0xff)
+  }
+
+  // 按 UTF-8 还原字符串（payload 可能含中文用户名等非 ASCII 字符）
+  let str = ''
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = bytes[i]
+    if (byte < 0x80) {
+      str += String.fromCharCode(byte)
+    } else if (byte < 0xe0) {
+      str += String.fromCharCode(((byte & 0x1f) << 6) | (bytes[++i] & 0x3f))
+    } else if (byte < 0xf0) {
+      str += String.fromCharCode(((byte & 0x0f) << 12) | ((bytes[++i] & 0x3f) << 6) | (bytes[++i] & 0x3f))
+    } else {
+      // 4 字节序列（如 emoji），转为 UTF-16 代理对
+      let code = ((byte & 0x07) << 18) | ((bytes[++i] & 0x3f) << 12) | ((bytes[++i] & 0x3f) << 6) | (bytes[++i] & 0x3f)
+      code -= 0x10000
+      str += String.fromCharCode(0xd800 + (code >> 10), 0xdc00 + (code & 0x3ff))
+    }
+  }
+  return str
+}
+
+// 校验 JWT 是否仍在有效期内：解析 payload 的 exp（秒级时间戳），
+// 解析失败、无 exp 或已过期一律视为无效，触发重新登录
+function _isTokenValid(token) {
+  try {
+    if (!token || typeof token !== 'string') return false
+    const parts = token.split('.')
+    if (parts.length !== 3) return false // JWT 固定三段结构
+    const payloadStr = _base64UrlDecode(parts[1])
+    if (!payloadStr) return false
+    const payload = JSON.parse(payloadStr)
+    if (typeof payload.exp !== 'number') return false // 无 exp 视为无效
+    // 预留 30 秒缓冲，避免请求到达后端时刚好过期造成间歇性 401
+    return payload.exp * 1000 > Date.now() + 30 * 1000
+  } catch (e) {
+    console.warn('[request] token 解析失败，视为无效:', e)
+    return false
+  }
+}
 
 function _ensureLogin() {
   const app = getApp()
@@ -10,7 +80,7 @@ function _ensureLogin() {
   if (app.globalData._loggingIn && _loginPromise) return _loginPromise
 
   const token = wx.getStorageSync('auth_token')
-  if (token && token.includes('.')) return Promise.resolve() // JWT 有效
+  if (_isTokenValid(token)) return Promise.resolve() // JWT 未过期
 
   // 需要登录
   console.log('[request] token 无效，触发 devAutoLogin...')
