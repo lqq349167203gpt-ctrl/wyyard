@@ -84,6 +84,15 @@ if [ -f "$LOGIN_JS" ]; then
   fi
 fi
 
+# ── 3.5 登录类请求必须 skipAuth：dev-login 失败不得阻断账号密码登录 ──
+if [ -f "$API_JS" ]; then
+  if grep -qE "passwordLogin:.*skipAuth:\s*true" "$API_JS"; then
+    pass "passwordLogin 已 skipAuth（登录流程不依赖 dev-login）"
+  else
+    fail "passwordLogin 缺少 skipAuth: true（dev-login 失败会阻断账号密码登录，审核必挂）"
+  fi
+fi
+
 # ── 4. app.json：permission 只允许 scope.userLocation ──────────
 APP_JSON="$MP_DIR/app.json"
 if [ -f "$APP_JSON" ]; then
@@ -102,11 +111,36 @@ if [ -n "$LOCALHOST_HITS" ]; then
   echo "$LOCALHOST_HITS" | head -5
 fi
 
+# ── 6. 生产后端冒烟：提审包将直连该地址，上传前必须可用 ──────────
+if command -v curl >/dev/null 2>&1; then
+  HEALTH=$(curl -sS -m 10 https://www.wyteahouse.cn/api/health 2>/dev/null || true)
+  if echo "$HEALTH" | grep -qE '"status"\s*:\s*"ok"'; then
+    pass "生产后端健康检查通过"
+  else
+    fail "生产后端 https://www.wyteahouse.cn/api/health 不可达或异常: ${HEALTH:-无响应}"
+  fi
+
+  LOGIN_RESP=$(curl -sS -m 10 -X POST https://www.wyteahouse.cn/api/accounts/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"__release_check__","password":"__release_check__"}' 2>/dev/null || true)
+  if echo "$LOGIN_RESP" | grep -qE '"success"\s*:\s*false'; then
+    pass "生产登录接口返回结构正确（错误凭据返回 success:false）"
+  else
+    fail "生产登录接口返回结构异常（提审包登录必挂）: ${LOGIN_RESP:-无响应}"
+  fi
+else
+  warn "未安装 curl，跳过生产后端冒烟检查"
+fi
+
 echo ""
 echo "=========================================="
 if [ "$FAIL" -eq 0 ]; then
   echo -e "${GREEN}检查通过，可以上传提审。${NC}"
-  echo "提醒：审核表单中记得填写测试账号的用户名和密码。"
+  echo "提醒："
+  echo "  1. 审核表单中记得填写测试账号的用户名和密码。"
+  echo "  2. MP 后台「开发管理-开发设置-服务器域名」的 request 合法域名必须包含 https://www.wyteahouse.cn"
+  echo "     （开发者工具默认不校验域名，本地正常不代表审核环境正常）。"
+  echo "  3. 上传后先用真机扫体验版二维码（关闭调试模式）自测登录，再提审。"
   exit 0
 else
   echo -e "${RED}存在阻断项，禁止上传！修复后重新运行本脚本。${NC}"

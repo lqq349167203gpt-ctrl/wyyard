@@ -281,12 +281,15 @@ const memberIdentityApi = {
 }
 
 // 登录 API
+// 结构性保险：所有「建立会话」的登录类请求一律 skipAuth。
+// 登录请求本身不需要 token，因此绝不等待/依赖 dev-login——
+// 即使 devMode 判断失灵，dev-login 失败也永远无法阻断账号密码登录。
 const authApi = {
-  login: (code) => request('/api/wechat/login', { method: 'POST', data: { code } }),
-  phoneLogin: (code) => request('/api/wechat/phone-login', { method: 'POST', data: { code } }),
+  login: (code) => request('/api/wechat/login', { method: 'POST', data: { code }, skipAuth: true }),
+  phoneLogin: (code) => request('/api/wechat/phone-login', { method: 'POST', data: { code }, skipAuth: true }),
   devLogin: (username) => request('/api/wechat/dev-login', { method: 'POST', data: { username }, skipAuth: true }),
-  passwordLogin: (username, password) => request('/api/accounts/login', { method: 'POST', data: { username, password } }),
-  bind: (token, username, password) => request('/api/wechat/bind', { method: 'POST', data: { token, username, password } }),
+  passwordLogin: (username, password) => request('/api/accounts/login', { method: 'POST', data: { username, password }, skipAuth: true }),
+  bind: (token, username, password) => request('/api/wechat/bind', { method: 'POST', data: { token, username, password }, skipAuth: true }),
 }
 
 // ---- 付费项目 API ----
