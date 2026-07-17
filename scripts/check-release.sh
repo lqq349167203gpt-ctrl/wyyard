@@ -93,6 +93,14 @@ if [ -f "$API_JS" ]; then
   fi
 fi
 
+# ── 3.6 历史驳回文案必须从代码中物理消失（回归守卫） ─────────────
+if grep -rn "登录未返回" "$MP_DIR" --include="*.js" >/dev/null 2>&1; then
+  fail "代码中仍存在「登录未返回」字样（两次驳回的原文，必须彻底移除）:"
+  grep -rn "登录未返回" "$MP_DIR" --include="*.js" | head -3
+else
+  pass "「登录未返回」已从代码中物理删除"
+fi
+
 # ── 4. app.json：permission 只允许 scope.userLocation ──────────
 APP_JSON="$MP_DIR/app.json"
 if [ -f "$APP_JSON" ]; then

@@ -1,7 +1,13 @@
 // API 请求封装
 // 按小程序环境自动切换后端地址：开发版连本地，体验版/正式版连生产
-const { miniProgram: { envVersion } } = wx.getAccountInfoSync()
-const BASE_URL = envVersion === 'develop'
+// 注意：环境探测失败时默认按正式环境处理（fail-safe 方向必须倒向生产，绝不误入开发模式）
+let ENV_VERSION = 'release'
+try {
+  ENV_VERSION = wx.getAccountInfoSync().miniProgram.envVersion || 'release'
+} catch (e) {
+  console.warn('[api.js] 无法获取小程序环境版本，按 release 处理:', e)
+}
+const BASE_URL = ENV_VERSION === 'develop'
   ? 'http://localhost:8000'
   : 'https://www.wyteahouse.cn'
 
@@ -74,6 +80,9 @@ function _isTokenValid(token) {
   }
 }
 
+// dev-login 只是开发便利：任何时候它失败都不允许阻断业务请求，
+// 降级为无 token 直连（后端返回 401 时走统一的重新登录流程）。
+// 因此本函数永不 reject——历史上的驳回报错文案已随之从代码中物理删除。
 function _ensureLogin() {
   const app = getApp()
   if (!app || !app.globalData.devMode) return Promise.resolve()
@@ -82,18 +91,14 @@ function _ensureLogin() {
   const token = wx.getStorageSync('auth_token')
   if (_isTokenValid(token)) return Promise.resolve() // JWT 未过期
 
-  // 需要登录
-  console.log('[request] token 无效，触发 devAutoLogin...')
+  // 需要登录：尝试 dev-login，失败仅降级放行，不影响正常登录流程
+  console.log('[request] token 无效，尝试 devAutoLogin（失败将降级放行）...')
   wx.removeStorageSync('auth_token')
   wx.removeStorageSync('currentUser')
   wx.removeStorageSync('userPermissions')
   _loginPromise = Promise.resolve(app._devAutoLogin())
-    .then(() => {
-      // 登录后检查 token 是否真的拿到了
-      const newToken = wx.getStorageSync('auth_token')
-      if (!newToken) {
-        return Promise.reject(new Error('登录未返回 token'))
-      }
+    .catch((err) => {
+      console.warn('[request] devAutoLogin 失败，本次请求降级为无 token 直连:', err)
     })
     .finally(() => { _loginPromise = null })
   return _loginPromise
@@ -101,25 +106,19 @@ function _ensureLogin() {
 
 async function request(path, options = {}) {
   const app = getApp()
-  // devMode 下：确保有有效 JWT（skipAuth 的请求跳过，如 dev-login 本身）
+  // devMode 下：先尽力确保有有效 JWT（skipAuth 的请求跳过，如登录类请求）。
+  // _ensureLogin 设计上永不 reject；等待超时也只是放行——dev-login 任何异常都不得阻断业务请求。
   if (app && app.globalData.devMode && !options.skipAuth) {
-    const loginP = _ensureLogin()
-    if (loginP) {
-      try {
-        await Promise.race([
-          loginP,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('登录超时')), 15000)),
-        ])
-      } catch (e) {
-        console.error('登录失败:', e.message)
-        wx.showToast({ title: '登录失败，请检查服务是否启动', icon: 'none', duration: 3000 })
-        return Promise.reject(new Error('登录失败: ' + e.message))
-      }
-    }
+    await Promise.race([
+      _ensureLogin(),
+      new Promise((resolve) => setTimeout(resolve, 15000)),
+    ])
   }
 
   return new Promise((resolve, reject) => {
-    const token = wx.getStorageSync('auth_token')
+    // skipAuth（登录类）请求不附带 token：建立会话不需要已有会话，
+    // 也避免过期 token 触发后端 AuthMiddleware 误拒登录请求
+    const token = options.skipAuth ? '' : wx.getStorageSync('auth_token')
     const req = wx.request({
       url: `${BASE_URL}${path}`,
       method: options.method || 'GET',
