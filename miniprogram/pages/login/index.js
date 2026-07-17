@@ -15,9 +15,19 @@ Page({
     saveAccount: false,
     devAccounts: DEV_ACCOUNTS,
     devIndex: 0,
+    isDev: false, // 仅开发版显示「开发模式」入口，体验版/正式版隐藏（过审要求）
   },
 
   onLoad() {
+    // 环境判断：仅 develop（开发者工具/开发版）允许 dev 登录入口
+    let isDev = false
+    try {
+      isDev = wx.getAccountInfoSync().miniProgram.envVersion === 'develop'
+    } catch (e) {
+      isDev = false
+    }
+    this.setData({ isDev })
+
     // 恢复保存的账号
     const savedAccount = wx.getStorageSync('login_save_account')
     if (savedAccount) {
@@ -31,6 +41,8 @@ Page({
   // ---------- 模式切换 ----------
 
   onToggleDev() {
+    // 双保险：非开发环境禁止进入 dev 登录（入口已隐藏，此处兜底）
+    if (!this.data.isDev) return
     this.setData({
       loginMode: this.data.loginMode === 'dev' ? 'password' : 'dev',
       error: '',

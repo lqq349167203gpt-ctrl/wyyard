@@ -66,7 +66,7 @@
     </view>
   </view>
 
-  <view class="dev-toggle" bindtap="onToggleDev">
+  <view class="dev-toggle" wx:if="{{isDev}}" bindtap="onToggleDev">
     <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回登录' : '开发模式'}}</text>
   </view>
 </view>
