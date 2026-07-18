@@ -558,7 +558,7 @@ export default function MemberStatisticsPage() {
 
       {/* 客户详情弹窗 */}
       <Dialog open={!!selectedCustomerId} onOpenChange={(open) => { if (!open) setSelectedCustomerId(null) }}>
-        <DialogContent className="max-w-[900px] max-h-[85vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="max-w-[1180px] max-h-[90vh] overflow-hidden flex flex-col p-0">
           <DetailView
             selectedCustomerId={selectedCustomerId}
             onClearSelection={() => setSelectedCustomerId(null)}

@@ -1,20 +1,22 @@
-"""统计 API — 邀约到访 / 实际到访 / 成交人数 / 会员情况"""
-from datetime import datetime, timedelta
+"""统计 API — 客户经营指标 / 邀约到访 / 实际到访 / 成交人数 / 会员情况"""
 from collections import defaultdict
+from datetime import date, datetime, timedelta
+
 from fastapi import APIRouter, Query
+
+from app.api.customer_detail import _build_activities, _build_payment_records
 from app.services import (
-    visit_service,
     customer_service,
-    membership_card_service,
-    group_case_service,
     emotional_release_service,
     energy_knot_service,
+    group_case_service,
     internal_course_service,
+    member_identity_service,
+    membership_card_service,
     oh_card_reading_service,
     other_project_service,
-    member_identity_service,
+    visit_service,
 )
-from app.api.customer_detail import _build_activities, _build_payment_records
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
 
@@ -30,6 +32,91 @@ def _get_record_date(r) -> str | None:
             return created_at.strftime("%Y-%m-%d")
         return str(created_at)[:10]
     return None
+
+
+def _get_record_amount(record) -> float:
+    """统一读取各付费项目的成交金额。"""
+    return float(
+        getattr(record, "fee", None)
+        or getattr(record, "price", None)
+        or getattr(record, "amount", None)
+        or 0
+    )
+
+
+def _payment_record_groups() -> list[list]:
+    """返回所有会产生成交记录的项目数据。"""
+    return [
+        membership_card_service.list_cards(),
+        group_case_service.list_cases(),
+        emotional_release_service.list_releases(),
+        energy_knot_service.list_knots(),
+        internal_course_service.list_courses(),
+        oh_card_reading_service.list_readings(),
+        other_project_service.list_projects(),
+    ]
+
+
+def _build_dashboard_summary(today: date) -> dict:
+    """构建客户资料页经营指标，日期均按自然月统计。"""
+    current_start = today.replace(day=1)
+    previous_end = current_start - timedelta(days=1)
+    previous_start = previous_end.replace(day=1)
+
+    current_from = current_start.isoformat()
+    current_to = today.isoformat()
+    previous_from = previous_start.isoformat()
+    previous_to = previous_end.isoformat()
+
+    customers = customer_service.list_customers()
+    new_customers = sum(
+        1
+        for customer in customers
+        if current_from <= customer.created_at.date().isoformat() <= current_to
+    )
+
+    current_arrivals = len(visit_service.get_arrived_customer_ids(current_from, current_to))
+    previous_arrivals = len(visit_service.get_arrived_customer_ids(previous_from, previous_to))
+    arrival_change_rate = None
+    if previous_arrivals > 0:
+        arrival_change_rate = round((current_arrivals - previous_arrivals) / previous_arrivals * 100, 1)
+
+    monthly_revenue = 0.0
+    monthly_transactions = 0
+    for records in _payment_record_groups():
+        for record in records:
+            record_date = _get_record_date(record)
+            if (
+                record_date
+                and current_from <= record_date <= current_to
+                and not getattr(record, "voided", False)
+            ):
+                monthly_revenue += _get_record_amount(record)
+                monthly_transactions += 1
+
+    not_arrived_days = 14
+    recent_arrival_from = (today - timedelta(days=not_arrived_days)).isoformat()
+    recently_arrived_ids = visit_service.get_arrived_customer_ids(recent_arrival_from, current_to)
+    not_arrived_customers = sum(1 for customer in customers if customer.id not in recently_arrived_ids)
+
+    return {
+        "month": current_start.strftime("%Y-%m"),
+        "total_customers": len(customers),
+        "new_customers_this_month": new_customers,
+        "arrived_customers_this_month": current_arrivals,
+        "arrived_customers_last_month": previous_arrivals,
+        "arrival_change_rate": arrival_change_rate,
+        "revenue_this_month": round(monthly_revenue, 2),
+        "transactions_this_month": monthly_transactions,
+        "not_arrived_customers": not_arrived_customers,
+        "not_arrived_days": not_arrived_days,
+    }
+
+
+@router.get("/dashboard")
+def get_dashboard_summary():
+    """获取客户资料页四项核心经营指标。"""
+    return _build_dashboard_summary(date.today())
 
 
 def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to: str | None = None) -> dict:
@@ -169,15 +256,7 @@ def get_overview(
 
     # 2. 成交人数（按 deal_date 去重客户）
     converted_by_date: dict[str, set] = defaultdict(set)
-    services = [
-        membership_card_service.list_cards(),
-        group_case_service.list_cases(),
-        emotional_release_service.list_releases(),
-        energy_knot_service.list_knots(),
-        internal_course_service.list_courses(),
-        oh_card_reading_service.list_readings(),
-        other_project_service.list_projects(),
-    ]
+    services = _payment_record_groups()
     for records in services:
         for r in records:
             deal_date = _get_record_date(r)
@@ -189,13 +268,10 @@ def get_overview(
         daily[date_str]["converted"] = len(customer_ids)
 
     # 3. 成交金额（按 deal_date 累加，排除已作废）
-    def _get_amount(r):
-        return getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0
-
     for records in services:
         for r in records:
             deal_date = _get_record_date(r)
-            price = _get_amount(r)
+            price = _get_record_amount(r)
             voided = getattr(r, "voided", False)
             if deal_date and not voided and date_from <= deal_date <= date_to:
                 daily[deal_date]["converted_amount"] += price

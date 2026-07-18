@@ -16,6 +16,7 @@ class OperationLog(OperationLogBase):
     id: str
     operator: str = ""  # 操作人
     operator_role: str = ""  # 操作人角色
+    source: str = "pc"  # 来源: pc / miniprogram / miniprogram-client / system
     method: str = ""  # HTTP 方法
     path: str = ""  # 请求路径
     entity_id: str = ""  # 被操作的实体 ID

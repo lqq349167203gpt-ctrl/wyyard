@@ -1,4 +1,4 @@
-import { memo, useRef, useCallback, useState, useEffect } from "react"
+import { useRef, useCallback, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown, X, ChevronRight } from "lucide-react"
 
@@ -53,7 +53,7 @@ type SelectDropdownProps = SelectDropdownSingleProps | SelectDropdownMultiProps
 
 let activeClose: (() => void) | null = null
 
-export const SelectDropdown = memo(function SelectDropdown({
+export function SelectDropdown({
   value,
   options,
   placeholder = "请选择",
@@ -358,4 +358,4 @@ export const SelectDropdown = memo(function SelectDropdown({
       )}
     </div>
   )
-})
+}

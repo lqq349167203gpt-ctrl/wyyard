@@ -17,6 +17,7 @@ function request(options) {
       data: options.data || {},
       header: {
         'Content-Type': 'application/json',
+        'X-Client-Type': 'miniprogram-client',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.header,
       },
@@ -61,6 +62,14 @@ const clientApi = {
     return get(`/api/client/activities${qs}`)
   },
 
+  // 按日期范围查询活动(含过去日期),用于日历定位
+  listActivitiesByRange(startDate, endDate) {
+    const params = ['page_size=100']
+    if (startDate) params.push(`start_date=${startDate}`)
+    if (endDate) params.push(`end_date=${endDate}`)
+    return get(`/api/client/activities?${params.join('&')}`)
+  },
+
   // 活动详情
   getActivity(id) {
     return get(`/api/client/activities/${id}`)
@@ -69,6 +78,39 @@ const clientApi = {
   // 报名
   signup(activityId) {
     return post(`/api/client/activities/${activityId}/signup`)
+  },
+
+  // 取消报名
+  cancelSignup(activityId) {
+    return post(`/api/client/activities/${activityId}/cancel-signup`)
+  },
+
+  // 消息通知
+  getNotifications() {
+    return request({
+      url: `/api/client/notifications?_t=${Date.now()}`,
+      method: 'GET',
+      header: { 'Cache-Control': 'no-cache' },
+    })
+  },
+
+  markNotificationRead(id) {
+    return request({ url: `/api/client/notifications/${id}/read`, method: 'PATCH' })
+  },
+
+  // 交易记录
+  getTransactions() {
+    return get('/api/client/transactions')
+  },
+
+  // 活动记录
+  getActivityRecords() {
+    return get('/api/client/activity-records')
+  },
+
+  // 销卡记录
+  getDeductions() {
+    return get('/api/client/deductions')
   },
 }
 

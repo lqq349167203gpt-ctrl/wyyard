@@ -1,9 +1,11 @@
 .page {
   min-height: 100vh;
-  background: #f7f8fa;
-  padding-bottom: 160rpx;
+  background: #f4f5f6;
+  padding: 24rpx 44rpx 260rpx;
+  box-sizing: border-box;
 }
 
+/* ===== 加载 ===== */
 .loading {
   display: flex;
   align-items: center;
@@ -12,119 +14,240 @@
 }
 
 .loading-text {
-  font-size: 28rpx;
-  color: #8f959e;
+  font-size: 26rpx;
+  color: #a8b1bd;
 }
 
-.header {
-  background: #ffffff;
-  padding: 40rpx 32rpx 32rpx;
-}
-
-.title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #2b2f36;
-  display: block;
-  margin-bottom: 16rpx;
-}
-
-.tags {
+/* ===== 日期时间行:左日期 + 右时间块 ===== */
+.hero {
   display: flex;
-  gap: 12rpx;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 36rpx;
+}
+
+.date {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #212631;
+  letter-spacing: 1rpx;
+}
+
+.week {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #a8b1bd;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+.timeblock {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  line-height: 1.1;
+}
+
+.start {
+  font-size: 52rpx;
+  font-weight: 800;
+  color: #212631;
+  letter-spacing: -1rpx;
+}
+
+.start-tbd {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #a8b1bd;
+}
+
+.end {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #a8b1bd;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+/* ===== 标签:中性浅灰胶囊,仅公益/线上 ===== */
+.tags {
+  margin-top: 48rpx;
+  display: flex;
+  gap: 16rpx;
 }
 
 .tag {
-  font-size: 22rpx;
-  padding: 6rpx 16rpx;
-  border-radius: 6rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+  padding: 10rpx 26rpx;
+  border-radius: 999rpx;
+  background: #f1f0ed;
+  color: #79838f;
+  line-height: 1.4;
 }
 
-.tag-online {
-  background: #e8f3ff;
-  color: #3370ff;
+/* ===== 标题 ===== */
+.title {
+  margin-top: 40rpx;
+  font-size: 52rpx;
+  font-weight: 700;
+  color: #212631;
+  line-height: 1.35;
+  letter-spacing: 2rpx;
 }
 
-.tag-offline {
-  background: #f0f1f2;
-  color: #4e535a;
-}
-
-.tag-welfare {
-  background: #fff2e8;
-  color: #f5a623;
-}
-
-.info-card {
-  background: #ffffff;
-  margin: 24rpx 0;
-  padding: 8rpx 32rpx;
-}
-
-.info-item {
+/* ===== 署名行:老师 + 地址一行,紧贴标题 ===== */
+.byline {
+  margin-top: 28rpx;
   display: flex;
   align-items: center;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
 }
 
-.info-item:last-child {
-  border-bottom: none;
+.b-avatars {
+  display: flex;
+  margin-right: 16rpx;
 }
 
-.info-label {
+.b-avatar {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #212631;
+  color: #c9f24b;
+  font-size: 22rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.b-avatar + .b-avatar {
+  margin-left: -10rpx;
+  border: 4rpx solid #f4f5f6;
+}
+
+.b-name {
   font-size: 28rpx;
-  color: #8f959e;
-  width: 120rpx;
+  font-weight: 700;
+  color: #212631;
+  letter-spacing: 1rpx;
+}
+
+.b-label {
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+}
+
+.b-dot {
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: #c4cad2;
+  margin: 0 20rpx;
   flex-shrink: 0;
 }
 
-.info-value {
-  font-size: 28rpx;
-  color: #2b2f36;
-  flex: 1;
+.b-addr {
+  font-size: 24rpx;
+  color: #a8b1bd;
+  letter-spacing: 1rpx;
 }
 
-.desc-card {
-  background: #ffffff;
-  padding: 32rpx;
+/* ===== 参与者:小字全部列出,紧贴署名行 ===== */
+.roster {
+  margin-top: 20rpx;
 }
 
-.desc-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #2b2f36;
-  display: block;
-  margin-bottom: 16rpx;
-}
-
-.desc-content {
-  font-size: 26rpx;
-  color: #4e535a;
+.rnames {
+  font-size: 24rpx;
   line-height: 1.8;
+  color: #a8b1bd;
+  letter-spacing: 1rpx;
 }
 
+.rname-me {
+  color: #212631;
+  font-weight: 600;
+}
+
+/* ===== 简介:与上方拉开,形成"紧紧松"节奏 ===== */
+.intro {
+  margin-top: 52rpx;
+}
+
+.intro-head {
+  display: flex;
+  align-items: center;
+}
+
+.bar {
+  width: 6rpx;
+  height: 28rpx;
+  background: #c9f24b;
+  border-radius: 4rpx;
+  margin-right: 20rpx;
+}
+
+.label {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #212631;
+  letter-spacing: 3rpx;
+}
+
+.intro-body {
+  display: block;
+  margin-top: 32rpx;
+  font-size: 30rpx;
+  line-height: 1.95;
+  color: #212631;
+  letter-spacing: 1rpx;
+  white-space: pre-wrap;
+}
+
+/* ===== 底部报名按钮:黑底青柠 ===== */
 .bottom-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: #ffffff;
-  padding: 24rpx 32rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
-  box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04);
+  padding: 24rpx 44rpx;
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, rgba(244, 245, 246, 0), #f4f5f6 34%);
+}
+
+.expired-notice {
+  width: 100%;
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #a8b1bd;
+  background: #f1f0ed;
+  border-radius: 999rpx;
 }
 
 .signup-btn {
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  background: #3370ff;
-  color: #ffffff;
+  display: block;
+  width: 100% !important;
+  height: 96rpx;
+  line-height: 96rpx;
+  padding: 0;
+  margin: 0;
+  background: #212631;
+  color: #c9f24b;
   font-size: 30rpx;
-  font-weight: 500;
-  border-radius: 12rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  border-radius: 999rpx;
   border: none;
+  box-sizing: border-box;
 }
 
 .signup-btn::after {
@@ -132,11 +255,22 @@
 }
 
 .signup-btn[disabled] {
-  background: #a8c4ff;
-  color: #ffffff;
+  background: #212631;
+  color: rgba(201, 242, 75, 0.45);
 }
 
-.signup-btn-done {
-  background: #f0f1f2;
-  color: #8f959e;
+.signup-btn-done,
+.signup-btn-done[disabled] {
+  background: #f1f0ed;
+  color: #a8b1bd;
+}
+
+.signup-btn-cancel {
+  background: transparent;
+  color: #f54a45;
+  border: 2rpx solid #f54a45;
+}
+
+.signup-btn-cancel::after {
+  border: none;
 }

@@ -269,7 +269,7 @@ export default function CustomerFormPage() {
               <SelectDropdown
                 className="w-[200px]"
                 value={form.traffic_source || ""}
-                options={["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐"].map(v => ({value: v, label: v}))}
+                options={["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐", "粗门"].map(v => ({value: v, label: v}))}
                 placeholder="请选择"
                 onChange={(v) => setForm({ ...form, traffic_source: v, traffic_source_detail: "" })}
               />

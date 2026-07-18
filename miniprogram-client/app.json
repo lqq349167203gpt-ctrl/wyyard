@@ -2,7 +2,14 @@
   "pages": [
     "pages/home/index",
     "pages/activity-detail/index",
-    "pages/me/index"
+    "pages/login/index",
+    "pages/me/index",
+    "pages/notifications/index",
+    "pages/transactions/index",
+    "pages/activity-records/index",
+    "pages/deductions/index",
+    "pages/agreement/service/index",
+    "pages/agreement/privacy/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",
@@ -11,8 +18,8 @@
     "backgroundColor": "#f7f8fa"
   },
   "tabBar": {
-    "color": "#8f959e",
-    "selectedColor": "#3370ff",
+    "color": "#a8b1bd",
+    "selectedColor": "#212631",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [

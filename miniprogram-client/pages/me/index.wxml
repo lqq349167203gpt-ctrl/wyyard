@@ -1,35 +1,124 @@
 <view class="page">
-  <!-- 已登录 -->
+  <!-- 已登录:横向资料会员卡 + 栏目 + 退出 -->
   <block wx:if="{{isLoggedIn && customer}}">
     <view class="profile-card">
-      <view class="avatar">
-        <text class="avatar-text">{{customer.nickname[0] || '用'}}</text>
+      <view class="profile-header">
+        <view class="avatar">
+          <text class="avatar-text">{{customer.nickname[0] || '用'}}</text>
+        </view>
+        <view class="profile-info">
+          <text class="nickname">{{customer.nickname}}</text>
+          <text wx:if="{{customer.member_type}}" class="member-type">{{customer.member_type}}</text>
+        </view>
       </view>
-      <view class="profile-info">
-        <text class="nickname">{{customer.nickname}}</text>
-        <text wx:if="{{customer.member_type}}" class="member-type">{{customer.member_type}}</text>
+      <view class="stats">
+        <view class="stat">
+          <text class="stat-num">{{stats.activity_count}}</text>
+          <text class="stat-label">参与活动数</text>
+        </view>
+        <view class="stat">
+          <text class="stat-num">{{stats.visit_count}}</text>
+          <text class="stat-label">到店次数</text>
+        </view>
+        <view class="stat hl">
+          <text class="stat-num">{{stats.remain_count}}</text>
+          <text class="stat-label">剩余次数</text>
+        </view>
       </view>
     </view>
 
     <view class="menu-card">
-      <button class="menu-item" bindtap="onLogout">
-        <text class="menu-text menu-text-danger">退出登录</text>
-      </button>
+      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="交易记录">
+        <text class="menu-text">交易记录</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="活动记录">
+        <text class="menu-text">活动记录</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="消息通知">
+        <view class="menu-text-wrap">
+          <text class="menu-text">消息通知</text>
+          <view wx:if="{{unreadCount > 0}}" class="badge">{{unreadCount > 99 ? '99+' : unreadCount}}</view>
+        </view>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="销卡记录">
+        <text class="menu-text">销卡记录</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+
+    <view class="logout-card">
+      <view class="menu-item logout-item" hover-class="menu-item-hover" bindtap="onLogout">
+        <text class="menu-text-danger">退出登录</text>
+      </view>
+    </view>
+
+    <!-- 最近活动时间轴 -->
+    <view wx:if="{{activityGroups.length > 0}}" class="tl-section">
+      <view class="sec-head">
+        <text class="sec-title">最近活动</text>
+        <text class="sec-count">共 {{activityTotalCount}} 场</text>
+      </view>
+
+      <view class="tl-list">
+        <view wx:for="{{activityGroups}}" wx:key="date" class="tl-day">
+          <view class="tl-axis">
+            <view class="tl-dot {{item.items[0].arrived ? '' : 'tl-dot-up'}}"></view>
+            <view class="tl-line"></view>
+          </view>
+
+          <view class="tl-body">
+            <view class="tl-date">
+              <text class="tl-daynum">{{item.dayNum}}</text>
+              <text class="tl-daylab">{{item.dateLabel}}</text>
+            </view>
+
+            <view wx:for="{{item.items}}" wx:for-item="act" wx:key="index" class="tl-item">
+              <view class="tl-main">
+                <text class="tl-name">{{act.name}}</text>
+                <text class="tl-meta">{{act.meta}}</text>
+              </view>
+              <text class="st {{act.badgeClass}}">{{act.badge}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
     </view>
   </block>
 
-  <!-- 未登录 -->
+  <!-- 未登录:骨架同会员卡 -->
   <block wx:else>
-    <view class="login-card">
-      <text class="login-title">欢迎使用无忧茶苑</text>
-      <text class="login-hint">请使用手机号登录</text>
-      <button
-        class="login-btn"
-        open-type="getPhoneNumber"
-        bindgetphonenumber="onGetPhoneNumber"
-      >
-        手机号快捷登录
-      </button>
+    <view class="profile-card">
+      <view class="profile-header">
+        <view class="avatar-empty">
+          <view class="ae-head"></view>
+          <view class="ae-body"></view>
+        </view>
+        <view class="profile-info">
+          <text class="nickname nickname-login" hover-class="nickname-login-hover" bindtap="onGoLogin">登录</text>
+          <text class="member-type">助力亿万家庭幸福美满</text>
+        </view>
+      </view>
+      <view class="stats">
+        <view class="stat">
+          <text class="stat-num">—</text>
+          <text class="stat-label">参与活动数</text>
+        </view>
+        <view class="stat">
+          <text class="stat-num">—</text>
+          <text class="stat-label">到店次数</text>
+        </view>
+        <view class="stat hl">
+          <text class="stat-num">—</text>
+          <text class="stat-label">剩余次数</text>
+        </view>
+      </view>
+    </view>
+    <view class="login-area">
+      <button class="login-btn" hover-class="login-btn-hover" bindtap="onGoLogin">手机号快捷登录</button>
+      <text class="login-tip">微信授权一键登录，新用户将自动注册</text>
     </view>
   </block>
 </view>

@@ -1,0 +1,13 @@
+<view class="page">
+  <view class="doc-card">
+    <text class="doc-title">{{title}}</text>
+    <text class="doc-date">更新日期:{{updated}} · 生效日期:{{effective}}</text>
+    <block wx:for="{{sections}}" wx:key="h">
+      <view class="sec">
+        <text class="sec-h">{{item.h}}</text>
+        <text wx:for="{{item.p}}" wx:for-item="para" wx:key="*this" class="sec-p">{{para}}</text>
+      </view>
+    </block>
+    <text class="doc-end">— 全文完 —</text>
+  </view>
+</view>

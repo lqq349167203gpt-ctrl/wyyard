@@ -17,6 +17,7 @@ def list_logs(
     date_to: Optional[str] = None,
     entity_id: Optional[str] = None,
     keyword: Optional[str] = None,
+    source: Optional[str] = None,
     page: int | None = Query(None, ge=1),
     page_size: int | None = Query(None, ge=1, le=100),
 ):
@@ -28,6 +29,7 @@ def list_logs(
         date_to=date_to,
         entity_id=entity_id,
         keyword=keyword,
+        source=source,
     )
     if page is not None:
         return paginate(items, page, page_size or 10)

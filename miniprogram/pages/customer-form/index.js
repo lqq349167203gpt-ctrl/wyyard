@@ -1,6 +1,6 @@
 const { customerApi } = require('../../utils/api')
 
-const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐']
+const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
 const TRAFFIC_NEED_LINK = ['小红书', '抖音', '公众号', '视频号']
 
 Page({

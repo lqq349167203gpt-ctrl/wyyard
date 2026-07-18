@@ -1,0 +1,42 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading-box">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <view wx:elif="{{items.length === 0}}" class="empty-box">
+    <view class="e-icon">
+      <view class="e-chime">
+        <view class="e-string"></view>
+        <view class="e-dome"></view>
+        <view class="e-rim"></view>
+        <view class="e-clap"></view>
+        <view class="e-paper">
+          <view class="e-paper-line"></view>
+          <view class="e-paper-line short"></view>
+        </view>
+      </view>
+      <view class="e-leaf e-leaf-a"></view>
+      <view class="e-leaf e-leaf-b"></view>
+    </view>
+    <text class="e-title">暂无销卡记录</text>
+    <text class="e-sub">还没有销卡记录</text>
+  </view>
+
+  <view wx:else class="list">
+    <view wx:for="{{items}}" wx:key="index" class="card">
+      <view class="card-header">
+        <text class="card-source {{item.source === 'activity' ? 'card-source-activity' : ''}}">{{item.source_text}}</text>
+        <text class="card-type">{{item.type_text}}</text>
+      </view>
+      <view class="card-body">
+        <text class="card-name">{{item.project_name}}</text>
+        <text class="card-count">-{{item.count}}次</text>
+      </view>
+      <view class="card-footer">
+        <text class="card-date">{{item.date_text}}</text>
+        <text wx:if="{{item.remaining_text}}" class="card-remaining">{{item.remaining_text}}</text>
+        <text wx:if="{{item.created_by}}" class="card-operator">{{item.created_by}}</text>
+      </view>
+    </view>
+  </view>
+</view>

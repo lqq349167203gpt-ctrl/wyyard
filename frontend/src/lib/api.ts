@@ -264,7 +264,9 @@ export interface Customer {
   service_teacher: string
   paid_content: PaidContentItem[]
   visit_count: number
+  activity_count: number
   total_payment: number
+  last_visit_date?: string | null
   core_situation: string
   need_tags: string
   follow_up_node: string
@@ -315,7 +317,7 @@ export const customerApi = {
     })
   },
   batch: (ids: string[]) => request<CustomerLight[]>("/api/customers/batch", { method: "POST", body: JSON.stringify({ ids }) }),
-  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; member_types?: string }) => {
+  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; member_types?: string; sort_by?: string; sort_order?: string }) => {
     const params = new URLSearchParams()
     params.set("page", String(page))
     params.set("page_size", String(pageSize))
@@ -324,6 +326,8 @@ export const customerApi = {
     if (filters?.referrer) params.set("referrer", filters.referrer)
     if (filters?.referrer_handler) params.set("referrer_handler", filters.referrer_handler)
     if (filters?.member_types) params.set("member_types", filters.member_types)
+    if (filters?.sort_by) params.set("sort_by", filters.sort_by)
+    if (filters?.sort_order) params.set("sort_order", filters.sort_order)
     return request<PaginatedResponse<Customer>>(`/api/customers?${params.toString()}`)
   },
   clearLightCache: () => { _customerLightCache = null },
@@ -1632,6 +1636,7 @@ export interface OperationLogQuery {
   operator?: string
   method?: string
   section?: string
+  source?: string
   date_from?: string
   date_to?: string
   entity_id?: string
@@ -1669,6 +1674,7 @@ export interface OperationLog {
   id: string
   operator: string
   operator_role: string
+  source: string
   section: string
   content: string
   method: string
@@ -1686,6 +1692,7 @@ export const operationLogApi = {
     if (params?.operator) qs.set("operator", params.operator)
     if (params?.method) qs.set("method", params.method)
     if (params?.section) qs.set("section", params.section)
+    if (params?.source) qs.set("source", params.source)
     if (params?.date_from) qs.set("date_from", params.date_from)
     if (params?.date_to) qs.set("date_to", params.date_to)
     if (params?.entity_id) qs.set("entity_id", params.entity_id)
@@ -1698,6 +1705,7 @@ export const operationLogApi = {
     if (params?.operator) qs.set("operator", params.operator)
     if (params?.method) qs.set("method", params.method)
     if (params?.section) qs.set("section", params.section)
+    if (params?.source) qs.set("source", params.source)
     if (params?.date_from) qs.set("date_from", params.date_from)
     if (params?.date_to) qs.set("date_to", params.date_to)
     if (params?.entity_id) qs.set("entity_id", params.entity_id)
@@ -2095,7 +2103,21 @@ export interface MemberStatistics {
   }>
 }
 
+export interface DashboardSummary {
+  month: string
+  total_customers: number
+  new_customers_this_month: number
+  arrived_customers_this_month: number
+  arrived_customers_last_month: number
+  arrival_change_rate: number | null
+  revenue_this_month: number
+  transactions_this_month: number
+  not_arrived_customers: number
+  not_arrived_days: number
+}
+
 export const statisticsApi = {
+  dashboard: () => request<DashboardSummary>("/api/statistics/dashboard"),
   overview: (params: { date_from?: string; date_to?: string; granularity?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)

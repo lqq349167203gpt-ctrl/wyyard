@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom"
-import { useEffect, useState } from "react"
+import { useEffect, useState, type CSSProperties } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { Button } from "@/components/ui/button"
@@ -66,7 +66,7 @@ export function AppLayout() {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": "11rem" } as CSSProperties}>
       <AppSidebar />
       <SidebarInset className="min-w-0">
         <header className="flex h-[38px] items-center justify-between bg-white px-5 border-b-2 border-[#f0f1f2]">

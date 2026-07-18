@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,7 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import ListView from "./components/list-view"
 import DetailView from "./components/detail-view"
-import { customerApi, memberIdentityApi, type CustomerLight } from "@/lib/api"
+import { customerApi, memberIdentityApi, statisticsApi, type CustomerLight, type DashboardSummary } from "@/lib/api"
 
 export default function HealingRecordsPage() {
   const navigate = useNavigate()
@@ -28,11 +28,18 @@ export default function HealingRecordsPage() {
   const [searchReferrer, setSearchReferrer] = useState("")
   const [searchReferrerHandler, setSearchReferrerHandler] = useState("")
 
+  // 统计摘要
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const loadSummary = useCallback(() => {
+    statisticsApi.dashboard().then(setSummary).catch(() => setSummary(null))
+  }, [])
+
   useEffect(() => {
     customerApi.clearLightCache()
     customerApi.light().then(setCustomers).catch(() => {})
     memberIdentityApi.list().then(list => setIdentityNames(list.map(i => i.name).reverse())).catch(() => {})
-  }, [])
+    loadSummary()
+  }, [loadSummary])
 
   // 从编辑页返回时自动刷新列表
   useEffect(() => {
@@ -40,8 +47,9 @@ export default function HealingRecordsPage() {
       setRefreshKey(k => k + 1)
       customerApi.clearLightCache()
       customerApi.light().then(setCustomers).catch(() => {})
+      loadSummary()
     }
-  }, [location.key])
+  }, [location.key, loadSummary])
 
   const handleClear = () => {
     setSearchNickname("")
@@ -77,75 +85,109 @@ export default function HealingRecordsPage() {
   }
 
   return (
-    <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-lg font-semibold">客户信息</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">管理与查看全部客户资料</p>
+    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4">
+      {/* V2 页眉横条：标题 + 统计 */}
+      <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
+        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">客户资料</span>
+        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部客户关系档案</span>
+        <span className="ml-auto flex items-center flex-wrap gap-y-1">
+          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-[11px] text-[#79838f]"><span className="inline-block w-[7px] h-[7px] rounded-full bg-[#3370ff] mr-1 align-[1px]" />客户总数</span>
+            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? summary.total_customers.toLocaleString() : "-"}</span>
+          </span>
+          <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
+          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-[11px] text-[#79838f]">本月到店</span>
+            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? `${summary.arrived_customers_this_month.toLocaleString()} 人` : "-"}</span>
+          </span>
+          <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
+          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-[11px] text-[#79838f]">本月消费额</span>
+            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? `¥${summary.revenue_this_month.toLocaleString()}` : "-"}</span>
+          </span>
+          <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
+          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-[11px] text-[#79838f]">待跟进</span>
+            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? `${summary.not_arrived_customers.toLocaleString()} 人` : "-"}</span>
+          </span>
+        </span>
       </div>
 
-      {/* 搜索栏 */}
-      <div className="flex items-end gap-3 flex-wrap">
-        <div className="w-44">
-          <CustomerSearchInput
-            customers={customers}
-            value={searchNickname}
-            onChange={(v) => { setSearchNickname(typeof v === "string" ? v : "") }}
-            placeholder="搜索昵称"
-            filterSelected={false}
+      {/* 表格卡：筛选条 + 数据表 */}
+      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
+          <div className="w-[172px]">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchNickname}
+              onChange={(v) => { setSearchNickname(typeof v === "string" ? v : "") }}
+              placeholder="搜索用户昵称或姓名"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
+            />
+          </div>
+          <SelectDropdown
+            className="w-[138px]"
+            buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+            rounded="7px"
+            value={searchIdentity}
+            options={[{value: "", label: "全部身份"}, ...identityNames.map(id => ({value: id, label: id}))]}
+            placeholder="全部身份"
+            textColor={searchIdentity ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+            onChange={(v) => { setSearchIdentity(v) }}
           />
+          <div className="w-[138px]">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchReferrer}
+              onChange={(v) => { setSearchReferrer(typeof v === "string" ? v : "") }}
+              placeholder="引流人"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
+            />
+          </div>
+          <div className="w-[138px]">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchReferrerHandler}
+              onChange={(v) => { setSearchReferrerHandler(typeof v === "string" ? v : "") }}
+              placeholder="承接人"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
+            />
+          </div>
+          <button
+            onClick={handleClear}
+            className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+          >
+            <X className="h-3.5 w-3.5" />
+            清空
+          </button>
+          <div className="flex-1" />
+          <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleAddNew}>
+            <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新建客户
+          </Button>
         </div>
-        <SelectDropdown
-          className="w-36"
-          value={searchIdentity}
-          options={[{value: "", label: "全部身份"}, ...identityNames.map(id => ({value: id, label: id}))]}
-          placeholder="全部身份"
-          onChange={(v) => { setSearchIdentity(v) }}
+
+        <ListView
+          refreshKey={refreshKey}
+          onSelectCustomer={handleSelectCustomer}
+          onDeleteCustomer={handleDeleteCustomer}
+          onEditCustomer={handleEditCustomer}
+          filterNickname={searchNickname}
+          filterIdentity={searchIdentity}
+          filterReferrer={searchReferrer}
+          filterReferrerHandler={searchReferrerHandler}
+          summary={summary}
         />
-        <div className="w-44">
-          <CustomerSearchInput
-            customers={customers}
-            value={searchReferrer}
-            onChange={(v) => { setSearchReferrer(typeof v === "string" ? v : "") }}
-            placeholder="搜索引流人"
-            filterSelected={false}
-          />
-        </div>
-        <div className="w-44">
-          <CustomerSearchInput
-            customers={customers}
-            value={searchReferrerHandler}
-            onChange={(v) => { setSearchReferrerHandler(typeof v === "string" ? v : "") }}
-            placeholder="搜索承接人"
-            filterSelected={false}
-          />
-        </div>
-        <button
-          onClick={handleClear}
-          className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
-        >
-          <X className="h-3.5 w-3.5" />
-          清空
-        </button>
-        <div className="flex-1" />
-        <Button size="sm" className="h-8 text-xs" onClick={handleAddNew}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新建
-        </Button>
       </div>
-
-      <ListView
-        refreshKey={refreshKey}
-        onSelectCustomer={handleSelectCustomer}
-        onDeleteCustomer={handleDeleteCustomer}
-        onEditCustomer={handleEditCustomer}
-        filterNickname={searchNickname}
-        filterIdentity={searchIdentity}
-        filterReferrer={searchReferrer}
-        filterReferrerHandler={searchReferrerHandler}
-      />
 
       {/* 客户详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>
-        <DialogContent className="max-w-[1000px] max-h-[85vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="max-w-[1180px] max-h-[90vh] overflow-y-auto p-0 gap-0">
           <DetailView
             selectedCustomerId={selectedCustomerId}
             onClearSelection={() => setDetailOpen(false)}

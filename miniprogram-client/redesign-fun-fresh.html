@@ -10,22 +10,23 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   :root{
-    --bg:#f3f4f1;            /* 页面底:极浅的暖灰,比冷灰蓝更干净 */
-    --ink:#17191d;           /* 主文字近黑 */
-    --ink-2:#6b7078;
-    --ink-3:#a6abb2;
-    --lime:#c9f24b;          /* 主强调色:荧光青柠,负责"有趣" */
+    --bg:#f4f5f6;            /* 页面底:中性浅灰,与冷灰文字同族 */
+    --ink:#212631;           /* 主文字:冷灰近黑 */
+    --ink-2:#79838f;
+    --ink-3:#a8b1bd;
+    --lime:#c9f24b;          /* 唯一强调色:青柠 */
     --lime-ink:#3d5500;
     --card:#ffffff;
+    --chip:#f1f0ed;          /* 中性标签底:浅灰 */
   }
   body{font-family:'Inter','Noto Sans SC','-apple-system','PingFang SC',sans-serif;background:#e8eaed;padding:36px 14px;color:var(--ink);-webkit-font-smoothing:antialiased}
   .wrap{max-width:1020px;margin:0 auto}
-  .phone{width:365px;height:780px;border-radius:38px;overflow:hidden;box-shadow:0 28px 65px rgba(20,35,25,.14);border:7px solid #1c1f22;background:var(--bg);display:flex;flex-direction:column}
+  .phone{width:365px;height:780px;border-radius:38px;overflow:hidden;box-shadow:0 28px 65px rgba(20,35,25,.14);border:7px solid #1c1f22;background:var(--bg);display:flex;flex-direction:column;position:relative}
   .nav-bar{flex-shrink:0;background:var(--bg);padding-top:calc(env(safe-area-inset-top,44px)+4px)}
-  .nav-status{height:20px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#000}
+  .nav-status{height:20px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:var(--ink)}
   .nav-capsule{display:flex;align-items:center;gap:6px;margin:2px 0 4px;padding-right:16px;justify-content:flex-end}
   .nav-capsule-line{width:52px;height:24px;border-radius:12px;border:.5px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.85)}
-  .nav-capsule-line .dot{width:7px;height:7px;border-radius:50%}.nav-capsule-line .dot-black{background:#000}.nav-capsule-line .dot-gray{background:rgba(0,0,0,.25)}
+  .nav-capsule-line .dot{width:7px;height:7px;border-radius:50%}.nav-capsule-line .dot-black{background:var(--ink)}.nav-capsule-line .dot-gray{background:rgba(33,38,49,.25)}
   .content{flex:1;overflow-y:auto;background:var(--bg)}
   .content::-webkit-scrollbar{display:none}
   .tab-bar{flex-shrink:0;display:flex;align-items:center;justify-content:space-around;background:#fff;height:58px;border-top:.5px solid rgba(0,0,0,.05)}
@@ -37,12 +38,12 @@
   .page{min-height:100%;padding:0 14px 4px;position:relative}
 
   /* ===== 顶部:日期胶囊 + 概览,同一行 ===== */
-  .hero{display:flex;align-items:center;justify-content:space-between;padding:4px 2px 8px}
+  .hero{display:flex;align-items:center;justify-content:space-between;padding:4px 2px 10px}
   .hero-date{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--lime-ink);background:var(--lime);padding:4px 10px;border-radius:999px}
   .hero-sub{font-size:11px;color:var(--ink-2);font-weight:500}
 
-  /* ===== 周日历:选中=黑底,未选中无底色更干净 ===== */
-  .week-picker{display:flex;justify-content:space-between;margin-bottom:7px}
+  /* ===== 周日历:选中=黑底,未选中无底色 ===== */
+  .week-picker{display:flex;justify-content:space-between;margin-bottom:14px}
   .wk-day{display:flex;flex-direction:column;align-items:center;gap:3px;width:38px;padding:5px 0 6px;border-radius:12px;cursor:pointer}
   .wk-name{font-size:10px;color:var(--ink-3);font-weight:600}
   .wk-num{font-size:12px;font-weight:800;color:var(--ink)}
@@ -52,33 +53,34 @@
   .wk-today-dot{width:4px;height:4px;border-radius:50%;background:var(--ink-3)}
   .wk-day.active .wk-today-dot{background:var(--lime)}
 
-  /* ===== 活动卡片:字号降一档降密度 + 长文案自动截断 ===== */
-  .card{background:var(--card);border-radius:16px;padding:10px 12px;margin-bottom:7px;box-shadow:0 1px 2px rgba(23,25,29,.05)}
+  /* ===== 多日分组:日期头 + 当天卡片 ===== */
+  .day-group{margin-bottom:4px}
+  .day-head{display:flex;align-items:baseline;gap:6px;margin:14px 2px 8px}
+  .day-group:first-child .day-head{margin-top:2px}
+  .dh-date{font-size:13px;font-weight:800;letter-spacing:-.01em}
+  .dh-week{font-size:10.5px;font-weight:600;color:var(--ink-3)}
+  .dh-week .today{color:var(--lime-ink);font-weight:700}
+
+  /* ===== 活动卡片:标签 + 名称 + 老师·简介 + 右侧时间;无周几无按钮 ===== */
+  .card{background:var(--card);border-radius:16px;padding:12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(33,38,49,.05)}
   .card-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
   .card-titles{flex:1;min-width:0}
-  .tagline{display:flex;gap:4px;margin-bottom:7px;overflow:hidden;white-space:nowrap}
+  .tagline{display:flex;align-items:center;gap:4px;margin-bottom:8px;overflow:hidden;white-space:nowrap}
   .tag{font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;line-height:1.5;flex-shrink:0}
-  /* 三类标签:类型=彩色实心(颜色随类型,负责层次) / 线上线下=描边 / 公益=固定青柠品牌色 */
+  /* 类型=pastel 实心(每张卡唯一彩色) / 线上线下·公益=中性浅灰 */
   .t-mint{background:#dcf5e4;color:#157a3c}.t-blue{background:#e0ebff;color:#2f5cc4}.t-peach{background:#ffe8d9;color:#c25a1b}.t-lav{background:#ece6ff;color:#6a48d8}
-  .t-mode{background:transparent;color:var(--ink-2);box-shadow:inset 0 0 0 1px rgba(23,25,29,.18)}
-  .t-welfare{background:var(--lime);color:var(--lime-ink)}
+  .t-mode{background:var(--chip);color:var(--ink-2)}
+  .t-welfare{background:var(--chip);color:var(--ink-2)}
   /* 名称:最多 2 行,超出截断 */
-  .card-name{font-size:14px;font-weight:700;line-height:1.4;letter-spacing:-.01px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  /* 老师·简介:固定 1 行,超出省略号 */
-  .card-meta{display:block;margin-top:5px;font-size:10.5px;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .card-meta .sep{color:var(--ink-3)}
+  .card-name{font-size:14px;font-weight:700;line-height:1.45;letter-spacing:-.01px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* 老师·简介:固定 1 行,超出省略号;字段固定为 老师 + 介绍 */
+  .card-meta{display:block;margin-top:6px;font-size:10.5px;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-meta .sep{color:var(--ink-3);margin:0 3px}
   .card-time{flex-shrink:0;text-align:right;line-height:1.15}
-  .ct-day{font-size:10px;font-weight:700;color:var(--ink-3);letter-spacing:.5px}
-  .ct-time{font-size:14px;font-weight:800;letter-spacing:-.3px;margin-top:2px}
-  .ct-end{font-size:10px;font-weight:600;color:var(--ink-3)}
-  .card-desc{margin-top:8px;font-size:12px;color:var(--ink-2);line-height:1.55}
-  .card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(23,25,29,.06)}
-  .loc{flex:1;min-width:0;font-size:10.5px;font-weight:600;color:var(--ink-2)}
-  .ltxt{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .loc.muted{color:var(--ink-3)}
-  .btn{flex-shrink:0;font-size:11px;font-weight:700;padding:5px 14px;border-radius:999px;background:var(--ink);color:#fff;cursor:pointer;border:none}
-  .btn-lime{background:var(--lime);color:var(--lime-ink)}
-  .btn-ghost{background:#f0f1ee;color:var(--ink-3);cursor:default}
+  .ct-time{font-size:14px;font-weight:800;letter-spacing:-.3px}
+  .ct-end{font-size:10px;font-weight:600;color:var(--ink-3);margin-top:2px}
+  /* 已报名:时间下方纯文字,无底色 */
+  .joined-text{display:block;margin-top:8px;font-size:10.5px;font-weight:700;color:var(--lime-ink);letter-spacing:.02em}
 
   .color-label{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:20;background:#1c1f22;color:#fff;font-size:10px;font-weight:700;padding:4px 14px;border-radius:99px;letter-spacing:.5px}
 </style>
@@ -87,18 +89,18 @@
 
 <div class="wrap">
   <div class="phone">
-    <div class="color-label">改版 · 清爽有趣</div>
+    <div class="color-label">清爽有趣 · 多日分组</div>
     <div class="nav-bar">
       <div class="nav-status"><span>11:06</span><span>&#128247; &#128267; 64%</span></div>
       <div class="nav-capsule">
-        <div style="display:flex;gap:8px;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg><div style="width:.5px;height:14px;background:rgba(0,0,0,.12)"></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+        <div style="display:flex;gap:8px;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg><div style="width:.5px;height:14px;background:rgba(0,0,0,.12)"></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
         <div class="nav-capsule-line"><div class="dot dot-black"></div><div class="dot dot-black"></div><div class="dot dot-gray"></div></div>
       </div>
     </div>
     <div class="content"><div class="page">
 
       <div class="hero">
-        <div class="hero-date">7月16日 · 周三 · 今天</div>
+        <div class="hero-date">7月16日</div>
         <div class="hero-sub">本周 4 场活动</div>
       </div>
 
@@ -112,86 +114,82 @@
         <div class="wk-day"><span class="wk-name">日</span><span class="wk-num">20</span><span class="wk-today-dot" style="opacity:0"></span></div>
       </div>
 
-      <!-- 卡片 1:类型+线下+公益,三标签齐全;地点故意取长文案,验证截断 -->
-      <div class="card">
-        <div class="card-head">
-          <div class="card-titles">
-            <div class="tagline"><span class="tag t-mint">茶会</span><span class="tag t-mode">线下</span><span class="tag t-welfare">公益</span></div>
-            <div class="card-name">夏日品茶会</div>
-            <div class="card-meta">张老师<span class="sep">·</span>龙井冲泡品鉴入门</div>
+      <!-- 7月16日 周三(今天):1 场 -->
+      <div class="day-group">
+        <div class="day-head"><span class="dh-date">7月16日</span><span class="dh-week">周三 · <span class="today">今天</span></span></div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-titles">
+              <div class="tagline"><span class="tag t-mint">茶会</span><span class="tag t-mode">线下</span><span class="tag t-welfare">公益</span></div>
+              <div class="card-name">夏日品茶会</div>
+              <div class="card-meta">张老师<span class="sep">·</span>龙井冲泡品鉴入门</div>
+            </div>
+            <div class="card-time"><div class="ct-time">19:00</div><div class="ct-end">21:00 结束</div></div>
           </div>
-          <div class="card-time"><div class="ct-day">周四</div><div class="ct-time">19:00</div><div class="ct-end">21:00 结束</div></div>
-        </div>
-        <div class="card-foot">
-          <div class="loc"><span class="ltxt">梧桐空间 · 一楼茶室（东门进入后上电梯左转）</span></div>
-          <button class="btn">报名</button>
         </div>
       </div>
 
-      <!-- 卡片 2:类型+线下 -->
-      <div class="card">
-        <div class="card-head">
-          <div class="card-titles">
-            <div class="tagline"><span class="tag t-blue">课程</span><span class="tag t-mode">线下</span></div>
-            <div class="card-name">茶艺基础课程</div>
-            <div class="card-meta">8 人小班<span class="sep">·</span>零基础可参加</div>
+      <!-- 7月17日 周四:2 场 -->
+      <div class="day-group">
+        <div class="day-head"><span class="dh-date">7月17日</span><span class="dh-week">周四</span></div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-titles">
+              <div class="tagline"><span class="tag t-blue">课程</span><span class="tag t-mode">线下</span></div>
+              <div class="card-name">茶艺基础课程</div>
+              <div class="card-meta">王老师<span class="sep">·</span>盖碗行茶基础练习</div>
+            </div>
+            <div class="card-time"><div class="ct-time">14:00</div><div class="ct-end">16:00 结束</div><span class="joined-text">✓ 已报名</span></div>
           </div>
-          <div class="card-time"><div class="ct-day">周四</div><div class="ct-time">14:00</div><div class="ct-end">16:00 结束</div></div>
         </div>
-        <div class="card-foot">
-          <div class="loc"><span class="ltxt">你已报名，记得准时来</span></div>
-          <button class="btn btn-lime">已报名 ✓</button>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-titles">
+              <div class="tagline"><span class="tag t-peach">讲座</span><span class="tag t-mode">线上</span></div>
+              <div class="card-name">普洱茶专题讲座：生熟分类与家庭仓储方法</div>
+              <div class="card-meta">李老师、王老师<span class="sep">·</span>从入门到精通系列分享第一场，适合零基础参加</div>
+            </div>
+            <div class="card-time"><div class="ct-time">20:00</div><div class="ct-end">21:30 结束</div></div>
+          </div>
         </div>
       </div>
 
-      <!-- 卡片 3:类型+线上;名称与简介故意取长文案,验证两行截断 -->
-      <div class="card">
-        <div class="card-head">
-          <div class="card-titles">
-            <div class="tagline"><span class="tag t-peach">讲座</span><span class="tag t-mode">线上</span></div>
-            <div class="card-name">普洱茶专题讲座：生熟分类与家庭仓储方法</div>
-            <div class="card-meta">李老师、王老师<span class="sep">·</span>从入门到精通系列分享第一场，适合零基础参加</div>
+      <!-- 7月18日 周五:1 场 -->
+      <div class="day-group">
+        <div class="day-head"><span class="dh-date">7月18日</span><span class="dh-week">周五</span></div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-titles">
+              <div class="tagline"><span class="tag t-lav">体验</span><span class="tag t-mode">线下</span></div>
+              <div class="card-name">冥想放松沙龙</div>
+              <div class="card-meta">王老师<span class="sep">·</span>90 分钟深度放松</div>
+            </div>
+            <div class="card-time"><div class="ct-time">10:00</div><div class="ct-end">11:30 结束</div></div>
           </div>
-          <div class="card-time"><div class="ct-day">周五</div><div class="ct-time">20:00</div><div class="ct-end">21:30 结束</div></div>
-        </div>
-        <div class="card-foot">
-          <div class="loc"><span class="ltxt">线上进行 · 无需到场</span></div>
-          <button class="btn">报名</button>
         </div>
       </div>
 
-      <!-- 卡片 4:类型+线下,已结束 -->
-      <div class="card" style="opacity:.72">
-        <div class="card-head">
-          <div class="card-titles">
-            <div class="tagline"><span class="tag t-lav">体验</span><span class="tag t-mode">线下</span></div>
-            <div class="card-name">冥想放松沙龙</div>
-            <div class="card-meta">王老师<span class="sep">·</span>90 分钟深度放松</div>
-          </div>
-          <div class="card-time"><div class="ct-day">周六</div><div class="ct-time">10:00</div><div class="ct-end">11:30 结束</div></div>
-        </div>
-        <div class="card-foot">
-          <div class="loc muted"><span class="ltxt">活动已结束，感谢参与</span></div>
-          <button class="btn btn-ghost">已结束</button>
-        </div>
-      </div>
     </div></div>
 
     <div class="tab-bar">
       <div class="tab-item active">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17191d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#212631" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
         <span class="tab-label">首页</span><span class="tdot"></span>
       </div>
       <div class="tab-item">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a6abb2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a8b1bd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
         <span class="tab-label">课程</span><span class="tdot"></span>
       </div>
       <div class="tab-item">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a6abb2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a8b1bd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>
         <span class="tab-label">活动</span><span class="tdot"></span>
       </div>
       <div class="tab-item">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a6abb2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a8b1bd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
         <span class="tab-label">我的</span><span class="tdot"></span>
       </div>
     </div>

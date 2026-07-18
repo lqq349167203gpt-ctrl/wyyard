@@ -1,0 +1,50 @@
+<view class="page">
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading-box">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 空状态:檐下风铃 + 落叶 -->
+  <view wx:elif="{{notifications.length === 0}}" class="empty-box">
+    <view class="e-icon">
+      <view class="e-chime">
+        <view class="e-string"></view>
+        <view class="e-dome"></view>
+        <view class="e-rim"></view>
+        <view class="e-clap"></view>
+        <view class="e-paper">
+          <view class="e-paper-line"></view>
+          <view class="e-paper-line short"></view>
+        </view>
+      </view>
+      <view class="e-leaf e-leaf-a"></view>
+      <view class="e-leaf e-leaf-b"></view>
+    </view>
+    <text class="e-title">暂无消息</text>
+    <text class="e-sub">风铃未响，有新消息会第一时间轻轻告诉你</text>
+  </view>
+
+  <!-- 通知列表 -->
+  <view wx:else class="list">
+    <view
+      wx:for="{{notifications}}"
+      wx:key="id"
+      class="card {{item.is_read ? '' : 'unread'}}"
+      bindtap="onTapItem"
+      data-id="{{item.id}}"
+    >
+      <view class="card-header">
+        <view class="dot-wrap">
+          <view wx:if="{{!item.is_read}}" class="dot"></view>
+        </view>
+        <text class="card-title">{{item.title}}</text>
+        <text class="card-time">{{item.time_text}}</text>
+      </view>
+      <text class="card-content">{{item.content}}</text>
+      <view class="card-footer">
+        <text wx:if="{{item.activity_name}}" class="card-tag">📋 {{item.activity_name}}</text>
+        <text wx:if="{{item.operator}}" class="card-operator">操作人：{{item.operator}}</text>
+      </view>
+    </view>
+  </view>
+</view>

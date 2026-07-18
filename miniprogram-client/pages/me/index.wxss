@@ -1,117 +1,426 @@
 .page {
   min-height: 100vh;
-  background: #f7f8fa;
-  padding: 32rpx;
+  background: #f4f5f6;
+  padding: 28rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
+
+/* ============ 已登录:横向资料会员卡 ============ */
+/* 未登录态复用同一资料卡骨架 */
 
 .profile-card {
   background: #ffffff;
-  border-radius: 16rpx;
-  padding: 40rpx 32rpx;
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
+  border-radius: 40rpx;
+  padding: 44rpx 32rpx 28rpx;
   margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 4rpx rgba(33, 38, 49, 0.05);
 }
 
+.profile-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 4rpx 12rpx 36rpx;
+  box-sizing: border-box;
+}
+
+.profile-info {
+  min-width: 0;
+  margin-left: 32rpx;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* 黑底青柠 + 青柠光环 */
 .avatar {
-  width: 96rpx;
-  height: 96rpx;
+  width: 112rpx;
+  height: 112rpx;
   border-radius: 50%;
-  background: #3370ff;
+  background: #212631;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 0 0 6rpx #c9f24b, 0 0 0 10rpx rgba(201, 242, 75, 0.3);
 }
 
 .avatar-text {
-  font-size: 40rpx;
-  color: #ffffff;
-  font-weight: 500;
-}
-
-.profile-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
+  font-size: 50rpx;
+  color: #c9f24b;
+  font-weight: 900;
 }
 
 .nickname {
-  font-size: 32rpx;
-  font-weight: 500;
-  color: #2b2f36;
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #212631;
+  letter-spacing: -0.01em;
 }
 
+/* 会员类型=青柠胶囊 */
 .member-type {
-  font-size: 24rpx;
-  color: #8f959e;
+  margin-top: 12rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #3d5500;
+  background: #c9f24b;
+  padding: 4rpx 20rpx;
+  border-radius: 999rpx;
+  line-height: 1.5;
 }
+
+/* 数据行:参与活动数 / 到店次数 / 剩余次数(高亮) */
+.stats {
+  display: flex;
+  width: 100%;
+  margin-top: 0;
+  padding-top: 28rpx;
+  border-top: 1rpx solid rgba(33, 38, 49, 0.07);
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-num {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #212631;
+  letter-spacing: -0.02em;
+}
+
+.stat.hl .stat-num {
+  color: #3d5500;
+}
+
+.stat-label {
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: #a8b1bd;
+  font-weight: 600;
+}
+
+/* ============ 栏目卡 ============ */
 
 .menu-card {
   background: #ffffff;
-  border-radius: 16rpx;
+  border-radius: 32rpx;
   overflow: hidden;
+  box-shadow: 0 2rpx 4rpx rgba(33, 38, 49, 0.05);
 }
 
 .menu-item {
   width: 100%;
-  height: 96rpx;
-  line-height: 96rpx;
-  padding: 0 32rpx;
-  background: transparent;
-  border: none;
-  text-align: left;
+  height: 104rpx;
+  padding: 0 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 28rpx;
+  font-weight: 600;
+  line-height: normal;
+  box-sizing: border-box;
+}
+
+.menu-item:not(:last-child) {
+  border-bottom: 1rpx solid rgba(33, 38, 49, 0.06);
 }
 
 .menu-item::after {
   border: none;
 }
 
+.menu-item-hover {
+  background: #f4f5f6;
+}
+
 .menu-text {
-  color: #2b2f36;
+  color: #212631;
+}
+
+.menu-text-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.badge {
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 10rpx;
+  background: #f54a45;
+  color: #ffffff;
+  font-size: 20rpx;
+  font-weight: 700;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 12rpx;
+  flex-shrink: 0;
+}
+
+.menu-arrow {
+  color: #a8b1bd;
+  font-size: 30rpx;
+}
+
+/* 退出登录:独立卡 + 红字居中 */
+.logout-card {
+  margin-top: 24rpx;
+  background: #ffffff;
+  border-radius: 32rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 4rpx rgba(33, 38, 49, 0.05);
+}
+
+.logout-item {
+  justify-content: center;
 }
 
 .menu-text-danger {
   color: #f54a45;
 }
 
-.login-card {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 80rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16rpx;
-  margin-top: 200rpx;
+/* ============ 未登录态 ============ */
+
+.avatar-empty {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 50%;
+  background: #eef0f2;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.login-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #2b2f36;
+.ae-head {
+  position: absolute;
+  left: 50%;
+  top: 22rpx;
+  transform: translateX(-50%);
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 50%;
+  background: #c3c9d2;
 }
 
-.login-hint {
-  font-size: 26rpx;
-  color: #8f959e;
-  margin-bottom: 40rpx;
+.ae-body {
+  position: absolute;
+  left: 50%;
+  bottom: -10rpx;
+  transform: translateX(-50%);
+  width: 76rpx;
+  height: 52rpx;
+  border-radius: 46rpx 46rpx 0 0;
+  background: #c3c9d2;
+}
+
+.login-area {
+  margin-top: 8rpx;
+  padding: 0 12rpx 24rpx;
 }
 
 .login-btn {
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  background: #3370ff;
-  color: #ffffff;
+  width: 100% !important;
+  height: 92rpx;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #212631;
+  color: #c9f24b;
   font-size: 30rpx;
-  font-weight: 500;
-  border-radius: 12rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  border-radius: 999rpx;
   border: none;
+  box-sizing: border-box;
 }
 
 .login-btn::after {
   border: none;
+}
+
+.login-btn[disabled] {
+  background: #212631;
+  color: rgba(201, 242, 75, 0.45);
+}
+
+.login-btn-hover {
+  background: #3a4150;
+}
+
+.login-tip {
+  display: block;
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: #a8b1bd;
+}
+
+
+/* 「登录」与昵称使用相同的文字排版,点击进入登录页 */
+.nickname-login {
+  display: block;
+  line-height: 1.2;
+}
+
+.nickname-login-hover {
+  opacity: 0.6;
+}
+
+/* ============ 最近活动时间轴(方案D) ============ */
+
+.tl-section {
+  margin-top: 24rpx;
+}
+
+.tl-section .sec-head {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 24rpx;
+}
+
+.tl-section .sec-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+
+.tl-section .sec-count {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 1rpx;
+}
+
+.tl-list {
+  margin: 0;
+}
+
+.tl-day {
+  display: flex;
+}
+
+.tl-axis {
+  width: 44rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tl-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: #212631;
+  margin-top: 14rpx;
+  flex-shrink: 0;
+}
+
+.tl-dot-up {
+  background: #c9f24b;
+  border: 4rpx solid #212631;
+  width: 22rpx;
+  height: 22rpx;
+  margin-top: 12rpx;
+}
+
+.tl-line {
+  flex: 1;
+  width: 4rpx;
+  background: #e5e3de;
+  margin-top: 8rpx;
+}
+
+.tl-day:last-child .tl-line {
+  display: none;
+}
+
+.tl-body {
+  flex: 1;
+  padding: 0 0 36rpx 20rpx;
+  min-width: 0;
+}
+
+.tl-date {
+  display: flex;
+  align-items: baseline;
+}
+
+.tl-daynum {
+  font-size: 40rpx;
+  font-weight: 800;
+}
+
+.tl-daylab {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 1rpx;
+}
+
+.tl-item {
+  display: flex;
+  align-items: center;
+  margin-top: 20rpx;
+}
+
+.tl-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-name {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  letter-spacing: 0.5rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 0.5rpx;
+}
+
+/* 状态胶囊 */
+.st {
+  font-size: 20rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+.st-done {
+  background: #f1f0ed;
+  color: #a8b1bd;
+}
+
+.st-up {
+  background: #c9f24b;
+  color: #3d5500;
+}
+
+.st-missed {
+  background: #fef2f2;
+  color: #dc2626;
 }

@@ -107,6 +107,13 @@ wyyard/
 - commit 信息用中文，简洁说明做了什么
 - 不提交 node_modules/、__pycache__/、.env、dist/
 
+### 设计咨询模式（owner 说"给方案/参考样式/设计一下看看"时）
+- 不重复读已熟悉的文件，必要时只 grep 关键行确认现状
+- 中小规模预览稿由主会话直接写，不派子代理；大型多模块任务才派
+- 预览稿交付前不做截图复核，owner 反馈后再修
+- 预览不动代码就不跑 tsc/build
+- 底线不变：动生产代码（frontend/src、小程序源码）必须 tsc+build 验证；动生产数据必须查验
+
 ### 冗余代码检测
 - **提交前**运行 `bash scripts/check-dead-code.sh`，确保无新增冗余
 - 后端用 `ruff check app/` 检测未使用导入/变量（F401、F841）

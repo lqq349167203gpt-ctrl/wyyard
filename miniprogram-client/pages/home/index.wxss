@@ -1,145 +1,362 @@
 .page {
   min-height: 100vh;
-  background: #f7f8fa;
-  padding-bottom: 20rpx;
+  background: #f4f5f6;
+  padding: 8rpx 28rpx 20rpx;
+  box-sizing: border-box;
 }
 
+/* ===== 吸顶头部:日期胶囊 + 周日历,滚动时固定 ===== */
+.page-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f4f5f6;
+  padding-bottom: 4rpx;
+}
+
+/* ===== 顶部:今日日期胶囊 + 本周概览 ===== */
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 20rpx;
+}
+
+.hero-date {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #3d5500;
+  background: #c9f24b;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+}
+
+.hero-sub {
+  font-size: 22rpx;
+  color: #79838f;
+  font-weight: 500;
+}
+
+/* ===== 周日历:选中=黑底青柠数字 ===== */
+.week-picker {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 28rpx;
+}
+
+.wk-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  width: 76rpx;
+  padding: 10rpx 0 12rpx;
+  border-radius: 24rpx;
+}
+
+.wk-name {
+  font-size: 20rpx;
+  color: #a8b1bd;
+  font-weight: 600;
+}
+
+.wk-num {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: #212631;
+}
+
+.wk-day.active {
+  background: #212631;
+}
+
+.wk-day.active .wk-name {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.wk-day.active .wk-num {
+  color: #c9f24b;
+}
+
+.wk-today-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #a8b1bd;
+  opacity: 0;
+}
+
+/* 小点=今天标记,与选中态(黑底)独立 */
+.wk-day.today .wk-today-dot {
+  opacity: 1;
+}
+
+.wk-day.active .wk-today-dot {
+  background: #c9f24b;
+}
+
+/* ===== 多日分组:日期头 ===== */
+.day-group {
+  margin-bottom: 8rpx;
+}
+
+.day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin: 28rpx 4rpx 16rpx;
+}
+
+.day-group:first-child .day-head {
+  margin-top: 4rpx;
+}
+
+.dh-date {
+  font-size: 26rpx;
+  font-weight: 800;
+  color: #212631;
+  letter-spacing: -0.02em;
+}
+
+.dh-week {
+  font-size: 21rpx;
+  font-weight: 600;
+  color: #a8b1bd;
+}
+
+.dh-week .today {
+  color: #3d5500;
+  font-weight: 700;
+}
+
+/* ===== 活动卡片:标签 + 名称 + 老师·简介 + 右侧时间 ===== */
+.card {
+  display: flex;
+  gap: 20rpx;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: #ffffff;
+  border-radius: 32rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 4rpx rgba(33, 38, 49, 0.05);
+}
+
+.card-expired {
+  opacity: 0.5;
+}
+
+.card-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.tagline {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tag {
+  font-size: 20rpx;
+  font-weight: 700;
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+/* 类型=pastel 实心(每张卡唯一彩色),按类型名稳定取色 */
+.tag-t1 { background: #dcf5e4; color: #157a3c; }
+.tag-t2 { background: #e0ebff; color: #2f5cc4; }
+.tag-t3 { background: #ffe8d9; color: #c25a1b; }
+.tag-t4 { background: #ece6ff; color: #6a48d8; }
+
+/* 线上/公益=中性浅灰 */
+.tag-mode {
+  background: #f1f0ed;
+  color: #79838f;
+}
+
+/* 名称:最多 2 行,超出截断 */
+.card-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #212631;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 老师·简介:固定 1 行,超出省略号 */
+.card-meta {
+  margin-top: 12rpx;
+  font-size: 21rpx;
+  color: #79838f;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-time {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  line-height: 1.15;
+}
+
+.ct-time {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #212631;
+  letter-spacing: -0.02em;
+}
+
+.ct-end {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #a8b1bd;
+  margin-top: 4rpx;
+}
+
+/* ===== 加载/空状态 ===== */
 .loading, .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 60vh;
+  height: 50vh;
 }
 
 .loading-text {
-  font-size: 28rpx;
-  color: #8f959e;
-}
-
-.empty-text {
-  font-size: 30rpx;
-  color: #2b2f36;
-  margin-bottom: 12rpx;
-}
-
-.empty-hint {
   font-size: 26rpx;
-  color: #8f959e;
+  color: #a8b1bd;
 }
 
-.list {
-  padding: 24rpx 32rpx;
-}
-
-.date-group {
-  margin-bottom: 32rpx;
-}
-
-.date-header {
+/* ===== 空状态:CSS 风铃(灰调铃身 + 青柠纸签) + 落叶,与消息通知页同款 ===== */
+.e-icon {
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 50%;
+  background: #f1f0ed;
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 16rpx;
-  padding: 0 4rpx;
+  justify-content: center;
+  position: relative;
 }
 
-.date-text {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #2b2f36;
-}
-
-.date-weekday {
-  font-size: 24rpx;
-  color: #8f959e;
-}
-
-.card {
-  background: #ffffff;
-  border-radius: 12rpx;
-  padding: 28rpx 32rpx;
-  margin-bottom: 16rpx;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
-}
-
-.card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20rpx;
-}
-
-.card-name {
-  font-size: 30rpx;
-  font-weight: 500;
-  color: #2b2f36;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-tags {
-  display: flex;
-  gap: 8rpx;
-  margin-left: 16rpx;
-  flex-shrink: 0;
-}
-
-.tag {
-  font-size: 20rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 4rpx;
-}
-
-.tag-online {
-  background: #e8f3ff;
-  color: #3370ff;
-}
-
-.tag-welfare {
-  background: #fff2e8;
-  color: #f5a623;
-}
-
-.card-info {
+/* 风铃整体:挂绳 → 铃身 → 铃沿 → 铃锤 → 纸签 */
+.e-chime {
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
-}
-
-.info-row {
-  display: flex;
   align-items: center;
-  font-size: 26rpx;
+  /* 纸签垂在下方,视觉上移少许保持居中 */
+  margin-top: -14rpx;
 }
 
-.info-label {
-  color: #8f959e;
-  width: 72rpx;
-  flex-shrink: 0;
+.e-string {
+  width: 4rpx;
+  height: 26rpx;
+  border-radius: 2rpx;
+  background: #c4cad2;
 }
 
-.info-value {
-  color: #2b2f36;
-  flex: 1;
+.e-dome {
+  width: 76rpx;
+  height: 54rpx;
+  margin-top: 2rpx;
+  background: linear-gradient(135deg, #d3d8df 0%, #bcc3cd 100%);
+  border-radius: 38rpx 38rpx 10rpx 10rpx;
 }
 
-.card-desc {
+.e-rim {
+  width: 88rpx;
+  height: 10rpx;
+  margin-top: -4rpx;
+  border-radius: 5rpx;
+  background: #b3bac4;
+}
+
+.e-clap {
+  width: 12rpx;
+  height: 12rpx;
+  margin-top: 6rpx;
+  border-radius: 50%;
+  background: #a8b1bd;
+}
+
+/* 青柠纸签:风铃下的短册,品牌点缀色 */
+.e-paper {
+  width: 34rpx;
+  height: 60rpx;
+  margin-top: 3rpx;
+  border-radius: 8rpx;
+  background: #c9f24b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12rpx;
+  box-sizing: border-box;
+}
+
+/* 纸签上的两行小字 */
+.e-paper-line {
+  width: 16rpx;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: #3d5500;
+  margin-bottom: 6rpx;
+}
+
+.e-paper-line.short {
+  width: 10rpx;
+}
+
+/* 院中落叶:两片安静的叶子 */
+.e-leaf {
+  position: absolute;
+  width: 22rpx;
+  height: 15rpx;
+  border-radius: 100% 4rpx 100% 4rpx;
+}
+
+.e-leaf-a {
+  left: 34rpx;
+  bottom: 34rpx;
+  background: #c4cad2;
+  transform: rotate(-24deg);
+}
+
+.e-leaf-b {
+  right: 38rpx;
+  bottom: 26rpx;
+  background: #dde9ac;
+  transform: rotate(18deg);
+}
+
+.e-title {
+  margin-top: 44rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #212631;
+  letter-spacing: 2rpx;
+}
+
+.e-sub {
   margin-top: 16rpx;
-  padding-top: 16rpx;
-  border-top: 1rpx solid #f0f0f0;
-}
-
-.desc-text {
   font-size: 24rpx;
-  color: #8f959e;
+  color: #79838f;
+  letter-spacing: 1rpx;
   line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  text-align: center;
 }
 
 .loading-more, .no-more {
@@ -149,5 +366,102 @@
 
 .no-more-text {
   font-size: 24rpx;
-  color: #c9cdd4;
+  color: #a8b1bd;
+}
+
+/* ===== 月历选择弹层 ===== */
+.cal-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(20, 24, 32, 0.4);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+
+.cal-sheet {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 20rpx 28rpx 48rpx;
+  box-sizing: border-box;
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 20rpx;
+}
+
+.cal-title {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #212631;
+}
+
+.cal-nav {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  color: #79838f;
+  background: #f4f5f6;
+  border-radius: 50%;
+}
+
+.cal-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.cal-wk {
+  width: 14.2857%;
+  text-align: center;
+  font-size: 20rpx;
+  color: #a8b1bd;
+  font-weight: 600;
+  padding: 12rpx 0;
+}
+
+.cal-cell {
+  width: 14.2857%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  padding: 12rpx 0;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #212631;
+  border-radius: 16rpx;
+}
+
+.cal-out {
+  color: transparent;
+}
+
+.cal-sel {
+  background: #212631;
+  color: #c9f24b;
+}
+
+.cal-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.cal-dot-on {
+  background: #c4cad2;
+}
+
+.cal-dot-act {
+  background: #c9f24b;
 }

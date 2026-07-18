@@ -47,6 +47,8 @@ SECTION_MAP = {
     "/api/activity-history": "邀约",
     "/api/visit-history": "邀约",
     "/api/communication-records": "沟通记录",
+    "/api/client/activities": "邀约",
+    "/api/client/notifications": "消息通知",
 }
 
 # 路径前缀 → (section, service_module, get_function_name)
@@ -253,7 +255,7 @@ def get_entity_id(path: str) -> str:
     if match:
         eid = match.group(1)
         # Skip action-like path segments (not real entity IDs)
-        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups", "deductions", "verify", "toggle", "sync-from-customers", "full"):
+        if eid in ("batch", "reorder", "refresh-all", "login", "roles", "groups", "deductions", "verify", "toggle", "sync-from-customers", "full", "signup", "cancel-signup", "activities", "notifications"):
             return ""
         return eid
     return ""
@@ -687,6 +689,25 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     entity_name = get_entity_name(body) if body else ""
     if not entity_name and before:
         entity_name = get_entity_name(before)
+
+    # 客户端报名/取消报名：从路径提取活动 ID，反查活动名称
+    if "/api/client/activities/" in path and "signup" in path:
+        is_cancel = "cancel-signup" in path
+        activity_id = re.search(r"/api/client/activities/([^/]+)/", path)
+        if activity_id:
+            try:
+                from app.api.client import _find_activity
+                item = _find_activity(activity_id.group(1))
+                if item:
+                    data = item.get("data", {})
+                    name = data.get("activity_name") or data.get("course_name", "")
+                    date = data.get("date", "")
+                    parts = [p for p in [name, date] if p]
+                    verb = "取消报名" if is_cancel else "报名活动"
+                    return f"{verb}：{'（'.join(parts)}）" if parts else verb
+            except Exception:
+                pass
+        return "取消报名" if is_cancel else "报名活动"
 
     # 沟通记录：用客户昵称作为实体名
     if "/api/communication-records" in path:
@@ -1155,15 +1176,25 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
 
         # AuthMiddleware 在 call_next 中执行，此时才能读到 user_id
         user_id = getattr(request.state, "user_id", "")
+        source = getattr(request.state, "source", "pc")
         operator = ""
         operator_role = ""
         if user_id:
             try:
-                from app.services import account_service
-                account = account_service.get_account(user_id)
-                if account:
-                    operator = account.owner or account.username
-                    operator_role = account.role
+                user_role = getattr(request.state, "user_role", "")
+                if user_role == "customer":
+                    # 客户 token：用客户昵称作为操作人
+                    from app.services import customer_service
+                    customer = customer_service.get_customer(user_id)
+                    if customer:
+                        operator = customer.nickname or customer.name or ""
+                        operator_role = "客户"
+                else:
+                    from app.services import account_service
+                    account = account_service.get_account(user_id)
+                    if account:
+                        operator = account.owner or account.username
+                        operator_role = account.role
             except Exception:
                 operator = user_id[:8]
 
@@ -1195,6 +1226,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             ), extra={
                 "operator": operator,
                 "operator_role": operator_role,
+                "source": source,
                 "method": method,
                 "path": path,
                 "entity_id": entity_id,

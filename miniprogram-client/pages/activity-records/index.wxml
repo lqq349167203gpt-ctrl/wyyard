@@ -1,0 +1,62 @@
+<view class="page">
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading-box">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:elif="{{groups.length === 0}}" class="empty-box">
+    <view class="e-icon">
+      <view class="e-chime">
+        <view class="e-string"></view>
+        <view class="e-dome"></view>
+        <view class="e-rim"></view>
+        <view class="e-clap"></view>
+        <view class="e-paper">
+          <view class="e-paper-line"></view>
+          <view class="e-paper-line short"></view>
+        </view>
+      </view>
+      <view class="e-leaf e-leaf-a"></view>
+      <view class="e-leaf e-leaf-b"></view>
+    </view>
+    <text class="e-title">暂无活动记录</text>
+    <text class="e-sub">还没有参加过活动，去首页看看吧</text>
+  </view>
+
+  <!-- 时间轴列表 -->
+  <view wx:else>
+    <view class="sec-head">
+      <text class="sec-title">我的活动</text>
+      <text class="sec-count">共 {{totalCount}} 场</text>
+    </view>
+
+    <view class="tl-list">
+      <view wx:for="{{groups}}" wx:key="date" class="tl-day">
+        <!-- 竖轴：圆点 + 竖线 -->
+        <view class="tl-axis">
+          <view class="tl-dot {{item.items[0].arrived ? '' : 'tl-dot-up'}}"></view>
+          <view class="tl-line"></view>
+        </view>
+
+        <!-- 右侧内容 -->
+        <view class="tl-body">
+          <!-- 日期行 -->
+          <view class="tl-date">
+            <text class="tl-daynum">{{item.dayNum}}</text>
+            <text class="tl-daylab">{{item.dateLabel}}</text>
+          </view>
+
+          <!-- 活动行 -->
+          <view wx:for="{{item.items}}" wx:for-item="act" wx:key="index" class="tl-item">
+            <view class="tl-main">
+              <text class="tl-name">{{act.name}}</text>
+              <text class="tl-meta">{{act.meta}}</text>
+            </view>
+            <text class="st {{act.badgeClass}}">{{act.badge}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

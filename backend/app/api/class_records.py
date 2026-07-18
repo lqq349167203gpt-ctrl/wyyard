@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.base import StrictBaseModel
 from typing import List, Optional
 from app.utils.pagination import paginate
@@ -188,10 +188,43 @@ def create_record(data: dict):
 
 
 @router.patch("/{record_id}")
-def update_record(record_id: str, data: dict):
+def update_record(record_id: str, data: dict, request: Request):
+    old_record = class_record_service.get_record(record_id)
+    old_ids = set(old_record.participant_ids) if old_record else set()
+
     record = class_record_service.update_record(record_id, data)
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 如果 participant_ids 被修改，同步清理小程序报名记录 + 发送通知
+    if "participant_ids" in data:
+        new_ids = set(record.participant_ids)
+        removed_ids = old_ids - new_ids
+        if removed_ids:
+            from app.services.storage import load_data, delete_item
+            signups_data = load_data("client_signups.json")
+            deleted_ids = []
+            for sid, s in signups_data.items():
+                if isinstance(s, dict) and s.get("activity_id") == record_id and s.get("customer_id") in removed_ids:
+                    deleted_ids.append(sid)
+            for sid in deleted_ids:
+                delete_item("client_signups.json", sid)
+
+            operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+            activity_name = record.activity_name or record.course_name
+            activity_date = record.date
+            from app.services import client_notification_service
+            for cid in removed_ids:
+                client_notification_service.create_notification(
+                    customer_id=cid,
+                    type="signup_cancelled",
+                    title="报名已取消",
+                    content=f'您在"{activity_name}"（{activity_date}）的报名已被管理员取消',
+                    activity_name=activity_name,
+                    activity_date=activity_date,
+                    operator=operator,
+                )
+
     return record
 
 
@@ -200,19 +233,54 @@ class ParticipantUpdate(StrictBaseModel):
 
 
 @router.patch("/{record_id}/participants")
-def update_participants(record_id: str, data: ParticipantUpdate):
+def update_participants(record_id: str, data: ParticipantUpdate, request: Request):
+    old_record = class_record_service.get_record(record_id)
+    old_ids = set(old_record.participant_ids) if old_record else set()
+
     record, warnings = class_record_service.update_participants(record_id, data.participant_ids)
     if not record:
         if warnings:
             raise HTTPException(status_code=422, detail="; ".join(warnings))
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 同步删除被移除人员的小程序报名记录 + 发送通知
+    new_ids = set(data.participant_ids)
+    removed_ids = old_ids - new_ids
+    if removed_ids:
+        from app.services.storage import load_data, delete_item
+        signups_data = load_data("client_signups.json")
+        deleted_ids = []
+        for sid, s in signups_data.items():
+            if isinstance(s, dict) and s.get("activity_id") == record_id and s.get("customer_id") in removed_ids:
+                deleted_ids.append(sid)
+        for sid in deleted_ids:
+            delete_item("client_signups.json", sid)
+
+        operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+        activity_name = record.activity_name or record.course_name
+        activity_date = record.date
+        from app.services import client_notification_service, customer_service
+        for cid in removed_ids:
+            client_notification_service.create_notification(
+                customer_id=cid,
+                type="signup_cancelled",
+                title="报名已取消",
+                content=f'您在"{activity_name}"（{activity_date}）的报名已被管理员取消',
+                activity_name=activity_name,
+                activity_date=activity_date,
+                operator=operator,
+            )
+
     result = record.model_dump(mode="json")
     result["warnings"] = warnings
     return result
 
 
 @router.patch("/{record_id}/groups")
-def update_groups(record_id: str, data: dict):
+def update_groups(record_id: str, data: dict, request: Request):
+    old_record = class_record_service.get_record(record_id)
+    old_ids = set(old_record.participant_ids) if old_record else set()
+
     groups = data.get("groups", [])
     try:
         record, warnings = class_record_service.update_groups(record_id, groups)
@@ -222,15 +290,80 @@ def update_groups(record_id: str, data: dict):
         if warnings:
             raise HTTPException(status_code=422, detail="; ".join(warnings))
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 同步删除被移除人员的小程序报名记录 + 发送通知
+    new_ids = set(record.participant_ids)
+    removed_ids = old_ids - new_ids
+    if removed_ids:
+        from app.services.storage import load_data, delete_item
+        signups_data = load_data("client_signups.json")
+        deleted_ids = []
+        for sid, s in signups_data.items():
+            if isinstance(s, dict) and s.get("activity_id") == record_id and s.get("customer_id") in removed_ids:
+                deleted_ids.append(sid)
+        for sid in deleted_ids:
+            delete_item("client_signups.json", sid)
+
+        operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+        activity_name = record.activity_name or record.course_name
+        activity_date = record.date
+        from app.services import client_notification_service, customer_service
+        for cid in removed_ids:
+            client_notification_service.create_notification(
+                customer_id=cid,
+                type="signup_cancelled",
+                title="报名已取消",
+                content=f'您在"{activity_name}"（{activity_date}）的报名已被管理员取消',
+                activity_name=activity_name,
+                activity_date=activity_date,
+                operator=operator,
+            )
+
     result = record.model_dump(mode="json")
     result["warnings"] = warnings
     return result
 
 
 @router.delete("/{record_id}")
-def delete_record(record_id: str):
+def delete_record(record_id: str, request: Request):
+    old_record = class_record_service.get_record(record_id)
+    if not old_record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_name = old_record.activity_name or old_record.course_name
+    activity_date = old_record.date
+    participant_ids = list(old_record.participant_ids)
+
     if not class_record_service.delete_record(record_id):
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 清理该活动的小程序报名记录 + 通知所有参与者
+    from app.services.storage import load_data, delete_item
+    signups_data = load_data("client_signups.json")
+    signup_customer_ids = set()
+    deleted_ids = []
+    for sid, s in signups_data.items():
+        if isinstance(s, dict) and s.get("activity_id") == record_id:
+            signup_customer_ids.add(s.get("customer_id", ""))
+            deleted_ids.append(sid)
+    for sid in deleted_ids:
+        delete_item("client_signups.json", sid)
+
+    all_notified = set(participant_ids) | signup_customer_ids
+    if all_notified:
+        from app.services import client_notification_service
+        for cid in all_notified:
+            client_notification_service.create_notification(
+                customer_id=cid,
+                type="activity_cancelled",
+                title="活动已取消",
+                content=f'您报名的"{activity_name}"（{activity_date}）已被取消',
+                activity_name=activity_name,
+                activity_date=activity_date,
+                operator=operator,
+            )
+
     return {"message": "删除成功"}
 
 

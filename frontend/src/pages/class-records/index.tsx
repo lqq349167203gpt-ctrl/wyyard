@@ -244,7 +244,7 @@ export default function ClassRecordsPage() {
 
       {/* 客户详情弹窗 */}
       <Dialog open={customerDetailOpen} onOpenChange={(open) => { setCustomerDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="max-w-[1180px] max-h-[90vh] overflow-y-auto p-0 gap-0">
           <CustomerDetailView
             selectedCustomerId={selectedCustomerId}
             onClearSelection={() => setCustomerDetailOpen(false)}

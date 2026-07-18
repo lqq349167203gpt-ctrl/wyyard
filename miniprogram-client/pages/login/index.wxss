@@ -1,0 +1,113 @@
+.page {
+  min-height: 100vh;
+  background: #f4f5f6;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* ===== 中央品牌区 ===== */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 200rpx;
+}
+
+.name {
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #212631;
+  letter-spacing: 12rpx;
+}
+
+.slogan {
+  margin-top: 28rpx;
+  font-size: 24rpx;
+  color: #a8b1bd;
+  letter-spacing: 4rpx;
+}
+
+/* ===== 底部操作区 ===== */
+.bottom {
+  padding: 0 44rpx;
+  padding-bottom: calc(130rpx + env(safe-area-inset-bottom));
+}
+
+.login-btn {
+  display: block;
+  width: 100% !important;
+  height: 96rpx;
+  line-height: 96rpx;
+  padding: 0;
+  margin: 0;
+  background: #212631;
+  color: #c9f24b;
+  font-size: 30rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  border-radius: 999rpx;
+  border: none;
+  box-sizing: border-box;
+}
+
+.login-btn::after {
+  border: none;
+}
+
+.login-btn[disabled] {
+  background: #212631;
+  color: rgba(201, 242, 75, 0.45);
+}
+
+.agreement {
+  margin-top: 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 50%;
+  border: 2rpx solid #c4cad2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 12rpx;
+  box-sizing: border-box;
+}
+
+.checkbox-on {
+  background: #c9f24b;
+  border-color: #c9f24b;
+}
+
+.check {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #3d5500;
+  line-height: 1;
+}
+
+.agreement-text {
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 1rpx;
+  line-height: 1.5;
+}
+
+.link {
+  color: #3d5500;
+}
+
+.skip {
+  margin-top: 32rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #a8b1bd;
+}

@@ -156,6 +156,7 @@ async def dev_login(data: DevLoginRequest, request: Request):
 
 class PhoneLoginRequest(StrictBaseModel):
     code: str  # wx.getPhoneNumber 返回的 code
+    avatar_url: str = ""
 
 
 @router.post("/phone-login")
@@ -202,6 +203,11 @@ async def customer_login(data: PhoneLoginRequest):
     customer = customer_service.get_by_phone(phone)
     if not customer:
         raise HTTPException(status_code=403, detail="该手机号未注册客户")
+
+    # 保存头像（如有）
+    if data.avatar_url and data.avatar_url != customer.avatar_url:
+        from app.models.customer import CustomerUpdate
+        customer_service.update_customer(customer.id, CustomerUpdate(avatar_url=data.avatar_url))
 
     from app.middleware.jwt_auth import create_customer_token
     token = create_customer_token(customer_id=customer.id, nickname=customer.nickname)

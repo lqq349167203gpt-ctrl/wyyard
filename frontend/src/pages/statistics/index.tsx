@@ -1013,7 +1013,7 @@ export default function StatisticsPage() {
 
       {/* 客户详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>
-        <DialogContent className="max-w-[1000px] max-h-[85vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="max-w-[1180px] max-h-[90vh] overflow-y-auto p-0 gap-0">
           <DetailView
             selectedCustomerId={selectedCustomerId}
             onClearSelection={() => setDetailOpen(false)}

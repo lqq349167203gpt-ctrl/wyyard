@@ -164,9 +164,30 @@ async def create_visit(data: VisitRecordCreate):
 
 @router.patch("/{visit_id}")
 async def update_visit(visit_id: str, data: dict):
+    # 记录更新前的到场状态
+    old_record = visit_service.get_visit(visit_id)
+    old_arrived = old_record.arrived if old_record else False
+
     record = visit_service.update_visit(visit_id, data)
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 从未到场 → 已到场：发送通知给客户
+    if not old_arrived and record.arrived:
+        from app.services import client_notification_service, customer_service
+        customer = customer_service.get_customer(record.customer_id)
+        if customer:
+            activity_names = "、".join(a.name for a in (record.activities or []) if a.name) or "今日活动"
+            client_notification_service.create_notification(
+                customer_id=record.customer_id,
+                type="arrival_confirmed",
+                title="已确认到场",
+                content=f'您在{record.visit_date}的{activity_names}已确认到场',
+                activity_name=activity_names,
+                activity_date=record.visit_date,
+                operator="管理员",
+            )
+
     return _fill_member_type(record)
 
 

@@ -1,0 +1,148 @@
+@import '../notifications/index.wxss';
+
+/* 标题栏 */
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  padding: 20rpx 44rpx 0;
+}
+
+.sec-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+
+.sec-count {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 1rpx;
+}
+
+/* 时间轴列表 */
+.tl-list {
+  margin: 24rpx 44rpx 0;
+}
+
+.tl-day {
+  display: flex;
+}
+
+/* 竖轴 */
+.tl-axis {
+  width: 44rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tl-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: #212631;
+  margin-top: 14rpx;
+  flex-shrink: 0;
+}
+
+.tl-dot-up {
+  background: #c9f24b;
+  border: 4rpx solid #212631;
+  width: 22rpx;
+  height: 22rpx;
+  margin-top: 12rpx;
+}
+
+.tl-line {
+  flex: 1;
+  width: 4rpx;
+  background: #e5e3de;
+  margin-top: 8rpx;
+}
+
+.tl-day:last-child .tl-line {
+  display: none;
+}
+
+/* 右侧内容 */
+.tl-body {
+  flex: 1;
+  padding: 0 0 36rpx 20rpx;
+  min-width: 0;
+}
+
+/* 日期行 */
+.tl-date {
+  display: flex;
+  align-items: baseline;
+}
+
+.tl-daynum {
+  font-size: 40rpx;
+  font-weight: 800;
+}
+
+.tl-daylab {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 1rpx;
+}
+
+/* 活动行 */
+.tl-item {
+  display: flex;
+  align-items: center;
+  margin-top: 20rpx;
+}
+
+.tl-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-name {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  letter-spacing: 0.5rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 0.5rpx;
+}
+
+/* 状态胶囊 */
+.st {
+  font-size: 20rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+.st-done {
+  background: #f1f0ed;
+  color: #a8b1bd;
+}
+
+.st-up {
+  background: #c9f24b;
+  color: #3d5500;
+}
+
+.st-missed {
+  background: #fef2f2;
+  color: #dc2626;
+}

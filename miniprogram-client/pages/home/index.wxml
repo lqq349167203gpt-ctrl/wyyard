@@ -1,54 +1,75 @@
 <view class="page">
+  <!-- 吸顶头部:日期胶囊(显示选中日期,点开月历) + 本周概览 + 周日历 -->
+  <view class="page-head">
+    <view class="hero">
+      <view class="hero-date" bindtap="onTapHeroDate">{{heroText}} ▾</view>
+      <view class="hero-sub">本周 {{weekCount}} 场活动</view>
+    </view>
+
+    <!-- 周日历:周一~周日,选中=黑底,小点=今天 -->
+    <view class="week-picker">
+      <view wx:for="{{weekDays}}" wx:key="name" class="wk-day {{item.selected ? 'active' : ''}} {{item.isToday ? 'today' : ''}}" bindtap="onTapDay" data-date="{{item.dateStr}}">
+        <text class="wk-name">{{item.name}}</text>
+        <text class="wk-num">{{item.num}}</text>
+        <view class="wk-today-dot"></view>
+      </view>
+    </view>
+  </view>
+
   <!-- 加载中 -->
   <view wx:if="{{loading && activities.length === 0}}" class="loading">
     <text class="loading-text">加载中...</text>
   </view>
 
-  <!-- 空状态 -->
+  <!-- 空状态:檐下风铃 + 落叶 -->
   <view wx:elif="{{!loading && activities.length === 0}}" class="empty">
-    <text class="empty-text">暂无活动</text>
-    <text class="empty-hint">请关注后续活动安排</text>
+    <view class="e-icon">
+      <view class="e-chime">
+        <view class="e-string"></view>
+        <view class="e-dome"></view>
+        <view class="e-rim"></view>
+        <view class="e-clap"></view>
+        <view class="e-paper">
+          <view class="e-paper-line"></view>
+          <view class="e-paper-line short"></view>
+        </view>
+      </view>
+      <view class="e-leaf e-leaf-a"></view>
+      <view class="e-leaf e-leaf-b"></view>
+    </view>
+    <text class="e-title">暂无活动</text>
+    <text class="e-sub">新活动发布后会第一时间在这里出现</text>
   </view>
 
-  <!-- 活动列表 -->
+  <!-- 多日分组活动列表 -->
   <view wx:else class="list">
     <block wx:for="{{grouped}}" wx:key="date">
-      <view class="date-group">
-        <view class="date-header">
-          <text class="date-text">{{item.date}}</text>
-          <text class="date-weekday">{{item.weekday}}</text>
+      <view class="day-group" id="day-{{item.date}}">
+        <view class="day-head">
+          <text class="dh-date">{{item.dateLabel}}</text>
+          <text class="dh-week">{{item.weekday}}<text wx:if="{{item.isToday}}" class="today"> · 今天</text></text>
         </view>
         <view
           wx:for="{{item.items}}"
           wx:for-item="act"
           wx:key="id"
-          class="card"
+          class="card {{act.isExpired ? 'card-expired' : ''}}"
           bindtap="onTapActivity"
           data-id="{{act.id}}"
         >
-          <view class="card-top">
-            <text class="card-name">{{act.name}}</text>
-            <view class="card-tags">
-              <text wx:if="{{act.activity_mode === '线上'}}" class="tag tag-online">线上</text>
-              <text wx:if="{{act.is_public_welfare}}" class="tag tag-welfare">公益</text>
+          <view class="card-titles">
+            <!-- 标签:类型(彩色) / 仅线上显示"线上" / 公益(中性灰);线下不显示 -->
+            <view wx:if="{{act.typeLabel || act.isOnline || act.is_public_welfare}}" class="tagline">
+              <text wx:if="{{act.typeLabel}}" class="tag {{act.typeClass}}">{{act.typeLabel}}</text>
+              <text wx:if="{{act.isOnline}}" class="tag tag-mode">线上</text>
+              <text wx:if="{{act.is_public_welfare}}" class="tag tag-mode">公益</text>
             </view>
+            <view class="card-name">{{act.name}}</view>
+            <view wx:if="{{act.meta}}" class="card-meta">{{act.meta}}</view>
           </view>
-          <view class="card-info">
-            <view class="info-row">
-              <text class="info-label">时间</text>
-              <text class="info-value">{{act.start_time || '待定'}}{{act.end_time ? ' - ' + act.end_time : ''}}</text>
-            </view>
-            <view wx:if="{{act.teacher_names.length > 0}}" class="info-row">
-              <text class="info-label">老师</text>
-              <text class="info-value">{{act.teacher_names[0]}}</text>
-            </view>
-            <view wx:if="{{act.location}}" class="info-row">
-              <text class="info-label">地点</text>
-              <text class="info-value">{{act.location}}</text>
-            </view>
-          </view>
-          <view wx:if="{{act.description}}" class="card-desc">
-            <text class="desc-text">{{act.description}}</text>
+          <view class="card-time">
+            <text class="ct-time">{{act.start_time || '待定'}}</text>
+            <text wx:if="{{act.end_time}}" class="ct-end">{{act.end_time}} 结束</text>
           </view>
         </view>
       </view>
@@ -60,6 +81,30 @@
     </view>
     <view wx:elif="{{!hasMore && activities.length > 0}}" class="no-more">
       <text class="no-more-text">已显示全部活动</text>
+    </view>
+  </view>
+
+  <!-- 月历选择弹层 -->
+  <view wx:if="{{calVisible}}" class="cal-mask" bindtap="onCalClose">
+    <view class="cal-sheet" catchtap="">
+      <view class="cal-head">
+        <view class="cal-nav" bindtap="onCalPrev">‹</view>
+        <text class="cal-title">{{calYear}}年{{calMonth}}月</text>
+        <view class="cal-nav" bindtap="onCalNext">›</view>
+      </view>
+      <view class="cal-grid">
+        <view wx:for="{{calWeekNames}}" wx:key="*this" class="cal-wk">{{item}}</view>
+        <view
+          wx:for="{{calCells}}"
+          wx:key="index"
+          class="cal-cell {{item.inMonth ? '' : 'cal-out'}} {{item.isSelected ? 'cal-sel' : ''}}"
+          data-date="{{item.dateStr}}"
+          bindtap="onCalTapDay"
+        >
+          <text>{{item.day}}</text>
+          <view class="cal-dot {{item.hasAct ? 'cal-dot-act' : (item.isToday ? 'cal-dot-on' : '')}}"></view>
+        </view>
+      </view>
     </view>
   </view>
 </view>

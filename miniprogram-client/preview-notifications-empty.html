@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>消息通知 · 空状态</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    background: #eceef1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  }
+
+  /* 顶部标注 */
+  .label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #212631;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+
+  .label-sub {
+    font-size: 11px;
+    color: #a8b1bd;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+  }
+
+  /* 375px 手机视口外框 */
+  .phone {
+    width: 375px;
+    height: 720px;
+    background: #f4f5f6;
+    border-radius: 36px;
+    border: 1px solid #dfe3e8;
+    box-shadow: 0 20px 60px rgba(33, 38, 49, 0.12);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 状态栏 + 导航栏 */
+  .statusbar {
+    height: 28px;
+    background: #ffffff;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 20px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #212631;
+  }
+
+  .statusbar .icons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .statusbar .bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .statusbar .bars i {
+    display: block;
+    width: 3px;
+    background: #212631;
+    border-radius: 1px;
+  }
+
+  .statusbar .bars i:nth-child(1) { height: 4px; }
+  .statusbar .bars i:nth-child(2) { height: 6px; }
+  .statusbar .bars i:nth-child(3) { height: 8px; }
+  .statusbar .bars i:nth-child(4) { height: 10px; }
+
+  .statusbar .battery {
+    width: 18px;
+    height: 9px;
+    border: 1.5px solid #212631;
+    border-radius: 2.5px;
+    position: relative;
+  }
+
+  .statusbar .battery::after {
+    content: "";
+    position: absolute;
+    left: 1.5px;
+    top: 1.5px;
+    bottom: 1.5px;
+    width: 60%;
+    background: #212631;
+    border-radius: 1px;
+  }
+
+  .navbar {
+    height: 44px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: #212631;
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(33, 38, 49, 0.04);
+  }
+
+  /* ===== 空状态(与 index.wxss 等比,2rpx = 1px) ===== */
+  .empty-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 100px;
+  }
+
+  .e-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #f1f0ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* 风铃整体:挂绳 → 铃身 → 铃沿 → 铃锤 → 纸签 */
+  .e-chime {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: -7px;
+  }
+
+  .e-string {
+    width: 2px;
+    height: 13px;
+    border-radius: 1px;
+    background: #c4cad2;
+  }
+
+  .e-dome {
+    width: 38px;
+    height: 27px;
+    margin-top: 1px;
+    background: linear-gradient(135deg, #d3d8df 0%, #bcc3cd 100%);
+    border-radius: 19px 19px 5px 5px;
+  }
+
+  .e-rim {
+    width: 44px;
+    height: 5px;
+    margin-top: -2px;
+    border-radius: 2.5px;
+    background: #b3bac4;
+  }
+
+  .e-clap {
+    width: 6px;
+    height: 6px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: #a8b1bd;
+  }
+
+  /* 青柠纸签 */
+  .e-paper {
+    width: 17px;
+    height: 30px;
+    margin-top: 1.5px;
+    border-radius: 4px;
+    background: #c9f24b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 6px;
+  }
+
+  .e-paper-line {
+    width: 8px;
+    height: 2px;
+    border-radius: 1px;
+    background: #3d5500;
+    margin-bottom: 3px;
+  }
+
+  .e-paper-line.short {
+    width: 5px;
+  }
+
+  /* 院中落叶 */
+  .e-leaf {
+    position: absolute;
+    width: 11px;
+    height: 7px;
+    border-radius: 100% 2px 100% 2px;
+  }
+
+  .e-leaf-a {
+    left: 17px;
+    bottom: 17px;
+    background: #c4cad2;
+    transform: rotate(-24deg);
+  }
+
+  .e-leaf-b {
+    right: 19px;
+    bottom: 13px;
+    background: #dde9ac;
+    transform: rotate(18deg);
+  }
+
+  .e-title {
+    margin-top: 22px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #212631;
+    letter-spacing: 1px;
+  }
+
+  .e-sub {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #79838f;
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .e-cta {
+    margin-top: 24px;
+    width: 140px;
+    height: 44px;
+    line-height: 44px;
+    text-align: center;
+    background: #212631;
+    color: #c9f24b;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    border-radius: 999px;
+    cursor: default;
+  }
+
+  /* 底部说明 */
+  .note {
+    margin-top: 24px;
+    font-size: 11px;
+    color: #a8b1bd;
+    letter-spacing: 1px;
+    text-align: center;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+  <div class="label">消息通知 · 空状态</div>
+  <div class="label-sub">无忧茶苑 · 客户端小程序</div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons">
+        <span class="bars"><i></i><i></i><i></i><i></i></span>
+        <span class="battery"></span>
+      </span>
+    </div>
+    <div class="navbar">消息通知</div>
+
+    <div class="empty-box">
+      <div class="e-icon">
+        <div class="e-chime">
+          <div class="e-string"></div>
+          <div class="e-dome"></div>
+          <div class="e-rim"></div>
+          <div class="e-clap"></div>
+          <div class="e-paper">
+            <div class="e-paper-line"></div>
+            <div class="e-paper-line short"></div>
+          </div>
+        </div>
+        <div class="e-leaf e-leaf-a"></div>
+        <div class="e-leaf e-leaf-b"></div>
+      </div>
+      <div class="e-title">暂无消息</div>
+      <div class="e-sub">风铃未响，有新消息会第一时间轻轻告诉你</div>
+      <div class="e-cta">去看看活动</div>
+    </div>
+  </div>
+
+  <div class="note">
+    插图寓意：檐下风铃，风至方响；风铃未响，院中安好。<br>
+    纯 CSS 绘制 · 灰调铃身 + 青柠纸签 + 两片落叶
+  </div>
+
+</body>
+</html>

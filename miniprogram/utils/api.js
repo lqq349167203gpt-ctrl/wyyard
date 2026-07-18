@@ -116,7 +116,7 @@ async function request(path, options = {}) {
       data: options.data,
       timeout: options.timeout || 60000,
       header: Object.assign(
-        { 'Content-Type': 'application/json' },
+        { 'Content-Type': 'application/json', 'X-Client-Type': 'miniprogram' },
         token ? { 'Authorization': 'Bearer ' + token } : {}
       ),
       success: (res) => {

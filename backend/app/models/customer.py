@@ -62,6 +62,7 @@ class CustomerBase(SafeBaseModel):
     other_info: str = Field(default="", max_length=5000)
     traffic_source: str = Field(default="", max_length=100)
     traffic_source_detail: str = Field(default="", max_length=200)
+    avatar_url: str = Field(default="", max_length=500)
     tracking_plan: str = Field(default="", max_length=2000)
     position_sort_orders: Dict[str, int] = {}
     space_id: str = Field(default="", max_length=50)
@@ -139,6 +140,7 @@ class CustomerUpdate(StrictBaseModel):
     other_info: Optional[str] = Field(default=None, max_length=5000)
     traffic_source: Optional[str] = Field(default=None, max_length=100)
     traffic_source_detail: Optional[str] = Field(default=None, max_length=200)
+    avatar_url: Optional[str] = Field(default=None, max_length=500)
     tracking_plan: Optional[str] = Field(default=None, max_length=2000)
     position_sort_orders: Optional[Dict[str, int]] = None
     space_id: Optional[str] = Field(default=None, max_length=50)

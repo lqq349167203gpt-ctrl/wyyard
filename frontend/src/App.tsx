@@ -117,7 +117,7 @@ function ProtectedRoute() {
     return <Navigate to="/login" replace />
   }
 
-  // 首页已移除，统一重定向
+  // 首页未配置业务内容，统一跳转到当前账号第一个有权限的页面
   if (location.pathname === "/") {
     return <Navigate to={getFirstAllowedPath} replace />
   }

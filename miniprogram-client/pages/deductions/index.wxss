@@ -1,0 +1,69 @@
+@import '../notifications/index.wxss';
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.card-source {
+  font-size: 22rpx;
+  color: #fff;
+  background: #6366f1;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+.card-source-activity {
+  background: #059669;
+}
+
+.card-type {
+  font-size: 24rpx;
+  color: #6b7280;
+  background: #f4f5f6;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+}
+
+.card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.card-name {
+  font-size: 28rpx;
+  color: #212631;
+  font-weight: 500;
+}
+
+.card-count {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.card-date {
+  font-size: 22rpx;
+  color: #a8b1bd;
+}
+
+.card-remaining {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.card-operator {
+  font-size: 22rpx;
+  color: #a8b1bd;
+  margin-left: auto;
+}

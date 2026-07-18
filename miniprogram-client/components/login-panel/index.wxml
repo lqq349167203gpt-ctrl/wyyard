@@ -1,0 +1,33 @@
+<!-- 公共登录面板:与「我的」页会员卡同骨架,任何页面可内嵌。登录成功通过 loginsuccess 事件回传 -->
+<view class="profile-card">
+  <view class="avatar-empty">
+    <view class="ae-head"></view>
+    <view class="ae-body"></view>
+  </view>
+  <text class="nickname">登录</text>
+  <text class="member-type">助力亿万家庭幸福美满</text>
+  <view class="stats">
+    <view class="stat feat">
+      <text class="stat-num">茶会活动</text>
+      <text class="stat-label">一键报名</text>
+    </view>
+    <view class="stat feat">
+      <text class="stat-num">会员次数</text>
+      <text class="stat-label">实时查询</text>
+    </view>
+    <view class="stat feat">
+      <text class="stat-num">活动记录</text>
+      <text class="stat-label">随时回看</text>
+    </view>
+  </view>
+</view>
+
+<view class="login-area">
+  <button
+    class="login-btn"
+    hover-class="login-btn-hover"
+    open-type="getPhoneNumber"
+    bindgetphonenumber="onGetPhoneNumber"
+  >手机号快捷登录</button>
+  <text class="login-tip">微信授权一键登录,新用户将自动注册</text>
+</view>

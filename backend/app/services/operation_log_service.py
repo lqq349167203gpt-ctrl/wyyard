@@ -40,6 +40,7 @@ def list_logs(
     date_to: Optional[str] = None,
     entity_id: Optional[str] = None,
     keyword: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> List[OperationLog]:
     logs = list(_logs.values())
     if operator:
@@ -57,6 +58,8 @@ def list_logs(
             logs = [l for l in logs if l.method == method]
     if entity_id:
         logs = [l for l in logs if l.entity_id == entity_id]
+    if source:
+        logs = [l for l in logs if l.source == source]
     if keyword:
         kw = keyword.lower()
         logs = [l for l in logs if l.content and kw in l.content.lower()]

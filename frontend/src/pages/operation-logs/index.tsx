@@ -59,6 +59,20 @@ const METHOD_COLORS: Record<string, string> = {
   GET: "bg-gray-50 text-gray-600",
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  pc: "PC端",
+  miniprogram: "员工小程序",
+  "miniprogram-client": "客户端小程序",
+  system: "系统",
+}
+
+const SOURCE_COLORS: Record<string, string> = {
+  pc: "bg-gray-50 text-gray-600",
+  miniprogram: "bg-blue-50 text-blue-600",
+  "miniprogram-client": "bg-green-50 text-green-600",
+  system: "bg-purple-50 text-purple-600",
+}
+
 const FIELD_CN: Record<string, string> = {
   nickname: "昵称", name: "名称", title: "标题", username: "用户名", owner: "归属人",
   phone: "电话", email: "邮箱", wechat: "微信", gender: "性别", age: "年龄", birthday: "生日",
@@ -157,6 +171,7 @@ export default function OperationLogsPage() {
   const [operatorFilter, setOperatorFilter] = useState("")
   const [methodFilter, setMethodFilter] = useState("")
   const [sectionFilter, setSectionFilter] = useState("")
+  const [sourceFilter, setSourceFilter] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [keywordFilter, setKeywordFilter] = useState("")
@@ -164,7 +179,7 @@ export default function OperationLogsPage() {
   const [accounts, setAccounts] = useState<AccountLight[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, dateFrom, dateTo, keywordFilter })
+  const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, sourceFilter, dateFrom, dateTo, keywordFilter })
 
   // 权限编辑弹窗状态
   const [permDialogOpen, setPermDialogOpen] = useState(false)
@@ -182,6 +197,7 @@ export default function OperationLogsPage() {
       operator: f.operatorFilter || undefined,
       method: f.methodFilter || undefined,
       section: f.sectionFilter || undefined,
+      source: f.sourceFilter || undefined,
       date_from: f.dateFrom || undefined,
       date_to: f.dateTo || undefined,
       keyword: f.keywordFilter || undefined,
@@ -212,6 +228,7 @@ export default function OperationLogsPage() {
       case "operator": setOperatorFilter(value); filtersRef.current.operatorFilter = value; break
       case "method": setMethodFilter(value); filtersRef.current.methodFilter = value; break
       case "section": setSectionFilter(value); filtersRef.current.sectionFilter = value; break
+      case "source": setSourceFilter(value); filtersRef.current.sourceFilter = value; break
       case "from": setDateFrom(value); filtersRef.current.dateFrom = value; break
       case "to": setDateTo(value); filtersRef.current.dateTo = value; break
       case "keyword": setKeywordFilter(value); filtersRef.current.keywordFilter = value; break
@@ -223,10 +240,11 @@ export default function OperationLogsPage() {
     setOperatorFilter("")
     setMethodFilter("")
     setSectionFilter("")
+    setSourceFilter("")
     setDateFrom("")
     setDateTo("")
     setKeywordFilter("")
-    filtersRef.current = { operatorFilter: "", methodFilter: "", sectionFilter: "", dateFrom: "", dateTo: "", keywordFilter: "" }
+    filtersRef.current = { operatorFilter: "", methodFilter: "", sectionFilter: "", sourceFilter: "", dateFrom: "", dateTo: "", keywordFilter: "" }
     goToPage(1)
   }
 
@@ -466,6 +484,22 @@ export default function OperationLogsPage() {
           />
         </div>
         <div className="flex flex-col gap-1">
+          <label className="text-[12px] text-[#8f959e]">来源</label>
+          <SelectDropdown
+            value={sourceFilter}
+            options={[
+              {value: "", label: "全部"},
+              {value: "pc", label: "PC端"},
+              {value: "miniprogram", label: "员工小程序"},
+              {value: "miniprogram-client", label: "客户端小程序"},
+              {value: "system", label: "系统"},
+            ]}
+            placeholder="全部"
+            onChange={(v) => handleFilterChange("source", v)}
+            className="w-32"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
           <label className="text-[12px] text-[#8f959e]">开始日期</label>
           <input
             type="date"
@@ -530,6 +564,11 @@ export default function OperationLogsPage() {
                       <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 shrink-0">
                         {log.section}
                       </span>
+                      {log.source && log.source !== "pc" && (
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${SOURCE_COLORS[log.source] || "bg-gray-50 text-gray-600"}`}>
+                          {SOURCE_LABELS[log.source] || log.source}
+                        </span>
+                      )}
                       <span className="flex-1 text-[13px] text-[#2b2b2b]">{log.content}</span>
                       {log.operator && (
                         <span className="text-[11px] text-[#8f959e] shrink-0">{log.operator}</span>
@@ -577,6 +616,12 @@ export default function OperationLogsPage() {
                 <div>
                   <span className="text-[#8f959e]">板块：</span>
                   <span className="text-[#2b2b2b]">{selectedLog.section}</span>
+                </div>
+                <div>
+                  <span className="text-[#8f959e]">来源：</span>
+                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${SOURCE_COLORS[selectedLog.source] || "bg-gray-50 text-gray-600"}`}>
+                    {SOURCE_LABELS[selectedLog.source] || selectedLog.source || "PC端"}
+                  </span>
                 </div>
                 <div>
                   <span className="text-[#8f959e]">请求路径：</span>

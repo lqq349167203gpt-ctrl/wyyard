@@ -165,6 +165,14 @@ def _parse_api_key(scope) -> str:
             auth = value.decode("utf-8", errors="ignore")
             if auth.startswith("ApiKey "):
                 return auth[7:]
+
+
+def _parse_client_type(scope) -> str:
+    """从 ASGI scope 中提取 X-Client-Type 头，用于操作日志来源追踪"""
+    for key, value in scope.get("headers", []):
+        if key == b"x-client-type":
+            return value.decode("utf-8", errors="ignore")
+    return ""
     return ""
 
 
@@ -214,6 +222,7 @@ class AuthMiddleware:
                     state["user_name"] = "系统任务"
                     state["user_owner"] = ""
                     state["user_role"] = "system"
+                    state["source"] = "system"
                     await self.app(scope, receive, send)
                     return
 
@@ -237,6 +246,7 @@ class AuthMiddleware:
                     state["user_owner"] = ""
                     state["user_role"] = "customer"
                     state["customer_id"] = customer_id
+                    state["source"] = _parse_client_type(scope) or "miniprogram-client"
                     # 滑动续期：临期时下发新 token（仅更新 exp）
                     new_token = _maybe_renew_token(payload)
                     if new_token:
@@ -279,6 +289,7 @@ class AuthMiddleware:
                 state["user_owner"] = account.owner or ""
                 state["user_role"] = account.role
                 state["token_jti"] = token_jti
+                state["source"] = _parse_client_type(scope) or "pc"
 
                 # 路径级授权：管理员路径的写操作拦截非管理员
                 method = scope.get("method", "")

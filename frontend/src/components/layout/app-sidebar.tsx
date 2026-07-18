@@ -1,24 +1,24 @@
 import { Link, useLocation } from "react-router-dom"
 import { useMemo, useState, useEffect } from "react"
 import {
-  IconBellRingingFilled,
-  IconChartAreaFilled,
-  IconBasketFilled,
-  IconStarFilled,
-  IconCalendarEventFilled,
-  IconCalendarFilled,
-  IconCreditCardFilled,
-  IconShieldCheckFilled,
-  IconSparklesFilled,
-  IconUserFilled,
+  IconBellRinging,
+  IconChartArea,
+  IconBasket,
+  IconStar,
+  IconCalendarEvent,
+  IconCalendar,
+  IconCreditCard,
+  IconShieldCheck,
+  IconSparkles,
+  IconUser,
   IconUsersGroup,
-  IconSettingsFilled,
-  IconBellFilled,
-  IconLockFilled,
-  IconStarsFilled,
-  IconMessageCircleFilled,
-  IconFileTextFilled,
-  IconClipboardTextFilled,
+  IconSettings,
+  IconBell,
+  IconLock,
+  IconStars,
+  IconMessageCircle,
+  IconFileText,
+  IconClipboardText,
   IconChevronDown,
 } from "@tabler/icons-react"
 import {
@@ -34,44 +34,44 @@ import {
 } from "@/components/ui/sidebar"
 
 const businessItems = [
-  { title: "提醒", icon: IconBellRingingFilled, path: "/business-reminders", permission: "business-reminders" },
-  { title: "数据记录", icon: IconChartAreaFilled, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
+  { title: "提醒", icon: IconBellRinging, path: "/business-reminders", permission: "business-reminders" },
+  { title: "数据记录", icon: IconChartArea, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
   { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "statistics" },
-  { title: "产品销售", icon: IconBasketFilled, path: "/product-sales", permission: "statistics" },
-  { title: "服务数据", icon: IconStarFilled, path: "/statistics", permission: "statistics" },
+  { title: "产品销售", icon: IconBasket, path: "/product-sales", permission: "statistics" },
+  { title: "服务数据", icon: IconStar, path: "/statistics", permission: "statistics" },
 ]
 
 const reportItems = [
-  { title: "每日报表", icon: IconClipboardTextFilled, path: "/daily-report", permission: "statistics" },
+  { title: "每日报表", icon: IconClipboardText, path: "/daily-report", permission: "statistics" },
 ]
 
 const courseItems = [
-  { title: "客户资料", icon: IconUserFilled, path: "/healing-records", permission: "healing-records" },
-  { title: "邀约", icon: IconCalendarEventFilled, path: "/courses/class-records", permission: "class-records" },
-  { title: "课表", icon: IconCalendarFilled, path: "/courses/daily-activities", permission: "daily-activities" },
-  { title: "沟通记录", icon: IconMessageCircleFilled, path: "/communication-records", permission: "communication-records" },
+  { title: "客户资料", icon: IconUser, path: "/healing-records", permission: "healing-records" },
+  { title: "邀约", icon: IconCalendarEvent, path: "/courses/class-records", permission: "class-records" },
+  { title: "课表", icon: IconCalendar, path: "/courses/daily-activities", permission: "daily-activities" },
+  { title: "沟通记录", icon: IconMessageCircle, path: "/communication-records", permission: "communication-records" },
 ]
 
 const configItems = [
-  { title: "会员身份", icon: IconShieldCheckFilled, path: "/config/member-identities", permission: "member-identities", clearTab: "tab_member-identities" },
-  { title: "疗愈老师", icon: IconSparklesFilled, path: "/healing-identities", permission: "healing-identities" },
-  { title: "组织管理", icon: IconUserFilled, path: "/organizations", permission: "organizations" },
-  { title: "空间配置", icon: IconSettingsFilled, path: "/courses/spaces", permission: "spaces" },
-  { title: "提醒配置", icon: IconBellFilled, path: "/config/reminders", permission: "reminders" },
+  { title: "会员身份", icon: IconShieldCheck, path: "/config/member-identities", permission: "member-identities", clearTab: "tab_member-identities" },
+  { title: "疗愈老师", icon: IconSparkles, path: "/healing-identities", permission: "healing-identities" },
+  { title: "组织管理", icon: IconUser, path: "/organizations", permission: "organizations" },
+  { title: "空间配置", icon: IconSettings, path: "/courses/spaces", permission: "spaces" },
+  { title: "提醒配置", icon: IconBell, path: "/config/reminders", permission: "reminders" },
 ]
 
 const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
 
 const accountItems = [
-  { title: "账号管理", icon: IconUserFilled, path: "/positions/management", permission: "position-management", clearTab: "tab_position-management" },
-  { title: "密码修改", icon: IconLockFilled, path: "/change-password", permission: "change-password" },
+  { title: "账号管理", icon: IconUser, path: "/positions/management", permission: "position-management", clearTab: "tab_position-management" },
+  { title: "密码修改", icon: IconLock, path: "/change-password", permission: "change-password" },
 ]
 
 const systemItems = [
-  { title: "AI 配置", icon: IconStarsFilled, path: "/agents", permission: "agents" },
-  { title: "沟通记录", icon: IconMessageCircleFilled, path: "/chat-history", permission: "chat-history" },
-  { title: "系统日志", icon: IconFileTextFilled, path: "/system-logs", permission: "system-logs" },
-  { title: "操作日志", icon: IconClipboardTextFilled, path: "/operation-logs", permission: "operation-logs" },
+  { title: "AI 配置", icon: IconStars, path: "/agents", permission: "agents" },
+  { title: "沟通记录", icon: IconMessageCircle, path: "/chat-history", permission: "chat-history" },
+  { title: "系统日志", icon: IconFileText, path: "/system-logs", permission: "system-logs" },
+  { title: "操作日志", icon: IconClipboardText, path: "/operation-logs", permission: "operation-logs" },
 ]
 
 function getPermissions(): string[] {
@@ -115,11 +115,11 @@ function MenuGroup({
   return (
     <SidebarGroup className="p-0">
       <SidebarGroupLabel
-        className="h-[34px] text-[11px] font-normal text-[#8f959e] pl-[24px] pr-5 mt-2.5 mb-0 uppercase cursor-pointer select-none flex items-center justify-between hover:text-[#5a6070] transition-colors"
+        className="mt-2.5 mb-0 flex h-[34px] cursor-pointer select-none items-center justify-between px-5 text-[12px] font-normal text-[#a8b1bd] uppercase transition-colors hover:text-[#79838f]"
         onClick={onToggle}
       >
         <span>{label}</span>
-        <IconChevronDown style={{ width: 14, height: 14 }} className={`text-[#c8ccd0] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <IconChevronDown style={{ width: 14, height: 14 }} className={`text-[#a8b1bd] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </SidebarGroupLabel>
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
@@ -135,9 +135,9 @@ function MenuGroup({
                     <SidebarMenuButton
                       render={<Link to={item.path} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
                       isActive={isActive}
-                      className={`h-[34px] text-[13px] pl-[22px] pr-5 rounded-none transition-none font-normal border-l-2 gap-2.5 ${isActive ? "border-[#3370ff] text-black" : "border-transparent text-[#4e535a]"}`}
+                      className={`relative mx-2 h-[34px] w-[calc(100%_-_16px)] gap-2.5 rounded-[8px] px-3 text-[13px] font-normal transition-colors ${isActive ? "bg-[#eaf1ff] text-[#212631] before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-[#3370ff] hover:bg-[#eaf1ff] hover:text-[#212631] data-active:bg-[#eaf1ff] data-active:text-[#212631] data-active:hover:bg-[#eaf1ff] data-active:hover:text-[#212631]" : "text-[#212631] hover:bg-[#f0f5ff]"}`}
                     >
-                      <item.icon className={`h-2.5 w-2.5 shrink-0 ${isActive ? "text-[#3370ff]" : "text-[#7d838c]"}`} />
+                      <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-[#245bdb]" : "text-[#79838f]"}`} />
                       <span>{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -175,7 +175,7 @@ function FixedGroup({
 
   return (
     <SidebarGroup className="p-0">
-      <SidebarGroupLabel className="h-[26px] text-[11px] font-normal text-[#8f959e] pl-[24px] pr-5 mt-2.5 mb-0 uppercase select-none flex items-center">
+      <SidebarGroupLabel className="mt-2.5 mb-0 flex h-[26px] select-none items-center px-5 text-[12px] font-normal text-[#a8b1bd] uppercase">
         <span>{label}</span>
       </SidebarGroupLabel>
       <SidebarGroupContent>
@@ -187,9 +187,9 @@ function FixedGroup({
                 <SidebarMenuButton
                   render={<Link to={item.path} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
                   isActive={isActive}
-                  className={`h-[34px] text-[13px] pl-[22px] pr-5 rounded-none transition-none font-normal border-l-2 gap-2.5 ${isActive ? "border-[#3370ff] text-black" : "border-transparent text-[#4e535a]"}`}
+                  className={`relative mx-2 h-[34px] w-[calc(100%_-_16px)] gap-2.5 rounded-[8px] px-3 text-[13px] font-normal transition-colors ${isActive ? "bg-[#eaf1ff] text-[#212631] before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-[#3370ff] hover:bg-[#eaf1ff] hover:text-[#212631] data-active:bg-[#eaf1ff] data-active:text-[#212631] data-active:hover:bg-[#eaf1ff] data-active:hover:text-[#212631]" : "text-[#212631] hover:bg-[#f0f5ff]"}`}
                 >
-                  <item.icon className={`h-2.5 w-2.5 shrink-0 ${isActive ? "text-[#3370ff]" : "text-[#7d838c]"}`} />
+                  <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-[#245bdb]" : "text-[#79838f]"}`} />
                   <span>{item.title}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -232,20 +232,29 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar style={{ "--sidebar-accent": "#ecedf0", "--sidebar-accent-foreground": "#3370ff" } as React.CSSProperties}>
-      <SidebarHeader className="px-5 pt-4 pb-2">
+    <Sidebar
+      style={{
+        "--sidebar": "#ffffff",
+        "--sidebar-foreground": "#212631",
+        "--sidebar-accent": "#eaf1ff",
+        "--sidebar-accent-foreground": "#212631",
+        "--sidebar-border": "#eef0f1",
+        "--sidebar-ring": "#3370ff",
+      } as React.CSSProperties}
+    >
+      <SidebarHeader className="px-5 pt-5 pb-2">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-[11px] font-semibold text-primary-foreground">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#3370ff] text-[12px] font-medium text-white">
             W
           </div>
-          <span className="text-[13px] font-medium tracking-tight">无忧茶苑</span>
+          <span className="text-[13px] font-medium tracking-tight text-[#212631]">无忧茶苑</span>
         </div>
       </SidebarHeader>
-      <SidebarContent className="mt-5">
+      <SidebarContent className="mt-4 pb-5">
         <FixedGroup label="数据" items={businessItems} />
         <FixedGroup label="报表" items={reportItems} />
         <FixedGroup label="业务" items={courseItems} />
-        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCardFilled, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "", icon: IconClipboardTextFilled }, { title: "退费", path: "/payment-refunds", permission: "", icon: IconFileTextFilled }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
+        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "", icon: IconFileText }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />

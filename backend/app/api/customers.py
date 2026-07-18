@@ -19,7 +19,7 @@ from app.services import (
     other_project_service,
     project_refund_service,
 )
-from app.services.visit_service import count_customer_visits, get_last_visit_date
+from app.services.visit_service import count_customer_visits, get_last_visit_date, _count_customer_activities
 from app.services.chat_parser import parse_chat_log, generate_tags
 from app.services.excel_parser import parse_excel
 from app.utils.pagination import paginate
@@ -112,6 +112,7 @@ def _build_enriched_items(customers) -> list[dict]:
     for c in customers:
         data = {k: getattr(c, k, None) for k in _SLIM_FIELDS}
         data["visit_count"] = count_customer_visits(c.id)
+        data["activity_count"] = _count_customer_activities(c.id)
         data["total_payment"] = max(payment_map.get(c.id, 0), 0)
         data["last_visit_date"] = get_last_visit_date(c.id)
         items.append(data)
@@ -127,6 +128,9 @@ def _fill_visit_count(customer):
     return data
 
 
+_SORTABLE_FIELDS = {"member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "created_at"}
+
+
 @router.get("")
 async def list_customers(
     page: int | None = Query(None, ge=1),
@@ -136,6 +140,8 @@ async def list_customers(
     referrer: str | None = Query(None),
     referrer_handler: str | None = Query(None),
     member_types: str | None = Query(None),
+    sort_by: str | None = Query(None),
+    sort_order: str | None = Query(None),
 ):
     customers = customer_service.list_customers()
     items = _build_enriched_items(customers)
@@ -154,8 +160,12 @@ async def list_customers(
         if allowed:
             items = [c for c in items if c.get("member_type") in allowed]
 
-    # Sort by created_at descending
-    items.sort(key=lambda c: c.get("created_at", ""), reverse=True)
+    # Sort
+    if sort_by and sort_by in _SORTABLE_FIELDS:
+        reverse = sort_order != "asc"
+        items.sort(key=lambda c: c.get(sort_by, "") or "", reverse=reverse)
+    else:
+        items.sort(key=lambda c: c.get("created_at", ""), reverse=True)
 
     if page is not None:
         return paginate(items, page, page_size or 10)

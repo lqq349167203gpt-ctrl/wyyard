@@ -1,0 +1,42 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading-box">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <view wx:elif="{{items.length === 0}}" class="empty-box">
+    <view class="e-icon">
+      <view class="e-chime">
+        <view class="e-string"></view>
+        <view class="e-dome"></view>
+        <view class="e-rim"></view>
+        <view class="e-clap"></view>
+        <view class="e-paper">
+          <view class="e-paper-line"></view>
+          <view class="e-paper-line short"></view>
+        </view>
+      </view>
+      <view class="e-leaf e-leaf-a"></view>
+      <view class="e-leaf e-leaf-b"></view>
+    </view>
+    <text class="e-title">暂无交易记录</text>
+    <text class="e-sub">还没有购买记录，去首页看看活动吧</text>
+  </view>
+
+  <view wx:else class="list">
+    <view wx:for="{{items}}" wx:key="index" class="card">
+      <view class="card-header">
+        <text class="card-type">{{item.type}}</text>
+        <text class="card-amount">{{item.amount_text}}</text>
+      </view>
+      <view class="card-body">
+        <text class="card-name">{{item.name}}</text>
+        <text wx:if="{{item.quantity}}" class="card-qty">×{{item.quantity}}</text>
+      </view>
+      <view class="card-footer">
+        <text class="card-date">{{item.date_text}}</text>
+        <text wx:if="{{item.expiry_text}}" class="card-expiry">{{item.expiry_text}}</text>
+        <text wx:if="{{item.closer_name}}" class="card-closer">{{item.closer_name}}</text>
+      </view>
+    </view>
+  </view>
+</view>

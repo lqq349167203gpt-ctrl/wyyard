@@ -51,6 +51,15 @@ def get_last_visit_date(customer_id: str) -> str:
     return max(dates) if dates else ""
 
 
+def get_arrived_customer_ids(date_from: str, date_to: str) -> set[str]:
+    """获取日期范围内实际到店的客户 ID，按客户去重。"""
+    return {
+        v.customer_id
+        for v in _visits.values()
+        if not v.is_deleted and v.arrived and date_from <= v.visit_date <= date_to
+    }
+
+
 def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> List[ActivityInfo]:
     """从5个模块收集某客户在指定日期的活动（单客户版本，供详情页使用）"""
     result = _build_all_activities(date)

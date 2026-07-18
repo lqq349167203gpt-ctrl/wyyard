@@ -1,0 +1,38 @@
+<view class="page">
+  <!-- 中央品牌区 -->
+  <view class="center">
+    <view class="name">无忧茶苑</view>
+    <view class="slogan">助力亿万家庭 · 幸福美满</view>
+  </view>
+
+  <!-- 底部操作区 -->
+  <view class="bottom">
+    <!-- 未同意：普通按钮，点击弹协议弹窗 -->
+    <button
+      wx:if="{{!agreed}}"
+      class="login-btn"
+      hover-class="none"
+      bindtap="onLoginTap"
+    >手机号快捷登录</button>
+
+    <!-- 已同意：原生手机号授权按钮，点击直接弹微信授权 -->
+    <button
+      wx:else
+      class="login-btn"
+      hover-class="none"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+      disabled="{{loggingIn}}"
+    >{{loggingIn ? '登录中...' : '手机号快捷登录'}}</button>
+
+    <view class="agreement" bindtap="onToggleAgree">
+      <view class="checkbox {{agreed ? 'checkbox-on' : ''}}">
+        <text wx:if="{{agreed}}" class="check">✓</text>
+      </view>
+      <view class="agreement-text">
+        <text>我已阅读并同意</text><text class="link" catchtap="onOpenService">《无忧茶苑服务协议》</text><text>与</text><text class="link" catchtap="onOpenPrivacy">《隐私协议》</text>
+      </view>
+    </view>
+    <view class="skip" bindtap="onSkip">暂不登录，随便看看</view>
+  </view>
+</view>
