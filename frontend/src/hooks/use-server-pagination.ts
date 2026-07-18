@@ -37,13 +37,16 @@ export function useServerPagination<T>(
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const fetchRef = useRef(fetchFn)
+  const requestSequenceRef = useRef(0)
 
   fetchRef.current = fetchFn
 
   const fetchData = useCallback(async (page: number) => {
+    const requestSequence = ++requestSequenceRef.current
     setLoading(true)
     try {
       const res = await fetchRef.current(page, pageSize)
+      if (requestSequence !== requestSequenceRef.current) return
       setItems(res.items)
       setTotal(res.total)
       setTotalPages(res.total_pages)
@@ -51,7 +54,9 @@ export function useServerPagination<T>(
     } catch {
       // 失败时不覆盖已有数据，避免闪现 0 条
     } finally {
-      setLoading(false)
+      if (requestSequence === requestSequenceRef.current) {
+        setLoading(false)
+      }
     }
   }, [pageSize])
 

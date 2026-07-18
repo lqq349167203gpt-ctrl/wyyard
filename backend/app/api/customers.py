@@ -1,27 +1,28 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Query, Depends
-from app.models.base import StrictBaseModel
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import Field
 from starlette.requests import Request as StarletteRequest
 
-from app.models.customer import CustomerCreate, CustomerUpdate, ChatLogParseRequest
 from app.middleware.jwt_auth import require_admin
 from app.middleware.rate_limit import limiter
+from app.models.base import StrictBaseModel
+from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerUpdate
 from app.services import (
     customer_service,
-    membership_card_service,
-    group_case_service,
     emotional_release_service,
     energy_knot_service,
+    group_case_service,
     internal_course_service,
+    member_identity_service,
+    membership_card_service,
     oh_card_reading_service,
     other_project_service,
     project_refund_service,
 )
-from app.services.visit_service import count_customer_visits, get_last_visit_date, _count_customer_activities
-from app.services.chat_parser import parse_chat_log, generate_tags
+from app.services.chat_parser import generate_tags, parse_chat_log
 from app.services.excel_parser import parse_excel
+from app.services.visit_service import _count_customer_activities, count_customer_visits, get_last_visit_date
 from app.utils.pagination import paginate
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,34 @@ def _fill_visit_count(customer):
 
 
 _SORTABLE_FIELDS = {"member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "created_at"}
+_NUMERIC_SORT_FIELDS = {"visit_count", "activity_count", "total_payment"}
+
+
+def _sort_customer_items(items: list[dict], sort_by: str, sort_order: str | None) -> None:
+    """对完整客户结果集排序；空值始终置底，数值 0 不视为空值。"""
+    reverse = sort_order != "asc"
+    populated = [item for item in items if item.get(sort_by) not in (None, "")]
+    empty = [item for item in items if item.get(sort_by) in (None, "")]
+
+    if sort_by in _NUMERIC_SORT_FIELDS:
+        populated.sort(key=lambda item: float(item[sort_by]), reverse=reverse)
+    elif sort_by == "member_type":
+        identity_order = {
+            identity.name: index
+            for index, identity in enumerate(member_identity_service.list_identities())
+        }
+        fallback_order = len(identity_order)
+        populated.sort(
+            key=lambda item: (
+                identity_order.get(str(item[sort_by]), fallback_order),
+                str(item[sort_by]).casefold(),
+            ),
+            reverse=reverse,
+        )
+    else:
+        populated.sort(key=lambda item: str(item[sort_by]), reverse=reverse)
+
+    items[:] = populated + empty
 
 
 @router.get("")
@@ -162,8 +191,7 @@ async def list_customers(
 
     # Sort
     if sort_by and sort_by in _SORTABLE_FIELDS:
-        reverse = sort_order != "asc"
-        items.sort(key=lambda c: c.get(sort_by, "") or "", reverse=reverse)
+        _sort_customer_items(items, sort_by, sort_order)
     else:
         items.sort(key=lambda c: c.get("created_at", ""), reverse=True)
 

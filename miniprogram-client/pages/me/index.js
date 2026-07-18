@@ -6,6 +6,7 @@ Page({
   data: {
     isLoggedIn: false,
     customer: null,
+    greeting: '',
     unreadCount: 0,
     stats: {
       activity_count: 0,
@@ -18,9 +19,12 @@ Page({
 
   onShow() {
     const app = getApp()
+    const hour = new Date().getHours()
+    const greeting = hour < 12 ? '上午好' : hour < 18 ? '下午好' : '晚上好'
     this.setData({
       isLoggedIn: app.isLoggedIn(),
       customer: app.globalData.customer,
+      greeting,
     })
     if (app.isLoggedIn()) {
       this.loadUnreadCount()
@@ -94,12 +98,15 @@ Page({
           const dayNum = d.getDate()
           const month = d.getMonth() + 1
           const weekday = WEEKDAYS[d.getDay()]
+          const dayStr = String(d.getDate()).padStart(2, '0')
+          const monStr = String(d.getMonth() + 1).padStart(2, '0')
           groupMap[date] = {
             date,
             dayNum,
             month,
             weekday,
             dateLabel: `${month}月 · ${weekday}`,
+            dateChip: `${weekday} ${monStr}/${dayStr}`,
             items: [],
           }
         }
@@ -119,24 +126,17 @@ Page({
     wx.navigateTo({ url: '/pages/login/index' })
   },
 
-  onMenuTap(e) {
-    const name = e.currentTarget.dataset.name
-    if (name === '交易记录') {
-      wx.navigateTo({ url: '/pages/transactions/index' })
-      return
-    }
-    if (name === '活动记录') {
+  onStatTap(e) {
+    const type = e.currentTarget.dataset.type
+    if (type === 'activity') {
       wx.navigateTo({ url: '/pages/activity-records/index' })
-      return
+    } else if (type === 'visit') {
+      wx.navigateTo({ url: '/pages/transactions/index' })
     }
-    if (name === '消息通知') {
-      wx.navigateTo({ url: '/pages/notifications/index' })
-      return
-    }
-    if (name === '销卡记录') {
-      wx.navigateTo({ url: '/pages/deductions/index' })
-      return
-    }
+  },
+
+  onBellTap() {
+    wx.navigateTo({ url: '/pages/notifications/index' })
   },
 
   onLogout() {

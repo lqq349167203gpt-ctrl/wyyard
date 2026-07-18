@@ -47,20 +47,17 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
   cpRef.current = cpCustomers
 
   // 排序状态
-  const [sortField, setSortField] = useState<SortField | null>(null)
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
-  const sortFieldRef = useRef(sortField)
-  sortFieldRef.current = sortField
-  const sortOrderRef = useRef(sortOrder)
-  sortOrderRef.current = sortOrder
+  const [sortState, setSortState] = useState<{
+    field: SortField | null
+    order: "asc" | "desc"
+  }>({ field: null, order: "desc" })
+  const { field: sortField, order: sortOrder } = sortState
 
   const handleSort = useCallback((field: SortField) => {
-    if (sortFieldRef.current === field) {
-      setSortOrder(prev => prev === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortOrder("desc")
-    }
+    setSortState(prev => prev.field === field
+      ? { field, order: prev.order === "asc" ? "desc" : "asc" }
+      : { field, order: "desc" }
+    )
   }, [])
 
   const fetchFn = useCallback(async (page: number, pageSize: number) => {
@@ -88,10 +85,10 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
       referrer: filterReferrer || undefined,
       referrer_handler: filterReferrerHandler || undefined,
       member_types: memberTypes,
-      sort_by: sortFieldRef.current || undefined,
-      sort_order: sortOrderRef.current || undefined,
+      sort_by: sortField || undefined,
+      sort_order: sortOrder,
     })
-  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler])
+  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, sortField, sortOrder])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, resetPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
 
@@ -132,43 +129,43 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
         ) : paginatedItems.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">暂无数据</div>
         ) : (
-          <Table>
+          <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">客户</TableHead>
-                <TableHead>
+                <TableHead className="pl-4" style={{ width: "160px" }}>客户</TableHead>
+                <TableHead style={{ width: "110px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("member_type")}>
                     会员身份<SortArrow field="member_type" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead>
+                <TableHead style={{ width: "90px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("visit_count")}>
                     到店<SortArrow field="visit_count" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead>
+                <TableHead style={{ width: "90px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("activity_count")}>
                     活动<SortArrow field="activity_count" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead>
+                <TableHead style={{ width: "100px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("total_payment")}>
                     消费<SortArrow field="total_payment" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead>
+                <TableHead style={{ width: "110px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("last_visit_date")}>
                     最近到访<SortArrow field="last_visit_date" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead>引流 / 承接</TableHead>
-                <TableHead>
+                <TableHead style={{ width: "130px" }}>引流 / 承接</TableHead>
+                <TableHead style={{ width: "110px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("created_at")}>
                     创建日期<SortArrow field="created_at" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead>创建人</TableHead>
-                <TableHead className="w-[88px] text-right pr-4">操作</TableHead>
+                <TableHead style={{ width: "80px" }}>创建人</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -188,7 +185,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                         {c.nickname || c.name || <DvEmpty />}
                       </span>
                       <span className="mt-0.5 block truncate text-[12px] text-[#a8b1bd]">
-                        {[c.name && c.name !== c.nickname ? c.name : "", c.gender, c.age ? `${c.age} 岁` : ""].filter(Boolean).join(" · ") || <DvEmpty />}
+                        {[c.name && c.name !== c.nickname ? c.name : "", c.gender].filter(Boolean).join(" · ") || <DvEmpty />}
                       </span>
                     </span>
                   </div>

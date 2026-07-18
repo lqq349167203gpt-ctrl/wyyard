@@ -1,119 +1,97 @@
 <view class="page">
-  <!-- 已登录:横向资料会员卡 + 栏目 + 退出 -->
+  <!-- 已登录 -->
   <block wx:if="{{isLoggedIn && customer}}">
-    <view class="profile-card">
-      <view class="profile-header">
+    <!-- 白色顶部区域 -->
+    <view class="topzone">
+      <!-- 风铃装饰 -->
+      <view class="chime">
+        <view class="c-string"></view>
+        <view class="c-dome"></view>
+        <view class="c-paper"></view>
+      </view>
+      <!-- 消息铃铛 -->
+      <view class="bell" bindtap="onBellTap">
+        <view class="bell-icon">
+          <view class="bell-body"></view>
+          <view class="bell-clapper"></view>
+        </view>
+        <view wx:if="{{unreadCount > 0}}" class="bell-dot"></view>
+      </view>
+
+      <view class="g-hi">{{greeting}}</view>
+      <view class="id-row">
         <view class="avatar">
           <text class="avatar-text">{{customer.nickname[0] || '用'}}</text>
         </view>
-        <view class="profile-info">
-          <text class="nickname">{{customer.nickname}}</text>
-          <text wx:if="{{customer.member_type}}" class="member-type">{{customer.member_type}}</text>
+        <view class="id-text">
+          <text class="id-name">{{customer.nickname}}</text>
+          <text class="id-slogan">助力亿万家庭幸福美满</text>
         </view>
       </view>
-      <view class="stats">
-        <view class="stat">
-          <text class="stat-num">{{stats.activity_count}}</text>
-          <text class="stat-label">参与活动数</text>
+
+      <!-- 数字即入口 -->
+      <view class="stats-flow">
+        <view class="sf" bindtap="onStatTap" data-type="activity">
+          <text class="sf-num">{{stats.activity_count}}</text>
+          <text class="sf-lab">场活动</text>
+          <text class="sf-arr">›</text>
         </view>
-        <view class="stat">
-          <text class="stat-num">{{stats.visit_count}}</text>
-          <text class="stat-label">到店次数</text>
+        <view class="sf" bindtap="onStatTap" data-type="visit">
+          <text class="sf-num">{{stats.visit_count}}</text>
+          <text class="sf-lab">次到店</text>
+          <text class="sf-arr">›</text>
         </view>
-        <view class="stat hl">
-          <text class="stat-num">{{stats.remain_count}}</text>
-          <text class="stat-label">剩余次数</text>
+        <view class="sf">
+          <text class="sf-num hl">{{stats.remain_count}}</text>
+          <text class="sf-lab">次剩余</text>
+          <text class="sf-arr">›</text>
         </view>
       </view>
     </view>
 
-    <view class="menu-card">
-      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="交易记录">
-        <text class="menu-text">交易记录</text>
-        <text class="menu-arrow">›</text>
-      </view>
-      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="活动记录">
-        <text class="menu-text">活动记录</text>
-        <text class="menu-arrow">›</text>
-      </view>
-      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="消息通知">
-        <view class="menu-text-wrap">
-          <text class="menu-text">消息通知</text>
-          <view wx:if="{{unreadCount > 0}}" class="badge">{{unreadCount > 99 ? '99+' : unreadCount}}</view>
-        </view>
-        <text class="menu-arrow">›</text>
-      </view>
-      <view class="menu-item" hover-class="menu-item-hover" bindtap="onMenuTap" data-name="销卡记录">
-        <text class="menu-text">销卡记录</text>
-        <text class="menu-arrow">›</text>
-      </view>
-    </view>
-
-    <view class="logout-card">
-      <view class="menu-item logout-item" hover-class="menu-item-hover" bindtap="onLogout">
-        <text class="menu-text-danger">退出登录</text>
-      </view>
-    </view>
-
-    <!-- 最近活动时间轴 -->
-    <view wx:if="{{activityGroups.length > 0}}" class="tl-section">
+    <!-- 我的活动 -->
+    <view wx:if="{{activityGroups.length > 0}}" class="act-section">
       <view class="sec-head">
-        <text class="sec-title">最近活动</text>
-        <text class="sec-count">共 {{activityTotalCount}} 场</text>
+        <text class="sec-title">我的活动</text>
       </view>
 
-      <view class="tl-list">
-        <view wx:for="{{activityGroups}}" wx:key="date" class="tl-day">
-          <view class="tl-axis">
-            <view class="tl-dot {{item.items[0].arrived ? '' : 'tl-dot-up'}}"></view>
-            <view class="tl-line"></view>
+      <view class="days">
+        <view wx:for="{{activityGroups}}" wx:key="date" class="day-card {{index === 0 ? 'day-next' : ''}}">
+          <view wx:if="{{index === 0}}" class="d-leaf"></view>
+          <view class="d-head">
+            <text class="d-chip">{{item.dateChip}}</text>
+            <text wx:if="{{item.items.length > 1}}" class="d-count">{{item.items.length}} 场</text>
           </view>
-
-          <view class="tl-body">
-            <view class="tl-date">
-              <text class="tl-daynum">{{item.dayNum}}</text>
-              <text class="tl-daylab">{{item.dateLabel}}</text>
-            </view>
-
-            <view wx:for="{{item.items}}" wx:for-item="act" wx:key="index" class="tl-item">
-              <view class="tl-main">
-                <text class="tl-name">{{act.name}}</text>
-                <text class="tl-meta">{{act.meta}}</text>
-              </view>
-              <text class="st {{act.badgeClass}}">{{act.badge}}</text>
-            </view>
+          <view wx:for="{{item.items}}" wx:for-item="act" wx:key="index" class="r-row">
+            <text class="r-time">{{act.start_time}}</text>
+            <text class="r-name">{{act.name}}</text>
+            <text class="r-st {{act.badgeClass}}">{{act.badge}}</text>
           </view>
         </view>
       </view>
     </view>
+
+    <view class="logout" bindtap="onLogout">退出登录</view>
   </block>
 
-  <!-- 未登录:骨架同会员卡 -->
+  <!-- 未登录 -->
   <block wx:else>
-    <view class="profile-card">
-      <view class="profile-header">
+    <view class="topzone">
+      <view class="g-hi">你好</view>
+      <view class="id-row">
         <view class="avatar-empty">
           <view class="ae-head"></view>
           <view class="ae-body"></view>
         </view>
-        <view class="profile-info">
-          <text class="nickname nickname-login" hover-class="nickname-login-hover" bindtap="onGoLogin">登录</text>
-          <text class="member-type">助力亿万家庭幸福美满</text>
+        <view class="id-text">
+          <text class="id-name id-name-login" hover-class="id-name-login-hover" bindtap="onGoLogin">登录</text>
+          <text class="id-slogan">助力亿万家庭幸福美满</text>
         </view>
       </view>
-      <view class="stats">
-        <view class="stat">
-          <text class="stat-num">—</text>
-          <text class="stat-label">参与活动数</text>
-        </view>
-        <view class="stat">
-          <text class="stat-num">—</text>
-          <text class="stat-label">到店次数</text>
-        </view>
-        <view class="stat hl">
-          <text class="stat-num">—</text>
-          <text class="stat-label">剩余次数</text>
-        </view>
+      <view class="stats-flow">
+        <view class="sf"><text class="sf-num">—</text><text class="sf-lab">场活动</text></view>
+        <view class="sf"><text class="sf-num">—</text><text class="sf-lab">次到店</text></view>
+        <view class="sf"><text class="sf-num hl">—</text><text class="sf-lab">次剩余</text></view>
       </view>
     </view>
     <view class="login-area">

@@ -1,198 +1,330 @@
 .page {
   min-height: 100vh;
   background: #f4f5f6;
-  padding: 28rpx;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
 }
 
-/* ============ 已登录:横向资料会员卡 ============ */
-/* 未登录态复用同一资料卡骨架 */
+/* ============ 白色顶部区域 ============ */
 
-.profile-card {
-  background: #ffffff;
-  border-radius: 40rpx;
-  padding: 44rpx 32rpx 28rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 4rpx rgba(33, 38, 49, 0.05);
+.topzone {
+  position: relative;
+  background: #fff;
+  border-radius: 0 0 44rpx 44rpx;
+  padding: 52rpx 44rpx 40rpx;
 }
 
-.profile-header {
+/* 风铃装饰 */
+.chime {
+  position: absolute;
+  right: 48rpx;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+}
+
+.c-string {
+  width: 4rpx;
+  height: 28rpx;
+  background: #e2e5e9;
+}
+
+.c-dome {
+  width: 48rpx;
+  height: 32rpx;
+  background: #e2e5e9;
+  border-radius: 24rpx 24rpx 6rpx 6rpx;
+}
+
+.c-paper {
+  width: 18rpx;
+  height: 30rpx;
+  margin-top: 4rpx;
+  border-radius: 6rpx;
+  background: #c9f24b;
+}
+
+/* 消息铃铛 */
+.bell {
+  position: absolute;
+  right: 128rpx;
+  top: 48rpx;
+  width: 68rpx;
+  height: 68rpx;
   display: flex;
   align-items: center;
-  width: 100%;
-  padding: 4rpx 12rpx 36rpx;
-  box-sizing: border-box;
+  justify-content: center;
 }
 
-.profile-info {
-  min-width: 0;
-  margin-left: 32rpx;
+.bell-icon {
+  position: relative;
+  width: 38rpx;
+  height: 38rpx;
+}
+
+.bell-body {
+  width: 38rpx;
+  height: 30rpx;
+  background: #e2e5e9;
+  border-radius: 19rpx 19rpx 4rpx 4rpx;
+  position: absolute;
+  top: 0;
+}
+
+.bell-clapper {
+  width: 14rpx;
+  height: 14rpx;
+  background: #e2e5e9;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.bell-dot {
+  position: absolute;
+  right: 12rpx;
+  top: 14rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #e8544d;
+  border: 4rpx solid #fff;
+  z-index: 3;
+}
+
+.g-hi {
+  font-size: 24rpx;
+  color: #a8b1bd;
+  letter-spacing: 2rpx;
+}
+
+.id-row {
+  margin-top: 20rpx;
   display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
 }
 
-/* 黑底青柠 + 青柠光环 */
 .avatar {
-  width: 112rpx;
-  height: 112rpx;
+  width: 108rpx;
+  height: 108rpx;
   border-radius: 50%;
   background: #212631;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 0 6rpx #c9f24b, 0 0 0 10rpx rgba(201, 242, 75, 0.3);
 }
 
 .avatar-text {
-  font-size: 50rpx;
+  font-size: 40rpx;
   color: #c9f24b;
-  font-weight: 900;
-}
-
-.nickname {
-  font-size: 36rpx;
   font-weight: 800;
-  color: #212631;
-  letter-spacing: -0.01em;
 }
 
-/* 会员类型=青柠胶囊 */
-.member-type {
-  margin-top: 12rpx;
-  font-size: 20rpx;
-  font-weight: 700;
-  color: #3d5500;
-  background: #c9f24b;
-  padding: 4rpx 20rpx;
-  border-radius: 999rpx;
-  line-height: 1.5;
-}
-
-/* 数据行:参与活动数 / 到店次数 / 剩余次数(高亮) */
-.stats {
-  display: flex;
-  width: 100%;
-  margin-top: 0;
-  padding-top: 28rpx;
-  border-top: 1rpx solid rgba(33, 38, 49, 0.07);
-}
-
-.stat {
-  flex: 1;
+.id-text {
+  margin-left: 28rpx;
   display: flex;
   flex-direction: column;
-  align-items: center;
 }
 
-.stat-num {
+.id-name {
+  font-size: 38rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+
+.id-slogan {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 2rpx;
+}
+
+/* 数字即入口 */
+.stats-flow {
+  margin-top: 32rpx;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.sf {
+  display: flex;
+  align-items: baseline;
+}
+
+.sf + .sf {
+  margin-left: 40rpx;
+}
+
+.sf-num {
   font-size: 34rpx;
   font-weight: 800;
-  color: #212631;
-  letter-spacing: -0.02em;
 }
 
-.stat.hl .stat-num {
+.sf-num.hl {
   color: #3d5500;
 }
 
-.stat-label {
-  margin-top: 6rpx;
-  font-size: 20rpx;
+.sf-lab {
+  margin-left: 8rpx;
+  font-size: 22rpx;
   color: #a8b1bd;
-  font-weight: 600;
+  letter-spacing: 2rpx;
 }
 
-/* ============ 栏目卡 ============ */
+.sf-arr {
+  margin-left: 6rpx;
+  font-size: 22rpx;
+  color: #c9cfd6;
+}
 
-.menu-card {
-  background: #ffffff;
-  border-radius: 32rpx;
+/* ============ 我的活动 ============ */
+
+.act-section {
+  padding: 0 32rpx;
+}
+
+.sec-head {
+  margin-top: 48rpx;
+  display: flex;
+  align-items: baseline;
+}
+
+.sec-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+
+.days {
+  margin-top: 24rpx;
+}
+
+.day-card {
+  position: relative;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 24rpx 30rpx 12rpx;
   overflow: hidden;
-  box-shadow: 0 2rpx 4rpx rgba(33, 38, 49, 0.05);
 }
 
-.menu-item {
-  width: 100%;
-  height: 104rpx;
-  padding: 0 28rpx;
+.day-card + .day-card {
+  margin-top: 20rpx;
+}
+
+.day-next {
+  background: #f2f7e2;
+}
+
+.d-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 28rpx;
-  font-weight: 600;
-  line-height: normal;
-  box-sizing: border-box;
+  padding-bottom: 16rpx;
 }
 
-.menu-item:not(:last-child) {
-  border-bottom: 1rpx solid rgba(33, 38, 49, 0.06);
-}
-
-.menu-item::after {
-  border: none;
-}
-
-.menu-item-hover {
-  background: #f4f5f6;
-}
-
-.menu-text {
-  color: #212631;
-}
-
-.menu-text-wrap {
-  display: flex;
-  align-items: center;
-}
-
-.badge {
-  min-width: 32rpx;
-  height: 32rpx;
-  padding: 0 10rpx;
-  background: #f54a45;
-  color: #ffffff;
+.d-chip {
   font-size: 20rpx;
   font-weight: 700;
-  border-radius: 999rpx;
+  letter-spacing: 2rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 14rpx;
+  background: #212631;
+  color: #c9f24b;
+}
+
+.d-count {
+  margin-left: auto;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 2rpx;
+}
+
+.r-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-left: 12rpx;
+  padding: 18rpx 0;
+}
+
+.r-row + .r-row {
+  border-top: 1rpx solid rgba(33, 38, 49, 0.05);
+}
+
+.r-time {
+  width: 92rpx;
   flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #79838f;
+  letter-spacing: 1rpx;
 }
 
-.menu-arrow {
-  color: #a8b1bd;
-  font-size: 30rpx;
-}
-
-/* 退出登录:独立卡 + 红字居中 */
-.logout-card {
-  margin-top: 24rpx;
-  background: #ffffff;
-  border-radius: 32rpx;
+.r-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  white-space: nowrap;
   overflow: hidden;
-  box-shadow: 0 2rpx 4rpx rgba(33, 38, 49, 0.05);
+  text-overflow: ellipsis;
 }
 
-.logout-item {
-  justify-content: center;
+.r-st {
+  font-size: 20rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
 }
 
-.menu-text-danger {
-  color: #f54a45;
+.st-up {
+  background: #c9f24b;
+  color: #3d5500;
+}
+
+.st-done {
+  background: #eef0f1;
+  color: #a8b1bd;
+}
+
+.st-missed {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.d-leaf {
+  position: absolute;
+  right: 28rpx;
+  top: 28rpx;
+  width: 36rpx;
+  height: 24rpx;
+  border-radius: 100% 8rpx 100% 8rpx;
+  background: #c9f24b;
+  transform: rotate(-16deg);
+}
+
+/* ============ 退出登录 ============ */
+
+.logout {
+  margin-top: 52rpx;
+  padding-bottom: 60rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #a8b1bd;
 }
 
 /* ============ 未登录态 ============ */
 
 .avatar-empty {
-  width: 112rpx;
-  height: 112rpx;
+  width: 108rpx;
+  height: 108rpx;
   border-radius: 50%;
   background: #eef0f2;
   position: relative;
@@ -222,9 +354,17 @@
   background: #c3c9d2;
 }
 
+.id-name-login {
+  color: #212631;
+}
+
+.id-name-login-hover {
+  opacity: 0.6;
+}
+
 .login-area {
-  margin-top: 8rpx;
-  padding: 0 12rpx 24rpx;
+  margin-top: 16rpx;
+  padding: 0 24rpx 48rpx;
 }
 
 .login-btn {
@@ -239,7 +379,7 @@
   color: #c9f24b;
   font-size: 30rpx;
   font-weight: 600;
-  letter-spacing: 2rpx;
+  letter-spacing: 4rpx;
   border-radius: 999rpx;
   border: none;
   box-sizing: border-box;
@@ -260,167 +400,9 @@
 
 .login-tip {
   display: block;
-  margin-top: 16rpx;
+  margin-top: 24rpx;
   text-align: center;
-  font-size: 20rpx;
+  font-size: 22rpx;
   line-height: 1.5;
   color: #a8b1bd;
-}
-
-
-/* 「登录」与昵称使用相同的文字排版,点击进入登录页 */
-.nickname-login {
-  display: block;
-  line-height: 1.2;
-}
-
-.nickname-login-hover {
-  opacity: 0.6;
-}
-
-/* ============ 最近活动时间轴(方案D) ============ */
-
-.tl-section {
-  margin-top: 24rpx;
-}
-
-.tl-section .sec-head {
-  display: flex;
-  align-items: baseline;
-  margin-bottom: 24rpx;
-}
-
-.tl-section .sec-title {
-  font-size: 32rpx;
-  font-weight: 700;
-  letter-spacing: 1rpx;
-}
-
-.tl-section .sec-count {
-  margin-left: 12rpx;
-  font-size: 22rpx;
-  color: #a8b1bd;
-  letter-spacing: 1rpx;
-}
-
-.tl-list {
-  margin: 0;
-}
-
-.tl-day {
-  display: flex;
-}
-
-.tl-axis {
-  width: 44rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.tl-dot {
-  width: 18rpx;
-  height: 18rpx;
-  border-radius: 50%;
-  background: #212631;
-  margin-top: 14rpx;
-  flex-shrink: 0;
-}
-
-.tl-dot-up {
-  background: #c9f24b;
-  border: 4rpx solid #212631;
-  width: 22rpx;
-  height: 22rpx;
-  margin-top: 12rpx;
-}
-
-.tl-line {
-  flex: 1;
-  width: 4rpx;
-  background: #e5e3de;
-  margin-top: 8rpx;
-}
-
-.tl-day:last-child .tl-line {
-  display: none;
-}
-
-.tl-body {
-  flex: 1;
-  padding: 0 0 36rpx 20rpx;
-  min-width: 0;
-}
-
-.tl-date {
-  display: flex;
-  align-items: baseline;
-}
-
-.tl-daynum {
-  font-size: 40rpx;
-  font-weight: 800;
-}
-
-.tl-daylab {
-  margin-left: 12rpx;
-  font-size: 22rpx;
-  color: #a8b1bd;
-  letter-spacing: 1rpx;
-}
-
-.tl-item {
-  display: flex;
-  align-items: center;
-  margin-top: 20rpx;
-}
-
-.tl-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.tl-name {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 600;
-  letter-spacing: 0.5rpx;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tl-meta {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  color: #a8b1bd;
-  letter-spacing: 0.5rpx;
-}
-
-/* 状态胶囊 */
-.st {
-  font-size: 20rpx;
-  font-weight: 600;
-  letter-spacing: 1rpx;
-  padding: 6rpx 18rpx;
-  border-radius: 999rpx;
-  flex-shrink: 0;
-  margin-left: 16rpx;
-}
-
-.st-done {
-  background: #f1f0ed;
-  color: #a8b1bd;
-}
-
-.st-up {
-  background: #c9f24b;
-  color: #3d5500;
-}
-
-.st-missed {
-  background: #fef2f2;
-  color: #dc2626;
 }
