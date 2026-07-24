@@ -59,22 +59,22 @@ def list_logs(
 ) -> List[SystemLog]:
     logs = list(_logs.values())
     if operator:
-        logs = [l for l in logs if operator.lower() in l.operator.lower()]
+        logs = [log for log in logs if operator.lower() in log.operator.lower()]
     if method:
         if method == "PUT":
-            logs = [l for l in logs if l.method in ("PUT", "PATCH")]
+            logs = [log for log in logs if log.method in ("PUT", "PATCH")]
         else:
-            logs = [l for l in logs if l.method == method]
+            logs = [log for log in logs if log.method == method]
     if date_from:
         try:
             dt = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
-            logs = [l for l in logs if l.created_at >= dt]
+            logs = [log for log in logs if log.created_at >= dt]
         except ValueError:
             pass
     if date_to:
         try:
             dt = datetime.fromisoformat(date_to).replace(tzinfo=timezone.utc)
-            logs = [l for l in logs if l.created_at <= dt]
+            logs = [log for log in logs if log.created_at <= dt]
         except ValueError:
             pass
     return sorted(logs, key=lambda x: x.created_at, reverse=True)

@@ -45,11 +45,20 @@ def list_course_type_names() -> List[str]:
     return [t["name"] for t in _types]
 
 
-def create_course_type(name: str, organization_id: str = "", show_in_client: bool = False) -> dict:
+def create_course_type(name: str, organization_id: str = "", show_in_client: bool = False,
+                       list_image: str = "", detail_images: list[str] | None = None,
+                       category: str = "salon") -> dict:
     existing_names = {t["name"] for t in _types}
     if name in existing_names:
         raise ValueError("类型名称已存在")
-    item = {"name": name, "organization_id": organization_id, "show_in_client": show_in_client}
+    item = {
+        "name": name,
+        "organization_id": organization_id,
+        "show_in_client": show_in_client,
+        "list_image": list_image,
+        "detail_images": detail_images or [],
+        "category": category,
+    }
     _types.append(item)
     _save(name)
     return item
@@ -80,7 +89,9 @@ def rename_course_type(old_name: str, new_name: str) -> bool:
     return True
 
 
-def update_course_type(name: str, organization_id: Optional[str] = None, show_in_client: Optional[bool] = None) -> bool:
+def update_course_type(name: str, organization_id: Optional[str] = None, show_in_client: Optional[bool] = None,
+                       list_image: Optional[str] = None, detail_images: Optional[list[str]] = None,
+                       category: Optional[str] = None) -> bool:
     names = [t["name"] for t in _types]
     if name not in names:
         return False
@@ -89,6 +100,12 @@ def update_course_type(name: str, organization_id: Optional[str] = None, show_in
         _types[idx]["organization_id"] = organization_id
     if show_in_client is not None:
         _types[idx]["show_in_client"] = show_in_client
+    if list_image is not None:
+        _types[idx]["list_image"] = list_image
+    if detail_images is not None:
+        _types[idx]["detail_images"] = detail_images
+    if category is not None:
+        _types[idx]["category"] = category
     _save(name)
     return True
 

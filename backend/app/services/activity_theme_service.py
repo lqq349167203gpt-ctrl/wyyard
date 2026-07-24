@@ -41,14 +41,23 @@ def list_themes(start_date: Optional[str] = None, end_date: Optional[str] = None
     return result
 
 
-def save_theme(date: str, week_theme: str, day_theme: str, space_id: str = "") -> ActivityTheme:
+def save_theme(
+    date: str,
+    week_theme: str,
+    day_theme: str,
+    space_id: str = "",
+    week_theme_detail: str = "",
+    day_theme_detail: str = "",
+) -> ActivityTheme:
     """按 date+space_id upsert"""
     key = f"{date}:{space_id}" if space_id else date
     existing = _themes.get(key)
     now = datetime.now()
     if existing:
         existing.week_theme = week_theme
+        existing.week_theme_detail = week_theme_detail
         existing.day_theme = day_theme
+        existing.day_theme_detail = day_theme_detail
         existing.updated_at = now
         _save(key)
         return existing
@@ -58,7 +67,9 @@ def save_theme(date: str, week_theme: str, day_theme: str, space_id: str = "") -
             date=date,
             space_id=space_id,
             week_theme=week_theme,
+            week_theme_detail=week_theme_detail,
             day_theme=day_theme,
+            day_theme_detail=day_theme_detail,
             created_at=now,
             updated_at=now,
         )

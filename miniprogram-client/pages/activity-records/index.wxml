@@ -5,7 +5,7 @@
   </view>
 
   <!-- 空状态 -->
-  <view wx:elif="{{groups.length === 0}}" class="empty-box">
+  <view wx:elif="{{allItems.length === 0}}" class="empty-box">
     <view class="e-icon">
       <view class="e-chime">
         <view class="e-string"></view>
@@ -24,39 +24,66 @@
     <text class="e-sub">还没有参加过活动，去首页看看吧</text>
   </view>
 
-  <!-- 时间轴列表 -->
-  <view wx:else>
-    <view class="sec-head">
-      <text class="sec-title">我的活动</text>
-      <text class="sec-count">共 {{totalCount}} 场</text>
-    </view>
-
-    <view class="tl-list">
-      <view wx:for="{{groups}}" wx:key="date" class="tl-day">
-        <!-- 竖轴：圆点 + 竖线 -->
-        <view class="tl-axis">
-          <view class="tl-dot {{item.items[0].arrived ? '' : 'tl-dot-up'}}"></view>
-          <view class="tl-line"></view>
-        </view>
-
-        <!-- 右侧内容 -->
-        <view class="tl-body">
-          <!-- 日期行 -->
-          <view class="tl-date">
-            <text class="tl-daynum">{{item.dayNum}}</text>
-            <text class="tl-daylab">{{item.dateLabel}}</text>
-          </view>
-
-          <!-- 活动行 -->
-          <view wx:for="{{item.items}}" wx:for-item="act" wx:key="index" class="tl-item">
-            <view class="tl-main">
-              <text class="tl-name">{{act.name}}</text>
-              <text class="tl-meta">{{act.meta}}</text>
-            </view>
-            <text class="st {{act.badgeClass}}">{{act.badge}}</text>
-          </view>
-        </view>
+  <!-- 内容 -->
+  <block wx:else>
+    <!-- 记录摘要 -->
+    <view class="summary">
+      <view class="sum">
+        <text class="sum-num">{{totalCount}}</text>
+        <text class="sum-lab">场</text>
+      </view>
+      <view class="sum">
+        <text class="sum-num">{{arrivedCount}}</text>
+        <text class="sum-lab">已到场</text>
+      </view>
+      <view class="sum">
+        <text class="sum-num">{{signedUpCount}}</text>
+        <text class="sum-lab">报名中</text>
+      </view>
+      <view class="sum">
+        <text class="sum-num">{{missedCount}}</text>
+        <text class="sum-lab">未到场</text>
       </view>
     </view>
-  </view>
+
+    <!-- 状态筛选 -->
+    <view class="tabs">
+      <text class="tab {{activeTab === 'all' ? 'on' : ''}}" bindtap="onTabTap" data-tab="all">全部</text>
+      <text class="tab {{activeTab === 'signedup' ? 'on' : ''}}" bindtap="onTabTap" data-tab="signedup">报名中</text>
+      <text class="tab {{activeTab === 'arrived' ? 'on' : ''}}" bindtap="onTabTap" data-tab="arrived">已到场</text>
+      <text class="tab {{activeTab === 'missed' ? 'on' : ''}}" bindtap="onTabTap" data-tab="missed">未到场</text>
+    </view>
+
+    <!-- 月份分组 -->
+    <block wx:for="{{groups}}" wx:key="month">
+      <view class="mon-head">
+        <text class="mon-title">{{item.month}} 月</text>
+        <view class="mon-rule"></view>
+        <text class="mon-note">{{item.totalCount}} 场</text>
+      </view>
+
+      <view class="days">
+        <block wx:for="{{item.dateGroups}}" wx:for-item="dg" wx:key="date">
+          <view class="day-card">
+            <view class="d-head">
+              <text class="d-chip {{dg.isPast ? 'past' : ''}} {{dg.chipTilt}}">{{dg.dateChip}}</text>
+              <text wx:if="{{dg.items.length > 1}}" class="d-count">{{dg.items.length}} 场</text>
+            </view>
+            <view wx:for="{{dg.items}}" wx:for-item="act" wx:key="index" class="r2">
+              <view class="r2-l1">
+                <text class="r-name">{{act.displayName}}</text>
+                <text class="r-st {{act.badgeClass}}">{{act.badge}}</text>
+              </view>
+              <view class="r2-l2">
+                <text class="m-time">{{act.timeRange}}</text>
+                <text class="role-tag {{act.roleTagClass}}">{{act.roleLabel}}</text>
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+    </block>
+
+    <view class="end-note">· 没有更多了 ·</view>
+  </block>
 </view>

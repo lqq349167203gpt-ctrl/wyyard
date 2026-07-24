@@ -5,7 +5,7 @@ from datetime import datetime
 class ClientNotification(SafeBaseModel):
     id: str
     customer_id: str
-    type: str  # signup_cancelled / activity_cancelled
+    type: str  # signup_cancelled / activity_cancelled / activity_changed / arrival_confirmed
     title: str
     content: str
     activity_name: str = ""

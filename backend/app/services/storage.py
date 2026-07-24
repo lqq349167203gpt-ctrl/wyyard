@@ -155,8 +155,10 @@ def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
         conn.commit()
     except Exception as e:
         logger.error("[SAVE_ERROR] %s/%s: %s", table, item_id, e)
-        try: conn.rollback()
-        except: pass
+        try:
+            conn.rollback()
+        except:
+            pass
         raise
     finally:
         _put_conn(conn)

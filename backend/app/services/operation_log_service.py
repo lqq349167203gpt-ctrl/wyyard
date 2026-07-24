@@ -48,31 +48,31 @@ def list_logs(
         from app.services import account_service
         accounts = account_service.list_accounts()
         owner_usernames = {a.username for a in accounts if a.owner == operator}
-        logs = [l for l in logs if l.operator == operator or (owner_usernames and l.operator in owner_usernames)]
+        logs = [log for log in logs if log.operator == operator or (owner_usernames and log.operator in owner_usernames)]
     if section:
-        logs = [l for l in logs if l.section == section]
+        logs = [log for log in logs if log.section == section]
     if method:
         if method == "UPDATE":
-            logs = [l for l in logs if l.method in ("PUT", "PATCH")]
+            logs = [log for log in logs if log.method in ("PUT", "PATCH")]
         else:
-            logs = [l for l in logs if l.method == method]
+            logs = [log for log in logs if log.method == method]
     if entity_id:
-        logs = [l for l in logs if l.entity_id == entity_id]
+        logs = [log for log in logs if log.entity_id == entity_id]
     if source:
-        logs = [l for l in logs if l.source == source]
+        logs = [log for log in logs if log.source == source]
     if keyword:
         kw = keyword.lower()
-        logs = [l for l in logs if l.content and kw in l.content.lower()]
+        logs = [log for log in logs if log.content and kw in log.content.lower()]
     if date_from:
         try:
             dt = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
-            logs = [l for l in logs if l.created_at >= dt]
+            logs = [log for log in logs if log.created_at >= dt]
         except ValueError:
             pass
     if date_to:
         try:
             dt = datetime.fromisoformat(date_to).replace(tzinfo=timezone.utc)
-            logs = [l for l in logs if l.created_at <= dt]
+            logs = [log for log in logs if log.created_at <= dt]
         except ValueError:
             pass
     return sorted(logs, key=lambda x: x.created_at, reverse=True)

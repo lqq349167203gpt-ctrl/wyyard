@@ -45,30 +45,32 @@ wyyard/
 ```
 
 ## 页面清单
-| 分组 | 页面 | 路由 |
-|------|------|------|
-| 疗愈 | 提醒 | /business-reminders |
-| 疗愈 | 数据记录 | /data-records |
-| 疗愈 | 客户资料 | /healing-records |
-| 疗愈 | 邀约 | /courses/class-records |
-| 疗愈 | 课表 | /courses/daily-activities |
+| 侧边栏分组 | 页面 | 路由 |
+|------------|------|------|
+| 数据 | 提醒 | /business-reminders |
+| 数据 | 数据记录 | /data-records |
+| 数据 | 会员情况 | /member-statistics |
+| 数据 | 产品销售 | /product-sales |
+| 数据 | 服务数据 | /statistics |
+| 报表 | 每日报表 | /daily-report |
+| 业务 | 客户资料 | /healing-records |
+| 业务 | 邀约 | /courses/class-records |
+| 业务 | 课表 | /courses/daily-activities |
+| 业务 | 沟通记录 | /communication-records |
 | 付费 | 付费项目 | /payment |
 | 付费 | 销卡 | /payment-deductions |
 | 付费 | 退费 | /payment-refunds |
-| 数据 | 产品数据 | /product-statistics |
 | 信息配置 | 会员身份 | /config/member-identities |
 | 信息配置 | 疗愈老师 | /healing-identities |
 | 信息配置 | 组织管理 | /organizations |
 | 信息配置 | 空间配置 | /courses/spaces |
 | 信息配置 | 提醒配置 | /config/reminders |
-| 账号 | 账号管理 | /positions/management |
-| 账号 | 密码修改 | /change-password |
-| 系统配置 | AI 配置 | /agents |
-| 系统配置 | 沟通记录 | /chat-history |
-| 系统配置 | 系统日志 | /system-logs |
-| 数据 | 数据统计 | /statistics |
-| 数据 | 产品数据 | /product-statistics |
-| 系统配置 | 操作日志 | /operation-logs |
+| 账号管理 | 账号管理 | /positions/management |
+| 账号管理 | 密码修改 | /change-password |
+| 系统 | AI 配置 | /agents |
+| 系统 | 沟通记录 | /chat-history |
+| 系统 | 系统日志 | /system-logs |
+| 系统 | 操作日志 | /operation-logs |
 | **小程序（员工）** | 客户列表 | /pages/customers/index |
 | **小程序（员工）** | 邀约 | /pages/visits/index |
 | **小程序（员工）** | 课表 | /pages/activities/index |

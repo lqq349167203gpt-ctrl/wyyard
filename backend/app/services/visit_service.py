@@ -107,8 +107,10 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
     # 2. 觉醒游戏（owner > host > participant）
     for s in group_case_session_service.list_sessions(date):
         all_ids = set()
-        if s.owner_id: all_ids.add(s.owner_id)
-        if s.host_id: all_ids.add(s.host_id)
+        if s.owner_id:
+            all_ids.add(s.owner_id)
+        if s.host_id:
+            all_ids.add(s.host_id)
         all_ids.update(s.participant_ids)
         for cid in all_ids:
             if cid == s.owner_id:
@@ -121,8 +123,10 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
     # 3. 情绪释放（owner > host > participant）
     for s in emotional_release_session_service.list_sessions(date):
         all_ids = set()
-        if s.owner_id: all_ids.add(s.owner_id)
-        if s.host_id: all_ids.add(s.host_id)
+        if s.owner_id:
+            all_ids.add(s.owner_id)
+        if s.host_id:
+            all_ids.add(s.host_id)
         all_ids.update(s.participant_ids)
         for cid in all_ids:
             if cid == s.owner_id:
@@ -135,7 +139,8 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
     # 4. 能量结（owner > teacher > participant）
     for s in energy_knot_session_service.list_sessions(date):
         all_ids = set()
-        if s.owner_id: all_ids.add(s.owner_id)
+        if s.owner_id:
+            all_ids.add(s.owner_id)
         all_ids.update(s.teacher_ids)
         all_ids.update(s.participant_ids)
         for cid in all_ids:
@@ -159,7 +164,8 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
     # 6. OH卡梳理（owner > teacher > participant）
     for s in oh_card_reading_session_service.list_sessions(date):
         all_ids = set()
-        if s.owner_id: all_ids.add(s.owner_id)
+        if s.owner_id:
+            all_ids.add(s.owner_id)
         all_ids.update(s.teacher_ids)
         all_ids.update(s.participant_ids)
         for cid in all_ids:
@@ -768,9 +774,12 @@ def _cleanup_activity_records(customer_id: str, date: str):
         for s in group_case_session_service.list_sessions(date=date):
             changed = False
             if s.host_id == customer_id:
-                s.host_id = ""; s.host_name = ""; changed = True
+                s.host_id = ""
+                s.host_name = ""
+                changed = True
             if customer_id in s.teacher_ids:
-                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]
+                changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
                     membership_card_service._do_restore(customer_id, f"gcs:{s.id}")
@@ -786,9 +795,12 @@ def _cleanup_activity_records(customer_id: str, date: str):
         for s in emotional_release_session_service.list_sessions(date=date):
             changed = False
             if s.host_id == customer_id:
-                s.host_id = ""; s.host_name = ""; changed = True
+                s.host_id = ""
+                s.host_name = ""
+                changed = True
             if customer_id in s.teacher_ids:
-                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]
+                changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
                     membership_card_service._do_restore(customer_id, f"ers:{s.id}")
@@ -804,7 +816,8 @@ def _cleanup_activity_records(customer_id: str, date: str):
         for s in energy_knot_session_service.list_sessions(date=date):
             changed = False
             if customer_id in s.teacher_ids:
-                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]
+                changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
                     membership_card_service._do_restore(customer_id, f"eks:{s.id}")
@@ -820,7 +833,8 @@ def _cleanup_activity_records(customer_id: str, date: str):
         for s in internal_course_session_service.list_sessions(date=date):
             changed = False
             if customer_id in s.teacher_ids:
-                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]
+                changed = True
             if customer_id in s.participant_ids:
                 membership_card_service._do_restore(customer_id, f"ics:{s.id}")
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
@@ -835,9 +849,12 @@ def _cleanup_activity_records(customer_id: str, date: str):
         for s in oh_card_reading_session_service.list_sessions(date=date):
             changed = False
             if s.host_id == customer_id:
-                s.host_id = ""; s.host_name = ""; changed = True
+                s.host_id = ""
+                s.host_name = ""
+                changed = True
             if customer_id in s.teacher_ids:
-                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]; changed = True
+                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]
+                changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
                     membership_card_service._do_restore(customer_id, f"ocr:{s.id}")
@@ -859,8 +876,10 @@ def _cleanup_activity_records(customer_id: str, date: str):
         if grouping and grouping.groups:
             cleaned = []
             for g in grouping.groups:
-                if g.leader_id == customer_id: g.leader_id = ""
-                if g.deputy_id == customer_id: g.deputy_id = ""
+                if g.leader_id == customer_id:
+                    g.leader_id = ""
+                if g.deputy_id == customer_id:
+                    g.deputy_id = ""
                 g.member_ids = [x for x in g.member_ids if x != customer_id]
                 if g.leader_id or g.deputy_id or g.member_ids:
                     cleaned.append(g)

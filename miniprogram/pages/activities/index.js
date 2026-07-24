@@ -189,17 +189,21 @@ Page({
   // ---------- 数据 ----------
 
   async loadData(spaceId) {
+    const requestSeq = (this._loadSeq || 0) + 1
+    this._loadSeq = requestSeq
+    const requestedDate = this.data.currentDate
     this.setData({ loading: true })
     try {
       const sid = spaceId !== undefined ? spaceId : this.data.spaceId
-      const dashboard = await classRecordApi.dashboard(this.data.currentDate, sid || undefined)
+      const dashboard = await classRecordApi.dashboard(requestedDate, sid || undefined)
+      if (requestSeq !== this._loadSeq || requestedDate !== this.data.currentDate || sid !== this.data.spaceId) return
       const records = []
-      this._rawMap = {}
+      const rawMap = {}
 
       if (dashboard.class_records) {
         dashboard.class_records.forEach(r => {
           const badge = r.course_type || '沙龙'
-          this._rawMap[`class_record_${r.id}`] = r
+          rawMap[`class_record_${r.id}`] = r
           records.push({
             id: r.id, badge,
             name: r.activity_name || r.course_name || '',
@@ -217,7 +221,7 @@ Page({
       if (dashboard.gcs_sessions) {
         dashboard.gcs_sessions.forEach(r => {
           const owner = r.owner_name || ''
-          this._rawMap[`group_case_${r.id}`] = r
+          rawMap[`group_case_${r.id}`] = r
           records.push({
             id: r.id, badge: '觉醒',
             name: r.name || (owner ? `觉醒游戏·${owner}` : '觉醒游戏'),
@@ -234,7 +238,7 @@ Page({
       if (dashboard.ers_sessions) {
         dashboard.ers_sessions.forEach(r => {
           const achiever = r.achiever_name || ''
-          this._rawMap[`emotional_release_${r.id}`] = r
+          rawMap[`emotional_release_${r.id}`] = r
           records.push({
             id: r.id, badge: '情绪释放',
             name: r.name || (achiever ? `情绪释放·${achiever}` : '情绪释放'),
@@ -251,7 +255,7 @@ Page({
       if (dashboard.eks_sessions) {
         dashboard.eks_sessions.forEach(r => {
           const teacher = (r.teacher_names || [])[0] || ''
-          this._rawMap[`energy_knot_${r.id}`] = r
+          rawMap[`energy_knot_${r.id}`] = r
           records.push({
             id: r.id, badge: '能量结',
             name: r.name || (teacher ? `能量结·${teacher}` : '能量结'),
@@ -267,7 +271,7 @@ Page({
 
       if (dashboard.ics_sessions) {
         dashboard.ics_sessions.forEach(r => {
-          this._rawMap[`internal_course_${r.id}`] = r
+          rawMap[`internal_course_${r.id}`] = r
           records.push({
             id: r.id, badge: '内部课程',
             name: r.course_name || r.course_type || '',
@@ -284,7 +288,7 @@ Page({
       if (dashboard.ocr_sessions) {
         dashboard.ocr_sessions.forEach(r => {
           const achiever = r.achiever_name || ''
-          this._rawMap[`oh_card_${r.id}`] = r
+          rawMap[`oh_card_${r.id}`] = r
           records.push({
             id: r.id, badge: 'OH卡',
             name: r.name || (achiever ? `OH卡·${achiever}` : 'OH卡'),
@@ -316,10 +320,11 @@ Page({
 
       // 保存日历计数，供展开时使用
       this._calendarCounts = dashboard.calendar_counts || {}
+      this._rawMap = rawMap
       this.setData({ records, participants, participantText: participants.join('、'), loading: false })
     } catch (e) {
       console.error('加载活动失败:', e)
-      this.setData({ loading: false })
+      if (requestSeq === this._loadSeq) this.setData({ loading: false })
     }
   },
 

@@ -51,9 +51,8 @@ Page({
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._goBack(), 600)
       })
-      .catch(err => {
+      .catch(() => {
         this.setData({ loggingIn: false })
-        wx.showToast({ title: err.message || '登录失败', icon: 'none' })
       })
   },
 

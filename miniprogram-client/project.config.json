@@ -1,7 +1,40 @@
 {
   "description": "无忧茶苑客户端小程序",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": ".refs"
+      },
+      {
+        "type": "folder",
+        "value": "design-refs"
+      },
+      {
+        "type": "folder",
+        "value": "outputs"
+      },
+      {
+        "type": "folder",
+        "value": "poster-landscape"
+      },
+      {
+        "type": "suffix",
+        "value": ".html"
+      },
+      {
+        "type": "suffix",
+        "value": ".md"
+      },
+      {
+        "type": "suffix",
+        "value": ".py"
+      },
+      {
+        "type": "file",
+        "value": ".preview-v4.png"
+      }
+    ],
     "include": []
   },
   "setting": {

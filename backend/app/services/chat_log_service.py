@@ -39,16 +39,16 @@ def list_logs(
 ) -> List[ChatLog]:
     results = list(_logs.values())
     if operator:
-        results = [l for l in results if l.operator == operator]
+        results = [log for log in results if log.operator == operator]
     if mode:
-        results = [l for l in results if l.mode == mode]
+        results = [log for log in results if log.mode == mode]
     if date_from:
-        results = [l for l in results if l.created_at >= date_from]
+        results = [log for log in results if log.created_at >= date_from]
     if date_to:
-        results = [l for l in results if l.created_at <= date_to]
+        results = [log for log in results if log.created_at <= date_to]
     if keyword:
         kw = keyword.lower()
-        results = [l for l in results if kw in l.user_message.lower() or kw in l.ai_reply.lower()]
+        results = [log for log in results if kw in log.user_message.lower() or kw in log.ai_reply.lower()]
     results.sort(key=lambda x: x.created_at, reverse=True)
     return results
 

@@ -4,6 +4,7 @@ import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -1578,17 +1579,27 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
 ))
 
 // ===== WeekThemeDialog =====
-const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onClose, onSaved }: {
+const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, defaultSpaceId, onClose, onSaved }: {
   open: boolean
   weekIndex: number
   weekDays: { date: string; weekday: string }[]
   themeMap: Map<string, ActivityTheme>
   spaces: Space[]
+  defaultSpaceId: string
   onClose: () => void
-  onSaved: (themes: { date: string; space_id: string; week_theme: string; day_theme: string }[]) => Promise<void>
+  onSaved: (themes: {
+    date: string
+    space_id: string
+    week_theme: string
+    week_theme_detail: string
+    day_theme: string
+    day_theme_detail: string
+  }[]) => Promise<void>
 }) => {
   const [weekTheme, setWeekTheme] = useState("")
+  const [weekThemeDetail, setWeekThemeDetail] = useState("")
   const [dayThemes, setDayThemes] = useState<Record<string, string>>({})
+  const [dayThemeDetails, setDayThemeDetails] = useState<Record<string, string>>({})
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([])
   const [spaceDropdownOpen, setSpaceDropdownOpen] = useState(false)
   const spaceDropdownRef = useRef<HTMLDivElement>(null)
@@ -1607,22 +1618,27 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
 
   useEffect(() => {
     if (open) {
-      const firstTheme = themeMap.get(weekDays[0]?.date || "")
+      const firstTheme = weekDays.map(day => themeMap.get(day.date)).find(Boolean)
       setWeekTheme(firstTheme?.week_theme || "")
+      setWeekThemeDetail(firstTheme?.week_theme_detail || "")
       const dt: Record<string, string> = {}
+      const details: Record<string, string> = {}
       for (const day of weekDays) {
         dt[day.date] = themeMap.get(day.date)?.day_theme || ""
+        details[day.date] = themeMap.get(day.date)?.day_theme_detail || ""
       }
       setDayThemes(dt)
+      setDayThemeDetails(details)
       // 初始化已选空间：从当前主题的 space_id 读取
       const spaceIds = new Set<string>()
       for (const day of weekDays) {
         const t = themeMap.get(day.date)
         if (t?.space_id) spaceIds.add(t.space_id)
       }
-      setSelectedSpaceIds(Array.from(spaceIds))
+      setSelectedSpaceIds(spaceIds.size > 0 ? Array.from(spaceIds) : (defaultSpaceId ? [defaultSpaceId] : []))
+      setSpaceError(false)
     }
-  }, [open, weekDays])
+  }, [open, weekDays, defaultSpaceId])
 
   const [spaceError, setSpaceError] = useState(false)
 
@@ -1635,7 +1651,12 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
     try {
       const themes = weekDays.flatMap(day =>
         selectedSpaceIds.map(sid => ({
-          date: day.date, space_id: sid, week_theme: weekTheme, day_theme: dayThemes[day.date] || "",
+          date: day.date,
+          space_id: sid,
+          week_theme: weekTheme,
+          week_theme_detail: weekThemeDetail,
+          day_theme: dayThemes[day.date] || "",
+          day_theme_detail: dayThemeDetails[day.date] || "",
         }))
       )
       await onSaved(themes)
@@ -1651,11 +1672,11 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+      <DialogContent className="max-w-3xl p-0 gap-0" initialFocus={false}>
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
           <DialogTitle className="text-[15px]">第{weekIndex + 1}周 {dateRangeLabel}</DialogTitle>
         </DialogHeader>
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-[80px_1fr] items-start gap-3">
             <span className="text-[12px] text-[#8f959e] text-right font-light pt-2">所属空间</span>
             <div className="space-y-1.5">
@@ -1717,28 +1738,48 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, onC
               {spaceError && <p className="text-xs text-destructive">请选择所属空间</p>}
             </div>
           </div>
-          <div className="grid grid-cols-[80px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right font-light">周主题</span>
-            <Input rounded="[2px]"
+          <div className="grid grid-cols-[80px_minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
+            <span className="pt-2 text-[12px] text-[#8f959e] text-right font-light">周主题</span>
+            <Textarea
               value={weekTheme}
               onChange={(e) => setWeekTheme(e.target.value)}
               placeholder="输入本周主题"
-              className="h-8 text-[12px]"
+              rows={2}
+              className="min-h-14 resize-y rounded-[4px]"
+            />
+            <Textarea
+              value={weekThemeDetail}
+              onChange={(e) => setWeekThemeDetail(e.target.value)}
+              placeholder="输入周主题详情"
+              rows={2}
+              className="min-h-14 resize-y rounded-[4px]"
             />
           </div>
           <div className="space-y-3">
-            <span className="text-[12px] text-[#8f959e] font-light">每日主题</span>
+            <div className="grid grid-cols-[80px_minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3">
+              <span className="text-[12px] text-[#8f959e] text-right font-light">日期</span>
+              <span className="text-[12px] text-[#8f959e] font-light">每日主题</span>
+              <span className="text-[12px] text-[#8f959e] font-light">主题详情</span>
+            </div>
             <div className="space-y-2">
               {weekDays.map((day) => (
-                <div key={day.date} className="grid grid-cols-[80px_1fr] items-center gap-3">
-                  <span className="text-[12px] text-[#8f959e] text-right font-light">
+                <div key={day.date} className="grid grid-cols-[80px_minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
+                  <span className="pt-2 text-[12px] text-[#8f959e] text-right font-light">
                     {day.date.split("-").slice(1).join("/")} 周{day.weekday}
                   </span>
-                  <Input rounded="[2px]"
+                  <Textarea
                     value={dayThemes[day.date] || ""}
                     onChange={(e) => setDayThemes(prev => ({ ...prev, [day.date]: e.target.value }))}
                     placeholder="输入每日主题"
-                    className="h-8 text-[12px]"
+                    rows={2}
+                    className="min-h-14 resize-y rounded-[4px]"
+                  />
+                  <Textarea
+                    value={dayThemeDetails[day.date] || ""}
+                    onChange={(e) => setDayThemeDetails(prev => ({ ...prev, [day.date]: e.target.value }))}
+                    placeholder="输入当天主题详情"
+                    rows={2}
+                    className="min-h-14 resize-y rounded-[4px]"
                   />
                 </div>
               ))}
@@ -2157,7 +2198,14 @@ export default function DailyActivitiesPage() {
     }
   }
 
-  const saveBatchThemes = async (themes: { date: string; space_id: string; week_theme: string; day_theme: string }[]) => {
+  const saveBatchThemes = async (themes: {
+    date: string
+    space_id: string
+    week_theme: string
+    week_theme_detail: string
+    day_theme: string
+    day_theme_detail: string
+  }[]) => {
     const results = await activityThemeApi.batchSave(themes)
     setThemes(prev => {
       const next = [...prev]
@@ -2763,7 +2811,7 @@ export default function DailyActivitiesPage() {
             </thead>
             <tbody>
               {themeWeeks.flatMap((week, wi) => {
-                const firstTheme = themeMap.get(week.days[0]?.date || "")
+                const firstTheme = week.days.map(day => themeMap.get(day.date)).find(theme => theme?.week_theme)
                 const weekThemeText = firstTheme?.week_theme || ""
                 const isLastWeek = wi === themeWeeks.length - 1
                 const dateRow = (
@@ -3015,6 +3063,7 @@ export default function DailyActivitiesPage() {
           weekDays={themeWeeks[themeEditWeekIndex].days.filter(d => d.inMonth)}
           themeMap={themeMap}
           spaces={spaces}
+          defaultSpaceId={selectedSpaceId}
           onClose={() => setThemeEditWeekIndex(null)}
           onSaved={saveBatchThemes}
         />

@@ -327,6 +327,30 @@ def _build_purchase_summary(customer_id: str) -> list:
     return summary
 
 
+def _resolve_activity_role(
+    customer_id: str,
+    *,
+    owner_id: str = "",
+    achiever_id: str = "",
+    host_id: str = "",
+    host_role: str = "",
+    teacher_ids: list[str] | None = None,
+    participant_ids: list[str] | set[str] | None = None,
+) -> str:
+    """按固定优先级返回客户在单场活动中的身份。"""
+    if owner_id and customer_id == owner_id:
+        return "案主"
+    if achiever_id and customer_id == achiever_id:
+        return "成就君"
+    if host_role and host_id and customer_id == host_id:
+        return host_role
+    if customer_id in (teacher_ids or []):
+        return "老师"
+    if customer_id in (participant_ids or []):
+        return "参与者"
+    return ""
+
+
 def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
     """合并所有活动记录，按日期倒序（必须实际到店）"""
     activities = []
@@ -341,24 +365,18 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
             teacher_names.append(t.nickname or t.name if t else tid)
         host = ", ".join(teacher_names)
         chargeable = class_record_service._get_group_member_ids(r)
-        if customer_id in chargeable:
+        role = _resolve_activity_role(
+            customer_id,
+            teacher_ids=r.teacher_ids,
+            participant_ids=chargeable,
+        )
+        if role:
             activities.append({
                 "type": "沙龙类型",
                 "date": r.date,
                 "name": r.course_name,
                 "course_type": r.course_type or "",
-                "role": "参与者",
-                "host": host,
-                "session_id": r.id,
-                "is_public_welfare": r.is_public_welfare,
-            })
-        elif customer_id in (r.teacher_ids or []):
-            activities.append({
-                "type": "沙龙类型",
-                "date": r.date,
-                "name": r.course_name,
-                "course_type": r.course_type or "",
-                "role": "老师",
+                "role": role,
                 "host": host,
                 "session_id": r.id,
                 "is_public_welfare": r.is_public_welfare,
@@ -369,32 +387,21 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
         if arrived_dates is not None and s.date not in arrived_dates:
             continue
         gc_name = f"觉醒游戏【{s.owner_name}】" if s.owner_name else "觉醒游戏"
-        if s.owner_id == customer_id:
+        role = _resolve_activity_role(
+            customer_id,
+            owner_id=s.owner_id,
+            achiever_id=s.achiever_id,
+            host_id=s.host_id,
+            host_role="成就君",
+            teacher_ids=s.teacher_ids,
+            participant_ids=s.participant_ids,
+        )
+        if role:
             activities.append({
                 "type": "觉醒游戏",
                 "date": s.date,
                 "name": gc_name,
-                "role": "案主",
-                "host": s.host_name or "",
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in s.participant_ids:
-            activities.append({
-                "type": "觉醒游戏",
-                "date": s.date,
-                "name": gc_name,
-                "role": "参与者",
-                "host": s.host_name or "",
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in (s.teacher_ids or []):
-            activities.append({
-                "type": "觉醒游戏",
-                "date": s.date,
-                "name": gc_name,
-                "role": "老师",
+                "role": role,
                 "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
@@ -405,32 +412,21 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
         if arrived_dates is not None and s.date not in arrived_dates:
             continue
         er_name = f"情绪释放【{s.owner_name}】" if s.owner_name else "情绪释放"
-        if s.owner_id == customer_id:
+        role = _resolve_activity_role(
+            customer_id,
+            owner_id=s.owner_id,
+            achiever_id=s.achiever_id,
+            host_id=s.host_id,
+            host_role="成就君",
+            teacher_ids=s.teacher_ids,
+            participant_ids=s.participant_ids,
+        )
+        if role:
             activities.append({
                 "type": "情绪释放",
                 "date": s.date,
                 "name": er_name,
-                "role": "案主",
-                "host": s.host_name or "",
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in s.participant_ids:
-            activities.append({
-                "type": "情绪释放",
-                "date": s.date,
-                "name": er_name,
-                "role": "参与者",
-                "host": s.host_name or "",
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in (s.teacher_ids or []):
-            activities.append({
-                "type": "情绪释放",
-                "date": s.date,
-                "name": er_name,
-                "role": "老师",
+                "role": role,
                 "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,
@@ -443,32 +439,20 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
         ek_names = _parse_ek_names(s.description)
         ek_name = f"能量结【{ek_names}】" if ek_names else "能量结"
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
-        if s.owner_id == customer_id:
+        role = _resolve_activity_role(
+            customer_id,
+            owner_id=s.owner_id,
+            host_id=s.host_id,
+            host_role="老师",
+            teacher_ids=s.teacher_ids,
+            participant_ids=s.participant_ids,
+        )
+        if role:
             activities.append({
                 "type": "能量结",
                 "date": s.date,
                 "name": ek_name,
-                "role": "案主",
-                "host": host,
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in s.participant_ids:
-            activities.append({
-                "type": "能量结",
-                "date": s.date,
-                "name": ek_name,
-                "role": "参与者",
-                "host": host,
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in (s.teacher_ids or []):
-            activities.append({
-                "type": "能量结",
-                "date": s.date,
-                "name": ek_name,
-                "role": "老师",
+                "role": role,
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
@@ -479,24 +463,20 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
         if arrived_dates is not None and s.date not in arrived_dates:
             continue
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
-        if customer_id in s.participant_ids:
+        role = _resolve_activity_role(
+            customer_id,
+            host_id=s.host_id,
+            host_role="老师",
+            teacher_ids=s.teacher_ids,
+            participant_ids=s.participant_ids,
+        )
+        if role:
             activities.append({
                 "type": "内部课程",
                 "date": s.date,
                 "name": s.course_name,
                 "course_type": s.course_type or "",
-                "role": "参与者",
-                "host": host,
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in (s.teacher_ids or []):
-            activities.append({
-                "type": "内部课程",
-                "date": s.date,
-                "name": s.course_name,
-                "course_type": s.course_type or "",
-                "role": "老师",
+                "role": role,
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
@@ -505,32 +485,21 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
     # OH卡梳理
     for s in oh_card_reading_session_service.list_sessions():
         ocr_name = f"OH卡梳理【{s.owner_name}】" if s.owner_name else "OH卡梳理"
-        if s.owner_id == customer_id:
+        role = _resolve_activity_role(
+            customer_id,
+            owner_id=s.owner_id,
+            achiever_id=s.achiever_id,
+            host_id=s.host_id,
+            host_role="成就君",
+            teacher_ids=s.teacher_ids,
+            participant_ids=s.participant_ids,
+        )
+        if role:
             activities.append({
                 "type": "OH卡梳理",
                 "date": s.date,
                 "name": ocr_name,
-                "role": "案主",
-                "host": s.host_name or "",
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in s.participant_ids:
-            activities.append({
-                "type": "OH卡梳理",
-                "date": s.date,
-                "name": ocr_name,
-                "role": "参与者",
-                "host": s.host_name or "",
-                "session_id": s.id,
-                "is_public_welfare": False,
-            })
-        elif customer_id in (s.teacher_ids or []):
-            activities.append({
-                "type": "OH卡梳理",
-                "date": s.date,
-                "name": ocr_name,
-                "role": "老师",
+                "role": role,
                 "host": s.host_name or "",
                 "session_id": s.id,
                 "is_public_welfare": False,

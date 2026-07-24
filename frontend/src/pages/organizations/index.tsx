@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react"
-import { Plus, Trash2, Edit, Users, Building2, ArrowUp, ArrowDown } from "lucide-react"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { Plus, Trash2, Edit, Users, Building2, ArrowUp, ArrowDown, ImagePlus, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { organizationApi, customerApi, courseTypeApi, type Organization, type Customer, type CourseType } from "@/lib/api"
+import { organizationApi, customerApi, courseTypeApi, uploadApi, type Organization, type Customer, type CourseType } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 
@@ -37,8 +37,8 @@ export default function OrganizationsPage() {
   const [deleteMemberInput, setDeleteMemberInput] = useState("")
   const [deleteMemberError, setDeleteMemberError] = useState("")
 
-  // 活动类型 tab
-  const [activeTab, setActiveTab] = useState<"members" | "activities">("members")
+  // 活动类型 tab: members=成员列表, salons=沙龙活动, others=其他活动
+  const [activeTab, setActiveTab] = useState<"members" | "salons" | "others">("members")
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
   const [actDialogOpen, setActDialogOpen] = useState(false)
   const [actEditingType, setActEditingType] = useState<string | null>(null)
@@ -48,6 +48,15 @@ export default function OrganizationsPage() {
   const [actDeleteDialogOpen, setActDeleteDialogOpen] = useState(false)
   const [actDeletingType, setActDeletingType] = useState<string | null>(null)
   const [actBlockedOpen, setActBlockedOpen] = useState(false)
+  const [actFormListImage, setActFormListImage] = useState("")
+  const [actFormDetailImages, setActFormDetailImages] = useState<string[]>([])
+  const [actUploading, setActUploading] = useState(false)
+  const [actUploadError, setActUploadError] = useState("")
+  const listImageRef = useRef<HTMLInputElement>(null)
+  const detailImagesRef = useRef<HTMLInputElement>(null)
+  const [actListImageWarn, setActListImageWarn] = useState("")
+  const [actDetailImageWarn, setActDetailImageWarn] = useState("")
+  const [actEditingIsOther, setActEditingIsOther] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -242,14 +251,21 @@ export default function OrganizationsPage() {
     setDeleteMemberDialogOpen(true)
   }
 
-  // 活动类型 CRUD
-  const orgCourseTypes = activeOrgId ? courseTypes.filter(t => t.organization_id === activeOrgId) : []
+  // 活动类型 CRUD:沙龙活动=category为空或salon, 其他活动=category=other
+  const orgCourseTypes = activeOrgId ? courseTypes.filter(t => t.organization_id === activeOrgId && t.category !== "other") : []
+  const otherCourseTypes = courseTypes.filter(t => t.category === "other")
 
   const handleOpenActCreate = () => {
     setActEditingType(null)
     setActFormName("")
     setActFormShowInClient(true)
     setActFormError("")
+    setActFormListImage("")
+    setActFormDetailImages([])
+    setActListImageWarn("")
+    setActDetailImageWarn("")
+    setActUploadError("")
+    setActEditingIsOther(false)
     setActDialogOpen(true)
   }
 
@@ -258,6 +274,12 @@ export default function OrganizationsPage() {
     setActFormName(type.name)
     setActFormShowInClient(type.show_in_client || false)
     setActFormError("")
+    setActFormListImage(type.list_image || "")
+    setActFormDetailImages(type.detail_images || [])
+    setActListImageWarn("")
+    setActDetailImageWarn("")
+    setActUploadError("")
+    setActEditingIsOther(type.category === "other")
     setActDialogOpen(true)
   }
 
@@ -269,15 +291,81 @@ export default function OrganizationsPage() {
         if (actFormName.trim() !== actEditingType) {
           await courseTypeApi.rename(actEditingType, actFormName.trim())
         }
-        await courseTypeApi.update(actFormName.trim(), { organization_id: activeOrgId, show_in_client: actFormShowInClient })
+        await courseTypeApi.update(actFormName.trim(), {
+          organization_id: activeOrgId,
+          show_in_client: actFormShowInClient,
+          list_image: actFormListImage,
+          detail_images: actFormDetailImages,
+        })
       } else {
-        await courseTypeApi.create(actFormName.trim(), activeOrgId, actFormShowInClient)
+        await courseTypeApi.create(actFormName.trim(), activeOrgId, actFormShowInClient, actFormListImage, actFormDetailImages)
       }
       setActDialogOpen(false)
       const types = await courseTypeApi.list().catch(() => [] as CourseType[])
       setCourseTypes(types)
     } catch (e: any) {
       setActFormError(e?.message || "保存失败")
+    }
+  }
+
+  // 图片探针:读取本地图片的宽高,用于上传前的软性校验(失败不阻塞上传)
+  const probeImage = (file: File): Promise<{ w: number; h: number }> =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => { URL.revokeObjectURL(url); resolve({ w: img.naturalWidth, h: img.naturalHeight }) }
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")) }
+      img.src = url
+    })
+
+  const handleUploadListImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const warns: string[] = []
+    if (file.size > 2 * 1024 * 1024) warns.push("体积超过 2MB，建议压缩至 500KB 内")
+    try {
+      const { w, h } = await probeImage(file)
+      const r = w / h
+      if (r < 0.66 || r > 0.8) warns.push("比例不是竖版 3:4，列表中会居中裁切")
+    } catch {
+      // 探针失败不阻塞
+    }
+    setActListImageWarn(warns.join("；"))
+    setActUploadError("")
+    setActUploading(true)
+    try {
+      const material = await uploadApi.uploadPublicImage(file)
+      setActFormListImage(material.url)
+    } catch (error) {
+      setActUploadError(error instanceof Error ? error.message : "列表图片上传失败")
+    } finally {
+      setActUploading(false)
+      if (listImageRef.current) listImageRef.current.value = ""
+    }
+  }
+
+  const handleUploadDetailImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const warns: string[] = []
+    if (file.size > 3 * 1024 * 1024) warns.push("单张超过 3MB，建议压缩至 1MB 内")
+    try {
+      const { w } = await probeImage(file)
+      if (w < 1000) warns.push("宽度不足 1200px，详情页全宽显示会模糊")
+    } catch {
+      // 探针失败不阻塞
+    }
+    setActDetailImageWarn(warns.join("；"))
+    setActUploadError("")
+    setActUploading(true)
+    try {
+      const material = await uploadApi.uploadPublicImage(file)
+      setActFormDetailImages(prev => [...prev, material.url])
+    } catch (error) {
+      setActUploadError(error instanceof Error ? error.message : "详情图片上传失败")
+    } finally {
+      setActUploading(false)
+      if (detailImagesRef.current) detailImagesRef.current.value = ""
     }
   }
 
@@ -427,7 +515,7 @@ export default function OrganizationsPage() {
 
         {/* 右侧面板 */}
         <div className="flex-1 bg-white rounded-lg flex flex-col min-w-0">
-          {/* Tab 切换 + 操作按钮 */}
+          {/* Tab 切换: 成员列表 / 沙龙活动 / 其他活动 */}
           <div className="flex items-center justify-between px-4 h-[45px] border-b border-[#f0f0f0] shrink-0">
             <div className="flex items-center gap-1">
               <button
@@ -437,16 +525,25 @@ export default function OrganizationsPage() {
                 成员列表
               </button>
               <button
-                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "activities" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
-                onClick={() => setActiveTab("activities")}
+                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "salons" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
+                onClick={() => setActiveTab("salons")}
               >
-                活动列表
+                沙龙活动
+              </button>
+              <button
+                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "others" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
+                onClick={() => setActiveTab("others")}
+              >
+                其他活动
               </button>
               {activeOrg && activeTab === "members" && (
                 <span className="text-[11px] text-[#8f959e] ml-1">{members.length} 人</span>
               )}
-              {activeOrg && activeTab === "activities" && (
+              {activeOrg && activeTab === "salons" && (
                 <span className="text-[11px] text-[#8f959e] ml-1">{orgCourseTypes.length} 个</span>
+              )}
+              {activeOrg && activeTab === "others" && (
+                <span className="text-[11px] text-[#8f959e] ml-1">{otherCourseTypes.length} 个</span>
               )}
             </div>
             {activeOrg && activeTab === "members" && (
@@ -454,7 +551,7 @@ export default function OrganizationsPage() {
                 <Plus className="mr-1 h-3 w-3" /> 新增
               </Button>
             )}
-            {activeOrg && activeTab === "activities" && (
+            {activeOrg && activeTab === "salons" && (
               <Button size="sm" className="h-7 text-xs" onClick={handleOpenActCreate}>
                 <Plus className="mr-1 h-3 w-3" /> 新增
               </Button>
@@ -541,8 +638,8 @@ export default function OrganizationsPage() {
                   </TableBody>
                 </Table>
               )
-            ) : (
-              /* 活动列表 */
+            ) : activeTab === "salons" ? (
+              /* 沙龙活动 */
               orgCourseTypes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="rounded-full bg-muted p-3 mb-3">
@@ -557,6 +654,7 @@ export default function OrganizationsPage() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-[40px] pl-4"></TableHead>
                       <TableHead className="text-xs font-medium">类型名称</TableHead>
+                      <TableHead className="text-xs font-medium w-[60px]">列表图</TableHead>
                       <TableHead className="text-xs font-medium w-[80px]">前端显示</TableHead>
                       <TableHead className="text-xs text-right pr-4">操作</TableHead>
                     </TableRow>
@@ -578,6 +676,13 @@ export default function OrganizationsPage() {
                           <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
                         </TableCell>
                         <TableCell>
+                          {type.list_image ? (
+                            <img src={type.list_image} alt="" className="w-10 h-10 rounded object-cover" />
+                          ) : (
+                            <span className="text-[11px] text-[#c9cdd4]">未设置</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <span className="text-[12px] text-[#2b2f36]">{type.show_in_client ? "是" : "否"}</span>
                         </TableCell>
                         <TableCell className="text-right pr-4">
@@ -587,6 +692,53 @@ export default function OrganizationsPage() {
                             </Button>
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setActDeletingType(type.name); setActDeleteDialogOpen(true) }}>
                               <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )
+            ) : (
+              /* 其他活动 */
+              otherCourseTypes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="rounded-full bg-muted p-3 mb-3">
+                    <Building2 className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">暂无其他活动类型</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-xs font-medium">类型名称</TableHead>
+                      <TableHead className="text-xs font-medium w-[60px]">列表图</TableHead>
+                      <TableHead className="text-xs font-medium w-[80px]">前端显示</TableHead>
+                      <TableHead className="text-xs text-right pr-4">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {otherCourseTypes.map((type) => (
+                      <TableRow key={type.name} className="group">
+                        <TableCell>
+                          <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
+                        </TableCell>
+                        <TableCell>
+                          {type.list_image ? (
+                            <img src={type.list_image} alt="" className="w-10 h-10 rounded object-cover" />
+                          ) : (
+                            <span className="text-[11px] text-[#c9cdd4]">未设置</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[12px] text-[#2b2f36]">{type.show_in_client ? "是" : "否"}</span>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenActEdit(type)}>
+                              <Edit className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </TableCell>
@@ -710,9 +862,9 @@ export default function OrganizationsPage() {
       <Dialog open={actDialogOpen} onOpenChange={setActDialogOpen}>
         <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">{actEditingType ? "编辑活动类型" : "新增活动类型"}</DialogTitle>
+            <DialogTitle className="text-base">{actEditingType ? (actEditingIsOther ? "编辑其他活动" : "编辑活动类型") : "新增活动类型"}</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">类型名称</span>
               <div>
@@ -733,9 +885,68 @@ export default function OrganizationsPage() {
                 <p className="text-[11px] text-[#c9cdd4] mt-1.5">勾选后，用户可在客户端查看到课程，自主报名</p>
               </div>
             </div>
+            {/* 列表图片 */}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">列表图片</span>
+              <div>
+                <input ref={listImageRef} type="file" accept="image/*" className="hidden" onChange={handleUploadListImage} />
+                {actFormListImage ? (
+                  <div className="relative inline-block">
+                    <img src={actFormListImage} alt="" className="w-[60px] h-20 rounded object-cover border border-[#e8eaed]" />
+                    <button
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#2b2f36] text-white flex items-center justify-center hover:bg-red-500 transition-colors"
+                      onClick={() => { setActFormListImage(""); setActListImageWarn("") }}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    className="flex items-center gap-2 px-4 py-3 border border-dashed border-[#e8eaed] rounded cursor-pointer hover:border-[#3370ff] transition-colors"
+                    onClick={() => listImageRef.current?.click()}
+                  >
+                    <ImagePlus className="h-4 w-4 text-[#8f959e]" />
+                    <span className="text-[12px] text-[#8f959e]">{actUploading ? "上传中..." : "点击上传"}</span>
+                  </label>
+                )}
+                <p className="text-[11px] text-[#c9cdd4] mt-1.5">用于小程序活动列表的缩略图，按竖版 3:4 居中显示</p>
+                <p className="text-[11px] text-[#c9cdd4] mt-0.5">要求：竖版 3:4 或 A4 竖版（如 1200×1600px）、JPG、500KB 内；关键文字避开上下 5% 边缘</p>
+                {actListImageWarn && <p className="text-[11px] text-amber-600 mt-1">{actListImageWarn}</p>}
+              </div>
+            </div>
+            {/* 详情图片 */}
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">详情图片</span>
+              <div>
+                <input ref={detailImagesRef} type="file" accept="image/*" className="hidden" onChange={handleUploadDetailImage} />
+                <div className="flex flex-wrap gap-2">
+                  {actFormDetailImages.map((url, idx) => (
+                    <div key={idx} className="relative">
+                      <img src={url} alt="" className="w-16 h-16 rounded object-cover border border-[#e8eaed]" />
+                      <button
+                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#2b2f36] text-white flex items-center justify-center hover:bg-red-500 transition-colors"
+                        onClick={() => setActFormDetailImages(prev => prev.filter((_, i) => i !== idx))}
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <label
+                    className="flex items-center justify-center w-16 h-16 border border-dashed border-[#e8eaed] rounded cursor-pointer hover:border-[#3370ff] transition-colors"
+                    onClick={() => detailImagesRef.current?.click()}
+                  >
+                    <ImagePlus className="h-4 w-4 text-[#8f959e]" />
+                  </label>
+                </div>
+                <p className="text-[11px] text-[#c9cdd4] mt-1.5">用于活动详情页正文展示，可添加多张；不传时详情页沿用列表图片</p>
+                <p className="text-[11px] text-[#c9cdd4] mt-0.5">要求：横竖不限（建议横版 3:2 或竖版 3:4）、宽 ≥1200px、单张 ≤1MB</p>
+                {actDetailImageWarn && <p className="text-[11px] text-amber-600 mt-1">{actDetailImageWarn}</p>}
+                {actUploadError && <p className="mt-1 text-[12px] text-destructive">{actUploadError}</p>}
+              </div>
+            </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setActDialogOpen(false)}>取消</Button>
-              <Button size="sm" onClick={handleSaveAct} disabled={!actFormName.trim()}>保存</Button>
+              <Button size="sm" onClick={handleSaveAct} disabled={!actFormName.trim() || actUploading}>保存</Button>
             </div>
           </div>
         </DialogContent>

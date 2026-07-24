@@ -1,20 +1,11 @@
 <view class="page">
   <!-- 已登录 -->
   <block wx:if="{{isLoggedIn && customer}}">
-    <!-- 白色顶部区域 -->
-    <view class="topzone">
-      <!-- 风铃装饰 -->
-      <view class="chime">
-        <view class="c-string"></view>
-        <view class="c-dome"></view>
-        <view class="c-paper"></view>
-      </view>
-      <!-- 消息铃铛 -->
+    <!-- 头部区域 -->
+    <view class="head">
+      <!-- 消息铃铛（右上角） -->
       <view class="bell" bindtap="onBellTap">
-        <view class="bell-icon">
-          <view class="bell-body"></view>
-          <view class="bell-clapper"></view>
-        </view>
+        <image class="bell-svg" src="/assets/bell.png" mode="aspectFit" />
         <view wx:if="{{unreadCount > 0}}" class="bell-dot"></view>
       </view>
 
@@ -25,50 +16,63 @@
         </view>
         <view class="id-text">
           <text class="id-name">{{customer.nickname}}</text>
-          <text class="id-slogan">助力亿万家庭幸福美满</text>
-        </view>
-      </view>
-
-      <!-- 数字即入口 -->
-      <view class="stats-flow">
-        <view class="sf" bindtap="onStatTap" data-type="activity">
-          <text class="sf-num">{{stats.activity_count}}</text>
-          <text class="sf-lab">场活动</text>
-          <text class="sf-arr">›</text>
-        </view>
-        <view class="sf" bindtap="onStatTap" data-type="visit">
-          <text class="sf-num">{{stats.visit_count}}</text>
-          <text class="sf-lab">次到店</text>
-          <text class="sf-arr">›</text>
-        </view>
-        <view class="sf">
-          <text class="sf-num hl">{{stats.remain_count}}</text>
-          <text class="sf-lab">次剩余</text>
-          <text class="sf-arr">›</text>
+          <text class="id-slogan">{{customer.member_type || '助力亿万家庭幸福美满'}}</text>
         </view>
       </view>
     </view>
 
+    <!-- 数据统计 -->
+    <view class="stats-flow">
+      <view class="sf">
+        <text class="sf-num">{{stats.visit_count}}</text>
+        <text class="sf-lab">次到店</text>
+      </view>
+      <view class="sf">
+        <text class="sf-num">{{stats.activity_count}}</text>
+        <text class="sf-lab">场活动</text>
+      </view>
+      <view class="sf-big">
+        <text class="sf-big-num {{remainClass}}">{{remainNum}}</text>
+        <text class="sf-big-lab">{{remainLabel}}</text>
+      </view>
+    </view>
+
+    <!-- 管理入口 -->
+    <view class="mgmt">
+      <view class="m-blk" bindtap="onRecordTap" data-type="transactions">交易记录</view>
+      <view class="m-blk" bindtap="onRecordTap" data-type="cancel">销卡记录</view>
+    </view>
+
     <!-- 我的活动 -->
-    <view wx:if="{{activityGroups.length > 0}}" class="act-section">
+    <view wx:if="{{activityGroups.length > 0}}">
       <view class="sec-head">
         <text class="sec-title">我的活动</text>
+        <view class="sec-rule"></view>
+        <text class="sec-note">本周 {{weekCount}} 场</text>
       </view>
 
       <view class="days">
-        <view wx:for="{{activityGroups}}" wx:key="date" class="day-card {{index === 0 ? 'day-next' : ''}}">
-          <view wx:if="{{index === 0}}" class="d-leaf"></view>
-          <view class="d-head">
-            <text class="d-chip">{{item.dateChip}}</text>
-            <text wx:if="{{item.items.length > 1}}" class="d-count">{{item.items.length}} 场</text>
+        <block wx:for="{{activityGroups}}" wx:key="date">
+          <view class="day-card">
+            <view class="d-head">
+              <text class="d-chip {{item.isPast ? 'past' : ''}}">{{item.isToday ? '今天 · ' : ''}}{{item.dateChip}}</text>
+              <text wx:if="{{item.items.length > 1}}" class="d-count">{{item.items.length}} 场</text>
+            </view>
+            <view wx:for="{{item.items}}" wx:for-item="act" wx:key="index" class="r2" bindtap="onActivityTap" data-id="{{act.session_id}}">
+              <view class="r2-l1">
+                <text class="r-name">{{act.displayName}}</text>
+                <text class="r-st {{act.badgeClass}}">{{act.badge}}</text>
+              </view>
+              <view class="r2-l2">
+                <text class="m-time">{{act.timeRange}}</text>
+                <text class="role-tag {{act.roleTagClass}}">{{act.roleLabel}}</text>
+              </view>
+            </view>
           </view>
-          <view wx:for="{{item.items}}" wx:for-item="act" wx:key="index" class="r-row">
-            <text class="r-time">{{act.start_time}}</text>
-            <text class="r-name">{{act.name}}</text>
-            <text class="r-st {{act.badgeClass}}">{{act.badge}}</text>
-          </view>
-        </view>
+        </block>
       </view>
+
+      <view class="all-link" bindtap="onViewAll">查看全部 {{activityTotalCount}} 场 ›</view>
     </view>
 
     <view class="logout" bindtap="onLogout">退出登录</view>
@@ -76,7 +80,7 @@
 
   <!-- 未登录 -->
   <block wx:else>
-    <view class="topzone">
+    <view class="head">
       <view class="g-hi">你好</view>
       <view class="id-row">
         <view class="avatar-empty">
@@ -84,18 +88,32 @@
           <view class="ae-body"></view>
         </view>
         <view class="id-text">
-          <text class="id-name id-name-login" hover-class="id-name-login-hover" bindtap="onGoLogin">登录</text>
+          <text class="id-name">未登录</text>
           <text class="id-slogan">助力亿万家庭幸福美满</text>
         </view>
       </view>
-      <view class="stats-flow">
-        <view class="sf"><text class="sf-num">—</text><text class="sf-lab">场活动</text></view>
-        <view class="sf"><text class="sf-num">—</text><text class="sf-lab">次到店</text></view>
-        <view class="sf"><text class="sf-num hl">—</text><text class="sf-lab">次剩余</text></view>
-      </view>
     </view>
-    <view class="login-area">
-      <button class="login-btn" hover-class="login-btn-hover" bindtap="onGoLogin">手机号快捷登录</button>
+
+    <view class="invite">
+      <text>登录后，你参加的每一场活动，</text>
+      <text>都会在这里记成一本小册子。</text>
+    </view>
+
+    <!-- 我的活动：空态预览 -->
+    <view class="sec-head guest-sec-head">
+      <text class="sec-title">我的活动</text>
+      <view class="sec-rule"></view>
+      <text class="sec-note">登录后可见</text>
+    </view>
+    <view class="ghost">
+      <view class="ghost-leaf"></view>
+      <text class="ghost-text">你的活动小册子，等你翻开第一页</text>
+    </view>
+
+    <view class="guest-login-area">
+      <view class="login-wrap">
+        <button class="login-btn" hover-class="login-btn-hover" bindtap="onGoLogin">手机号快捷登录</button>
+      </view>
       <text class="login-tip">微信授权一键登录，新用户将自动注册</text>
     </view>
   </block>

@@ -1,77 +1,106 @@
 <view class="page">
+  <!-- 透明自定义导航栏 -->
+  <view class="custom-nav" style="height: {{navTotalHeight}}px; padding-top: {{statusBarHeight}}px;">
+    <view class="custom-nav-inner" style="height: {{navBarHeight}}px;">
+      <view class="nav-back" bindtap="onBack" aria-role="button" aria-label="返回">
+        <view class="nav-back-icon"></view>
+      </view>
+    </view>
+  </view>
+
   <!-- 加载中 -->
   <view wx:if="{{loading}}" class="loading">
     <text class="loading-text">加载中...</text>
   </view>
 
   <block wx:elif="{{activity}}">
-    <!-- 日期时间行:左日期 + 右时间块(与首页卡片同款时间语言) -->
-    <view class="hero">
-      <view class="hero-left">
-        <text class="date">{{activity.dateLabel}}</text>
-        <text class="week">{{activity.weekday}}</text>
+    <!-- Hero:橱窗底衬 — 模糊海报底图 + 清晰前景海报 -->
+    <view wx:if="{{activity.posterImage}}" class="hero">
+      <view class="hero-bg">
+        <image class="hero-bg-image" src="{{activity.posterImage}}" mode="aspectFill" />
+        <view class="hero-bg-veil"></view>
       </view>
-      <view class="timeblock">
-        <text wx:if="{{activity.timeStart}}" class="start">{{activity.timeStart}}</text>
-        <text wx:else class="start start-tbd">时间待定</text>
-        <text wx:if="{{activity.timeEnd}}" class="end">至 {{activity.timeEnd}}</text>
+      <view class="hero-fg">
+        <image class="hero-poster activity-image-filter" src="{{activity.posterImage}}" mode="aspectFit" bindtap="onPreviewPoster" />
       </view>
     </view>
 
-    <!-- 标签:只保留标题里没有的增量信息(公益/线上),不放类型标签避免与标题重复 -->
-    <view class="tags" wx:if="{{activity.is_public_welfare || activity.isOnline}}">
-      <text wx:if="{{activity.is_public_welfare}}" class="tag">公益</text>
-      <text wx:if="{{activity.isOnline}}" class="tag">线上</text>
-    </view>
+    <!-- 无海报时为透明导航栏预留安全距离 -->
+    <view wx:if="{{!activity.posterImage}}" style="height: {{navTotalHeight}}px;"></view>
 
-    <!-- 标题 -->
-    <view class="title">{{activity.name}}</view>
-
-    <!-- 署名行:老师 + 地址并一行(紧贴标题) -->
-    <view class="byline" wx:if="{{activity.teachers.length || activity.addressText}}">
-      <view class="b-avatars" wx:if="{{activity.teachers.length}}">
-        <view wx:for="{{activity.teachers}}" wx:key="index" class="b-avatar">{{item.initial}}</view>
+    <!-- 内容 sheet:白底上移覆盖 hero 底部 -->
+    <view class="sheet {{activity.posterImage ? 'sheet--overlap' : ''}}">
+      <!-- W1：标题 + 日期 + 时间双行信息 -->
+      <view class="w1-title-line">
+        <text class="w1-title">{{activity.name}}</text>
       </view>
-      <text wx:if="{{activity.teacherText}}" class="b-name">{{activity.teacherText}}</text>
-      <text wx:if="{{activity.teachers.length}}" class="b-label">老师</text>
-      <view wx:if="{{activity.teachers.length && activity.addressText}}" class="b-dot"></view>
-      <text wx:if="{{activity.addressText}}" class="b-addr">{{activity.addressText}}</text>
-    </view>
-
-    <!-- 参与者:一行小字全部列出,自己加粗(紧贴署名行) -->
-    <view class="roster" wx:if="{{activity.rosterList.length}}">
-      <text class="rnames"><text wx:for="{{activity.rosterList}}" wx:key="index" class="{{item.is_me ? 'rname-me' : ''}}">{{item.name}}{{index < activity.rosterList.length - 1 ? '、' : ''}}</text> 已报名</text>
-    </view>
-
-    <!-- 活动简介:青柠小条引导,长文完整展示 -->
-    <view class="intro" wx:if="{{activity.description}}">
-      <view class="intro-head">
-        <view class="bar"></view>
-        <text class="label">活动介绍</text>
+      <view class="w1-date">
+        <text class="w1-date-main">{{activity.dateLabel}}</text>
+        <text wx:if="{{activity.weekday}}" class="w1-week"> · {{activity.weekday}}</text>
       </view>
-      <text class="intro-body">{{activity.description}}</text>
+      <view wx:if="{{activity.timeStart}}" class="w1-time">
+        <view wx:if="{{activity.is_public_welfare || activity.isOnline}}" class="w1-time-tags">
+          <text wx:if="{{activity.is_public_welfare}}" class="tag-in tag-gy">公益</text>
+          <text wx:if="{{activity.isOnline}}" class="tag-in tag-online">线上</text>
+        </view>
+        <text class="w1-time-value">{{activity.timeStart}}<text wx:if="{{activity.timeEnd}}"> – {{activity.timeEnd}}</text></text>
+        <text wx:if="{{activity.durationText}}" class="w1-duration">{{activity.durationText}}</text>
+      </view>
+
+      <!-- 署名行：老师姓名 + 地址 -->
+      <view class="byline" wx:if="{{activity.teacherText || activity.addressText}}">
+        <text wx:if="{{activity.teacherText}}" class="tag-in tag-online leader-label">{{activity.leaderRoleLabel}}</text>
+        <text wx:if="{{activity.teacherText}}" class="b-name">{{activity.teacherText}}</text>
+        <view wx:if="{{activity.teacherText && activity.addressText}}" class="b-dot"></view>
+        <text wx:if="{{activity.addressText}}" class="b-addr">{{activity.addressText}}</text>
+      </view>
+
+      <!-- 个案活动案主 -->
+      <view wx:if="{{activity.ownerText}}" class="owner-line {{activity.teacherText || activity.addressText ? '' : 'owner-line--standalone'}}">
+        <text class="owner-label">案主</text>
+        <text class="owner-name">{{activity.ownerText}}</text>
+      </view>
+
+      <!-- 活动介绍:叶子分隔线 -->
+      <view class="sec" wx:if="{{activity.description}}">
+        <view class="ic-leaf"></view>
+        <text class="sec-t">活动介绍</text>
+        <view class="sec-r"></view>
+      </view>
+      <view wx:if="{{activity.description}}" class="intro">
+        <view wx:for="{{activity.descParagraphs}}" wx:key="index" class="intro-p">{{item.text}}</view>
+      </view>
+
+      <!-- 参与者卡片 -->
+      <view class="part" wx:if="{{activity.rosterList.length}}">
+        <view class="part-head">
+          <text class="part-t">参与者</text>
+          <text class="part-n">{{activity.rosterCount}} 人已参与</text>
+        </view>
+        <view class="rnames">
+          <text wx:for="{{activity.rosterList}}" wx:key="index" class="{{item.is_me ? 'rname-me' : ''}}">{{item.name}}{{index < activity.rosterList.length - 1 ? '、' : ''}}</text>
+          <text> 已参与</text>
+        </view>
+      </view>
     </view>
   </block>
 
-  <!-- 底部报名按钮:黑底青柠,与首页选中态同语言 -->
+  <!-- 底部报名区 -->
   <view wx:if="{{activity}}" class="bottom-bar">
-    <view wx:if="{{activity.expiredStatus === 'ended'}}" class="expired-notice">活动已结束，无法报名</view>
+    <block wx:if="{{activity.participationLocked}}">
+      <view class="signup-done">已参与</view>
+      <text class="role-participation-note">本场{{activity.participationRoleLabel}} · 无需报名</text>
+    </block>
+    <view wx:elif="{{activity.expiredStatus === 'ended'}}" class="expired-notice">活动已结束，无法报名</view>
     <view wx:elif="{{activity.expiredStatus === 'ongoing'}}" class="expired-notice">活动进行中，无法报名</view>
     <block wx:elif="{{!signedUp}}">
-      <button
-        class="signup-btn"
-        bindtap="onSignup"
-        disabled="{{signingUp}}"
-      >
+      <button class="signup-btn" bindtap="onSignup" disabled="{{signingUp}}">
         {{signingUp ? '报名中...' : '立即报名'}}
       </button>
     </block>
-    <button
-      wx:else
-      class="signup-btn signup-btn-cancel"
-      bindtap="onCancelSignup"
-    >
-      取消报名
-    </button>
+    <block wx:else>
+      <view class="signup-done">已报名</view>
+      <text class="cancel-link" bindtap="onCancelSignup">取消报名</text>
+    </block>
   </view>
 </view>

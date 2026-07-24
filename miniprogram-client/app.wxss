@@ -5,3 +5,8 @@ page {
   color: #2b2f36;
   line-height: 1.5;
 }
+
+/* 活动图片默认调色：方案二·轻滤镜 */
+.activity-image-filter {
+  filter: saturate(0.8) contrast(1.03) brightness(1.02);
+}

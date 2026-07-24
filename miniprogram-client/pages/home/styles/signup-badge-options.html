@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活动海报报名人数 · 四版轻量样式</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 28px 64px;
+      background: #e9e7e2;
+      color: #212631;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .head {
+      width: min(1380px, 100%);
+      margin: 0 auto 26px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.4;
+    }
+    .head p {
+      margin: 7px 0 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #777b80;
+    }
+    .grid {
+      width: min(1380px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .option {
+      overflow: hidden;
+      border: 1px solid rgba(33, 38, 49, .06);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 8px 30px rgba(35, 32, 27, .06);
+    }
+    .label {
+      min-height: 82px;
+      padding: 17px 18px 15px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .label b {
+      display: block;
+      font-size: 14px;
+    }
+    .label span {
+      display: block;
+      margin-top: 5px;
+      font-size: 11.5px;
+      line-height: 1.55;
+      color: #8a8f95;
+    }
+    .screen {
+      min-height: 370px;
+      padding: 24px 20px 28px;
+      background: #fff;
+    }
+    .section-title {
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: #a8b1bd;
+      letter-spacing: 2px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr) 10px;
+      align-items: center;
+      gap: 15px;
+      padding: 16px 0;
+    }
+    .poster {
+      width: 96px;
+      height: 120px;
+      overflow: hidden;
+      position: relative;
+      border-radius: 12px;
+      background: #f1f0ed url("../../../design-refs/poster-sample.jpg") center / cover no-repeat;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .035);
+    }
+    .name {
+      overflow: hidden;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .time {
+      margin-top: 5px;
+      font-family: Georgia, serif;
+      font-size: 12px;
+      font-style: italic;
+      color: #3d5500;
+    }
+    .teacher {
+      margin-top: 5px;
+      font-size: 11px;
+      color: #6b7178;
+    }
+    .desc {
+      overflow: hidden;
+      margin-top: 5px;
+      font-size: 11px;
+      color: #a0a7ad;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chev {
+      font-size: 17px;
+      color: #c9cdd2;
+    }
+
+    /* A：浅雾面角标 */
+    .a .badge {
+      min-width: 38px;
+      height: 20px;
+      padding: 0 7px;
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px 0 0 0;
+      background: rgba(255, 255, 255, .78);
+      color: rgba(33, 38, 49, .76);
+      font-size: 10px;
+      font-weight: 500;
+      backdrop-filter: blur(7px);
+    }
+
+    /* B：轻渐隐底边 */
+    .b .badge {
+      height: 26px;
+      padding: 8px 7px 0;
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      background: linear-gradient(to bottom, transparent, rgba(24, 27, 33, .34));
+      color: rgba(255, 255, 255, .92);
+      font-size: 10px;
+      font-weight: 400;
+    }
+
+    /* C：内嵌玻璃胶囊 */
+    .c .badge {
+      height: 20px;
+      padding: 0 8px;
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      display: flex;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, .38);
+      border-radius: 10px;
+      background: rgba(30, 33, 38, .24);
+      color: rgba(255, 255, 255, .94);
+      font-size: 10px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+    }
+
+    /* D：无底色纯文字 */
+    .d .badge {
+      position: absolute;
+      right: 7px;
+      bottom: 6px;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 500;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .72);
+    }
+
+    .recommend {
+      display: inline-flex;
+      margin-left: 7px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #eef5d8;
+      color: #60751f;
+      font-size: 9px;
+      font-weight: 500;
+      vertical-align: 1px;
+    }
+    @media (max-width: 1000px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      body { padding: 24px 14px 40px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <h1>活动海报报名人数 · 四版轻量样式</h1>
+    <p>统一只显示“12人”，重点比较遮罩面积、透明度和与海报的融合程度。</p>
+  </div>
+  <main class="grid">
+    <section class="option a">
+      <div class="label">
+        <b>A · 浅雾面角标</b>
+        <span>右下角贴边，白色半透明；在深浅海报上都稳定。</span>
+      </div>
+      <div class="screen">
+        <div class="section-title">当日活动</div>
+        <div class="row">
+          <div class="poster"><span class="badge">12人</span></div>
+          <div><h2 class="name">听见生命的旋律</h2><div class="time">11:00 – 12:00</div><div class="teacher">王老师</div><div class="desc">用音乐疗愈身心，共享音愈时刻。</div></div>
+          <span class="chev">›</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="option b">
+      <div class="label">
+        <b>B · 轻渐隐底边</b>
+        <span>仍保留“海报遮罩”的感觉，但只占很薄的一层。</span>
+      </div>
+      <div class="screen">
+        <div class="section-title">当日活动</div>
+        <div class="row">
+          <div class="poster"><span class="badge">12人</span></div>
+          <div><h2 class="name">听见生命的旋律</h2><div class="time">11:00 – 12:00</div><div class="teacher">王老师</div><div class="desc">用音乐疗愈身心，共享音愈时刻。</div></div>
+          <span class="chev">›</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="option c">
+      <div class="label">
+        <b>C · 内嵌玻璃胶囊 <i class="recommend">推荐</i></b>
+        <span>不贴边，像海报自身的信息层；最轻，也最精致。</span>
+      </div>
+      <div class="screen">
+        <div class="section-title">当日活动</div>
+        <div class="row">
+          <div class="poster"><span class="badge">12人</span></div>
+          <div><h2 class="name">听见生命的旋律</h2><div class="time">11:00 – 12:00</div><div class="teacher">王老师</div><div class="desc">用音乐疗愈身心，共享音愈时刻。</div></div>
+          <span class="chev">›</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="option d">
+      <div class="label">
+        <b>D · 无底色纯文字</b>
+        <span>完全去掉遮罩，仅靠文字阴影保证识别，存在感最低。</span>
+      </div>
+      <div class="screen">
+        <div class="section-title">当日活动</div>
+        <div class="row">
+          <div class="poster"><span class="badge">12人</span></div>
+          <div><h2 class="name">听见生命的旋律</h2><div class="time">11:00 – 12:00</div><div class="teacher">王老师</div><div class="desc">用音乐疗愈身心，共享音愈时刻。</div></div>
+          <span class="chev">›</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

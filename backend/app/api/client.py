@@ -1,22 +1,44 @@
 import uuid
-from datetime import date as date_cls, datetime
+from datetime import date as date_cls
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Query, Request
+
+from app.api.customer_detail import _build_activities, _build_payment_records
 from app.services import (
     class_record_service,
     course_type_service,
+    emotional_release_session_service,
+    energy_knot_session_service,
+    group_case_session_service,
     internal_course_session_service,
     membership_card_service,
+    oh_card_reading_session_service,
     project_deduction_service,
     space_service,
     visit_service,
 )
-from app.api.customer_detail import _build_payment_records, _build_activities
-from app.services.customer_service import list_customers, get_customer
+from app.services.customer_service import get_customer, list_customers
 from app.services.storage import load_data, save_item
 
 router = APIRouter(prefix="/api/client", tags=["client"])
 
 SIGNUPS_FILE = "client_signups.json"
+
+OTHER_ACTIVITY_SERVICES = {
+    "觉醒游戏": ("gcs", group_case_session_service),
+    "情绪释放": ("ers", emotional_release_session_service),
+    "能量结": ("eks", energy_knot_session_service),
+    "OH卡梳理": ("ocr", oh_card_reading_session_service),
+}
+
+SESSION_SERVICES = {
+    "gcs": group_case_session_service,
+    "ers": emotional_release_session_service,
+    "eks": energy_knot_session_service,
+    "ics": internal_course_session_service,
+    "ocr": oh_card_reading_session_service,
+}
 
 
 def _get_visible_types() -> set[str]:
@@ -29,13 +51,16 @@ def _build_customer_map() -> dict:
     return {c.id: c for c in customers}
 
 
-def _get_teacher_names(teacher_ids: list[str], customer_map: dict) -> list[str]:
-    names = []
+def _get_teacher_profiles(teacher_ids: list[str], customer_map: dict) -> list[dict]:
+    profiles = []
     for tid in teacher_ids:
-        c = customer_map.get(tid)
-        if c:
-            names.append(c.nickname)
-    return names
+        customer = customer_map.get(tid)
+        if customer:
+            profiles.append({
+                "name": customer.nickname or customer.name,
+                "avatar_url": customer.avatar_url or "",
+            })
+    return profiles
 
 
 def _get_space_map() -> tuple[dict[str, str], dict[str, str]]:
@@ -48,8 +73,19 @@ def _get_space_map() -> tuple[dict[str, str], dict[str, str]]:
     return space_map, room_map
 
 
+def _session_item(activity_type: str, session, display_type: str) -> dict:
+    d = session.model_dump(mode="json") if hasattr(session, "model_dump") else dict(session)
+    d["course_type"] = display_type
+    return {
+        "type": activity_type,
+        "id": d.get("id", ""),
+        "data": d,
+        "date": d.get("date", ""),
+    }
+
+
 def _aggregate_visible_activities(visible_types: set[str]) -> list[dict]:
-    """聚合 class 和 ics 活动，只保留 course_type 在可见集合中的"""
+    """聚合所有可在客户端显示的活动场次"""
     items = []
 
     for r in class_record_service.list_records():
@@ -59,11 +95,17 @@ def _aggregate_visible_activities(visible_types: set[str]) -> list[dict]:
             items.append({"type": "class", "id": d["id"], "data": d, "date": d.get("date", "")})
 
     for s in internal_course_session_service.list_sessions():
-        d = s.model_dump(mode="json") if hasattr(s, "model_dump") else s
+        d = s.model_dump(mode="json") if hasattr(s, "model_dump") else dict(s)
         ct = d.get("course_type", "")
-        if ct and ct in visible_types:
-            date_str = d.get("date", "")
-            items.append({"type": "ics", "id": d.get("id", ""), "data": d, "date": date_str})
+        if ct in visible_types or "内部课程" in visible_types:
+            display_type = ct if ct in visible_types else "内部课程"
+            items.append(_session_item("ics", s, display_type))
+
+    for display_type, (activity_type, service) in OTHER_ACTIVITY_SERVICES.items():
+        if display_type not in visible_types:
+            continue
+        for session in service.list_sessions():
+            items.append(_session_item(activity_type, session, display_type))
 
     return items
 
@@ -86,18 +128,54 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
             name = activity_name
         else:
             name = course_name or ct_name
+    elif activity_type == "ics":
+        name = d.get("course_name") or d.get("course_type", "")
     else:
-        name = d.get("course_name", "")
+        configured_name = d.get("course_type", "")
+        owner_name = d.get("owner_name", "")
+        name = d.get("name") or (f"{configured_name}·{owner_name}" if owner_name else configured_name)
 
     # 老师
     teacher_ids = d.get("teacher_ids", [])
-    teacher_names = _get_teacher_names(teacher_ids, customer_map)
+    teacher_profiles = _get_teacher_profiles(teacher_ids, customer_map)
+    leader_role_label = "老师" if teacher_profiles else ""
+    achiever_activity_types = {"gcs", "ers", "ocr"}
+    if (
+        activity_type in achiever_activity_types
+        and d.get("achiever_id")
+        and d["achiever_id"] in teacher_ids
+    ):
+        leader_role_label = "成就君"
 
     # 主持人（ics 用 host_id）
     if activity_type == "ics" and d.get("host_id"):
         host = customer_map.get(d["host_id"])
         if host:
-            teacher_names = [host.nickname]
+            teacher_profiles = [{
+                "name": host.nickname or host.name,
+                "avatar_url": host.avatar_url or "",
+            }]
+    elif activity_type in SESSION_SERVICES and not teacher_profiles:
+        facilitator_id = d.get("achiever_id") or d.get("host_id")
+        facilitator = customer_map.get(facilitator_id) if facilitator_id else None
+        facilitator_name = d.get("achiever_name") or d.get("host_name")
+        if facilitator:
+            teacher_profiles = [{
+                "name": facilitator.nickname or facilitator.name,
+                "avatar_url": facilitator.avatar_url or "",
+            }]
+        elif facilitator_name:
+            teacher_profiles = [{"name": facilitator_name, "avatar_url": ""}]
+        if teacher_profiles:
+            leader_role_label = "成就君" if activity_type in achiever_activity_types else "老师"
+    teacher_names = [profile["name"] for profile in teacher_profiles]
+
+    # 觉醒游戏、情绪释放、能量结详情单独展示案主
+    owner_name = ""
+    if activity_type in {"gcs", "ers", "eks"}:
+        owner_id = d.get("owner_id", "")
+        owner = customer_map.get(owner_id) if owner_id else None
+        owner_name = (owner.nickname or owner.name) if owner else d.get("owner_name", "")
 
     # 空间
     space_name = space_map.get(d.get("space_id", ""), "")
@@ -107,6 +185,17 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
     # 简介
     description = d.get("course_description") or d.get("description", "")
 
+    # 列表图片和详情图片：从活动类型配置中获取
+    ct_name = d.get("course_type", "")
+    list_image = ""
+    detail_images: list[str] = []
+    if ct_name:
+        for ct in course_type_service.list_course_types():
+            if ct["name"] == ct_name:
+                list_image = ct.get("list_image", "")
+                detail_images = [url for url in (ct.get("detail_images") or []) if isinstance(url, str) and url]
+                break
+
     return {
         "id": item["id"],
         "type": activity_type,
@@ -115,32 +204,100 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
         "start_time": d.get("start_time", ""),
         "end_time": d.get("end_time", ""),
         "teacher_names": teacher_names,
+        "teachers": teacher_profiles,
+        "leader_role_label": leader_role_label,
+        "owner_name": owner_name,
         "description": description,
         "activity_mode": d.get("activity_mode", "线下"),
         "is_public_welfare": d.get("is_public_welfare", False),
         "space_name": space_name,
         "room_name": room_name,
         "location": location,
-        "course_type": d.get("course_type", ""),
+        "course_type": ct_name,
+        "list_image": list_image,
+        "detail_images": detail_images,
     }
 
 
 def _load_signups(activity_id: str) -> list[dict]:
     """读取某活动的全部报名记录,按报名时间升序。兼容两种存储形态:按 uuid 单条存储 / 遗留的 signups 列表键"""
+    rows = _load_all_signups()
+    result = [row for row in rows if row.get("activity_id") == activity_id]
+    result.sort(key=lambda s: s.get("created_at", ""))
+    return result
+
+
+def _load_all_signups() -> list[dict]:
+    """一次读取全部小程序报名记录"""
     data = load_data(SIGNUPS_FILE)
     rows: list[dict] = []
     for v in data.values():
-        if isinstance(v, dict) and v.get("activity_id") == activity_id:
+        if isinstance(v, dict) and v.get("activity_id"):
             rows.append(v)
         elif isinstance(v, list):
-            rows.extend(s for s in v if isinstance(s, dict) and s.get("activity_id") == activity_id)
-    rows.sort(key=lambda s: s.get("created_at", ""))
+            rows.extend(s for s in v if isinstance(s, dict) and s.get("activity_id"))
     return rows
 
 
-def _count_signups(activity_id: str) -> int:
-    """统计活动报名人数"""
-    return len(_load_signups(activity_id))
+def _signup_map() -> dict[str, list[dict]]:
+    """按活动 ID 聚合报名记录，避免列表逐条读取存储"""
+    result: dict[str, list[dict]] = {}
+    for signup in _load_all_signups():
+        result.setdefault(signup["activity_id"], []).append(signup)
+    return result
+
+
+def _activity_role_ids(item: dict) -> dict[str, set[str]]:
+    """返回活动中无需报名、默认参与的案主和老师 ID。"""
+    data = item["data"]
+    owner_ids = {data.get("owner_id")} - {None, ""}
+    teacher_ids = {customer_id for customer_id in (data.get("teacher_ids") or []) if customer_id}
+
+    # 与详情页展示的老师口径保持一致：内部课程以主持人为老师；
+    # 其他活动未单独指定老师时，以带领者/主持人为老师。
+    if item["type"] == "ics" and data.get("host_id"):
+        teacher_ids.add(data["host_id"])
+    elif item["type"] in SESSION_SERVICES and not teacher_ids:
+        facilitator_id = data.get("achiever_id") or data.get("host_id")
+        if facilitator_id:
+            teacher_ids.add(facilitator_id)
+
+    return {"owner": owner_ids, "teacher": teacher_ids}
+
+
+def _activity_role_for_customer(item: dict, customer_id: str) -> str:
+    """返回客户在活动中的固定身份，案主优先于老师。"""
+    if not customer_id:
+        return ""
+    role_ids = _activity_role_ids(item)
+    if customer_id in role_ids["owner"]:
+        return "owner"
+    if customer_id in role_ids["teacher"]:
+        return "teacher"
+    return ""
+
+
+def _activity_role_label(role: str) -> str:
+    return {"owner": "案主", "teacher": "老师"}.get(role, "")
+
+
+def _activity_signup_count(item: dict, signups: list[dict]) -> int:
+    """合并固定身份、后台参与者、分组成员和小程序报名并去重。"""
+    seen = {cid for cid in (item["data"].get("participant_ids") or []) if cid}
+    role_ids = _activity_role_ids(item)
+    seen.update(role_ids["owner"])
+    seen.update(role_ids["teacher"])
+    for group in (item["data"].get("groups") or []):
+        seen.update(cid for cid in (group.get("member_ids") or []) if cid)
+
+    anonymous_count = 0
+    for signup in signups:
+        customer_id = signup.get("customer_id", "")
+        if customer_id:
+            seen.add(customer_id)
+        else:
+            anonymous_count += 1
+    return len(seen) + anonymous_count
 
 
 def _current_customer_id(request: Request) -> str:
@@ -162,19 +319,47 @@ def _current_customer_id(request: Request) -> str:
 
 
 def _find_activity(activity_id: str) -> dict | None:
-    """从 class 和 ics 中查找活动，返回原始 item 或 None"""
+    """从全部活动服务中查找活动，返回统一 item"""
     record = class_record_service.get_record(activity_id)
     if record:
         d = record.model_dump(mode="json")
         return {"type": "class", "id": d["id"], "data": d, "date": d.get("date", "")}
 
-    for s in internal_course_session_service.list_sessions():
-        sid = s.id if hasattr(s, "id") else s.get("id", "")
-        if sid == activity_id:
-            d = s.model_dump(mode="json") if hasattr(s, "model_dump") else s
-            return {"type": "ics", "id": sid, "data": d, "date": d.get("date", "")}
+    visible_types = _get_visible_types()
+    internal_session = internal_course_session_service.get_session(activity_id)
+    if internal_session:
+        source_type = internal_session.course_type or ""
+        display_type = source_type if source_type in visible_types else "内部课程"
+        return _session_item("ics", internal_session, display_type)
+
+    for display_type, (activity_type, service) in OTHER_ACTIVITY_SERVICES.items():
+        session = service.get_session(activity_id)
+        if session:
+            return _session_item(activity_type, session, display_type)
 
     return None
+
+
+def _sync_activity_participant(item: dict, customer_id: str, add: bool) -> None:
+    """把客户端报名状态同步到对应 PC 活动的 participant_ids"""
+    activity_type = item["type"]
+    participant_ids = list(item["data"].get("participant_ids") or [])
+    if add:
+        if customer_id in participant_ids:
+            return
+        participant_ids.append(customer_id)
+    else:
+        if customer_id not in participant_ids:
+            return
+        participant_ids.remove(customer_id)
+
+    if activity_type == "class":
+        class_record_service.update_participants(item["id"], participant_ids)
+        return
+
+    service = SESSION_SERVICES.get(activity_type)
+    if service:
+        service.update_session(item["id"], {"participant_ids": participant_ids})
 
 
 @router.get("/activities")
@@ -206,7 +391,12 @@ def list_activities(
     customer_map = _build_customer_map()
     space_map, room_map = _get_space_map()
 
-    formatted = [_format_activity(i, customer_map, space_map, room_map) for i in items]
+    signups_by_activity = _signup_map()
+    formatted = []
+    for item in items:
+        activity = _format_activity(item, customer_map, space_map, room_map)
+        activity["signup_count"] = _activity_signup_count(item, signups_by_activity.get(item["id"], []))
+        formatted.append(activity)
 
     # 按日期升序，同日期按开始时间升序
     formatted.sort(key=lambda x: (x["date"], x["start_time"] or ""))
@@ -243,11 +433,18 @@ def get_activity(activity_id: str, request: Request):
     space_map, room_map = _get_space_map()
     result = _format_activity(item, customer_map, space_map, room_map)
 
-    # 参与者 = 后台维护的 participant_ids(+分组成员) ∪ 小程序报名记录
+    # 参与者 = 案主/老师 ∪ 后台维护的 participant_ids(+分组成员) ∪ 小程序报名记录
     # 当前用户(若已登录)排最前并标记 is_me
     customer_id = _current_customer_id(request)
     member_ids: list[str] = []
     seen: set[str] = set()
+
+    role_ids = _activity_role_ids(item)
+    for role in ("owner", "teacher"):
+        for cid in sorted(role_ids[role]):
+            if cid and cid not in seen:
+                seen.add(cid)
+                member_ids.append(cid)
     for cid in (item["data"].get("participant_ids") or []):
         if cid and cid not in seen:
             seen.add(cid)
@@ -263,19 +460,27 @@ def get_activity(activity_id: str, request: Request):
         participants.append({
             "nickname": (c.nickname if c and c.nickname else "匿名"),
             "is_me": bool(customer_id) and cid == customer_id,
+            "role": _activity_role_for_customer(item, cid) or "participant",
         })
     for s in _load_signups(activity_id):
         cid = s.get("customer_id", "")
         if cid and cid in seen:
             continue  # 已在后台名单中
+        if cid:
+            seen.add(cid)
         participants.append({
             "nickname": s.get("nickname") or "匿名",
             "is_me": bool(customer_id) and cid == customer_id,
+            "role": "participant",
         })
     participants.sort(key=lambda p: 0 if p["is_me"] else 1)
+    participation_role = _activity_role_for_customer(item, customer_id)
     result["signup_count"] = len(participants)
     result["participants"] = participants
     result["signed_up"] = any(p["is_me"] for p in participants)
+    result["participation_locked"] = bool(participation_role)
+    result["participation_role"] = participation_role
+    result["participation_role_label"] = _activity_role_label(participation_role)
     return result
 
 
@@ -296,6 +501,11 @@ def signup_activity(activity_id: str, request: Request):
     customer_id = getattr(request.state, "customer_id", "") or getattr(request.state, "user_id", "")
     if not customer_id:
         raise HTTPException(status_code=401, detail="请先登录")
+
+    participation_role = _activity_role_for_customer(item, customer_id)
+    if participation_role:
+        role_label = _activity_role_label(participation_role)
+        raise HTTPException(status_code=409, detail=f"你是本场{role_label}，已自动参与，无需报名")
 
     customer = get_customer(customer_id)
     nickname = customer.nickname if customer else ""
@@ -323,12 +533,8 @@ def signup_activity(activity_id: str, request: Request):
             pass
 
     # 检查是否已报名
-    data = load_data(SIGNUPS_FILE)
-    signups = data.get("signups", [])
-    if isinstance(signups, dict):
-        signups = list(signups.values())
-    for s in signups:
-        if s.get("activity_id") == activity_id and s.get("customer_id") == customer_id:
+    for s in _load_signups(activity_id):
+        if s.get("customer_id") == customer_id:
             raise HTTPException(status_code=409, detail="已报名该活动")
 
     # 创建报名记录
@@ -346,8 +552,9 @@ def signup_activity(activity_id: str, request: Request):
     activity_date = item["data"].get("date", "")
     space_id = item["data"].get("space_id", "")
     if activity_date:
-        from app.services import visit_service
         from app.models.visit import VisitRecordCreate
+        from app.services import visit_service
+
         existing = visit_service.list_visits(date=activity_date, customer_id=customer_id)
         if existing:
             visit = existing[0]
@@ -361,16 +568,9 @@ def signup_activity(activity_id: str, request: Request):
             )
             visit_service.create_visit(visit_data)
 
-    # 同步到 PC 端活动参与者列表
+    # 同步到对应 PC 活动的参与者列表
     if activity_date and customer_id:
-        activity_name = item["data"].get("activity_name") or item["data"].get("course_name", "")
-        records = class_record_service.list_records(date=activity_date)
-        for record in records:
-            record_name = record.activity_name or record.course_name
-            if record_name == activity_name and customer_id not in record.participant_ids:
-                record.participant_ids.append(customer_id)
-                class_record_service.update_participants(record.id, record.participant_ids)
-                break
+        _sync_activity_participant(item, customer_id, add=True)
 
     return {"message": "报名成功", "signup_id": signup_id}
 
@@ -382,8 +582,17 @@ def cancel_signup(activity_id: str, request: Request):
     if not customer_id:
         raise HTTPException(status_code=401, detail="请先登录")
 
+    item = _find_activity(activity_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="活动不存在")
+
+    participation_role = _activity_role_for_customer(item, customer_id)
+    if participation_role:
+        role_label = _activity_role_label(participation_role)
+        raise HTTPException(status_code=409, detail=f"你是本场{role_label}，无法取消参与")
+
     # 删除 client_signups.json 中的报名记录
-    from app.services.storage import load_data, delete_item
+    from app.services.storage import delete_item, load_data
     signups_data = load_data(SIGNUPS_FILE)
     deleted = False
     for sid, s in signups_data.items():
@@ -395,19 +604,8 @@ def cancel_signup(activity_id: str, request: Request):
     if not deleted:
         raise HTTPException(status_code=404, detail="未找到报名记录")
 
-    # 从 PC 端 participant_ids 中移除
-    item = _find_activity(activity_id)
-    if item:
-        activity_date = item["data"].get("date", "")
-        activity_name = item["data"].get("activity_name") or item["data"].get("course_name", "")
-        if activity_date and activity_name:
-            records = class_record_service.list_records(date=activity_date)
-            for record in records:
-                record_name = record.activity_name or record.course_name
-                if record_name == activity_name and customer_id in record.participant_ids:
-                    record.participant_ids.remove(customer_id)
-                    class_record_service.update_participants(record.id, record.participant_ids)
-                    break
+    # 从对应 PC 活动的 participant_ids 中移除
+    _sync_activity_participant(item, customer_id, add=False)
 
     return {"message": "已取消报名"}
 
@@ -445,6 +643,16 @@ def get_activity_records(request: Request):
         _enrich_activity_time(act)
 
     return {"items": activities, "total": len(activities)}
+
+
+@router.get("/remaining")
+def get_remaining(request: Request):
+    """剩余次数 — 与 PC 端客户详情页同一算法：grand_total - 销卡 - 活动扣卡"""
+    customer_id = _current_customer_id(request)
+    if not customer_id:
+        raise HTTPException(status_code=401, detail="请先登录")
+    effective = membership_card_service.get_effective_remaining(customer_id)
+    return {"remaining": effective}
 
 
 def _enrich_activity_time(act: dict):

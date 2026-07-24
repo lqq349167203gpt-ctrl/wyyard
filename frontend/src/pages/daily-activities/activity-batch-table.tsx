@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { GripVertical, Trash2, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi,
@@ -286,6 +288,14 @@ export function ActivityBatchTable({
   const fetchedRemainingRef = useRef<Set<string>>(new Set())
   const prevOwnerRef = useRef<Record<number, string>>({})
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
+  const [editingDescriptionKey, setEditingDescriptionKey] = useState<number | null>(null)
+  const [descriptionDraft, setDescriptionDraft] = useState("")
+
+  const fitDescriptionPreview = useCallback((element: HTMLTextAreaElement | null) => {
+    if (!element) return
+    element.style.height = "0px"
+    element.style.height = `${Math.min(Math.max(element.scrollHeight, 180), 440)}px`
+  }, [])
 
   // 客户端 IP（挂载时获取一次）
   const ipRef = useRef<string>("")
@@ -1079,6 +1089,20 @@ export function ActivityBatchTable({
     return changedCellMap.get(rowKey)?.has(field) ?? false
   }, [changedCellMap])
 
+  const closeDescriptionDialog = () => {
+    setEditingDescriptionKey(null)
+    setDescriptionDraft("")
+  }
+
+  const saveDescription = () => {
+    if (editingDescriptionKey === null) return
+    const editingRow = rows.find(row => row.key === editingDescriptionKey)
+    if (editingRow && editingRow.description !== descriptionDraft) {
+      updateRow(editingDescriptionKey, "description", descriptionDraft)
+    }
+    closeDescriptionDialog()
+  }
+
   return (
     <div className={`bg-white rounded-[2px] relative ${isLocked ? "activity-table-locked" : ""}`}>
       {isPreview && (
@@ -1357,14 +1381,21 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动简介 */}
-                  <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}>
+                  <td className={`px-1 py-0.5 align-middle ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {row.record_type === "eks" ? null : (
-                      <Input rounded="[2px]"
-                        value={row.description}
-                        onChange={(e) => updateRow(row.key, "description", e.target.value)}
-                        placeholder=""
-                        className="h-7 text-[12px] [&]:border-[0.5px]"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDescriptionDraft(row.description)
+                          setEditingDescriptionKey(row.key)
+                        }}
+                        title={row.description}
+                        className="flex h-7 w-full items-center overflow-hidden rounded-[2px] border-[0.5px] border-input bg-transparent px-2 text-left text-[12px] text-[#2b2f36] outline-none hover:border-[#c9cdd4] focus:border-[#3370ff]"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {row.description.replace(/\s+/g, " ").trim()}
+                        </span>
+                      </button>
                     )}
                   </td>
 
@@ -1436,6 +1467,37 @@ export function ActivityBatchTable({
           </button>
         </div>
       )}
+
+      <Dialog open={editingDescriptionKey !== null} onOpenChange={(open) => { if (!open) closeDescriptionDialog() }}>
+        <DialogContent className="w-[440px] max-w-[90vw] p-0 gap-0">
+          <DialogHeader className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
+            <DialogTitle className="text-[14px] font-normal">小程序活动简介</DialogTitle>
+          </DialogHeader>
+          <div className="bg-[#f7f8fa] px-5 py-5">
+            <div className="mx-auto w-[375px] max-w-full bg-[#f4f5f6] px-[22px] py-[26px]">
+              <div className="flex items-center">
+                <span className="mr-[10px] h-[14px] w-[3px] shrink-0 rounded-[2px] bg-[#c9f24b]" />
+                <span className="text-[15px] font-medium tracking-[1.5px] text-[#212631]">活动介绍</span>
+              </div>
+              <textarea
+                autoFocus
+                ref={fitDescriptionPreview}
+                value={descriptionDraft}
+                onChange={(event) => {
+                  fitDescriptionPreview(event.currentTarget)
+                  setDescriptionDraft(event.target.value)
+                }}
+                placeholder="请输入活动简介，支持回车换行"
+                className="mt-4 block min-h-[180px] max-h-[440px] w-full resize-none overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-[15px] leading-[1.95] tracking-[0.5px] text-[#212631] outline-none placeholder:text-[#a8b1bd]"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={closeDescriptionDialog}>取消</Button>
+            <Button size="sm" className="h-8 text-[12px]" onClick={saveDescription}>保存</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

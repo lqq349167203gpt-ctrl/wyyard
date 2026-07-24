@@ -600,12 +600,15 @@ export interface CourseType {
   name: string
   organization_id: string
   show_in_client?: boolean
+  list_image?: string
+  detail_images?: string[]
+  category?: string
 }
 
 export const courseTypeApi = {
   list: () => request<CourseType[]>("/api/course-types"),
-  create: (name: string, organization_id?: string, show_in_client?: boolean) => request<CourseType>("/api/course-types", { method: "POST", body: JSON.stringify({ name, organization_id: organization_id || "", show_in_client: show_in_client || false }) }),
-  update: (name: string, data: { organization_id?: string; show_in_client?: boolean }) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "PATCH", body: JSON.stringify(data) }),
+  create: (name: string, organization_id?: string, show_in_client?: boolean, list_image?: string, detail_images?: string[]) => request<CourseType>("/api/course-types", { method: "POST", body: JSON.stringify({ name, organization_id: organization_id || "", show_in_client: show_in_client || false, list_image: list_image || "", detail_images: detail_images || [] }) }),
+  update: (name: string, data: { organization_id?: string; show_in_client?: boolean; list_image?: string; detail_images?: string[] }) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "PATCH", body: JSON.stringify(data) }),
   rename: (oldName: string, newName: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(oldName)}/rename`, { method: "PUT", body: JSON.stringify({ new_name: newName }) }),
   delete: (name: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "DELETE" }),
   reorder: (names: string[]) => request<CourseType[]>("/api/course-types", { method: "PATCH", body: JSON.stringify({ names }) }),
@@ -643,6 +646,21 @@ export interface Material {
 }
 
 export const uploadApi = {
+  uploadPublicImage: async (file: File): Promise<Material> => {
+    const formData = new FormData()
+    formData.append("file", file)
+    const token = localStorage.getItem("authToken")
+    const uploadHeaders: Record<string, string> = {}
+    if (token) uploadHeaders["Authorization"] = `Bearer ${token}`
+    const res = await fetch(`${API_BASE}/api/uploads/public-images`, { method: "POST", headers: uploadHeaders, body: formData })
+    applyNewToken(res)
+    if (res.status === 401) { handle401(); throw new Error("登录已过期") }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.detail || "图片上传失败")
+    }
+    return res.json()
+  },
   uploadMaterial: async (file: File): Promise<Material> => {
     const formData = new FormData()
     formData.append("file", file)
@@ -1878,7 +1896,9 @@ export interface ActivityTheme {
   date: string
   space_id: string
   week_theme: string
+  week_theme_detail: string
   day_theme: string
+  day_theme_detail: string
   created_at: string
   updated_at: string
 }
@@ -1891,12 +1911,26 @@ export const activityThemeApi = {
     if (space_ids) space_ids.forEach(id => params.append("space_ids", id))
     return request<ActivityTheme[]>(`/api/activity-themes?${params.toString()}`)
   },
-  save: (date: string, week_theme: string, day_theme: string, space_id: string = "") =>
+  save: (
+    date: string,
+    week_theme: string,
+    day_theme: string,
+    space_id: string = "",
+    week_theme_detail: string = "",
+    day_theme_detail: string = "",
+  ) =>
     request<ActivityTheme>(`/api/activity-themes`, {
       method: "POST",
-      body: JSON.stringify({ date, space_id, week_theme, day_theme }),
+      body: JSON.stringify({ date, space_id, week_theme, week_theme_detail, day_theme, day_theme_detail }),
     }),
-  batchSave: (themes: { date: string; space_id: string; week_theme: string; day_theme: string }[]) =>
+  batchSave: (themes: {
+    date: string
+    space_id: string
+    week_theme: string
+    week_theme_detail: string
+    day_theme: string
+    day_theme_detail: string
+  }[]) =>
     request<ActivityTheme[]>(`/api/activity-themes/batch`, {
       method: "POST",
       body: JSON.stringify({ themes }),

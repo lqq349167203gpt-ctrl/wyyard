@@ -10,6 +10,9 @@ class CourseTypeCreate(StrictBaseModel):
     name: str
     organization_id: Optional[str] = ""
     show_in_client: Optional[bool] = False
+    list_image: Optional[str] = ""
+    detail_images: Optional[list[str]] = []
+    category: Optional[str] = "salon"
 
 
 class CourseTypeRename(StrictBaseModel):
@@ -19,6 +22,9 @@ class CourseTypeRename(StrictBaseModel):
 class CourseTypeUpdate(StrictBaseModel):
     organization_id: Optional[str] = None
     show_in_client: Optional[bool] = None
+    list_image: Optional[str] = None
+    detail_images: Optional[list[str]] = None
+    category: Optional[str] = None
 
 
 @router.get("")
@@ -31,14 +37,22 @@ def create_type(data: CourseTypeCreate):
     if not data.name.strip():
         raise HTTPException(status_code=400, detail="类型名称不能为空")
     try:
-        return course_type_service.create_course_type(data.name.strip(), data.organization_id or "", data.show_in_client or False)
+        return course_type_service.create_course_type(
+            data.name.strip(), data.organization_id or "", data.show_in_client or False,
+            list_image=data.list_image or "", detail_images=data.detail_images or [],
+            category=data.category or "salon",
+        )
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.patch("/{name}")
 def update_type(name: str, data: CourseTypeUpdate):
-    if not course_type_service.update_course_type(name, data.organization_id, data.show_in_client):
+    if not course_type_service.update_course_type(
+        name, data.organization_id, data.show_in_client,
+        list_image=data.list_image, detail_images=data.detail_images,
+        category=data.category,
+    ):
         raise HTTPException(status_code=404, detail="类型不存在")
     return {"message": "更新成功"}
 

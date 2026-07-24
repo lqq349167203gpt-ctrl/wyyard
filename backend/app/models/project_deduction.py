@@ -13,6 +13,7 @@ class ProjectDeductionBase(SafeBaseModel):
     count: int = Field(default=1, ge=1)
     deduction_date: str  # YYYY-MM-DD
     remaining_after: Optional[int] = None
+    reason: str = ""
     created_by: str = ""
     updated_by: str = ""
 
@@ -22,6 +23,7 @@ class ProjectDeductionCreate(StrictBaseModel):
     project_type: str
     project_id: str
     count: int = Field(default=1, ge=1)
+    reason: str = Field(min_length=1, max_length=200)
     created_by: str = ""
 
 

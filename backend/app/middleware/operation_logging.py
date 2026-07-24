@@ -281,7 +281,7 @@ def get_before_data(path: str, entity_id: str, body: dict = None) -> dict:
         return None
 
     # position-permissions: entity key is body["position"]
-    if "/api/position-permissions" in path and not "/api/position-customer-permissions" in path:
+    if "/api/position-permissions" in path and "/api/position-customer-permissions" not in path:
         position = body.get("position", "")
         if position:
             try:

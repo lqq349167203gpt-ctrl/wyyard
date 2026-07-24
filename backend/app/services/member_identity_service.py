@@ -242,22 +242,28 @@ def _count_activity_days(customer_id: str, all_class_records, all_group_cases,
                 active_dates.add(r.date)
     for s in all_group_cases:
         ids = set(s.participant_ids or [])
-        if s.owner_id: ids.add(s.owner_id)
-        if s.host_id: ids.add(s.host_id)
+        if s.owner_id:
+            ids.add(s.owner_id)
+        if s.host_id:
+            ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
         if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_emotional_releases:
         ids = set(s.participant_ids or [])
-        if s.owner_id: ids.add(s.owner_id)
-        if s.host_id: ids.add(s.host_id)
+        if s.owner_id:
+            ids.add(s.owner_id)
+        if s.host_id:
+            ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
         if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_energy_knots:
         ids = set(s.participant_ids or [])
-        if s.owner_id: ids.add(s.owner_id)
-        if s.host_id: ids.add(s.host_id)
+        if s.owner_id:
+            ids.add(s.owner_id)
+        if s.host_id:
+            ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
         if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
@@ -454,24 +460,30 @@ def refresh_all():
 
     for s in all_gc_sessions:
         ids = set(s.participant_ids or [])
-        if s.owner_id: ids.add(s.owner_id)
-        if s.host_id: ids.add(s.host_id)
+        if s.owner_id:
+            ids.add(s.owner_id)
+        if s.host_id:
+            ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
         for cid in ids:
             _add_activity_date(cid, s.date)
 
     for s in all_er_sessions:
         ids = set(s.participant_ids or [])
-        if s.owner_id: ids.add(s.owner_id)
-        if s.host_id: ids.add(s.host_id)
+        if s.owner_id:
+            ids.add(s.owner_id)
+        if s.host_id:
+            ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
         for cid in ids:
             _add_activity_date(cid, s.date)
 
     for s in all_ek_sessions:
         ids = set(s.participant_ids or [])
-        if s.owner_id: ids.add(s.owner_id)
-        if s.host_id: ids.add(s.host_id)
+        if s.owner_id:
+            ids.add(s.owner_id)
+        if s.host_id:
+            ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
         for cid in ids:
             _add_activity_date(cid, s.date)

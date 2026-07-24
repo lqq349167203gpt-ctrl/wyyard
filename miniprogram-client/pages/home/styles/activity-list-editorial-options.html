@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>活动列表 · 编辑感排版提案</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #171a1f;
+    --lime: #c9f24b;
+    --lime-ink: #314400;
+    --paper: #f0f1ee;
+    --muted: #92989f;
+    --line: rgba(23, 26, 31, .09);
+  }
+  html, body {
+    min-height: 100%;
+    background: #dfe1dd;
+    color: var(--ink);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { padding: 28px 20px 44px; }
+  .board {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 24px;
+    min-width: 1240px;
+  }
+  .proposal { width: 390px; }
+  .proposal-head { margin: 0 3px 12px; }
+  .proposal-kicker {
+    color: #6f756f;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .proposal-title {
+    margin-top: 5px;
+    font-size: 20px;
+    font-weight: 850;
+    letter-spacing: -.5px;
+  }
+  .proposal-note {
+    margin-top: 5px;
+    color: #777d78;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .phone {
+    position: relative;
+    width: 390px;
+    height: 844px;
+    overflow: hidden;
+    border: 7px solid #111419;
+    border-radius: 40px;
+    background: var(--paper);
+    box-shadow: 0 28px 58px rgba(24, 28, 24, .18);
+  }
+  .status {
+    position: absolute;
+    z-index: 20;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 38px;
+    padding: 13px 22px 0;
+    display: flex;
+    justify-content: space-between;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 750;
+  }
+  .head {
+    height: 188px;
+    padding: 45px 22px 18px;
+    background: var(--ink);
+    color: #fff;
+  }
+  .head-top { display: flex; align-items: flex-start; }
+  .date-small { color: rgba(255,255,255,.48); font-size: 10px; font-weight: 700; letter-spacing: 2px; }
+  .date-big { margin-top: 4px; font-family: Georgia, "Times New Roman", serif; font-size: 35px; line-height: 1; font-weight: 400; letter-spacing: -1.5px; }
+  .head-count {
+    margin-left: auto;
+    margin-top: 10px;
+    padding: 6px 11px;
+    border: 1px solid rgba(201,242,75,.38);
+    border-radius: 999px;
+    color: var(--lime);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: .5px;
+  }
+  .week { display: flex; justify-content: space-between; margin-top: 21px; }
+  .day { width: 39px; padding: 6px 0 5px; border-radius: 13px; text-align: center; }
+  .day b { display: block; color: rgba(255,255,255,.42); font-size: 9px; font-weight: 600; }
+  .day span { display: block; margin-top: 3px; color: rgba(255,255,255,.82); font-size: 13px; font-weight: 750; }
+  .day.active { background: var(--lime); transform: rotate(-2deg); }
+  .day.active b { color: rgba(49,68,0,.55); }
+  .day.active span { color: var(--lime-ink); }
+  .scroll { height: 598px; overflow: hidden; }
+  .tab {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background: rgba(255,255,255,.96);
+    border-top: 1px solid rgba(23,26,31,.06);
+  }
+  .tab-item { width: 50%; text-align: center; color: #a8adb2; font-size: 10px; }
+  .tab-icon { width: 18px; height: 18px; margin: 0 auto 3px; border: 2px solid currentColor; border-radius: 5px; }
+  .tab-item.on { color: var(--ink); font-weight: 750; }
+  .tab-item.on .tab-icon { position: relative; background: var(--ink); }
+  .tab-item.on .tab-icon::after { content: ""; position: absolute; width: 5px; height: 5px; right: -3px; top: -3px; border-radius: 50%; background: var(--lime); }
+
+  /* A · 主视觉 + 节奏列表 */
+  .focus-body { padding: 18px 16px 80px; }
+  .section-row { display: flex; align-items: center; margin: 0 2px 12px; }
+  .section-row strong { font-size: 14px; font-weight: 850; letter-spacing: .5px; }
+  .section-row span { margin-left: 7px; color: var(--muted); font-size: 10px; }
+  .section-row i { flex: 1; height: 1px; margin-left: 12px; background: var(--line); }
+  .lead-card { overflow: hidden; border-radius: 22px; background: var(--ink); color: #fff; }
+  .lead-stage { position: relative; height: 232px; overflow: hidden; }
+  .lead-blur { position: absolute; inset: -26px; width: calc(100% + 52px); height: calc(100% + 52px); object-fit: cover; filter: blur(24px) saturate(1.12); opacity: .66; }
+  .lead-shade { position: absolute; inset: 0; background: rgba(12,14,17,.32); }
+  .lead-poster { position: relative; display: block; width: auto; height: 208px; margin: 12px auto 0; border-radius: 12px; object-fit: contain; box-shadow: 0 14px 26px rgba(0,0,0,.28); }
+  .lead-index { position: absolute; left: 16px; top: 14px; color: var(--lime); font-family: Georgia, serif; font-size: 17px; font-style: italic; }
+  .lead-info { padding: 15px 17px 17px; }
+  .lead-time { color: var(--lime); font-family: Georgia, serif; font-size: 21px; }
+  .lead-title { margin-top: 5px; font-size: 17px; font-weight: 850; letter-spacing: .2px; }
+  .lead-meta { margin-top: 7px; color: rgba(255,255,255,.52); font-size: 10.5px; letter-spacing: .4px; }
+  .mini-list { margin-top: 13px; }
+  .mini-row { display: grid; grid-template-columns: 42px 68px 1fr; gap: 11px; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+  .mini-no { align-self: start; padding-top: 2px; color: #9da29e; font-family: Georgia, serif; font-size: 13px; font-style: italic; }
+  .mini-img { width: 68px; height: 88px; border-radius: 10px; object-fit: contain; background: var(--ink); }
+  .mini-time { color: var(--lime-ink); font-size: 11px; font-weight: 850; letter-spacing: .6px; }
+  .mini-title { margin-top: 4px; font-size: 14px; line-height: 1.35; font-weight: 850; }
+  .mini-meta { margin-top: 7px; color: var(--muted); font-size: 10px; }
+
+  /* B · 横向画廊 */
+  .gallery-scroll { background: #f5f5f1; }
+  .gallery-head { padding: 18px 20px 13px; display: flex; align-items: baseline; }
+  .gallery-head strong { font-size: 18px; font-weight: 850; }
+  .gallery-head span { margin-left: 8px; color: var(--muted); font-size: 10px; }
+  .gallery-head em { margin-left: auto; color: #899080; font-size: 10px; font-style: normal; }
+  .track { display: flex; gap: 14px; width: max-content; padding: 0 20px; transform: translateX(0); }
+  .gallery-card { width: 272px; flex: none; }
+  .gallery-stage { position: relative; height: 360px; overflow: hidden; border-radius: 24px; background: var(--ink); }
+  .gallery-stage::after { content: ""; position: absolute; inset: 0; border: 1px solid rgba(255,255,255,.11); border-radius: inherit; pointer-events: none; }
+  .gallery-poster { display: block; width: auto; height: 326px; margin: 17px auto 0; object-fit: contain; border-radius: 12px; }
+  .gallery-num { position: absolute; left: 15px; top: 13px; color: rgba(255,255,255,.45); font-family: Georgia, serif; font-size: 13px; font-style: italic; }
+  .gallery-chip { position: absolute; right: 14px; top: 13px; padding: 6px 10px; border-radius: 9px; background: var(--lime); color: var(--lime-ink); font-size: 10px; font-weight: 850; transform: rotate(2deg); }
+  .gallery-info { padding: 13px 2px 17px; }
+  .gallery-title { font-size: 17px; font-weight: 850; line-height: 1.35; }
+  .gallery-meta { margin-top: 7px; color: var(--muted); font-size: 10.5px; }
+  .gallery-dots { display: flex; align-items: center; gap: 5px; padding: 5px 20px 70px; }
+  .gallery-dots i { width: 5px; height: 5px; border-radius: 50%; background: #c8cbc6; }
+  .gallery-dots i.on { width: 18px; border-radius: 999px; background: var(--ink); }
+
+  /* C · 自由错位编辑排版 */
+  .free-scroll { position: relative; padding: 19px 16px 84px; background: #f1f1ed; }
+  .free-title { display: flex; align-items: flex-end; margin: 0 2px 24px; }
+  .free-title strong { font-family: Georgia, serif; font-size: 25px; line-height: 1; font-weight: 400; }
+  .free-title span { margin-left: 9px; color: var(--muted); font-size: 10px; }
+  .free-item { position: relative; min-height: 158px; margin-bottom: 28px; }
+  .free-item::before { content: ""; position: absolute; width: 108px; height: 142px; top: 12px; background: var(--ink); border-radius: 16px; }
+  .free-item.left::before { left: 0; transform: rotate(-3deg); }
+  .free-item.right::before { right: 0; transform: rotate(3deg); }
+  .free-poster { position: absolute; z-index: 2; top: 0; width: 104px; height: 147px; border-radius: 13px; object-fit: contain; background: #fff; box-shadow: 0 10px 22px rgba(28,31,28,.13); }
+  .free-item.left .free-poster { left: 10px; transform: rotate(1.5deg); }
+  .free-item.right .free-poster { right: 10px; transform: rotate(-1.5deg); }
+  .free-copy { position: absolute; top: 19px; width: 218px; }
+  .free-item.left .free-copy { right: 0; padding-left: 12px; }
+  .free-item.right .free-copy { left: 0; padding-right: 12px; text-align: right; }
+  .free-kicker { color: var(--lime-ink); font-size: 10px; font-weight: 850; letter-spacing: 1px; }
+  .free-name { margin-top: 6px; font-size: 17px; line-height: 1.32; font-weight: 900; }
+  .free-time { margin-top: 12px; font-family: Georgia, serif; font-size: 23px; }
+  .free-time small { margin-left: 5px; color: var(--muted); font-family: inherit; font-size: 11px; }
+  .free-meta { margin-top: 7px; color: var(--muted); font-size: 10px; }
+  .free-item.right .free-tag { margin-left: auto; }
+  .free-tag { width: max-content; margin-top: 10px; padding: 4px 9px; border-radius: 999px; background: var(--ink); color: var(--lime); font-size: 9px; font-weight: 800; }
+</style>
+</head>
+<body>
+<main class="board">
+  <section class="proposal" data-option="focus">
+    <header class="proposal-head">
+      <div class="proposal-kicker">Option A · Recommended</div>
+      <div class="proposal-title">主视觉＋节奏列表</div>
+      <div class="proposal-note">第一场给冲击力，其余快速浏览；最兼顾识别度与效率。</div>
+    </header>
+    <div class="phone">
+      <div class="status"><span>02:17</span><span>●●●　⌁　▱</span></div>
+      <header class="head">
+        <div class="head-top"><div><div class="date-small">SUNDAY · TODAY</div><div class="date-big">7月20日</div></div><div class="head-count">本周 3 场活动</div></div>
+        <div class="week"><div class="day active"><b>一</b><span>20</span></div><div class="day"><b>二</b><span>21</span></div><div class="day"><b>三</b><span>22</span></div><div class="day"><b>四</b><span>23</span></div><div class="day"><b>五</b><span>24</span></div><div class="day"><b>六</b><span>25</span></div><div class="day"><b>日</b><span>26</span></div></div>
+      </header>
+      <div class="scroll focus-body">
+        <div class="section-row"><strong>明日活动</strong><span>7月21日 · 周二</span><i></i></div>
+        <article class="lead-card">
+          <div class="lead-stage"><img class="lead-blur" src="../../../design-refs/thumb-1.jpg"><div class="lead-shade"></div><img class="lead-poster" src="../../../design-refs/thumb-1.jpg"><span class="lead-index">01</span></div>
+          <div class="lead-info"><div class="lead-time">09:00 — 10:00</div><div class="lead-title">《当下的力量》读书会</div><div class="lead-meta">薇薇老师 · 桃源时代大厦 · 公益</div></div>
+        </article>
+        <div class="mini-list">
+          <article class="mini-row"><div class="mini-no">02</div><img class="mini-img" src="../../../design-refs/thumb-2.jpg"><div><div class="mini-time">11:00 — 11:50</div><div class="mini-title">呼吸禅茶</div><div class="mini-meta">娟娟老师 · 线下</div></div></article>
+          <article class="mini-row"><div class="mini-no">03</div><img class="mini-img" src="../../../design-refs/thumb-3.jpg"><div><div class="mini-time">15:00 — 16:00</div><div class="mini-title">AB 情景剧</div><div class="mini-meta">余墨老师 · 公益</div></div></article>
+        </div>
+      </div>
+      <nav class="tab"><div class="tab-item on"><div class="tab-icon"></div>首页</div><div class="tab-item"><div class="tab-icon"></div>我的</div></nav>
+    </div>
+  </section>
+
+  <section class="proposal" data-option="gallery">
+    <header class="proposal-head">
+      <div class="proposal-kicker">Option B · Bold</div>
+      <div class="proposal-title">横向策展画廊</div>
+      <div class="proposal-note">海报完整展示、下一张露边；最自由，也最像一本活动杂志。</div>
+    </header>
+    <div class="phone">
+      <div class="status"><span>02:17</span><span>●●●　⌁　▱</span></div>
+      <header class="head">
+        <div class="head-top"><div><div class="date-small">SUNDAY · TODAY</div><div class="date-big">7月20日</div></div><div class="head-count">本周 3 场活动</div></div>
+        <div class="week"><div class="day active"><b>一</b><span>20</span></div><div class="day"><b>二</b><span>21</span></div><div class="day"><b>三</b><span>22</span></div><div class="day"><b>四</b><span>23</span></div><div class="day"><b>五</b><span>24</span></div><div class="day"><b>六</b><span>25</span></div><div class="day"><b>日</b><span>26</span></div></div>
+      </header>
+      <div class="scroll gallery-scroll">
+        <div class="gallery-head"><strong>7月21日</strong><span>周二</span><em>左右滑动 ›</em></div>
+        <div class="track">
+          <article class="gallery-card"><div class="gallery-stage"><img class="gallery-poster" src="../../../design-refs/thumb-1.jpg"><span class="gallery-num">01 / 03</span><span class="gallery-chip">09:00</span></div><div class="gallery-info"><div class="gallery-title">《当下的力量》读书会</div><div class="gallery-meta">至 10:00 · 薇薇老师 · 公益</div></div></article>
+          <article class="gallery-card"><div class="gallery-stage"><img class="gallery-poster" src="../../../design-refs/thumb-2.jpg"><span class="gallery-num">02 / 03</span><span class="gallery-chip">11:00</span></div><div class="gallery-info"><div class="gallery-title">呼吸禅茶</div><div class="gallery-meta">至 11:50 · 娟娟老师</div></div></article>
+        </div>
+        <div class="gallery-dots"><i class="on"></i><i></i><i></i></div>
+      </div>
+      <nav class="tab"><div class="tab-item on"><div class="tab-icon"></div>首页</div><div class="tab-item"><div class="tab-icon"></div>我的</div></nav>
+    </div>
+  </section>
+
+  <section class="proposal" data-option="free">
+    <header class="proposal-head">
+      <div class="proposal-kicker">Option C · Expressive</div>
+      <div class="proposal-title">自由错位编辑排版</div>
+      <div class="proposal-note">图文左右交替、轻微旋转；个性最强，但仍用黑框统一海报。</div>
+    </header>
+    <div class="phone">
+      <div class="status"><span>02:17</span><span>●●●　⌁　▱</span></div>
+      <header class="head">
+        <div class="head-top"><div><div class="date-small">SUNDAY · TODAY</div><div class="date-big">7月20日</div></div><div class="head-count">本周 3 场活动</div></div>
+        <div class="week"><div class="day active"><b>一</b><span>20</span></div><div class="day"><b>二</b><span>21</span></div><div class="day"><b>三</b><span>22</span></div><div class="day"><b>四</b><span>23</span></div><div class="day"><b>五</b><span>24</span></div><div class="day"><b>六</b><span>25</span></div><div class="day"><b>日</b><span>26</span></div></div>
+      </header>
+      <div class="scroll free-scroll">
+        <div class="free-title"><strong>Tomorrow</strong><span>7月21日 · 3 场</span></div>
+        <article class="free-item left"><img class="free-poster" src="../../../design-refs/thumb-1.jpg"><div class="free-copy"><div class="free-kicker">READING · 01</div><div class="free-name">《当下的力量》读书会</div><div class="free-time">09:00<small>— 10:00</small></div><div class="free-meta">薇薇老师 · 桃源时代大厦</div><div class="free-tag">公益活动</div></div></article>
+        <article class="free-item right"><img class="free-poster" src="../../../design-refs/thumb-2.jpg"><div class="free-copy"><div class="free-kicker">BREATH · 02</div><div class="free-name">呼吸禅茶</div><div class="free-time">11:00<small>— 11:50</small></div><div class="free-meta">娟娟老师 · 线下</div></div></article>
+        <article class="free-item left"><img class="free-poster" src="../../../design-refs/thumb-3.jpg"><div class="free-copy"><div class="free-kicker">THEATRE · 03</div><div class="free-name">AB 情景剧</div><div class="free-time">15:00<small>— 16:00</small></div><div class="free-meta">余墨老师 · 公益</div></div></article>
+      </div>
+      <nav class="tab"><div class="tab-item on"><div class="tab-icon"></div>首页</div><div class="tab-item"><div class="tab-icon"></div>我的</div></nav>
+    </div>
+  </section>
+</main>
+</body>
+</html>

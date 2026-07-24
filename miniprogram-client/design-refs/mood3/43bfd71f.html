@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html
+  lang="en"
+  class="no-js"
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="renderer"
+      content="webkit"
+    />
+    <meta
+      http-equiv="x-ua-compatible"
+      content="IE=Edge"
+    />
+    <link
+      rel="icon"
+      href="https://cdn-static.sspai.com/pwa/releases/build/favicons/favicon.ico?v7"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="192x192"
+      href="https://cdn-static.sspai.com/pwa/releases/build/icons/512-maskable.png?v7"
+    />
+    <meta
+      name="mobile-web-app-capable"
+      content="yes"
+    />
+    <meta
+      name="apple-mobile-web-app-capable"
+      content="yes"
+    />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="default"
+    />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1,  user-scalable=0, viewport-fit=cover"
+    />
+    <meta
+      name="theme-color"
+      content="#f2f2f2"
+    />
+    <meta
+      name="format-detection"
+      content="telephone=no"
+    />
+    <meta
+      name="msapplication-tap-highlight"
+      content="no"
+    />
+    <meta
+      name="author"
+      content="Jason Feng <solidzoro[#]live.com>"
+    />
+
+    <link
+      rel="manifest"
+      href="/manifest.json?v=7"
+    />
+    <title>少数派</title>
+  <script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-react-da778b8f.8cdbc77306.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-react-ae2c9f0d.dc82b89aa1.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-react-dd6cf089.86c78a2ed6.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-react-3.50851486cf.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-router-0.93b2bb4962.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-router-94b4e4d2.b7f5ee4512.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-polyfill-0.10ce89bba3.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/lib-polyfill-1.fb0ed0740f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/4522.00fb4dafd3.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3262.6e668151d1.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/5195.6ebc364bef.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/1710.099b8bc2f6.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/4192.c38427b9fa.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/575.11793912d1.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/6839.c078309714.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/2181.215a4b2c24.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7284.7e5e3cffef.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3962.86198a22c8.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/4287.0ac4f003db.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/6771.16a83810f6.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/6753.1bab1dc128.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7869.bfa1069f04.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/9889.0b118ad309.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/678.26116819ae.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/8041.26a07121a4.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3045.94ba8e1a08.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/9288.45a0d51145.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3469.fbc41eeb93.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/57.12505a6384.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7028.184855567a.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/5472.70993257bf.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/5359.17c6ff5879.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3303.57e196a3d7.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/1668.3d1edbe7e4.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7233.d117731c66.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/9799.97950e0ed9.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3921.38489e7904.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7970.d1410308bc.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/5761.71d22087ea.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3448.0c4aa7ba80.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/2299.812b590e7f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7969.15eadc7293.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/4626.116d7ecf80.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7211.59cc40320d.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/2724.bb5f4debb6.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/1709.41132f2db0.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/6053.0f56b3d030.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/2444.762567f50f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/9612.814d46b71c.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/102.68185c4f9e.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/8780.c44f367750.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/6755.c93a51504b.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/1534.5b122c13ff.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/8714.4f1a0d3256.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/6177.d76fdf1aae.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/8974.ac7276a094.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/9677.43a414491a.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/3756.bdfa09b74f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/8035.6ca3657ee3.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/4767.1d4af08877.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/4486.f2549b2249.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/257.d905489e60.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/1595.68cb8283dd.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/1514.3b88d4ce18.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/969.33857f4930.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/4460.4e9c168585.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/1365.5b552a99a0.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/8367.a02ccea10f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/7023.91c1ba11db.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/8946.56b9739ab3.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/907.bb646af696.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/9326.9d7eb652b6.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~0.51fe6e77bf.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~1.95f1ebb731.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~2.2166dbf1da.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~3.3fa6e04420.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~4.bb5286719a.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~5.4159c20451.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~6.6f3b0a70f5.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~7.b347272915.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~8.33873840bc.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~9.74dc54f14b.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~10.dc79965c56.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~11.17daa6bc92.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~12.7cbbbd4f1b.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~13.c1a4fe76bd.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~14.f9e4da3c7f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~15.ddaa747662.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~16.b08db7a05a.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~17.78025ea645.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~18.fe6de88b35.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~19.53eeb25ba2.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~20.659f960d17.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~21.e6ef4d253f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~22.4b71ff7b19.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~23.83a8f23884.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~24.1f51a6b794.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~25.848de55870.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~26.e7aa7609d8.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~27.84285bf3bf.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~28.1dca3606b9.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~29.dd6bac5aa6.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~30.8faa42affc.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~31.5c2a94a171.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~32.4341246182.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~33.edcf2102aa.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~752b7541.4deea84e76.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~35.003657c835.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~36.81f311b731.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~37.c116af5f5b.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~38.740cce24a1.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~39.6ef34bea3f.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~40.c815c1d9a5.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~41.a8dc85a38a.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~42.a2fa6ed39d.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~43.6f7ea3e9c5.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~44.2e5306ddf6.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~45.5d414c6716.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~46.1f97724283.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~47.4c6958f1e2.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~48.54f61d9b33.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~49.ad70b40eee.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~50.16a920598c.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~51.b77c7e39f0.js"></script><script defer src="https://cdn-static.sspai.com/pwa/releases/build/static/js/index~52.d15dcd232e.js"></script><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~0.13f423be78.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~3.127c4ba7cc.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~4.fcc01c71a6.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~7.7320b3879d.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~8.232b8e9d1c.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~9.cd3e7e2890.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~10.990c4c7221.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~14.4883d508bb.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~15.4d70d3fec6.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~16.e99a6e4c81.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~17.280d869964.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~18.52138451a7.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~19.1e16e5d6c1.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~20.06e272beee.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~21.a4a342fb21.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~22.4b207e2080.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~23.aa48e621b4.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~24.e080fffcd9.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~25.ab6b4ff501.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~28.b87951687c.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~30.9295f7749a.css" rel="stylesheet"><link href="https://cdn-static.sspai.com/pwa/releases/build/static/css/index~41.0c4d4358ec.css" rel="stylesheet"><script id="buildinfo" type="application/json">{"VERSION":"3.18.19","BUILD_NUMBER":3018019,"BUILD_TIME":"20260621-183111","COMMIT_HASH":"99d9"}</script></head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"><div id="__SKELETON_PLACEHOLDER__">
+      <script>
+        (function () {
+          const lsTheme =
+            localStorage && localStorage.getItem('appTheme');
+
+          let nextTheme;
+
+          if (lsTheme) {
+            // 1. user
+            nextTheme = lsTheme;
+
+          } else if (window.__APP_PLATFORM__ === 'harmony') {
+            // 2. hm
+            nextTheme =
+              window.__APP_SYS_THEME__ === 'dark'
+                ? 'dark'
+                : 'light';
+          } else if (
+            // 3. matchMedia
+            window &&
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches
+          ) {
+            // 4. fallback
+            nextTheme = 'dark';
+          } else {
+            nextTheme = 'light';
+          }
+
+          document.documentElement.classList.add(
+            nextTheme === 'dark'
+              ? 'skeleton-theme-dark'
+              : 'skeleton-theme-light'
+          );
+        })();
+      </script>
+
+      <style>
+        html {
+          --app-skeleton-placeholder-body-bg-color: #f2f2f2;
+          --app-skeleton-placeholder-banner-color: #eaeaea;
+          /**/
+          --app-skeleton-placeholder-tabbars-bg-color: #f8f8f8;
+          --app-skeleton-placeholder-tabbars-border-color: #eee;
+          --app-skeleton-placeholder-tab-bg-color: #eee;
+          /**/
+          --app-skeleton-placeholder-skeleton-blink-color-1: #eaeaea;
+          --app-skeleton-placeholder-skeleton-blink-color-2: #f8f8f8;
+          --app-skeleton-placeholder-skeleton-blink-color-3: #eaeaea;
+        }
+
+
+        html.skeleton-theme-dark {
+          --app-skeleton-placeholder-body-bg-color: #121212;
+          --app-skeleton-placeholder-banner-color: #1e1e1e;
+          --app-skeleton-placeholder-tabbars-bg-color: #1a1a1a;
+          --app-skeleton-placeholder-tabbars-border-color: #2a2a2a;
+          --app-skeleton-placeholder-tab-bg-color: #2a2a2a;
+          --app-skeleton-placeholder-skeleton-blink-color-1: #2a2a2a;
+          --app-skeleton-placeholder-skeleton-blink-color-2: #1a1a1a;
+          --app-skeleton-placeholder-skeleton-blink-color-3: #2a2a2a;
+        }
+
+
+        html,
+        body {
+          margin: 0 auto;
+          padding: 0;
+          background-color: var(--app-skeleton-placeholder-body-bg-color);
+        }
+
+
+        /*@media (min-width: 576px) {*/
+        /*  body {*/
+        /*    width: 576px;*/
+        /*    margin: 0 auto;*/
+        /*  }*/
+        /*}*/
+
+        @keyframes skeleton-line {
+          0% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0 50%;
+          }
+        }
+
+        @keyframes skeleton-line {
+          0% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0 50%;
+          }
+        }
+
+        #__SKELETON_PLACEHOLDER__ {
+          height: 100vh;
+          width: 100%;
+        }
+
+        /* Skeleton Effect */
+        .skeleton-blink {
+          background-image: linear-gradient(
+            90deg,
+            var(--app-skeleton-placeholder-skeleton-blink-color-1) 40%,
+            var(--app-skeleton-placeholder-skeleton-blink-color-2) 60%,
+            var(--app-skeleton-placeholder-skeleton-blink-color-3) 100%
+          );
+          background-size: 400% 100%;
+          background-position: 100% 50%;
+          animation: skeleton-line 1.4s ease infinite;
+        }
+
+
+        /* ---- header ---- */
+        .header {
+          display: block;
+        }
+
+        .banners {
+          display: block;
+          width: 100%;
+          height: 450px;
+          background-color: var(--app-skeleton-placeholder-banner-color);
+        }
+
+
+        .banner {
+          width: 100%;
+          height: 400px;
+          display: flex;
+          justify-content: center;
+          place-items: center;
+          position: relative;
+        }
+
+        .banner .logo {
+          position: absolute;
+          top: 22px;
+          left: 15px;
+        }
+
+        /* ---- container ---- */
+        .container {
+          display: block;
+          width: 100%;
+        }
+
+        .container .list {
+        }
+
+        .container .list .item {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 25px;
+          margin-top: 20px;
+          margin-left: 15px;
+        }
+
+        /*@media (min-width: 576px) {*/
+        /*  .container .list .item {*/
+        /*    margin-left: 0;*/
+        /*  }*/
+        /*}*/
+
+        .container .list .item .info {
+          height: 90px;
+          width: 100%;
+          margin-right: 15px;
+        }
+
+        .container .list .item .info .title {
+          display: block;
+          height: 30px;
+        }
+
+        .container .list .item .info .text {
+          display: block;
+          height: 15px;
+          margin-top: 15px;
+          width: 75%;
+        }
+
+        .container .list .item .info .text2 {
+          margin-top: 10px;
+          width: 50%;
+        }
+
+        .container .list .item .banner {
+          height: 90px;
+          width: 160px;
+          flex: 160px 0 0;
+        }
+
+        /* ---- container ---- */
+
+        .footer {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          width: 100%;
+        }
+
+        .tabbars {
+          height: 51px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background-color: var(--app-skeleton-placeholder-tabbars-bg-color);
+          border-top: 1px solid var(--app-skeleton-placeholder-tabbars-border-color);
+        }
+
+
+        .skeleton-theme-dark .tabbars {
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .tab {
+          display: block;
+          width: 100px;
+          height: 26px;
+          padding: 0 10px;
+          margin: 0 10px;
+          background-color: var(--app-skeleton-placeholder-tab-bg-color);
+          border-radius: 40px;
+        }
+
+
+        .tab--large {
+          width: 100%;
+        }
+      </style>
+
+      <div class="header">
+        <div class="banners">
+          <div class="banner">
+            <svg width="32" height="32" class="logo" enable-background="new 0 0 74 74" viewBox="0 0 74 74" xmlns="http://www.w3.org/2000/svg">
+              <clipPath id="a">
+                <path d="m53.5 19.8-35.2 5.8c-.7.1-1.3.6-1.4 1.4l-.4 3c-.1 1 .5 1.7 1.5 1.8h.4l6.9-1.2v24c0 1 .7 1.6 1.7 1.6.3 0 .6-.1.8-.2l2.5-1.7c.6-.4 1.1-1.1 1.1-1.9v-22.8l9.4-1.6v17c0 1.1.2 2 .7 3l4.2 7.7c.2.4.7.7 1.3.7h3.6c.7 0 1.4-.6 1.4-1.4 0-.2 0-.4-.1-.6l-4.1-7.9c-.4-.8-.7-1.9-.7-2.9v-16.6l6.7-1.2c.7-.1 1.3-.6 1.4-1.4l.3-2.9c.1-1-.5-1.7-1.5-1.8-.3.1-.4.1-.5.1"></path>
+              </clipPath>
+              <clipPath id="b">
+                <path d="m-22.3-72.7h428.3v927.5h-428.3z"></path>
+              </clipPath>
+              <circle cx="37" cy="37" fill="#da282a" r="36.5"></circle>
+              <g clip-path="url(#a)">
+                <g clip-path="url(#b)">
+                  <path d="m10.9 14.1h50.3v47.9h-50.3z" fill="#fefefe"></path>
+                </g>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="list">
+          <div class="item">
+            <div class="info">
+              <div class="skeleton-blink title"></div>
+              <div class="skeleton-blink text"></div>
+              <div class="skeleton-blink text text2"></div>
+            </div>
+            <div class="skeleton-blink banner"></div>
+          </div>
+
+          <div class="item">
+            <div class="info">
+              <div class="skeleton-blink title"></div>
+              <div class="skeleton-blink text"></div>
+              <div class="skeleton-blink text text2"></div>
+            </div>
+            <div class="skeleton-blink banner"></div>
+          </div>
+
+          <div class="item">
+            <div class="info">
+              <div class="skeleton-blink title"></div>
+              <div class="skeleton-blink text"></div>
+              <div class="skeleton-blink text text2"></div>
+            </div>
+            <div class="skeleton-blink banner"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="tabbars">
+          <div class="tab"></div>
+          <div class="tab tab--large"></div>
+        </div>
+      </div>
+    </div></div>
+  </body>
+</html>

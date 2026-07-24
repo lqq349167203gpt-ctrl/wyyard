@@ -1,10 +1,70 @@
 // API 请求封装 — 客户端小程序
 
-// 按小程序环境自动切换后端地址：开发版连本地，体验版/正式版连生产
+// 开发环境读取本地数据：开发者工具走 localhost，扫码真机走电脑局域网地址
 const { miniProgram: { envVersion } } = wx.getAccountInfoSync()
-const BASE_URL = envVersion === 'develop'
+const { platform } = wx.getDeviceInfo()
+const LOCAL_BASE_URL = platform === 'devtools'
   ? 'http://localhost:8000'
+  : 'http://192.168.31.141:8000'
+const BASE_URL = envVersion === 'develop'
+  ? LOCAL_BASE_URL
   : 'https://www.wyteahouse.cn'
+const IS_LOCAL_DEVICE_PREVIEW = envVersion === 'develop' && platform !== 'devtools'
+
+function resolveResourceUrl(url) {
+  if (!url) return ''
+  if (url.startsWith('/')) return BASE_URL + url
+  if (IS_LOCAL_DEVICE_PREVIEW) {
+    return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, BASE_URL)
+  }
+  return url
+}
+
+function _resourceCachePath(url) {
+  let hash = 0
+  for (let i = 0; i < url.length; i++) {
+    hash = ((hash * 31) + url.charCodeAt(i)) >>> 0
+  }
+  const cleanPath = url.split('?')[0]
+  const extMatch = cleanPath.match(/\.(png|jpe?g|webp)$/i)
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'img'
+  return `${wx.env.USER_DATA_PATH}/activity-image-${hash.toString(16)}.${ext}`
+}
+
+// 真机开发预览时，本地 HTTP 图片可能被 image 组件拦截；通过 request 落盘后展示本地文件
+function cacheImage(url) {
+  const absoluteUrl = resolveResourceUrl(url)
+  if (!absoluteUrl || !IS_LOCAL_DEVICE_PREVIEW) return Promise.resolve(absoluteUrl)
+
+  const filePath = _resourceCachePath(absoluteUrl)
+  const fs = wx.getFileSystemManager()
+  return new Promise(resolve => {
+    fs.access({
+      path: filePath,
+      success: () => resolve(filePath),
+      fail: () => {
+        wx.request({
+          url: absoluteUrl,
+          method: 'GET',
+          responseType: 'arraybuffer',
+          success(res) {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              resolve(absoluteUrl)
+              return
+            }
+            fs.writeFile({
+              filePath,
+              data: res.data,
+              success: () => resolve(filePath),
+              fail: () => resolve(absoluteUrl),
+            })
+          },
+          fail: () => resolve(absoluteUrl),
+        })
+      },
+    })
+  })
+}
 
 function request(options) {
   return new Promise((resolve, reject) => {
@@ -85,6 +145,15 @@ const clientApi = {
     return post(`/api/client/activities/${activityId}/cancel-signup`)
   },
 
+  // 每日主题
+  getActivityThemes(startDate, endDate) {
+    const params = []
+    if (startDate) params.push(`start_date=${startDate}`)
+    if (endDate) params.push(`end_date=${endDate}`)
+    const qs = params.length ? '?' + params.join('&') : ''
+    return get(`/api/activity-themes${qs}`)
+  },
+
   // 消息通知
   getNotifications() {
     return request({
@@ -108,6 +177,11 @@ const clientApi = {
     return get('/api/client/activity-records')
   },
 
+  // 剩余次数
+  getRemaining() {
+    return get('/api/client/remaining')
+  },
+
   // 销卡记录
   getDeductions() {
     return get('/api/client/deductions')
@@ -122,4 +196,13 @@ const wechatApi = {
   },
 }
 
-module.exports = { request, get, post, BASE_URL, clientApi, wechatApi }
+module.exports = {
+  request,
+  get,
+  post,
+  BASE_URL,
+  resolveResourceUrl,
+  cacheImage,
+  clientApi,
+  wechatApi,
+}

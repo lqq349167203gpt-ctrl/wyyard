@@ -1,4 +1,4 @@
-const { clientApi } = require('../../utils/api')
+const { clientApi, resolveResourceUrl, cacheImage } = require('../../utils/api')
 
 Page({
   data: {
@@ -7,24 +7,62 @@ Page({
     signingUp: false,
     signedUp: false,
     activityId: '',
+    statusBarHeight: 20,
+    navBarHeight: 44,
+    navTotalHeight: 64,
   },
 
   onLoad(options) {
+    this.setupNavigationBar()
     if (options.id) {
       this.setData({ activityId: options.id })
       this.loadActivity(options.id)
     }
   },
 
+  setupNavigationBar() {
+    const windowInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+    const menuButton = wx.getMenuButtonBoundingClientRect()
+    const statusBarHeight = windowInfo.statusBarHeight || 20
+    const navBarHeight = menuButton.height
+      ? (menuButton.top - statusBarHeight) * 2 + menuButton.height
+      : 44
+
+    this.setData({
+      statusBarHeight,
+      navBarHeight,
+      navTotalHeight: statusBarHeight + navBarHeight,
+    })
+  },
+
+  onBack() {
+    if (getCurrentPages().length > 1) {
+      wx.navigateBack()
+      return
+    }
+    wx.switchTab({ url: '/pages/home/index' })
+  },
+
   loadActivity(id) {
     this.setData({ loading: true })
     clientApi.getActivity(id)
       .then(res => {
+        const activity = this._decorate(res)
         this.setData({
-          activity: this._decorate(res),
+          activity,
           loading: false,
           signedUp: !!res.signed_up,
         })
+        if (activity.previewImages.length) {
+          Promise.all(activity.previewImages.map(cacheImage)).then(previewImages => {
+            if (this.data.activity?.id === activity.id) {
+              this.setData({
+                'activity.posterImage': previewImages[0] || activity.posterImage,
+                'activity.previewImages': previewImages,
+              })
+            }
+          })
+        }
       })
       .catch(() => {
         this.setData({ loading: false })
@@ -62,6 +100,34 @@ Page({
         }
       }
     }
+    // 描述拆段：连续换行视为段落分隔，每段渲染独立 view 加间距
+    const desc = (a.description || '').replace(/\r\n/g, '\n')
+    const descParagraphs = desc.split(/\n/).filter(p => p.trim()).map(p => ({ text: p.trim() }))
+
+    // 海报图：从活动类型 list_image 获取，拼完整 URL
+    const posterImage = resolveResourceUrl(a.list_image)
+    const detailImages = (Array.isArray(a.detail_images) ? a.detail_images : [])
+      .map(resolveResourceUrl)
+      .filter(Boolean)
+    const previewImages = [...new Set([posterImage, ...detailImages].filter(Boolean))]
+
+    // 时长文本：如 "约 1 小时"
+    let durationText = ''
+    if (a.start_time && a.end_time) {
+      const [sh, sm] = a.start_time.split(':').map(Number)
+      const [eh, em] = a.end_time.split(':').map(Number)
+      const diffMin = (eh * 60 + em) - (sh * 60 + sm)
+      if (diffMin > 0) {
+        if (diffMin < 60) {
+          durationText = `约 ${diffMin} 分钟`
+        } else {
+          const h = Math.floor(diffMin / 60)
+          const m = diffMin % 60
+          durationText = m ? `约 ${h} 小时 ${m} 分钟` : `约 ${h} 小时`
+        }
+      }
+    }
+
     return {
       ...a,
       isOnline: a.activity_mode === '线上',
@@ -69,12 +135,22 @@ Page({
       expiredStatus,
       teachers,
       teacherText: names.join('、'),
+      leaderRoleLabel: a.leader_role_label || '老师',
+      ownerText: a.owner_name || '',
       addressText: a.space_name || '',
       dateLabel,
       weekday,
       timeStart: a.start_time || '',
       timeEnd: a.end_time || '',
       rosterList: roster,
+      rosterCount: roster.length,
+      descParagraphs,
+      posterImage,
+      detailImages,
+      previewImages,
+      durationText,
+      participationLocked: !!a.participation_locked,
+      participationRoleLabel: a.participation_role_label || '',
     }
   },
 
@@ -86,11 +162,28 @@ Page({
       .sort((a, b) => (b.is_me ? 1 : 0) - (a.is_me ? 1 : 0))
   },
 
+  onPreviewPoster() {
+    const activity = this.data.activity
+    const urls = activity?.previewImages || []
+    if (!urls.length) return
+
+    wx.previewImage({
+      current: activity.posterImage || urls[0],
+      urls,
+    })
+  },
+
   onSignup() {
     const app = getApp()
     if (!app.isLoggedIn()) {
       const url = `/pages/activity-detail/index?id=${this.data.activityId}`
       wx.navigateTo({ url: `/pages/login/index?redirect=${encodeURIComponent(url)}` })
+      return
+    }
+
+    if (this.data.activity?.participationLocked) {
+      const roleLabel = this.data.activity.participationRoleLabel || '固定参与人员'
+      wx.showToast({ title: `${roleLabel}已自动参与，无需报名`, icon: 'none' })
       return
     }
 
@@ -112,6 +205,12 @@ Page({
   },
 
   onCancelSignup() {
+    if (this.data.activity?.participationLocked) {
+      const roleLabel = this.data.activity.participationRoleLabel || '固定参与人员'
+      wx.showToast({ title: `${roleLabel}无法取消参与`, icon: 'none' })
+      return
+    }
+
     wx.showModal({
       title: '提示',
       content: '确定要取消报名吗？',

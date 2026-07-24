@@ -230,7 +230,14 @@ def get_available_items(customer_id: str, project_type: str) -> list:
     return []
 
 
-def auto_deduct(nickname: str, project_type: str, count: int = 1, created_by: str = "", name_filter: str = "") -> ProjectDeduction:
+def auto_deduct(
+    nickname: str,
+    project_type: str,
+    count: int = 1,
+    created_by: str = "",
+    name_filter: str = "",
+    reason: str = "Excel批量导入销卡",
+) -> ProjectDeduction:
     """按昵称自动销卡：找到最早到期的可用项目并扣减（仅用于 Excel 导入）"""
     customers = customer_service.list_customers()
     matches = [c for c in customers if c.nickname == nickname]
@@ -274,6 +281,7 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, created_by: st
         project_type=project_type,
         project_id=target["id"],
         count=count,
+        reason=reason,
         created_by=created_by,
     )
     return create_deduction(data)
@@ -281,6 +289,10 @@ def auto_deduct(nickname: str, project_type: str, count: int = 1, created_by: st
 
 def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
     with _deduct_lock:
+        reason = data.reason.strip()
+        if not reason:
+            raise ValueError("请填写销卡原因")
+
         customer = customer_service.get_customer(data.customer_id)
         if not customer:
             raise ValueError("客户不存在")
@@ -372,6 +384,7 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
             count=data.count,
             deduction_date=now.strftime("%Y-%m-%d"),
             remaining_after=remaining_after,
+            reason=reason,
             created_by=data.created_by,
             updated_by=data.created_by,
             created_at=now,
@@ -382,7 +395,12 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
 
 
 
-def update_deduction(deduction_id: str, count: int, updated_by: str = "") -> ProjectDeduction:
+def update_deduction(
+    deduction_id: str,
+    count: int,
+    updated_by: str = "",
+    reason: str | None = None,
+) -> ProjectDeduction:
     """修改销卡次数（不重新扣费，不覆盖创建人）"""
     with _deduct_lock:
         deduction = _deductions.get(deduction_id)
@@ -390,8 +408,12 @@ def update_deduction(deduction_id: str, count: int, updated_by: str = "") -> Pro
             raise ValueError("记录不存在")
         if count < 1:
             raise ValueError("次数必须大于 0")
+        if reason is not None and not reason.strip():
+            raise ValueError("请填写销卡原因")
 
         deduction.count = count
+        if reason is not None:
+            deduction.reason = reason.strip()
         deduction.updated_by = updated_by
         _deductions[deduction_id] = deduction
         _save(deduction_id)

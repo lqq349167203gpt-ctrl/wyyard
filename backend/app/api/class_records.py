@@ -192,9 +192,48 @@ def update_record(record_id: str, data: dict, request: Request):
     old_record = class_record_service.get_record(record_id)
     old_ids = set(old_record.participant_ids) if old_record else set()
 
+    # 更新前记录课程名称/内容，用于检测变化
+    old_course_name = old_record.course_name if old_record else ""
+    old_activity_name = old_record.activity_name if old_record else ""
+    old_description = old_record.course_description if old_record else ""
+
     record = class_record_service.update_record(record_id, data)
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 检测课程名称/内容变化，通知所有已报名用户
+    new_course_name = record.course_name or ""
+    new_activity_name = record.activity_name or ""
+    new_description = record.course_description or ""
+    name_changed = (new_course_name != old_course_name or new_activity_name != old_activity_name)
+    desc_changed = (new_description != old_description)
+    if (name_changed or desc_changed) and old_ids:
+        operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+        display_name = record.activity_name or record.course_name
+        activity_date = record.date
+
+        # 收集变化说明
+        changes = []
+        if name_changed:
+            old_display = old_activity_name or old_course_name
+            new_display = new_activity_name or new_course_name
+            if old_display != new_display:
+                changes.append(f"活动名称已更新为「{new_display}」")
+        if desc_changed:
+            changes.append("活动内容已更新")
+        change_text = "，".join(changes)
+
+        from app.services import client_notification_service
+        for cid in old_ids:
+            client_notification_service.create_notification(
+                customer_id=cid,
+                type="activity_changed",
+                title="活动信息已更新",
+                content=f'您报名的"{display_name}"（{activity_date}）{change_text}，请留意最新信息',
+                activity_name=display_name,
+                activity_date=activity_date,
+                operator=operator,
+            )
 
     # 如果 participant_ids 被修改，同步清理小程序报名记录 + 发送通知
     if "participant_ids" in data:
@@ -444,17 +483,23 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     def _match_space(record) -> bool:
         return not space_id or getattr(record, "space_id", "") == space_id
     for r in class_record_service.list_records():
-        if r.date and _match_space(r): cal_counts[r.date] += 1
+        if r.date and _match_space(r):
+            cal_counts[r.date] += 1
     for s in group_case_session_service.list_sessions():
-        if s.date and _match_space(s): cal_counts[s.date] += 1
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
     for s in emotional_release_session_service.list_sessions():
-        if s.date and _match_space(s): cal_counts[s.date] += 1
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
     for s in energy_knot_session_service.list_sessions():
-        if s.date and _match_space(s): cal_counts[s.date] += 1
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
     for s in internal_course_session_service.list_sessions():
-        if s.date and _match_space(s): cal_counts[s.date] += 1
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
     for s in oh_card_reading_session_service.list_sessions():
-        if s.date and _match_space(s): cal_counts[s.date] += 1
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
 
     records_cr = class_record_service.list_records(date)
     records_gcs = group_case_session_service.list_sessions(date)

@@ -27,13 +27,19 @@ def create_deduction(data: ProjectDeductionCreate):
 
 class DeductionUpdate(StrictBaseModel):
     count: int
+    reason: str | None = None
     updated_by: str = ""
 
 
 @router.patch("/{deduction_id}")
 def update_deduction(deduction_id: str, data: DeductionUpdate):
     try:
-        return project_deduction_service.update_deduction(deduction_id, data.count, data.updated_by).model_dump(mode="json")
+        return project_deduction_service.update_deduction(
+            deduction_id,
+            data.count,
+            data.updated_by,
+            data.reason,
+        ).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -64,7 +70,12 @@ class AutoDeductRequest(StrictBaseModel):
 def auto_deduct(data: AutoDeductRequest):
     try:
         return project_deduction_service.auto_deduct(
-            data.nickname, data.project_type, data.count, data.created_by, data.name_filter
+            data.nickname,
+            data.project_type,
+            data.count,
+            data.created_by,
+            data.name_filter,
+            "Excel批量导入销卡",
         ).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

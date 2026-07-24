@@ -1,11 +1,18 @@
+import io
 import os
 import uuid
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from PIL import Image
+
 from app.middleware.jwt_auth import require_admin
 
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "materials")
 UPLOAD_DIR = os.path.normpath(UPLOAD_DIR)
+PUBLIC_IMAGE_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "public-images")
+)
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
@@ -26,14 +33,7 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"}
 INLINE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
-@router.post("/materials")
-async def upload_material(file: UploadFile = File(...)):
-    # 先校验扩展名（廉价拦截，不读取文件体）
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="不支持的文件类型，仅允许上传图片或 PDF 文件")
-
-    # 分块读取，累计超过 10MB 立即中断，避免超大文件一次性占满内存
+async def _read_upload(file: UploadFile) -> bytearray:
     content = bytearray()
     while True:
         chunk = await file.read(CHUNK_SIZE)
@@ -42,14 +42,62 @@ async def upload_material(file: UploadFile = File(...)):
         content.extend(chunk)
         if len(content) > MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="文件大小不能超过 10MB")
+    return content
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def _save_upload(content: bytearray, directory: str, ext: str) -> tuple[str, str]:
+    os.makedirs(directory, exist_ok=True)
     file_id = str(uuid.uuid4())[:12]
     saved_name = f"{file_id}{ext}"
-    saved_path = os.path.join(UPLOAD_DIR, saved_name)
+    saved_path = os.path.join(directory, saved_name)
+    with open(saved_path, "wb") as target:
+        target.write(content)
+    return file_id, saved_name
 
-    with open(saved_path, "wb") as f:
-        f.write(content)
+
+# 小程序图片 2MB 限制，超出时自动压缩
+MINIPROGRAM_IMAGE_MAX_SIZE = 2 * 1024 * 1024
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def _compress_image(content: bytearray, ext: str) -> bytearray:
+    """压缩图片至 2MB 以内，保持 JPEG/WebP 格式，PNG 保留透明通道。"""
+    if ext not in IMAGE_EXTENSIONS or len(content) <= MINIPROGRAM_IMAGE_MAX_SIZE:
+        return content
+    try:
+        img = Image.open(io.BytesIO(content))
+        # 限制最大边长 2048px
+        img.thumbnail((2048, 2048), Image.LANCZOS)
+        buf = io.BytesIO()
+        save_ext = ext.lstrip(".")
+        if save_ext in ("jpg", "jpeg"):
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            img.save(buf, format="JPEG", quality=80, optimize=True)
+        elif save_ext == "webp":
+            img.save(buf, format="WEBP", quality=80, method=4)
+        elif save_ext == "png":
+            img.save(buf, format="PNG", optimize=True)
+        else:
+            return content
+        compressed = buf.getvalue()
+        if len(compressed) < len(content):
+            return bytearray(compressed)
+    except Exception:
+        pass
+    return content
+
+
+@router.post("/materials")
+async def upload_material(file: UploadFile = File(...)):
+    # 先校验扩展名（廉价拦截，不读取文件体）
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="不支持的文件类型，仅允许上传图片或 PDF 文件")
+
+    content = await _read_upload(file)
+    content = _compress_image(content, ext)
+    file_id, saved_name = _save_upload(content, UPLOAD_DIR, ext)
 
     return {
         "id": file_id,
@@ -59,9 +107,34 @@ async def upload_material(file: UploadFile = File(...)):
     }
 
 
+@router.post("/public-images")
+async def upload_public_image(file: UploadFile = File(...)):
+    """上传活动公开展示图片；写入仍需登录且仅管理员可操作。"""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in INLINE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="不支持的图片类型，仅允许 JPG、PNG、WebP 或 GIF")
+
+    content = await _read_upload(file)
+    content = _compress_image(content, ext)
+    file_id, saved_name = _save_upload(content, PUBLIC_IMAGE_DIR, ext)
+    return {
+        "id": file_id,
+        "name": file.filename or saved_name,
+        "url": f"/api/uploads/public-images/{saved_name}",
+        "size": len(content),
+    }
+
+
 def _safe_path(filename: str) -> str:
     file_path = os.path.normpath(os.path.join(UPLOAD_DIR, filename))
     if not file_path.startswith(os.path.normpath(UPLOAD_DIR) + os.sep) and file_path != os.path.normpath(UPLOAD_DIR):
+        raise HTTPException(status_code=400, detail="非法文件名")
+    return file_path
+
+
+def _safe_public_image_path(filename: str) -> str:
+    file_path = os.path.normpath(os.path.join(PUBLIC_IMAGE_DIR, filename))
+    if not file_path.startswith(PUBLIC_IMAGE_DIR + os.sep) and file_path != PUBLIC_IMAGE_DIR:
         raise HTTPException(status_code=400, detail="非法文件名")
     return file_path
 
@@ -78,6 +151,15 @@ async def get_material(filename: str):
     if ext in INLINE_EXTENSIONS:
         return FileResponse(file_path)
     return FileResponse(file_path, filename=filename, content_disposition_type="attachment")
+
+
+@router.get("/public-images/{filename}")
+async def get_public_image(filename: str):
+    file_path = _safe_public_image_path(filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in INLINE_EXTENSIONS or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="图片不存在")
+    return FileResponse(file_path)
 
 
 @router.delete("/materials/{filename}")
