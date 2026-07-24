@@ -23,20 +23,29 @@
   </view>
 
   <view wx:else class="list">
-    <view wx:for="{{items}}" wx:key="index" class="card">
-      <view class="card-header">
-        <text class="card-type">{{item.type}}</text>
-        <text class="card-amount">{{item.amount_text}}</text>
+    <block wx:for="{{groups}}" wx:for-item="group" wx:key="day">
+      <view class="g-head">
+        <text class="g-t">{{group.day}}</text>
+        <view class="g-rule"></view>
       </view>
-      <view class="card-body">
-        <text class="card-name">{{item.name}}</text>
-        <text wx:if="{{item.quantity}}" class="card-qty">×{{item.quantity}}</text>
+      <view class="date-group-cards">
+        <view wx:for="{{group.items}}" wx:for-item="record" wx:key="index" class="card">
+          <!-- 标签 -->
+          <view class="c-head">
+            <text class="ttag {{record.is_refund ? 'tt-refund' : 'tt-buy'}}">{{record.type}}</text>
+          </view>
+          <!-- 名称 + 金额 -->
+          <view class="c-main">
+            <text class="c-name">{{record.name}}</text>
+            <text class="amt {{record.is_refund ? 'back' : ''}}">{{record.amount_text}}</text>
+          </view>
+          <!-- 有效期 + 经办 -->
+          <view wx:if="{{record.validity_text || record.closer_name}}" class="c-foot">
+            <text wx:if="{{record.validity_text}}" class="c-exp">{{record.validity_text}}</text>
+            <text wx:if="{{record.closer_name}}" class="c-closer">经办 · {{record.closer_name}}</text>
+          </view>
+        </view>
       </view>
-      <view class="card-footer">
-        <text class="card-date">{{item.date_text}}</text>
-        <text wx:if="{{item.expiry_text}}" class="card-expiry">{{item.expiry_text}}</text>
-        <text wx:if="{{item.closer_name}}" class="card-closer">{{item.closer_name}}</text>
-      </view>
-    </view>
+    </block>
   </view>
 </view>

@@ -100,7 +100,7 @@
 
 .sf {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
 }
 
 .sf + .sf {
@@ -286,7 +286,7 @@
 
 .m-time {
   flex-shrink: 0;
-  color: #3d5500;
+  color: #98a1ad;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 23rpx;
   font-style: normal;
@@ -296,8 +296,6 @@
 .role-tag {
   flex-shrink: 0;
   margin-left: 12rpx;
-  padding: 4rpx 11rpx;
-  border-radius: 8rpx;
   font-size: 18rpx;
   font-weight: 700;
   line-height: 1.35;
@@ -305,18 +303,14 @@
 }
 
 .rt-join {
-  border: 1rpx solid #e2e4e7;
-  background: #ffffff;
   color: #a8b1bd;
 }
 
 .rt-lead {
-  background: #212631;
-  color: #c9f24b;
+  color: #212631;
 }
 
 .rt-owner {
-  background: #faf0cd;
   color: #7f620c;
 }
 

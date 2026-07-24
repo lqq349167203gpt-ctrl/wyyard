@@ -235,7 +235,7 @@ Page({
     const routes = {
       transactions: '/pages/transactions/index',
       activity: '/pages/activity-records/index',
-      cancel: '/pages/cancel-records/index',
+      cancel: '/pages/deductions/index',
     }
     const url = routes[type]
     if (!url) return

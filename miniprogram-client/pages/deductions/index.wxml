@@ -3,40 +3,101 @@
     <text class="loading-text">加载中...</text>
   </view>
 
-  <view wx:elif="{{items.length === 0}}" class="empty-box">
-    <view class="e-icon">
-      <view class="e-chime">
-        <view class="e-string"></view>
-        <view class="e-dome"></view>
-        <view class="e-rim"></view>
-        <view class="e-clap"></view>
-        <view class="e-paper">
-          <view class="e-paper-line"></view>
-          <view class="e-paper-line short"></view>
+  <block wx:else>
+    <view wx:if="{{projects.length}}" class="project-section">
+      <view class="project-sec">
+        <text class="project-sec-title">生效中 · {{activeProjects.length}}</text>
+        <view class="project-sec-rule"></view>
+      </view>
+      <view class="project-cards">
+        <view wx:for="{{activeProjects}}" wx:key="key" class="project-card">
+          <view class="project-line-one">
+            <text class="project-name">{{item.name}}</text>
+            <text class="project-remaining">{{item.remaining_text}}</text>
+            <text wx:if="{{item.total_text}}" class="project-total">{{item.total_text}}</text>
+          </view>
+          <view class="project-line-two">
+            <text class="project-type">{{item.type}}</text>
+            <text class="project-validity">{{item.validity_text}}</text>
+          </view>
+          <view class="project-progress" style="width: {{item.bar_width}}%;"></view>
         </view>
       </view>
-      <view class="e-leaf e-leaf-a"></view>
-      <view class="e-leaf e-leaf-b"></view>
+      <view wx:if="{{expiredProjects.length}}" class="project-expired">
+        <view class="project-expired-trigger" bindtap="toggleExpiredProjects">
+          <text class="project-expired-title">已过期 · {{expiredProjects.length}}</text>
+          <text wx:if="{{!expiredExpanded}}" class="project-expired-names">{{expiredProjectNames}}</text>
+          <view class="project-expired-arrow {{expiredExpanded ? 'is-expanded' : ''}}"></view>
+        </view>
+        <view wx:if="{{expiredExpanded}}" class="project-cards project-expired-cards">
+          <view wx:for="{{expiredProjects}}" wx:key="key" class="project-card project-card-expired">
+            <view class="project-line-one">
+              <text class="project-name">{{item.name}}</text>
+              <text class="project-remaining">{{item.remaining_text}}</text>
+              <text wx:if="{{item.total_text}}" class="project-total">{{item.total_text}}</text>
+            </view>
+            <view class="project-line-two">
+              <text class="project-type">{{item.type}}</text>
+              <text class="project-validity">{{item.validity_text}}</text>
+            </view>
+            <view class="project-progress" style="width: {{item.bar_width}}%;"></view>
+          </view>
+        </view>
+      </view>
     </view>
-    <text class="e-title">暂无销卡记录</text>
-    <text class="e-sub">还没有销卡记录</text>
-  </view>
 
-  <view wx:else class="list">
-    <view wx:for="{{items}}" wx:key="index" class="card">
-      <view class="card-header">
-        <text class="card-source {{item.source === 'activity' ? 'card-source-activity' : ''}}">{{item.source_text}}</text>
-        <text class="card-type">{{item.type_text}}</text>
+    <view wx:if="{{items.length === 0}}" class="empty-box">
+      <view class="e-icon">
+        <view class="e-chime">
+          <view class="e-string"></view>
+          <view class="e-dome"></view>
+          <view class="e-rim"></view>
+          <view class="e-clap"></view>
+          <view class="e-paper">
+            <view class="e-paper-line"></view>
+            <view class="e-paper-line short"></view>
+          </view>
+        </view>
+        <view class="e-leaf e-leaf-a"></view>
+        <view class="e-leaf e-leaf-b"></view>
       </view>
-      <view class="card-body">
-        <text class="card-name">{{item.project_name}}</text>
-        <text class="card-count">-{{item.count}}次</text>
-      </view>
-      <view class="card-footer">
-        <text class="card-date">{{item.date_text}}</text>
-        <text wx:if="{{item.remaining_text}}" class="card-remaining">{{item.remaining_text}}</text>
-        <text wx:if="{{item.created_by}}" class="card-operator">{{item.created_by}}</text>
-      </view>
+      <text class="e-title">暂无销卡记录</text>
+      <text class="e-sub">还没有销卡记录</text>
     </view>
-  </view>
+
+    <view wx:else class="list">
+      <block wx:for="{{groups}}" wx:for-item="group" wx:key="day">
+        <view class="g-head">
+          <text class="g-t">{{group.day}}</text>
+          <view class="g-rule"></view>
+        </view>
+        <view class="date-group-cards">
+          <view wx:for="{{group.items}}" wx:for-item="record" wx:key="index" class="card">
+            <!-- 标签 -->
+            <view class="c-head">
+              <text class="dtag dt-{{record.tag_tone}}">{{record.tag_text}}</text>
+            </view>
+            <!-- 名称 + 扣次 -->
+            <view class="c-main">
+              <text class="c-name">{{record.project_name}}</text>
+              <view class="c-amt">
+                <text class="c-amt-num">-{{record.count}}</text>
+                <text class="c-amt-unit">次</text>
+              </view>
+            </view>
+            <!-- 权益/内容 -->
+            <view wx:if="{{record.benefit_text || record.reason_text}}" class="c-why">
+              <text class="c-why-label">{{record.tag_tone === 'manual' ? '内容' : '使用权益'}}</text>
+              <text class="c-why-text">{{record.tag_tone === 'manual' ? record.reason_text : record.benefit_text}}</text>
+            </view>
+            <!-- 剩余 + 操作人 -->
+            <view wx:if="{{record.remaining_text || record.created_by}}" class="c-foot">
+              <text wx:if="{{record.remaining_text}}" class="c-remain">{{record.remaining_text}}</text>
+              <text wx:if="{{record.created_by}}" class="c-op">操作人 · {{record.created_by}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </block>
 </view>
