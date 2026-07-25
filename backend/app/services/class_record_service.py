@@ -86,7 +86,10 @@ def _deduct_for_record(record):
     """为新创建的沙龙活动扣费（公益类不扣费）"""
     if record.is_public_welfare:
         return
-    chargeable = _get_group_member_ids(record)
+    chargeable = membership_card_service.filter_arrived_customer_ids(
+        record.date,
+        _get_group_member_ids(record),
+    )
     activity_key = f"class:{record.id}"
     with membership_card_service._deduct_lock:
         for cid in chargeable:
@@ -112,6 +115,8 @@ def _sync_deduction(record, old_chargeable, new_chargeable):
     """同步扣费：为新增人员扣费，为移除人员退费"""
     if record.is_public_welfare:
         return
+    old_chargeable = membership_card_service.filter_arrived_customer_ids(record.date, old_chargeable)
+    new_chargeable = membership_card_service.filter_arrived_customer_ids(record.date, new_chargeable)
     activity_key = f"class:{record.id}"
     with membership_card_service._deduct_lock:
         for cid in old_chargeable - new_chargeable:
@@ -187,7 +192,10 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
                     for cid in old_chargeable:
                         membership_card_service._do_restore(cid, activity_key)
                 else:
-                    new_chargeable = _get_group_member_ids(record)
+                    new_chargeable = membership_card_service.filter_arrived_customer_ids(
+                        record.date,
+                        _get_group_member_ids(record),
+                    )
                     for cid in new_chargeable:
                         membership_card_service._do_deduct(cid, activity_key)
                 membership_card_service._save_deductions()

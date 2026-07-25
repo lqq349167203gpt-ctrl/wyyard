@@ -778,6 +778,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         project_type = body.get("project_type", "")
         project_id = body.get("project_id", "")
         count = body.get("count", 1)
+        reason = str(body.get("reason", "")).strip()
         customer_name = ""
         project_name = ""
         try:
@@ -833,6 +834,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             parts.append(customer_name)
         parts.append(project_name)
         parts.append(f"扣减{count}次")
+        if reason:
+            parts.append(f"原因：{reason}")
         return " · ".join(parts)
 
     # 项目退费：生成"用户名 · 项目名 退费¥金额"格式

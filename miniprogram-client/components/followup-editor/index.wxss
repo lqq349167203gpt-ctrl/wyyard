@@ -1,0 +1,136 @@
+.followup-layer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+}
+
+.followup-mask {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(22, 26, 34, 0.34);
+}
+
+.followup-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  padding: 30rpx 36rpx calc(30rpx + env(safe-area-inset-bottom));
+  border-radius: 28rpx 28rpx 0 0;
+  background: #ffffff;
+}
+
+.followup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.followup-title {
+  color: #212631;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.followup-close {
+  width: 56rpx;
+  height: 56rpx;
+  color: #98a1ad;
+  font-size: 40rpx;
+  font-weight: 400;
+  line-height: 52rpx;
+  text-align: center;
+}
+
+.followup-activity {
+  display: flex;
+  flex-direction: column;
+  margin-top: 14rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 12rpx;
+  background: #f7f8f9;
+}
+
+.followup-name {
+  color: #212631;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.followup-meta {
+  margin-top: 7rpx;
+  color: #8f98a4;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.followup-input-wrap {
+  position: relative;
+  margin-top: 20rpx;
+  padding: 20rpx 20rpx 44rpx;
+  border: 1rpx solid #e5e8eb;
+  border-radius: 12rpx;
+  background: #ffffff;
+}
+
+.followup-input {
+  width: 100%;
+  height: 220rpx;
+  color: #212631;
+  font-size: 26rpx;
+  line-height: 1.65;
+}
+
+.followup-placeholder {
+  color: #b4bbc4;
+}
+
+.followup-count {
+  position: absolute;
+  right: 18rpx;
+  bottom: 14rpx;
+  color: #b4bbc4;
+  font-size: 20rpx;
+}
+
+.followup-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 22rpx;
+}
+
+.followup-action {
+  height: 76rpx;
+  margin: 0;
+  border-radius: 38rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  line-height: 76rpx;
+}
+
+.followup-action::after {
+  border: 0;
+}
+
+.followup-action.secondary {
+  width: 190rpx;
+  background: #f2f4f5;
+  color: #69727e;
+}
+
+.followup-action.primary {
+  flex: 1;
+  background: #212631;
+  color: #c9f24b;
+}
+
+.followup-action[disabled] {
+  opacity: 0.65;
+}

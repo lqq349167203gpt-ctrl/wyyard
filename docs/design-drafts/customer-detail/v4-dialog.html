@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 V4 · 弹窗版（单列全宽滚动卡）— 客户详情</title>
+<style>
+  :root{
+    --bg:#f4f5f6;
+    --card:#ffffff;
+    --ink:#212631;
+    --sub:#79838f;
+    --weak:#a8b1bd;
+    --lime:#c9f24b;
+    --olive:#3d5500;
+    --line:#eceef0;
+    --shadow:0 2px 4px rgba(33,38,49,.05);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{-webkit-font-smoothing:antialiased;}
+  body{
+    font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    font-size:13px;line-height:1.6;color:var(--ink);
+  }
+
+  /* ── 预览遮罩 + 居中弹窗 ── */
+  .overlay{
+    position:fixed;inset:0;background:rgba(20,24,32,.48);
+    display:flex;align-items:center;justify-content:center;
+    backdrop-filter:blur(2px);
+  }
+  .dialog{
+    width:1000px;max-width:96vw;height:85vh;max-height:750px;
+    background:var(--bg);border-radius:18px;overflow:hidden;
+    box-shadow:0 24px 64px rgba(15,18,24,.35);
+    display:flex;flex-direction:column;
+    padding:14px 16px;gap:12px;
+  }
+  .close-x{
+    position:absolute;top:14px;right:16px;width:30px;height:30px;border-radius:50%;
+    background:#fff;color:var(--sub);display:flex;align-items:center;justify-content:center;
+    font-size:15px;box-shadow:var(--shadow);cursor:pointer;flex:none;
+  }
+  .dialog-head{position:relative;flex:none;height:22px;display:flex;align-items:center;}
+  .mark{
+    display:inline-flex;align-items:center;gap:7px;
+    background:var(--ink);color:var(--lime);
+    font-size:11px;font-weight:600;letter-spacing:.4px;
+    padding:4px 12px;border-radius:999px;
+  }
+  .mark i{width:5px;height:5px;border-radius:50%;background:var(--lime);}
+
+  /* ── 细滚动条（内部区域通用） ── */
+  .scroll-thin{overflow-y:auto;scrollbar-width:thin;scrollbar-color:transparent transparent;}
+  .scroll-thin::-webkit-scrollbar{width:5px;}
+  .scroll-thin::-webkit-scrollbar-thumb{background:transparent;border-radius:99px;}
+  .scroll-thin:hover{scrollbar-color:#d4d9df transparent;}
+  .scroll-thin:hover::-webkit-scrollbar-thumb{background:#d4d9df;}
+  .scroll-thin::-webkit-scrollbar-thumb:hover{background:#b7bec7;}
+
+  /* ── 1. 身份条（一行收拢 60-70px） ── */
+  .identity{
+    flex:none;height:66px;background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:14px;padding:0 18px;
+  }
+  .avatar{
+    width:40px;height:40px;border-radius:12px;flex:none;
+    background:linear-gradient(135deg,#eef3e2,#dcf5e4);
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:800;color:var(--olive);
+  }
+  .id-name{display:flex;align-items:baseline;gap:8px;white-space:nowrap;}
+  .id-name h1{font-size:18px;font-weight:800;letter-spacing:.3px;}
+  .id-name .real{font-size:12px;color:var(--sub);font-weight:500;}
+  .id-tags{display:flex;gap:6px;flex:none;}
+  .tag{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;line-height:1.5;white-space:nowrap;}
+  .tag.green{background:#dcf5e4;color:#157a3c;}
+  .tag.blue{background:#e0ebff;color:#2f5cc4;}
+  .tag.purple{background:#ece6ff;color:#6a48d8;}
+  .id-metrics{margin-left:auto;display:flex;align-items:center;gap:16px;flex:none;}
+  .im{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;}
+  .im b{font-size:16px;font-weight:800;}
+  .im b.lime-dark{color:var(--ink);}
+  .im span{font-size:11px;color:var(--weak);}
+  .im-div{width:1px;height:26px;background:var(--line);}
+
+  /* ── 2. 联系与来源高密度横条（~40px） ── */
+  .strip{
+    flex:none;height:40px;background:var(--card);border-radius:12px;box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:0;padding:0 16px;overflow:hidden;
+    font-size:12px;color:var(--sub);
+  }
+  .strip .cell{display:flex;align-items:center;gap:6px;white-space:nowrap;padding:0 14px;}
+  .strip .cell:first-child{padding-left:0;}
+  .strip .cell + .cell{border-left:1px solid var(--line);}
+  .strip .k{color:var(--weak);}
+  .strip .v{color:var(--ink);font-weight:600;}
+  .strip .src{background:#ffe8d9;color:#c25a1b;font-weight:700;padding:1px 8px;border-radius:999px;font-size:11px;}
+  .strip .url{
+    color:#2f5cc4;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .copy-btn{
+    border:1px solid var(--line);background:#fafbfc;color:var(--sub);
+    font-size:10.5px;padding:1px 8px;border-radius:999px;cursor:pointer;font-family:inherit;flex:none;
+  }
+  .copy-btn:hover{background:var(--lime);color:var(--olive);border-color:var(--lime);}
+
+  /* ── 3. 长文本区：单列全宽 × 5 字段，总高固定 ── */
+  .fields{
+    flex:none;height:274px;background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    padding:6px 18px;display:flex;flex-direction:column;overflow:hidden;
+  }
+  .field{flex:none;padding:7px 0;}
+  .field + .field{border-top:1px dashed var(--line);}
+  .f-title{
+    font-size:11px;font-weight:700;color:var(--weak);letter-spacing:1.2px;
+    display:flex;align-items:center;gap:6px;margin-bottom:3px;
+  }
+  .f-title::before{content:"";width:3px;height:10px;border-radius:2px;background:var(--lime);flex:none;}
+  .field.trauma .f-title::before{background:#ffd9c2;}
+  .f-body{
+    font-size:12.5px;line-height:1.7;color:#3c4450;
+    max-height:64px; /* 3 行 */
+    padding-right:8px;
+  }
+
+  /* ── 4. 记录区：tab 头固定，内容内部滚动，占满剩余高度 ── */
+  .records{
+    flex:1;min-height:0;background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .tabs{display:flex;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--line);flex:none;}
+  .tab{
+    border:none;background:none;cursor:pointer;font-family:inherit;
+    font-size:12.5px;font-weight:600;color:var(--weak);padding:7px 13px 9px;position:relative;
+  }
+  .tab .n{
+    font-size:10.5px;font-weight:700;background:#f1f0ed;color:var(--sub);
+    border-radius:999px;padding:0 6px;margin-left:5px;
+  }
+  .tab.active{color:var(--ink);}
+  .tab.active::after{
+    content:"";position:absolute;left:11px;right:11px;bottom:-1px;height:3px;
+    border-radius:3px 3px 0 0;background:var(--lime);
+  }
+  .tab.active .n{background:var(--ink);color:var(--lime);}
+  .pane{display:none;flex:1;min-height:0;padding:12px 16px 14px;}
+  .pane.active{display:block;}
+
+  /* 跟进点小卡片 */
+  .follow-item{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    padding:11px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(33,38,49,.03);
+  }
+  .f-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+  .f-date{font-size:13px;font-weight:800;}
+  .pill{font-size:10.5px;font-weight:700;padding:1px 9px;border-radius:999px;}
+  .pill.done{background:#dcf5e4;color:#157a3c;}
+  .pill.miss{background:#f1f0ed;color:#79838f;}
+  .f-grid{display:grid;grid-template-columns:64px 1fr;gap:4px 12px;font-size:12.5px;}
+  .f-grid dt{color:var(--weak);}
+  .f-grid dd{color:#3c4450;line-height:1.6;}
+
+  /* 沟通记录 */
+  .chat-item{display:flex;gap:10px;padding:9px 2px;border-bottom:1px dashed var(--line);font-size:12.5px;}
+  .chat-item:last-child{border-bottom:none;}
+  .chat-who{
+    flex:none;width:52px;height:24px;border-radius:999px;background:#e0ebff;color:#2f5cc4;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
+  }
+  .chat-body .c-date{font-size:11px;color:var(--weak);margin-bottom:1px;}
+  .chat-body .c-text{color:#3c4450;line-height:1.6;}
+
+  /* 剩余次数：三列并排 */
+  .quota-wrap{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding-top:4px;}
+  .quota{background:#fafbfc;border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .quota-name{font-size:12.5px;font-weight:700;}
+  .quota-name small{color:var(--weak);font-weight:500;margin-left:5px;font-size:10.5px;}
+  .quota-num{font-size:11.5px;color:var(--sub);margin:5px 0 7px;}
+  .quota-num b{font-size:17px;font-weight:800;color:var(--ink);}
+  .bar{height:6px;border-radius:999px;background:#edeff1;overflow:hidden;}
+  .bar i{display:block;height:100%;border-radius:999px;background:var(--lime);}
+
+  /* 交易记录 */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{
+    text-align:left;color:var(--weak);font-weight:600;font-size:11px;letter-spacing:.5px;
+    padding:5px 8px;border-bottom:1px solid var(--line);
+  }
+  td{padding:9px 8px;border-bottom:1px solid var(--line);color:#3c4450;}
+  tr:last-child td{border-bottom:none;}
+  td .amt{font-weight:800;color:var(--ink);}
+  .status{font-size:10.5px;font-weight:700;background:#dcf5e4;color:#157a3c;padding:1px 9px;border-radius:999px;}
+</style>
+</head>
+<body>
+<div class="overlay">
+  <div class="dialog">
+
+    <div class="dialog-head">
+      <div class="mark"><i></i>方案 V4 · 弹窗版「单列全宽滚动卡」</div>
+      <div class="close-x">×</div>
+    </div>
+
+    <!-- 1. 身份条 -->
+    <section class="identity">
+      <div class="avatar">满</div>
+      <div class="id-name">
+        <h1>林小满</h1>
+        <span class="real">林晓曼 · 女 · 34 岁</span>
+      </div>
+      <div class="id-tags">
+        <span class="tag green">深度会员</span>
+        <span class="tag blue">疗愈老师 · 沈青</span>
+        <span class="tag purple">疗愈老师 · 苏禾</span>
+      </div>
+      <div class="id-metrics">
+        <div class="im"><b class="lime-dark">27<small style="font-size:11px;font-weight:700;"> 次</small></b><span>到店次数</span></div>
+        <div class="im-div"></div>
+        <div class="im"><b>¥36,800</b><span>累计消费</span></div>
+        <div class="im-div"></div>
+        <div class="im"><b style="font-size:13px;">2025/11/3</b><span>首次到访</span></div>
+      </div>
+    </section>
+
+    <!-- 2. 联系与来源横条 -->
+    <section class="strip">
+      <div class="cell"><span class="k">电话</span><span class="v">138 2619 5543</span></div>
+      <div class="cell"><span class="k">微信</span><span class="v">xiaoman_lin</span></div>
+      <div class="cell"><span class="k">引流人</span><span class="v">王珂</span></div>
+      <div class="cell"><span class="k">承接人</span><span class="v">婷婷</span></div>
+      <div class="cell"><span class="k">来源</span><span class="src">小红书</span></div>
+      <div class="cell" style="min-width:0;flex:1;">
+        <span class="k">链接</span>
+        <span class="url">https://xhslink.com/a/8fj3k2mx9</span>
+        <button class="copy-btn" data-copy="https://xhslink.com/a/8fj3k2mx9">复制</button>
+      </div>
+    </section>
+
+    <!-- 3. 长文本区：5 字段单列全宽，各 3 行封顶内部滚动 -->
+    <section class="fields">
+      <div class="field">
+        <div class="f-title">到访目的</div>
+        <div class="f-body scroll-thin">想在亲密关系里不再重复旧模式，学会建立边界感；改善长期失眠和焦虑引起的躯体化反应（心悸、肠胃不适）。</div>
+      </div>
+      <div class="field trauma">
+        <div class="f-title">创伤经历</div>
+        <div class="f-body scroll-thin">童年时期父母长期争吵，初二时父亲离家出走，母亲情绪崩溃后把情感需求全部压在孩子身上，形成典型的亲职化。来访者很小就学会察言观色、压抑自己的需求去照顾别人。大学时第一段恋爱关系里反复讨好对方，被冷暴力分手后出现持续半年的抑郁情绪，期间有过自伤念头（未实施）。三年前开始接受心理咨询，情绪趋于稳定，但讨好模式和边界模糊的问题依然反复。</div>
+      </div>
+      <div class="field">
+        <div class="f-title">当下卡点</div>
+        <div class="f-body scroll-thin">最近半年和伴侣在谈婚论嫁，对方家庭催得紧，她发现自己又开始用顺从换和平，明明不情愿却答应了两家合买房。上周因为这件事失眠加重，心悸发作两次。她意识到这是旧模式重演，但「拒绝别人」对她来说仍然像「天要塌下来」。</div>
+      </div>
+      <div class="field">
+        <div class="f-title">工作情况</div>
+        <div class="f-body scroll-thin">互联网大厂产品经理，996 高压节奏。近一年明显职业倦怠，睡眠差，正在考虑降薪转型到身心健康行业。</div>
+      </div>
+      <div class="field">
+        <div class="f-title">其他信息</div>
+        <div class="f-body scroll-thin">对声音敏感，疗愈空间需要保持安静；每周三晚上有线上英语课，排课需避开。</div>
+      </div>
+    </section>
+
+    <!-- 4. 记录区 -->
+    <section class="records">
+      <div class="tabs">
+        <button class="tab active" data-tab="follow">跟进点<span class="n">3</span></button>
+        <button class="tab" data-tab="chat">沟通记录<span class="n">2</span></button>
+        <button class="tab" data-tab="quota">剩余次数<span class="n">3</span></button>
+        <button class="tab" data-tab="deal">交易记录<span class="n">2</span></button>
+      </div>
+
+      <div class="pane active scroll-thin" id="pane-follow">
+        <div class="follow-item">
+          <div class="f-head">
+            <span class="f-date">2026/7/15</span>
+            <span class="pill done">已到店</span>
+          </div>
+          <dl class="f-grid">
+            <dt>当日需求</dt><dd>OH卡梳理，想看清自己在买房这件事里的真实感受</dd>
+            <dt>组长反馈</dt><dd>参与度很高，抽到「面具」卡时情绪明显波动</dd>
+            <dt>跟进点</dt><dd>引导她把「我应该」和「我想要」分开表述，布置了边界练习：本周对一件小事说不</dd>
+            <dt>客户信息</dt><dd>结束后主动说要试试跟伴侣重谈买房分工</dd>
+          </dl>
+        </div>
+        <div class="follow-item">
+          <div class="f-head">
+            <span class="f-date">2026/7/8</span>
+            <span class="pill done">已到店</span>
+          </div>
+          <dl class="f-grid">
+            <dt>当日需求</dt><dd>情绪释放，最近心慌得厉害</dd>
+            <dt>组长反馈</dt><dd>释放过程顺利，哭了很久但能自己收住</dd>
+            <dt>跟进点</dt><dd>躯体化与压抑愤怒有关，建议记录「生气时刻」日记</dd>
+            <dt>客户信息</dt><dd>反馈睡眠好了两天又反复</dd>
+          </dl>
+        </div>
+        <div class="follow-item">
+          <div class="f-head">
+            <span class="f-date">2026/7/1</span>
+            <span class="pill miss">未到店</span>
+          </div>
+          <dl class="f-grid">
+            <dt>当日需求</dt><dd>临时加班请假</dd>
+            <dt>组长反馈</dt><dd>-</dd>
+            <dt>跟进点</dt><dd>连续两次因加班改期，需关注是否回避</dd>
+            <dt>客户信息</dt><dd>-</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="pane scroll-thin" id="pane-chat">
+        <div class="chat-item">
+          <div class="chat-who">婷婷</div>
+          <div class="chat-body">
+            <div class="c-date">2026/7/14</div>
+            <div class="c-text">微信回访，说周末和伴侣谈了买房分工，对方比想象中好说话，她很惊讶</div>
+          </div>
+        </div>
+        <div class="chat-item">
+          <div class="chat-who" style="background:#ece6ff;color:#6a48d8;">沈青</div>
+          <div class="chat-body">
+            <div class="c-date">2026/7/9</div>
+            <div class="c-text">提醒她周三英语课改期，已确认</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane scroll-thin" id="pane-quota">
+        <div class="quota-wrap">
+          <div class="quota">
+            <div class="quota-name">会员卡<small>2026/1/1~2026/12/31</small></div>
+            <div class="quota-num">剩余 <b>14</b> / 40 次</div>
+            <div class="bar"><i style="width:35%;"></i></div>
+          </div>
+          <div class="quota">
+            <div class="quota-name">OH卡梳理</div>
+            <div class="quota-num">剩余 <b>3</b> / 10 次</div>
+            <div class="bar"><i style="width:30%;"></i></div>
+          </div>
+          <div class="quota">
+            <div class="quota-name">情绪释放</div>
+            <div class="quota-num">剩余 <b>1</b> / 5 次</div>
+            <div class="bar"><i style="width:20%;"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane scroll-thin" id="pane-deal">
+        <table>
+          <thead>
+            <tr><th>项目</th><th>规格</th><th>金额</th><th>状态</th><th>成交人</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>会员卡</td><td>40 次</td>
+              <td><span class="amt">¥20,000</span></td>
+              <td><span class="status">生效中</span></td><td>婷婷</td>
+            </tr>
+            <tr>
+              <td>OH卡梳理</td><td>10 次</td>
+              <td><span class="amt">¥6,800</span></td>
+              <td><span class="status">生效中</span></td><td>王珂</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  // 记录区 tab 切换（无展开/收起逻辑，长文本靠内部滚动）
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+      document.querySelectorAll('.pane').forEach(function(p){ p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // 复制链接
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (navigator.clipboard) { navigator.clipboard.writeText(btn.dataset.copy); }
+      btn.textContent = '已复制';
+      setTimeout(function(){ btn.textContent = '复制'; }, 1500);
+    });
+  });
+</script>
+</body>
+</html>

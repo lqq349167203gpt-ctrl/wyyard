@@ -502,6 +502,7 @@ def test_a5_payment():
             "project_type": "membership-cards",
             "project_id": card_id,
             "count": 2,
+            "reason": "自动化测试销卡",
         }
         resp = api(A, "post", "/api/project-deductions", json=deduct_data)
         if resp.status_code == 200:
@@ -525,6 +526,7 @@ def test_a5_payment():
             "project_type": "membership-cards",
             "project_id": card_id,
             "count": -1,
+            "reason": "自动化测试负数校验",
         }
         resp = api(A, "post", "/api/project-deductions", json=deduct_data)
         if resp.status_code in (400, 422):
@@ -541,6 +543,7 @@ def test_a5_payment():
             "project_type": "membership-cards",
             "project_id": card_id,
             "count": 9999,
+            "reason": "自动化测试超额校验",
         }
         resp = api(A, "post", "/api/project-deductions", json=deduct_data)
         if resp.status_code in (400, 422):

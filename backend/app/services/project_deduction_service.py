@@ -1,11 +1,11 @@
-import uuid
 import threading
+import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from app.models.project_deduction import ProjectDeduction, ProjectDeductionCreate
-from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "project_deductions.json"
 _deductions: Dict[str, ProjectDeduction] = {}
@@ -49,7 +49,7 @@ def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] =
 
 
 def _fill_current_remaining(deductions: List[ProjectDeduction]):
-    """为扣减记录填充当前实际剩余次数"""
+    """仅为没有历史快照的老记录补值，已有快照不随当前余额变化。"""
     from app.services import membership_card_service
 
     # 按 customer_id + project_type 分组
@@ -64,20 +64,22 @@ def _fill_current_remaining(deductions: List[ProjectDeduction]):
 
         if project_type == "membership-cards":
             for d in items:
-                card_remaining = membership_card_service.get_card_effective_remaining(d.project_id)
-                if card_remaining is not None:
+                if d.remaining_after is None:
+                    card_remaining = membership_card_service.get_card_effective_remaining(d.project_id)
                     d.remaining_after = card_remaining
             continue
         elif project_type == "other-projects":
             from app.services import other_project_service
             for d in items:
-                remaining = other_project_service.get_effective_remaining(d.project_id)
-                d.remaining_after = remaining
+                if d.remaining_after is None:
+                    d.remaining_after = other_project_service.get_effective_remaining(d.project_id)
             continue
         else:
             from app.services import (
-                group_case_session_service, emotional_release_session_service,
-                oh_card_reading_session_service, energy_knot_session_service,
+                emotional_release_session_service,
+                energy_knot_session_service,
+                group_case_session_service,
+                oh_card_reading_session_service,
             )
             svc_map = {
                 "group-cases": group_case_session_service,
@@ -91,7 +93,8 @@ def _fill_current_remaining(deductions: List[ProjectDeduction]):
 
         if current_remaining is not None:
             for d in items:
-                d.remaining_after = current_remaining
+                if d.remaining_after is None:
+                    d.remaining_after = current_remaining
 
 
 def get_deduction_total(customer_id: str, project_type: str) -> int:
@@ -110,10 +113,15 @@ def get_deduction_total_for_project(project_id: str) -> int:
 def get_available_items(customer_id: str, project_type: str) -> list:
     """返回用户可销卡的项目列表"""
     from app.services import (
-        membership_card_service, group_case_service, emotional_release_service,
-        oh_card_reading_service, energy_knot_service,
-        group_case_session_service, emotional_release_session_service,
-        oh_card_reading_session_service, energy_knot_session_service,
+        emotional_release_service,
+        emotional_release_session_service,
+        energy_knot_service,
+        energy_knot_session_service,
+        group_case_service,
+        group_case_session_service,
+        membership_card_service,
+        oh_card_reading_service,
+        oh_card_reading_session_service,
     )
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -291,7 +299,7 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
     with _deduct_lock:
         reason = data.reason.strip()
         if not reason:
-            raise ValueError("请填写销卡原因")
+            raise ValueError("请填写销卡内容")
 
         customer = customer_service.get_customer(data.customer_id)
         if not customer:
@@ -335,10 +343,14 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
 
         else:
             from app.services import (
-                group_case_session_service, emotional_release_session_service,
-                oh_card_reading_session_service, energy_knot_session_service,
-                group_case_service, emotional_release_service,
-                oh_card_reading_service, energy_knot_service,
+                emotional_release_service,
+                emotional_release_session_service,
+                energy_knot_service,
+                energy_knot_session_service,
+                group_case_service,
+                group_case_session_service,
+                oh_card_reading_service,
+                oh_card_reading_session_service,
             )
 
             service_map = {
@@ -409,9 +421,10 @@ def update_deduction(
         if count < 1:
             raise ValueError("次数必须大于 0")
         if reason is not None and not reason.strip():
-            raise ValueError("请填写销卡原因")
+            raise ValueError("请填写销卡内容")
 
         deduction.count = count
+        deduction.remaining_after = None  # 重算剩余次数
         if reason is not None:
             deduction.reason = reason.strip()
         deduction.updated_by = updated_by

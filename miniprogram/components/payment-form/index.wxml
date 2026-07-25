@@ -157,6 +157,12 @@
     <view class="pf-closer-total" wx:if="{{closers.length > 1}}">
       <text>总金额: {{closerTotal}} 元</text>
     </view>
+    <view class="pf-row pf-row-last">
+      <text class="pf-label">支付方式</text>
+      <picker class="pf-picker" mode="selector" range="{{paymentMethods}}" range-key="label" value="{{paymentMethodIndex}}" bindchange="onPaymentMethodChange">
+        <view class="pf-value {{paymentMethodIndex >= 0 ? '' : 'pf-placeholder'}}">{{paymentMethodIndex >= 0 ? paymentMethods[paymentMethodIndex].label : '请选择'}}</view>
+      </picker>
+    </view>
   </view>
 
   <!-- 搜索弹窗 -->

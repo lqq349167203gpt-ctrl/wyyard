@@ -629,6 +629,7 @@ def _deduct_for_arrival(visit):
         group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        internal_course_session_service,
         oh_card_reading_session_service,
     )
     cid = visit.customer_id
@@ -661,6 +662,12 @@ def _deduct_for_arrival(visit):
                 if cid in chargeable:
                     membership_card_service._do_deduct(cid, f"ocr:{s.id}")
 
+        for s in internal_course_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = internal_course_session_service._get_chargeable_ids(s)
+                if cid in chargeable:
+                    membership_card_service._do_deduct(cid, f"ics:{s.id}")
+
         for cr in class_record_service.list_records():
             if cr.date == date and not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
@@ -679,6 +686,7 @@ def _restore_for_arrival(visit):
         group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        internal_course_session_service,
         oh_card_reading_session_service,
     )
     cid = visit.customer_id
@@ -710,6 +718,12 @@ def _restore_for_arrival(visit):
                 chargeable.discard(s.owner_id)
                 if cid in chargeable:
                     membership_card_service._do_restore(cid, f"ocr:{s.id}")
+
+        for s in internal_course_session_service.list_sessions():
+            if s.date == date and not s.is_deleted:
+                chargeable = internal_course_session_service._get_chargeable_ids(s)
+                if cid in chargeable:
+                    membership_card_service._do_restore(cid, f"ics:{s.id}")
 
         for cr in class_record_service.list_records():
             if cr.date == date and not cr.is_public_welfare:

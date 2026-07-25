@@ -33,6 +33,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/operation-logs": "无忧 - 操作日志",
   "/data-records": "无忧 - 数据记录",
   "/communication-records": "无忧 - 沟通记录",
+  "/followup-records": "无忧 - 回访记录",
   "/chat-history": "无忧 - 沟通记录",
 }
 

@@ -57,6 +57,7 @@ from app.api.system_helper import router as system_helper_router
 from app.api.system_helper_config import router as system_helper_config_router
 from app.api.chat_history import router as chat_history_router
 from app.api.communication_records import router as communication_records_router
+from app.api.followup_records import router as followup_records_router
 from app.api.consumption_records import router as consumption_records_router
 from app.api.activity_history import router as activity_history_router
 from app.api.visit_history import router as visit_history_router
@@ -134,6 +135,7 @@ app.include_router(system_helper_router)
 app.include_router(system_helper_config_router)
 app.include_router(chat_history_router)
 app.include_router(communication_records_router)
+app.include_router(followup_records_router)
 app.include_router(consumption_records_router)
 app.include_router(activity_history_router)
 app.include_router(visit_history_router)

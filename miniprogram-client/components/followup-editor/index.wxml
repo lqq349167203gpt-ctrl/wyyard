@@ -1,0 +1,39 @@
+<view wx:if="{{visible}}" class="followup-layer">
+  <view class="followup-mask" catchtap="onClose" catchtouchmove="noop"></view>
+  <view class="followup-sheet">
+    <view class="followup-head">
+      <view class="followup-title">活动回访</view>
+      <view class="followup-close" catchtap="onClose">×</view>
+    </view>
+
+    <view class="followup-activity">
+      <text class="followup-name">{{activity.displayName || activity.name}}</text>
+      <text class="followup-meta">{{activity.date}}{{activity.timeRange ? ' · ' + activity.timeRange : ''}}</text>
+      <text wx:if="{{activity.host}}" class="followup-meta">老师/带领人 · {{activity.host}}</text>
+    </view>
+
+    <view class="followup-input-wrap">
+      <textarea
+        class="followup-input"
+        value="{{content}}"
+        maxlength="1000"
+        placeholder="写下这场活动的感受、收获或建议…"
+        placeholder-class="followup-placeholder"
+        show-confirm-bar="{{false}}"
+        cursor-spacing="32"
+        bindinput="onInput"
+      ></textarea>
+      <text class="followup-count">{{contentLength}}/1000</text>
+    </view>
+
+    <view class="followup-actions">
+      <button class="followup-action secondary" catchtap="onClose">取消</button>
+      <button
+        class="followup-action primary"
+        loading="{{saving}}"
+        disabled="{{saving}}"
+        catchtap="onSave"
+      >{{activity.has_followup ? '保存修改' : '提交回访'}}</button>
+    </view>
+  </view>
+</view>

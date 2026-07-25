@@ -569,8 +569,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
       case "energy_knot":
         return {
           customer_id: formCustomerId, nickname: formNickname,
-          // purchase_count 是创建时定，编辑时不发送（后端 PATCH 禁止直接修改）
-          ...(editingItem ? {} : { purchase_count: parseInt(formPurchaseCount) || 0, created_by: createdBy }),
+          // purchase_count 允许编辑修正（后端校验非负整数，剩余次数实时派生）；created_by 仅新建时写入
+          purchase_count: parseInt(formPurchaseCount) || 0,
+          ...(editingItem ? {} : { created_by: createdBy }),
           amount: parseFloat(formAmount) || 0,
           closer_id, closer_name, closers, organization_id, deal_date,
           payment_method: formPaymentMethod || null,

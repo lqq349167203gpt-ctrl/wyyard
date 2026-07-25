@@ -177,6 +177,15 @@ const clientApi = {
     return get('/api/client/activity-records')
   },
 
+  // 活动回访（同一场活动重复提交会更新原记录）
+  saveActivityFollowup(activityType, sessionId, content) {
+    return post('/api/client/activity-followups', {
+      activity_type: activityType,
+      session_id: sessionId,
+      content,
+    })
+  },
+
   // 剩余次数
   getRemaining() {
     return get('/api/client/remaining')
@@ -184,7 +193,7 @@ const clientApi = {
 
   // 销卡记录
   getDeductions() {
-    return get('/api/client/deductions')
+    return get(`/api/client/deductions?_t=${Date.now()}`)
   },
 }
 

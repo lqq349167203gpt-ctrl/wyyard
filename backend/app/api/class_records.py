@@ -298,7 +298,7 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
         operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
         activity_name = record.activity_name or record.course_name
         activity_date = record.date
-        from app.services import client_notification_service, customer_service
+        from app.services import client_notification_service
         for cid in removed_ids:
             client_notification_service.create_notification(
                 customer_id=cid,
@@ -346,7 +346,7 @@ def update_groups(record_id: str, data: dict, request: Request):
         operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
         activity_name = record.activity_name or record.course_name
         activity_date = record.date
-        from app.services import client_notification_service, customer_service
+        from app.services import client_notification_service
         for cid in removed_ids:
             client_notification_service.create_notification(
                 customer_id=cid,

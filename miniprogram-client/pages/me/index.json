@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "我的",
-  "backgroundColor": "#ffffff"
+  "backgroundColor": "#ffffff",
+  "usingComponents": {
+    "followup-editor": "/components/followup-editor/index"
+  }
 }

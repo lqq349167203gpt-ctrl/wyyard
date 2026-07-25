@@ -52,14 +52,17 @@ def get_session(session_id: str) -> Optional[InternalCourseSession]:
 
 
 def _get_chargeable_ids(session) -> set:
-    """需要扣费的人员：参与者"""
-    return set(session.participant_ids)
+    """内部课程全部免费，不产生会员卡扣费人员。"""
+    return set()
 
 
 def _deduct_for_session(session):
     """为新创建的活动扣费"""
     from app.services import membership_card_service
-    chargeable = _get_chargeable_ids(session)
+    chargeable = membership_card_service.filter_arrived_customer_ids(
+        session.date,
+        _get_chargeable_ids(session),
+    )
     activity_key = f"ics:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in chargeable:
@@ -83,6 +86,8 @@ def _restore_for_session(session):
 def _sync_deduction(session, old_chargeable, new_chargeable):
     """同步扣费：为新增人员扣费，为移除人员退费"""
     from app.services import membership_card_service
+    old_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, old_chargeable)
+    new_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, new_chargeable)
     activity_key = f"ics:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in old_chargeable - new_chargeable:

@@ -48,7 +48,7 @@ export default function DetailView({
   const [loading, setLoading] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editingRec, setEditingRec] = useState<HealingRec | null>(null)
-  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "communication" | "payment" | "purchase">(defaultTab)
+  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "communication" | "followups" | "payment" | "purchase">(defaultTab)
   const [activitiesPage, setActivitiesPage] = useState(1)
   const [healingPage, setHealingPage] = useState(1)
   const [paymentPage, setPaymentPage] = useState(1)
@@ -58,6 +58,7 @@ export default function DetailView({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [commRecords, setCommRecords] = useState<CommunicationRecord[]>([])
   const [commPage, setCommPage] = useState(1)
+  const [followupsPage, setFollowupsPage] = useState(1)
   const loadSeqRef = useRef(0)
 
   useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
@@ -69,7 +70,7 @@ export default function DetailView({
     setLoading(true)
     setLoadError(null)
     setCopied(false)
-    setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1)
+    setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1); setFollowupsPage(1)
     try {
       const data = await customerDetailApi.get(cid)
       if (seq !== loadSeqRef.current) return
@@ -342,6 +343,7 @@ export default function DetailView({
                 { key: "healing" as const, label: "跟进点", cnt: (detail?.visit_records || []).length },
                 { key: "communication" as const, label: "沟通记录", cnt: commRecords.length },
                 { key: "activities" as const, label: "活动记录", cnt: (detail?.activities || []).length },
+                { key: "followups" as const, label: "用户回访", cnt: (detail?.activity_followups || []).length },
                 { key: "purchase" as const, label: "剩余次数", cnt: null as number | null },
                 { key: "payment" as const, label: "交易记录", cnt: (detail?.payment_records || []).length },
               ].map(tab => (
@@ -353,6 +355,7 @@ export default function DetailView({
                     setHealingPage(1)
                     setPaymentPage(1)
                     setPurchasePage(1)
+                    setFollowupsPage(1)
                   }}
                   className={`relative px-3.5 pt-3 pb-2.5 text-[13px] whitespace-nowrap transition-colors ${
                     activeTab === tab.key
@@ -543,6 +546,78 @@ export default function DetailView({
                 {totalPages > 1 && (
                   <div className="px-4 py-2 border-t border-[#f0f0f0]">
                     <PaginationBar currentPage={activitiesPage} totalPages={totalPages} totalItems={dayGroups.length} unit="天" startIndex={(activitiesPage-1)*pageSize+1} endIndex={Math.min(activitiesPage*pageSize, dayGroups.length)} onPageChange={setActivitiesPage} />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* 用户回访：与具体活动绑定，展示提交时的活动信息快照 */}
+          {activeTab === "followups" && (() => {
+            const followups = [...(detail?.activity_followups || [])]
+              .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))
+            const pageSize = 6
+            const totalPages = Math.ceil(followups.length / pageSize)
+            const paginatedRecords = followups.slice(
+              (followupsPage - 1) * pageSize,
+              followupsPage * pageSize,
+            )
+            const formatFollowupTime = (value: string) => {
+              if (!value) return "-"
+              const time = new Date(value)
+              if (Number.isNaN(time.getTime())) return value
+              return `${time.getFullYear()}/${String(time.getMonth() + 1).padStart(2, "0")}/${String(time.getDate()).padStart(2, "0")} ${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}`
+            }
+            return followups.length === 0 ? (
+              <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无用户回访</div>
+            ) : (
+              <div>
+                <div className="divide-y divide-[#f0f1f2]">
+                  {paginatedRecords.map(record => {
+                    const activityTime = record.start_time
+                      ? `${record.start_time}${record.end_time ? `–${record.end_time}` : ""}`
+                      : ""
+                    return (
+                      <div key={record.id} className="px-3 py-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="text-[13px] font-medium text-[#2b2f36]">
+                                {record.activity_name || "-"}
+                              </span>
+                              <span className="rounded-[4px] bg-[#f1f3f5] px-1.5 py-0.5 text-[12px] text-[#68717d]">
+                                {record.activity_category || "活动"}
+                              </span>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#8f959e]">
+                              <span className="tabular-nums">
+                                活动时间：{record.activity_date || "-"}{activityTime ? ` ${activityTime}` : ""}
+                              </span>
+                              <span>老师/带领人：{record.teacher || "-"}</span>
+                              <span>用户身份：{record.customer_role || "-"}</span>
+                            </div>
+                          </div>
+                          <span className="shrink-0 text-[12px] tabular-nums text-[#a3a9b1]">
+                            回访于 {formatFollowupTime(record.updated_at)}
+                          </span>
+                        </div>
+                        <p className="mt-2 rounded-[4px] bg-[#fafafa] px-3 py-2 text-[13px] font-normal leading-[1.65] text-[#3d444d] whitespace-pre-wrap break-words">
+                          {record.content}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+                {totalPages > 1 && (
+                  <div className="px-4 py-2 border-t border-[#f0f0f0]">
+                    <PaginationBar
+                      currentPage={followupsPage}
+                      totalPages={totalPages}
+                      totalItems={followups.length}
+                      startIndex={(followupsPage - 1) * pageSize + 1}
+                      endIndex={Math.min(followupsPage * pageSize, followups.length)}
+                      onPageChange={setFollowupsPage}
+                    />
                   </div>
                 )}
               </div>

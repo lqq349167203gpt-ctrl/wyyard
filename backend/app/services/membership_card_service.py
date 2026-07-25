@@ -1,12 +1,13 @@
-import uuid
 import threading
-from datetime import datetime, timezone, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
+
 from dateutil.relativedelta import relativedelta
-from typing import List, Optional, Dict
 
 from app.models.membership_card import MembershipCard, MembershipCardCreate
-from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "membership_cards.json"
 DEDUCTIONS_FILE = "membership_deductions.json"
@@ -39,16 +40,36 @@ def _migrate_total_count(item: MembershipCard) -> MembershipCard:
 
 
 def _migrate_deductions(raw):
-    """兼容老数据：把 _deductions 元素统一为 {key, card_id}"""
+    """兼容老数据并排除内部课程曾错误生成的扣卡流水。"""
     out: Dict[str, list] = {}
     for customer_id, items in (raw or {}).items():
         migrated = []
         for it in items:
+            activity_key = it.get("key") if isinstance(it, dict) else it
+            if isinstance(activity_key, str) and activity_key.startswith("ics:"):
+                continue
             if isinstance(it, dict):
-                migrated.append({"key": it.get("key"), "card_id": it.get("card_id")})
+                migrated.append({
+                    "key": activity_key,
+                    "card_id": it.get("card_id"),
+                    "benefit_type": it.get("benefit_type", ""),
+                    "benefit_id": it.get("benefit_id", ""),
+                    "benefit_name": it.get("benefit_name", ""),
+                    "remaining_after": it.get("remaining_after"),
+                    "deducted_at": it.get("deducted_at"),
+                })
             else:
-                migrated.append({"key": it, "card_id": None})
-        out[customer_id] = migrated
+                migrated.append({
+                    "key": it,
+                    "card_id": None,
+                    "benefit_type": "",
+                    "benefit_id": "",
+                    "benefit_name": "",
+                    "remaining_after": None,
+                    "deducted_at": None,
+                })
+        if migrated:
+            out[customer_id] = migrated
     return out
 
 
@@ -59,8 +80,24 @@ def _load():
     for k, v in data.items():
         _cards[k] = _migrate_total_count(_migrate_closers(MembershipCard(**v)))
     _deductions = _migrate_deductions(load_data(DEDUCTIONS_FILE))
-    _debts = load_data(DEBTS_FILE) or {}
-    _debt_activities = load_data(DEBT_ACTIVITIES_FILE) or {}
+    raw_debts = load_data(DEBTS_FILE) or {}
+    raw_debt_activities = load_data(DEBT_ACTIVITIES_FILE) or {}
+    _debt_activities = {}
+    _debts = {}
+    for customer_id, activity_keys in raw_debt_activities.items():
+        filtered_keys = [
+            key for key in activity_keys
+            if not (isinstance(key, str) and key.startswith("ics:"))
+        ]
+        removed_count = len(activity_keys) - len(filtered_keys)
+        if filtered_keys:
+            _debt_activities[customer_id] = filtered_keys
+        remaining_debt = max(0, int(raw_debts.get(customer_id, 0) or 0) - removed_count)
+        if remaining_debt:
+            _debts[customer_id] = remaining_debt
+    for customer_id, debt_count in raw_debts.items():
+        if customer_id not in raw_debt_activities and debt_count:
+            _debts[customer_id] = debt_count
 
 
 def _save(card_id: str = ""):
@@ -75,6 +112,15 @@ def _save(card_id: str = ""):
 
 def _save_deductions():
     save_data(DEDUCTIONS_FILE, _deductions)
+
+
+def list_activity_usage_records(customer_id: str) -> list[dict]:
+    """返回客户的活动权益使用记录副本，供统一销卡记录接口读取。"""
+    reconcile_customer_card_usage(customer_id)
+    return [
+        dict(item) if isinstance(item, dict) else {"key": str(item), "card_id": None}
+        for item in _deductions.get(customer_id, [])
+    ]
 
 
 def _save_debts():
@@ -103,6 +149,18 @@ def _active_cards(customer_id: str, today: Optional[str] = None) -> List[Members
         and (not c.effective_date or c.effective_date <= today)
         and (not c.expiry_date or c.expiry_date >= today)
     ]
+
+
+def filter_arrived_customer_ids(date: str, customer_ids: set) -> set:
+    """只保留当日已确认到场的客户，活动名单本身不再触发扣卡。"""
+    from app.services import visit_service
+
+    arrived_ids = {
+        visit.customer_id
+        for visit in visit_service.list_visits(date=date)
+        if visit.arrived and not visit.is_deleted
+    }
+    return set(customer_ids) & arrived_ids
 
 
 def void_card(card_id: str) -> Optional[MembershipCard]:
@@ -173,12 +231,12 @@ def get_manual_deductions(customer_id: str) -> int:
 def _count_raw_activities(customer_id: str) -> int:
     """统计该用户实际参与的活动总数（原始计数，不考虑卡和内部课程）"""
     from app.services import (
-        visit_service,
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         oh_card_reading_session_service,
+        visit_service,
     )
     arrived_dates = {v.visit_date for v in visit_service._visits.values()
                      if v.customer_id == customer_id and v.arrived and not v.is_deleted}
@@ -213,24 +271,46 @@ def _count_raw_activities(customer_id: str) -> int:
 
 
 def get_activity_deductions(customer_id: str) -> int:
-    """活动扣卡次数（仅计算实际从次数卡扣除的，不含不限次和内部课程覆盖的）"""
+    """活动扣卡次数（只统计实际使用次数卡的记录）。"""
     today = datetime.now().strftime("%Y-%m-%d")
     active = _active_cards(customer_id, today)
     countable = [c for c in active if c.remaining_count is not None]
     if not countable:
-        return 0  # 无次数卡，全部走不限次
-    count = _count_raw_activities(customer_id)
-    if count <= 0:
         return 0
-    # 按生效日期排序，计算次数卡总可用量
+
+    countable_ids = {card.id for card in countable}
+    records = _deductions.get(customer_id, [])
+    tracked = sum(
+        1
+        for item in records
+        if isinstance(item, dict) and item.get("card_id") in countable_ids
+    )
+
+    # 兼容未记录 card_id 的历史数据，仅在次数卡剩余容量内补算。
+    legacy_untracked = sum(
+        1
+        for item in records
+        if not isinstance(item, dict)
+        or (
+            not item.get("card_id")
+            and not item.get("benefit_type")
+            and not item.get("benefit_id")
+        )
+    )
+    if legacy_untracked <= 0:
+        return tracked
+
     from app.services import project_deduction_service
-    countable.sort(key=lambda c: (c.effective_date or "9999-12-31", c.expiry_date or "9999-12-31", c.id))
-    total_capacity = 0
-    for c in countable:
-        manual = project_deduction_service.get_deduction_total_for_project(c.id)
-        total_capacity += max(0, (c.total_count or 0) - manual)
-    # 次数卡最多扣 total_capacity，剩余的走不限次或内部课程
-    return min(count, total_capacity)
+    total_capacity = sum(
+        max(
+            0,
+            (card.total_count or 0)
+            - project_deduction_service.get_deduction_total_for_project(card.id),
+        )
+        for card in countable
+    )
+    actual_legacy = min(legacy_untracked, _count_raw_activities(customer_id))
+    return tracked + min(actual_legacy, max(0, total_capacity - tracked))
 
 
 def get_card_manual_deductions(card_id: str) -> int:
@@ -275,9 +355,9 @@ def _get_activity_date(activity_key: str) -> Optional[str]:
     """根据 activity_key（如 class:xxx, gcs:xxx）查找活动日期"""
     from app.services import (
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         oh_card_reading_session_service,
     )
     if ':' not in activity_key:
@@ -307,34 +387,32 @@ def _get_activity_date(activity_key: str) -> Optional[str]:
 def get_effective_remaining(customer_id: str) -> Optional[int]:
     """唯一真理：有效剩余 = 总购买 - 销卡 - 活动扣卡
 
-    返回 None 表示不限次。触发不限次的两种情况：
-    1. 有任一不限次卡在有效期内
-    2. 在内部课程有效期（疗愈师课程等已购课程生效区间）
-
-    其余情况按 total - manual - activity 计算（可为负数，表示欠费）。
+    权益顺序：先使用会员卡；会员卡没有可用次数时，才由内部课程权益覆盖。
+    返回 None 表示当前由不限次会员卡或内部课程权益覆盖。
     不再读 card.remaining_count 作为依据，仅用流水相减。
     """
+    reconcile_customer_card_usage(customer_id)
     from app.services import internal_course_service
     today = datetime.now().strftime("%Y-%m-%d")
     active = _active_cards(customer_id, today)
     all_cards = [c for c in list_cards() if c.customer_id == customer_id]
     if not all_cards:
-        # 无会员卡：若在内部课程有效期，视为不限次；否则按流水算欠费（负数）
         if internal_course_service.has_active_course(customer_id):
             return None
         manual = get_manual_deductions(customer_id)
         activity = get_activity_deductions(customer_id)
         return 0 - manual - activity
-    # 有不限次卡在有效期内 → 不限次
     if any(c.remaining_count is None for c in active):
-        return None
-    # 在内部课程有效期 → 不限次（即使会员卡次数已扣完，也不显示负数）
-    if internal_course_service.has_active_course(customer_id):
         return None
     total = get_grand_total(customer_id)
     manual = get_manual_deductions(customer_id)
     activity = get_activity_deductions(customer_id)
-    return total - manual - activity
+    remaining = total - manual - activity
+    if remaining > 0:
+        return remaining
+    if internal_course_service.has_active_course(customer_id):
+        return None
+    return remaining
 
 
 _load()
@@ -393,31 +471,9 @@ def create_card(data: MembershipCardCreate) -> MembershipCard:
         )
         _cards[card.id] = card
         _save(card.id)
-        # 购买新卡后，把之前的欠费活动补登记为已扣费（移到 _deductions 流水，不动 card.remaining_count）
         customer_id = card.customer_id
-        debt_acts = list(_debt_activities.get(customer_id, []))
-        debt_count = _debts.get(customer_id, 0)
-        tracked_count = min(debt_count, len(debt_acts))
-        if tracked_count > 0 and card.remaining_count is not None:
-            to_settle = debt_acts[:tracked_count]
-            _deductions.setdefault(customer_id, []).extend(to_settle)
-            remaining_acts = debt_acts[tracked_count:]
-            if remaining_acts:
-                _debt_activities[customer_id] = remaining_acts
-            else:
-                _debt_activities.pop(customer_id, None)
-            new_debt = debt_count - tracked_count
-            if new_debt > 0:
-                _debts[customer_id] = new_debt
-            else:
-                _debts.pop(customer_id, None)
-            _save_deductions()
-            _save_debts()
-        elif tracked_count > 0 and card.remaining_count is None:
-            # 不限次卡：直接清除所有欠费记录（不限次卡覆盖所有历史使用）
-            _debt_activities.pop(customer_id, None)
-            _debts.pop(customer_id, None)
-            _save_debts()
+        # 后补会员卡时，按活动日期把内部课程抵扣/欠费记录回填到有效期覆盖的会员卡。
+        reconcile_customer_card_usage(customer_id)
     _refresh_member_type(customer_id)
     return card
 
@@ -439,6 +495,7 @@ def update_card(card_id: str, data: dict) -> Optional[MembershipCard]:
         card.updated_at = datetime.now(timezone.utc)
         _cards[card_id] = card
         _save(card_id)
+    reconcile_customer_card_usage(card.customer_id)
     _refresh_member_type(card.customer_id)
     return card
 
@@ -456,51 +513,75 @@ def delete_card(card_id: str) -> bool:
     return True
 
 
-def _deduct_one(customer_id: str) -> tuple:
+def _select_membership_benefit(customer_id: str, usage_date: str) -> Optional[tuple]:
+    """按活动日期选择可用会员卡权益；没有可用会员卡时返回 None。"""
+    active_cards = _active_cards(customer_id, usage_date)
+    unlimited_cards = [card for card in active_cards if card.remaining_count is None]
+    if unlimited_cards:
+        unlimited_cards.sort(
+            key=lambda card: (
+                card.expiry_date or "9999-12-31",
+                card.effective_date or "9999-12-31",
+                card.created_at or "",
+                card.id,
+            )
+        )
+        selected = unlimited_cards[0]
+        return (
+            selected.id,
+            "unlimited_card",
+            selected.id,
+            selected.card_type,
+        )
+
+    countable = [card for card in active_cards if card.remaining_count is not None]
+    selected = _pick_earliest_expiry_card(countable, customer_id)
+    if selected:
+        from app.services import project_deduction_service
+
+        manual = project_deduction_service.get_deduction_total_for_project(selected.id)
+        activity = _get_card_activity_deductions_count(selected.id)
+        if (selected.total_count or 0) - manual - activity > 0:
+            return (
+                selected.id,
+                "count_card",
+                selected.id,
+                selected.card_type,
+            )
+    return None
+
+
+def _deduct_one(customer_id: str, usage_date: Optional[str] = None) -> tuple:
     """内部：为指定用户扣除一次会员活动剩余次数。
 
-    返回 (success, card_id)：
-      success=True, card_id=xxx — 扣到具体卡，card_id 用于 _deductions 追溯
-      success=True, card_id=None — 不限次卡或内部课程期，不消耗任何卡次数
-      success=False, card_id=None — 无法扣（欠费/无卡/未生效卡）
+    返回 (success, card_id, benefit_type, benefit_id, benefit_name)：
+      success=True — 已匹配到次数卡、不限次卡或内部课程权益
+      success=False — 无法匹配有效权益，进入欠费或等待未生效卡
     新逻辑：不修改 card.remaining_count 字段，扣减由调用方记流水实现（见 deduct_for_activity）。
     """
-    today = datetime.now().strftime("%Y-%m-%d")
-    active_cards = _active_cards(customer_id, today)
-    if not active_cards:
-        pending_cards = [
-            c for c in list_cards()
-            if c.customer_id == customer_id and c.effective_date and c.effective_date > today
-        ]
-        if pending_cards:
-            return (False, None)  # 有未生效的卡，不记录欠费，等生效后再扣
-        from app.services import internal_course_service
-        if internal_course_service.has_active_course(customer_id):
-            return (False, None)
-        _debts[customer_id] = _debts.get(customer_id, 0) + 1
-        _save_debts()
-        return (False, None)
-    # 先试次数卡（按生效日期最早优先），有剩余就扣次数卡
-    countable = [c for c in active_cards if c.remaining_count is not None]
-    if countable:
-        selected = _pick_earliest_expiry_card(countable, customer_id)
-        if selected:
-            from app.services import project_deduction_service
-            manual = project_deduction_service.get_deduction_total_for_project(selected.id)
-            activity = _get_card_activity_deductions_count(selected.id)
-            remaining = (selected.total_count or 0) - manual - activity
-            if remaining > 0:
-                return (True, selected.id)
-    # 次数卡扣完了或没有次数卡，走不限次卡
-    if any(c.remaining_count is None for c in active_cards):
-        return (True, None)
-    # 都没有，检查内部课程
+    target_date = usage_date or datetime.now().strftime("%Y-%m-%d")
     from app.services import internal_course_service
-    if internal_course_service.has_active_course(customer_id):
-        return (False, None)
+
+    # 第一优先级：会员卡（次数卡或不限次卡）。
+    card_benefit = _select_membership_benefit(customer_id, target_date)
+    if card_benefit:
+        card_id, benefit_type, benefit_id, benefit_name = card_benefit
+        return (True, card_id, benefit_type, benefit_id, benefit_name)
+
+    # 第二优先级：活动当天有效的内部课程权益。
+    active_course = internal_course_service.get_active_course(customer_id, target_date)
+    if active_course:
+        return (
+            True,
+            None,
+            "internal_course",
+            active_course.id,
+            active_course.course_type,
+        )
+
+    # 最后才进入欠费，后续补卡时可按活动日期自动回填。
     _debts[customer_id] = _debts.get(customer_id, 0) + 1
-    _save_debts()
-    return (False, None)
+    return (False, None, "", "", "")
 
 
 def _pick_earliest_expiry_card(countable_cards, customer_id: str):
@@ -532,30 +613,226 @@ def _pick_earliest_expiry_card(countable_cards, customer_id: str):
 
 
 def _get_card_activity_deductions_count(card_id: str) -> int:
-    """统计该卡的活动扣卡次数（按实际活动参与 + 生效日期优先分配，不依赖 _deductions 流水表）"""
-    from app.services import project_deduction_service
+    """统计明确记录到该卡的活动使用次数。"""
     card = _cards.get(card_id)
     if not card:
         return 0
-    customer_id = card.customer_id
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    total_activities = get_activity_deductions(customer_id)
-    if total_activities <= 0:
-        return 0
-    # 按生效日期最早优先分配到各次数卡
-    countable = [c for c in list_cards()
-                 if c.customer_id == customer_id and c.remaining_count is not None and not c.voided
-                 and (not c.effective_date or c.effective_date <= today)]
-    countable.sort(key=lambda c: (c.effective_date or "9999-12-31", c.expiry_date or "9999-12-31", c.id))
-    remaining_activities = total_activities
-    for c in countable:
-        manual = project_deduction_service.get_deduction_total_for_project(c.id)
-        available = (c.total_count or 0) - manual
-        allocated = min(remaining_activities, max(0, available))
-        if c.id == card_id:
-            return allocated
-        remaining_activities -= allocated
-    return 0
+    return sum(
+        1
+        for item in _deductions.get(card.customer_id, [])
+        if isinstance(item, dict) and item.get("card_id") == card_id
+    )
+
+
+def _set_record_benefit(record: dict, benefit: tuple) -> None:
+    """将活动使用记录改记到指定会员卡权益。"""
+    card_id, benefit_type, benefit_id, benefit_name = benefit
+    remaining_after = None
+    if benefit_type == "count_card" and card_id:
+        current_remaining = get_card_effective_remaining(card_id)
+        if current_remaining is not None:
+            remaining_after = max(0, current_remaining - 1)
+    record.update({
+        "card_id": card_id,
+        "benefit_type": benefit_type,
+        "benefit_id": benefit_id,
+        "benefit_name": benefit_name,
+        "remaining_after": remaining_after,
+    })
+
+
+def _set_record_internal_course(record: dict, course) -> None:
+    """将活动使用记录改记到内部课程权益。"""
+    record.update({
+        "card_id": None,
+        "benefit_type": "internal_course",
+        "benefit_id": course.id,
+        "benefit_name": course.course_type,
+        "remaining_after": None,
+    })
+
+
+def _rebuild_card_remaining_snapshots(card: MembershipCard) -> bool:
+    """按真实扣卡顺序重建该卡每条流水扣减后的余额快照。"""
+    from app.services import project_deduction_service
+
+    if card.remaining_count is None:
+        return False
+
+    events = []
+    for deduction in project_deduction_service._deductions.values():
+        if (
+            deduction.project_id == card.id
+            and deduction.project_type == "membership-cards"
+            and not deduction.is_deleted
+        ):
+            created_at = deduction.created_at.isoformat() if deduction.created_at else ""
+            events.append((
+                deduction.deduction_date or created_at[:10],
+                created_at,
+                deduction.id,
+                deduction.count,
+                "manual",
+                deduction,
+            ))
+
+    for record in _deductions.get(card.customer_id, []):
+        if not isinstance(record, dict) or record.get("card_id") != card.id:
+            continue
+        activity_key = record.get("key", "")
+        activity_date = _get_activity_date(activity_key)
+        if not activity_date:
+            continue
+        deducted_at = record.get("deducted_at") or f"{activity_date}T23:59:59"
+        events.append((
+            activity_date,
+            deducted_at,
+            activity_key,
+            1,
+            "activity",
+            record,
+        ))
+
+    changed = False
+    remaining = card.total_count or 0
+    changed_manual_records = []
+    for _, _, _, count, event_type, event in sorted(events, key=lambda item: item[:3]):
+        remaining = max(0, remaining - count)
+        previous_remaining = event.remaining_after if event_type == "manual" else event.get("remaining_after")
+        if previous_remaining != remaining:
+            if event_type == "manual":
+                event.remaining_after = remaining
+                changed_manual_records.append(event)
+            else:
+                event["remaining_after"] = remaining
+            changed = True
+
+    for deduction in changed_manual_records:
+        project_deduction_service._save(deduction.id)
+    return changed
+
+
+def reconcile_customer_card_usage(customer_id: str) -> bool:
+    """按活动日期重排客户权益使用记录。
+
+    会员卡始终优先；卡的有效期不覆盖活动时，才回退到活动当天有效的内部课程权益。
+    后补会员卡后，本函数会把原内部课程抵扣和欠费记录转回会员卡，直到卡次数用完。
+    """
+    from app.services import internal_course_service
+
+    changed = False
+    records = _deductions.get(customer_id, [])
+    candidates: list[tuple[str, dict]] = []
+
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        activity_key = record.get("key")
+        if not isinstance(activity_key, str) or activity_key.startswith("ics:"):
+            continue
+        usage_date = _get_activity_date(activity_key)
+        if not usage_date:
+            continue
+
+        benefit_type = record.get("benefit_type")
+        card_id = record.get("card_id")
+        card = _cards.get(card_id) if card_id else None
+        card_covers_date = bool(
+            card
+            and not card.is_deleted
+            and not card.voided
+            and (not card.effective_date or card.effective_date <= usage_date)
+            and (not card.expiry_date or card.expiry_date >= usage_date)
+        )
+        if benefit_type == "internal_course" or (card_id and not card_covers_date):
+            candidates.append((usage_date, record))
+
+    newly_uncovered_keys = []
+    for usage_date, record in sorted(candidates, key=lambda item: (item[0], item[1].get("key", ""))):
+        previous = (
+            record.get("card_id"),
+            record.get("benefit_type"),
+            record.get("benefit_id"),
+            record.get("benefit_name"),
+        )
+        # 先清空当前归属，避免它占用原卡容量后影响重新选择。
+        record.update({
+            "card_id": None,
+            "benefit_type": "",
+            "benefit_id": "",
+            "benefit_name": "",
+            "remaining_after": None,
+        })
+        card_benefit = _select_membership_benefit(customer_id, usage_date)
+        if card_benefit:
+            _set_record_benefit(record, card_benefit)
+        else:
+            course = internal_course_service.get_active_course(customer_id, usage_date)
+            if course:
+                _set_record_internal_course(record, course)
+            else:
+                records.remove(record)
+                newly_uncovered_keys.append(record["key"])
+        current = (
+            record.get("card_id"),
+            record.get("benefit_type"),
+            record.get("benefit_id"),
+            record.get("benefit_name"),
+        )
+        changed = changed or current != previous
+
+    debt_keys = list(_debt_activities.get(customer_id, []))
+    for activity_key in newly_uncovered_keys:
+        if activity_key not in debt_keys:
+            debt_keys.append(activity_key)
+    remaining_debts = []
+    for activity_key in sorted(debt_keys, key=lambda key: (_get_activity_date(key) or "9999-12-31", key)):
+        usage_date = _get_activity_date(activity_key)
+        if not usage_date:
+            remaining_debts.append(activity_key)
+            continue
+        record = {
+            "key": activity_key,
+            "card_id": None,
+            "benefit_type": "",
+            "benefit_id": "",
+            "benefit_name": "",
+            "remaining_after": None,
+            "deducted_at": None,
+        }
+        card_benefit = _select_membership_benefit(customer_id, usage_date)
+        if card_benefit:
+            _set_record_benefit(record, card_benefit)
+        else:
+            course = internal_course_service.get_active_course(customer_id, usage_date)
+            if course:
+                _set_record_internal_course(record, course)
+            else:
+                remaining_debts.append(activity_key)
+                continue
+        _deductions.setdefault(customer_id, []).append(record)
+        changed = True
+
+    # 人工销卡与活动扣卡统一按发生时间重建，确保每条都是该次扣减后的快照。
+    for card in (card for card in list_cards() if card.customer_id == customer_id):
+        changed = _rebuild_card_remaining_snapshots(card) or changed
+
+    previous_debt_keys = _debt_activities.get(customer_id, [])
+    previous_debt_count = _debts.get(customer_id, 0)
+    if remaining_debts:
+        _debt_activities[customer_id] = remaining_debts
+        _debts[customer_id] = len(remaining_debts)
+    else:
+        if customer_id in _debt_activities or customer_id in _debts:
+            changed = True
+        _debt_activities.pop(customer_id, None)
+        _debts.pop(customer_id, None)
+
+    changed = changed or remaining_debts != previous_debt_keys or len(remaining_debts) != previous_debt_count
+    if changed:
+        _save_deductions()
+        _save_debts()
+    return changed
 
 
 def _restore_one(customer_id: str, card_id: Optional[str] = None) -> bool:
@@ -589,15 +866,28 @@ def _is_activity_already_deducted(customer_id: str, activity_key: str) -> bool:
 
 def _do_deduct(customer_id: str, activity_key: str) -> bool:
     """内部扣费逻辑（不加锁、不保存），供 deduct_for_activity 和 _deduct_for_record 调用"""
+    if activity_key.startswith("ics:"):
+        return True
     if _is_activity_already_deducted(customer_id, activity_key):
         return True  # 已扣过，跳过
-    success, card_id = _deduct_one(customer_id)
+    usage_date = _get_activity_date(activity_key)
+    success, card_id, benefit_type, benefit_id, benefit_name = _deduct_one(customer_id, usage_date)
     if success:
-        _deductions.setdefault(customer_id, []).append({"key": activity_key, "card_id": card_id})
-    elif not success:
-        from app.services import internal_course_service
-        if internal_course_service.has_active_course(customer_id):
-            return True  # 卡扣完了，内部课程覆盖，不记欠费
+        record = {
+            "key": activity_key,
+            "card_id": card_id,
+            "benefit_type": benefit_type,
+            "benefit_id": benefit_id,
+            "benefit_name": benefit_name,
+            "remaining_after": None,
+            "deducted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if benefit_type == "count_card" and card_id:
+            current_remaining = get_card_effective_remaining(card_id)
+            if current_remaining is not None:
+                record["remaining_after"] = max(0, current_remaining - 1)
+        _deductions.setdefault(customer_id, []).append(record)
+    else:
         _debt_activities.setdefault(customer_id, []).append(activity_key)
     return success
 

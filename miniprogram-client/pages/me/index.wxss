@@ -273,6 +273,31 @@
   align-items: center;
 }
 
+.followup-btn {
+  flex-shrink: 0;
+  min-width: 92rpx;
+  height: 46rpx;
+  margin: 0 0 0 auto;
+  padding: 0 18rpx;
+  border: 1rpx solid #dfe3e7;
+  border-radius: 23rpx;
+  background: #ffffff;
+  color: #59636f;
+  font-size: 21rpx;
+  font-weight: 500;
+  line-height: 44rpx;
+}
+
+.followup-btn::after {
+  border: 0;
+}
+
+.followup-btn.done {
+  border-color: #e5ebd0;
+  background: #f7faed;
+  color: #68783b;
+}
+
 .r-name {
   flex: 1;
   min-width: 0;

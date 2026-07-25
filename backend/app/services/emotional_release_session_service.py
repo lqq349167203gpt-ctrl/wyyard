@@ -60,7 +60,10 @@ def _get_chargeable_ids(session) -> set:
 def _deduct_for_session(session):
     """为新创建的活动扣费"""
     from app.services import membership_card_service
-    chargeable = _get_chargeable_ids(session)
+    chargeable = membership_card_service.filter_arrived_customer_ids(
+        session.date,
+        _get_chargeable_ids(session),
+    )
     activity_key = f"ers:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in chargeable:
@@ -84,6 +87,8 @@ def _restore_for_session(session):
 def _sync_deduction(session, old_chargeable, new_chargeable):
     """同步扣费：为新增人员扣费，为移除人员退费"""
     from app.services import membership_card_service
+    old_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, old_chargeable)
+    new_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, new_chargeable)
     activity_key = f"ers:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in old_chargeable - new_chargeable:
@@ -199,8 +204,20 @@ def get_remaining_count(customer_id: str) -> int:
     """计算某用户的情绪释放剩余次数（仅统计案主使用，成就君不限次，参与者走会员卡）"""
     releases = emotional_release_service.list_releases()
     total_purchased = sum(r.purchase_count for r in releases if r.customer_id == customer_id)
-    # 仅统计案主的使用次数
-    used = sum(1 for s in _sessions.values() if not s.is_deleted and s.owner_id == customer_id)
+    from app.services import visit_service
+    arrived_dates = {
+        visit.visit_date
+        for visit in visit_service.list_visits(customer_id=customer_id)
+        if visit.arrived and not visit.is_deleted
+    }
+    # 仅统计已确认到场的案主使用次数
+    used = sum(
+        1
+        for session in _sessions.values()
+        if not session.is_deleted
+        and session.owner_id == customer_id
+        and session.date in arrived_dates
+    )
     from app.services import project_deduction_service
     manual_deductions = project_deduction_service.get_deduction_total(customer_id, "emotional-releases")
     return total_purchased - used - manual_deductions

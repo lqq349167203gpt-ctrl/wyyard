@@ -224,9 +224,10 @@ class TestPaymentFlows:
         case_id = resp.json()["id"]
         assert resp.json()["purchase_count"] == 5
 
-        # 更新：purchase_count 由活动扣减流水派生，禁止直接 PATCH 修改
+        # 更新：purchase_count 允许修正，剩余次数实时派生
         resp = client.patch(f"/api/group-cases/{case_id}", json={"purchase_count": 3})
-        assert resp.status_code == 400
+        assert resp.status_code == 200
+        assert resp.json()["purchase_count"] == 3
 
         # 删除
         resp = client.delete(f"/api/group-cases/{case_id}")

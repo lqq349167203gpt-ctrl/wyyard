@@ -268,7 +268,10 @@ class TestGroupCaseCRUD:
         })
         cid = resp.json()["id"]
         resp = client.patch(f"/api/group-cases/{cid}", json={"purchase_count": 10})
-        assert resp.status_code == 400  # purchase_count 禁止直接 PATCH
+        assert resp.status_code == 200  # purchase_count 允许修正，剩余次数实时派生
+        assert resp.json()["purchase_count"] == 10
+        resp = client.patch(f"/api/group-cases/{cid}", json={"purchase_count": -1})
+        assert resp.status_code == 400  # 负数非法
 
     def test_update_amount(self, client, created_customer):
         resp = client.post("/api/group-cases", json={
@@ -357,7 +360,8 @@ class TestEmotionalReleaseCRUD:
         })
         rid = resp.json()["id"]
         resp = client.patch(f"/api/emotional-releases/{rid}", json={"purchase_count": 5})
-        assert resp.status_code == 400  # purchase_count 禁止直接 PATCH
+        assert resp.status_code == 200  # purchase_count 允许修正，剩余次数实时派生
+        assert resp.json()["purchase_count"] == 5
 
     def test_update_nonexistent(self, client):
         resp = client.patch("/api/emotional-releases/nonexistent", json={"amount": 1.0})
@@ -422,7 +426,8 @@ class TestEnergyKnotCRUD:
         })
         rid = resp.json()["id"]
         resp = client.patch(f"/api/energy-knots/{rid}", json={"purchase_count": 7})
-        assert resp.status_code == 400  # purchase_count 禁止直接 PATCH
+        assert resp.status_code == 200  # purchase_count 允许修正，剩余次数实时派生
+        assert resp.json()["purchase_count"] == 7
 
     def test_update_nonexistent(self, client):
         resp = client.patch("/api/energy-knots/nonexistent", json={"amount": 1.0})

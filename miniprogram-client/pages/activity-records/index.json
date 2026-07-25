@@ -2,5 +2,8 @@
   "navigationBarTitleText": "活动记录",
   "navigationBarBackgroundColor": "#ffffff",
   "backgroundColorTop": "#ffffff",
-  "backgroundColor": "#ffffff"
+  "backgroundColor": "#ffffff",
+  "usingComponents": {
+    "followup-editor": "/components/followup-editor/index"
+  }
 }

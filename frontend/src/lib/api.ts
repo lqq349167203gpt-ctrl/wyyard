@@ -1360,6 +1360,7 @@ export interface ProjectDeduction {
   count: number
   deduction_date: string
   remaining_after: number | null
+  reason: string
   created_by: string
   updated_by: string
   created_at: string
@@ -1373,14 +1374,14 @@ export const projectDeductionApi = {
     if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
     return request<PaginatedResponse<ProjectDeduction>>(`/api/project-deductions?${qs}`)
   },
-  create: (data: { customer_id: string; project_type: string; project_id: string; count: number; created_by?: string }) =>
+  create: (data: { customer_id: string; project_type: string; project_id: string; count: number; reason: string; created_by?: string }) =>
     request<ProjectDeduction>("/api/project-deductions", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: { count: number; updated_by?: string }) =>
+  update: (id: string, data: { count: number; reason?: string; updated_by?: string }) =>
     request<ProjectDeduction>(`/api/project-deductions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/api/project-deductions/${id}`, { method: "DELETE" }),
   getAvailableItems: (customerId: string, projectType: string) =>
-    request<{ id: string; name: string; remaining_count: number; detail?: string; card_type?: string; expiry_date?: string }[]>(
+    request<{ id: string; name: string; remaining_count: number | null; detail?: string; card_type?: string; expiry_date?: string }[]>(
       `/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`
     ),
   autoDeduct: (data: { nickname: string; project_type: string; count: number; created_by?: string; name_filter?: string }) =>
@@ -1596,12 +1597,32 @@ export interface PurchaseSummaryItem {
 
 export interface ActivityRecord {
   type: string
+  activity_type: string
+  activity_key: string
   date: string
   name: string
   role: string
   host: string
   session_id: string
   is_public_welfare?: boolean
+}
+
+export interface ActivityFollowup {
+  id: string
+  customer_id: string
+  activity_key: string
+  activity_type: string
+  session_id: string
+  activity_name: string
+  activity_category: string
+  activity_date: string
+  start_time: string
+  end_time: string
+  teacher: string
+  customer_role: string
+  content: string
+  created_at: string
+  updated_at: string
 }
 
 export interface PaymentRecord {
@@ -1620,6 +1641,7 @@ export interface CustomerDetail {
   customer: Customer
   purchase_summary: PurchaseSummaryItem[]
   activities: ActivityRecord[]
+  activity_followups: ActivityFollowup[]
   healing_records: HealingRecord[]
   payment_records: PaymentRecord[]
   visit_records: VisitRecord[]
@@ -2209,4 +2231,8 @@ export const communicationRecordApi = {
   create: (data: CommunicationRecordCreate) => request<CommunicationRecord>("/api/communication-records", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: CommunicationRecordCreate) => request<CommunicationRecord>(`/api/communication-records/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/api/communication-records/${id}`, { method: "DELETE" }),
+}
+
+export const followupRecordApi = {
+  list: (customerId?: string) => request<{ items: ActivityFollowup[]; total: number }>(`/api/followup-records${customerId ? `?customer_id=${customerId}` : ""}`),
 }

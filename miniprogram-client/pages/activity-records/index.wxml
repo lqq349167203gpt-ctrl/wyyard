@@ -77,6 +77,11 @@
               <view class="r2-l2">
                 <text class="m-time">{{act.timeRange}}</text>
                 <text class="role-tag {{act.roleTagClass}}">{{act.roleLabel}}</text>
+                <button
+                  class="followup-btn {{act.has_followup ? 'done' : ''}}"
+                  catchtap="onFollowupTap"
+                  data-key="{{act.activity_key}}"
+                >{{act.has_followup ? '已回访' : '回访'}}</button>
               </view>
             </view>
           </view>
@@ -87,3 +92,10 @@
     <view class="end-note">· 没有更多了 ·</view>
   </block>
 </view>
+
+<followup-editor
+  visible="{{!!selectedFollowupActivity}}"
+  activity="{{selectedFollowupActivity}}"
+  bind:close="onFollowupClose"
+  bind:saved="onFollowupSaved"
+/>

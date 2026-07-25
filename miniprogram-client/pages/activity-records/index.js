@@ -30,6 +30,7 @@ Page({
     missedCount: 0,
     activeTab: 'all',
     loading: true,
+    selectedFollowupActivity: null,
   },
 
   onShow() {
@@ -176,5 +177,20 @@ Page({
     if (tab === this.data.activeTab) return
     this.setData({ activeTab: tab })
     this._buildGroups(this.data.allItems)
+  },
+
+  onFollowupTap(e) {
+    const activityKey = e.currentTarget.dataset.key
+    const activity = this.data.allItems.find(item => item.activity_key === activityKey)
+    if (activity) this.setData({ selectedFollowupActivity: activity })
+  },
+
+  onFollowupClose() {
+    this.setData({ selectedFollowupActivity: null })
+  },
+
+  onFollowupSaved() {
+    this.setData({ selectedFollowupActivity: null })
+    this.loadActivityRecords()
   },
 })

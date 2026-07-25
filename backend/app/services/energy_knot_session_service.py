@@ -61,7 +61,10 @@ def _get_chargeable_ids(session) -> set:
 def _deduct_for_session(session):
     """为新创建的活动扣费"""
     from app.services import membership_card_service
-    chargeable = _get_chargeable_ids(session)
+    chargeable = membership_card_service.filter_arrived_customer_ids(
+        session.date,
+        _get_chargeable_ids(session),
+    )
     activity_key = f"eks:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in chargeable:
@@ -85,6 +88,8 @@ def _restore_for_session(session):
 def _sync_deduction(session, old_chargeable, new_chargeable):
     """同步扣费：为新增人员扣费，为移除人员退费"""
     from app.services import membership_card_service
+    old_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, old_chargeable)
+    new_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, new_chargeable)
     activity_key = f"eks:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in old_chargeable - new_chargeable:
@@ -196,9 +201,15 @@ def get_remaining_count(customer_id: str) -> int:
     """计算某用户的能量结剩余次数（按部位数扣除）"""
     knots = energy_knot_service.list_knots()
     total_purchased = sum(k.purchase_count for k in knots if k.customer_id == customer_id)
+    from app.services import visit_service
+    arrived_dates = {
+        visit.visit_date
+        for visit in visit_service.list_visits(customer_id=customer_id)
+        if visit.arrived and not visit.is_deleted
+    }
     used = 0
     for s in _sessions.values():
-        if s.is_deleted:
+        if s.is_deleted or s.date not in arrived_dates:
             continue
         found_in_desc = False
         try:

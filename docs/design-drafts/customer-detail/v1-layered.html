@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 V1 · 档案卡上下分层 — 客户详情预览</title>
+<style>
+  :root{
+    --bg:#f4f5f6;
+    --card:#ffffff;
+    --ink:#212631;
+    --ink-2:#79838f;
+    --ink-3:#a8b1bd;
+    --lime:#c9f24b;
+    --lime-ink:#3d5500;
+    --hairline:#f0f1f3;
+    --shadow:0 2px 4px rgba(33,38,49,.05);
+    --green-bg:#dcf5e4; --green-tx:#157a3c;
+    --blue-bg:#e0ebff;  --blue-tx:#2f5cc4;
+    --orange-bg:#ffe8d9;--orange-tx:#c25a1b;
+    --purple-bg:#ece6ff;--purple-tx:#6a48d8;
+    --neutral-bg:#f1f0ed;--neutral-tx:#79838f;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    font-size:13px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--lime);color:var(--lime-ink)}
+  button{font-family:inherit;cursor:pointer;border:0;background:none}
+
+  /* ---------- 方案标注条 ---------- */
+  .annot{background:var(--ink)}
+  .annot-in{
+    max-width:1180px;margin:0 auto;padding:9px 24px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .annot-name{color:var(--lime);font-size:12px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+  .annot-desc{color:rgba(201,242,75,.55);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .annot-btn{
+    margin-left:auto;flex-shrink:0;
+    color:var(--lime);font-size:12px;font-weight:500;
+    border:1px solid rgba(201,242,75,.35);border-radius:999px;
+    padding:4px 14px;transition:background .15s;
+  }
+  .annot-btn:hover{background:rgba(201,242,75,.12)}
+
+  /* ---------- 页面骨架 ---------- */
+  .page{max-width:1180px;margin:0 auto;padding:28px 24px 8px;transition:max-width .25s ease}
+  .page.narrow{max-width:660px}
+  .card{
+    background:var(--card);border-radius:16px;box-shadow:var(--shadow);
+    padding:24px 28px;margin-bottom:16px;
+  }
+  .sec-head{display:flex;align-items:center;margin-bottom:14px}
+  .sec-bar{width:4px;height:14px;border-radius:2px;background:var(--lime);margin-right:9px;flex-shrink:0}
+  .sec-title{font-size:15px;font-weight:800;letter-spacing:.01em}
+  .sec-note{
+    margin-left:auto;font-size:12px;color:var(--neutral-tx);
+    background:var(--neutral-bg);border-radius:999px;padding:3px 12px;white-space:nowrap;
+  }
+
+  /* ---------- 1. 身份条 ---------- */
+  .identity{display:flex;align-items:center;gap:18px}
+  .avatar{
+    width:56px;height:56px;border-radius:50%;flex-shrink:0;
+    background:var(--lime);color:var(--lime-ink);
+    display:flex;align-items:center;justify-content:center;
+    font-size:21px;font-weight:800;
+  }
+  .id-main{min-width:0}
+  .id-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .nickname{font-size:22px;font-weight:800;letter-spacing:.01em;line-height:1.3}
+  .tag{
+    display:inline-flex;align-items:center;
+    font-size:12px;font-weight:500;line-height:1;
+    padding:5px 11px;border-radius:999px;white-space:nowrap;
+  }
+  .tag-green{background:var(--green-bg);color:var(--green-tx)}
+  .tag-blue{background:var(--blue-bg);color:var(--blue-tx)}
+  .id-sub{margin-top:5px;font-size:13px;color:var(--ink-2)}
+  .id-sub i{font-style:normal;margin:0 7px;color:var(--ink-3)}
+  .stats{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+  .pill{
+    display:inline-flex;align-items:baseline;gap:7px;
+    padding:8px 15px;border-radius:999px;font-size:12px;line-height:1;white-space:nowrap;
+  }
+  .pill .v{font-size:14px;font-weight:800;letter-spacing:.01em}
+  .pill-lime{background:var(--lime);color:var(--lime-ink)}
+  .pill-lime .k{font-weight:500}
+  .pill-dark{background:var(--ink);color:rgba(255,255,255,.55)}
+  .pill-dark .v{color:var(--lime)}
+  .pill-neutral{background:var(--neutral-bg);color:var(--neutral-tx)}
+  .pill-neutral .v{color:var(--ink);font-weight:700}
+
+  /* ---------- 2. 联系与来源 ---------- */
+  .contact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 28px}
+  .c-label{font-size:12px;color:var(--ink-3);margin-bottom:3px}
+  .c-value{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;min-width:0}
+  .c-value .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .copy-btn{
+    flex-shrink:0;display:inline-flex;align-items:center;gap:4px;
+    font-size:12px;font-weight:500;color:var(--ink-2);
+    padding:2px 8px;border-radius:999px;background:var(--neutral-bg);
+    transition:color .15s,background .15s;
+  }
+  .copy-btn:hover{color:var(--ink)}
+  .copy-btn.done{color:var(--green-tx);background:var(--green-bg)}
+  .copy-btn svg{display:block}
+
+  /* ---------- 3. 长文本区 ---------- */
+  .field{padding:17px 0}
+  .field:first-of-type{padding-top:2px}
+  .field + .field{border-top:1px solid var(--hairline)}
+  .f-head{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .f-label{font-size:13px;font-weight:700}
+  .f-chars{font-size:11px;color:var(--ink-3);font-weight:400}
+  .field-text{
+    font-size:14px;line-height:1.75;color:var(--ink);
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;
+    overflow:hidden;
+  }
+  .field.open .field-text{display:block;-webkit-line-clamp:unset;overflow:visible}
+  .expand-btn{
+    display:none;align-items:center;gap:4px;margin-top:7px;
+    font-size:12px;font-weight:600;color:var(--ink-2);
+    padding:3px 10px 3px 0;border-radius:6px;transition:color .15s;
+  }
+  .expand-btn:hover{color:var(--ink)}
+  .expand-btn .chev{transition:transform .2s}
+  .field.open .expand-btn .chev{transform:rotate(180deg)}
+  .field.has-more .expand-btn{display:inline-flex}
+
+  /* ---------- 4. 记录区 ---------- */
+  .records-head{display:flex;align-items:center;margin:4px 0 14px}
+  .tabs{
+    margin-left:auto;display:inline-flex;align-items:center;
+    background:var(--card);border-radius:999px;padding:4px;box-shadow:var(--shadow);
+  }
+  .tab{
+    font-size:13px;font-weight:500;color:var(--ink-2);
+    padding:7px 15px;border-radius:999px;line-height:1;transition:color .15s,background .15s;
+  }
+  .tab .cnt{font-size:11px;margin-left:4px;opacity:.65}
+  .tab:hover{color:var(--ink)}
+  .tab.active{background:var(--ink);color:var(--lime);font-weight:700}
+  .panel{display:none}
+  .panel.active{display:block}
+
+  /* 跟进点 */
+  .follow-list .follow-card{margin-bottom:12px}
+  .follow-card{
+    background:var(--card);border-radius:16px;box-shadow:var(--shadow);
+    padding:20px 22px;display:flex;gap:22px;
+  }
+  .f-datecol{width:74px;flex-shrink:0}
+  .date-block{background:var(--bg);border-radius:12px;padding:11px 0 10px;text-align:center}
+  .date-md{font-size:16px;font-weight:800;line-height:1.2}
+  .date-y{font-size:11px;color:var(--ink-3);margin-top:2px}
+  .status{
+    margin-top:8px;display:flex;justify-content:center;
+    font-size:12px;font-weight:600;line-height:1;
+    padding:5px 0;border-radius:999px;
+  }
+  .status-green{background:var(--green-bg);color:var(--green-tx)}
+  .status-orange{background:var(--orange-bg);color:var(--orange-tx)}
+  .f-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:13px 26px;min-width:0}
+  .f-item-label{font-size:12px;color:var(--ink-3);margin-bottom:2px}
+  .f-item-text{font-size:13px;line-height:1.65;color:var(--ink)}
+  .f-item-text.muted{color:var(--ink-3)}
+
+  /* 沟通记录 */
+  .panel-card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:6px 24px}
+  .comm-row{display:flex;align-items:flex-start;gap:14px;padding:15px 0}
+  .comm-row + .comm-row{border-top:1px solid var(--hairline)}
+  .comm-date{width:88px;flex-shrink:0;font-size:13px;font-weight:600;padding-top:1px}
+  .comm-who{
+    flex-shrink:0;font-size:12px;font-weight:500;line-height:1;
+    padding:4px 10px;border-radius:999px;background:var(--neutral-bg);color:var(--neutral-tx);
+    margin-top:1px;
+  }
+  .comm-text{flex:1;font-size:13px;line-height:1.65;min-width:0}
+
+  /* 剩余次数 */
+  .remain-row{display:flex;align-items:center;gap:22px;padding:17px 0}
+  .remain-row + .remain-row{border-top:1px solid var(--hairline)}
+  .remain-info{width:250px;flex-shrink:0}
+  .remain-name{font-size:13px;font-weight:700}
+  .remain-sub{font-size:12px;color:var(--ink-3);margin-top:2px}
+  .bar{flex:1;height:8px;background:var(--neutral-bg);border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:var(--lime);border-radius:999px}
+  .remain-num{width:118px;flex-shrink:0;text-align:right;font-size:12px;color:var(--ink-2)}
+  .remain-num b{font-size:16px;font-weight:800;color:var(--ink);margin:0 2px}
+  .remain-num.warn b{color:var(--orange-tx)}
+
+  /* 交易记录 */
+  table{width:100%;border-collapse:collapse}
+  th{
+    text-align:left;font-size:12px;font-weight:500;color:var(--ink-3);
+    padding:11px 8px;border-bottom:1px solid var(--hairline);
+  }
+  td{font-size:13px;padding:14px 8px;border-bottom:1px solid var(--hairline);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  td.money{font-weight:800}
+  .mini-tag{
+    display:inline-flex;font-size:12px;font-weight:500;line-height:1;
+    padding:4px 10px;border-radius:999px;background:var(--green-bg);color:var(--green-tx);
+  }
+
+  .foot{text-align:center;font-size:12px;color:var(--ink-3);padding:26px 0 30px}
+
+  @media (max-width:920px){
+    .contact-grid{grid-template-columns:1fr 1fr}
+    .f-grid{grid-template-columns:1fr}
+    .identity{flex-wrap:wrap}
+    .stats{margin-left:0;justify-content:flex-start}
+    .annot-desc{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- 方案标注条（非设计方案本体） -->
+<div class="annot">
+  <div class="annot-in">
+    <span class="annot-name">方案 V1 · 档案卡上下分层</span>
+    <span class="annot-desc">长文本全宽排列 · 默认 4 行 · 超出自动出现「展开」</span>
+    <button class="annot-btn" id="narrowBtn" type="button">窄屏预览</button>
+  </div>
+</div>
+
+<div class="page" id="page">
+
+  <!-- 1. 身份条 -->
+  <section class="card identity">
+    <div class="avatar">林</div>
+    <div class="id-main">
+      <div class="id-row">
+        <span class="nickname">林小满</span>
+        <span class="tag tag-green">深度会员</span>
+        <span class="tag tag-blue">疗愈老师：沈青、苏禾</span>
+      </div>
+      <div class="id-sub">林晓曼<i>·</i>女<i>·</i>34 岁</div>
+    </div>
+    <div class="stats">
+      <span class="pill pill-lime"><span class="k">到店</span><span class="v">27 次</span></span>
+      <span class="pill pill-dark"><span class="k">累计消费</span><span class="v">¥36,800</span></span>
+      <span class="pill pill-neutral"><span class="k">首次到访</span><span class="v">2025/11/3</span></span>
+    </div>
+  </section>
+
+  <!-- 2. 联系与来源 -->
+  <section class="card">
+    <div class="sec-head">
+      <span class="sec-bar"></span>
+      <h2 class="sec-title">联系与来源</h2>
+    </div>
+    <div class="contact-grid">
+      <div>
+        <div class="c-label">电话</div>
+        <div class="c-value"><span class="txt">138 2619 5543</span></div>
+      </div>
+      <div>
+        <div class="c-label">微信</div>
+        <div class="c-value"><span class="txt">xiaoman_lin</span></div>
+      </div>
+      <div>
+        <div class="c-label">引流人</div>
+        <div class="c-value"><span class="txt">王珂</span></div>
+      </div>
+      <div>
+        <div class="c-label">承接人</div>
+        <div class="c-value"><span class="txt">婷婷</span></div>
+      </div>
+      <div>
+        <div class="c-label">流量来源</div>
+        <div class="c-value"><span class="txt">小红书</span></div>
+      </div>
+      <div>
+        <div class="c-label">流量链接</div>
+        <div class="c-value">
+          <span class="txt" id="linkText" title="https://xhslink.com/a/8fj3k2mx9">https://xhslink.com/a/8fj3k2mx9</span>
+          <button class="copy-btn" id="copyBtn" type="button">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="7" height="7" rx="1.5"></rect>
+              <path d="M8 4V2.5A1.5 1.5 0 0 0 6.5 1H2.5A1.5 1.5 0 0 0 1 2.5v4A1.5 1.5 0 0 0 2.5 8H4"></path>
+            </svg>
+            <span id="copyLabel">复制</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 长文本区（核心：全宽 + 默认 4 行） -->
+  <section class="card">
+    <div class="sec-head">
+      <span class="sec-bar"></span>
+      <h2 class="sec-title">客户情况</h2>
+      <span class="sec-note">默认展示 4 行 · 超出自动出现「展开」</span>
+    </div>
+
+    <div class="field">
+      <div class="f-head"><span class="f-label">到访目的</span></div>
+      <p class="field-text">想在亲密关系里不再重复旧模式，学会建立边界感；改善长期失眠和焦虑引起的躯体化反应（心悸、肠胃不适）。</p>
+      <button class="expand-btn" type="button"><span class="exp-label">展开全部</span><svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5 9 4.5"></path></svg></button>
+    </div>
+
+    <div class="field">
+      <div class="f-head"><span class="f-label">创伤经历</span><span class="f-chars">约 190 字</span></div>
+      <p class="field-text">童年时期父母长期争吵，初二时父亲离家出走，母亲情绪崩溃后把情感需求全部压在孩子身上，形成典型的亲职化。来访者很小就学会察言观色、压抑自己的需求去照顾别人。大学时第一段恋爱关系里反复讨好对方，被冷暴力分手后出现持续半年的抑郁情绪，期间有过自伤念头（未实施）。三年前开始接受心理咨询，情绪趋于稳定，但讨好模式和边界模糊的问题依然反复。</p>
+      <button class="expand-btn" type="button"><span class="exp-label">展开全部</span><svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5 9 4.5"></path></svg></button>
+    </div>
+
+    <div class="field">
+      <div class="f-head"><span class="f-label">当下卡点</span><span class="f-chars">约 120 字</span></div>
+      <p class="field-text">最近半年和伴侣在谈婚论嫁，对方家庭催得紧，她发现自己又开始用顺从换和平，明明不情愿却答应了两家合买房。上周因为这件事失眠加重，心悸发作两次。她意识到这是旧模式重演，但「拒绝别人」对她来说仍然像「天要塌下来」。</p>
+      <button class="expand-btn" type="button"><span class="exp-label">展开全部</span><svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5 9 4.5"></path></svg></button>
+    </div>
+
+    <div class="field">
+      <div class="f-head"><span class="f-label">其他信息</span></div>
+      <p class="field-text">对声音敏感，疗愈空间需要保持安静；每周三晚上有线上英语课，排课需避开。</p>
+      <button class="expand-btn" type="button"><span class="exp-label">展开全部</span><svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5 9 4.5"></path></svg></button>
+    </div>
+
+    <div class="field">
+      <div class="f-head"><span class="f-label">工作情况</span></div>
+      <p class="field-text">互联网大厂产品经理，996 高压节奏。近一年明显职业倦怠，睡眠差，正在考虑降薪转型到身心健康行业。</p>
+      <button class="expand-btn" type="button"><span class="exp-label">展开全部</span><svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5 9 4.5"></path></svg></button>
+    </div>
+  </section>
+
+  <!-- 4. 记录区 -->
+  <section class="records">
+    <div class="records-head">
+      <span class="sec-bar"></span>
+      <h2 class="sec-title">记录</h2>
+      <div class="tabs">
+        <button class="tab active" type="button" data-target="panel-follow">跟进点<span class="cnt">3</span></button>
+        <button class="tab" type="button" data-target="panel-comm">沟通记录<span class="cnt">2</span></button>
+        <button class="tab" type="button" data-target="panel-remain">剩余次数<span class="cnt">3</span></button>
+        <button class="tab" type="button" data-target="panel-trade">交易记录<span class="cnt">2</span></button>
+      </div>
+    </div>
+
+    <!-- 跟进点 -->
+    <div class="panel active" id="panel-follow">
+      <div class="follow-list">
+
+        <div class="follow-card">
+          <div class="f-datecol">
+            <div class="date-block">
+              <div class="date-md">7/15</div>
+              <div class="date-y">2026</div>
+            </div>
+            <div class="status status-green">已到店</div>
+          </div>
+          <div class="f-grid">
+            <div>
+              <div class="f-item-label">当日需求</div>
+              <div class="f-item-text">OH卡梳理，想看清自己在买房这件事里的真实感受</div>
+            </div>
+            <div>
+              <div class="f-item-label">组长反馈</div>
+              <div class="f-item-text">参与度很高，抽到「面具」卡时情绪明显波动</div>
+            </div>
+            <div>
+              <div class="f-item-label">跟进点</div>
+              <div class="f-item-text">引导她把「我应该」和「我想要」分开表述，布置了边界练习：本周对一件小事说不</div>
+            </div>
+            <div>
+              <div class="f-item-label">客户信息</div>
+              <div class="f-item-text">结束后主动说要试试跟伴侣重谈买房分工</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="follow-card">
+          <div class="f-datecol">
+            <div class="date-block">
+              <div class="date-md">7/8</div>
+              <div class="date-y">2026</div>
+            </div>
+            <div class="status status-green">已到店</div>
+          </div>
+          <div class="f-grid">
+            <div>
+              <div class="f-item-label">当日需求</div>
+              <div class="f-item-text">情绪释放，最近心慌得厉害</div>
+            </div>
+            <div>
+              <div class="f-item-label">组长反馈</div>
+              <div class="f-item-text">释放过程顺利，哭了很久但能自己收住</div>
+            </div>
+            <div>
+              <div class="f-item-label">跟进点</div>
+              <div class="f-item-text">躯体化与压抑愤怒有关，建议记录「生气时刻」日记</div>
+            </div>
+            <div>
+              <div class="f-item-label">客户信息</div>
+              <div class="f-item-text">反馈睡眠好了两天又反复</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="follow-card">
+          <div class="f-datecol">
+            <div class="date-block">
+              <div class="date-md">7/1</div>
+              <div class="date-y">2026</div>
+            </div>
+            <div class="status status-orange">未到店</div>
+          </div>
+          <div class="f-grid">
+            <div>
+              <div class="f-item-label">当日需求</div>
+              <div class="f-item-text">临时加班请假</div>
+            </div>
+            <div>
+              <div class="f-item-label">组长反馈</div>
+              <div class="f-item-text muted">-</div>
+            </div>
+            <div>
+              <div class="f-item-label">跟进点</div>
+              <div class="f-item-text">连续两次因加班改期，需关注是否回避</div>
+            </div>
+            <div>
+              <div class="f-item-label">客户信息</div>
+              <div class="f-item-text muted">-</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 沟通记录 -->
+    <div class="panel" id="panel-comm">
+      <div class="panel-card">
+        <div class="comm-row">
+          <span class="comm-date">2026/7/14</span>
+          <span class="comm-who">婷婷</span>
+          <span class="comm-text">微信回访，说周末和伴侣谈了买房分工，对方比想象中好说话，她很惊讶</span>
+        </div>
+        <div class="comm-row">
+          <span class="comm-date">2026/7/9</span>
+          <span class="comm-who">沈青</span>
+          <span class="comm-text">提醒她周三英语课改期，已确认</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 剩余次数 -->
+    <div class="panel" id="panel-remain">
+      <div class="panel-card">
+        <div class="remain-row">
+          <div class="remain-info">
+            <div class="remain-name">会员卡</div>
+            <div class="remain-sub">2026/1/1 – 2026/12/31 · 共 40 次</div>
+          </div>
+          <div class="bar"><i style="width:35%"></i></div>
+          <div class="remain-num">剩余<b>14</b>次</div>
+        </div>
+        <div class="remain-row">
+          <div class="remain-info">
+            <div class="remain-name">OH卡梳理</div>
+            <div class="remain-sub">共 10 次</div>
+          </div>
+          <div class="bar"><i style="width:30%"></i></div>
+          <div class="remain-num">剩余<b>3</b>次</div>
+        </div>
+        <div class="remain-row">
+          <div class="remain-info">
+            <div class="remain-name">情绪释放</div>
+            <div class="remain-sub">共 5 次</div>
+          </div>
+          <div class="bar"><i style="width:20%"></i></div>
+          <div class="remain-num warn">剩余<b>1</b>次</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 交易记录 -->
+    <div class="panel" id="panel-trade">
+      <div class="panel-card">
+        <table>
+          <thead>
+            <tr><th>项目</th><th>规格</th><th>金额</th><th>状态</th><th>成交人</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>会员卡</td>
+              <td>40 次</td>
+              <td class="money">¥20,000</td>
+              <td><span class="mini-tag">生效中</span></td>
+              <td>婷婷</td>
+            </tr>
+            <tr>
+              <td>OH卡梳理</td>
+              <td>10 次</td>
+              <td class="money">¥6,800</td>
+              <td><span class="mini-tag">生效中</span></td>
+              <td>王珂</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">方案 V1 预览稿 · 统一演示数据 · 1280px 桌面视口最佳</footer>
+</div>
+
+<script>
+(function () {
+  /* ---------- 长文本：默认 4 行，超出才显示「展开」 ---------- */
+  function setBtn(btn, open) {
+    btn.querySelector('.exp-label').textContent = open ? '收起' : '展开全部';
+  }
+  function refreshClamps() {
+    document.querySelectorAll('.field').forEach(function (f) {
+      f.classList.remove('open');
+      var txt = f.querySelector('.field-text');
+      var btn = f.querySelector('.expand-btn');
+      setBtn(btn, false);
+      var overflow = txt.scrollHeight - txt.clientHeight > 2;
+      f.classList.toggle('has-more', overflow);
+    });
+  }
+  document.querySelectorAll('.expand-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var f = btn.closest('.field');
+      var open = !f.classList.contains('open');
+      f.classList.toggle('open', open);
+      setBtn(btn, open);
+    });
+  });
+  window.addEventListener('DOMContentLoaded', refreshClamps);
+  var rsTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(rsTimer);
+    rsTimer = setTimeout(refreshClamps, 150);
+  });
+
+  /* ---------- 记录区 tab 切换 ---------- */
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target).classList.add('active');
+    });
+  });
+
+  /* ---------- 复制流量链接 ---------- */
+  var copyBtn = document.getElementById('copyBtn');
+  var copyLabel = document.getElementById('copyLabel');
+  var linkText = document.getElementById('linkText').textContent.trim();
+  function markCopied() {
+    copyBtn.classList.add('done');
+    copyLabel.textContent = '已复制';
+    setTimeout(function () {
+      copyBtn.classList.remove('done');
+      copyLabel.textContent = '复制';
+    }, 1600);
+  }
+  copyBtn.addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(linkText).then(markCopied, markCopied);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = linkText;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      markCopied();
+    }
+  });
+
+  /* ---------- 标注条：窄屏预览（演示 4 行收起 + 展开按钮） ---------- */
+  var narrowBtn = document.getElementById('narrowBtn');
+  var page = document.getElementById('page');
+  narrowBtn.addEventListener('click', function () {
+    var narrow = !page.classList.contains('narrow');
+    page.classList.toggle('narrow', narrow);
+    narrowBtn.textContent = narrow ? '退出窄屏' : '窄屏预览';
+    refreshClamps();
+  });
+})();
+</script>
+</body>
+</html>

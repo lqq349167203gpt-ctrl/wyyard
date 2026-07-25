@@ -50,6 +50,18 @@ const CARD_TYPE_OPTIONS = [
   { value: "年卡", label: "年卡" },
 ]
 
+type AvailableDeductionItem = {
+  id: string
+  name: string
+  remaining_count: number | null
+  detail?: string
+  card_type?: string
+  expiry_date?: string
+  project_type: string
+  project_type_label: string
+  selection_key: string
+}
+
 export function ProjectDeductionTab() {
   const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -82,17 +94,18 @@ export function ProjectDeductionTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [customerId, setCustomerId] = useState("")
   const [customerName, setCustomerName] = useState("")
-  const [projectType, setProjectType] = useState("")
-  const [cardType, setCardType] = useState("")
-  const [availableItems, setAvailableItems] = useState<{ id: string; name: string; remaining_count: number | null; detail?: string; card_type?: string; expiry_date?: string }[]>([])
-  const [selectedItemId, setSelectedItemId] = useState("")
+  const [availableItems, setAvailableItems] = useState<AvailableDeductionItem[]>([])
+  const [selectedItemKey, setSelectedItemKey] = useState("")
   const [deductCount, setDeductCount] = useState("1")
+  const [deductReason, setDeductReason] = useState("")
   const [deducting, setDeducting] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
+  const availableItemsRequestRef = useRef(0)
 
   // 编辑弹窗
   const [editTarget, setEditTarget] = useState<ProjectDeduction | null>(null)
   const [editCount, setEditCount] = useState("1")
+  const [editReason, setEditReason] = useState("")
   const [editing, setEditing] = useState(false)
 
   // 删除确认
@@ -161,68 +174,67 @@ export function ProjectDeductionTab() {
 
   // 选中用户后加载可销卡项目
   const handleSelectCustomer = useCallback(async (c: Customer) => {
+    const requestId = ++availableItemsRequestRef.current
     setCustomerId(c.id)
     setCustomerName(c.nickname)
-    setProjectType("")
-    setCardType("")
-    setSelectedItemId("")
+    setSelectedItemKey("")
     setAvailableItems([])
+    setLoadingItems(true)
+    const groupedItems = await Promise.all(PROJECT_TYPE_OPTIONS.map(async (option) => {
+      try {
+        const items = await projectDeductionApi.getAvailableItems(c.id, option.value)
+        return items
+          .filter((item) => item.remaining_count === null || item.remaining_count > 0)
+          .map((item) => ({
+            ...item,
+            project_type: option.value,
+            project_type_label: option.label,
+            selection_key: `${option.value}:${item.id}`,
+          }))
+      } catch {
+        return []
+      }
+    }))
+    if (requestId !== availableItemsRequestRef.current) return
+    setAvailableItems(groupedItems.flat())
+    setLoadingItems(false)
   }, [])
 
   const handleClearCustomer = useCallback(() => {
+    availableItemsRequestRef.current += 1
     setCustomerId("")
     setCustomerName("")
-    setProjectType("")
-    setCardType("")
-    setSelectedItemId("")
+    setSelectedItemKey("")
     setAvailableItems([])
+    setLoadingItems(false)
   }, [])
 
-  // 选择项目类型后加载可销卡项目
-  const handleProjectTypeChange = useCallback(async (type: string) => {
-    setProjectType(type)
-    setCardType("")
-    setSelectedItemId("")
-    setAvailableItems([])
-    if (!customerId || !type) return
-    setLoadingItems(true)
-    try {
-      const items = await projectDeductionApi.getAvailableItems(customerId, type)
-      setAvailableItems(items)
-    } catch {
-      setAvailableItems([])
-    }
-    setLoadingItems(false)
-  }, [customerId])
-
-  // 选择卡类型后筛选（不选卡类型时显示全部）
-  const filteredItems = projectType === "membership-cards" && cardType
-    ? availableItems.filter(i => i.card_type === cardType)
-    : projectType === "membership-cards"
-    ? availableItems
-    : availableItems
-
-  const selectedItem = availableItems.find(i => i.id === selectedItemId)
+  const selectedItem = availableItems.find(i => i.selection_key === selectedItemKey)
 
   const handleDeduct = async () => {
-    if (!customerId || !selectedItemId || !projectType) return
+    if (!customerId || !selectedItem) return
+    const reason = deductReason.trim()
+    if (!reason) {
+      alert("请填写销卡内容")
+      return
+    }
     setDeducting(true)
     try {
       await projectDeductionApi.create({
         customer_id: customerId,
-        project_type: projectType,
-        project_id: selectedItemId,
+        project_type: selectedItem.project_type,
+        project_id: selectedItem.id,
         count: parseInt(deductCount) || 1,
+        reason,
         created_by: currentUserName,
       })
       setDialogOpen(false)
       setCustomerId("")
       setCustomerName("")
-      setProjectType("")
-      setCardType("")
-      setSelectedItemId("")
+      setSelectedItemKey("")
       setAvailableItems([])
       setDeductCount("1")
+      setDeductReason("")
       refreshDeductions()
     } catch (error: any) {
       alert(error?.message || "销卡失败")
@@ -233,10 +245,16 @@ export function ProjectDeductionTab() {
 
   const handleEdit = async () => {
     if (!editTarget || editing) return
+    const reason = editReason.trim()
+    if (!reason) {
+      alert("请填写销卡内容")
+      return
+    }
     setEditing(true)
     try {
       await projectDeductionApi.update(editTarget.id, {
         count: parseInt(editCount) || 1,
+        reason,
         updated_by: currentUserName,
       })
       setEditTarget(null)
@@ -602,6 +620,7 @@ export function ProjectDeductionTab() {
                 <TableHead>项目名称</TableHead>
                 <TableHead>销卡次数</TableHead>
                 <TableHead>销卡日期</TableHead>
+                <TableHead>销卡内容</TableHead>
                 <TableHead>该卡剩余</TableHead>
                 <TableHead>创建人</TableHead>
                 <TableHead className="w-20">操作</TableHead>
@@ -619,13 +638,20 @@ export function ProjectDeductionTab() {
                   <TableCell className="text-[#2b2f36]">{d.project_name}</TableCell>
                   <TableCell className="text-[#2b2f36]">{d.count} 次</TableCell>
                   <TableCell className="text-[#2b2f36]">{d.deduction_date}</TableCell>
+                  <TableCell className={d.reason ? "text-[#4e535a]" : "text-[#d0d3d6]"}>
+                    {d.reason || "-"}
+                  </TableCell>
                   <TableCell className="text-[#2b2f36]">
                     {d.remaining_after === null || d.remaining_after === undefined ? "不限" : d.remaining_after < 0 ? <span className="text-[#c4506a]">{d.remaining_after} 次</span> : `${d.remaining_after} 次`}
                   </TableCell>
                   <TableCell className="text-[#8f959e]">{d.created_by || "-"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <button className="p-1 hover:bg-[#f0f1f2] rounded" onClick={() => { setEditTarget(d); setEditCount(String(d.count)) }}>
+                      <button className="p-1 hover:bg-[#f0f1f2] rounded" onClick={() => {
+                        setEditTarget(d)
+                        setEditCount(String(d.count))
+                        setEditReason(d.reason || "")
+                      }}>
                         <Pencil className="h-3.5 w-3.5 text-[#8f959e]" />
                       </button>
                       <button className="p-1 hover:bg-[#fef0f0] rounded" onClick={() => setDeleteTarget(d)}>
@@ -654,18 +680,19 @@ export function ProjectDeductionTab() {
       <Dialog open={dialogOpen} onOpenChange={(open) => {
         setDialogOpen(open)
         if (!open) {
-          setCustomerId(""); setCustomerName(""); setProjectType(""); setCardType("")
-          setSelectedItemId(""); setAvailableItems([]); setDeductCount("1")
+          availableItemsRequestRef.current += 1
+          setCustomerId(""); setCustomerName(""); setSelectedItemKey("")
+          setAvailableItems([]); setLoadingItems(false); setDeductCount("1"); setDeductReason("")
         }
       }}>
-        <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+        <DialogContent className="w-[400px] max-w-[90vw] p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">项目销卡</DialogTitle>
+            <DialogTitle className="text-[14px] font-normal">项目销卡</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             {/* 用户搜索 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">用户</span>
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">用户</span>
               <CustomerSearchInput
                 customers={customers}
                 value={customerName || ""}
@@ -678,59 +705,32 @@ export function ProjectDeductionTab() {
               />
             </div>
 
-            {/* 项目类型 */}
+            {/* 可扣项目 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">类型</span>
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">可扣项目</span>
               {!customerId ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">请先选择用户</div>
+              ) : loadingItems ? (
+                <div className="h-8 flex items-center text-[12px] text-[#8f959e]">正在加载可扣项目...</div>
+              ) : availableItems.length === 0 ? (
+                <div className="h-8 flex items-center text-[12px] text-[#8f959e]">该用户暂无可扣项目</div>
               ) : (
                 <SelectDropdown
-                  value={projectType}
-                  options={PROJECT_TYPE_OPTIONS}
-                  placeholder="选择项目类型"
-                  onChange={handleProjectTypeChange}
+                  value={selectedItemKey}
+                  options={availableItems.map((item) => ({
+                    value: item.selection_key,
+                    label: `${item.project_type_label} · ${item.name} · ${item.detail || (item.remaining_count === null ? "不限" : `剩余 ${item.remaining_count} 次`)}`,
+                  }))}
+                  placeholder="请选择可扣项目"
+                  onChange={setSelectedItemKey}
                 />
               )}
             </div>
 
-            {/* 会员卡卡类型子选项 */}
-            {projectType === "membership-cards" && (
-              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">卡类型</span>
-                <SelectDropdown
-                  value={cardType}
-                  options={CARD_TYPE_OPTIONS}
-                  placeholder="选择卡类型"
-                  onChange={(v) => { setCardType(v); setSelectedItemId("") }}
-                />
-              </div>
-            )}
-
-            {/* 选择项目 */}
-            {projectType && (
-              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目</span>
-                {loadingItems ? (
-                  <div className="h-8 flex items-center text-[12px] text-[#8f959e]">加载中...</div>
-                ) : filteredItems.length === 0 ? (
-                  <div className="h-8 flex items-center text-[12px] text-[#8f959e]">该用户无可销卡项目</div>
-                ) : (
-                  <SelectDropdown
-                    value={selectedItemId}
-                    options={filteredItems.map((i) => ({
-                      value: i.id,
-                      label: `${i.name} - ${i.detail || (i.remaining_count === null ? "不限" : `剩余${i.remaining_count}次`)}`,
-                    }))}
-                    placeholder="请选择项目"
-                    onChange={setSelectedItemId}
-                  />
-                )}
-              </div>
-            )}
-
             {/* 项目详情 */}
             {selectedItem && (
               <div className="bg-[#f7f8fa] rounded-md p-3 text-[12px] space-y-1">
+                <div className="flex justify-between"><span className="text-[#8f959e]">项目类型</span><span>{selectedItem.project_type_label}</span></div>
                 <div className="flex justify-between"><span className="text-[#8f959e]">项目名称</span><span>{selectedItem.name}</span></div>
                 <div className="flex justify-between"><span className="text-[#8f959e]">剩余次数</span><span>{selectedItem.remaining_count === null ? "不限" : `${selectedItem.remaining_count} 次`}</span></div>
                 {selectedItem.expiry_date && (
@@ -741,7 +741,7 @@ export function ProjectDeductionTab() {
 
             {/* 次数 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">次数</span>
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">次数</span>
               <Input
                 type="text"
                 inputMode="numeric"
@@ -751,9 +751,20 @@ export function ProjectDeductionTab() {
               />
             </div>
 
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">销卡内容</span>
+              <Input
+                value={deductReason}
+                maxLength={200}
+                placeholder="必填，请填写本次销卡内容"
+                onChange={(e) => setDeductReason(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button size="sm" onClick={handleDeduct} disabled={deducting || !customerId || !selectedItemId}>
+              <Button size="sm" onClick={handleDeduct} disabled={deducting || !customerId || !selectedItem || !deductReason.trim()}>
                 {deducting ? "销卡中..." : "确认销卡"}
               </Button>
             </div>
@@ -762,7 +773,12 @@ export function ProjectDeductionTab() {
       </Dialog>
 
       {/* 编辑弹窗 */}
-      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null) }}>
+      <Dialog open={!!editTarget} onOpenChange={(open) => {
+        if (!open) {
+          setEditTarget(null)
+          setEditReason("")
+        }
+      }}>
         <DialogContent className="max-w-xs p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-5 pt-4 pb-3 border-b">
             <DialogTitle className="text-[13px]">修改销卡次数</DialogTitle>
@@ -781,9 +797,19 @@ export function ProjectDeductionTab() {
                 className="h-8 text-[12px]"
               />
             </div>
+            <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">销卡内容</span>
+              <Input
+                value={editReason}
+                maxLength={200}
+                placeholder="请输入销卡内容"
+                onChange={(e) => setEditReason(e.target.value)}
+                className="h-8 text-[12px]"
+              />
+            </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setEditTarget(null)}>取消</Button>
-              <Button size="sm" onClick={handleEdit} disabled={editing || !editCount}>
+              <Button size="sm" onClick={handleEdit} disabled={editing || !editCount || !editReason.trim()}>
                 {editing ? "保存中..." : "保存"}
               </Button>
             </div>

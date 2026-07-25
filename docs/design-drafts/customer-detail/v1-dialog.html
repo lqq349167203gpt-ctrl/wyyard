@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 V1 · 弹窗版 三区固定布局 — 客户详情预览</title>
+<style>
+  :root{
+    --bg:#f4f5f6;
+    --card:#ffffff;
+    --ink:#212631;
+    --ink-2:#79838f;
+    --ink-3:#a8b1bd;
+    --lime:#c9f24b;
+    --lime-ink:#3d5500;
+    --hairline:#f0f1f3;
+    --shadow:0 2px 4px rgba(33,38,49,.05);
+    --green-bg:#dcf5e4; --green-tx:#157a3c;
+    --blue-bg:#e0ebff;  --blue-tx:#2f5cc4;
+    --orange-bg:#ffe8d9;--orange-tx:#c25a1b;
+    --neutral-bg:#f1f0ed;--neutral-tx:#79838f;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    font-size:13px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  ::selection{background:var(--lime);color:var(--lime-ink)}
+  button{font-family:inherit;cursor:pointer;border:0;background:none}
+
+  /* ---------- 方案标注条（非设计方案本体） ---------- */
+  .annot{
+    position:fixed;top:0;left:0;right:0;z-index:30;background:var(--ink);
+  }
+  .annot-in{
+    max-width:1000px;margin:0 auto;padding:8px 20px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .annot-name{color:var(--lime);font-size:12px;font-weight:700;white-space:nowrap}
+  .annot-desc{color:rgba(201,242,75,.55);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* ---------- 遮罩 + 弹窗框 ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:10;
+    background:rgba(24,28,35,.45);
+    display:flex;align-items:center;justify-content:center;
+    padding:44px 16px 16px;
+  }
+  .dialog{
+    position:relative;
+    width:1000px;max-width:96vw;
+    height:85vh;max-height:780px;min-height:600px;
+    background:var(--bg);
+    border-radius:18px;
+    box-shadow:0 18px 60px rgba(15,18,24,.28);
+    padding:16px 20px;
+    display:flex;flex-direction:column;gap:12px;
+    overflow:hidden;
+  }
+  .dlg-close{
+    position:absolute;top:13px;right:14px;z-index:5;
+    width:28px;height:28px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink-2);background:rgba(255,255,255,.7);
+    transition:background .15s,color .15s;
+  }
+  .dlg-close:hover{background:var(--neutral-bg);color:var(--ink)}
+
+  /* ---------- 区域内部滚动：细淡滚动条，hover 变明显 ---------- */
+  .scrollable{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(33,38,49,.16) transparent}
+  .scrollable::-webkit-scrollbar{width:5px}
+  .scrollable::-webkit-scrollbar-track{background:transparent}
+  .scrollable::-webkit-scrollbar-thumb{background:rgba(33,38,49,.14);border-radius:999px}
+  .scrollable:hover::-webkit-scrollbar-thumb{background:rgba(33,38,49,.3)}
+
+  /* ---------- 1. 身份条（一行收拢，约 60px） ---------- */
+  .identity{
+    flex-shrink:0;height:60px;
+    background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:14px;padding:0 18px;
+  }
+  .avatar{
+    width:38px;height:38px;border-radius:50%;flex-shrink:0;
+    background:var(--lime);color:var(--lime-ink);
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:800;
+  }
+  .id-name{font-size:16px;font-weight:800;white-space:nowrap}
+  .id-sub{font-size:12px;color:var(--ink-2);white-space:nowrap}
+  .id-sub i{font-style:normal;margin:0 5px;color:var(--ink-3)}
+  .tag{
+    display:inline-flex;align-items:center;white-space:nowrap;
+    font-size:11.5px;font-weight:500;line-height:1;
+    padding:4px 10px;border-radius:999px;
+  }
+  .tag-green{background:var(--green-bg);color:var(--green-tx)}
+  .tag-blue{background:var(--blue-bg);color:var(--blue-tx)}
+  .stats{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .pill{
+    display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap;
+    padding:6px 12px;border-radius:999px;font-size:11.5px;line-height:1;
+  }
+  .pill .v{font-size:13px;font-weight:800}
+  .pill-lime{background:var(--lime);color:var(--lime-ink)}
+  .pill-dark{background:var(--ink);color:rgba(255,255,255,.55)}
+  .pill-dark .v{color:var(--lime)}
+  .pill-neutral{background:var(--neutral-bg);color:var(--neutral-tx)}
+  .pill-neutral .v{color:var(--ink);font-weight:700}
+
+  /* ---------- 2. 联系与来源（一行高密度横条，约 38px） ---------- */
+  .contact-strip{
+    flex-shrink:0;
+    background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:0;padding:9px 18px;
+    overflow:hidden;
+  }
+  .c-item{display:flex;align-items:baseline;gap:6px;white-space:nowrap;min-width:0}
+  .c-item + .c-item{margin-left:16px;padding-left:16px;border-left:1px solid var(--hairline)}
+  .c-label{font-size:11px;color:var(--ink-3)}
+  .c-value{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .c-value.link{
+    max-width:190px;overflow:hidden;text-overflow:ellipsis;
+    font-weight:500;color:var(--ink-2);
+  }
+  .copy-btn{
+    flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+    width:22px;height:22px;border-radius:6px;color:var(--ink-3);
+    transition:color .15s,background .15s;margin-left:4px;vertical-align:middle;
+  }
+  .copy-btn:hover{color:var(--ink);background:var(--neutral-bg)}
+  .copy-btn.done{color:var(--green-tx)}
+
+  /* ---------- 3. 长文本区：2 列 × 3 排固定网格（260px，永不变高） ---------- */
+  .fields{
+    flex-shrink:0;height:260px;
+    display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);
+    gap:10px;
+  }
+  .field-card{
+    background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    padding:9px 13px;display:flex;flex-direction:column;min-height:0;overflow:hidden;
+  }
+  .f-head{display:flex;align-items:baseline;gap:8px;margin-bottom:3px;flex-shrink:0}
+  .f-label{font-size:12px;font-weight:700}
+  .f-label::before{
+    content:"";display:inline-block;width:3px;height:10px;border-radius:2px;
+    background:var(--lime);margin-right:6px;vertical-align:-1px;
+  }
+  .f-chars{font-size:10.5px;color:var(--ink-3);font-weight:400}
+  .f-body{
+    flex:1;min-height:0;
+    font-size:12.5px;line-height:1.5;color:var(--ink);
+  }
+  /* 次数余量卡（复用真实数据，补满 2×3 网格） */
+  .quota{display:flex;flex-direction:column;justify-content:space-between;height:100%}
+  .quota-row{display:flex;align-items:baseline;font-size:12px;line-height:1.3}
+  .quota-name{color:var(--ink-2)}
+  .quota-val{margin-left:auto;font-weight:800}
+  .quota-val.warn{color:var(--orange-tx)}
+
+  /* ---------- 4. 记录区：tab 头固定，内容内部滚动，填满剩余高度 ---------- */
+  .records{
+    flex:1;min-height:0;
+    background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .rec-head{
+    flex-shrink:0;display:flex;align-items:center;gap:14px;
+    padding:10px 16px 9px;border-bottom:1px solid var(--hairline);
+  }
+  .sec-bar{width:4px;height:13px;border-radius:2px;background:var(--lime);flex-shrink:0}
+  .sec-title{font-size:14px;font-weight:800;white-space:nowrap}
+  .tabs{
+    margin-left:auto;display:inline-flex;align-items:center;
+    background:var(--neutral-bg);border-radius:999px;padding:3px;
+  }
+  .tab{
+    font-size:12px;font-weight:500;color:var(--ink-2);line-height:1;
+    padding:6px 13px;border-radius:999px;transition:color .15s,background .15s;
+  }
+  .tab .cnt{font-size:10.5px;margin-left:3px;opacity:.65}
+  .tab:hover{color:var(--ink)}
+  .tab.active{background:var(--ink);color:var(--lime);font-weight:700}
+  .rec-body{flex:1;min-height:0;padding:10px 16px 14px}
+  .panel{display:none}
+  .panel.active{display:block}
+
+  /* 跟进点卡片（紧凑） */
+  .follow-card{
+    display:flex;gap:16px;
+    background:var(--bg);border-radius:12px;
+    padding:12px 16px;margin-bottom:10px;
+  }
+  .f-datecol{width:56px;flex-shrink:0}
+  .date-block{background:var(--card);border-radius:10px;padding:7px 0 6px;text-align:center;box-shadow:var(--shadow)}
+  .date-md{font-size:13px;font-weight:800;line-height:1.2}
+  .date-y{font-size:10px;color:var(--ink-3);margin-top:1px}
+  .status{
+    margin-top:6px;display:flex;justify-content:center;
+    font-size:10.5px;font-weight:600;line-height:1;padding:4px 0;border-radius:999px;
+  }
+  .status-green{background:var(--green-bg);color:var(--green-tx)}
+  .status-orange{background:var(--orange-bg);color:var(--orange-tx)}
+  .f-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:7px 20px;min-width:0}
+  .f-item-label{font-size:11px;color:var(--ink-3);margin-bottom:1px}
+  .f-item-text{font-size:12.5px;line-height:1.5;color:var(--ink)}
+  .f-item-text.muted{color:var(--ink-3)}
+
+  /* 沟通记录 */
+  .comm-row{display:flex;align-items:flex-start;gap:12px;padding:10px 4px}
+  .comm-row + .comm-row{border-top:1px solid var(--hairline)}
+  .comm-date{width:84px;flex-shrink:0;font-size:12.5px;font-weight:600;padding-top:1px}
+  .comm-who{
+    flex-shrink:0;font-size:11px;font-weight:500;line-height:1;margin-top:2px;
+    padding:3px 9px;border-radius:999px;background:var(--neutral-bg);color:var(--neutral-tx);
+  }
+  .comm-text{flex:1;font-size:12.5px;line-height:1.55;min-width:0}
+
+  /* 剩余次数 */
+  .remain-row{display:flex;align-items:center;gap:18px;padding:12px 4px}
+  .remain-row + .remain-row{border-top:1px solid var(--hairline)}
+  .remain-info{width:220px;flex-shrink:0}
+  .remain-name{font-size:12.5px;font-weight:700}
+  .remain-sub{font-size:11px;color:var(--ink-3);margin-top:1px}
+  .bar{flex:1;height:7px;background:var(--neutral-bg);border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:var(--lime);border-radius:999px}
+  .remain-num{width:105px;flex-shrink:0;text-align:right;font-size:11.5px;color:var(--ink-2)}
+  .remain-num b{font-size:15px;font-weight:800;color:var(--ink);margin:0 2px}
+  .remain-num.warn b{color:var(--orange-tx)}
+
+  /* 交易记录 */
+  table{width:100%;border-collapse:collapse}
+  th{
+    text-align:left;font-size:11px;font-weight:500;color:var(--ink-3);
+    padding:8px 8px;border-bottom:1px solid var(--hairline);
+  }
+  td{font-size:12.5px;padding:11px 8px;border-bottom:1px solid var(--hairline);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  td.money{font-weight:800}
+  .mini-tag{
+    display:inline-flex;font-size:11px;font-weight:500;line-height:1;
+    padding:3px 9px;border-radius:999px;background:var(--green-bg);color:var(--green-tx);
+  }
+</style>
+</head>
+<body>
+
+<!-- 方案标注条（非设计方案本体） -->
+<div class="annot">
+  <div class="annot-in">
+    <span class="annot-name">方案 V1 · 弹窗版「三区固定布局」</span>
+    <span class="annot-desc">弹窗 1000 × 85vh · 外层不滚动 · 长文本卡内滚动 · tab 内容区内滚</span>
+  </div>
+</div>
+
+<div class="overlay">
+  <div class="dialog" role="dialog" aria-label="客户详情">
+
+    <button class="dlg-close" type="button" aria-label="关闭">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M2.5 2.5 9.5 9.5M9.5 2.5 2.5 9.5"></path>
+      </svg>
+    </button>
+
+    <!-- 1. 身份条 -->
+    <header class="identity">
+      <div class="avatar">林</div>
+      <span class="id-name">林小满</span>
+      <span class="id-sub">林晓曼<i>·</i>女<i>·</i>34 岁</span>
+      <span class="tag tag-green">深度会员</span>
+      <span class="tag tag-blue">疗愈老师：沈青、苏禾</span>
+      <div class="stats">
+        <span class="pill pill-lime"><span class="k">到店</span><span class="v">27 次</span></span>
+        <span class="pill pill-dark"><span class="k">累计消费</span><span class="v">¥36,800</span></span>
+        <span class="pill pill-neutral"><span class="k">首次到访</span><span class="v">2025/11/3</span></span>
+      </div>
+    </header>
+
+    <!-- 2. 联系与来源（高密度横条） -->
+    <div class="contact-strip">
+      <div class="c-item"><span class="c-label">电话</span><span class="c-value">138 2619 5543</span></div>
+      <div class="c-item"><span class="c-label">微信</span><span class="c-value">xiaoman_lin</span></div>
+      <div class="c-item"><span class="c-label">引流人</span><span class="c-value">王珂</span></div>
+      <div class="c-item"><span class="c-label">承接人</span><span class="c-value">婷婷</span></div>
+      <div class="c-item"><span class="c-label">来源</span><span class="c-value">小红书</span></div>
+      <div class="c-item">
+        <span class="c-label">链接</span>
+        <span class="c-value link" id="linkText" title="https://xhslink.com/a/8fj3k2mx9">https://xhslink.com/a/8fj3k2mx9</span>
+        <button class="copy-btn" id="copyBtn" type="button" title="复制链接">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="7" height="7" rx="1.5"></rect>
+            <path d="M8 4V2.5A1.5 1.5 0 0 0 6.5 1H2.5A1.5 1.5 0 0 0 1 2.5v4A1.5 1.5 0 0 0 2.5 8H4"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. 长文本区：2 列 × 3 排，固定 260px -->
+    <section class="fields">
+      <div class="field-card">
+        <div class="f-head"><span class="f-label">创伤经历</span><span class="f-chars">约 190 字 · 可滚动</span></div>
+        <p class="f-body scrollable">童年时期父母长期争吵，初二时父亲离家出走，母亲情绪崩溃后把情感需求全部压在孩子身上，形成典型的亲职化。来访者很小就学会察言观色、压抑自己的需求去照顾别人。大学时第一段恋爱关系里反复讨好对方，被冷暴力分手后出现持续半年的抑郁情绪，期间有过自伤念头（未实施）。三年前开始接受心理咨询，情绪趋于稳定，但讨好模式和边界模糊的问题依然反复。</p>
+      </div>
+      <div class="field-card">
+        <div class="f-head"><span class="f-label">当下卡点</span><span class="f-chars">约 120 字 · 可滚动</span></div>
+        <p class="f-body scrollable">最近半年和伴侣在谈婚论嫁，对方家庭催得紧，她发现自己又开始用顺从换和平，明明不情愿却答应了两家合买房。上周因为这件事失眠加重，心悸发作两次。她意识到这是旧模式重演，但「拒绝别人」对她来说仍然像「天要塌下来」。</p>
+      </div>
+      <div class="field-card">
+        <div class="f-head"><span class="f-label">到访目的</span></div>
+        <p class="f-body scrollable">想在亲密关系里不再重复旧模式，学会建立边界感；改善长期失眠和焦虑引起的躯体化反应（心悸、肠胃不适）。</p>
+      </div>
+      <div class="field-card">
+        <div class="f-head"><span class="f-label">工作情况</span></div>
+        <p class="f-body scrollable">互联网大厂产品经理，996 高压节奏。近一年明显职业倦怠，睡眠差，正在考虑降薪转型到身心健康行业。</p>
+      </div>
+      <div class="field-card">
+        <div class="f-head"><span class="f-label">其他信息</span></div>
+        <p class="f-body scrollable">对声音敏感，疗愈空间需要保持安静；每周三晚上有线上英语课，排课需避开。</p>
+      </div>
+      <div class="field-card">
+        <div class="f-head"><span class="f-label">次数余量</span><span class="f-chars">与「剩余次数」tab 同步</span></div>
+        <div class="f-body quota">
+          <div class="quota-row"><span class="quota-name">会员卡</span><span class="quota-val">剩 14 / 40</span></div>
+          <div class="quota-row"><span class="quota-name">OH卡梳理</span><span class="quota-val">剩 3 / 10</span></div>
+          <div class="quota-row"><span class="quota-name">情绪释放</span><span class="quota-val warn">剩 1 / 5</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 记录区：tab 头固定 + 内容内滚 -->
+    <section class="records">
+      <div class="rec-head">
+        <span class="sec-bar"></span>
+        <h2 class="sec-title">记录</h2>
+        <div class="tabs">
+          <button class="tab active" type="button" data-target="panel-follow">跟进点<span class="cnt">3</span></button>
+          <button class="tab" type="button" data-target="panel-comm">沟通记录<span class="cnt">2</span></button>
+          <button class="tab" type="button" data-target="panel-remain">剩余次数<span class="cnt">3</span></button>
+          <button class="tab" type="button" data-target="panel-trade">交易记录<span class="cnt">2</span></button>
+        </div>
+      </div>
+      <div class="rec-body scrollable">
+
+        <!-- 跟进点 -->
+        <div class="panel active" id="panel-follow">
+          <div class="follow-card">
+            <div class="f-datecol">
+              <div class="date-block">
+                <div class="date-md">7/15</div>
+                <div class="date-y">2026</div>
+              </div>
+              <div class="status status-green">已到店</div>
+            </div>
+            <div class="f-grid">
+              <div>
+                <div class="f-item-label">当日需求</div>
+                <div class="f-item-text">OH卡梳理，想看清自己在买房这件事里的真实感受</div>
+              </div>
+              <div>
+                <div class="f-item-label">组长反馈</div>
+                <div class="f-item-text">参与度很高，抽到「面具」卡时情绪明显波动</div>
+              </div>
+              <div>
+                <div class="f-item-label">跟进点</div>
+                <div class="f-item-text">引导她把「我应该」和「我想要」分开表述，布置了边界练习：本周对一件小事说不</div>
+              </div>
+              <div>
+                <div class="f-item-label">客户信息</div>
+                <div class="f-item-text">结束后主动说要试试跟伴侣重谈买房分工</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="follow-card">
+            <div class="f-datecol">
+              <div class="date-block">
+                <div class="date-md">7/8</div>
+                <div class="date-y">2026</div>
+              </div>
+              <div class="status status-green">已到店</div>
+            </div>
+            <div class="f-grid">
+              <div>
+                <div class="f-item-label">当日需求</div>
+                <div class="f-item-text">情绪释放，最近心慌得厉害</div>
+              </div>
+              <div>
+                <div class="f-item-label">组长反馈</div>
+                <div class="f-item-text">释放过程顺利，哭了很久但能自己收住</div>
+              </div>
+              <div>
+                <div class="f-item-label">跟进点</div>
+                <div class="f-item-text">躯体化与压抑愤怒有关，建议记录「生气时刻」日记</div>
+              </div>
+              <div>
+                <div class="f-item-label">客户信息</div>
+                <div class="f-item-text">反馈睡眠好了两天又反复</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="follow-card">
+            <div class="f-datecol">
+              <div class="date-block">
+                <div class="date-md">7/1</div>
+                <div class="date-y">2026</div>
+              </div>
+              <div class="status status-orange">未到店</div>
+            </div>
+            <div class="f-grid">
+              <div>
+                <div class="f-item-label">当日需求</div>
+                <div class="f-item-text">临时加班请假</div>
+              </div>
+              <div>
+                <div class="f-item-label">组长反馈</div>
+                <div class="f-item-text muted">-</div>
+              </div>
+              <div>
+                <div class="f-item-label">跟进点</div>
+                <div class="f-item-text">连续两次因加班改期，需关注是否回避</div>
+              </div>
+              <div>
+                <div class="f-item-label">客户信息</div>
+                <div class="f-item-text muted">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 沟通记录 -->
+        <div class="panel" id="panel-comm">
+          <div class="comm-row">
+            <span class="comm-date">2026/7/14</span>
+            <span class="comm-who">婷婷</span>
+            <span class="comm-text">微信回访，说周末和伴侣谈了买房分工，对方比想象中好说话，她很惊讶</span>
+          </div>
+          <div class="comm-row">
+            <span class="comm-date">2026/7/9</span>
+            <span class="comm-who">沈青</span>
+            <span class="comm-text">提醒她周三英语课改期，已确认</span>
+          </div>
+        </div>
+
+        <!-- 剩余次数 -->
+        <div class="panel" id="panel-remain">
+          <div class="remain-row">
+            <div class="remain-info">
+              <div class="remain-name">会员卡</div>
+              <div class="remain-sub">2026/1/1 – 2026/12/31 · 共 40 次</div>
+            </div>
+            <div class="bar"><i style="width:35%"></i></div>
+            <div class="remain-num">剩余<b>14</b>次</div>
+          </div>
+          <div class="remain-row">
+            <div class="remain-info">
+              <div class="remain-name">OH卡梳理</div>
+              <div class="remain-sub">共 10 次</div>
+            </div>
+            <div class="bar"><i style="width:30%"></i></div>
+            <div class="remain-num">剩余<b>3</b>次</div>
+          </div>
+          <div class="remain-row">
+            <div class="remain-info">
+              <div class="remain-name">情绪释放</div>
+              <div class="remain-sub">共 5 次</div>
+            </div>
+            <div class="bar"><i style="width:20%"></i></div>
+            <div class="remain-num warn">剩余<b>1</b>次</div>
+          </div>
+        </div>
+
+        <!-- 交易记录 -->
+        <div class="panel" id="panel-trade">
+          <table>
+            <thead>
+              <tr><th>项目</th><th>规格</th><th>金额</th><th>状态</th><th>成交人</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>会员卡</td>
+                <td>40 次</td>
+                <td class="money">¥20,000</td>
+                <td><span class="mini-tag">生效中</span></td>
+                <td>婷婷</td>
+              </tr>
+              <tr>
+                <td>OH卡梳理</td>
+                <td>10 次</td>
+                <td class="money">¥6,800</td>
+                <td><span class="mini-tag">生效中</span></td>
+                <td>王珂</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ---------- tab 切换（内容区内滚，tab 头固定） ---------- */
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target).classList.add('active');
+      document.querySelector('.rec-body').scrollTop = 0;
+    });
+  });
+
+  /* ---------- 复制流量链接 ---------- */
+  var copyBtn = document.getElementById('copyBtn');
+  var linkText = document.getElementById('linkText').textContent.trim();
+  copyBtn.addEventListener('click', function () {
+    function done() {
+      copyBtn.classList.add('done');
+      setTimeout(function () { copyBtn.classList.remove('done'); }, 1500);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(linkText).then(done, done);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = linkText;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      done();
+    }
+  });
+})();
+</script>
+</body>
+</html>

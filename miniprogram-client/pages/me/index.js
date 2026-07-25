@@ -37,6 +37,7 @@ Page({
     activityGroups: [],
     activityTotalCount: 0,
     weekCount: 0,
+    selectedFollowupActivity: null,
   },
 
   onShow() {
@@ -260,6 +261,25 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     wx.navigateTo({ url: `/pages/activity-detail/index?id=${id}` })
+  },
+
+  onFollowupTap(e) {
+    const activityKey = e.currentTarget.dataset.key
+    let activity = null
+    for (const group of this.data.activityGroups) {
+      activity = group.items.find(item => item.activity_key === activityKey)
+      if (activity) break
+    }
+    if (activity) this.setData({ selectedFollowupActivity: activity })
+  },
+
+  onFollowupClose() {
+    this.setData({ selectedFollowupActivity: null })
+  },
+
+  onFollowupSaved() {
+    this.setData({ selectedFollowupActivity: null })
+    this.loadActivityTimeline()
   },
 
   onLogout() {

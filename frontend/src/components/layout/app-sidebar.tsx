@@ -50,6 +50,7 @@ const courseItems = [
   { title: "邀约", icon: IconCalendarEvent, path: "/courses/class-records", permission: "class-records" },
   { title: "课表", icon: IconCalendar, path: "/courses/daily-activities", permission: "daily-activities" },
   { title: "沟通记录", icon: IconMessageCircle, path: "/communication-records", permission: "communication-records" },
+  { title: "回访记录", icon: IconClipboardText, path: "/followup-records", permission: "followup-records" },
 ]
 
 const configItems = [

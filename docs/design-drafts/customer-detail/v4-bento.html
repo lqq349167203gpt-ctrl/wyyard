@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 V4 · Bento 卡片网格 — 客户详情</title>
+<style>
+  :root{
+    --bg:#f4f5f6;
+    --card:#ffffff;
+    --ink:#212631;
+    --sub:#79838f;
+    --weak:#a8b1bd;
+    --lime:#c9f24b;
+    --olive:#3d5500;
+    --line:#eceef0;
+    --shadow:0 2px 4px rgba(33,38,49,.05);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{-webkit-font-smoothing:antialiased;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    font-size:13px;line-height:1.65;
+  }
+  .page{max-width:1280px;margin:0 auto;padding:28px 32px 64px;}
+
+  /* ── 方案标注条 ── */
+  .mark{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--ink);color:var(--lime);
+    font-size:12px;font-weight:600;letter-spacing:.4px;
+    padding:6px 14px;border-radius:999px;margin-bottom:20px;
+  }
+  .mark i{width:6px;height:6px;border-radius:50%;background:var(--lime);font-style:normal;}
+
+  /* ── 顶部身份行 ── */
+  .identity{
+    display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+    background:var(--card);border-radius:16px;box-shadow:var(--shadow);
+    padding:22px 26px;margin-bottom:18px;
+  }
+  .avatar{
+    width:56px;height:56px;border-radius:16px;flex:none;
+    background:linear-gradient(135deg,#eef3e2,#dcf5e4);
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;font-weight:800;color:var(--olive);
+  }
+  .id-main{min-width:0;}
+  .id-name{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+  .id-name h1{font-size:24px;font-weight:800;letter-spacing:.5px;line-height:1.3;}
+  .id-name .real{font-size:13px;color:var(--sub);font-weight:500;}
+  .id-tags{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .tag{
+    font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;line-height:1.5;
+  }
+  .tag.green{background:#dcf5e4;color:#157a3c;}
+  .tag.blue{background:#e0ebff;color:#2f5cc4;}
+  .tag.purple{background:#ece6ff;color:#6a48d8;}
+  .tag.neutral{background:#f1f0ed;color:#79838f;}
+  .id-meta{margin-left:auto;text-align:right;color:var(--weak);font-size:12px;line-height:1.8;}
+  .id-meta b{color:var(--sub);font-weight:600;}
+
+  /* ── Bento 网格 ── */
+  .bento{
+    display:grid;grid-template-columns:repeat(6,1fr);gap:18px;
+    margin-bottom:18px;
+  }
+  .card{
+    background:var(--card);border-radius:16px;box-shadow:var(--shadow);
+    padding:20px 22px;display:flex;flex-direction:column;min-width:0;
+  }
+  .card h3{
+    font-size:12px;font-weight:600;color:var(--weak);letter-spacing:1.2px;
+    margin-bottom:14px;display:flex;align-items:center;gap:8px;
+  }
+  .card h3::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--lime);flex:none;}
+
+  .span2{grid-column:span 2;}
+  .span3{grid-column:span 3;}
+
+  /* 指标卡（黑底 + 青柠） */
+  .metric{
+    background:var(--ink);color:#fff;justify-content:center;
+    box-shadow:0 4px 14px rgba(33,38,49,.18);
+  }
+  .metric .m-label{font-size:12px;color:#8b94a3;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .metric .m-label::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--lime);}
+  .metric .m-value{font-size:32px;font-weight:800;color:var(--lime);line-height:1.15;letter-spacing:.5px;}
+  .metric .m-value small{font-size:15px;font-weight:700;margin-left:2px;}
+  .metric .m-foot{font-size:12px;color:#8b94a3;margin-top:8px;}
+
+  /* 键值列表 */
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;align-content:start;}
+  .kv dt{color:var(--weak);font-size:12.5px;white-space:nowrap;padding-top:1px;}
+  .kv dd{color:var(--ink);font-size:13px;font-weight:500;min-width:0;word-break:break-all;}
+  .kv dd.mono{font-weight:600;letter-spacing:.2px;}
+  .link-row{display:flex;align-items:center;gap:8px;min-width:0;}
+  .link-row .url{
+    color:#2f5cc4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;
+  }
+  .copy-btn{
+    flex:none;border:1px solid var(--line);background:#fafbfc;color:var(--sub);
+    font-size:11px;padding:2px 9px;border-radius:999px;cursor:pointer;font-family:inherit;
+  }
+  .copy-btn:hover{background:var(--lime);color:var(--olive);border-color:var(--lime);}
+
+  /* 长文本卡 */
+  .text-card .body{
+    color:#3c4450;font-size:13px;line-height:1.75;
+    display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+    transition:all .2s ease;
+  }
+  .text-card.expanded .body{-webkit-line-clamp:unset;display:block;}
+  .toggle{
+    margin-top:10px;align-self:flex-start;
+    border:none;background:#f1f0ed;color:var(--sub);
+    font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;
+    cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;
+  }
+  .toggle:hover{background:var(--lime);color:var(--olive);}
+  .toggle .arrow{display:inline-block;transition:transform .2s ease;font-size:10px;}
+  .text-card.expanded .toggle .arrow{transform:rotate(180deg);}
+  .text-card.trauma h3::before{background:#ffd9c2;}
+  .text-card.trauma.expanded{background:#fffdf9;box-shadow:0 4px 16px rgba(33,38,49,.08);}
+
+  /* ── 记录区 ── */
+  .records{background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .tabs{display:flex;gap:4px;padding:14px 18px 0;border-bottom:1px solid var(--line);}
+  .tab{
+    border:none;background:none;cursor:pointer;font-family:inherit;
+    font-size:13.5px;font-weight:600;color:var(--weak);
+    padding:10px 16px 12px;border-radius:10px 10px 0 0;position:relative;
+  }
+  .tab .n{
+    font-size:11px;font-weight:700;background:#f1f0ed;color:var(--sub);
+    border-radius:999px;padding:1px 7px;margin-left:6px;
+  }
+  .tab.active{color:var(--ink);}
+  .tab.active::after{
+    content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:3px;
+    border-radius:3px 3px 0 0;background:var(--lime);
+  }
+  .tab.active .n{background:var(--ink);color:var(--lime);}
+  .pane{display:none;padding:20px 22px 24px;}
+  .pane.active{display:block;}
+
+  /* 跟进点小卡片 */
+  .follow-item{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:16px 18px;margin-bottom:12px;
+    box-shadow:0 1px 2px rgba(33,38,49,.03);
+  }
+  .follow-item:last-child{margin-bottom:0;}
+  .f-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+  .f-date{font-size:14px;font-weight:800;letter-spacing:.3px;}
+  .pill{font-size:11.5px;font-weight:700;padding:2px 10px;border-radius:999px;}
+  .pill.done{background:#dcf5e4;color:#157a3c;}
+  .pill.miss{background:#f1f0ed;color:#79838f;}
+  .f-grid{display:grid;grid-template-columns:110px 1fr;gap:8px 16px;}
+  .f-grid dt{color:var(--weak);font-size:12.5px;}
+  .f-grid dd{color:#3c4450;font-size:13px;line-height:1.7;}
+
+  /* 沟通记录 */
+  .chat-item{display:flex;gap:14px;padding:14px 4px;border-bottom:1px dashed var(--line);}
+  .chat-item:last-child{border-bottom:none;}
+  .chat-who{
+    flex:none;width:64px;height:30px;border-radius:999px;background:#e0ebff;color:#2f5cc4;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  }
+  .chat-body .c-date{font-size:12px;color:var(--weak);margin-bottom:3px;}
+  .chat-body .c-text{font-size:13px;color:#3c4450;line-height:1.7;}
+
+  /* 剩余次数 */
+  .quota{display:flex;flex-direction:column;gap:16px;}
+  .quota-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .quota-name{font-size:13.5px;font-weight:700;}
+  .quota-name small{color:var(--weak);font-weight:500;margin-left:8px;font-size:12px;}
+  .quota-num{font-size:13px;color:var(--sub);}
+  .quota-num b{font-size:18px;font-weight:800;color:var(--ink);}
+  .bar{height:8px;border-radius:999px;background:#f1f0ed;overflow:hidden;}
+  .bar i{display:block;height:100%;border-radius:999px;background:var(--lime);}
+
+  /* 交易记录 */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;color:var(--weak);font-weight:600;font-size:12px;letter-spacing:.6px;
+    padding:8px 10px;border-bottom:1px solid var(--line);
+  }
+  td{padding:12px 10px;border-bottom:1px solid var(--line);color:#3c4450;}
+  tr:last-child td{border-bottom:none;}
+  td .amt{font-weight:800;color:var(--ink);}
+  .status{font-size:11.5px;font-weight:700;background:#dcf5e4;color:#157a3c;padding:2px 10px;border-radius:999px;}
+
+  @media (max-width:900px){
+    .bento{grid-template-columns:repeat(2,1fr);}
+    .span3{grid-column:span 2;}
+    .id-meta{margin-left:0;text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="mark"><i></i>方案 V4 · Bento 卡片网格</div>
+
+  <!-- 顶部身份行 -->
+  <section class="identity">
+    <div class="avatar">满</div>
+    <div class="id-main">
+      <div class="id-name">
+        <h1>林小满</h1>
+        <span class="real">林晓曼 · 女 · 34 岁</span>
+      </div>
+      <div class="id-tags">
+        <span class="tag green">深度会员</span>
+        <span class="tag blue">疗愈老师 · 沈青</span>
+        <span class="tag purple">疗愈老师 · 苏禾</span>
+      </div>
+    </div>
+    <div class="id-meta">
+      首次到访 <b>2025/11/3</b><br>
+      电话 <b>138 2619 5543</b> · 微信 <b>xiaoman_lin</b>
+    </div>
+  </section>
+
+  <!-- Bento 网格 -->
+  <section class="bento">
+
+    <div class="card metric span2">
+      <div class="m-label">到店次数</div>
+      <div class="m-value">27<small>次</small></div>
+      <div class="m-foot">首次到访 2025/11/3</div>
+    </div>
+
+    <div class="card metric span2">
+      <div class="m-label">累计消费</div>
+      <div class="m-value"><small>¥</small>36,800</div>
+      <div class="m-foot">深度会员 · 生效中</div>
+    </div>
+
+    <div class="card span2">
+      <h3>工作情况</h3>
+      <div style="color:#3c4450;line-height:1.75;">互联网大厂产品经理，996 高压节奏。近一年明显职业倦怠，睡眠差，正在考虑降薪转型到身心健康行业。</div>
+    </div>
+
+    <div class="card span3">
+      <h3>联系方式</h3>
+      <dl class="kv">
+        <dt>电话</dt><dd class="mono">138 2619 5543</dd>
+        <dt>微信</dt><dd class="mono">xiaoman_lin</dd>
+        <dt>性别</dt><dd>女</dd>
+        <dt>年龄</dt><dd>34 岁</dd>
+      </dl>
+    </div>
+
+    <div class="card span3">
+      <h3>来源信息</h3>
+      <dl class="kv">
+        <dt>引流人</dt><dd>王珂</dd>
+        <dt>承接人</dt><dd>婷婷</dd>
+        <dt>流量来源</dt><dd><span class="tag" style="background:#ffe8d9;color:#c25a1b;">小红书</span></dd>
+        <dt>流量链接</dt>
+        <dd class="link-row">
+          <span class="url">https://xhslink.com/a/8fj3k2mx9</span>
+          <button class="copy-btn" data-copy="https://xhslink.com/a/8fj3k2mx9">复制</button>
+        </dd>
+      </dl>
+    </div>
+
+    <div class="card span3 text-card">
+      <h3>到访目的</h3>
+      <div class="body">想在亲密关系里不再重复旧模式，学会建立边界感；改善长期失眠和焦虑引起的躯体化反应（心悸、肠胃不适）。</div>
+      <button class="toggle">展开全部 <span class="arrow">▼</span></button>
+    </div>
+
+    <div class="card span3 text-card trauma">
+      <h3>创伤经历</h3>
+      <div class="body">童年时期父母长期争吵，初二时父亲离家出走，母亲情绪崩溃后把情感需求全部压在孩子身上，形成典型的亲职化。来访者很小就学会察言观色、压抑自己的需求去照顾别人。大学时第一段恋爱关系里反复讨好对方，被冷暴力分手后出现持续半年的抑郁情绪，期间有过自伤念头（未实施）。三年前开始接受心理咨询，情绪趋于稳定，但讨好模式和边界模糊的问题依然反复。</div>
+      <button class="toggle">展开全部 <span class="arrow">▼</span></button>
+    </div>
+
+    <div class="card span3 text-card">
+      <h3>当下卡点</h3>
+      <div class="body">最近半年和伴侣在谈婚论嫁，对方家庭催得紧，她发现自己又开始用顺从换和平，明明不情愿却答应了两家合买房。上周因为这件事失眠加重，心悸发作两次。她意识到这是旧模式重演，但「拒绝别人」对她来说仍然像「天要塌下来」。</div>
+      <button class="toggle">展开全部 <span class="arrow">▼</span></button>
+    </div>
+
+    <div class="card span3 text-card">
+      <h3>其他信息</h3>
+      <div class="body">对声音敏感，疗愈空间需要保持安静；每周三晚上有线上英语课，排课需避开。</div>
+      <button class="toggle">展开全部 <span class="arrow">▼</span></button>
+    </div>
+
+  </section>
+
+  <!-- 记录区 -->
+  <section class="records">
+    <div class="tabs">
+      <button class="tab active" data-tab="follow">跟进点<span class="n">3</span></button>
+      <button class="tab" data-tab="chat">沟通记录<span class="n">2</span></button>
+      <button class="tab" data-tab="quota">剩余次数<span class="n">3</span></button>
+      <button class="tab" data-tab="deal">交易记录<span class="n">2</span></button>
+    </div>
+
+    <div class="pane active" id="pane-follow">
+      <div class="follow-item">
+        <div class="f-head">
+          <span class="f-date">2026/7/15</span>
+          <span class="pill done">已到店</span>
+        </div>
+        <dl class="f-grid">
+          <dt>当日需求</dt><dd>OH卡梳理，想看清自己在买房这件事里的真实感受</dd>
+          <dt>组长反馈</dt><dd>参与度很高，抽到「面具」卡时情绪明显波动</dd>
+          <dt>跟进点</dt><dd>引导她把「我应该」和「我想要」分开表述，布置了边界练习：本周对一件小事说不</dd>
+          <dt>客户信息</dt><dd>结束后主动说要试试跟伴侣重谈买房分工</dd>
+        </dl>
+      </div>
+      <div class="follow-item">
+        <div class="f-head">
+          <span class="f-date">2026/7/8</span>
+          <span class="pill done">已到店</span>
+        </div>
+        <dl class="f-grid">
+          <dt>当日需求</dt><dd>情绪释放，最近心慌得厉害</dd>
+          <dt>组长反馈</dt><dd>释放过程顺利，哭了很久但能自己收住</dd>
+          <dt>跟进点</dt><dd>躯体化与压抑愤怒有关，建议记录「生气时刻」日记</dd>
+          <dt>客户信息</dt><dd>反馈睡眠好了两天又反复</dd>
+        </dl>
+      </div>
+      <div class="follow-item">
+        <div class="f-head">
+          <span class="f-date">2026/7/1</span>
+          <span class="pill miss">未到店</span>
+        </div>
+        <dl class="f-grid">
+          <dt>当日需求</dt><dd>临时加班请假</dd>
+          <dt>组长反馈</dt><dd>-</dd>
+          <dt>跟进点</dt><dd>连续两次因加班改期，需关注是否回避</dd>
+          <dt>客户信息</dt><dd>-</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-chat">
+      <div class="chat-item">
+        <div class="chat-who">婷婷</div>
+        <div class="chat-body">
+          <div class="c-date">2026/7/14</div>
+          <div class="c-text">微信回访，说周末和伴侣谈了买房分工，对方比想象中好说话，她很惊讶</div>
+        </div>
+      </div>
+      <div class="chat-item">
+        <div class="chat-who" style="background:#ece6ff;color:#6a48d8;">沈青</div>
+        <div class="chat-body">
+          <div class="c-date">2026/7/9</div>
+          <div class="c-text">提醒她周三英语课改期，已确认</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-quota">
+      <div class="quota">
+        <div>
+          <div class="quota-top">
+            <span class="quota-name">会员卡<small>2026/1/1 ~ 2026/12/31</small></span>
+            <span class="quota-num">剩余 <b>14</b> / 40 次</span>
+          </div>
+          <div class="bar"><i style="width:35%;"></i></div>
+        </div>
+        <div>
+          <div class="quota-top">
+            <span class="quota-name">OH卡梳理</span>
+            <span class="quota-num">剩余 <b>3</b> / 10 次</span>
+          </div>
+          <div class="bar"><i style="width:30%;"></i></div>
+        </div>
+        <div>
+          <div class="quota-top">
+            <span class="quota-name">情绪释放</span>
+            <span class="quota-num">剩余 <b>1</b> / 5 次</span>
+          </div>
+          <div class="bar"><i style="width:20%;"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-deal">
+      <table>
+        <thead>
+          <tr><th>项目</th><th>规格</th><th>金额</th><th>状态</th><th>成交人</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>会员卡</td><td>40 次</td>
+            <td><span class="amt">¥20,000</span></td>
+            <td><span class="status">生效中</span></td><td>婷婷</td>
+          </tr>
+          <tr>
+            <td>OH卡梳理</td><td>10 次</td>
+            <td><span class="amt">¥6,800</span></td>
+            <td><span class="status">生效中</span></td><td>王珂</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // 长文本展开 / 收起
+  document.querySelectorAll('.text-card .toggle').forEach(function(btn){
+    var card = btn.closest('.text-card');
+    var body = card.querySelector('.body');
+    // 内容不超过 4 行则隐藏按钮
+    if (body.scrollHeight <= body.clientHeight + 2) { btn.style.display = 'none'; }
+    btn.addEventListener('click', function(){
+      var open = card.classList.toggle('expanded');
+      btn.innerHTML = (open ? '收起 <span class="arrow">▼</span>' : '展开全部 <span class="arrow">▼</span>');
+    });
+  });
+
+  // 记录区 tab 切换
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+      document.querySelectorAll('.pane').forEach(function(p){ p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // 复制链接
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var text = btn.dataset.copy;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function(){ btn.textContent = '已复制'; });
+      } else { btn.textContent = '已复制'; }
+      setTimeout(function(){ btn.textContent = '复制'; }, 1500);
+    });
+  });
+</script>
+</body>
+</html>

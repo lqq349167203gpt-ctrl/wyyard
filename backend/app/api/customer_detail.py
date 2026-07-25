@@ -3,25 +3,27 @@
 汇总单个客户的所有业务数据
 """
 import json
-from datetime import datetime, timedelta
+
 from fastapi import APIRouter, HTTPException, Request
+
 from app.services import (
-    customer_service,
-    visit_service,
-    membership_card_service,
-    group_case_service,
-    emotional_release_service,
-    energy_knot_service,
-    internal_course_service,
+    activity_followup_service,
     class_record_service,
-    group_case_session_service,
+    customer_service,
+    emotional_release_service,
     emotional_release_session_service,
+    energy_knot_service,
     energy_knot_session_service,
-    internal_course_session_service,
+    group_case_service,
+    group_case_session_service,
     healing_record_service,
-    other_project_service,
+    internal_course_service,
+    internal_course_session_service,
+    membership_card_service,
     oh_card_reading_service,
     oh_card_reading_session_service,
+    other_project_service,
+    visit_service,
 )
 
 router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
@@ -64,6 +66,10 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
         "customer": basic,
         "purchase_summary": purchase_summary,
         "activities": activities,
+        "activity_followups": [
+            record.model_dump(mode="json")
+            for record in activity_followup_service.list_followups(customer_id)
+        ],
         "healing_records": healing_records,
         "payment_records": payment_records,
         "visit_records": visit_records,
@@ -85,25 +91,12 @@ def _parse_ek_names(desc) -> str:
 
 
 def _count_internal_course_covered(customer_id: str) -> int:
-    """统计内部课程覆盖的活动场次（次数卡+不限次卡都扣完后多出来的部分）
-
-    逻辑：先扣次数卡 → 次数卡扣完走不限次卡 → 都没有才走内部课程。
-    """
-    if not internal_course_service.has_active_course(customer_id):
-        return 0
-    raw_activities = membership_card_service._count_raw_activities(customer_id)
-    if raw_activities <= 0:
-        return 0
-    # 有不限次卡时，次数卡扣完后走不限次卡，不会走到内部课程
-    from app.services import membership_card_service as mcs
-    today = __import__('datetime').datetime.now().strftime("%Y-%m-%d")
-    active = mcs._active_cards(customer_id, today)
-    if any(c.remaining_count is None for c in active):
-        return 0
-    grand_total = membership_card_service.get_grand_total(customer_id)
-    manual = membership_card_service.get_manual_deductions(customer_id)
-    card_available = max(0, grand_total - manual)
-    return max(0, raw_activities - card_available)
+    """统计会员卡不可用后，实际由内部课程权益覆盖的活动场次。"""
+    return sum(
+        1
+        for record in membership_card_service.list_activity_usage_records(customer_id)
+        if record.get("benefit_type") == "internal_course"
+    )
 
 
 def _build_purchase_summary(customer_id: str) -> list:
@@ -312,13 +305,14 @@ def _build_purchase_summary(customer_id: str) -> list:
     # 其他项目
     op_projects = [p for p in other_project_service.list_projects() if p.customer_id == customer_id]
     for p in op_projects:
+        project_remaining = other_project_service.get_effective_remaining(p.id)
         summary.append({
             "type": "其他项目",
             "name": p.project_name,
-            "total_purchased": p.remaining_count if p.remaining_count is not None else "不限",
+            "total_purchased": p.total_count if p.total_count is not None else "不限",
             "total_amount": p.fee,
             "used": "-",
-            "remaining": p.remaining_count if p.remaining_count is not None else "不限",
+            "remaining": project_remaining if project_remaining is not None else "不限",
             "effective_date": p.effective_date,
             "expiry_date": p.expiry_date or "",
             "activity_mode": p.activity_mode or "线下",
@@ -505,6 +499,20 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
                 "is_public_welfare": False,
             })
 
+    activity_type_codes = {
+        "沙龙类型": "class",
+        "觉醒游戏": "gcs",
+        "情绪释放": "ers",
+        "能量结": "eks",
+        "内部课程": "ics",
+        "OH卡梳理": "ocr",
+    }
+    for activity in activities:
+        activity["activity_type"] = activity_type_codes[activity["type"]]
+        activity["activity_key"] = (
+            f"{activity['activity_type']}:{activity['session_id']}"
+        )
+
     activities.sort(key=lambda a: a["date"], reverse=True)
     return activities
 
@@ -517,6 +525,8 @@ def _build_payment_records(customer_id: str) -> list:
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
     for c in cards:
         records.append({
+            "source_id": c.id,
+            "source_created_at": c.created_at.isoformat(),
             "type": "会员卡",
             "name": c.card_type,
             "quantity": 1,
@@ -532,6 +542,8 @@ def _build_payment_records(customer_id: str) -> list:
     gc = [c for c in group_case_service.list_cases() if c.customer_id == customer_id]
     for c in gc:
         records.append({
+            "source_id": c.id,
+            "source_created_at": c.created_at.isoformat(),
             "type": "觉醒游戏",
             "name": "觉醒游戏",
             "quantity": c.purchase_count,
@@ -546,6 +558,8 @@ def _build_payment_records(customer_id: str) -> list:
     er = [r for r in emotional_release_service.list_releases() if r.customer_id == customer_id]
     for r in er:
         records.append({
+            "source_id": r.id,
+            "source_created_at": r.created_at.isoformat(),
             "type": "情绪释放",
             "name": "情绪释放",
             "quantity": r.purchase_count,
@@ -560,6 +574,8 @@ def _build_payment_records(customer_id: str) -> list:
     ek = [k for k in energy_knot_service.list_knots() if k.customer_id == customer_id]
     for k in ek:
         records.append({
+            "source_id": k.id,
+            "source_created_at": k.created_at.isoformat(),
             "type": "能量结",
             "name": "能量结",
             "quantity": k.purchase_count,
@@ -574,6 +590,8 @@ def _build_payment_records(customer_id: str) -> list:
     ic = [c for c in internal_course_service.list_courses() if c.customer_id == customer_id]
     for c in ic:
         records.append({
+            "source_id": c.id,
+            "source_created_at": c.created_at.isoformat(),
             "type": "内部课程",
             "name": c.course_type,
             "quantity": 1,
@@ -588,6 +606,8 @@ def _build_payment_records(customer_id: str) -> list:
     ocr = [r for r in oh_card_reading_service.list_readings() if r.customer_id == customer_id]
     for r in ocr:
         records.append({
+            "source_id": r.id,
+            "source_created_at": r.created_at.isoformat(),
             "type": "OH卡梳理",
             "name": "OH卡梳理",
             "quantity": r.purchase_count,
@@ -603,6 +623,8 @@ def _build_payment_records(customer_id: str) -> list:
     for p in op:
         created = p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at or "")
         records.append({
+            "source_id": p.id,
+            "source_created_at": p.created_at.isoformat(),
             "type": "其他项目",
             "name": p.project_name,
             "quantity": p.remaining_count if p.remaining_count is not None else "不限",

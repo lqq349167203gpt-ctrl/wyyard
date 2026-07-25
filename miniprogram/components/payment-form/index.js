@@ -21,6 +21,12 @@ const DURATION_TYPES = [
   { key: 'month', label: '月' },
 ]
 
+const PAYMENT_METHODS = [
+  { key: '支付宝', label: '支付宝' },
+  { key: '微信', label: '微信' },
+  { key: '其他', label: '其他' },
+]
+
 function today() {
   const d = new Date()
   const y = d.getFullYear()
@@ -54,6 +60,8 @@ Component({
     courseTypeIndex: -1,
     durationTypes: DURATION_TYPES,
     durationTypeIndex: -1,
+    paymentMethods: PAYMENT_METHODS,
+    paymentMethodIndex: -1,
     submitting: false,
     allCustomers: [],
     organizations: [],
@@ -116,6 +124,7 @@ Component({
         project_name: d.project_name ?? '',
         card_type: d.card_type ?? '',
         course_type: d.course_type ?? '',
+        payment_method: d.payment_method ?? '',
       }
       const type = this.data.type
       if (type === 'membership_card' && d.card_type) {
@@ -135,6 +144,10 @@ Component({
       if (fd.duration_type) {
         const idx = DURATION_TYPES.findIndex(dt => dt.key === fd.duration_type)
         if (idx >= 0) this.setData({ durationTypeIndex: idx })
+      }
+      if (fd.payment_method) {
+        const idx = PAYMENT_METHODS.findIndex(method => method.key === fd.payment_method)
+        if (idx >= 0) this.setData({ paymentMethodIndex: idx })
       }
       // 匹配组织 index
       if (d.organization_id && this.data.organizations.length > 0) {
@@ -307,6 +320,14 @@ Component({
       this.setData({
         durationTypeIndex: idx,
         'formData.duration_type': DURATION_TYPES[idx].key,
+      })
+    },
+
+    onPaymentMethodChange(e) {
+      const idx = parseInt(e.detail.value)
+      this.setData({
+        paymentMethodIndex: idx,
+        'formData.payment_method': PAYMENT_METHODS[idx].key,
       })
     },
 
