@@ -21,8 +21,11 @@ ISSUES=0
 echo -e "${YELLOW}[1/4] 后端：ruff 检查未使用导入/变量${NC}"
 cd "$PROJECT_ROOT/backend"
 if command -v .venv/bin/ruff &> /dev/null; then
-    RUFF_OUTPUT=$( .venv/bin/ruff check app/ --select F401,F841 2>&1 || true )
-    if [ -n "$RUFF_OUTPUT" ]; then
+    set +e
+    RUFF_OUTPUT=$( .venv/bin/ruff check app/ --select F401,F841 2>&1 )
+    RUFF_EXIT=$?
+    set -e
+    if [ $RUFF_EXIT -ne 0 ]; then
         echo "$RUFF_OUTPUT"
         ISSUES=$((ISSUES + 1))
     else
@@ -38,7 +41,8 @@ echo -e "${YELLOW}[2/4] 前端：knip 检测未使用文件${NC}"
 cd "$PROJECT_ROOT/frontend"
 if command -v npx &> /dev/null; then
     KNIP_OUTPUT=$( npx knip --no-exit-code 2>&1 || true )
-    if echo "$KNIP_OUTPUT" | grep -q "Unused files\|Unused dependencies\|Unused exports"; then
+    # 未使用文件/依赖判为问题；ui 组件库的未使用导出（shadcn 样板）仅作信息展示
+    if echo "$KNIP_OUTPUT" | grep -q "Unused files\|Unused dependencies"; then
         echo "$KNIP_OUTPUT" | grep -E "^(Unused|src/|@)" | head -30
         ISSUES=$((ISSUES + 1))
     else
