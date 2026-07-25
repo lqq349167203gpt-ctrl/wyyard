@@ -649,28 +649,28 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     group_case: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
-      { header: "购买次数", key: "purchase_count", width: 10, example: "5" },
+      { header: "购买场次", key: "purchase_count", width: 10, example: "5" },
       { header: "金额", key: "amount", width: 10, example: "799" },
       { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     emotional_release: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
-      { header: "购买次数", key: "purchase_count", width: 10, example: "3" },
+      { header: "购买场次", key: "purchase_count", width: 10, example: "3" },
       { header: "金额", key: "amount", width: 10, example: "500" },
       { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     oh_card_reading: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
-      { header: "购买次数", key: "purchase_count", width: 10, example: "3" },
+      { header: "购买场次", key: "purchase_count", width: 10, example: "3" },
       { header: "金额", key: "amount", width: 10, example: "500" },
       { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     energy_knot: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
-      { header: "购买次数", key: "purchase_count", width: 10, example: "3" },
+      { header: "购买场次", key: "purchase_count", width: 10, example: "3" },
       { header: "金额", key: "amount", width: 10, example: "500" },
       { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
@@ -858,19 +858,19 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         break
       }
       case "group_case":
-        payload = { ...base, purchase_count: parseInt(get("购买次数")) || 0, amount }
+        payload = { ...base, purchase_count: parseInt(get("购买场次")) || 0, amount }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
       case "emotional_release":
-        payload = { ...base, purchase_count: parseInt(get("购买次数")) || 0, amount }
+        payload = { ...base, purchase_count: parseInt(get("购买场次")) || 0, amount }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
       case "oh_card_reading":
-        payload = { ...base, purchase_count: parseInt(get("购买次数")) || 0, amount }
+        payload = { ...base, purchase_count: parseInt(get("购买场次")) || 0, amount }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
       case "energy_knot":
-        payload = { ...base, purchase_count: parseInt(get("购买次数")) || 0, amount }
+        payload = { ...base, purchase_count: parseInt(get("购买场次")) || 0, amount }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
       case "internal_course": {
@@ -1074,7 +1074,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         rows.push({ label: "有效期", value: v })
       }
     } else {
-      rows.push({ label: "购买次数", value: `${formPurchaseCount || "0"} 次` })
+      rows.push({ label: "购买场次", value: `${formPurchaseCount || "0"} 次` })
       rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
     }
     rows.push({ label: "所属组织", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
@@ -1170,7 +1170,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                   <TableHead>用户</TableHead>
                   {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && <TableHead>项目名称</TableHead>}
                   <TableHead>金额</TableHead>
-                  <TableHead>购买次数</TableHead>
+                  <TableHead>购买场次</TableHead>
                   <TableHead>生效日期</TableHead>
                   <TableHead>到期日期</TableHead>
                   <TableHead>状态</TableHead>
@@ -1422,7 +1422,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
             {(formType === "group_case" || formType === "emotional_release" || formType === "oh_card_reading" || formType === "energy_knot") && (
               <>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">购买次数</span>
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">购买场次</span>
                   <Input type="number" value={formPurchaseCount} onChange={(e) => setFormPurchaseCount(e.target.value)} placeholder="0" min="0" className="h-8 text-xs" />
                 </div>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
