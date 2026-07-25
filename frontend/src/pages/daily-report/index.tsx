@@ -161,7 +161,7 @@ export default function DailyReportPage() {
     const totalAmount = financeRows.reduce((s, r) => s + r.amount, 0)
     html += `<table><colgroup><col width="60"><col width="80"><col width="70"><col width="100"><col width="60"><col width="60"><col width="60"><col width="70"><col width="80"><col width="80"></colgroup>`
     html += `<tr class="section"><td colspan="10">当日财务报表</td></tr>`
-    html += `<tr><th>引流</th><th>昵称</th><th>项目类型</th><th>项目名称</th><th>购买次数</th><th>剩余卡次</th><th>成交人</th><th>付费方式</th><th>小计</th><th></th></tr>`
+    html += `<tr><th>引流</th><th>昵称</th><th>项目类型</th><th>项目名称</th><th>购买场次</th><th>剩余卡次</th><th>成交人</th><th>付费方式</th><th>小计</th><th></th></tr>`
     for (const r of financeRows) {
       html += `<tr>
         <td>${esc(r.referrer || "-")}</td>
@@ -649,7 +649,7 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-left font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">昵称</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">项目类型</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[90px] border-b-[0.5px] border-[#e8eaed]">项目名称</th>
-                  <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">购买次数</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">购买场次</th>
                   <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">剩余卡次</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">成交人</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[100px] border-b-[0.5px] border-[#e8eaed]">付费方式</th>
@@ -798,7 +798,7 @@ export default function DailyReportPage() {
                 <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                   <span className="w-16 shrink-0">项目类型</span>
                   <span className="flex-1">项目名称</span>
-                  <span className="w-16 shrink-0 text-center">购买次数</span>
+                  <span className="w-16 shrink-0 text-center">购买场次</span>
                   <span className="w-20 shrink-0 text-right">金额</span>
                   <span className="w-16 shrink-0 text-right">成交人</span>
                 </div>

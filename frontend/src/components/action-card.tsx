@@ -36,7 +36,7 @@ const FIELD_LABELS: Record<string, string> = {
   card_type: "卡类型",
   price: "价格",
   effective_date: "生效日期",
-  purchase_count: "购买次数",
+  purchase_count: "购买场次",
   amount: "金额",
   course_type: "课程类型",
   project_name: "项目名称",

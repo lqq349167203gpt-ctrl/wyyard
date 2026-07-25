@@ -716,7 +716,7 @@ export default function ProductSalesPage() {
                     <span className="w-24 shrink-0">昵称</span>
                     <span className="w-20 shrink-0">项目类型</span>
                     <span className="flex-1 min-w-0">项目名称</span>
-                    <span className="w-20 shrink-0">购买次数</span>
+                    <span className="w-20 shrink-0">购买场次</span>
                     <span className="w-20 shrink-0">金额</span>
                     <span className="w-36 shrink-0">成交人</span>
                   </div>

@@ -740,7 +740,7 @@ export default function StatisticsPage() {
                       ["day_activities", "当日活动", "w-20"],
                       ["type", "项目类型", "w-24"],
                       ["name", "项目名称", "w-24"],
-                      ["quantity", "购买次数", "w-20"],
+                      ["quantity", "购买场次", "w-20"],
                       ["amount", "成交金额", "w-24"],
                       ["date", "成交日期", "w-24"],
                     ] : [

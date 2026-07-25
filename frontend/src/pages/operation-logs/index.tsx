@@ -97,7 +97,7 @@ const FIELD_CN: Record<string, string> = {
   groups: "分组", materials: "资料", images: "图片", rooms: "房间",
   location: "地点", address: "地址",
   start_date: "开始日期", end_date: "结束日期",
-  remaining_count: "剩余次数", card_type: "卡类型", purchase_count: "购买次数",
+  remaining_count: "剩余次数", card_type: "卡类型", purchase_count: "购买场次",
   customer_id: "客户", customer_name: "用户",
   space_id: "空间", room_id: "房间", space_name: "空间名", room_name: "房间名",
   organization_id: "组织",

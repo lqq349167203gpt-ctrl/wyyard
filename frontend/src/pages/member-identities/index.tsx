@@ -72,7 +72,7 @@ function conditionSummary(c: IdentityCondition): string {
         const validity = c.validity === "active" ? "有效" : "含过期"
         parts.push(`${prefix}${validity}：${subItems}`)
       } else {
-        parts.push(`${cat} 购买次数 ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`)
+        parts.push(`${cat} 购买场次 ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`)
       }
     }
     return parts.join("，")
@@ -609,10 +609,10 @@ export default function MemberIdentitiesPage() {
                             </div>
                           )}
 
-                          {/* 觉醒游戏/情绪释放/能量结 → 购买次数 */}
+                          {/* 觉醒游戏/情绪释放/能量结 → 购买场次 */}
                           {getPaymentCategories(cond).some((cat: string) => COUNT_CATEGORIES.includes(cat)) && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">购买次数</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">购买场次</span>
                               <SelectDropdown
                                 value={cond.count_op}
                                 options={[{value: ">", label: "大于"}, {value: "=", label: "等于"}, {value: "<", label: "小于"}]}

@@ -1184,7 +1184,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               <span className="text-[12px]">{pendingOwner?.nickname || ""}</span>
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-              <span className="text-[12px] text-[#8f959e] text-right">购买次数</span>
+              <span className="text-[12px] text-[#8f959e] text-right">购买场次</span>
               <Input rounded="[2px]" type="number" value={purchaseCount} onChange={(e) => setPurchaseCount(e.target.value)} className="h-8 text-[12px]" min="1" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-3">
