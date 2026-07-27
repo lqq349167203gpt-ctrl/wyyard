@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException
-from app.models.base import StrictBaseModel
 from typing import Optional
+
+from fastapi import APIRouter, HTTPException
+
+from app.models.base import StrictBaseModel
 from app.services import course_type_service
 
 router = APIRouter(prefix="/api/course-types", tags=["course-types"])
@@ -9,7 +11,6 @@ router = APIRouter(prefix="/api/course-types", tags=["course-types"])
 class CourseTypeCreate(StrictBaseModel):
     name: str
     organization_id: Optional[str] = ""
-    show_in_client: Optional[bool] = False
     list_image: Optional[str] = ""
     detail_images: Optional[list[str]] = []
     category: Optional[str] = "salon"
@@ -21,7 +22,6 @@ class CourseTypeRename(StrictBaseModel):
 
 class CourseTypeUpdate(StrictBaseModel):
     organization_id: Optional[str] = None
-    show_in_client: Optional[bool] = None
     list_image: Optional[str] = None
     detail_images: Optional[list[str]] = None
     category: Optional[str] = None
@@ -38,7 +38,7 @@ def create_type(data: CourseTypeCreate):
         raise HTTPException(status_code=400, detail="类型名称不能为空")
     try:
         return course_type_service.create_course_type(
-            data.name.strip(), data.organization_id or "", data.show_in_client or False,
+            data.name.strip(), data.organization_id or "",
             list_image=data.list_image or "", detail_images=data.detail_images or [],
             category=data.category or "salon",
         )
@@ -49,7 +49,7 @@ def create_type(data: CourseTypeCreate):
 @router.patch("/{name}")
 def update_type(name: str, data: CourseTypeUpdate):
     if not course_type_service.update_course_type(
-        name, data.organization_id, data.show_in_client,
+        name, data.organization_id,
         list_image=data.list_image, detail_images=data.detail_images,
         category=data.category,
     ):

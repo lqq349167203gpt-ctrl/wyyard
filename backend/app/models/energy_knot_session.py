@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
+
+from app.models.base import SafeBaseModel
 
 
 class EnergyKnotSessionBase(SafeBaseModel):
@@ -15,6 +16,7 @@ class EnergyKnotSessionBase(SafeBaseModel):
     teacher_ids: List[str] = []  # 老师（多选）
     host_id: str = ""  # 主持人
     host_name: str = ""
+    is_published: bool = False
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""

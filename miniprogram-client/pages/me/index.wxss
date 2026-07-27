@@ -275,27 +275,16 @@
 
 .followup-btn {
   flex-shrink: 0;
-  min-width: 92rpx;
-  height: 46rpx;
-  margin: 0 0 0 auto;
-  padding: 0 18rpx;
-  border: 1rpx solid #dfe3e7;
-  border-radius: 23rpx;
-  background: #ffffff;
-  color: #59636f;
-  font-size: 21rpx;
-  font-weight: 500;
-  line-height: 44rpx;
-}
-
-.followup-btn::after {
-  border: 0;
+  margin-left: auto;
+  font-size: 23rpx;
+  font-weight: 600;
+  color: #3d5500;
+  letter-spacing: 0.5rpx;
 }
 
 .followup-btn.done {
-  border-color: #e5ebd0;
-  background: #f7faed;
-  color: #68783b;
+  color: #b6bec8;
+  font-weight: 400;
 }
 
 .r-name {
@@ -311,58 +300,46 @@
 
 .m-time {
   flex-shrink: 0;
-  color: #98a1ad;
+  color: #3d5500;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 23rpx;
+  font-style: italic;
+  letter-spacing: 0.5rpx;
+}
+
+.m-time.undecided {
   font-style: normal;
-  letter-spacing: 1rpx;
+  font-family: inherit;
+  color: #a8b1bd;
 }
 
 .role-tag {
   flex-shrink: 0;
-  margin-left: 12rpx;
-  font-size: 18rpx;
-  font-weight: 700;
-  line-height: 1.35;
-  letter-spacing: 1rpx;
-}
-
-.rt-join {
+  margin-left: 16rpx;
+  font-size: 22rpx;
   color: #a8b1bd;
-}
-
-.rt-lead {
-  color: #212631;
-}
-
-.rt-owner {
-  color: #7f620c;
+  letter-spacing: 0.5rpx;
 }
 
 .r-st {
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 600;
-  letter-spacing: 2rpx;
-  padding: 6rpx 18rpx;
-  border-radius: 999rpx;
+  letter-spacing: 0.5rpx;
   flex-shrink: 0;
   margin-left: 16rpx;
 }
 
 .st-up {
-  background: #ffffff;
-  color: #212631;
+  color: #3d5500;
 }
 
 .st-done {
-  background: #ffffff;
   color: #a8b1bd;
+  font-weight: 400;
 }
 
 .st-miss {
-  color: #b6bec8;
-  padding-left: 0;
-  padding-right: 0;
+  color: #c3c9cf;
 }
 
 /* ============ 查看全部 ============ */

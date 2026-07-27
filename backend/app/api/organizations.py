@@ -32,6 +32,10 @@ async def update_organization(org_id: str, data: dict):
 
 @router.delete("/{org_id}")
 async def delete_organization(org_id: str):
-    if not organization_service.delete_organization(org_id):
+    try:
+        deleted = organization_service.delete_organization(org_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if not deleted:
         raise HTTPException(status_code=404, detail="组织不存在")
     return {"message": "已删除"}

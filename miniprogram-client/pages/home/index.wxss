@@ -31,12 +31,12 @@
 }
 
 .d-arrow {
-  width: 14rpx;
-  height: 14rpx;
+  width: 8rpx;
+  height: 8rpx;
   margin-left: 2rpx;
-  margin-top: -6rpx;
-  border-right: 4rpx solid #9aa3ac;
-  border-bottom: 4rpx solid #9aa3ac;
+  margin-top: -2rpx;
+  border-top: 2rpx solid #d2d7dc;
+  border-right: 2rpx solid #d2d7dc;
   transform: rotate(45deg);
 }
 
@@ -233,14 +233,10 @@
 /* 活动行 */
 .ev-row {
   display: grid;
-  grid-template-columns: 128rpx minmax(0, 1fr) 20rpx;
+  grid-template-columns: 128rpx minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 24rpx;
   padding: 24rpx 0;
-}
-
-.ev-expired {
-  opacity: 0.5;
 }
 
 .ev-cover {
@@ -425,9 +421,22 @@
 }
 
 .ev-chev {
+  justify-self: end;
   color: #c9cdd2;
   font-size: 30rpx;
   text-align: right;
+}
+
+.ev-ended-tag {
+  justify-self: end;
+  padding: 6rpx 14rpx;
+  border-radius: 12rpx;
+  background: #f5f5f2;
+  color: #92999f;
+  font-size: 19rpx;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 /* ===== 加载/空状态 ===== */

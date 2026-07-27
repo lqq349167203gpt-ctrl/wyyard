@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
+
+from app.models.base import SafeBaseModel
 
 
 class OhCardReadingSessionBase(SafeBaseModel):
@@ -18,6 +19,7 @@ class OhCardReadingSessionBase(SafeBaseModel):
     achiever_id: str = ""  # 成就君
     achiever_name: str = ""
     materials: List[dict] = []
+    is_published: bool = False
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""

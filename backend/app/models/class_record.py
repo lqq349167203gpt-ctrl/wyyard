@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import List, Optional
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class GroupMember(SafeBaseModel):
@@ -24,6 +25,7 @@ class ClassRecordBase(SafeBaseModel):
     materials: List[dict] = []
     groups: List[GroupMember] = []
     is_public_welfare: bool = False
+    is_published: bool = False
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""
@@ -43,6 +45,7 @@ class ClassRecordCreate(StrictBaseModel):
     teacher_ids: List[str] = []
     participant_ids: List[str] = []
     is_public_welfare: bool = False
+    is_published: bool = False
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""

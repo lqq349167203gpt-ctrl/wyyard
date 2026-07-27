@@ -128,9 +128,38 @@ def get_access_token() -> str:
     return data["access_token"]
 
 
+# ---- access token 缓存（客户端） ----
+_client_access_token_cache = {"token": "", "expires_at": 0}
+
+
+def get_client_access_token() -> str:
+    """获取微信 access_token（客户端），自动缓存"""
+    now = datetime.now(timezone.utc).timestamp()
+    if _client_access_token_cache["token"] and _client_access_token_cache["expires_at"] > now + 60:
+        return _client_access_token_cache["token"]
+
+    appid = settings.wechat_client_appid
+    secret = settings.wechat_client_secret
+    if not appid or not secret:
+        raise ValueError("未配置客户端微信 appid 或 secret")
+
+    params = urlencode({"grant_type": "client_credential", "appid": appid, "secret": secret})
+    url = f"https://api.weixin.qq.com/cgi-bin/token?{params}"
+    req = Request(url)
+    with urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode())
+
+    if "errcode" in data and data["errcode"] != 0:
+        raise ValueError(f"获取客户端 access_token 失败: {data.get('errmsg', '未知错误')}")
+
+    _client_access_token_cache["token"] = data["access_token"]
+    _client_access_token_cache["expires_at"] = now + data.get("expires_in", 7200)
+    return _client_access_token_cache["token"]
+
+
 def get_phone_number(code: str) -> str:
     """用微信 getPhoneNumber code 解密手机号"""
-    access_token = get_access_token()
+    access_token = get_client_access_token()
     url = f"https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token={access_token}"
     body = json.dumps({"code": code}).encode()
     req = Request(url, data=body, headers={"Content-Type": "application/json"})

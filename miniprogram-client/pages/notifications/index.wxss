@@ -205,7 +205,7 @@
   background: #c9f24b;
   margin-left: 12rpx;
   flex-shrink: 0;
-  box-shadow: 0 0 0 3rpx #212631;
+  box-shadow: 0 0 0 2rpx #212631;
 }
 
 .r-time {

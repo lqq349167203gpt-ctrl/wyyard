@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react"
-import { Plus, Trash2, Edit, Users, Building2, ArrowUp, ArrowDown, ImagePlus, X } from "lucide-react"
+import { Fragment, useEffect, useState, useCallback, useRef } from "react"
+import { Plus, Trash2, Edit, ArrowUp, ArrowDown, ImagePlus, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -13,6 +13,11 @@ import {
 import { organizationApi, customerApi, courseTypeApi, uploadApi, type Organization, type Customer, type CourseType } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
+
+/** 与客户资料页一致的空值占位：4×2 极淡圆角短横 */
+const EmptyValue = () => (
+  <span className="inline-block h-[2px] w-[4px] shrink-0 rounded-full bg-[#e5e8eb] align-middle" />
+)
 
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
@@ -33,17 +38,16 @@ export default function OrganizationsPage() {
   const [memberAddOpen, setMemberAddOpen] = useState(false)
   const [memberName, setMemberName] = useState("")
   const [deleteMemberDialogOpen, setDeleteMemberDialogOpen] = useState(false)
-  const [deletingMember, setDeletingMember] = useState<{ id: string; nickname: string } | null>(null)
+  const [deletingMember, setDeletingMember] = useState<{ id: string; nickname: string; organizationId: string } | null>(null)
   const [deleteMemberInput, setDeleteMemberInput] = useState("")
   const [deleteMemberError, setDeleteMemberError] = useState("")
 
-  // 活动类型 tab: members=成员列表, salons=沙龙活动, others=其他活动
-  const [activeTab, setActiveTab] = useState<"members" | "salons" | "others">("members")
+  const [activeTab, setActiveTab] = useState<"members" | "activities">("members")
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
   const [actDialogOpen, setActDialogOpen] = useState(false)
   const [actEditingType, setActEditingType] = useState<string | null>(null)
   const [actFormName, setActFormName] = useState("")
-  const [actFormShowInClient, setActFormShowInClient] = useState(true)
+  const [actFormOrganizationId, setActFormOrganizationId] = useState("")
   const [actFormError, setActFormError] = useState("")
   const [actDeleteDialogOpen, setActDeleteDialogOpen] = useState(false)
   const [actDeletingType, setActDeletingType] = useState<string | null>(null)
@@ -88,13 +92,16 @@ export default function OrganizationsPage() {
   const activeOrg = organizations.find(o => o.id === activeOrgId) || null
 
   const FIXED_ORG_NAME = "无忧茶苑"
+  const FIXED_ORG_ALIASES = new Set(["无忧茶苑", "无忧茶院"])
+  const isFixedOrganization = (name: string) => FIXED_ORG_ALIASES.has(name.trim())
 
   const sortedOrganizations = [...organizations].sort((a, b) => {
     // 无忧茶苑始终置顶
-    if (a.name === FIXED_ORG_NAME) return -1
-    if (b.name === FIXED_ORG_NAME) return 1
+    if (isFixedOrganization(a.name)) return -1
+    if (isFixedOrganization(b.name)) return 1
     return (a.sort_order ?? 9999) - (b.sort_order ?? 9999)
   })
+  const firstMovableOrgIndex = sortedOrganizations[0] && isFixedOrganization(sortedOrganizations[0].name) ? 1 : 0
 
   const handleMoveOrg = async (org: Organization, direction: "up" | "down") => {
     const idx = sortedOrganizations.findIndex(o => o.id === org.id)
@@ -122,9 +129,8 @@ export default function OrganizationsPage() {
     }
   }
 
-  const handleMoveMember = async (memberId: string, direction: "up" | "down") => {
-    if (!activeOrg) return
-    const ids = [...activeOrg.member_ids]
+  const handleMoveMember = async (org: Organization, memberId: string, direction: "up" | "down") => {
+    const ids = [...org.member_ids]
     const idx = ids.indexOf(memberId)
     if (idx < 0) return
     const targetIdx = direction === "up" ? idx - 1 : idx + 1
@@ -133,17 +139,12 @@ export default function OrganizationsPage() {
     ids[idx] = ids[targetIdx]
     ids[targetIdx] = tmp
     try {
-      await organizationApi.update(activeOrg.id, { member_ids: ids })
+      await organizationApi.update(org.id, { member_ids: ids })
       loadData()
     } catch (error) {
       console.error("排序失败:", error)
     }
   }
-
-  const getMemberNicknames = (org: Organization) =>
-    org.member_ids
-      .map(id => customers.find(c => c.id === id)?.nickname)
-      .filter((n): n is string => !!n)
 
   const getMemberDisplayNames = (org: Organization) =>
     org.member_ids
@@ -177,7 +178,7 @@ export default function OrganizationsPage() {
   }
 
   const handleOpenEdit = (org: Organization) => {
-    if (org.name === FIXED_ORG_NAME) return
+    if (isFixedOrganization(org.name)) return
     setEditingOrg(org)
     setOrgName(org.name)
     setNameError("")
@@ -188,8 +189,10 @@ export default function OrganizationsPage() {
   const handleSaveOrg = async () => {
     if (!orgName.trim()) return
     const trimmedName = orgName.trim()
+    const comparableName = isFixedOrganization(trimmedName) ? FIXED_ORG_NAME : trimmedName
     const duplicate = organizations.find(
-      o => o.name === trimmedName && (!editingOrg || o.id !== editingOrg.id)
+      o => (isFixedOrganization(o.name) ? FIXED_ORG_NAME : o.name) === comparableName
+        && (!editingOrg || o.id !== editingOrg.id)
     )
     if (duplicate) {
       setNameError("组织名称已存在")
@@ -227,7 +230,7 @@ export default function OrganizationsPage() {
   }
 
   const handleDeleteOrg = async () => {
-    if (!deletingOrg || deletingOrg.name === FIXED_ORG_NAME) return
+    if (!deletingOrg || isFixedOrganization(deletingOrg.name)) return
     try {
       await organizationApi.delete(deletingOrg.id)
       if (activeOrgId === deletingOrg.id) {
@@ -241,24 +244,52 @@ export default function OrganizationsPage() {
     }
   }
 
-  const handleRemoveMember = (memberId: string) => {
-    if (!activeOrg) return
+  const handleRemoveMember = (org: Organization, memberId: string) => {
     const member = customers.find(c => c.id === memberId)
     const nickname = member?.nickname || memberId
-    setDeletingMember({ id: memberId, nickname })
+    setDeletingMember({ id: memberId, nickname, organizationId: org.id })
     setDeleteMemberInput("")
     setDeleteMemberError("")
     setDeleteMemberDialogOpen(true)
   }
 
-  // 活动类型 CRUD:沙龙活动=category为空或salon, 其他活动=category=other
-  const orgCourseTypes = activeOrgId ? courseTypes.filter(t => t.organization_id === activeOrgId && t.category !== "other") : []
+  // 内置的其他活动与普通活动合并展示，但保留不可改名、不可删除的约束。
+  const salonCourseTypes = courseTypes.filter(t => t.category !== "other")
   const otherCourseTypes = courseTypes.filter(t => t.category === "other")
+  const activityTypes = [...salonCourseTypes, ...otherCourseTypes]
+  const knownOrganizationIds = new Set(sortedOrganizations.map(org => org.id))
+  const unassignedCourseTypes = salonCourseTypes.filter(
+    type => !type.organization_id || !knownOrganizationIds.has(type.organization_id)
+  )
+  const hasFixedOrganization = sortedOrganizations.some(org => isFixedOrganization(org.name))
+  const activityGroups = [
+    ...sortedOrganizations.map(org => ({
+      key: org.id,
+      name: isFixedOrganization(org.name) ? FIXED_ORG_NAME : org.name,
+      organizationId: org.id,
+      types: [
+        ...salonCourseTypes.filter(type => type.organization_id === org.id),
+        ...(isFixedOrganization(org.name) ? otherCourseTypes : []),
+      ],
+    })),
+    ...(unassignedCourseTypes.length > 0 ? [{
+      key: "unassigned",
+      name: "未归属",
+      organizationId: "",
+      types: unassignedCourseTypes,
+    }] : []),
+    ...(!hasFixedOrganization && otherCourseTypes.length > 0 ? [{
+      key: "fixed-system",
+      name: FIXED_ORG_NAME,
+      organizationId: "",
+      types: otherCourseTypes,
+    }] : []),
+  ]
 
-  const handleOpenActCreate = () => {
+  const handleOpenActCreate = (organizationId = "") => {
     setActEditingType(null)
     setActFormName("")
-    setActFormShowInClient(true)
+    setActFormOrganizationId(organizationId || sortedOrganizations[0]?.id || "")
     setActFormError("")
     setActFormListImage("")
     setActFormDetailImages([])
@@ -272,7 +303,7 @@ export default function OrganizationsPage() {
   const handleOpenActEdit = (type: CourseType) => {
     setActEditingType(type.name)
     setActFormName(type.name)
-    setActFormShowInClient(type.show_in_client || false)
+    setActFormOrganizationId(type.organization_id || "")
     setActFormError("")
     setActFormListImage(type.list_image || "")
     setActFormDetailImages(type.detail_images || [])
@@ -284,21 +315,20 @@ export default function OrganizationsPage() {
   }
 
   const handleSaveAct = async () => {
-    if (!actFormName.trim() || !activeOrgId) return
+    if (!actFormName.trim() || (!actEditingIsOther && !actFormOrganizationId)) return
     setActFormError("")
     try {
       if (actEditingType) {
-        if (actFormName.trim() !== actEditingType) {
+        if (!actEditingIsOther && actFormName.trim() !== actEditingType) {
           await courseTypeApi.rename(actEditingType, actFormName.trim())
         }
         await courseTypeApi.update(actFormName.trim(), {
-          organization_id: activeOrgId,
-          show_in_client: actFormShowInClient,
+          ...(!actEditingIsOther ? { organization_id: actFormOrganizationId } : {}),
           list_image: actFormListImage,
           detail_images: actFormDetailImages,
         })
       } else {
-        await courseTypeApi.create(actFormName.trim(), activeOrgId, actFormShowInClient, actFormListImage, actFormDetailImages)
+        await courseTypeApi.create(actFormName.trim(), actFormOrganizationId, actFormListImage, actFormDetailImages)
       }
       setActDialogOpen(false)
       const types = await courseTypeApi.list().catch(() => [] as CourseType[])
@@ -384,31 +414,48 @@ export default function OrganizationsPage() {
   }
 
   const handleMoveActType = async (typeName: string, direction: "up" | "down") => {
-    const names = courseTypes.map(t => t.name)
-    const idx = names.indexOf(typeName)
+    const currentType = salonCourseTypes.find(type => type.name === typeName)
+    if (!currentType) return
+    const currentGroupId = currentType.organization_id && knownOrganizationIds.has(currentType.organization_id)
+      ? currentType.organization_id
+      : ""
+    const groupNames = salonCourseTypes
+      .filter(type => {
+        const groupId = type.organization_id && knownOrganizationIds.has(type.organization_id)
+          ? type.organization_id
+          : ""
+        return groupId === currentGroupId
+      })
+      .map(type => type.name)
+    const idx = groupNames.indexOf(typeName)
     if (idx < 0) return
     const targetIdx = direction === "up" ? idx - 1 : idx + 1
-    if (targetIdx < 0 || targetIdx >= names.length) return
+    if (targetIdx < 0 || targetIdx >= groupNames.length) return
+    const names = salonCourseTypes.map(type => type.name)
+    const currentGlobalIdx = names.indexOf(typeName)
+    const targetGlobalIdx = names.indexOf(groupNames[targetIdx])
     const reordered = [...names]
-    const tmp = reordered[idx]
-    reordered[idx] = reordered[targetIdx]
-    reordered[targetIdx] = tmp
+    const tmp = reordered[currentGlobalIdx]
+    reordered[currentGlobalIdx] = reordered[targetGlobalIdx]
+    reordered[targetGlobalIdx] = tmp
     try {
-      await courseTypeApi.reorder(reordered)
+      await courseTypeApi.reorder([...reordered, ...otherCourseTypes.map(t => t.name)])
       const types = await courseTypeApi.list().catch(() => [] as CourseType[])
       setCourseTypes(types)
     } catch {}
   }
 
   const handleConfirmDeleteMember = async () => {
-    if (!activeOrg || !deletingMember) return
+    if (!deletingMember) return
+    const organization = organizations.find(org => org.id === deletingMember.organizationId)
+    if (!organization) return
     if (deleteMemberInput !== deletingMember.nickname) {
       setDeleteMemberError("输入的昵称不匹配")
       return
     }
-    const newMemberIds = activeOrg.member_ids.filter(id => id !== deletingMember.id)
+    const newMemberIds = organization.member_ids.filter(id => id !== deletingMember.id)
     try {
-      await organizationApi.update(activeOrg.id, { member_ids: newMemberIds })
+      await organizationApi.update(organization.id, { member_ids: newMemberIds })
       setDeleteMemberDialogOpen(false)
       setDeletingMember(null)
       loadData()
@@ -417,339 +464,359 @@ export default function OrganizationsPage() {
     }
   }
 
-  const members = activeOrg ? getValidMembers(activeOrg) : []
-  const memberDisplayNames = activeOrg ? getMemberDisplayNames(activeOrg) : []
-
   return (
-    <div className="px-6 pt-12 pb-6 space-y-3">
-      {/* 页面头部 */}
-      <div className="flex items-center justify-between pb-2">
+    <div className="px-6 pb-6 pt-12">
+      <div className="mb-5 flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold">组织管理</h1>
-          <p className="text-xs text-muted-foreground mt-1.5">管理组织及其成员</p>
+          <h1 className="text-[18px] font-medium text-[#2b2f36]">组织信息</h1>
+          <p className="mt-1.5 text-[12px] text-[#8f959e]">集中配置组织成员与客户端活动</p>
         </div>
+        {activeTab === "members" ? (
+          <Button size="sm" className="h-8 text-[12px]" onClick={handleOpenCreate}>
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            新增组织
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="h-8 text-[12px]"
+            onClick={() => handleOpenActCreate()}
+            disabled={organizations.length === 0}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            新增活动
+          </Button>
+        )}
       </div>
 
-      {/* 左右布局 */}
-      <div className="flex gap-4" style={{ height: 'calc(100vh - 180px)' }}>
-        {/* 左侧：组织列表 */}
-        <div className="w-[234px] bg-white rounded-lg flex flex-col shrink-0">
-          <div className="flex items-center justify-between px-4 h-[45px] border-b border-[#f0f0f0] shrink-0">
-            <span className="text-[13px] font-medium text-[#2b2f36]">组织列表</span>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={handleOpenCreate}>
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto py-1">
-            {loading ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">加载中...</div>
-            ) : organizations.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">暂无组织</div>
-            ) : (
-              sortedOrganizations.map((org) => {
-                const isActive = activeOrgId === org.id
-                const count = getMemberNicknames(org).length
-                return (
-                  <div
-                    key={org.id}
-                    className={`group flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
-                      isActive
-                        ? "bg-[#f0f5ff] text-[#3370ff]"
-                        : "text-[#2b2f36] hover:bg-[#f7f8fa]"
-                    }`}
-                    onClick={() => setActiveOrgId(org.id)}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {org.name !== FIXED_ORG_NAME && (
-                        <div className="flex flex-col items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "up") }}>
-                            <ArrowUp className="h-3 w-3" />
-                          </button>
-                          <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={(e) => { e.stopPropagation(); handleMoveOrg(org, "down") }}>
-                            <ArrowDown className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )}
-                      <Building2 className={`h-4 w-4 shrink-0 ${isActive ? "text-[#3370ff]" : "text-[#8f959e]"}`} />
-                      <span className="text-[13px] truncate">{org.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {org.name !== FIXED_ORG_NAME && (
-                        <>
-                          <button
-                            className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleOpenEdit(org)
-                            }}
-                          >
-                            <Edit className="h-3 w-3 text-[#8f959e]" />
-                          </button>
-                          <button
-                            className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (org.member_ids.length > 0) {
-                                setErrorMessage("删除失败，该组织中存在成员")
-                                setErrorDialogOpen(true)
-                                return
-                              }
-                              setDeletingOrg(org)
-                              setDeleteDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3 text-[#8f959e]" />
-                          </button>
-                        </>
-                      )}
-                      <span className={`text-[11px] ${isActive ? "text-[#3370ff]/70" : "text-[#8f959e]"}`}>
-                        {count}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
+      <div className="mb-4 flex items-center justify-between border-b border-[#e8eaed]">
+        <div className="flex h-10 items-end gap-6">
+          <button
+            className={`h-10 border-b-2 px-1 text-[13px] transition-colors ${
+              activeTab === "members"
+                ? "border-[#3370ff] font-medium text-[#3370ff]"
+                : "border-transparent text-[#8f959e] hover:text-[#2b2f36]"
+            }`}
+            onClick={() => setActiveTab("members")}
+          >
+            成员配置
+          </button>
+          <button
+            className={`h-10 border-b-2 px-1 text-[13px] transition-colors ${
+              activeTab === "activities"
+                ? "border-[#3370ff] font-medium text-[#3370ff]"
+                : "border-transparent text-[#8f959e] hover:text-[#2b2f36]"
+            }`}
+            onClick={() => setActiveTab("activities")}
+          >
+            活动配置
+          </button>
         </div>
+        <span className="pb-2 text-[12px] text-[#8f959e]">
+          {activeTab === "members"
+            ? `${organizations.length} 个组织，${organizations.reduce((sum, org) => sum + getValidMembers(org).length, 0)} 位成员`
+            : `${activityTypes.length} 个活动类型`}
+        </span>
+      </div>
 
-        {/* 右侧面板 */}
-        <div className="flex-1 bg-white rounded-lg flex flex-col min-w-0">
-          {/* Tab 切换: 成员列表 / 沙龙活动 / 其他活动 */}
-          <div className="flex items-center justify-between px-4 h-[45px] border-b border-[#f0f0f0] shrink-0">
-            <div className="flex items-center gap-1">
-              <button
-                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "members" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
-                onClick={() => setActiveTab("members")}
-              >
-                成员列表
-              </button>
-              <button
-                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "salons" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
-                onClick={() => setActiveTab("salons")}
-              >
-                沙龙活动
-              </button>
-              <button
-                className={`px-3 py-1.5 text-[13px] rounded transition-colors ${activeTab === "others" ? "font-medium text-[#2b2f36] bg-[#f0f5ff] text-[#3370ff]" : "text-[#8f959e] hover:text-[#2b2f36]"}`}
-                onClick={() => setActiveTab("others")}
-              >
-                其他活动
-              </button>
-              {activeOrg && activeTab === "members" && (
-                <span className="text-[11px] text-[#8f959e] ml-1">{members.length} 人</span>
-              )}
-              {activeOrg && activeTab === "salons" && (
-                <span className="text-[11px] text-[#8f959e] ml-1">{orgCourseTypes.length} 个</span>
-              )}
-              {activeOrg && activeTab === "others" && (
-                <span className="text-[11px] text-[#8f959e] ml-1">{otherCourseTypes.length} 个</span>
-              )}
-            </div>
-            {activeOrg && activeTab === "members" && (
-              <Button size="sm" className="h-7 text-xs" onClick={() => { setMemberName(""); setMemberAddOpen(true) }}>
-                <Plus className="mr-1 h-3 w-3" /> 新增
-              </Button>
-            )}
-            {activeOrg && activeTab === "salons" && (
-              <Button size="sm" className="h-7 text-xs" onClick={handleOpenActCreate}>
-                <Plus className="mr-1 h-3 w-3" /> 新增
-              </Button>
-            )}
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {!activeOrg ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="rounded-full bg-muted p-3 mb-3">
-                  <Building2 className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <p className="text-sm text-muted-foreground">请从左侧选择组织</p>
-                <p className="text-xs text-muted-foreground mt-1">或点击"+"按钮新增组织</p>
-              </div>
-            ) : activeTab === "members" ? (
-              /* 成员列表 */
-              members.length === 0 && memberDisplayNames.filter(n => n.startsWith("[已删除:")).length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="rounded-full bg-muted p-3 mb-3">
-                    <Users className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">暂无成员</p>
-                  <p className="text-xs text-muted-foreground mt-1">点击上方"新增"按钮添加</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-xs font-medium w-[40px] text-center">排序</TableHead>
-                      <TableHead className="text-xs font-medium pl-4">昵称</TableHead>
-                      <TableHead className="text-xs font-medium">姓名</TableHead>
-                      <TableHead className="text-xs font-medium">会员类型</TableHead>
-                      <TableHead className="text-xs font-medium">到场次数</TableHead>
-                      <TableHead className="text-xs text-right pr-4">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {members.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="px-0">
-                          <div className="flex flex-col items-center gap-0.5">
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "up") }}>
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); handleMoveMember(member.id, "down") }}>
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs pl-4">{member.nickname}</TableCell>
-                        <TableCell className="text-xs">{member.name || "-"}</TableCell>
-                        <TableCell className="text-xs">{member.member_type || "-"}</TableCell>
-                        <TableCell className="text-xs">{member.visit_count || 0}</TableCell>
-                        <TableCell className="text-right pr-4">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleRemoveMember(member.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {memberDisplayNames
-                      .filter(n => n.startsWith("[已删除:"))
-                      .map((name, idx) => (
-                        <TableRow key={`deleted-${idx}`} className="opacity-50">
-                          <TableCell />
-                          <TableCell className="text-xs pl-4">{name}</TableCell>
-                          <TableCell className="text-xs">-</TableCell>
-                          <TableCell className="text-xs">-</TableCell>
-                          <TableCell className="text-xs">-</TableCell>
-                          <TableCell className="text-right pr-4">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
-                              const prefix = name.slice(6, -1)
-                              if (activeOrg) {
-                                const found = activeOrg.member_ids.find(id => id.startsWith(prefix))
-                                if (found) handleRemoveMember(found)
-                              }
-                            }}>
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
+      <div className="overflow-hidden rounded-[6px] border border-[#e8eaed] bg-white">
+        {activeTab === "members" ? (
+          loading ? (
+            <div className="py-14 text-center text-[12px] text-[#8f959e]">加载中...</div>
+          ) : sortedOrganizations.length === 0 ? (
+            <div className="py-14 text-center text-[12px] text-[#8f959e]">暂无组织，请先新增组织</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="h-10 bg-[#f7f8fa] hover:bg-[#f7f8fa]">
+                  <TableHead className="w-[210px] pl-4 text-[12px] font-medium text-[#4e535a]">组织名称</TableHead>
+                  <TableHead className="w-[68px] text-center text-[12px] font-medium text-[#4e535a]">成员排序</TableHead>
+                  <TableHead className="text-[12px] font-medium text-[#4e535a]">昵称</TableHead>
+                  <TableHead className="text-[12px] font-medium text-[#4e535a]">姓名</TableHead>
+                  <TableHead className="text-[12px] font-medium text-[#4e535a]">会员类型</TableHead>
+                  <TableHead className="w-[88px] text-center text-[12px] font-medium text-[#4e535a]">到场次数</TableHead>
+                  <TableHead className="w-[88px] pr-4 text-right text-[12px] font-medium text-[#4e535a]">成员操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedOrganizations.map((org, orgIndex) => {
+                  const rows = org.member_ids.length > 0 ? org.member_ids : [""]
+                  return (
+                    <Fragment key={org.id}>
+                      {rows.map((memberId, memberIndex) => {
+                        const member = customers.find(customer => customer.id === memberId)
+                        return (
+                          <TableRow key={memberId || `${org.id}-empty`} className="group min-h-12 hover:bg-[#fafbfc]">
+                            {memberIndex === 0 && (
+                              <TableCell
+                                rowSpan={rows.length}
+                                className="border-r border-[#f0f1f2] py-3 pl-4 align-top"
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className="mt-0.5 flex w-4 shrink-0 flex-col items-center">
+                                    {!isFixedOrganization(org.name) && (
+                                      <>
+                                        <button
+                                          className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                          disabled={orgIndex <= firstMovableOrgIndex}
+                                          onClick={() => handleMoveOrg(org, "up")}
+                                          title="上移组织"
+                                        >
+                                          <ArrowUp className="h-3 w-3" />
+                                        </button>
+                                        <button
+                                          className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                          disabled={orgIndex === sortedOrganizations.length - 1}
+                                          onClick={() => handleMoveOrg(org, "down")}
+                                          title="下移组织"
+                                        >
+                                          <ArrowDown className="h-3 w-3" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="truncate text-[13px] font-medium text-[#2b2f36]">
+                                        {isFixedOrganization(org.name) ? FIXED_ORG_NAME : org.name}
+                                      </span>
+                                      <span className="shrink-0 text-[11px] text-[#8f959e]">{getValidMembers(org).length} 人</span>
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-2 text-[12px]">
+                                      <button
+                                        className="text-[#3370ff] hover:text-[#245be8]"
+                                        onClick={() => {
+                                          setActiveOrgId(org.id)
+                                          setMemberName("")
+                                          setMemberAddOpen(true)
+                                        }}
+                                      >
+                                        添加成员
+                                      </button>
+                                      {!isFixedOrganization(org.name) && (
+                                        <>
+                                          <button className="text-[#8f959e] hover:text-[#2b2f36]" onClick={() => handleOpenEdit(org)}>编辑</button>
+                                          <button
+                                            className="text-[#8f959e] hover:text-[#d14343]"
+                                            onClick={() => {
+                                              if (org.member_ids.length > 0) {
+                                                setErrorMessage("删除失败，该组织中存在成员")
+                                                setErrorDialogOpen(true)
+                                                return
+                                              }
+                                              setDeletingOrg(org)
+                                              setDeleteDialogOpen(true)
+                                            }}
+                                          >
+                                            删除
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            )}
+                            <TableCell className="px-0 text-center">
+                              {memberId ? (
+                                <div className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                  <button
+                                    className="p-1 text-[#8f959e] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                    disabled={memberIndex === 0}
+                                    onClick={() => handleMoveMember(org, memberId, "up")}
+                                    title="上移成员"
+                                  >
+                                    <ArrowUp className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    className="p-1 text-[#8f959e] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                    disabled={memberIndex === rows.length - 1}
+                                    onClick={() => handleMoveMember(org, memberId, "down")}
+                                    title="下移成员"
+                                  >
+                                    <ArrowDown className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <EmptyValue />
+                              )}
+                            </TableCell>
+                            <TableCell className="text-[13px] text-[#2b2f36]">
+                              {member
+                                ? member.nickname || <EmptyValue />
+                                : memberId
+                                  ? `[已删除:${memberId.slice(0, 6)}]`
+                                  : <EmptyValue />}
+                            </TableCell>
+                            <TableCell className="text-[12px] text-[#4e535a]">{member?.name || <EmptyValue />}</TableCell>
+                            <TableCell className="text-[12px] text-[#4e535a]">{member?.member_type || <EmptyValue />}</TableCell>
+                            <TableCell className="text-center text-[12px] text-[#4e535a]">{member?.visit_count ?? <EmptyValue />}</TableCell>
+                            <TableCell className="pr-4 text-right">
+                              {memberId && (
+                                <button
+                                  className="text-[12px] text-[#8f959e] opacity-0 transition-opacity hover:text-[#d14343] group-hover:opacity-100"
+                                  onClick={() => handleRemoveMember(org, memberId)}
+                                >
+                                  移除
+                                </button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </Fragment>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )
+        ) : loading ? (
+          <div className="py-14 text-center text-[12px] text-[#8f959e]">加载中...</div>
+        ) : activityGroups.length === 0 ? (
+          <div className="py-14 text-center text-[12px] text-[#8f959e]">暂无活动配置</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="h-10 bg-[#f7f8fa] hover:bg-[#f7f8fa]">
+                <TableHead className="w-[210px] pl-4 text-[12px] font-medium text-[#4e535a]">组织名称</TableHead>
+                <TableHead className="w-[68px] text-center text-[12px] font-medium text-[#4e535a]">活动排序</TableHead>
+                <TableHead className="text-[12px] font-medium text-[#4e535a]">活动名称</TableHead>
+                <TableHead className="w-[100px] text-[12px] font-medium text-[#4e535a]">配置类型</TableHead>
+                <TableHead className="w-[84px] text-[12px] font-medium text-[#4e535a]">列表图</TableHead>
+                <TableHead className="w-[88px] pr-4 text-right text-[12px] font-medium text-[#4e535a]">活动操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {activityGroups.map((group, groupIndex) => {
+                const rows = group.types.length > 0 ? group.types : [null]
+                const organization = group.organizationId
+                  ? sortedOrganizations.find(org => org.id === group.organizationId)
+                  : null
+                return (
+                  <Fragment key={group.key}>
+                    {rows.map((type, typeIndex) => {
+                      const isSystemActivity = type?.category === "other"
+                      const sortableTypes = group.types.filter(item => item.category !== "other")
+                      const sortableIndex = type
+                        ? sortableTypes.findIndex(item => item.name === type.name)
+                        : -1
+                      return (
+                        <TableRow key={type?.name || `${group.key}-empty`} className="group min-h-12 hover:bg-[#fafbfc]">
+                          {typeIndex === 0 && (
+                            <TableCell
+                              rowSpan={rows.length}
+                              className="border-r border-[#f0f1f2] py-3 pl-4 align-top"
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="mt-0.5 flex w-4 shrink-0 flex-col items-center">
+                                  {organization && !isFixedOrganization(organization.name) && (
+                                    <>
+                                      <button
+                                        className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                        disabled={groupIndex <= firstMovableOrgIndex}
+                                        onClick={() => handleMoveOrg(organization, "up")}
+                                        title="上移组织"
+                                      >
+                                        <ArrowUp className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                        disabled={groupIndex === sortedOrganizations.length - 1}
+                                        onClick={() => handleMoveOrg(organization, "down")}
+                                        title="下移组织"
+                                      >
+                                        <ArrowDown className="h-3 w-3" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="truncate text-[13px] font-medium text-[#2b2f36]">{group.name}</span>
+                                    <span className="shrink-0 text-[11px] text-[#8f959e]">{group.types.length} 个</span>
+                                  </div>
+                                  {group.organizationId ? (
+                                    <button
+                                      className="mt-2 text-[12px] text-[#3370ff] hover:text-[#245be8]"
+                                      onClick={() => handleOpenActCreate(group.organizationId)}
+                                    >
+                                      添加活动
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </TableCell>
+                          )}
+                          <TableCell className="px-0 text-center">
+                            {type && !isSystemActivity ? (
+                              <div className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                <button
+                                  className="p-1 text-[#8f959e] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                  disabled={sortableIndex === 0}
+                                  onClick={() => handleMoveActType(type.name, "up")}
+                                  title="上移活动"
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  className="p-1 text-[#8f959e] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
+                                  disabled={sortableIndex === sortableTypes.length - 1}
+                                  onClick={() => handleMoveActType(type.name, "down")}
+                                  title="下移活动"
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <EmptyValue />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-[13px] text-[#2b2f36]">{type?.name || <EmptyValue />}</TableCell>
+                          <TableCell>
+                            {type ? (
+                              <span className={`inline-flex rounded-[4px] px-2 py-0.5 text-[11px] ${
+                                isSystemActivity ? "bg-[#f2f3f5] text-[#6b7078]" : "bg-[#eef3ff] text-[#4d6fa9]"
+                              }`}>
+                                {isSystemActivity ? "系统内置" : "普通活动"}
+                              </span>
+                            ) : (
+                              <EmptyValue />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {type?.list_image ? (
+                              <img src={type.list_image} alt="" className="h-9 w-9 rounded-[4px] border border-[#e8eaed] object-cover" />
+                            ) : (
+                              <EmptyValue />
+                            )}
+                          </TableCell>
+                          <TableCell className="pr-4 text-right">
+                            {type && (
+                              <div className="flex items-center justify-end gap-3 text-[12px] opacity-0 transition-opacity group-hover:opacity-100">
+                                <button className="text-[#3370ff] hover:text-[#245be8]" onClick={() => handleOpenActEdit(type)}>编辑</button>
+                                {!isSystemActivity && (
+                                  <button
+                                    className="text-[#8f959e] hover:text-[#d14343]"
+                                    onClick={() => {
+                                      setActDeletingType(type.name)
+                                      setActDeleteDialogOpen(true)
+                                    }}
+                                  >
+                                    删除
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
-                      ))
-                    }
-                  </TableBody>
-                </Table>
-              )
-            ) : activeTab === "salons" ? (
-              /* 沙龙活动 */
-              orgCourseTypes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="rounded-full bg-muted p-3 mb-3">
-                    <Building2 className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">暂无活动类型</p>
-                  <p className="text-xs text-muted-foreground mt-1">点击上方"新增"按钮添加</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[40px] pl-4"></TableHead>
-                      <TableHead className="text-xs font-medium">类型名称</TableHead>
-                      <TableHead className="text-xs font-medium w-[60px]">列表图</TableHead>
-                      <TableHead className="text-xs font-medium w-[80px]">前端显示</TableHead>
-                      <TableHead className="text-xs text-right pr-4">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {orgCourseTypes.map((type) => (
-                      <TableRow key={type.name} className="group">
-                        <TableCell className="pl-4">
-                          <div className="flex flex-col items-center gap-0">
-                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={() => handleMoveActType(type.name, "up")}>
-                              <ArrowUp className="h-3 w-3" />
-                            </button>
-                            <button className="text-[#8f959e] hover:text-[#3370ff] leading-none" onClick={() => handleMoveActType(type.name, "down")}>
-                              <ArrowDown className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
-                        </TableCell>
-                        <TableCell>
-                          {type.list_image ? (
-                            <img src={type.list_image} alt="" className="w-10 h-10 rounded object-cover" />
-                          ) : (
-                            <span className="text-[11px] text-[#c9cdd4]">未设置</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[12px] text-[#2b2f36]">{type.show_in_client ? "是" : "否"}</span>
-                        </TableCell>
-                        <TableCell className="text-right pr-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenActEdit(type)}>
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setActDeletingType(type.name); setActDeleteDialogOpen(true) }}>
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )
-            ) : (
-              /* 其他活动 */
-              otherCourseTypes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="rounded-full bg-muted p-3 mb-3">
-                    <Building2 className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">暂无其他活动类型</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-xs font-medium">类型名称</TableHead>
-                      <TableHead className="text-xs font-medium w-[60px]">列表图</TableHead>
-                      <TableHead className="text-xs font-medium w-[80px]">前端显示</TableHead>
-                      <TableHead className="text-xs text-right pr-4">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {otherCourseTypes.map((type) => (
-                      <TableRow key={type.name} className="group">
-                        <TableCell>
-                          <span className="text-[13px] text-[#2b2f36]">{type.name}</span>
-                        </TableCell>
-                        <TableCell>
-                          {type.list_image ? (
-                            <img src={type.list_image} alt="" className="w-10 h-10 rounded object-cover" />
-                          ) : (
-                            <span className="text-[11px] text-[#c9cdd4]">未设置</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[12px] text-[#2b2f36]">{type.show_in_client ? "是" : "否"}</span>
-                        </TableCell>
-                        <TableCell className="text-right pr-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenActEdit(type)}>
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )
-            )}
-          </div>
-        </div>
+                      )
+                    })}
+                  </Fragment>
+                )
+              })}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* 新增/编辑组织弹窗 */}
@@ -862,29 +929,37 @@ export default function OrganizationsPage() {
       <Dialog open={actDialogOpen} onOpenChange={setActDialogOpen}>
         <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">{actEditingType ? (actEditingIsOther ? "编辑其他活动" : "编辑活动类型") : "新增活动类型"}</DialogTitle>
+            <DialogTitle className="text-base">{actEditingType ? "编辑活动配置" : "新增活动"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">类型名称</span>
               <div>
-                <Input value={actFormName} onChange={(e) => { setActFormName(e.target.value); setActFormError("") }} placeholder="如：冥想、瑜伽、疗愈" />
+                <Input
+                  value={actFormName}
+                  disabled={actEditingIsOther}
+                  onChange={(e) => { setActFormName(e.target.value); setActFormError("") }}
+                  placeholder="如：冥想、瑜伽、疗愈"
+                />
+                {actEditingIsOther && <p className="mt-1.5 text-[11px] text-[#8f959e]">系统内置活动名称不可修改</p>}
                 {actFormError && <p className="text-xs text-destructive mt-1">{actFormError}</p>}
               </div>
             </div>
-            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">前端显示</span>
-              <div>
+            {!actEditingIsOther && (
+              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+                <span className="pt-2.5 text-right text-[12px] font-normal tracking-widest text-[#4e535a]">所属组织</span>
                 <SelectDropdown
-                  value={actFormShowInClient ? "true" : "false"}
-                  options={[{ value: "true", label: "是" }, { value: "false", label: "否" }]}
-                  onChange={(v) => setActFormShowInClient(v === "true")}
+                  value={actFormOrganizationId}
+                  options={sortedOrganizations.map(org => ({
+                    value: org.id,
+                    label: isFixedOrganization(org.name) ? FIXED_ORG_NAME : org.name,
+                  }))}
+                  onChange={setActFormOrganizationId}
                   rounded="[2px]"
                   className="border-[#e8eaed]"
                 />
-                <p className="text-[11px] text-[#c9cdd4] mt-1.5">勾选后，用户可在客户端查看到课程，自主报名</p>
               </div>
-            </div>
+            )}
             {/* 列表图片 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">列表图片</span>
@@ -946,7 +1021,13 @@ export default function OrganizationsPage() {
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setActDialogOpen(false)}>取消</Button>
-              <Button size="sm" onClick={handleSaveAct} disabled={!actFormName.trim() || actUploading}>保存</Button>
+              <Button
+                size="sm"
+                onClick={handleSaveAct}
+                disabled={!actFormName.trim() || (!actEditingIsOther && !actFormOrganizationId) || actUploading}
+              >
+                保存
+              </Button>
             </div>
           </div>
         </DialogContent>

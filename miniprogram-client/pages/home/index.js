@@ -51,14 +51,18 @@ Page({
   },
 
   onShow() {
-    // 每次显示时刷新（可能从详情页返回）
+    // 首次显示的加载已由 onLoad 发起，避免重复请求
+    if (!this._hasShown) {
+      this._hasShown = true
+      return
+    }
+    // 从详情页或其他页面返回时，只刷新当前选中周，保留历史日期
     this._buildWeek()
-    this.loadActivities()
+    this._refreshSelectedWeek()
   },
 
   onPullDownRefresh() {
-    this.setData({ page: 1, hasMore: true })
-    this.loadActivities().then(() => wx.stopPullDownRefresh())
+    this._refreshSelectedWeek().then(() => wx.stopPullDownRefresh())
   },
 
   onReachBottom() {
@@ -380,8 +384,14 @@ Page({
     if (!hasLoaded) this._fetchWeekFor(dateStr)
   },
 
-  // 按周拉取活动并合并进列表(用于定位到未加载/过去的日期)
-  _fetchWeekFor(dateStr) {
+  _refreshSelectedWeek() {
+    const selectedDate = this.data.selectedStr || this.data.todayStr
+    if (!selectedDate) return this.loadActivities()
+    return this._fetchWeekFor(selectedDate, true)
+  },
+
+  // 按周拉取活动：定位新日期时合并，页面刷新时替换当前周
+  _fetchWeekFor(dateStr, replaceRange = false) {
     const d = new Date(dateStr.replace(/-/g, '/'))
     const mondayOffset = (d.getDay() + 6) % 7
     const monday = new Date(d)
@@ -393,9 +403,12 @@ Page({
     return clientApi.listActivitiesByRange(start, end)
       .then(res => {
         const items = (res.items || []).map(item => this._decorate(item))
-        if (!items.length) return
+        if (!items.length && !replaceRange) return
+        const currentItems = replaceRange
+          ? this.data.activities.filter(item => item.date < start || item.date > end)
+          : this.data.activities
         const map = {}
-        for (const a of this.data.activities) map[a.id] = a
+        for (const a of currentItems) map[a.id] = a
         for (const a of items) map[a.id] = a
         const all = Object.values(map)
         this.setData({
@@ -544,19 +557,23 @@ Page({
     }
     // 判断活动状态：已结束 / 进行中 / 未开始
     let expiredStatus = '' // '' = 未开始, 'ongoing' = 进行中, 'ended' = 已结束
-    if (item.date && item.start_time) {
+    if (item.date) {
       const now = new Date()
-      const actStart = new Date(`${item.date}T${item.start_time}:00`)
-      if (!isNaN(actStart.getTime())) {
-        if (item.end_time) {
-          const actEnd = new Date(`${item.date}T${item.end_time}:00`)
-          if (!isNaN(actEnd.getTime()) && now >= actEnd) {
-            expiredStatus = 'ended'
-          }
-        }
-        if (!expiredStatus && now >= actStart) {
-          expiredStatus = 'ongoing'
-        }
+      const dayEnd = new Date(`${item.date}T23:59:59`)
+      const actStart = item.start_time
+        ? new Date(`${item.date}T${item.start_time}:00`)
+        : null
+      const actEnd = item.end_time
+        ? new Date(`${item.date}T${item.end_time}:00`)
+        : null
+
+      if (actEnd && !isNaN(actEnd.getTime()) && now >= actEnd) {
+        expiredStatus = 'ended'
+      } else if ((!actEnd || isNaN(actEnd.getTime())) && !isNaN(dayEnd.getTime()) && now > dayEnd) {
+        // 未配置结束时间的历史活动，在活动日期结束后视为已结束
+        expiredStatus = 'ended'
+      } else if (actStart && !isNaN(actStart.getTime()) && now >= actStart) {
+        expiredStatus = 'ongoing'
       }
     }
     // badge: 卡片右侧的胶囊标签
@@ -577,7 +594,7 @@ Page({
       typeClass: item.course_type ? `tag-t${this._hashIndex(item.course_type) + 1}` : '',
       isOnline: item.activity_mode === '线上',
       isPublicWelfare: !!item.is_public_welfare,
-      isExpired: !!expiredStatus,
+      isEnded: expiredStatus === 'ended',
       expiredStatus,
       locationText,
       teacherPreview,

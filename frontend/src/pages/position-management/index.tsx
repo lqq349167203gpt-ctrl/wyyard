@@ -34,7 +34,7 @@ const ALL_PAGES = [
   // 信息配置
   { key: "member-identities", label: "会员身份" },
   { key: "healing-identities", label: "疗愈老师" },
-  { key: "organizations", label: "组织管理" },
+  { key: "organizations", label: "组织信息" },
   { key: "spaces", label: "空间配置" },
   { key: "reminders", label: "提醒配置" },
   // 账号管理

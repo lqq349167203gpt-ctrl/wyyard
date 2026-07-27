@@ -224,6 +224,11 @@ export default function DetailView({
               {c.member_type && (
                 <span className="px-[9px] py-[2px] rounded-full text-[11px] font-semibold bg-[#ffe8d9] text-[#c25a1b]">{c.member_type}</span>
               )}
+              {c.follow_up_status && (
+                <span className="rounded-[4px] bg-[#f2f3f5] px-[9px] py-[2px] text-[11px] font-normal text-[#4e535a]">
+                  {c.follow_up_status}
+                </span>
+              )}
               {c.service_teacher ? (
                 <span className="px-[9px] py-[2px] rounded-full text-[11px] font-semibold bg-[#e0ebff] text-[#2f5cc4]">服务老师 · {c.service_teacher}</span>
               ) : (

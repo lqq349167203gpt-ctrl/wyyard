@@ -38,7 +38,7 @@ const PAGE_LABELS: Record<string, string> = {
   "healing-identities": "疗愈老师",
   "position-management": "账号管理",
   "courses": "活动配置",
-  "organizations": "组织管理",
+  "organizations": "组织信息",
   "spaces": "疗愈空间",
   "reminders": "提醒配置",
 }
@@ -103,7 +103,7 @@ const FIELD_CN: Record<string, string> = {
   organization_id: "组织",
   password: "密码", old_password: "旧密码", new_password: "新密码",
   core_situation: "核心情况", need_tags: "需求标签",
-  follow_up_node: "跟进节点", follow_up_action: "跟进动作",
+  follow_up_node: "跟进节点", follow_up_action: "跟进动作", follow_up_status: "跟进状态",
   tracking_plan: "跟进计划",
   pages: "页面权限", member_types: "用户信息权限",
   operator: "匹配方式", conditions: "匹配条件",
@@ -119,7 +119,7 @@ const FIELD_CN: Record<string, string> = {
 
 const SECTION_OPTIONS = [
   "客户资料", "邀约", "课表", "付费项目", "活动配置", "会员身份",
-  "疗愈老师", "组织管理", "空间配置", "提醒配置", "提醒",
+  "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
 
@@ -146,7 +146,7 @@ const ALL_PAGES = [
   { key: "healing-identities", label: "疗愈老师" },
   { key: "position-management", label: "账号管理" },
   { key: "courses", label: "活动配置" },
-  { key: "organizations", label: "组织管理" },
+  { key: "organizations", label: "组织信息" },
   { key: "spaces", label: "疗愈空间" },
   { key: "reminders", label: "提醒配置" },
 ]
@@ -165,6 +165,8 @@ const CUSTOMER_FILTER_PAGES = [
   "class-records-visitors", "class-records-activities", "class-records-arrival",
   "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses",
 ]
+
+const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
 
 export default function OperationLogsPage() {
   const navigate = useNavigate()
@@ -348,7 +350,7 @@ export default function OperationLogsPage() {
   const SECTION_ENTITY: Record<string, string> = {
     "空间配置": "空间", "活动配置": "活动", "客户资料": "客户",
     "邀约": "记录", "课表": "活动", "付费项目": "项目", "会员身份": "身份",
-    "疗愈老师": "老师", "组织管理": "组织", "提醒配置": "提醒", "提醒": "提醒", "账号管理": "账号",
+    "疗愈老师": "老师", "组织信息": "组织", "组织管理": "组织", "提醒配置": "提醒", "提醒": "提醒", "账号管理": "账号",
     "AI 配置": "配置", "系统日志": "日志",
   }
 
@@ -562,7 +564,7 @@ export default function OperationLogsPage() {
                         {METHOD_LABELS[log.method] || log.method}
                       </span>
                       <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 shrink-0">
-                        {log.section}
+                        {formatSectionLabel(log.section)}
                       </span>
                       {log.source && log.source !== "pc" && (
                         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${SOURCE_COLORS[log.source] || "bg-gray-50 text-gray-600"}`}>
@@ -615,7 +617,7 @@ export default function OperationLogsPage() {
                 </div>
                 <div>
                   <span className="text-[#8f959e]">板块：</span>
-                  <span className="text-[#2b2b2b]">{selectedLog.section}</span>
+                  <span className="text-[#2b2b2b]">{formatSectionLabel(selectedLog.section)}</span>
                 </div>
                 <div>
                   <span className="text-[#8f959e]">来源：</span>

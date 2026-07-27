@@ -19,6 +19,7 @@ SKIP_PATHS = (
 # 仅 GET 公开的路径前缀（不需要 token 即可访问）
 PUBLIC_GET_PATHS = (
     "/api/client/activities",
+    "/api/activity-themes",
     "/api/uploads/public-images",
 )
 

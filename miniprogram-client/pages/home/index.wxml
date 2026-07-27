@@ -87,7 +87,7 @@
         wx:for="{{item.items}}"
         wx:for-item="act"
         wx:key="id"
-        class="ev-row {{act.isExpired ? 'ev-expired' : ''}}"
+        class="ev-row"
         bindtap="onTapActivity"
         data-id="{{act.id}}"
       >
@@ -123,7 +123,8 @@
           </view>
           <text wx:if="{{act.introText}}" class="ev-desc">{{act.introText}}</text>
         </view>
-        <text class="ev-chev">›</text>
+        <text wx:if="{{act.isEnded}}" class="ev-ended-tag">已结束</text>
+        <text wx:else class="ev-chev">›</text>
       </view>
     </block>
 

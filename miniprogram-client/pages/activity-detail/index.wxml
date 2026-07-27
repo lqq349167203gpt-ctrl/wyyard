@@ -61,16 +61,6 @@
         <text class="owner-name">{{activity.ownerText}}</text>
       </view>
 
-      <!-- 活动介绍:叶子分隔线 -->
-      <view class="sec" wx:if="{{activity.description}}">
-        <view class="ic-leaf"></view>
-        <text class="sec-t">活动介绍</text>
-        <view class="sec-r"></view>
-      </view>
-      <view wx:if="{{activity.description}}" class="intro">
-        <view wx:for="{{activity.descParagraphs}}" wx:key="index" class="intro-p">{{item.text}}</view>
-      </view>
-
       <!-- 参与者卡片 -->
       <view class="part" wx:if="{{activity.rosterList.length}}">
         <view class="part-head">
@@ -81,6 +71,16 @@
           <text wx:for="{{activity.rosterList}}" wx:key="index" class="{{item.is_me ? 'rname-me' : ''}}">{{item.name}}{{index < activity.rosterList.length - 1 ? '、' : ''}}</text>
           <text> 已参与</text>
         </view>
+      </view>
+
+      <!-- 活动介绍:叶子分隔线 -->
+      <view class="sec" wx:if="{{activity.description}}">
+        <view class="ic-leaf"></view>
+        <text class="sec-t">活动介绍</text>
+        <view class="sec-r"></view>
+      </view>
+      <view wx:if="{{activity.description}}" class="intro">
+        <view wx:for="{{activity.descParagraphs}}" wx:key="index" class="intro-p">{{item.text}}</view>
       </view>
     </view>
   </block>

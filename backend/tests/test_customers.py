@@ -1,5 +1,6 @@
 """客户 API 测试"""
 import uuid
+
 import pytest
 
 
@@ -64,7 +65,7 @@ class TestCustomerCRUD:
         """验证返回字段完整性"""
         data = created_customer
         required_fields = ["id", "nickname", "name", "gender", "phone", "traffic_source",
-                           "traffic_source_detail", "created_at", "updated_at", "visit_count"]
+                           "traffic_source_detail", "follow_up_status", "created_at", "updated_at", "visit_count"]
         for field in required_fields:
             assert field in data, f"缺少字段: {field}"
 
@@ -95,6 +96,41 @@ class TestCustomerTrafficSource:
         resp = client.post("/api/customers", json={"nickname": f"无来源客户_{_uid()}"})
         assert resp.status_code == 200
         assert resp.json()["traffic_source"] == ""
+
+
+class TestCustomerFollowUpStatus:
+    def test_defaults_to_new(self, client):
+        resp = client.post("/api/customers", json={"nickname": f"跟进状态_{_uid()}"})
+        assert resp.status_code == 200
+        customer_id = resp.json()["id"]
+        assert resp.json()["follow_up_status"] == "新添加"
+        client.delete(f"/api/customers/{customer_id}")
+
+    @pytest.mark.parametrize("status", ["新添加", "沟通中", "已到店", "已成交", "沉默/流失"])
+    def test_accepts_all_supported_statuses(self, client, status):
+        resp = client.post("/api/customers", json={
+            "nickname": f"跟进状态_{_uid()}",
+            "follow_up_status": status,
+        })
+        assert resp.status_code == 200
+        customer_id = resp.json()["id"]
+        assert resp.json()["follow_up_status"] == status
+        client.delete(f"/api/customers/{customer_id}")
+
+    def test_updates_status(self, client):
+        created = client.post("/api/customers", json={"nickname": f"跟进状态_{_uid()}"}).json()
+        customer_id = created["id"]
+        resp = client.patch(f"/api/customers/{customer_id}", json={"follow_up_status": "沟通中"})
+        assert resp.status_code == 200
+        assert resp.json()["follow_up_status"] == "沟通中"
+        client.delete(f"/api/customers/{customer_id}")
+
+    def test_rejects_unknown_status(self, client):
+        resp = client.post("/api/customers", json={
+            "nickname": f"跟进状态_{_uid()}",
+            "follow_up_status": "未知状态",
+        })
+        assert resp.status_code == 422
 
 
 class TestCustomerEdgeCases:

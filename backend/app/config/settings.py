@@ -21,9 +21,13 @@ class Settings(BaseSettings):
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
 
-    # 微信小程序
+    # 微信小程序（员工端）
     wechat_appid: str = ""
     wechat_secret: str = ""
+
+    # 微信小程序（客户端）
+    wechat_client_appid: str = ""
+    wechat_client_secret: str = ""
 
     # JWT
     jwt_secret: str = ""

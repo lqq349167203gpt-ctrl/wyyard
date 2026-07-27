@@ -1,8 +1,10 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
-from pydantic import Field, field_validator, model_validator
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
+
+from pydantic import Field, field_validator, model_validator
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class PaidItem(str, Enum):
@@ -16,6 +18,14 @@ class SelfTag(str, Enum):
     SELF_GROWTH = "自我成长"
     CO_CREATE = "共创"
     MONETIZE = "变现"
+
+
+class FollowUpStatus(str, Enum):
+    NEW = "新添加"
+    COMMUNICATING = "沟通中"
+    VISITED = "已到店"
+    CONVERTED = "已成交"
+    SILENT_OR_LOST = "沉默/流失"
 
 
 class Position(str, Enum):
@@ -45,6 +55,7 @@ class CustomerBase(SafeBaseModel):
     service_teacher: str = Field(default="", max_length=50)
     referrer: str = Field(default="", max_length=50)
     referrer_handler: str = Field(default="", max_length=50)
+    follow_up_status: FollowUpStatus = FollowUpStatus.NEW
     member_type: str = Field(default="", max_length=50)
     paid_content: List[PaidContentItem] = Field(default=[], max_length=20)
     visit_count: int = Field(default=0, ge=0)
@@ -123,6 +134,7 @@ class CustomerUpdate(StrictBaseModel):
     service_teacher: Optional[str] = Field(default=None, max_length=50)
     referrer: Optional[str] = Field(default=None, max_length=50)
     referrer_handler: Optional[str] = Field(default=None, max_length=50)
+    follow_up_status: Optional[FollowUpStatus] = None
     member_type: Optional[str] = Field(default=None, max_length=50)
     paid_content: Optional[List[PaidContentItem]] = Field(default=None, max_length=20)
     visit_count: Optional[int] = Field(default=None, ge=0)

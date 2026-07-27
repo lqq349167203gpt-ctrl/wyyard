@@ -20,6 +20,7 @@ import {
   IconFileText,
   IconClipboardText,
   IconChevronDown,
+  IconAffiliate,
 } from "@tabler/icons-react"
 import {
   Sidebar,
@@ -36,6 +37,7 @@ import {
 const businessItems = [
   { title: "提醒", icon: IconBellRinging, path: "/business-reminders", permission: "business-reminders" },
   { title: "数据记录", icon: IconChartArea, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
+  { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "statistics" },
   { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "statistics" },
   { title: "产品销售", icon: IconBasket, path: "/product-sales", permission: "statistics" },
   { title: "服务数据", icon: IconStar, path: "/statistics", permission: "statistics" },
@@ -56,7 +58,7 @@ const courseItems = [
 const configItems = [
   { title: "会员身份", icon: IconShieldCheck, path: "/config/member-identities", permission: "member-identities", clearTab: "tab_member-identities" },
   { title: "疗愈老师", icon: IconSparkles, path: "/healing-identities", permission: "healing-identities" },
-  { title: "组织管理", icon: IconUser, path: "/organizations", permission: "organizations" },
+  { title: "组织信息", icon: IconUser, path: "/organizations", permission: "organizations" },
   { title: "空间配置", icon: IconSettings, path: "/courses/spaces", permission: "spaces" },
   { title: "提醒配置", icon: IconBell, path: "/config/reminders", permission: "reminders" },
 ]

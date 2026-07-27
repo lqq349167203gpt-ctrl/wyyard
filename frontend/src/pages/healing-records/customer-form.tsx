@@ -10,6 +10,7 @@ import { customerApi, type CustomerCreate, type CustomerLight } from "@/lib/api"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "",
+  follow_up_status: "新添加",
   member_type: "", paid_content: [], visit_count: 0,
   basic_info: "", assessment: "", tags: "", traffic_source: "", traffic_source_detail: "",
 }
@@ -17,6 +18,7 @@ const emptyCustomer: Record<string, any> = {
 const UPDATE_FIELDS = [
   "nickname", "name", "gender", "phone", "wechat", "age",
   "service_teacher", "referrer", "referrer_handler",
+  "follow_up_status",
   "traffic_source", "traffic_source_detail",
   "work_status", "work_description",
   "basic_info", "assessment", "tags", "other_info",
@@ -265,6 +267,18 @@ export default function CustomerFormPage() {
               {referrerHandlerError && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{referrerHandlerError}</p>}
             </div>
             <div className="flex items-center gap-2">
+              <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">跟进状态</label>
+              <SelectDropdown
+                value={form.follow_up_status || "新添加"}
+                options={["新添加", "沟通中", "已到店", "已成交", "沉默/流失"].map(value => ({
+                  value,
+                  label: value,
+                }))}
+                onChange={(value) => setField("follow_up_status", value)}
+                className="w-[200px]"
+              />
+            </div>
+            <div className="flex basis-full items-center gap-2">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">流量来源</label>
               <SelectDropdown
                 className="w-[200px]"

@@ -1,13 +1,17 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from app.models.organization import Organization, OrganizationCreate
 from app.services.storage import load_data, save_item
 
 FILENAME = "organizations.json"
 _organizations: Dict[str, Organization] = {}
-PROTECTED_NAMES = {"无忧茶苑"}
+PROTECTED_NAMES = {"无忧茶苑", "无忧茶院"}
+
+
+def _is_protected_name(name: str) -> bool:
+    return name.strip() in PROTECTED_NAMES
 
 
 def _load():
@@ -40,19 +44,22 @@ def get_organization(org_id: str) -> Optional[Organization]:
 
 
 def create_organization(data: OrganizationCreate) -> Organization:
-    if not data.name.strip():
+    normalized_name = data.name.strip()
+    if not normalized_name:
         raise ValueError("组织名称不能为空")
     # 检查重名
     existing_names = {o.name for o in _organizations.values() if not o.is_deleted}
-    if data.name.strip() in existing_names:
+    has_protected_organization = any(_is_protected_name(name) for name in existing_names)
+    if normalized_name in existing_names or (_is_protected_name(normalized_name) and has_protected_organization):
         raise ValueError("组织名称已存在")
     now = datetime.now(timezone.utc)
     org = Organization(
         id=str(uuid.uuid4())[:12],
         created_at=now,
         updated_at=now,
-        name=data.name.strip(),
+        name=normalized_name,
         member_ids=data.member_ids,
+        sort_order=data.sort_order,
     )
     _organizations[org.id] = org
     _save(org.id)
@@ -63,15 +70,16 @@ def update_organization(org_id: str, data: dict) -> Optional[Organization]:
     org = _organizations.get(org_id)
     if not org:
         return None
-    if org.name in PROTECTED_NAMES:
-        raise ValueError(f"「{org.name}」为系统核心组织，不允许修改")
+    if _is_protected_name(org.name) and any(key in data for key in ("name", "is_deleted", "deleted_at")):
+        raise ValueError(f"「{org.name}」为系统核心组织，不允许改名或删除")
     # 检查名称
     new_name = data.get("name")
     if new_name is not None:
         if not new_name.strip():
             raise ValueError("组织名称不能为空")
         existing_names = {o.name for o in _organizations.values() if not o.is_deleted and o.id != org_id}
-        if new_name.strip() in existing_names:
+        has_protected_organization = any(_is_protected_name(name) for name in existing_names)
+        if new_name.strip() in existing_names or (_is_protected_name(new_name) and has_protected_organization):
             raise ValueError("组织名称已存在")
         data["name"] = new_name.strip()
     for key, value in data.items():
@@ -87,7 +95,7 @@ def delete_organization(org_id: str) -> bool:
     org = _organizations.get(org_id)
     if not org:
         return False
-    if org.name in PROTECTED_NAMES:
+    if _is_protected_name(org.name):
         raise ValueError(f"「{org.name}」为系统核心组织，不允许删除")
     org.is_deleted = True
     org.deleted_at = datetime.now(timezone.utc)

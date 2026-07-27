@@ -53,11 +53,6 @@ ACTIVITY_KEY_LABELS = {
 }
 
 
-def _get_visible_types() -> set[str]:
-    """获取 show_in_client=true 的课程类型名称集合"""
-    return {t["name"] for t in course_type_service.list_course_types() if t.get("show_in_client")}
-
-
 def _build_customer_map() -> dict:
     customers = list_customers()
     return {c.id: c for c in customers}
@@ -96,28 +91,26 @@ def _session_item(activity_type: str, session, display_type: str) -> dict:
     }
 
 
-def _aggregate_visible_activities(visible_types: set[str]) -> list[dict]:
-    """聚合所有可在客户端显示的活动场次"""
+def _aggregate_published_activities() -> list[dict]:
+    """聚合所有已发布到客户端的活动场次"""
     items = []
 
     for r in class_record_service.list_records():
         d = r.model_dump(mode="json")
-        ct = d.get("course_type", "")
-        if ct and ct in visible_types:
+        if d.get("is_published", False):
             items.append({"type": "class", "id": d["id"], "data": d, "date": d.get("date", "")})
 
     for s in internal_course_session_service.list_sessions():
         d = s.model_dump(mode="json") if hasattr(s, "model_dump") else dict(s)
-        ct = d.get("course_type", "")
-        if ct in visible_types or "内部课程" in visible_types:
-            display_type = ct if ct in visible_types else "内部课程"
+        if d.get("is_published", False):
+            display_type = d.get("course_type") or "内部课程"
             items.append(_session_item("ics", s, display_type))
 
     for display_type, (activity_type, service) in OTHER_ACTIVITY_SERVICES.items():
-        if display_type not in visible_types:
-            continue
         for session in service.list_sessions():
-            items.append(_session_item(activity_type, session, display_type))
+            d = session.model_dump(mode="json") if hasattr(session, "model_dump") else dict(session)
+            if d.get("is_published", False):
+                items.append(_session_item(activity_type, session, display_type))
 
     return items
 
@@ -337,11 +330,9 @@ def _find_activity(activity_id: str) -> dict | None:
         d = record.model_dump(mode="json")
         return {"type": "class", "id": d["id"], "data": d, "date": d.get("date", "")}
 
-    visible_types = _get_visible_types()
     internal_session = internal_course_session_service.get_session(activity_id)
     if internal_session:
-        source_type = internal_session.course_type or ""
-        display_type = source_type if source_type in visible_types else "内部课程"
+        display_type = internal_session.course_type or "内部课程"
         return _session_item("ics", internal_session, display_type)
 
     for display_type, (activity_type, service) in OTHER_ACTIVITY_SERVICES.items():
@@ -382,11 +373,7 @@ def list_activities(
     end_date: str | None = Query(None),
 ):
     """客户端活动列表 — 默认只返回未来活动;指定日期范围时按范围返回(含过去)"""
-    visible_types = _get_visible_types()
-    if not visible_types:
-        return {"items": [], "total": 0, "page": 1, "page_size": 20, "total_pages": 0}
-
-    items = _aggregate_visible_activities(visible_types)
+    items = _aggregate_published_activities()
 
     if start_date or end_date:
         # 指定日期范围(含过去日期),用于客户端按周/按日查询
@@ -435,10 +422,7 @@ def get_activity(activity_id: str, request: Request):
     if not item:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    # 检查可见性
-    visible_types = _get_visible_types()
-    ct = item["data"].get("course_type", "")
-    if not ct or ct not in visible_types:
+    if not item["data"].get("is_published", False):
         raise HTTPException(status_code=404, detail="活动不存在")
 
     customer_map = _build_customer_map()
@@ -503,10 +487,7 @@ def signup_activity(activity_id: str, request: Request):
     if not item:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    # 检查可见性
-    visible_types = _get_visible_types()
-    ct = item["data"].get("course_type", "")
-    if not ct or ct not in visible_types:
+    if not item["data"].get("is_published", False):
         raise HTTPException(status_code=404, detail="活动不存在")
 
     # 获取客户信息

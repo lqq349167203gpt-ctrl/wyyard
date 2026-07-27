@@ -250,6 +250,8 @@ export interface PaidContentItem {
   salesperson: string
 }
 
+export type CustomerFollowUpStatus = "新添加" | "沟通中" | "已到店" | "已成交" | "沉默/流失"
+
 export interface Customer {
   id: string
   nickname: string
@@ -260,6 +262,7 @@ export interface Customer {
   age: string
   referrer: string
   referrer_handler: string
+  follow_up_status: CustomerFollowUpStatus
   member_type: string
   service_teacher: string
   paid_content: PaidContentItem[]
@@ -599,7 +602,6 @@ export const courseApi = {
 export interface CourseType {
   name: string
   organization_id: string
-  show_in_client?: boolean
   list_image?: string
   detail_images?: string[]
   category?: string
@@ -607,8 +609,8 @@ export interface CourseType {
 
 export const courseTypeApi = {
   list: () => request<CourseType[]>("/api/course-types"),
-  create: (name: string, organization_id?: string, show_in_client?: boolean, list_image?: string, detail_images?: string[]) => request<CourseType>("/api/course-types", { method: "POST", body: JSON.stringify({ name, organization_id: organization_id || "", show_in_client: show_in_client || false, list_image: list_image || "", detail_images: detail_images || [] }) }),
-  update: (name: string, data: { organization_id?: string; show_in_client?: boolean; list_image?: string; detail_images?: string[] }) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "PATCH", body: JSON.stringify(data) }),
+  create: (name: string, organization_id?: string, list_image?: string, detail_images?: string[]) => request<CourseType>("/api/course-types", { method: "POST", body: JSON.stringify({ name, organization_id: organization_id || "", list_image: list_image || "", detail_images: detail_images || [] }) }),
+  update: (name: string, data: { organization_id?: string; list_image?: string; detail_images?: string[] }) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "PATCH", body: JSON.stringify(data) }),
   rename: (oldName: string, newName: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(oldName)}/rename`, { method: "PUT", body: JSON.stringify({ new_name: newName }) }),
   delete: (name: string) => request<{ message: string }>(`/api/course-types/${encodeURIComponent(name)}`, { method: "DELETE" }),
   reorder: (names: string[]) => request<CourseType[]>("/api/course-types", { method: "PATCH", body: JSON.stringify({ names }) }),
@@ -690,6 +692,7 @@ export interface ClassRecord {
   materials: Material[]
   groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]
   is_public_welfare: boolean
+  is_published: boolean
   activity_mode?: string
   space_id: string
   room_id: string
@@ -710,6 +713,7 @@ export interface ClassRecordCreate {
   teacher_ids?: string[]
   participant_ids?: string[]
   is_public_welfare?: boolean
+  is_published?: boolean
   activity_mode?: string
   space_id?: string
   room_id?: string
@@ -811,6 +815,7 @@ export interface GroupCaseSession {
   host_id: string
   host_name: string
   materials: Material[]
+  is_published: boolean
   activity_mode?: string
   space_id: string
   room_id: string
@@ -832,6 +837,7 @@ export interface GroupCaseSessionCreate {
   teacher_ids?: string[]
   host_id?: string
   host_name?: string
+  is_published?: boolean
   space_id?: string
   room_id?: string
   room_name?: string
@@ -908,6 +914,7 @@ export interface OhCardReadingSession {
   host_id: string
   host_name: string
   materials: Material[]
+  is_published: boolean
   activity_mode?: string
   space_id: string
   room_id: string
@@ -929,6 +936,7 @@ export interface OhCardReadingSessionCreate {
   teacher_ids?: string[]
   host_id?: string
   host_name?: string
+  is_published?: boolean
   space_id?: string
   room_id?: string
   room_name?: string
@@ -1033,6 +1041,7 @@ export interface EmotionalReleaseSession {
   host_id: string
   host_name: string
   materials: Material[]
+  is_published: boolean
   activity_mode?: string
   space_id: string
   room_id: string
@@ -1054,6 +1063,7 @@ export interface EmotionalReleaseSessionCreate {
   teacher_ids?: string[]
   host_id?: string
   host_name?: string
+  is_published?: boolean
   space_id?: string
   room_id?: string
   room_name?: string
@@ -1092,6 +1102,7 @@ export interface EnergyKnotSession {
   teacher_ids: string[]
   host_id: string
   host_name: string
+  is_published: boolean
   activity_mode?: string
   space_id: string
   room_id: string
@@ -1113,6 +1124,7 @@ export interface EnergyKnotSessionCreate {
   teacher_ids?: string[]
   host_id?: string
   host_name?: string
+  is_published?: boolean
   space_id?: string
   room_id?: string
   room_name?: string
@@ -1150,6 +1162,7 @@ export interface InternalCourseSession {
   host_name: string
   participant_ids: string[]
   materials: Material[]
+  is_published: boolean
   activity_mode?: string
   space_id: string
   room_id: string
@@ -1170,6 +1183,7 @@ export interface InternalCourseSessionCreate {
   host_id?: string
   host_name?: string
   participant_ids?: string[]
+  is_published?: boolean
   space_id?: string
   room_id?: string
   room_name?: string
@@ -2159,6 +2173,28 @@ export interface MemberStatistics {
   }>
 }
 
+export interface ReferralStatistics {
+  total_people: number
+  status_names: CustomerFollowUpStatus[]
+  status_totals: Record<CustomerFollowUpStatus, number>
+  referrer_names: string[]
+  chart_new: Record<string, string | number>[]
+  chart_total: Record<string, string | number>[]
+  members: Array<{
+    id: string
+    nickname: string
+    member_type: string
+    referrer: string
+    follow_up_status: CustomerFollowUpStatus
+    first_visit_date: string
+    invited_count: number
+    visit_count: number
+    visit_interval: string
+    activity_count: number
+    total_consumption: number
+  }>
+}
+
 export interface DashboardSummary {
   month: string
   total_customers: number
@@ -2209,6 +2245,14 @@ export const statisticsApi = {
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.granularity) searchParams.set("granularity", params.granularity)
     return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
+  },
+  referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.granularity) searchParams.set("granularity", params.granularity)
+    if (params.referrer) searchParams.set("referrer", params.referrer)
+    return request<ReferralStatistics>(`/api/statistics/referrals?${searchParams.toString()}`)
   },
 }
 

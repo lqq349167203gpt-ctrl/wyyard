@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
+
+from app.models.base import SafeBaseModel
 
 
 class EmotionalReleaseSessionBase(SafeBaseModel):
@@ -18,6 +19,7 @@ class EmotionalReleaseSessionBase(SafeBaseModel):
     achiever_name: str = ""
     description: str = ""
     materials: List[dict] = []
+    is_published: bool = False
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""

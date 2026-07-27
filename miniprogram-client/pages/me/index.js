@@ -14,12 +14,6 @@ function formatActivityName(name) {
   return (name || '').replace(/\s*【[^】]*】\s*$/, '').trim()
 }
 
-function getRoleTagClass(roleLabel) {
-  if (roleLabel === '案主') return 'rt-owner'
-  if (roleLabel === '老师' || roleLabel === '成就君') return 'rt-lead'
-  return 'rt-join'
-}
-
 Page({
   data: {
     isLoggedIn: false,
@@ -111,8 +105,12 @@ Page({
         }
 
         let timeRange = ''
+        let timeUndecided = false
         if (a.start_time) {
           timeRange = a.end_time ? `${a.start_time}–${a.end_time}` : a.start_time
+        } else {
+          timeRange = '未定'
+          timeUndecided = true
         }
 
         const isToday = a.date === todayStr
@@ -136,12 +134,12 @@ Page({
           ...a,
           status,
           timeRange,
+          timeUndecided,
           badge,
           badgeClass,
           isToday,
           meta: [timeRange, a.host || ''].filter(Boolean).join(' · '),
           roleLabel: ROLE_LABELS[a.role] || '参与者',
-          roleTagClass: getRoleTagClass(ROLE_LABELS[a.role] || '参与者'),
           displayName: formatActivityName(a.name),
         }
       })

@@ -1,8 +1,9 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
-from pydantic import Field
 from typing import Optional
 
+from pydantic import Field
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 DEFAULT_SYSTEM_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 助手。你的职责是帮助用户快速找到系统功能的操作位置。
 
@@ -34,7 +35,7 @@ DEFAULT_SYSTEM_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 助手�
 
 ### 信息配置
 - **活动配置** (`/positions/courses`)：配置活动类型（课程类型）
-- **组织管理** (`/organizations`)：管理组织架构
+- **组织信息** (`/organizations`)：配置组织成员与活动
 - **会员身份** (`/config/member-identities`)：配置会员身份类型（如次卡用户、体验会员等）
 - **疗愈老师** (`/healing-identities`)：管理疗愈老师信息
 - **疗愈空间** (`/courses/spaces`)：管理活动空间和房间

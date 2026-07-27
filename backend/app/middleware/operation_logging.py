@@ -1,10 +1,12 @@
-import re
 import json
+import re
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from app.services.operation_log_service import create_log
+
 from app.models.operation_log import OperationLogCreate
+from app.services.operation_log_service import create_log
 
 SECTION_MAP = {
     "/api/customers": "客户资料",
@@ -43,7 +45,7 @@ SECTION_MAP = {
     "/api/reminders": "提醒配置",
     "/api/business-reminders": "提醒",
     "/api/activity-themes": "课表",
-    "/api/organizations": "组织管理",
+    "/api/organizations": "组织信息",
     "/api/activity-history": "邀约",
     "/api/visit-history": "邀约",
     "/api/communication-records": "沟通记录",
@@ -82,7 +84,7 @@ GETTER_MAP = {
     "/api/oh-card-reading-sessions": ("活动安排", "oh_card_reading_session_service", "get_session"),
     "/api/reminders": ("提醒配置", "reminder_service", "get_reminder"),
     "/api/activity-themes": ("活动安排", "activity_theme_service", "get_theme"),
-    "/api/organizations": ("组织管理", "organization_service", "get_organization"),
+    "/api/organizations": ("组织信息", "organization_service", "get_organization"),
 }
 
 PAGE_LABELS: dict[str, str] = {
@@ -124,7 +126,7 @@ PAGE_LABELS: dict[str, str] = {
     "reminders": "提醒配置",
     "business-reminders": "提醒",
     "activity-themes": "课表",
-    "organizations": "组织管理",
+    "organizations": "组织信息",
     "activity-history": "邀约",
     "visit-history": "邀约",
 }
@@ -209,7 +211,7 @@ FIELD_NAMES = {
     "wechat": "微信", "core_situation": "核心情况",
     "deal_date": "成交日期", "last_visit_date": "最近到店", "other_info": "其他信息",
     "service_teacher": "服务老师", "is_leader": "组长", "group_leader_feedback": "组长反馈",
-    "need_tags": "需求标签", "follow_up_node": "跟进节点",
+    "need_tags": "需求标签", "follow_up_node": "跟进节点", "follow_up_status": "跟进状态",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
     "operator": "匹配方式", "conditions": "匹配条件",
@@ -270,7 +272,7 @@ def get_before_data(path: str, entity_id: str, body: dict = None) -> dict:
         position = body.get("position", "")
         if position:
             try:
-                from app.services import position_permission_service, position_customer_permission_service
+                from app.services import position_customer_permission_service, position_permission_service
                 pages = position_permission_service.get_permissions(position)
                 c = position_customer_permission_service.get_customer_permissions("customers", position)
                 cr = position_customer_permission_service.get_customer_permissions("class_records", position)

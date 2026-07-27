@@ -1,3 +1,4 @@
+from datetime import datetime
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -7,6 +8,7 @@ from fastapi import HTTPException, UploadFile
 from app.api import client as client_api
 from app.api import customer_detail, uploads
 from app.middleware.jwt_auth import AuthMiddleware
+from app.models.class_record import ClassRecord
 
 
 @pytest.mark.asyncio
@@ -97,13 +99,35 @@ def test_client_activity_returns_list_and_detail_images(monkeypatch):
     ]
 
 
-def test_client_aggregates_all_visible_other_activity_types(monkeypatch):
-    monkeypatch.setattr(client_api.class_record_service, "list_records", lambda: [])
+def test_client_aggregates_only_published_activities(monkeypatch):
+    monkeypatch.setattr(client_api.class_record_service, "list_records", lambda: [
+        ClassRecord(
+            id="class-published",
+            date="2026-07-25",
+            course_id="course-1",
+            course_name="疗愈活动",
+            course_type="疗愈活动",
+            is_published=True,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        ),
+        ClassRecord(
+            id="class-draft",
+            date="2026-07-25",
+            course_id="course-1",
+            course_name="疗愈活动",
+            course_type="疗愈活动",
+            is_published=False,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        ),
+    ])
     monkeypatch.setattr(client_api.internal_course_session_service, "list_sessions", lambda: [{
         "id": "ics-1",
         "date": "2026-07-25",
         "course_type": "内部课程子类型",
         "course_name": "内部课程场次",
+        "is_published": True,
     }])
 
     expected = {
@@ -118,17 +142,19 @@ def test_client_aggregates_all_visible_other_activity_types(monkeypatch):
             "id": aid,
             "date": "2026-07-25",
             "name": "",
+            "is_published": True,
         }])
 
-    visible_types = set(expected) | {"内部课程"}
-    result = client_api._aggregate_visible_activities(visible_types)
+    result = client_api._aggregate_published_activities()
     by_id = {item["id"]: item for item in result}
 
+    assert "class-published" in by_id
+    assert "class-draft" not in by_id
     for display_type, (activity_type, activity_id) in expected.items():
         assert by_id[activity_id]["type"] == activity_type
         assert by_id[activity_id]["data"]["course_type"] == display_type
     assert by_id["ics-1"]["type"] == "ics"
-    assert by_id["ics-1"]["data"]["course_type"] == "内部课程"
+    assert by_id["ics-1"]["data"]["course_type"] == "内部课程子类型"
 
 
 def test_client_formats_other_activity_with_configured_images(monkeypatch):
@@ -326,6 +352,7 @@ def test_client_activity_detail_marks_owner_as_locked_participant(monkeypatch):
             "owner_id": "owner-1",
             "teacher_ids": ["teacher-1"],
             "participant_ids": [],
+            "is_published": True,
         },
     }
     customers = {
@@ -333,7 +360,6 @@ def test_client_activity_detail_marks_owner_as_locked_participant(monkeypatch):
         "teacher-1": SimpleNamespace(nickname="测试老师", name="测试老师", avatar_url=""),
     }
     monkeypatch.setattr(client_api, "_find_activity", lambda activity_id: item)
-    monkeypatch.setattr(client_api, "_get_visible_types", lambda: {"觉醒游戏"})
     monkeypatch.setattr(client_api, "_build_customer_map", lambda: customers)
     monkeypatch.setattr(client_api, "_get_space_map", lambda: ({}, {}))
     monkeypatch.setattr(client_api, "_load_signups", lambda activity_id: [])
@@ -352,6 +378,26 @@ def test_client_activity_detail_marks_owner_as_locked_participant(monkeypatch):
         "is_me": True,
         "role": "owner",
     }
+
+
+@pytest.mark.parametrize("handler", [client_api.get_activity, client_api.signup_activity])
+def test_client_rejects_direct_access_to_unpublished_activity(monkeypatch, handler):
+    item = {
+        "id": "draft-1",
+        "type": "class",
+        "data": {
+            "course_type": "疗愈活动",
+            "is_published": False,
+        },
+    }
+    monkeypatch.setattr(client_api, "_find_activity", lambda activity_id: item)
+    request = SimpleNamespace(state=SimpleNamespace(customer_id="customer-1", user_id=""))
+
+    with pytest.raises(HTTPException) as exc_info:
+        handler("draft-1", request)
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "活动不存在"
 
 
 @pytest.mark.parametrize(
@@ -374,10 +420,10 @@ def test_client_rejects_signup_changes_for_fixed_participants(
             "course_type": "觉醒游戏",
             "owner_id": "owner-1",
             "teacher_ids": ["teacher-1"],
+            "is_published": True,
         },
     }
     monkeypatch.setattr(client_api, "_find_activity", lambda activity_id: item)
-    monkeypatch.setattr(client_api, "_get_visible_types", lambda: {"觉醒游戏"})
     request = SimpleNamespace(state=SimpleNamespace(customer_id=customer_id, user_id=""))
 
     with pytest.raises(HTTPException) as exc_info:

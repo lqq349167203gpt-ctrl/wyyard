@@ -2,17 +2,18 @@ import json
 import time
 import uuid
 from collections import defaultdict
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from app.models.base import StrictBaseModel
 
 from app.config.settings import settings
-from app.services import system_helper_config_service, position_permission_service
-from app.services.chat_history_service import save_message
+from app.models.base import StrictBaseModel
 from app.models.chat_history import ChatRecordCreate
-from app.services.ai_entry_service import parse_entry_intent, execute_entry, analyze_image_intent
+from app.services import position_permission_service, system_helper_config_service
+from app.services.ai_entry_service import analyze_image_intent, execute_entry, parse_entry_intent
+from app.services.chat_history_service import save_message
 
 router = APIRouter(prefix="/api/system-helper", tags=["system-helper"])
 
@@ -60,7 +61,7 @@ PERMISSION_PAGE_MAP = {
     "courses": ("活动配置", "/positions/courses"),
     "member-identities": ("会员身份", "/config/member-identities"),
     "healing-identities": ("疗愈老师", "/healing-identities"),
-    "organizations": ("组织管理", "/organizations"),
+    "organizations": ("组织信息", "/organizations"),
     "spaces": ("疗愈空间", "/courses/spaces"),
     "reminders": ("提醒配置", "/config/reminders"),
     "position-management": ("账号管理", "/positions/management"),

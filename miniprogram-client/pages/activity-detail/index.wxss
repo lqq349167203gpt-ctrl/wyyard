@@ -104,7 +104,7 @@
 
 .hero-poster {
   width: 392rpx;
-  height: 560rpx;
+  height: 660rpx;
   max-width: 82%;
   border-radius: 24rpx;
   box-shadow: 0 28rpx 68rpx rgba(90, 60, 30, 0.22);

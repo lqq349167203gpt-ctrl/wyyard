@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Query
 
 from app.api.customer_detail import _build_activities, _build_payment_records
+from app.models.customer import FollowUpStatus
 from app.services import (
     customer_service,
     emotional_release_service,
@@ -1166,4 +1167,95 @@ def get_member_statistics(
         "chart_new": chart_data_new,
         "chart_total": chart_data_total,
         "members": members_list,
+    }
+
+
+@router.get("/referrals")
+def get_referral_statistics(
+    date_from: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
+    granularity: str = Query("day", description="聚合粒度: day/week/month"),
+    referrer: str | None = Query(None, description="引流人昵称"),
+):
+    """获取引流统计：跟进状态分布、变化趋势和人员明细。"""
+    date_from, date_to = _get_date_range(date_from, date_to)
+    status_names = [status.value for status in FollowUpStatus]
+    all_customers = customer_service.list_customers()
+    referrer_counts: dict[str, int] = defaultdict(int)
+    for customer in all_customers:
+        referrer_name = (customer.referrer or "").strip()
+        if referrer_name:
+            referrer_counts[referrer_name] += 1
+    referrer_names = [
+        name
+        for name, _count in sorted(
+            referrer_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+    ]
+    customers = [
+        customer
+        for customer in all_customers
+        if not referrer or (customer.referrer or "").strip() == referrer
+    ]
+
+    status_totals = {status: 0 for status in status_names}
+    customers_by_date: dict[str, dict[str, int]] = defaultdict(
+        lambda: {status: 0 for status in status_names}
+    )
+    for customer in customers:
+        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
+        if status not in status_totals:
+            status = FollowUpStatus.NEW.value
+        status_totals[status] += 1
+        if isinstance(customer.created_at, datetime):
+            created_date = customer.created_at.strftime("%Y-%m-%d")
+        elif customer.created_at:
+            created_date = str(customer.created_at)[:10]
+        else:
+            continue
+        customers_by_date[created_date][status] += 1
+
+    daily_new = {
+        created_date: values
+        for created_date, values in customers_by_date.items()
+        if date_from <= created_date <= date_to
+    }
+    cumulative_by_date: dict[str, dict[str, int]] = {}
+    cumulative = {status: 0 for status in status_names}
+    for created_date in sorted(customers_by_date):
+        for status in status_names:
+            cumulative[status] += customers_by_date[created_date].get(status, 0)
+        cumulative_by_date[created_date] = dict(cumulative)
+
+    members = []
+    for customer in customers:
+        stats = _get_customer_stats(customer.id, None, None)
+        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
+        members.append({
+            "id": customer.id,
+            "nickname": customer.nickname or "",
+            "member_type": customer.member_type or "",
+            "referrer": customer.referrer or "",
+            "follow_up_status": status,
+            "first_visit_date": stats.get("first_visit_date", "-"),
+            "invited_count": stats.get("invited_count", 0),
+            "visit_count": stats.get("visit_count", 0),
+            "visit_interval": stats.get("visit_interval", "-"),
+            "activity_count": stats.get("activity_count", 0),
+            "total_consumption": stats.get("total_consumption", 0),
+        })
+
+    return {
+        "total_people": len(customers),
+        "status_names": status_names,
+        "status_totals": status_totals,
+        "referrer_names": referrer_names,
+        "chart_new": _aggregate_member_by_granularity(
+            daily_new, granularity, date_from, date_to, status_names
+        ),
+        "chart_total": _aggregate_member_cumulative(
+            cumulative_by_date, granularity, date_from, date_to, status_names
+        ),
+        "members": members,
     }

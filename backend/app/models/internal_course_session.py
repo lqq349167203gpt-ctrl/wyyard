@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
+
+from app.models.base import SafeBaseModel
 
 
 class InternalCourseSessionBase(SafeBaseModel):
@@ -15,6 +16,7 @@ class InternalCourseSessionBase(SafeBaseModel):
     host_name: str = ""
     participant_ids: List[str] = []  # 参与者
     materials: List[dict] = []
+    is_published: bool = False
     activity_mode: str = "线下"
     space_id: str = ""
     room_id: str = ""

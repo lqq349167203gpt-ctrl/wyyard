@@ -1588,7 +1588,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>需要先配置组织</AlertDialogTitle>
-            <AlertDialogDescription>系统中暂无组织信息，请先前往组织管理页面配置组织。</AlertDialogDescription>
+            <AlertDialogDescription>系统中暂无组织信息，请先前往组织信息页面配置组织。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>

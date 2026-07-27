@@ -125,6 +125,7 @@ interface ActivityRow {
   participant_ids: string[]
   activity_mode: string
   is_public_welfare: boolean
+  is_published: boolean
   deduction_count: number
   space_id: string
   room_id: string
@@ -195,6 +196,7 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
     participant_ids: participantIds,
     activity_mode: data.activity_mode || "线下",
     is_public_welfare: data.is_public_welfare || false,
+    is_published: data.is_published || false,
     deduction_count: type === "eks" ? parseEksDescription(data.description || "").count : (data.is_public_welfare ? 0 : 1),
     space_id: sid, room_id: rid,
     description: desc,
@@ -217,6 +219,7 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
     participant_ids: [],
     activity_mode: "线下",
     is_public_welfare: false,
+    is_published: false,
     deduction_count: 1,
     space_id: sid, room_id: rid,
     description: "",
@@ -607,6 +610,7 @@ export function ActivityBatchTable({
         start_time: row.start_time || null,
         end_time: row.end_time || null,
         activity_mode: row.activity_mode,
+        is_published: row.is_published,
         space_id: row.space_id || undefined,
         room_id: row.room_id || undefined,
         space_name: space?.name || undefined,
@@ -785,7 +789,7 @@ export function ActivityBatchTable({
 
   const FIELD_LABELS: Record<string, string> = {
     name: "名称", start_time: "时间", end_time: "时间",
-    activity_mode: "活动方式", description: "简介",
+    activity_mode: "活动方式", description: "简介", is_published: "发布",
     is_public_welfare: "公益", participant_ids: "参与人",
     host_ids: "老师", host_names: "老师",
     owner_id: "案主", owner_name: "案主",
@@ -1060,7 +1064,7 @@ export function ActivityBatchTable({
     }
     // 先捕获 pre-change 快照（与 updateRow/handleTypeChange 一致）
     const preRows = rowsRef.current.map(r => ({ ...r }))
-    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "space_id"]
+    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "is_published", "space_id"]
     pushHistory("新增了活动", [fresh.key], `新增了「${newName}」`, preRows, [{ rowKey: fresh.key, fields: allFields }])
     setRows(prev => [...prev, fresh])
     setRowStatus(prev => ({ ...prev, [fresh.key]: "idle" }))
@@ -1127,7 +1131,7 @@ export function ActivityBatchTable({
         `}</style>
       )}
       <div className="overflow-x-auto scrollbar-visible">
-        <div className={hasOwnerType ? "min-w-[1367px]" : "min-w-[1211px]"}>
+        <div className={hasOwnerType ? "min-w-[1409px]" : "min-w-[1253px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
             <tr className="bg-[#f7f8fa] text-[#8f959e]">
@@ -1143,6 +1147,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
               <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
               <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
+              <th className="w-[42px] sticky right-[42px] z-10 bg-[#f7f8fa] px-1 py-2 text-center font-normal">发布</th>
               <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
@@ -1437,6 +1442,19 @@ export function ActivityBatchTable({
                         </span>
                       ))}
                     </span>
+                  </td>
+
+                  {/* 发布到客户端 */}
+                  <td className={`sticky right-[42px] z-10 px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
+                    <div className="flex h-7 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={row.is_published}
+                        onChange={(e) => updateRow(row.key, "is_published", e.target.checked)}
+                        aria-label={`发布${row.name || "活动"}`}
+                        className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                      />
+                    </div>
                   </td>
 
                   {/* 操作 */}

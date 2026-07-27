@@ -103,6 +103,7 @@ def _build_enriched_items(customers) -> list[dict]:
         "id", "nickname", "name", "gender", "phone", "wechat", "age",
         "member_type", "positions", "self_tags", "paid_content",
         "referrer", "referrer_handler", "service_teacher",
+        "follow_up_status",
         "traffic_source", "traffic_source_detail",
         "need_tags", "follow_up_node", "follow_up_action",
         "core_situation", "tags", "work_status", "work_description",

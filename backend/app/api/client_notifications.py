@@ -82,7 +82,7 @@ def _sync_financial_notifications(customer_id: str) -> None:
             title = "活动扣卡"
 
         content_lines = [
-            f"{deduction.get('project_name') or '销卡'} · -{deduction.get('count', 1)} 次",
+            f"{deduction.get('project_name') or '销卡'}扣{deduction.get('count', 1)}次",
         ]
         if source == "manual":
             content_lines.append(f"内容：{deduction.get('reason') or '后台人工销卡'}")

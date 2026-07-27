@@ -37,6 +37,7 @@ import StatisticsPage from "@/pages/statistics"
 import ProductSalesPage from "@/pages/product-sales"
 import DailyReportPage from "@/pages/daily-report"
 import MemberStatisticsPage from "@/pages/member-statistics"
+import ReferralStatisticsPage from "@/pages/referral-statistics"
 import CommunicationRecordsPage from "@/pages/communication-records"
 import FollowupRecordsPage from "@/pages/followup-records"
 
@@ -70,6 +71,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/config/reminders": "reminders",
   "/business-reminders": "business-reminders",
   "/data-records": "data-records",
+  "/referral-statistics": "statistics",
   "/chat-history": "chat-history",
   "/statistics": "statistics",
   "/product-sales": "statistics",
@@ -191,6 +193,7 @@ function App() {
               <Route path="/config/reminders" element={<RemindersPage />} />
               <Route path="/business-reminders" element={<BusinessRemindersPage />} />
               <Route path="/data-records" element={<DataRecordsPage />} />
+              <Route path="/referral-statistics" element={<ReferralStatisticsPage />} />
               <Route path="/chat-history" element={<ChatHistoryPage />} />
               <Route path="/statistics" element={<StatisticsPage />} />
               <Route path="/product-sales" element={<ProductSalesPage />} />
