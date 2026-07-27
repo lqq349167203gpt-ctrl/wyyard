@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, useCallback, useRef } from "react"
-import { Plus, Trash2, Edit, ArrowUp, ArrowDown, ImagePlus, X } from "lucide-react"
+import { Plus, Trash2, Edit, ArrowUp, ArrowDown, CircleAlert, ImagePlus, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -18,6 +18,8 @@ import { SelectDropdown } from "@/components/select-dropdown"
 const EmptyValue = () => (
   <span className="inline-block h-[2px] w-[4px] shrink-0 rounded-full bg-[#e5e8eb] align-middle" />
 )
+
+const MAX_PUBLIC_IMAGE_SIZE = 2 * 1024 * 1024
 
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
@@ -351,23 +353,29 @@ export default function OrganizationsPage() {
   const handleUploadListImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setActUploadError("")
+    if (file.size > MAX_PUBLIC_IMAGE_SIZE) {
+      setActListImageWarn("")
+      setActUploadError("列表图片上传失败：图片不能超过 2MB，请压缩后重试")
+      if (listImageRef.current) listImageRef.current.value = ""
+      return
+    }
     const warns: string[] = []
-    if (file.size > 2 * 1024 * 1024) warns.push("体积超过 2MB，建议压缩至 500KB 内")
     try {
       const { w, h } = await probeImage(file)
       const r = w / h
-      if (r < 0.66 || r > 0.8) warns.push("比例不是竖版 3:4，列表中会居中裁切")
+      if (r < 0.76 || r > 0.84) warns.push("图片不是竖版 4:5，小程序列表会居中裁切")
     } catch {
       // 探针失败不阻塞
     }
     setActListImageWarn(warns.join("；"))
-    setActUploadError("")
     setActUploading(true)
     try {
       const material = await uploadApi.uploadPublicImage(file)
       setActFormListImage(material.url)
     } catch (error) {
-      setActUploadError(error instanceof Error ? error.message : "列表图片上传失败")
+      const message = error instanceof Error ? error.message : "未知错误"
+      setActUploadError(`列表图片上传失败：${message}`)
     } finally {
       setActUploading(false)
       if (listImageRef.current) listImageRef.current.value = ""
@@ -377,22 +385,29 @@ export default function OrganizationsPage() {
   const handleUploadDetailImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setActUploadError("")
+    if (file.size > MAX_PUBLIC_IMAGE_SIZE) {
+      setActDetailImageWarn("")
+      setActUploadError("详情图片上传失败：图片不能超过 2MB，请压缩后重试")
+      if (detailImagesRef.current) detailImagesRef.current.value = ""
+      return
+    }
     const warns: string[] = []
-    if (file.size > 3 * 1024 * 1024) warns.push("单张超过 3MB，建议压缩至 1MB 内")
     try {
-      const { w } = await probeImage(file)
-      if (w < 1000) warns.push("宽度不足 1200px，详情页全宽显示会模糊")
+      const { w, h } = await probeImage(file)
+      if (w < 1200) warns.push("宽度不足 1200px，手机详情页可能不够清晰")
+      if (w / h < 0.68) warns.push("图片过高，详情页会裁切部分上下内容")
     } catch {
       // 探针失败不阻塞
     }
     setActDetailImageWarn(warns.join("；"))
-    setActUploadError("")
     setActUploading(true)
     try {
       const material = await uploadApi.uploadPublicImage(file)
       setActFormDetailImages(prev => [...prev, material.url])
     } catch (error) {
-      setActUploadError(error instanceof Error ? error.message : "详情图片上传失败")
+      const message = error instanceof Error ? error.message : "未知错误"
+      setActUploadError(`详情图片上传失败：${message}`)
     } finally {
       setActUploading(false)
       if (detailImagesRef.current) detailImagesRef.current.value = ""
@@ -931,6 +946,12 @@ export default function OrganizationsPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{actEditingType ? "编辑活动配置" : "新增活动"}</DialogTitle>
           </DialogHeader>
+          {actUploadError && (
+            <div className="flex items-start gap-2 border-b border-[#f0f0f0] px-6 py-3 text-[12px] text-destructive" role="alert">
+              <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="leading-5">{actUploadError}</span>
+            </div>
+          )}
           <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">类型名称</span>
@@ -962,12 +983,12 @@ export default function OrganizationsPage() {
             )}
             {/* 列表图片 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">列表图片</span>
+              <span className="pt-2.5 text-right text-[12px] font-normal tracking-widest text-[#4e535a]">列表图片</span>
               <div>
                 <input ref={listImageRef} type="file" accept="image/*" className="hidden" onChange={handleUploadListImage} />
                 {actFormListImage ? (
                   <div className="relative inline-block">
-                    <img src={actFormListImage} alt="" className="w-[60px] h-20 rounded object-cover border border-[#e8eaed]" />
+                    <img src={actFormListImage} alt="" className="h-20 w-16 rounded object-cover border border-[#e8eaed]" />
                     <button
                       className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#2b2f36] text-white flex items-center justify-center hover:bg-red-500 transition-colors"
                       onClick={() => { setActFormListImage(""); setActListImageWarn("") }}
@@ -984,14 +1005,14 @@ export default function OrganizationsPage() {
                     <span className="text-[12px] text-[#8f959e]">{actUploading ? "上传中..." : "点击上传"}</span>
                   </label>
                 )}
-                <p className="text-[11px] text-[#c9cdd4] mt-1.5">用于小程序活动列表的缩略图，按竖版 3:4 居中显示</p>
-                <p className="text-[11px] text-[#c9cdd4] mt-0.5">要求：竖版 3:4 或 A4 竖版（如 1200×1600px）、JPG、500KB 内；关键文字避开上下 5% 边缘</p>
-                {actListImageWarn && <p className="text-[11px] text-amber-600 mt-1">{actListImageWarn}</p>}
+                <p className="mt-1.5 text-[12px] text-[#8f959e]">小程序列表按 128×160rpx（竖版 4:5）居中裁切</p>
+                <p className="mt-0.5 text-[12px] text-[#8f959e]">建议 1200×1500px、2MB 内；文字和人物避开四周 8% 边缘</p>
+                {actListImageWarn && <p className="mt-1 text-[12px] text-amber-600">{actListImageWarn}</p>}
               </div>
             </div>
             {/* 详情图片 */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">详情图片</span>
+              <span className="pt-2.5 text-right text-[12px] font-normal tracking-widest text-[#4e535a]">详情图片</span>
               <div>
                 <input ref={detailImagesRef} type="file" accept="image/*" className="hidden" onChange={handleUploadDetailImage} />
                 <div className="flex flex-wrap gap-2">
@@ -1013,10 +1034,10 @@ export default function OrganizationsPage() {
                     <ImagePlus className="h-4 w-4 text-[#8f959e]" />
                   </label>
                 </div>
-                <p className="text-[11px] text-[#c9cdd4] mt-1.5">用于活动详情页正文展示，可添加多张；不传时详情页沿用列表图片</p>
-                <p className="text-[11px] text-[#c9cdd4] mt-0.5">要求：横竖不限（建议横版 3:2 或竖版 3:4）、宽 ≥1200px、单张 ≤1MB</p>
-                {actDetailImageWarn && <p className="text-[11px] text-amber-600 mt-1">{actDetailImageWarn}</p>}
-                {actUploadError && <p className="mt-1 text-[12px] text-destructive">{actUploadError}</p>}
+                <p className="mt-1.5 text-[12px] text-[#8f959e]">详情页会自适应图片比例，与列表统一建议使用竖版 4:5</p>
+                <p className="mt-0.5 text-[12px] text-[#8f959e]">建议 1200×1500px、2MB 内；超长图会裁切部分上下内容</p>
+                <p className="mt-0.5 text-[12px] text-[#8f959e]">多图请保持同一比例，轮播高度以第一张图片为准；不上传则沿用列表图片</p>
+                {actDetailImageWarn && <p className="mt-1 text-[12px] text-amber-600">{actDetailImageWarn}</p>}
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">

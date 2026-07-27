@@ -654,12 +654,20 @@ export const uploadApi = {
     const token = localStorage.getItem("authToken")
     const uploadHeaders: Record<string, string> = {}
     if (token) uploadHeaders["Authorization"] = `Bearer ${token}`
-    const res = await fetch(`${API_BASE}/api/uploads/public-images`, { method: "POST", headers: uploadHeaders, body: formData })
+    let res: Response
+    try {
+      res = await fetch(`${API_BASE}/api/uploads/public-images`, { method: "POST", headers: uploadHeaders, body: formData })
+    } catch {
+      throw new Error("网络连接异常，请检查网络后重试")
+    }
     applyNewToken(res)
     if (res.status === 401) { handle401(); throw new Error("登录已过期") }
+    if (res.status === 413) {
+      throw new Error("图片超过服务器上传限制，请压缩至 2MB 内后重试")
+    }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      throw new Error(data.detail || "图片上传失败")
+      throw new Error(data.detail || `服务器返回错误（${res.status}）`)
     }
     return res.json()
   },

@@ -10,6 +10,12 @@ Page({
     statusBarHeight: 20,
     navBarHeight: 44,
     navTotalHeight: 64,
+    posterHeroStyle: '',
+    currentPosterIndex: 0,
+    currentPosterImage: '',
+    posterSlides: [],
+    posterSizes: [],
+    carouselHeroHeight: 660,
   },
 
   onLoad(options) {
@@ -44,7 +50,15 @@ Page({
   },
 
   loadActivity(id) {
-    this.setData({ loading: true })
+    this.setData({
+      loading: true,
+      posterHeroStyle: '',
+      currentPosterIndex: 0,
+      currentPosterImage: '',
+      posterSlides: [],
+      posterSizes: [],
+      carouselHeroHeight: 660,
+    })
     clientApi.getActivity(id)
       .then(res => {
         const activity = this._decorate(res)
@@ -52,13 +66,27 @@ Page({
           activity,
           loading: false,
           signedUp: !!res.signed_up,
+          currentPosterImage: activity.previewImages[0] || '',
+          posterSlides: activity.previewImages.map(url => ({
+            url,
+            imageStyle: 'width: 496rpx; height: 660rpx;',
+            mode: 'aspectFit',
+          })),
         })
         if (activity.previewImages.length) {
-          Promise.all(activity.previewImages.map(cacheImage)).then(previewImages => {
+          Promise.all(activity.previewImages.map(cacheImage)).then(cachedImages => {
             if (this.data.activity?.id === activity.id) {
+              const previewImages = cachedImages.map((url, index) => url || activity.previewImages[index])
+              const posterSlides = previewImages.map((url, index) => ({
+                url,
+                imageStyle: this.data.posterSlides[index]?.imageStyle || 'width: 496rpx; height: 660rpx;',
+                mode: this.data.posterSlides[index]?.mode || 'aspectFit',
+              }))
               this.setData({
                 'activity.posterImage': previewImages[0] || activity.posterImage,
                 'activity.previewImages': previewImages,
+                currentPosterImage: previewImages[this.data.currentPosterIndex] || previewImages[0] || '',
+                posterSlides,
               })
             }
           })
@@ -109,7 +137,9 @@ Page({
     const detailImages = (Array.isArray(a.detail_images) ? a.detail_images : [])
       .map(resolveResourceUrl)
       .filter(Boolean)
-    const previewImages = [...new Set([posterImage, ...detailImages].filter(Boolean))]
+    const previewImages = detailImages.length
+      ? [...new Set(detailImages)]
+      : [posterImage].filter(Boolean)
 
     // 时长文本：如 "约 1 小时"
     let durationText = ''
@@ -145,7 +175,7 @@ Page({
       rosterList: roster,
       rosterCount: roster.length,
       descParagraphs,
-      posterImage,
+      posterImage: previewImages[0] || posterImage,
       detailImages,
       previewImages,
       durationText,
@@ -162,14 +192,82 @@ Page({
       .sort((a, b) => (b.is_me ? 1 : 0) - (a.is_me ? 1 : 0))
   },
 
-  onPreviewPoster() {
+  onPreviewPoster(e) {
     const activity = this.data.activity
     const urls = activity?.previewImages || []
     if (!urls.length) return
+    const requestedIndex = Number(e.currentTarget?.dataset?.index)
+    const currentIndex = Number.isInteger(requestedIndex) ? requestedIndex : this.data.currentPosterIndex
 
     wx.previewImage({
-      current: activity.posterImage || urls[0],
+      current: urls[currentIndex] || urls[0],
       urls,
+    })
+  },
+
+  _calculateHeroHeight(width, height) {
+    const ratio = width / height
+    if (ratio >= 0.75) return 660
+
+    const posterWidth = 570
+    const maxHeroHeight = 840
+    return Math.min(Math.round(posterWidth / ratio), maxHeroHeight)
+  },
+
+  _buildSlideLayout(width, height, heroHeight) {
+    const ratio = width / height
+    if (ratio >= 0.75) {
+      return {
+        imageStyle: `width: 496rpx; height: ${heroHeight}rpx;`,
+        mode: 'aspectFit',
+      }
+    }
+
+    const posterWidth = 570
+    const naturalHeight = posterWidth / ratio
+    return {
+      imageStyle: `width: ${posterWidth}rpx; height: ${heroHeight}rpx;`,
+      mode: naturalHeight > heroHeight ? 'aspectFill' : 'aspectFit',
+    }
+  },
+
+  onPosterLoad(e) {
+    const width = Number(e.detail?.width)
+    const height = Number(e.detail?.height)
+    if (!width || !height) return
+
+    const index = Number(e.currentTarget?.dataset?.index) || 0
+    const posterSizes = [...this.data.posterSizes]
+    posterSizes[index] = { width, height }
+
+    // 轮播区高度只由第一张图决定，切换不同长宽比图片时不再引起整页位移。
+    const carouselHeroHeight = index === 0
+      ? this._calculateHeroHeight(width, height)
+      : this.data.carouselHeroHeight
+    const posterSlides = this.data.posterSlides.map((slide, slideIndex) => {
+      const size = posterSizes[slideIndex]
+      if (!size) return slide
+      return {
+        ...slide,
+        ...this._buildSlideLayout(size.width, size.height, carouselHeroHeight),
+      }
+    })
+
+    this.setData({
+      posterSizes,
+      posterSlides,
+      carouselHeroHeight,
+      posterHeroStyle: carouselHeroHeight === 660 ? '' : `height: ${carouselHeroHeight}rpx;`,
+    })
+  },
+
+  onPosterChange(e) {
+    const currentPosterIndex = Number(e.detail?.current) || 0
+    this.setData({
+      currentPosterIndex,
+      currentPosterImage: this.data.posterSlides[currentPosterIndex]?.url
+        || this.data.activity?.previewImages?.[currentPosterIndex]
+        || '',
     })
   },
 

@@ -1,20 +1,12 @@
 // API 请求封装 — 客户端小程序
 
-// 开发环境读取本地数据：开发者工具走 localhost，扫码真机走电脑局域网地址
-const { miniProgram: { envVersion } } = wx.getAccountInfoSync()
-const { platform } = wx.getDeviceInfo()
-const LOCAL_BASE_URL = platform === 'devtools'
-  ? 'http://localhost:8000'
-  : 'http://192.168.31.141:8000'
-const BASE_URL = envVersion === 'develop'
-  ? LOCAL_BASE_URL
-  : 'https://www.wyteahouse.cn'
-const IS_LOCAL_DEVICE_PREVIEW = envVersion === 'develop' && platform !== 'devtools'
+// 后端地址由 utils/config.js 的 DEV 总开关决定（上线/提审前切为 false 即指向生产）
+const { DEV, BASE_URL } = require('./config')
 
 function resolveResourceUrl(url) {
   if (!url) return ''
   if (url.startsWith('/')) return BASE_URL + url
-  if (IS_LOCAL_DEVICE_PREVIEW) {
+  if (DEV) {
     return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, BASE_URL)
   }
   return url
@@ -34,7 +26,7 @@ function _resourceCachePath(url) {
 // 真机开发预览时，本地 HTTP 图片可能被 image 组件拦截；通过 request 落盘后展示本地文件
 function cacheImage(url) {
   const absoluteUrl = resolveResourceUrl(url)
-  if (!absoluteUrl || !IS_LOCAL_DEVICE_PREVIEW) return Promise.resolve(absoluteUrl)
+  if (!absoluteUrl || !DEV) return Promise.resolve(absoluteUrl)
 
   const filePath = _resourceCachePath(absoluteUrl)
   const fs = wx.getFileSystemManager()
@@ -210,6 +202,7 @@ module.exports = {
   get,
   post,
   BASE_URL,
+  DEV,
   resolveResourceUrl,
   cacheImage,
   clientApi,

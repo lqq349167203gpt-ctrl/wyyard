@@ -15,21 +15,41 @@
 
   <block wx:elif="{{activity}}">
     <!-- Hero:橱窗底衬 — 模糊海报底图 + 清晰前景海报 -->
-    <view wx:if="{{activity.posterImage}}" class="hero">
+    <view wx:if="{{posterSlides.length}}" class="hero" style="{{posterHeroStyle}}">
       <view class="hero-bg">
-        <image class="hero-bg-image" src="{{activity.posterImage}}" mode="aspectFill" />
+        <image class="hero-bg-image" src="{{currentPosterImage}}" mode="aspectFill" />
         <view class="hero-bg-veil"></view>
       </view>
-      <view class="hero-fg">
-        <image class="hero-poster activity-image-filter" src="{{activity.posterImage}}" mode="aspectFit" bindtap="onPreviewPoster" />
+      <swiper
+        class="hero-swiper"
+        current="{{currentPosterIndex}}"
+        circular="{{posterSlides.length > 1}}"
+        bindchange="onPosterChange"
+      >
+        <swiper-item wx:for="{{posterSlides}}" wx:key="url">
+          <view class="hero-fg">
+            <image
+              class="hero-poster activity-image-filter"
+              style="{{item.imageStyle}}"
+              src="{{item.url}}"
+              mode="{{item.mode}}"
+              data-index="{{index}}"
+              bindload="onPosterLoad"
+              bindtap="onPreviewPoster"
+            />
+          </view>
+        </swiper-item>
+      </swiper>
+      <view wx:if="{{posterSlides.length > 1}}" class="hero-page-count">
+        {{currentPosterIndex + 1}} / {{posterSlides.length}}
       </view>
     </view>
 
     <!-- 无海报时为透明导航栏预留安全距离 -->
-    <view wx:if="{{!activity.posterImage}}" style="height: {{navTotalHeight}}px;"></view>
+    <view wx:if="{{!activity.previewImages.length}}" style="height: {{navTotalHeight}}px;"></view>
 
     <!-- 内容 sheet:白底上移覆盖 hero 底部 -->
-    <view class="sheet {{activity.posterImage ? 'sheet--overlap' : ''}}">
+    <view class="sheet {{activity.previewImages.length ? 'sheet--overlap' : ''}}">
       <!-- W1：标题 + 日期 + 时间双行信息 -->
       <view class="w1-title-line">
         <text class="w1-title">{{activity.name}}</text>
