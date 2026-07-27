@@ -1458,10 +1458,10 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 操作 */}
-                  <td className="px-1 py-0.5 text-center sticky right-0 z-10 bg-white align-top">
+                  <td className="px-1 py-0.5 text-center sticky right-0 z-10 bg-white">
                     <button
                       onClick={() => handleDelete(row)}
-                      className="text-[#8f959e] hover:text-[#e02020]"
+                      className="h-7 w-full flex items-center justify-center text-[#8f959e] hover:text-[#e02020]"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
