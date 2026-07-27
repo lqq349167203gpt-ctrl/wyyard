@@ -18,6 +18,7 @@ Page({
     service_teacher: '',
     referrer: '',
     referrer_handler: '',
+    follow_up_status: '',
     traffic_source: '',
     traffic_source_detail: '',
     needTrafficDetail: false,
@@ -28,6 +29,7 @@ Page({
     tags: '',
     other_info: '',
     trafficSources: TRAFFIC_SOURCES,
+    followUpStatuses: ['新添加', '沟通中', '已到店', '已成交', '沉默/流失'],
     // 搜索选择弹窗
     allCustomers: [],
     showPicker: false,
@@ -90,6 +92,7 @@ Page({
         service_teacher: c.service_teacher || '',
         referrer: c.referrer || '',
         referrer_handler: c.referrer_handler || '',
+        follow_up_status: c.follow_up_status || '',
         traffic_source: ts,
         traffic_source_detail: c.traffic_source_detail || '',
         needTrafficDetail: TRAFFIC_NEED_LINK.includes(ts),
@@ -122,6 +125,11 @@ Page({
       traffic_source_detail: '',
       needTrafficDetail: TRAFFIC_NEED_LINK.includes(source),
     })
+  },
+
+  onFollowUpStatusChange(e) {
+    const statuses = ['新添加', '沟通中', '已到店', '已成交', '沉默/流失']
+    this.setData({ follow_up_status: statuses[e.detail.value] })
   },
 
   onWorkStatusChange(e) {
@@ -212,6 +220,7 @@ Page({
         service_teacher: this.data.service_teacher.trim(),
         referrer: this.data.referrer.trim(),
         referrer_handler: this.data.referrer_handler.trim(),
+        follow_up_status: this.data.follow_up_status,
         traffic_source: this.data.traffic_source.trim(),
         traffic_source_detail: this.data.traffic_source_detail.trim(),
         work_status: this.data.work_status,

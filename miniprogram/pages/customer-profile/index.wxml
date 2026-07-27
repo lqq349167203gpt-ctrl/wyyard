@@ -7,7 +7,10 @@
     </view>
     <view class="hero-info">
       <text class="hero-name">{{customer.nickname || '-'}}</text>
-      <text class="hero-type" wx:if="{{customer.member_type}}">{{customer.member_type}}</text>
+      <view class="hero-tags">
+        <text class="hero-type" wx:if="{{customer.member_type}}">{{customer.member_type}}</text>
+        <text class="hero-type" wx:if="{{customer.follow_up_status}}">{{customer.follow_up_status}}</text>
+      </view>
     </view>
     <view class="hero-stats">
       <view class="stat">

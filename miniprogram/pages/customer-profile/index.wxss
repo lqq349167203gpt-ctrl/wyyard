@@ -36,6 +36,12 @@
   margin-bottom: 28rpx;
 }
 
+.hero-tags {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
 .hero-name {
   font-size: 36rpx;
   font-weight: 400;

@@ -1147,8 +1147,8 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
               <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
               <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
-              <th className="w-[42px] sticky right-[42px] z-10 bg-[#f7f8fa] px-1 py-2 text-center font-normal">发布</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="w-[42px] sticky right-[42px] z-10 bg-[#f7f8fa] px-1 py-2 text-center font-normal relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">发布</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f7f8fa] z-10">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -1445,7 +1445,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 发布到客户端 */}
-                  <td className={`sticky right-[42px] z-10 px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
+                  <td className={`sticky right-[42px] z-10 px-1 py-0.5 text-center align-top relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)] ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
                     <div className="flex h-7 items-center justify-center">
                       <input
                         type="checkbox"
@@ -1458,7 +1458,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 操作 */}
-                  <td className="px-1 py-0.5 text-center sticky right-0 z-10 bg-white relative align-top before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">
+                  <td className="px-1 py-0.5 text-center sticky right-0 z-10 bg-white align-top">
                     <button
                       onClick={() => handleDelete(row)}
                       className="text-[#8f959e] hover:text-[#e02020]"

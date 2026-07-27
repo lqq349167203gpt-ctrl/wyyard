@@ -48,6 +48,12 @@
         <text class="picker-clear" wx:if="{{referrer_handler}}" catchtap="onPickerClear" data-field="referrer_handler">x</text>
       </view>
     </view>
+    <view class="form-item">
+      <text class="form-label">跟进状态</text>
+      <picker class="form-picker" mode="selector" range="{{followUpStatuses}}" bindchange="onFollowUpStatusChange">
+        <view class="picker-display {{follow_up_status ? '' : 'placeholder'}}">{{follow_up_status || '选择状态'}}</view>
+      </picker>
+    </view>
     <view class="form-item {{(traffic_source === '好友推荐' || traffic_source === '朋友圈' || (traffic_source && needTrafficDetail)) ? '' : 'last'}}">
       <text class="form-label">流量来源</text>
       <picker class="form-picker" mode="selector" range="{{trafficSources}}" bindchange="onTrafficSourceChange">
