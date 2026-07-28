@@ -1626,6 +1626,7 @@ export interface PurchaseSummaryItem {
   effective_remaining?: number | string
   manual_deductions?: number
   activity_deductions?: number
+  advance_deductions?: number
   internal_course_deductions?: number
   unlimited_deductions?: number
   name?: string
@@ -1646,6 +1647,7 @@ export interface ActivityRecord {
   host: string
   session_id: string
   is_public_welfare?: boolean
+  membership_deduction_count?: number
 }
 
 export interface ActivityFollowup {

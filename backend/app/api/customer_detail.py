@@ -107,8 +107,10 @@ def _build_purchase_summary(customer_id: str) -> list:
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
     grand_total = membership_card_service.get_grand_total(customer_id)
     manual_deductions = membership_card_service.get_manual_deductions(customer_id)
-    # 活动扣卡 = 已扣卡流水 + 欠费登记流水
+    # 已实际扣到次数卡上的活动扣卡
     activity_deductions = membership_card_service.get_activity_deductions(customer_id)
+    # 无可用会员卡时登记的欠卡次数
+    advance_deductions = membership_card_service.get_debt(customer_id)
     # 内部课程抵扣：活动日期落在内部课程期间内的场次
     internal_course_deductions = _count_internal_course_covered(customer_id)
     # 不限次扣卡：通过不限次卡扣除的活动次数（无不限次卡时为0）
@@ -179,6 +181,7 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "effective_remaining": effective_remaining,
                 "manual_deductions": card_manual,
                 "activity_deductions": card_activity,
+                "advance_deductions": advance_deductions,
                 "internal_course_deductions": internal_course_deductions,
                 "unlimited_deductions": unlimited_deductions,
                 "effective_date": c.effective_date,
@@ -198,6 +201,7 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "effective_remaining": effective_remaining,
                 "manual_deductions": card_manual,
                 "activity_deductions": card_activity,
+                "advance_deductions": advance_deductions,
                 "internal_course_deductions": internal_course_deductions,
                 "unlimited_deductions": unlimited_deductions,
                 "effective_date": c.effective_date,
@@ -217,6 +221,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "effective_remaining": effective_remaining,
             "manual_deductions": manual_deductions,
             "activity_deductions": activity_deductions,
+            "advance_deductions": advance_deductions,
             "internal_course_deductions": internal_course_deductions,
                 "unlimited_deductions": unlimited_deductions,
             "effective_date": "",
@@ -347,12 +352,16 @@ def _resolve_activity_role(
 
 def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
     """合并客户参与的全部活动，按日期倒序；不按客户端发布状态过滤。"""
+    # 未指定到达日期时，从到访记录自动计算
+    if arrived_dates is None:
+        arrived_dates = {
+            v.visit_date for v in visit_service.list_visits(customer_id=customer_id)
+            if v.arrived
+        }
     activities = []
 
     # 课程记录 - 作为参与者或老师（必须实际到店）
     for r in class_record_service.list_records():
-        if arrived_dates is not None and r.date not in arrived_dates:
-            continue
         teacher_names = []
         for tid in r.teacher_ids:
             t = customer_service.get_customer(tid)
@@ -365,6 +374,7 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
             participant_ids=chargeable,
         )
         if role:
+            attended = r.date in arrived_dates
             activities.append({
                 "type": "沙龙类型",
                 "date": r.date,
@@ -374,13 +384,14 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
                 "host": host,
                 "session_id": r.id,
                 "is_public_welfare": r.is_public_welfare,
+                "membership_deduction_count": r.membership_deduction_count if attended and customer_id in chargeable else 0,
             })
 
     # 觉醒游戏（必须实际到店）
     for s in group_case_session_service.list_sessions():
-        if arrived_dates is not None and s.date not in arrived_dates:
-            continue
         gc_name = f"觉醒游戏【{s.owner_name}】" if s.owner_name else "觉醒游戏"
+        teacher_names = [customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]
+        host = ", ".join(teacher_names) if teacher_names else (s.host_name or "")
         role = _resolve_activity_role(
             customer_id,
             owner_id=s.owner_id,
@@ -391,21 +402,24 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
             participant_ids=s.participant_ids,
         )
         if role:
+            attended = s.date in arrived_dates
+            chargeable = set(s.participant_ids) - {s.owner_id}
             activities.append({
                 "type": "觉醒游戏",
                 "date": s.date,
                 "name": gc_name,
                 "role": role,
-                "host": s.host_name or "",
+                "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
+                "membership_deduction_count": s.membership_deduction_count if attended and customer_id in chargeable else 0,
             })
 
     # 情绪释放（必须实际到店）
     for s in emotional_release_session_service.list_sessions():
-        if arrived_dates is not None and s.date not in arrived_dates:
-            continue
         er_name = f"情绪释放【{s.owner_name}】" if s.owner_name else "情绪释放"
+        teacher_names = [customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]
+        host = ", ".join(teacher_names) if teacher_names else (s.host_name or "")
         role = _resolve_activity_role(
             customer_id,
             owner_id=s.owner_id,
@@ -416,20 +430,21 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
             participant_ids=s.participant_ids,
         )
         if role:
+            attended = s.date in arrived_dates
+            chargeable = set(s.participant_ids) - {s.owner_id}
             activities.append({
                 "type": "情绪释放",
                 "date": s.date,
                 "name": er_name,
                 "role": role,
-                "host": s.host_name or "",
+                "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
+                "membership_deduction_count": s.membership_deduction_count if attended and customer_id in chargeable else 0,
             })
 
     # 能量结（必须实际到店）
     for s in energy_knot_session_service.list_sessions():
-        if arrived_dates is not None and s.date not in arrived_dates:
-            continue
         ek_names = _parse_ek_names(s.description)
         ek_name = f"能量结【{ek_names}】" if ek_names else "能量结"
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
@@ -450,12 +465,11 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
+                "membership_deduction_count": 0,
             })
 
     # 内部课程（必须实际到店）
     for s in internal_course_session_service.list_sessions():
-        if arrived_dates is not None and s.date not in arrived_dates:
-            continue
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         role = _resolve_activity_role(
             customer_id,
@@ -474,11 +488,14 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
+                "membership_deduction_count": 0,
             })
 
     # OH卡梳理
     for s in oh_card_reading_session_service.list_sessions():
         ocr_name = f"OH卡梳理【{s.owner_name}】" if s.owner_name else "OH卡梳理"
+        teacher_names = [customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]
+        host = ", ".join(teacher_names) if teacher_names else (s.host_name or "")
         role = _resolve_activity_role(
             customer_id,
             owner_id=s.owner_id,
@@ -489,14 +506,17 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
             participant_ids=s.participant_ids,
         )
         if role:
+            attended = s.date in arrived_dates
+            chargeable = set(s.participant_ids) - {s.owner_id}
             activities.append({
                 "type": "OH卡梳理",
                 "date": s.date,
                 "name": ocr_name,
                 "role": role,
-                "host": s.host_name or "",
+                "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
+                "membership_deduction_count": s.membership_deduction_count if attended and customer_id in chargeable else 0,
             })
 
     activity_type_codes = {

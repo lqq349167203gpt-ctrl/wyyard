@@ -523,7 +523,10 @@ export default function DetailView({
                                 ? "rounded-[14px] border border-dashed border-[#e8eaec] bg-[#fbfbfa] px-4 py-3"
                                 : "rounded-[14px] border border-[#f0f1f3] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(33,38,49,.03)]"}>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className={`text-[13.5px] font-bold ${notArrived ? "text-[#79838f]" : "text-[#212631]"}`}>{a.name || <span className="text-[#d0d3d6]">-</span>}</span>
+                                  <span className={`min-w-0 flex-1 text-[13.5px] font-bold ${notArrived ? "text-[#79838f]" : "text-[#212631]"}`}>{a.name || <span className="text-[#d0d3d6]">-</span>}</span>
+                                  {a.membership_deduction_count != null && a.membership_deduction_count > 0 && !a.is_public_welfare && (
+                                    <span className="ml-auto shrink-0 text-[11.5px] tabular-nums text-[#8f959e]">会员扣卡{a.membership_deduction_count}次</span>
+                                  )}
                                   {a.is_public_welfare && <span className="whitespace-nowrap rounded-md bg-[#dcf5e4] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#157a3c]">公益</span>}
                                   {notArrived && <span className="whitespace-nowrap rounded-md bg-[#f1f0ed] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#79838f]">未参加</span>}
                                 </div>
@@ -686,6 +689,7 @@ export default function DetailView({
                   <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
                     {(() => {
                       const totalManual = memberItems.reduce((sum, s) => sum + (s.manual_deductions || 0), 0)
+                      const advanceDeductions = memberItems[0]?.advance_deductions || 0
                       const icDeduct = memberItems[0]?.internal_course_deductions || 0
                       const cardDeductions = memberItems
                         .filter(s => !s.voided)
@@ -700,6 +704,7 @@ export default function DetailView({
                       else parts.push("不限")
                       parts.push(...cardDeductions)
                       if (totalManual > 0) parts.push(`销卡${totalManual}次`)
+                      if (advanceDeductions > 0) parts.push(`预支扣卡${advanceDeductions}次`)
                       if (icDeduct > 0) parts.push(`内部课程抵扣${icDeduct}次`)
                       return (
                         <span>
