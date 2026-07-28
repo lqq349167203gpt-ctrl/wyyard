@@ -295,6 +295,7 @@ export function ActivityBatchTable({
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
   const eksCountEditRef = useRef<Record<string, string>>({})
+  const [membershipDeductionDrafts, setMembershipDeductionDrafts] = useState<Record<number, string>>({})
   const lastEditedEksRef = useRef<ActivityRow | null>(null)
   const eksEditsRef = useRef<Map<string, { owner_id: string; owner_name: string; billing_description: string }>>(new Map())
   const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
@@ -1424,11 +1425,39 @@ export function ActivityBatchTable({
                       <input
                         type="number"
                         min={row.is_public_welfare ? 0 : 1}
-                        value={row.is_public_welfare ? 0 : row.membership_deduction_count}
+                        value={row.is_public_welfare
+                          ? 0
+                          : membershipDeductionDrafts[row.key] ?? row.membership_deduction_count}
                         disabled={row.is_public_welfare}
+                        onFocus={(e) => {
+                          setMembershipDeductionDrafts(prev => ({
+                            ...prev,
+                            [row.key]: String(row.membership_deduction_count),
+                          }))
+                          e.currentTarget.select()
+                        }}
                         onChange={(e) => {
-                          const count = Math.max(1, Number.parseInt(e.target.value, 10) || 1)
-                          updateRow(row.key, "membership_deduction_count", count)
+                          const raw = e.target.value
+                          setMembershipDeductionDrafts(prev => ({ ...prev, [row.key]: raw }))
+                          if (raw === "") return
+                          const count = Math.max(1, Number.parseInt(raw, 10) || 1)
+                          if (count !== row.membership_deduction_count) {
+                            updateRow(row.key, "membership_deduction_count", count)
+                          }
+                        }}
+                        onBlur={() => {
+                          const raw = membershipDeductionDrafts[row.key]
+                          setMembershipDeductionDrafts(prev => {
+                            const next = { ...prev }
+                            delete next[row.key]
+                            return next
+                          })
+                          if (raw === undefined) return
+                          const count = Math.max(1, Number.parseInt(raw, 10) || 1)
+                          const currentRow = rowsRef.current.find(item => item.key === row.key)
+                          if (count !== currentRow?.membership_deduction_count) {
+                            updateRow(row.key, "membership_deduction_count", count)
+                          }
                         }}
                         className="h-7 w-[48px] rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent text-center text-[12px] text-[#2b2f36] tabular-nums outline-none focus:border-[#3370ff] disabled:cursor-not-allowed disabled:bg-[#f7f8fa] disabled:text-[#8f959e] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
