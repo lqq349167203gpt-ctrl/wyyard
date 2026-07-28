@@ -411,6 +411,96 @@ def _get_activity_date(activity_key: str) -> Optional[str]:
     return None
 
 
+def _get_expected_activity_keys(customer_id: str) -> list[str]:
+    """根据当前活动、参与身份和到店记录生成唯一的应扣卡流水键。"""
+    from app.services import (
+        class_record_service,
+        emotional_release_session_service,
+        group_case_session_service,
+        oh_card_reading_session_service,
+        visit_service,
+    )
+
+    arrived_dates = {
+        visit.visit_date
+        for visit in visit_service._visits.values()
+        if (
+            visit.customer_id == customer_id
+            and visit.arrived
+            and not visit.is_deleted
+        )
+    }
+    if not arrived_dates:
+        return []
+
+    expected: list[tuple[str, str, str]] = []
+
+    def append_activity(prefix: str, activity) -> None:
+        base_key = f"{prefix}:{activity.id}"
+        created_at = activity.created_at.isoformat() if activity.created_at else ""
+        count = get_activity_deduction_count(activity)
+        for unit_index in range(1, count + 1):
+            expected.append((
+                activity.date,
+                created_at,
+                _activity_unit_key(base_key, unit_index),
+            ))
+
+    for record in class_record_service.list_records():
+        if (
+            record.date in arrived_dates
+            and not record.is_public_welfare
+            and customer_id in class_record_service._get_group_member_ids(record)
+        ):
+            append_activity("class", record)
+
+    session_services = (
+        ("gcs", group_case_session_service),
+        ("ers", emotional_release_session_service),
+        ("ocr", oh_card_reading_session_service),
+    )
+    for prefix, service in session_services:
+        for session in service.list_sessions():
+            if (
+                session.date in arrived_dates
+                and customer_id in service._get_chargeable_ids(session)
+            ):
+                append_activity(prefix, session)
+
+    expected.sort(key=lambda item: item)
+    return [activity_key for _, _, activity_key in expected]
+
+
+def _tracking_matches_expected(customer_id: str, expected_keys: list[str]) -> bool:
+    """检查每个应扣卡单位是否恰好存在一条卡流水或预支流水。"""
+    tracked_keys = []
+    for item in _deductions.get(customer_id, []):
+        key = item.get("key") if isinstance(item, dict) else item
+        if isinstance(key, str):
+            tracked_keys.append(key)
+    tracked_keys.extend(
+        key
+        for key in _debt_activities.get(customer_id, [])
+        if isinstance(key, str)
+    )
+    return (
+        len(tracked_keys) == len(set(tracked_keys))
+        and set(tracked_keys) == set(expected_keys)
+    )
+
+
+def _rebuild_activity_tracking(
+    customer_id: str,
+    expected_keys: list[str],
+) -> None:
+    """以当前业务数据为准重建活动权益流水，清除重复及失效预支。"""
+    _deductions.pop(customer_id, None)
+    _debt_activities.pop(customer_id, None)
+    _debts.pop(customer_id, None)
+    for activity_key in expected_keys:
+        _do_deduct(customer_id, activity_key)
+
+
 def get_effective_remaining(customer_id: str) -> Optional[int]:
     """唯一真理：有效剩余 = 总购买 - 销卡 - 活动扣卡
 
@@ -749,6 +839,11 @@ def reconcile_customer_card_usage(customer_id: str) -> bool:
     from app.services import internal_course_service
 
     changed = False
+    expected_keys = _get_expected_activity_keys(customer_id)
+    if not _tracking_matches_expected(customer_id, expected_keys):
+        _rebuild_activity_tracking(customer_id, expected_keys)
+        changed = True
+
     records = _deductions.get(customer_id, [])
     candidates: list[tuple[str, dict]] = []
 
@@ -883,13 +978,11 @@ def can_deduct(customer_id: str, activity_key: str) -> bool:
 
 
 def _is_activity_already_deducted(customer_id: str, activity_key: str) -> bool:
-    if customer_id not in _deductions:
-        return False
-    for item in _deductions[customer_id]:
+    for item in _deductions.get(customer_id, []):
         key = item.get("key") if isinstance(item, dict) else item
         if key == activity_key:
             return True
-    return False
+    return activity_key in _debt_activities.get(customer_id, [])
 
 
 def _do_deduct(customer_id: str, activity_key: str) -> bool:
@@ -922,31 +1015,33 @@ def _do_deduct(customer_id: str, activity_key: str) -> bool:
 
 def _do_restore(customer_id: str, activity_key: str) -> bool:
     """内部退费逻辑（不加锁、不保存），供 restore_for_activity 和 _restore_for_record 调用"""
-    if customer_id in _deductions:
-        target_idx = None
-        target_card_id = None
-        for i, item in enumerate(_deductions[customer_id]):
-            key = item.get("key") if isinstance(item, dict) else item
-            if key == activity_key:
-                target_idx = i
-                target_card_id = item.get("card_id") if isinstance(item, dict) else None
-                break
-        if target_idx is not None:
-            _restore_one(customer_id, target_card_id)
-            _deductions[customer_id].pop(target_idx)
-            if not _deductions[customer_id]:
-                del _deductions[customer_id]
-            return True
-    if customer_id in _debt_activities and activity_key in _debt_activities[customer_id]:
-        _debt_activities[customer_id].remove(activity_key)
-        if not _debt_activities[customer_id]:
-            del _debt_activities[customer_id]
-        if customer_id in _debts and _debts[customer_id] > 0:
-            _debts[customer_id] -= 1
-            if _debts[customer_id] <= 0:
-                del _debts[customer_id]
-        return True
-    return False
+    removed = False
+    records = _deductions.get(customer_id, [])
+    kept_records = []
+    for item in records:
+        key = item.get("key") if isinstance(item, dict) else item
+        if key == activity_key:
+            card_id = item.get("card_id") if isinstance(item, dict) else None
+            _restore_one(customer_id, card_id)
+            removed = True
+        else:
+            kept_records.append(item)
+    if kept_records:
+        _deductions[customer_id] = kept_records
+    else:
+        _deductions.pop(customer_id, None)
+
+    debt_keys = _debt_activities.get(customer_id, [])
+    kept_debt_keys = [key for key in debt_keys if key != activity_key]
+    if len(kept_debt_keys) != len(debt_keys):
+        removed = True
+    if kept_debt_keys:
+        _debt_activities[customer_id] = kept_debt_keys
+        _debts[customer_id] = len(kept_debt_keys)
+    else:
+        _debt_activities.pop(customer_id, None)
+        _debts.pop(customer_id, None)
+    return removed
 
 
 def _do_sync_activity_count(customer_id: str, activity_key: str, desired_count: int) -> None:

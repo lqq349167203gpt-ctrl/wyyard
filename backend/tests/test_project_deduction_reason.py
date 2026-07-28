@@ -236,9 +236,90 @@ def test_activity_without_membership_card_keeps_negative_remaining(client, creat
         if item["type"] == "会员卡"
     )
     assert membership_summary["effective_remaining"] == -2
+    assert membership_summary["advance_deductions"] == 2
 
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
     assert membership_card_service.get_effective_remaining(created_customer["id"]) == 0
+    client.delete(f"/api/class-records/{activity.json()['id']}")
+
+
+def test_reconcile_removes_duplicate_and_public_welfare_debt(
+    client,
+    created_customer,
+):
+    from app.services import class_record_service, membership_card_service
+
+    activity_date = "2026-07-24"
+    activity = client.post("/api/class-records", json={
+        "date": activity_date,
+        "course_id": "test-reconcile-debt",
+        "course_name": "预支流水校准测试",
+        "participant_ids": [created_customer["id"]],
+    })
+    assert activity.status_code == 200
+    activity_key = f"class:{activity.json()['id']}"
+
+    visit = client.post("/api/visits", json={
+        "visit_date": activity_date,
+        "customer_id": created_customer["id"],
+        "arrived": True,
+    })
+    assert visit.status_code == 200
+    assert membership_card_service.get_debt(created_customer["id"]) == 1
+
+    membership_card_service._debt_activities[created_customer["id"]].extend([
+        activity_key,
+        activity_key,
+    ])
+    membership_card_service._debts[created_customer["id"]] = 3
+    assert membership_card_service.get_effective_remaining(created_customer["id"]) == -1
+    assert membership_card_service._debt_activities[created_customer["id"]] == [
+        activity_key,
+    ]
+
+    record = class_record_service.get_record(activity.json()["id"])
+    record.is_public_welfare = True
+    record.membership_deduction_count = 0
+    class_record_service._save(record.id)
+
+    assert membership_card_service.get_effective_remaining(created_customer["id"]) == 0
+    assert membership_card_service.get_debt(created_customer["id"]) == 0
+
+    client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
+    client.delete(f"/api/class-records/{activity.json()['id']}")
+
+
+def test_debt_deduction_is_idempotent(client, created_customer):
+    from app.services import membership_card_service
+
+    activity_date = "2026-07-24"
+    activity = client.post("/api/class-records", json={
+        "date": activity_date,
+        "course_id": "test-idempotent-debt",
+        "course_name": "预支幂等测试",
+        "participant_ids": [created_customer["id"]],
+    })
+    assert activity.status_code == 200
+    activity_key = f"class:{activity.json()['id']}"
+
+    visit = client.post("/api/visits", json={
+        "visit_date": activity_date,
+        "customer_id": created_customer["id"],
+        "arrived": True,
+    })
+    assert visit.status_code == 200
+
+    assert membership_card_service.deduct_for_activity(
+        created_customer["id"],
+        activity_key,
+    ) is True
+    assert membership_card_service.deduct_for_activity(
+        created_customer["id"],
+        activity_key,
+    ) is True
+    assert membership_card_service.get_debt(created_customer["id"]) == 1
+
+    client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
     client.delete(f"/api/class-records/{activity.json()['id']}")
 
 
