@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
-from app.utils.pagination import paginate
-from app.services import group_case_session_service
+
+from fastapi import APIRouter, HTTPException, Query, Request
+
 from app.models.group_case_session import GroupCaseSessionCreate
+from app.services import activity_assignment_notification_service, group_case_session_service
 from app.services.customer_service import list_customers
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/group-case-sessions", tags=["group-case-sessions"])
 
@@ -53,12 +55,22 @@ def list_sessions(date: Optional[str] = None, page: int | None = Query(None, ge=
 
 
 @router.post("")
-def create_session(data: GroupCaseSessionCreate):
-    return group_case_session_service.create_session(data)
+def create_session(data: GroupCaseSessionCreate, request: Request, conversion: bool = False):
+    session = group_case_session_service.create_session(data, refresh_identities=not conversion)
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    if not conversion:
+        activity_assignment_notification_service.notify_new_assignments(
+            "gcs",
+            session,
+            operator=operator,
+        )
+    return session
 
 
 @router.patch("/{session_id}")
-def update_session(session_id: str, data: dict):
+def update_session(session_id: str, data: dict, request: Request):
+    old_session = group_case_session_service.get_session(session_id)
+    old_member_ids = activity_assignment_notification_service.get_member_ids(old_session)
     try:
         session, warnings = group_case_session_service.update_session(session_id, data)
     except ValueError as e:
@@ -67,14 +79,21 @@ def update_session(session_id: str, data: dict):
         if warnings:
             raise HTTPException(status_code=422, detail="; ".join(warnings))
         raise HTTPException(status_code=404, detail="记录不存在")
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "gcs",
+        session,
+        previous_member_ids=old_member_ids,
+        operator=operator,
+    )
     result = session.model_dump(mode="json")
     result["warnings"] = warnings
     return result
 
 
 @router.delete("/{session_id}")
-def delete_session(session_id: str):
-    if not group_case_session_service.delete_session(session_id):
+def delete_session(session_id: str, conversion: bool = False):
+    if not group_case_session_service.delete_session(session_id, refresh_identities=not conversion):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "删除成功"}
 

@@ -1,10 +1,12 @@
 import json
-from fastapi import APIRouter, HTTPException, Query, Request
-from app.models.base import StrictBaseModel
 from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException, Query, Request
+
+from app.models.base import StrictBaseModel
+from app.services import activity_assignment_notification_service, class_record_service
+from app.services.customer_service import get_customer, list_customers
 from app.utils.pagination import paginate
-from app.services import class_record_service
-from app.services.customer_service import list_customers, get_customer
 
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
 
@@ -64,9 +66,9 @@ def list_unified(
     teacher_id: str | None = Query(None),
 ):
     from app.services import (
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
         oh_card_reading_session_service,
     )
@@ -178,19 +180,27 @@ def list_unified(
 
 
 @router.post("")
-def create_record(data: dict):
+def create_record(data: dict, request: Request):
     from app.models.class_record import ClassRecordCreate
     try:
         record = ClassRecordCreate(**data)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return class_record_service.create_record(record)
+    created = class_record_service.create_record(record)
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "class",
+        created,
+        operator=operator,
+    )
+    return created
 
 
 @router.patch("/{record_id}")
 def update_record(record_id: str, data: dict, request: Request):
     old_record = class_record_service.get_record(record_id)
     old_ids = set(old_record.participant_ids) if old_record else set()
+    old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
     # 更新前记录课程名称/内容，用于检测变化
     old_course_name = old_record.course_name if old_record else ""
@@ -240,7 +250,7 @@ def update_record(record_id: str, data: dict, request: Request):
         new_ids = set(record.participant_ids)
         removed_ids = old_ids - new_ids
         if removed_ids:
-            from app.services.storage import load_data, delete_item
+            from app.services.storage import delete_item, load_data
             signups_data = load_data("client_signups.json")
             deleted_ids = []
             for sid, s in signups_data.items():
@@ -264,6 +274,13 @@ def update_record(record_id: str, data: dict, request: Request):
                     operator=operator,
                 )
 
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "class",
+        record,
+        previous_member_ids=old_member_ids,
+        operator=operator,
+    )
     return record
 
 
@@ -275,6 +292,7 @@ class ParticipantUpdate(StrictBaseModel):
 def update_participants(record_id: str, data: ParticipantUpdate, request: Request):
     old_record = class_record_service.get_record(record_id)
     old_ids = set(old_record.participant_ids) if old_record else set()
+    old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
     record, warnings = class_record_service.update_participants(record_id, data.participant_ids)
     if not record:
@@ -286,7 +304,7 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
     new_ids = set(data.participant_ids)
     removed_ids = old_ids - new_ids
     if removed_ids:
-        from app.services.storage import load_data, delete_item
+        from app.services.storage import delete_item, load_data
         signups_data = load_data("client_signups.json")
         deleted_ids = []
         for sid, s in signups_data.items():
@@ -310,6 +328,14 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
                 operator=operator,
             )
 
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "class",
+        record,
+        previous_member_ids=old_member_ids,
+        operator=operator,
+    )
+
     result = record.model_dump(mode="json")
     result["warnings"] = warnings
     return result
@@ -319,6 +345,7 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
 def update_groups(record_id: str, data: dict, request: Request):
     old_record = class_record_service.get_record(record_id)
     old_ids = set(old_record.participant_ids) if old_record else set()
+    old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
     groups = data.get("groups", [])
     try:
@@ -334,7 +361,7 @@ def update_groups(record_id: str, data: dict, request: Request):
     new_ids = set(record.participant_ids)
     removed_ids = old_ids - new_ids
     if removed_ids:
-        from app.services.storage import load_data, delete_item
+        from app.services.storage import delete_item, load_data
         signups_data = load_data("client_signups.json")
         deleted_ids = []
         for sid, s in signups_data.items():
@@ -357,6 +384,14 @@ def update_groups(record_id: str, data: dict, request: Request):
                 activity_date=activity_date,
                 operator=operator,
             )
+
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "class",
+        record,
+        previous_member_ids=old_member_ids,
+        operator=operator,
+    )
 
     result = record.model_dump(mode="json")
     result["warnings"] = warnings
@@ -378,7 +413,7 @@ def delete_record(record_id: str, request: Request):
         raise HTTPException(status_code=404, detail="记录不存在")
 
     # 清理该活动的小程序报名记录 + 通知所有参与者
-    from app.services.storage import load_data, delete_item
+    from app.services.storage import delete_item, load_data
     signups_data = load_data("client_signups.json")
     signup_customer_ids = set()
     deleted_ids = []
@@ -409,14 +444,15 @@ def delete_record(record_id: str, request: Request):
 @router.get("/calendar-counts")
 def calendar_counts():
     """返回各日期的活动场数统计 {date: count}，只计数不序列化"""
+    from collections import defaultdict
+
     from app.services import (
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
         oh_card_reading_session_service,
     )
-    from collections import defaultdict
     counts: dict[str, int] = defaultdict(int)
 
     for r in class_record_service.list_records():
@@ -444,16 +480,17 @@ def calendar_counts():
 @router.get("/dashboard")
 def dashboard(date: str = Query(...), space_id: str = Query("")):
     """单次请求返回当天全部数据，替代 8 个独立 API 调用"""
+    from datetime import datetime, timedelta
+
     from app.services import (
-        group_case_session_service,
+        daily_grouping_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
         oh_card_reading_session_service,
         visit_service,
-        daily_grouping_service,
     )
-    from datetime import datetime, timedelta
 
     # 计算日期范围（21 天窗口，与前端一致）
     d = datetime.strptime(date, "%Y-%m-%d")

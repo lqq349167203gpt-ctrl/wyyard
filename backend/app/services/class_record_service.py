@@ -91,38 +91,39 @@ def _deduct_for_record(record):
         _get_group_member_ids(record),
     )
     activity_key = f"class:{record.id}"
+    deduction_count = membership_card_service.get_activity_deduction_count(record)
     with membership_card_service._deduct_lock:
         for cid in chargeable:
-            membership_card_service._do_deduct(cid, activity_key)
+            membership_card_service._do_sync_activity_count(cid, activity_key, deduction_count)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
 
 def _restore_for_record(record):
     """为删除的沙龙活动退费"""
-    if record.is_public_welfare:
-        return
     chargeable = _get_group_member_ids(record)
     activity_key = f"class:{record.id}"
     with membership_card_service._deduct_lock:
         for cid in chargeable:
-            membership_card_service._do_restore(cid, activity_key)
+            membership_card_service._do_sync_activity_count(cid, activity_key, 0)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
 
 def _sync_deduction(record, old_chargeable, new_chargeable):
-    """同步扣费：为新增人员扣费，为移除人员退费"""
-    if record.is_public_welfare:
-        return
+    """同步参与人员、公益状态和单场扣卡次数。"""
     old_chargeable = membership_card_service.filter_arrived_customer_ids(record.date, old_chargeable)
     new_chargeable = membership_card_service.filter_arrived_customer_ids(record.date, new_chargeable)
     activity_key = f"class:{record.id}"
+    deduction_count = (
+        0
+        if record.is_public_welfare
+        else membership_card_service.get_activity_deduction_count(record)
+    )
     with membership_card_service._deduct_lock:
-        for cid in old_chargeable - new_chargeable:
-            membership_card_service._do_restore(cid, activity_key)
-        for cid in new_chargeable - old_chargeable:
-            membership_card_service._do_deduct(cid, activity_key)
+        for cid in old_chargeable | new_chargeable:
+            target_count = deduction_count if cid in new_chargeable else 0
+            membership_card_service._do_sync_activity_count(cid, activity_key, target_count)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
@@ -174,36 +175,21 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
 
         # 获取旧状态
         old_chargeable = _get_group_member_ids(record)
-        old_is_public_welfare = record.is_public_welfare
 
         for key, value in data.items():
             if hasattr(record, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
                 setattr(record, key, value)
+        record.membership_deduction_count = (
+            0
+            if record.is_public_welfare
+            else max(1, int(record.membership_deduction_count or 1))
+        )
         record.updated_at = datetime.now(timezone.utc)
         _records[record_id] = record
         _save(record_id)
 
-        # 公益状态变更：非公益→公益 退费，公益→非公益 扣费
-        new_is_public_welfare = record.is_public_welfare
-        if old_is_public_welfare != new_is_public_welfare:
-            activity_key = f"class:{record.id}"
-            with membership_card_service._deduct_lock:
-                if new_is_public_welfare:
-                    for cid in old_chargeable:
-                        membership_card_service._do_restore(cid, activity_key)
-                else:
-                    new_chargeable = membership_card_service.filter_arrived_customer_ids(
-                        record.date,
-                        _get_group_member_ids(record),
-                    )
-                    for cid in new_chargeable:
-                        membership_card_service._do_deduct(cid, activity_key)
-                membership_card_service._save_deductions()
-                membership_card_service._save_debts()
-        else:
-            # 同步扣费（人员变更）
-            new_chargeable = _get_group_member_ids(record)
-            _sync_deduction(record, old_chargeable, new_chargeable)
+        new_chargeable = _get_group_member_ids(record)
+        _sync_deduction(record, old_chargeable, new_chargeable)
 
         # 刷新所有受影响客户的会员身份（旧参与者 + 新参与者）
         _refresh_affected_identities(old_chargeable | _get_all_member_ids(record))

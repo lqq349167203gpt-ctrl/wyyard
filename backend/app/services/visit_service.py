@@ -640,39 +640,62 @@ def _deduct_for_arrival(visit):
             if s.date == date and not s.is_deleted:
                 chargeable = group_case_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_deduct(cid, f"gcs:{s.id}")
+                    membership_card_service._do_sync_activity_count(
+                        cid,
+                        f"gcs:{s.id}",
+                        membership_card_service.get_activity_deduction_count(s),
+                    )
 
         for s in emotional_release_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
                 chargeable = emotional_release_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_deduct(cid, f"ers:{s.id}")
+                    membership_card_service._do_sync_activity_count(
+                        cid,
+                        f"ers:{s.id}",
+                        membership_card_service.get_activity_deduction_count(s),
+                    )
 
         for s in energy_knot_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
-                chargeable = set(s.participant_ids)
-                chargeable.discard(s.owner_id)
+                chargeable = energy_knot_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_deduct(cid, f"eks:{s.id}")
+                    membership_card_service._do_sync_activity_count(
+                        cid,
+                        f"eks:{s.id}",
+                        membership_card_service.get_activity_deduction_count(s),
+                    )
 
         for s in oh_card_reading_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
                 chargeable = set(s.participant_ids)
                 chargeable.discard(s.owner_id)
                 if cid in chargeable:
-                    membership_card_service._do_deduct(cid, f"ocr:{s.id}")
+                    membership_card_service._do_sync_activity_count(
+                        cid,
+                        f"ocr:{s.id}",
+                        membership_card_service.get_activity_deduction_count(s),
+                    )
 
         for s in internal_course_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
                 chargeable = internal_course_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_deduct(cid, f"ics:{s.id}")
+                    membership_card_service._do_sync_activity_count(
+                        cid,
+                        f"ics:{s.id}",
+                        membership_card_service.get_activity_deduction_count(s),
+                    )
 
         for cr in class_record_service.list_records():
             if cr.date == date and not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
                 if cid in chargeable:
-                    membership_card_service._do_deduct(cid, f"class:{cr.id}")
+                    membership_card_service._do_sync_activity_count(
+                        cid,
+                        f"class:{cr.id}",
+                        membership_card_service.get_activity_deduction_count(cr),
+                    )
 
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
@@ -697,39 +720,38 @@ def _restore_for_arrival(visit):
             if s.date == date and not s.is_deleted:
                 chargeable = group_case_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_restore(cid, f"gcs:{s.id}")
+                    membership_card_service._do_sync_activity_count(cid, f"gcs:{s.id}", 0)
 
         for s in emotional_release_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
                 chargeable = emotional_release_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_restore(cid, f"ers:{s.id}")
+                    membership_card_service._do_sync_activity_count(cid, f"ers:{s.id}", 0)
 
         for s in energy_knot_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
-                chargeable = set(s.participant_ids)
-                chargeable.discard(s.owner_id)
+                chargeable = energy_knot_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_restore(cid, f"eks:{s.id}")
+                    membership_card_service._do_sync_activity_count(cid, f"eks:{s.id}", 0)
 
         for s in oh_card_reading_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
                 chargeable = set(s.participant_ids)
                 chargeable.discard(s.owner_id)
                 if cid in chargeable:
-                    membership_card_service._do_restore(cid, f"ocr:{s.id}")
+                    membership_card_service._do_sync_activity_count(cid, f"ocr:{s.id}", 0)
 
         for s in internal_course_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
                 chargeable = internal_course_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
-                    membership_card_service._do_restore(cid, f"ics:{s.id}")
+                    membership_card_service._do_sync_activity_count(cid, f"ics:{s.id}", 0)
 
         for cr in class_record_service.list_records():
             if cr.date == date and not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
                 if cid in chargeable:
-                    membership_card_service._do_restore(cid, f"class:{cr.id}")
+                    membership_card_service._do_sync_activity_count(cid, f"class:{cr.id}", 0)
 
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
@@ -763,7 +785,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 changed = True
             if customer_id in cr.participant_ids:
                 if not cr.is_public_welfare:
-                    membership_card_service._do_restore(customer_id, f"class:{cr.id}")
+                    membership_card_service._do_sync_activity_count(customer_id, f"class:{cr.id}", 0)
                 cr.participant_ids = [x for x in cr.participant_ids if x != customer_id]
                 changed = True
             if cr.groups:
@@ -796,7 +818,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service._do_restore(customer_id, f"gcs:{s.id}")
+                    membership_card_service._do_sync_activity_count(customer_id, f"gcs:{s.id}", 0)
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -817,7 +839,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service._do_restore(customer_id, f"ers:{s.id}")
+                    membership_card_service._do_sync_activity_count(customer_id, f"ers:{s.id}", 0)
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -834,7 +856,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service._do_restore(customer_id, f"eks:{s.id}")
+                    membership_card_service._do_sync_activity_count(customer_id, f"eks:{s.id}", 0)
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -850,7 +872,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]
                 changed = True
             if customer_id in s.participant_ids:
-                membership_card_service._do_restore(customer_id, f"ics:{s.id}")
+                membership_card_service._do_sync_activity_count(customer_id, f"ics:{s.id}", 0)
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:
@@ -871,7 +893,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 changed = True
             if customer_id in s.participant_ids:
                 if customer_id != s.owner_id:
-                    membership_card_service._do_restore(customer_id, f"ocr:{s.id}")
+                    membership_card_service._do_sync_activity_count(customer_id, f"ocr:{s.id}", 0)
                 s.participant_ids = [x for x in s.participant_ids if x != customer_id]
                 changed = True
             if changed:

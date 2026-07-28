@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Query
-from app.utils.pagination import paginate
-from app.services import emotional_release_session_service
+from fastapi import APIRouter, HTTPException, Query, Request
+
 from app.models.emotional_release_session import EmotionalReleaseSessionCreate
+from app.services import activity_assignment_notification_service, emotional_release_session_service
 from app.services.customer_service import list_customers
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/emotional-release-sessions", tags=["emotional-release-sessions"])
 
@@ -51,12 +52,22 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 
 @router.post("")
-def create_session(data: EmotionalReleaseSessionCreate):
-    return emotional_release_session_service.create_session(data)
+def create_session(data: EmotionalReleaseSessionCreate, request: Request, conversion: bool = False):
+    session = emotional_release_session_service.create_session(data, refresh_identities=not conversion)
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    if not conversion:
+        activity_assignment_notification_service.notify_new_assignments(
+            "ers",
+            session,
+            operator=operator,
+        )
+    return session
 
 
 @router.patch("/{session_id}")
-def update_session(session_id: str, data: dict):
+def update_session(session_id: str, data: dict, request: Request):
+    old_session = emotional_release_session_service.get_session(session_id)
+    old_member_ids = activity_assignment_notification_service.get_member_ids(old_session)
     try:
         session, warnings = emotional_release_session_service.update_session(session_id, data)
     except ValueError as e:
@@ -65,14 +76,21 @@ def update_session(session_id: str, data: dict):
         if warnings:
             raise HTTPException(status_code=422, detail="; ".join(warnings))
         raise HTTPException(status_code=404, detail="记录不存在")
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "ers",
+        session,
+        previous_member_ids=old_member_ids,
+        operator=operator,
+    )
     result = session.model_dump(mode="json")
     result["warnings"] = warnings
     return result
 
 
 @router.delete("/{session_id}")
-def delete_session(session_id: str):
-    if not emotional_release_session_service.delete_session(session_id):
+def delete_session(session_id: str, conversion: bool = False):
+    if not emotional_release_session_service.delete_session(session_id, refresh_identities=not conversion):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "删除成功"}
 

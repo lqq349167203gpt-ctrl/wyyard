@@ -195,6 +195,36 @@ class TestGroupCaseSessionFull:
         })
         assert resp.status_code == 200
 
+    def test_conversion_mode_skips_duplicate_side_effects(self, client, created_customer, monkeypatch):
+        from app.api import group_case_sessions as group_case_sessions_api
+        from app.services import group_case_session_service
+
+        identity_refreshes = []
+        notifications = []
+        monkeypatch.setattr(
+            group_case_session_service,
+            "_refresh_affected_identities",
+            lambda customer_ids: identity_refreshes.append(customer_ids),
+        )
+        monkeypatch.setattr(
+            group_case_sessions_api.activity_assignment_notification_service,
+            "notify_new_assignments",
+            lambda *args, **kwargs: notifications.append((args, kwargs)),
+        )
+
+        resp = client.post("/api/group-case-sessions?conversion=true", json={
+            "date": "2026-08-01",
+            "owner_id": created_customer["id"],
+            "owner_name": created_customer["nickname"],
+        })
+        assert resp.status_code == 200
+        session_id = resp.json()["id"]
+
+        deleted = client.delete(f"/api/group-case-sessions/{session_id}?conversion=true")
+        assert deleted.status_code == 200
+        assert identity_refreshes == []
+        assert notifications == []
+
     def test_create_with_description(self, client, created_customer):
         resp = client.post("/api/group-case-sessions", json={
             "date": "2026-08-02",
@@ -453,9 +483,11 @@ class TestEnergyKnotSessionFull:
             "date": "2026-08-02",
             "owner_id": created_customer["id"],
             "owner_name": created_customer["nickname"],
-            "description": "能量结描述",
+            "description": '[{"id":"owner-1","name":"测试案主","count":2}]',
+            "course_description": "能量结活动简介\n支持换行",
         })
         assert resp.status_code == 200
+        assert resp.json()["course_description"] == "能量结活动简介\n支持换行"
 
     def test_create_with_hosts(self, client, created_customer):
         """多课程老师"""

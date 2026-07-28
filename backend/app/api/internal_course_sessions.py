@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query, Request
-from app.utils.pagination import paginate
-from app.services import internal_course_session_service
+
 from app.models.internal_course_session import InternalCourseSessionCreate
+from app.services import activity_assignment_notification_service, internal_course_session_service
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/internal-course-sessions", tags=["internal-course-sessions"])
 
@@ -37,14 +38,22 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 
 @router.post("")
-def create_session(data: InternalCourseSessionCreate):
-    return internal_course_session_service.create_session(data)
+def create_session(data: InternalCourseSessionCreate, request: Request):
+    session = internal_course_session_service.create_session(data)
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "ics",
+        session,
+        operator=operator,
+    )
+    return session
 
 
 @router.patch("/{session_id}")
 def update_session(session_id: str, data: dict, request: Request):
     old_session = internal_course_session_service.get_session(session_id)
     old_ids = set(old_session.participant_ids) if old_session else set()
+    old_member_ids = activity_assignment_notification_service.get_member_ids(old_session)
 
     old_course_name = old_session.course_name if old_session else ""
     old_description = old_session.course_description if old_session else ""
@@ -85,6 +94,13 @@ def update_session(session_id: str, data: dict, request: Request):
                 operator=operator,
             )
 
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "ics",
+        session,
+        previous_member_ids=old_member_ids,
+        operator=operator,
+    )
     return session
 
 

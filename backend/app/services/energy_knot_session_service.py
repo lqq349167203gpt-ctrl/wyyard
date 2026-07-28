@@ -1,11 +1,11 @@
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from app.models.energy_knot_session import EnergyKnotSession, EnergyKnotSessionCreate
-from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service, energy_knot_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "energy_knot_sessions.json"
 _sessions: Dict[str, EnergyKnotSession] = {}
@@ -52,10 +52,8 @@ def get_session(session_id: str) -> Optional[EnergyKnotSession]:
 
 
 def _get_chargeable_ids(session) -> set:
-    """需要扣费的人员：参与者 + 老师（不含案主）"""
-    ids = set(session.participant_ids)
-    ids.discard(session.owner_id)
-    return ids
+    """能量结不产生参与者会员卡扣费；案主按专项次数单独计算。"""
+    return set()
 
 
 def _deduct_for_session(session):
@@ -66,9 +64,10 @@ def _deduct_for_session(session):
         _get_chargeable_ids(session),
     )
     activity_key = f"eks:{session.id}"
+    deduction_count = membership_card_service.get_activity_deduction_count(session)
     with membership_card_service._deduct_lock:
         for cid in chargeable:
-            membership_card_service._do_deduct(cid, activity_key)
+            membership_card_service._do_sync_activity_count(cid, activity_key, deduction_count)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
@@ -80,22 +79,22 @@ def _restore_for_session(session):
     activity_key = f"eks:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in chargeable:
-            membership_card_service._do_restore(cid, activity_key)
+            membership_card_service._do_sync_activity_count(cid, activity_key, 0)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
-    """同步扣费：为新增人员扣费，为移除人员退费"""
+    """同步参与人员和单场扣卡次数。"""
     from app.services import membership_card_service
     old_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, old_chargeable)
     new_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, new_chargeable)
     activity_key = f"eks:{session.id}"
+    deduction_count = membership_card_service.get_activity_deduction_count(session)
     with membership_card_service._deduct_lock:
-        for cid in old_chargeable - new_chargeable:
-            membership_card_service._do_restore(cid, activity_key)
-        for cid in new_chargeable - old_chargeable:
-            membership_card_service._do_deduct(cid, activity_key)
+        for cid in old_chargeable | new_chargeable:
+            target_count = deduction_count if cid in new_chargeable else 0
+            membership_card_service._do_sync_activity_count(cid, activity_key, target_count)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
@@ -120,7 +119,7 @@ def _refresh_affected_identities(customer_ids: set):
                 pass
 
 
-def create_session(data: EnergyKnotSessionCreate) -> EnergyKnotSession:
+def create_session(data: EnergyKnotSessionCreate, refresh_identities: bool = True) -> EnergyKnotSession:
     now = datetime.now(timezone.utc)
     session = EnergyKnotSession(
         id=str(uuid.uuid4())[:12],
@@ -131,7 +130,8 @@ def create_session(data: EnergyKnotSessionCreate) -> EnergyKnotSession:
     _sessions[session.id] = session
     _save(session.id)
     _deduct_for_session(session)
-    _refresh_affected_identities(_get_all_member_ids(session))
+    if refresh_identities:
+        _refresh_affected_identities(_get_all_member_ids(session))
     return session
 
 
@@ -168,7 +168,7 @@ def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
     return session
 
 
-def delete_session(session_id: str) -> bool:
+def delete_session(session_id: str, refresh_identities: bool = True) -> bool:
     session = _sessions.get(session_id)
     if not session or session.is_deleted:
         return False
@@ -177,7 +177,8 @@ def delete_session(session_id: str) -> bool:
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
     _save(session_id)
-    _refresh_affected_identities(affected_ids)
+    if refresh_identities:
+        _refresh_affected_identities(affected_ids)
     return True
 
 
@@ -198,18 +199,12 @@ def search_customers(keyword: str) -> list:
 
 
 def get_remaining_count(customer_id: str) -> int:
-    """计算某用户的能量结剩余次数（按部位数扣除）"""
+    """计算某用户的能量结剩余次数；保存活动后立即按部位数扣除。"""
     knots = energy_knot_service.list_knots()
     total_purchased = sum(k.purchase_count for k in knots if k.customer_id == customer_id)
-    from app.services import visit_service
-    arrived_dates = {
-        visit.visit_date
-        for visit in visit_service.list_visits(customer_id=customer_id)
-        if visit.arrived and not visit.is_deleted
-    }
     used = 0
     for s in _sessions.values():
-        if s.is_deleted or s.date not in arrived_dates:
+        if s.is_deleted:
             continue
         found_in_desc = False
         try:

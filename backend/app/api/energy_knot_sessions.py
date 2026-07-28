@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Query
-from app.utils.pagination import paginate
-from app.services import energy_knot_session_service
+from fastapi import APIRouter, HTTPException, Query, Request
+
 from app.models.energy_knot_session import EnergyKnotSessionCreate
+from app.services import activity_assignment_notification_service, energy_knot_session_service
 from app.services.customer_service import list_customers
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/energy-knot-sessions", tags=["energy-knot-sessions"])
 
@@ -49,24 +50,41 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 
 @router.post("")
-def create_session(data: EnergyKnotSessionCreate):
-    return energy_knot_session_service.create_session(data)
+def create_session(data: EnergyKnotSessionCreate, request: Request, conversion: bool = False):
+    session = energy_knot_session_service.create_session(data, refresh_identities=not conversion)
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    if not conversion:
+        activity_assignment_notification_service.notify_new_assignments(
+            "eks",
+            session,
+            operator=operator,
+        )
+    return session
 
 
 @router.patch("/{session_id}")
-def update_session(session_id: str, data: dict):
+def update_session(session_id: str, data: dict, request: Request):
+    old_session = energy_knot_session_service.get_session(session_id)
+    old_member_ids = activity_assignment_notification_service.get_member_ids(old_session)
     try:
         session = energy_knot_session_service.update_session(session_id, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not session:
         raise HTTPException(status_code=404, detail="记录不存在")
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    activity_assignment_notification_service.notify_new_assignments(
+        "eks",
+        session,
+        previous_member_ids=old_member_ids,
+        operator=operator,
+    )
     return session
 
 
 @router.delete("/{session_id}")
-def delete_session(session_id: str):
-    if not energy_knot_session_service.delete_session(session_id):
+def delete_session(session_id: str, conversion: bool = False):
+    if not energy_knot_session_service.delete_session(session_id, refresh_identities=not conversion):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "删除成功"}
 

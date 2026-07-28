@@ -16,13 +16,14 @@ Page({
     this.setData({ loading: true })
     try {
       const res = await clientApi.getNotifications()
-      const items = (res.items || []).map(n => {
+      const items = (res.items || []).filter(n => n.type !== 'deduction').map(n => {
         const d = new Date(n.created_at)
         return {
           ...n,
           time_text: this._formatTime(d),
           day_label: this._dayLabel(d),
           meta_text: this._buildMeta(n),
+          activity_date_text: this._buildActivityDate(n),
         }
       })
       const groups = this._groupByDay(items)
@@ -63,11 +64,30 @@ Page({
     const yesterday = new Date(now)
     yesterday.setDate(yesterday.getDate() - 1)
     if (d.toDateString() === yesterday.toDateString()) return '昨天'
+    if (d.getFullYear() !== now.getFullYear()) {
+      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+    }
     return `${d.getMonth() + 1}月${d.getDate()}日`
   },
 
   _buildMeta(n) {
     return n.operator || ''
+  },
+
+  _buildActivityDate(n) {
+    const activityTypes = [
+      'activity_assigned',
+      'activity_changed',
+      'activity_cancelled',
+      'signup_cancelled',
+      'arrival_confirmed',
+    ]
+    const isActivityMessage = activityTypes.includes(n.type)
+    if (!isActivityMessage || !n.activity_date) return ''
+
+    const parts = String(n.activity_date).split('-')
+    if (parts.length !== 3) return n.activity_date
+    return `${Number(parts[0])}年${Number(parts[1])}月${Number(parts[2])}日`
   },
 
   _groupByDay(items) {

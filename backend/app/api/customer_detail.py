@@ -346,7 +346,7 @@ def _resolve_activity_role(
 
 
 def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
-    """合并所有活动记录，按日期倒序（必须实际到店）"""
+    """合并客户参与的全部活动，按日期倒序；不按客户端发布状态过滤。"""
     activities = []
 
     # 课程记录 - 作为参与者或老师（必须实际到店）

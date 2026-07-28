@@ -148,6 +148,66 @@ def test_activity_deducts_only_after_arrival(client, created_customer):
     client.delete(f"/api/membership-cards/{card['id']}")
 
 
+def test_activity_supports_configurable_membership_deduction_count(client, created_customer):
+    from app.services import membership_card_service
+
+    card = _create_count_card(client, created_customer)
+    activity_date = "2026-07-24"
+    activity = client.post("/api/class-records", json={
+        "date": activity_date,
+        "course_id": "test-multi-deduction-course",
+        "course_name": "多次扣卡测试",
+        "participant_ids": [created_customer["id"]],
+        "membership_deduction_count": 2,
+    })
+    assert activity.status_code == 200
+    assert activity.json()["membership_deduction_count"] == 2
+
+    visit = client.post("/api/visits", json={
+        "visit_date": activity_date,
+        "customer_id": created_customer["id"],
+        "arrived": True,
+    })
+    assert visit.status_code == 200
+
+    card_state = client.get(f"/api/membership-cards/{card['id']}")
+    assert card_state.json()["effective_remaining"] == 3
+    base_key = f"class:{activity.json()['id']}"
+    usage_keys = {
+        item["key"]
+        for item in membership_card_service.list_activity_usage_records(created_customer["id"])
+        if item["key"].startswith(base_key)
+    }
+    assert usage_keys == {base_key, f"{base_key}#unit=2"}
+
+    reduced = client.patch(
+        f"/api/class-records/{activity.json()['id']}",
+        json={"membership_deduction_count": 1},
+    )
+    assert reduced.status_code == 200
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 4
+
+    welfare = client.patch(
+        f"/api/class-records/{activity.json()['id']}",
+        json={"is_public_welfare": True, "membership_deduction_count": 0},
+    )
+    assert welfare.status_code == 200
+    assert welfare.json()["membership_deduction_count"] == 0
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 5
+
+    chargeable_again = client.patch(
+        f"/api/class-records/{activity.json()['id']}",
+        json={"is_public_welfare": False},
+    )
+    assert chargeable_again.status_code == 200
+    assert chargeable_again.json()["membership_deduction_count"] == 1
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 4
+
+    client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
+    client.delete(f"/api/class-records/{activity.json()['id']}")
+    client.delete(f"/api/membership-cards/{card['id']}")
+
+
 def test_activity_remaining_is_snapshot_after_that_deduction(client, created_customer):
     from app.middleware.jwt_auth import create_customer_token
 
@@ -189,6 +249,7 @@ def test_activity_remaining_is_snapshot_after_that_deduction(client, created_cus
         if item["source"] == "activity" and item["project_name"] == "剩余次数快照测试"
     )
     assert activity_record["remaining_after"] == 2
+    assert activity_record["activity_role"] == "参与者"
 
     client.delete(f"/api/project-deductions/{manual.json()['id']}")
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
@@ -482,52 +543,115 @@ def test_internal_course_session_never_deducts_card(client, created_customer):
     client.delete(f"/api/membership-cards/{card['id']}")
 
 
-def test_special_project_usage_appears_only_after_arrival(client, created_customer):
-    from app.api.client import _build_special_project_usage_records
+def test_energy_knot_count_applies_without_arrival_and_never_deducts_participant_card(client, created_customer):
+    import json
+    import uuid
 
-    purchase_response = client.post("/api/group-cases", json={
+    from app.api.client import _build_special_project_usage_records
+    from app.services import membership_card_service
+
+    purchase_response = client.post("/api/energy-knots", json={
         "customer_id": created_customer["id"],
         "nickname": created_customer["nickname"],
-        "purchase_count": 2,
-        "amount": 2000,
+        "purchase_count": 5,
+        "amount": 1000,
     })
     assert purchase_response.status_code == 200
     purchase = purchase_response.json()
 
-    session_response = client.post("/api/group-case-sessions", json={
-        "date": "2026-07-27",
-        "name": "觉醒游戏专项记录测试",
+    participant_response = client.post("/api/customers", json={
+        "nickname": f"能量结参与者_{uuid.uuid4().hex[:8]}",
+    })
+    assert participant_response.status_code == 200
+    participant = participant_response.json()
+    card = _create_count_card(client, participant)
+
+    session_response = client.post("/api/energy-knot-sessions", json={
+        "date": "2026-08-12",
+        "name": "能量结即时销卡测试",
         "owner_id": created_customer["id"],
         "owner_name": created_customer["nickname"],
+        "participant_ids": [participant["id"]],
+        "description": json.dumps([{
+            "id": created_customer["id"],
+            "name": created_customer["nickname"],
+            "count": 2,
+        }], ensure_ascii=False),
     })
     assert session_response.status_code == 200
     session = session_response.json()
 
-    assert _build_special_project_usage_records(created_customer["id"]) == []
-    before_arrival = client.get(f"/api/group-cases/{purchase['id']}")
-    assert before_arrival.json()["effective_remaining"] == 2
+    purchase_state = client.get(f"/api/energy-knots/{purchase['id']}")
+    assert purchase_state.status_code == 200
+    assert purchase_state.json()["effective_remaining"] == 3
+
+    records = _build_special_project_usage_records(created_customer["id"])
+    record = next(item for item in records if item["project_name"] == "能量结即时销卡测试")
+    assert record["count"] == 2
+    assert record["remaining_after"] == 3
 
     visit = client.post("/api/visits", json={
-        "visit_date": "2026-07-27",
-        "customer_id": created_customer["id"],
+        "visit_date": "2026-08-12",
+        "customer_id": participant["id"],
         "arrived": True,
     })
     assert visit.status_code == 200
-
-    records = _build_special_project_usage_records(created_customer["id"])
-    record = next(item for item in records if item["project_name"] == "觉醒游戏专项记录测试")
-    assert record["source"] == "project_activity"
-    assert record["project_type"] == "group-cases"
-    assert record["benefit_name"] == "觉醒游戏次数"
-    assert record["count"] == 1
-    assert record["remaining_after"] == 1
-
-    after_arrival = client.get(f"/api/group-cases/{purchase['id']}")
-    assert after_arrival.json()["effective_remaining"] == 1
+    usage = membership_card_service.list_activity_usage_records(participant["id"])
+    assert all(not item["key"].startswith(f"eks:{session['id']}") for item in usage)
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 5
 
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
-    client.delete(f"/api/group-case-sessions/{session['id']}")
-    client.delete(f"/api/group-cases/{purchase['id']}")
+    client.delete(f"/api/energy-knot-sessions/{session['id']}")
+    client.delete(f"/api/membership-cards/{card['id']}")
+    client.delete(f"/api/customers/{participant['id']}")
+    client.delete(f"/api/energy-knots/{purchase['id']}")
+
+
+def test_special_project_usage_appears_immediately_after_owner_assignment(client, created_customer):
+    from app.api.client import _build_special_project_usage_records
+
+    configs = [
+        ("group-cases", "group-case-sessions", "觉醒游戏"),
+        ("emotional-releases", "emotional-release-sessions", "情绪释放"),
+        ("oh-card-readings", "oh-card-reading-sessions", "OH卡梳理"),
+    ]
+    for index, (project_path, session_path, type_label) in enumerate(configs, start=1):
+        purchase_response = client.post(f"/api/{project_path}", json={
+            "customer_id": created_customer["id"],
+            "nickname": created_customer["nickname"],
+            "purchase_count": 2,
+            "amount": 2000,
+        })
+        assert purchase_response.status_code == 200
+        purchase = purchase_response.json()
+
+        activity_name = f"{type_label}立即扣次测试"
+        session_response = client.post(f"/api/{session_path}", json={
+            "date": f"2026-07-{26 + index:02d}",
+            "name": activity_name,
+            "owner_id": created_customer["id"],
+            "owner_name": created_customer["nickname"],
+        })
+        assert session_response.status_code == 200
+        session = session_response.json()
+
+        purchase_state = client.get(f"/api/{project_path}/{purchase['id']}")
+        assert purchase_state.json()["effective_remaining"] == 1
+
+        records = _build_special_project_usage_records(created_customer["id"])
+        record = next(item for item in records if item["project_name"] == activity_name)
+        assert record["source"] == "project_activity"
+        assert record["project_type"] == project_path
+        assert record["benefit_name"] == f"{type_label}次数"
+        assert record["count"] == 1
+        assert record["remaining_after"] == 1
+        assert record["activity_role"] == "案主"
+        assert record["reason"] == f"课表录入案主使用{type_label}"
+
+        client.delete(f"/api/{session_path}/{session['id']}")
+        restored_state = client.get(f"/api/{project_path}/{purchase['id']}")
+        assert restored_state.json()["effective_remaining"] == 2
+        client.delete(f"/api/{project_path}/{purchase['id']}")
 
 
 def test_unpurchased_special_project_usage_keeps_negative_remaining(client, created_customer):

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from app.api.customer_detail import _build_activities, _build_payment_records, _build_purchase_summary
 from app.models.activity_followup import ActivityFollowupCreate
 from app.services import (
+    activity_assignment_notification_service,
     activity_followup_service,
     class_record_service,
     course_type_service,
@@ -188,7 +189,11 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
     location = f"{space_name} {room_name}".strip() if space_name else ""
 
     # 简介
-    description = d.get("course_description") or d.get("description", "")
+    description = (
+        d.get("course_description", "")
+        if activity_type == "eks"
+        else d.get("course_description") or d.get("description", "")
+    )
 
     # 列表图片和详情图片：从活动类型配置中获取
     ct_name = d.get("course_type", "")
@@ -284,6 +289,25 @@ def _activity_role_for_customer(item: dict, customer_id: str) -> str:
 
 def _activity_role_label(role: str) -> str:
     return {"owner": "案主", "teacher": "老师"}.get(role, "")
+
+
+def _customer_participates_in_activity(item: dict, customer_id: str) -> bool:
+    """判断客户是否属于活动名单；用于本人访问未发布活动。"""
+    if not customer_id:
+        return False
+    if _activity_role_for_customer(item, customer_id):
+        return True
+    if customer_id in (item["data"].get("participant_ids") or []):
+        return True
+    if any(
+        customer_id in (group.get("member_ids") or [])
+        for group in (item["data"].get("groups") or [])
+    ):
+        return True
+    return any(
+        signup.get("customer_id") == customer_id
+        for signup in _load_signups(item["id"])
+    )
 
 
 def _activity_signup_count(item: dict, signups: list[dict]) -> int:
@@ -422,7 +446,11 @@ def get_activity(activity_id: str, request: Request):
     if not item:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    if not item["data"].get("is_published", False):
+    customer_id = _current_customer_id(request)
+    if (
+        not item["data"].get("is_published", False)
+        and not _customer_participates_in_activity(item, customer_id)
+    ):
         raise HTTPException(status_code=404, detail="活动不存在")
 
     customer_map = _build_customer_map()
@@ -431,7 +459,6 @@ def get_activity(activity_id: str, request: Request):
 
     # 参与者 = 案主/老师 ∪ 后台维护的 participant_ids(+分组成员) ∪ 小程序报名记录
     # 当前用户(若已登录)排最前并标记 is_me
-    customer_id = _current_customer_id(request)
     member_ids: list[str] = []
     seen: set[str] = set()
 
@@ -563,7 +590,15 @@ def signup_activity(activity_id: str, request: Request):
 
     # 同步到对应 PC 活动的参与者列表
     if activity_date and customer_id:
+        previous_member_ids = activity_assignment_notification_service.get_member_ids(item["data"])
         _sync_activity_participant(item, customer_id, add=True)
+        updated_item = _find_activity(activity_id)
+        if updated_item:
+            activity_assignment_notification_service.notify_new_assignments(
+                updated_item["type"],
+                {"id": updated_item["id"], **updated_item["data"]},
+                previous_member_ids=previous_member_ids,
+            )
 
     return {"message": "报名成功", "signup_id": signup_id}
 
@@ -673,7 +708,7 @@ def get_transactions(request: Request):
 
 @router.get("/activity-records")
 def get_activity_records(request: Request):
-    """活动记录 — 当前客户的参与活动记录"""
+    """活动记录 — 当前客户参与的全部活动，不受发布状态限制。"""
     customer_id = _current_customer_id(request)
     if not customer_id:
         raise HTTPException(status_code=401, detail="请先登录")
@@ -791,6 +826,10 @@ def _enrich_activity_time(act: dict):
 def _build_client_deduction_items(customer_id: str) -> list[dict]:
     """构建客户端销卡记录，供销卡页和消息通知共用。"""
     items = []
+    activity_roles = {
+        activity["activity_key"]: activity.get("role", "")
+        for activity in _build_activities(customer_id)
+    }
     arrived_dates = {
         visit.visit_date
         for visit in visit_service.list_visits(customer_id=customer_id)
@@ -812,6 +851,7 @@ def _build_client_deduction_items(customer_id: str) -> list[dict]:
             "deduction_date": d.deduction_date,
             "reason": d.reason or "后台手工销卡",
             "created_by": d.created_by,
+            "activity_role": "",
         })
 
     # 活动会员权益使用：内部课程场次免费，不进入销卡记录
@@ -827,6 +867,7 @@ def _build_client_deduction_items(customer_id: str) -> list[dict]:
             continue
         benefit_name, benefit_type = _resolve_usage_benefit(item)
         remaining_after = item.get("remaining_after") if isinstance(item, dict) else None
+        activity_key = key.split("#unit=", 1)[0]
         items.append({
             "source_id": f"activity:{key}",
             "source_created_at": item.get("deducted_at") or f"{activity['date']}T12:00:00+00:00",
@@ -841,6 +882,7 @@ def _build_client_deduction_items(customer_id: str) -> list[dict]:
             "deduction_date": activity["date"],
             "reason": f"参加{activity['type_label']}",
             "created_by": "",
+            "activity_role": activity_roles.get(activity_key, ""),
         })
 
     items.extend(_build_special_project_usage_records(customer_id))
@@ -868,7 +910,7 @@ def _resolve_activity_usage(key: str) -> dict | None:
     parts = key.split(":", 1)
     if len(parts) < 2:
         return None
-    act_type, act_id = parts[0], parts[1]
+    act_type, act_id = parts[0], parts[1].split("#unit=", 1)[0]
     if act_type == "class":
         record = class_record_service.get_record(act_id)
         if record:
@@ -929,12 +971,7 @@ def _energy_knot_usage_count(session, customer_id: str) -> int:
 
 
 def _build_special_project_usage_records(customer_id: str) -> list[dict]:
-    """将专项项目案主的实际到场使用转换为销卡记录。"""
-    arrived_dates = {
-        visit.visit_date
-        for visit in visit_service.list_visits(customer_id=customer_id)
-        if visit.arrived and not visit.is_deleted
-    }
+    """将专项项目案主的课表使用转换为销卡记录。"""
     configs = [
         ("group-cases", "觉醒游戏", group_case_session_service),
         ("emotional-releases", "情绪释放", emotional_release_session_service),
@@ -951,7 +988,7 @@ def _build_special_project_usage_records(customer_id: str) -> list[dict]:
         has_purchased = isinstance(total_purchased, (int, float)) and total_purchased > 0
         current_remaining = service.get_remaining_count(customer_id)
         for session in service.list_sessions():
-            if session.owner_id != customer_id or session.date not in arrived_dates:
+            if session.owner_id != customer_id:
                 continue
             count = (
                 _energy_knot_usage_count(session, customer_id)
@@ -969,7 +1006,8 @@ def _build_special_project_usage_records(customer_id: str) -> list[dict]:
                 "count": count,
                 "remaining_after": current_remaining,
                 "deduction_date": session.date,
-                "reason": f"案主到场使用{type_label}",
+                "reason": f"课表录入案主使用{type_label}",
                 "created_by": "",
+                "activity_role": "案主",
             })
     return records

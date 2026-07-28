@@ -2,7 +2,7 @@ const { clientApi } = require('../../utils/api')
 
 const SOURCE_LABELS = {
   manual: '人工销卡',
-  activity: '活动扣卡',
+  activity: '沙龙活动扣卡',
   project_activity: '项目扣卡',
 }
 
@@ -75,6 +75,7 @@ Page({
             : (['unlimited_card', 'internal_course'].includes(d.benefit_type) ? '不限次' : ''),
           date_label: this._dateLabel(d.deduction_date),
           reason_text: d.reason || '',
+          activity_role_text: d.activity_role || '',
         }
       })
       this.setData({

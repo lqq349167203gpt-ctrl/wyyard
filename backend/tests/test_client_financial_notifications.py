@@ -1,5 +1,7 @@
 """客户端购买与销卡消息通知测试。"""
 
+from datetime import datetime, timezone
+
 from app.middleware.jwt_auth import create_customer_token
 
 
@@ -8,7 +10,7 @@ def _customer_headers(customer: dict) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_purchase_and_manual_deduction_sync_to_notifications(client, created_customer):
+def test_purchase_syncs_but_manual_deduction_is_hidden_from_notifications(client, created_customer):
     card_response = client.post("/api/membership-cards", json={
         "customer_id": created_customer["id"],
         "nickname": created_customer["nickname"],
@@ -43,24 +45,19 @@ def test_purchase_and_manual_deduction_sync_to_notifications(client, created_cus
     assert "购买数量：1 次" in purchase["content"]
     assert "支付金额：¥300" in purchase["content"]
 
-    manual = next(item for item in items if item["title"] == "人工销卡")
-    assert "内容：消息通知销卡内容" in manual["content"]
-    assert "剩余：2 次" in manual["content"]
-    assert manual["operator"] == "测试员工"
+    assert not any(item["type"] == "deduction" for item in items)
 
     repeated = client.get("/api/client/notifications", headers=headers)
     assert len(repeated.json()["items"]) == len(items)
-    marked = client.patch(f"/api/client/notifications/{manual['id']}/read", headers=headers)
-    assert marked.status_code == 200
-    refreshed = client.get("/api/client/notifications", headers=headers)
-    refreshed_manual = next(item for item in refreshed.json()["items"] if item["id"] == manual["id"])
-    assert refreshed_manual["is_read"] is True
 
     client.delete(f"/api/project-deductions/{deduction['id']}")
     client.delete(f"/api/membership-cards/{card['id']}")
 
 
-def test_activity_and_unpurchased_project_deductions_sync_to_notifications(client, created_customer):
+def test_activity_deductions_are_replaced_by_activity_arrangement_notifications(
+    client,
+    created_customer,
+):
     card_response = client.post("/api/membership-cards", json={
         "customer_id": created_customer["id"],
         "nickname": created_customer["nickname"],
@@ -107,14 +104,29 @@ def test_activity_and_unpurchased_project_deductions_sync_to_notifications(clien
     assert response.status_code == 200
     items = response.json()["items"]
 
-    activity_notification = next(item for item in items if item["title"] == "活动扣卡")
-    assert "活动通知测试" in activity_notification["content"]
-    assert "剩余：2 次" in activity_notification["content"]
+    assert not any(item["type"] == "deduction" for item in items)
 
-    project_notification = next(item for item in items if item["title"] == "觉醒游戏扣卡")
-    assert "未购买觉醒游戏通知" in project_notification["content"]
-    assert "使用权益：未购买" in project_notification["content"]
-    assert "剩余：-1 次" in project_notification["content"]
+    activity_notification = next(
+        item
+        for item in items
+        if item["title"] == "活动安排"
+        and item["activity_name"] == "活动通知测试"
+    )
+    assert "活动名称：活动通知测试" in activity_notification["content"]
+    assert "身份：参与者" in activity_notification["content"]
+    assert activity_notification["activity_date"] == "2026-07-29"
+    sent_at = datetime.fromisoformat(activity_notification["created_at"].replace("Z", "+00:00"))
+    assert (datetime.now(timezone.utc) - sent_at).total_seconds() < 60
+
+    project_notification = next(
+        item
+        for item in items
+        if item["title"] == "活动安排"
+        and item["activity_name"] == "未购买觉醒游戏通知"
+    )
+    assert "活动名称：未购买觉醒游戏通知" in project_notification["content"]
+    assert "身份：案主" in project_notification["content"]
+    assert project_notification["activity_date"] == "2026-07-29"
 
     client.patch(f"/api/visits/{visit['id']}", json={"arrived": False})
     client.delete(f"/api/group-case-sessions/{session['id']}")

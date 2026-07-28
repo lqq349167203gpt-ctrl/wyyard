@@ -702,6 +702,7 @@ export interface ClassRecord {
   is_public_welfare: boolean
   is_published: boolean
   activity_mode?: string
+  membership_deduction_count: number
   space_id: string
   room_id: string
   room_name: string
@@ -723,6 +724,7 @@ export interface ClassRecordCreate {
   is_public_welfare?: boolean
   is_published?: boolean
   activity_mode?: string
+  membership_deduction_count?: number
   space_id?: string
   room_id?: string
   room_name?: string
@@ -825,6 +827,7 @@ export interface GroupCaseSession {
   materials: Material[]
   is_published: boolean
   activity_mode?: string
+  membership_deduction_count: number
   space_id: string
   room_id: string
   room_name: string
@@ -846,6 +849,8 @@ export interface GroupCaseSessionCreate {
   host_id?: string
   host_name?: string
   is_published?: boolean
+  activity_mode?: string
+  membership_deduction_count?: number
   space_id?: string
   room_id?: string
   room_name?: string
@@ -864,9 +869,9 @@ export interface GroupCaseCustomerSearchResult {
 export const groupCaseSessionApi = {
   list: (date?: string) => request<GroupCaseSession[]>(`/api/group-case-sessions${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<GroupCaseSession>>(`/api/group-case-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
-  create: (data: GroupCaseSessionCreate) => request<GroupCaseSession>("/api/group-case-sessions", { method: "POST", body: JSON.stringify(data) }),
+  create: (data: GroupCaseSessionCreate, conversion = false) => request<GroupCaseSession>(`/api/group-case-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<GroupCaseSessionCreate>) => request<GroupCaseSession & { warnings?: string[] }>(`/api/group-case-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => request<{ message: string }>(`/api/group-case-sessions/${id}`, { method: "DELETE" }),
+  delete: (id: string, conversion = false) => request<{ message: string }>(`/api/group-case-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<GroupCaseCustomerSearchResult[]>(`/api/group-case-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
@@ -924,6 +929,7 @@ export interface OhCardReadingSession {
   materials: Material[]
   is_published: boolean
   activity_mode?: string
+  membership_deduction_count: number
   space_id: string
   room_id: string
   room_name: string
@@ -945,6 +951,8 @@ export interface OhCardReadingSessionCreate {
   host_id?: string
   host_name?: string
   is_published?: boolean
+  activity_mode?: string
+  membership_deduction_count?: number
   space_id?: string
   room_id?: string
   room_name?: string
@@ -954,9 +962,9 @@ export interface OhCardReadingSessionCreate {
 export const ohCardReadingSessionApi = {
   list: (date?: string) => request<OhCardReadingSession[]>(`/api/oh-card-reading-sessions${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<OhCardReadingSession>>(`/api/oh-card-reading-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
-  create: (data: OhCardReadingSessionCreate) => request<OhCardReadingSession>("/api/oh-card-reading-sessions", { method: "POST", body: JSON.stringify(data) }),
+  create: (data: OhCardReadingSessionCreate, conversion = false) => request<OhCardReadingSession>(`/api/oh-card-reading-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<OhCardReadingSessionCreate>) => request<OhCardReadingSession & { warnings?: string[] }>(`/api/oh-card-reading-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => request<{ message: string }>(`/api/oh-card-reading-sessions/${id}`, { method: "DELETE" }),
+  delete: (id: string, conversion = false) => request<{ message: string }>(`/api/oh-card-reading-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<GroupCaseCustomerSearchResult[]>(`/api/oh-card-reading-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
@@ -1051,6 +1059,7 @@ export interface EmotionalReleaseSession {
   materials: Material[]
   is_published: boolean
   activity_mode?: string
+  membership_deduction_count: number
   space_id: string
   room_id: string
   room_name: string
@@ -1072,6 +1081,8 @@ export interface EmotionalReleaseSessionCreate {
   host_id?: string
   host_name?: string
   is_published?: boolean
+  activity_mode?: string
+  membership_deduction_count?: number
   space_id?: string
   room_id?: string
   room_name?: string
@@ -1090,9 +1101,9 @@ export interface EmotionalReleaseCustomerSearchResult {
 export const emotionalReleaseSessionApi = {
   list: (date?: string) => request<EmotionalReleaseSession[]>(`/api/emotional-release-sessions${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<EmotionalReleaseSession>>(`/api/emotional-release-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
-  create: (data: EmotionalReleaseSessionCreate) => request<EmotionalReleaseSession>("/api/emotional-release-sessions", { method: "POST", body: JSON.stringify(data) }),
+  create: (data: EmotionalReleaseSessionCreate, conversion = false) => request<EmotionalReleaseSession>(`/api/emotional-release-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EmotionalReleaseSessionCreate>) => request<EmotionalReleaseSession & { warnings?: string[] }>(`/api/emotional-release-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => request<{ message: string }>(`/api/emotional-release-sessions/${id}`, { method: "DELETE" }),
+  delete: (id: string, conversion = false) => request<{ message: string }>(`/api/emotional-release-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<EmotionalReleaseCustomerSearchResult[]>(`/api/emotional-release-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
@@ -1106,12 +1117,14 @@ export interface EnergyKnotSession {
   owner_name: string
   name: string
   description: string | null
+  course_description: string
   participant_ids: string[]
   teacher_ids: string[]
   host_id: string
   host_name: string
   is_published: boolean
   activity_mode?: string
+  membership_deduction_count: number
   space_id: string
   room_id: string
   room_name: string
@@ -1128,11 +1141,14 @@ export interface EnergyKnotSessionCreate {
   owner_name: string
   name?: string
   description?: string
+  course_description?: string
   participant_ids?: string[]
   teacher_ids?: string[]
   host_id?: string
   host_name?: string
   is_published?: boolean
+  activity_mode?: string
+  membership_deduction_count?: number
   space_id?: string
   room_id?: string
   room_name?: string
@@ -1150,9 +1166,9 @@ export interface EnergyKnotCustomerSearchResult {
 export const energyKnotSessionApi = {
   list: (date?: string) => request<EnergyKnotSession[]>(`/api/energy-knot-sessions${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<EnergyKnotSession>>(`/api/energy-knot-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
-  create: (data: EnergyKnotSessionCreate) => request<EnergyKnotSession>("/api/energy-knot-sessions", { method: "POST", body: JSON.stringify(data) }),
+  create: (data: EnergyKnotSessionCreate, conversion = false) => request<EnergyKnotSession>(`/api/energy-knot-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EnergyKnotSessionCreate>) => request<EnergyKnotSession & { warnings?: string[] }>(`/api/energy-knot-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => request<{ message: string }>(`/api/energy-knot-sessions/${id}`, { method: "DELETE" }),
+  delete: (id: string, conversion = false) => request<{ message: string }>(`/api/energy-knot-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<EnergyKnotCustomerSearchResult[]>(`/api/energy-knot-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
@@ -1172,6 +1188,7 @@ export interface InternalCourseSession {
   materials: Material[]
   is_published: boolean
   activity_mode?: string
+  membership_deduction_count: number
   space_id: string
   room_id: string
   room_name: string
@@ -1192,6 +1209,8 @@ export interface InternalCourseSessionCreate {
   host_name?: string
   participant_ids?: string[]
   is_published?: boolean
+  activity_mode?: string
+  membership_deduction_count?: number
   space_id?: string
   room_id?: string
   room_name?: string

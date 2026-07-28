@@ -183,6 +183,23 @@ def test_client_formats_other_activity_with_configured_images(monkeypatch):
     assert result["detail_images"] == ["/api/uploads/public-images/gcs-detail.jpg"]
 
 
+def test_client_formats_energy_knot_with_independent_course_description(monkeypatch):
+    monkeypatch.setattr(client_api.course_type_service, "list_course_types", lambda: [])
+    item = {
+        "id": "eks-1",
+        "type": "eks",
+        "data": {
+            "date": "2026-07-27",
+            "description": '[{"id":"owner-1","name":"测试案主","count":2}]',
+            "course_description": "第一行\n第二行",
+        },
+    }
+
+    result = client_api._format_activity(item, {}, {}, {})
+
+    assert result["description"] == "第一行\n第二行"
+
+
 def test_client_activity_returns_teacher_avatar(monkeypatch):
     monkeypatch.setattr(client_api.course_type_service, "list_course_types", lambda: [])
     teacher = SimpleNamespace(
@@ -380,6 +397,33 @@ def test_client_activity_detail_marks_owner_as_locked_participant(monkeypatch):
     }
 
 
+def test_client_participant_can_view_unpublished_activity_detail(monkeypatch):
+    item = {
+        "id": "draft-1",
+        "type": "class",
+        "data": {
+            "course_type": "疗愈活动",
+            "course_name": "未发布的本人活动",
+            "date": "2026-08-01",
+            "participant_ids": ["customer-1"],
+            "is_published": False,
+        },
+    }
+    customer = SimpleNamespace(nickname="测试用户", name="测试用户", avatar_url="")
+    monkeypatch.setattr(client_api, "_find_activity", lambda activity_id: item)
+    monkeypatch.setattr(client_api, "_build_customer_map", lambda: {"customer-1": customer})
+    monkeypatch.setattr(client_api, "_get_space_map", lambda: ({}, {}))
+    monkeypatch.setattr(client_api, "_load_signups", lambda activity_id: [])
+    monkeypatch.setattr(client_api, "_current_customer_id", lambda request: "customer-1")
+    monkeypatch.setattr(client_api.course_type_service, "list_course_types", lambda: [])
+
+    result = client_api.get_activity("draft-1", SimpleNamespace())
+
+    assert result["name"] == "未发布的本人活动"
+    assert result["signed_up"] is True
+    assert result["participants"][0]["is_me"] is True
+
+
 @pytest.mark.parametrize("handler", [client_api.get_activity, client_api.signup_activity])
 def test_client_rejects_direct_access_to_unpublished_activity(monkeypatch, handler):
     item = {
@@ -391,7 +435,10 @@ def test_client_rejects_direct_access_to_unpublished_activity(monkeypatch, handl
         },
     }
     monkeypatch.setattr(client_api, "_find_activity", lambda activity_id: item)
-    request = SimpleNamespace(state=SimpleNamespace(customer_id="customer-1", user_id=""))
+    request = SimpleNamespace(
+        state=SimpleNamespace(customer_id="customer-1", user_id=""),
+        headers={},
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         handler("draft-1", request)

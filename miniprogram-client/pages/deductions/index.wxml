@@ -85,6 +85,11 @@
                 <text class="c-amt-unit">次</text>
               </view>
             </view>
+            <!-- 活动身份 -->
+            <view wx:if="{{record.activity_role_text}}" class="c-why">
+              <text class="c-why-label">活动身份</text>
+              <text class="c-why-text">{{record.activity_role_text}}</text>
+            </view>
             <!-- 权益/内容 -->
             <view wx:if="{{record.benefit_text || record.reason_text}}" class="c-why">
               <text class="c-why-label">{{record.tag_tone === 'manual' ? '内容' : '使用权益'}}</text>

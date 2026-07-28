@@ -64,9 +64,10 @@ def _deduct_for_session(session):
         _get_chargeable_ids(session),
     )
     activity_key = f"ics:{session.id}"
+    deduction_count = membership_card_service.get_activity_deduction_count(session)
     with membership_card_service._deduct_lock:
         for cid in chargeable:
-            membership_card_service._do_deduct(cid, activity_key)
+            membership_card_service._do_sync_activity_count(cid, activity_key, deduction_count)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
@@ -78,22 +79,22 @@ def _restore_for_session(session):
     activity_key = f"ics:{session.id}"
     with membership_card_service._deduct_lock:
         for cid in chargeable:
-            membership_card_service._do_restore(cid, activity_key)
+            membership_card_service._do_sync_activity_count(cid, activity_key, 0)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
-    """同步扣费：为新增人员扣费，为移除人员退费"""
+    """同步参与人员和单场扣卡次数。"""
     from app.services import membership_card_service
     old_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, old_chargeable)
     new_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, new_chargeable)
     activity_key = f"ics:{session.id}"
+    deduction_count = membership_card_service.get_activity_deduction_count(session)
     with membership_card_service._deduct_lock:
-        for cid in old_chargeable - new_chargeable:
-            membership_card_service._do_restore(cid, activity_key)
-        for cid in new_chargeable - old_chargeable:
-            membership_card_service._do_deduct(cid, activity_key)
+        for cid in old_chargeable | new_chargeable:
+            target_count = deduction_count if cid in new_chargeable else 0
+            membership_card_service._do_sync_activity_count(cid, activity_key, target_count)
         membership_card_service._save_deductions()
         membership_card_service._save_debts()
 

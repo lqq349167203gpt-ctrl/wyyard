@@ -25,6 +25,7 @@ _debt_activities: Dict[str, list] = {}
 _deduct_lock = threading.Lock()
 # 并发锁：保护 create_card / update_card / delete_card / void_card / unvoid_card
 _card_lock = threading.Lock()
+_ACTIVITY_UNIT_SEPARATOR = "#unit="
 
 
 def _migrate_closers(item: MembershipCard) -> MembershipCard:
@@ -40,13 +41,13 @@ def _migrate_total_count(item: MembershipCard) -> MembershipCard:
 
 
 def _migrate_deductions(raw):
-    """兼容老数据并排除内部课程曾错误生成的扣卡流水。"""
+    """兼容老数据并排除不产生会员卡扣费的活动流水。"""
     out: Dict[str, list] = {}
     for customer_id, items in (raw or {}).items():
         migrated = []
         for it in items:
             activity_key = it.get("key") if isinstance(it, dict) else it
-            if isinstance(activity_key, str) and activity_key.startswith("ics:"):
+            if isinstance(activity_key, str) and activity_key.startswith(("ics:", "eks:")):
                 continue
             if isinstance(it, dict):
                 migrated.append({
@@ -87,7 +88,10 @@ def _load():
     for customer_id, activity_keys in raw_debt_activities.items():
         filtered_keys = [
             key for key in activity_keys
-            if not (isinstance(key, str) and key.startswith("ics:"))
+            if not (
+                isinstance(key, str)
+                and key.startswith(("ics:", "eks:"))
+            )
         ]
         removed_count = len(activity_keys) - len(filtered_keys)
         if filtered_keys:
@@ -233,7 +237,6 @@ def _count_raw_activities(customer_id: str) -> int:
     from app.services import (
         class_record_service,
         emotional_release_session_service,
-        energy_knot_session_service,
         group_case_session_service,
         oh_card_reading_session_service,
         visit_service,
@@ -254,12 +257,6 @@ def _count_raw_activities(customer_id: str) -> int:
     for s in emotional_release_session_service.list_sessions():
         if not s.is_deleted and s.date in arrived_dates:
             if customer_id in emotional_release_session_service._get_chargeable_ids(s):
-                count += 1
-    for s in energy_knot_session_service.list_sessions():
-        if not s.is_deleted and s.date in arrived_dates:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if customer_id in chargeable:
                 count += 1
     for s in oh_card_reading_session_service.list_sessions():
         if not s.is_deleted and s.date in arrived_dates:
@@ -351,6 +348,35 @@ def get_card_effective_remaining(card_id: str) -> Optional[int]:
     return max(0, (card.total_count or 0) - manual - activity)
 
 
+def get_activity_deduction_count(activity) -> int:
+    """获取单个参与者在该场活动中需要扣除的会员卡次数。"""
+    try:
+        return max(1, int(getattr(activity, "membership_deduction_count", 1)))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _base_activity_key(activity_key: str) -> str:
+    """移除多次扣卡的单位后缀，得到活动自身的稳定键。"""
+    return activity_key.split(_ACTIVITY_UNIT_SEPARATOR, 1)[0]
+
+
+def _activity_unit_key(activity_key: str, unit_index: int) -> str:
+    """第一次沿用历史键，后续次数使用可独立撤销的单位键。"""
+    if unit_index <= 1:
+        return activity_key
+    return f"{activity_key}{_ACTIVITY_UNIT_SEPARATOR}{unit_index}"
+
+
+def _activity_unit_index(activity_key: str) -> int:
+    if _ACTIVITY_UNIT_SEPARATOR not in activity_key:
+        return 1
+    try:
+        return max(1, int(activity_key.rsplit(_ACTIVITY_UNIT_SEPARATOR, 1)[1]))
+    except (TypeError, ValueError):
+        return 1
+
+
 def _get_activity_date(activity_key: str) -> Optional[str]:
     """根据 activity_key（如 class:xxx, gcs:xxx）查找活动日期"""
     from app.services import (
@@ -360,6 +386,7 @@ def _get_activity_date(activity_key: str) -> Optional[str]:
         group_case_session_service,
         oh_card_reading_session_service,
     )
+    activity_key = _base_activity_key(activity_key)
     if ':' not in activity_key:
         return None
     type_prefix, item_id = activity_key.split(':', 1)
@@ -919,6 +946,31 @@ def _do_restore(customer_id: str, activity_key: str) -> bool:
                 del _debts[customer_id]
         return True
     return False
+
+
+def _do_sync_activity_count(customer_id: str, activity_key: str, desired_count: int) -> None:
+    """将某客户在某活动的扣卡/欠费单位同步到指定次数（不加锁、不保存）。"""
+    desired_count = max(0, int(desired_count or 0))
+    base_key = _base_activity_key(activity_key)
+    existing_keys: set[str] = set()
+    for item in _deductions.get(customer_id, []):
+        key = item.get("key") if isinstance(item, dict) else item
+        if isinstance(key, str) and _base_activity_key(key) == base_key:
+            existing_keys.add(key)
+    for key in _debt_activities.get(customer_id, []):
+        if isinstance(key, str) and _base_activity_key(key) == base_key:
+            existing_keys.add(key)
+
+    desired_keys = {
+        _activity_unit_key(base_key, unit_index)
+        for unit_index in range(1, desired_count + 1)
+    }
+    for key in sorted(existing_keys - desired_keys, key=_activity_unit_index, reverse=True):
+        _do_restore(customer_id, key)
+    for unit_index in range(1, desired_count + 1):
+        key = _activity_unit_key(base_key, unit_index)
+        if key not in existing_keys:
+            _do_deduct(customer_id, key)
 
 
 def deduct_for_activity(customer_id: str, activity_key: str) -> bool:

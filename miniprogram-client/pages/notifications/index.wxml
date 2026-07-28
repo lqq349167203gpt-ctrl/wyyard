@@ -48,6 +48,10 @@
             <text class="r-time">{{n.time_text}}</text>
           </view>
           <text class="r-text">{{n.content}}</text>
+          <view wx:if="{{n.activity_date_text}}" class="r-activity-date">
+            <text class="r-activity-date-label">活动日期</text>
+            <text class="r-activity-date-value">{{n.activity_date_text}}</text>
+          </view>
           <view wx:if="{{n.meta_text}}" class="r-foot">
             <text class="r-foot-op">操作人 · {{n.meta_text}}</text>
           </view>

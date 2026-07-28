@@ -234,6 +234,28 @@
   color: #8a94a0;
 }
 
+.r-activity-date {
+  margin-top: 12rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.r-activity-date-label {
+  font-size: 20rpx;
+  color: #8a94a0;
+}
+
+.r-activity-date-value {
+  font-size: 22rpx;
+  color: #454e59;
+}
+
+.read .r-activity-date-label,
+.read .r-activity-date-value {
+  color: #a8b1bd;
+}
+
 /* 底部操作人 */
 .r-foot {
   margin-top: 14rpx;

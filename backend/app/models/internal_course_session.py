@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import List, Optional
 
+from pydantic import Field
+
 from app.models.base import SafeBaseModel
 
 
@@ -18,6 +20,7 @@ class InternalCourseSessionBase(SafeBaseModel):
     materials: List[dict] = []
     is_published: bool = False
     activity_mode: str = "线下"
+    membership_deduction_count: int = Field(default=1, ge=0)
     space_id: str = ""
     room_id: str = ""
     room_name: str = ""

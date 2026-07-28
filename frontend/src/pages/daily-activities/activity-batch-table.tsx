@@ -126,10 +126,12 @@ interface ActivityRow {
   activity_mode: string
   is_public_welfare: boolean
   is_published: boolean
+  membership_deduction_count: number
   deduction_count: number
   space_id: string
   room_id: string
   description: string
+  billing_description: string
   pendingCreate: boolean
   raw: any
 }
@@ -181,7 +183,9 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
     participantIds = [...(data.participant_ids || [])].filter(Boolean)
   }
 
-  const desc = (type === "class" || type === "ics") ? (data.course_description || "") : (data.description || "")
+  const desc = (type === "class" || type === "ics" || type === "eks")
+    ? (data.course_description || "")
+    : (data.description || "")
   const sid = data.space_id || defaultSpaceId || ""
   const rid = data.room_id || (spaces.find(s => s.id === sid)?.rooms?.[0]?.id || "")
 
@@ -197,9 +201,13 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
     activity_mode: data.activity_mode || "线下",
     is_public_welfare: data.is_public_welfare || false,
     is_published: data.is_published || false,
+    membership_deduction_count: type === "eks" || type === "ics" || data.is_public_welfare
+      ? 0
+      : Math.max(1, Number(data.membership_deduction_count) || 1),
     deduction_count: type === "eks" ? parseEksDescription(data.description || "").count : (data.is_public_welfare ? 0 : 1),
     space_id: sid, room_id: rid,
     description: desc,
+    billing_description: type === "eks" ? (data.description || "") : "",
     pendingCreate: false,
     raw: data,
   }
@@ -220,9 +228,11 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
     activity_mode: "线下",
     is_public_welfare: false,
     is_published: false,
+    membership_deduction_count: type === "eks" || type === "ics" ? 0 : 1,
     deduction_count: 1,
     space_id: sid, room_id: rid,
     description: "",
+    billing_description: "",
     pendingCreate: true,
     raw: {},
   }
@@ -286,7 +296,7 @@ export function ActivityBatchTable({
   const dragKeyRef = useRef<number | null>(null)
   const eksCountEditRef = useRef<Record<string, string>>({})
   const lastEditedEksRef = useRef<ActivityRow | null>(null)
-  const eksEditsRef = useRef<Map<string, { owner_id: string; owner_name: string; description: string }>>(new Map())
+  const eksEditsRef = useRef<Map<string, { owner_id: string; owner_name: string; billing_description: string }>>(new Map())
   const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
   const fetchedRemainingRef = useRef<Set<string>>(new Set())
   const prevOwnerRef = useRef<Record<number, string>>({})
@@ -314,6 +324,7 @@ export function ActivityBatchTable({
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([])
   const historyPushedRef = useRef<Set<number>>(new Set())
   const saveRowRef = useRef<(row: ActivityRow) => Promise<void>>(() => Promise.resolve())
+  const typeChangeKeysRef = useRef<Set<number>>(new Set())
 
   const getUserName = useCallback(() => {
     try {
@@ -338,15 +349,15 @@ export function ActivityBatchTable({
     onHistoryPushed?.(entry)
   }, [getUserName, onHistoryPushed])
 
-  const deleteRecordFromBackend = useCallback(async (row: ActivityRow) => {
+  const deleteRecordFromBackend = useCallback(async (row: ActivityRow, conversion = false) => {
     const id = row.record_id
     if (!id) return
     if (row.record_type === "class") await classRecordApi.delete(id)
-    else if (row.record_type === "gcs") await groupCaseSessionApi.delete(id)
-    else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(id)
-    else if (row.record_type === "eks") await energyKnotSessionApi.delete(id)
+    else if (row.record_type === "gcs") await groupCaseSessionApi.delete(id, conversion)
+    else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(id, conversion)
+    else if (row.record_type === "eks") await energyKnotSessionApi.delete(id, conversion)
     else if (row.record_type === "ics") await internalCourseSessionApi.delete(id)
-    else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(id)
+    else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(id, conversion)
   }, [])
 
   const undo = useCallback(() => {
@@ -559,7 +570,7 @@ export function ActivityBatchTable({
           if (edit) {
             row.owner_id = edit.owner_id
             row.owner_name = edit.owner_name
-            row.description = edit.description
+            row.billing_description = edit.billing_description
           }
         }
         return row
@@ -600,7 +611,8 @@ export function ActivityBatchTable({
   }, [records, courses, date, spaceId, spaces, courseTypes])
 
   // 保存单行（返回 API 结果，供 handleCreate 获取 record_id）
-  const saveRowInner = useCallback(async (row: ActivityRow): Promise<any> => {
+  const saveRowInner = useCallback(async (row: ActivityRow, conversion = false): Promise<any> => {
+    rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saving" }
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       const type = row.record_type
@@ -611,6 +623,9 @@ export function ActivityBatchTable({
         end_time: row.end_time || null,
         activity_mode: row.activity_mode,
         is_published: row.is_published,
+        membership_deduction_count: type === "eks" || type === "ics" || row.is_public_welfare
+          ? 0
+          : row.membership_deduction_count,
         space_id: row.space_id || undefined,
         room_id: row.room_id || undefined,
         space_name: space?.name || undefined,
@@ -640,7 +655,8 @@ export function ActivityBatchTable({
           createData.owner_name = row.owner_name || ""
           createData.name = row.name || ""
           createData.teacher_ids = row.host_ids
-          createData.description = row.description || ""
+          createData.description = row.billing_description || ""
+          createData.course_description = row.description || ""
         } else if (type === "ics") {
           createData.course_type = row.ics_course_key?.replace("ics:", "") || ""
           createData.course_name = row.name || ""
@@ -650,26 +666,30 @@ export function ActivityBatchTable({
 
         let result: any
         if (type === "class") result = await classRecordApi.create(createData)
-        else if (type === "gcs") result = await groupCaseSessionApi.create(createData)
-        else if (type === "ers") result = await emotionalReleaseSessionApi.create(createData)
-        else if (type === "eks") result = await energyKnotSessionApi.create(createData)
+        else if (type === "gcs") result = await groupCaseSessionApi.create(createData, conversion)
+        else if (type === "ers") result = await emotionalReleaseSessionApi.create(createData, conversion)
+        else if (type === "eks") result = await energyKnotSessionApi.create(createData, conversion)
         else if (type === "ics") result = await internalCourseSessionApi.create(createData)
-        else if (type === "ocr") result = await ohCardReadingSessionApi.create(createData)
+        else if (type === "ocr") result = await ohCardReadingSessionApi.create(createData, conversion)
 
-        // 更新行：标记为已创建
-        setRows(prev => {
-          const next = prev.map(r => r.key === row.key ? {
-            ...r, record_id: result?.id || "", pendingCreate: false, raw: result || {},
-          } : r)
-          // 保存顺序
-          const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
-          try {
-            const order = next.map(r => `${r.record_type}-${r.record_id}`)
-            localStorage.setItem(orderKey, JSON.stringify(order))
-          } catch {}
-          return next
-        })
+        // 更新行：标记为已创建。先同步 rowsRef，避免 React 批处理期间再次被当成未创建记录。
+        const rowsWithCreatedRecord = rowsRef.current.map(r => r.key === row.key ? {
+          ...r, record_id: result?.id || "", pendingCreate: false, raw: result || {},
+        } : r)
+        rowsRef.current = rowsWithCreatedRecord
+        setRows(rowsWithCreatedRecord)
+        // 保存顺序
+        const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
+        try {
+          const order = rowsWithCreatedRecord.map(r => `${r.record_type}-${r.record_id}`)
+          localStorage.setItem(orderKey, JSON.stringify(order))
+        } catch {}
+        rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saved" }
         setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+        if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+          // 余额列表数据量较大，不阻塞场次创建和旧类型清理。
+          void fetchRemaining(row.record_type, "all")
+        }
         return result
       } else {
         // 更新已有记录
@@ -713,7 +733,8 @@ export function ActivityBatchTable({
             owner_name: row.owner_name || "",
             name: row.name || "",
             teacher_ids: row.host_ids,
-            description: row.description,
+            description: row.billing_description,
+            course_description: row.description,
             participant_ids: row.participant_ids,
           })
         } else if (type === "ics") {
@@ -738,6 +759,7 @@ export function ActivityBatchTable({
         }
       }
 
+      rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saved" }
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
       historyPushedRef.current.delete(row.key)
       if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
@@ -753,23 +775,27 @@ export function ActivityBatchTable({
       // 404 = record_id 已失效（记录被删后重建），降级为 create
       if (row.record_id && !row.pendingCreate && (msg.includes("404") || msg.includes("不存在"))) {
         await deleteRecordFromBackend(row).catch(() => {})
-        return await saveRowInner({ ...row, record_id: "", pendingCreate: true })
+        return await saveRowInner({ ...row, record_id: "", pendingCreate: true }, conversion)
       }
       console.error("[SAVE] error", { key: row.key, type: row.record_type, id: row.record_id, error: e?.message })
+      rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "error" }
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       throw e
     }
   }, [courses, spaceId, spaces, date, fetchRemaining])
 
   // saveRow 包装：加 15 秒超时，防止 API 挂起时 status 永远停在 "saving"
-  const saveRow = useCallback(async (row: ActivityRow): Promise<any> => {
+  const saveRow = useCallback(async (row: ActivityRow, conversion = false): Promise<any> => {
     const key = row.key
     const timer = setTimeout(() => {
       // 仅当状态仍为 "saving" 时才改为 "error"
-      setRowStatus(prev => prev[key] === "saving" ? { ...prev, [key]: "error" } : prev)
+      if (rowStatusRef.current[key] === "saving") {
+        rowStatusRef.current = { ...rowStatusRef.current, [key]: "error" }
+        setRowStatus(prev => ({ ...prev, [key]: "error" }))
+      }
     }, 15000)
     try {
-      return await saveRowInner(row)
+      return await saveRowInner(row, conversion)
     } finally {
       clearTimeout(timer)
     }
@@ -791,6 +817,7 @@ export function ActivityBatchTable({
     name: "名称", start_time: "时间", end_time: "时间",
     activity_mode: "活动方式", description: "简介", is_published: "发布",
     is_public_welfare: "公益", participant_ids: "参与人",
+    membership_deduction_count: "扣卡次数",
     host_ids: "老师", host_names: "老师",
     owner_id: "案主", owner_name: "案主",
     space_id: "空间", room_id: "空间",
@@ -869,6 +896,8 @@ export function ActivityBatchTable({
 
   // 类型切换 → 先创建新记录，成功后再删除旧记录（防止数据丢失）
   const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {
+    // 同一行的类型转换必须串行执行，避免连续切换时留下中间类型的孤立场次。
+    if (typeChangeKeysRef.current.has(rowKey) || rowStatusRef.current[rowKey] === "saving") return
     const row = rowsRef.current.find(r => r.key === rowKey)
     if (!row) return
     // 解析复合值，如 "ics:疗愈师课程"
@@ -877,19 +906,16 @@ export function ActivityBatchTable({
     const newTypeName = parsedCourse || TYPE_NAMES[parsedType as ActivityType] || parsedType
     const type = parsedType as ActivityType
     // 同类型且同课程 → 忽略（在 pushHistory 之前检查，避免污染 undo 栈）
-    if (type === row.record_type && parsedCourse && parsedCourse === row.ics_course_key?.replace("ics:", "")) return
-    // 构造切换后的行，用于历史快照
-    const switchedRow: ActivityRow = {
-      ...row,
-      record_type: type,
-      ics_course_key: type === "ics" ? newType : "",
-      class_course_type: type === "class" ? parsedCourse : "",
-      record_id: "",
-      pendingCreate: true,
-      name: parsedCourse || TYPE_NAMES[type] || "",
-      course_id: "",
-      raw: {},
-      deduction_count: type === "eks" ? 2 : 1,
+    const currentCourse = row.record_type === "ics"
+      ? row.ics_course_key?.replace("ics:", "")
+      : row.record_type === "class"
+        ? row.class_course_type
+        : ""
+    if (type === row.record_type && (!["class", "ics"].includes(type) || parsedCourse === currentCourse)) return
+    typeChangeKeysRef.current.add(rowKey)
+    if (timersRef.current[rowKey]) {
+      clearTimeout(timersRef.current[rowKey])
+      delete timersRef.current[rowKey]
     }
     // 存 pre-change 快照用于 undo
     const preRows = rowsRef.current.map(r => ({ ...r }))
@@ -905,35 +931,50 @@ export function ActivityBatchTable({
       name: parsedCourse || TYPE_NAMES[type] || "",
       course_id: "",
       raw: {},
+      membership_deduction_count: type === "eks" || type === "ics" ? 0 : 1,
       deduction_count: type === "eks" ? 2 : 1,
     }
-    setRows(prev => prev.map(r => r.key === rowKey ? updated : r))
+    const rowsWithUpdatedType = rowsRef.current.map(r => r.key === rowKey ? updated : r)
+    rowsRef.current = rowsWithUpdatedType
+    setRows(rowsWithUpdatedType)
+    rowStatusRef.current = { ...rowStatusRef.current, [rowKey]: "idle" }
     setRowStatus(prev => ({ ...prev, [rowKey]: "idle" }))
     lastEditedEksRef.current = null
-    // 先保存新记录，成功后再推历史快照（确保快照包含 record_id）
+    // 先保存新记录，再删除旧记录；任一步失败都回滚新记录并恢复旧行。
     try {
-      const result = await saveRow(updated)
+      const result = await saveRow(updated, true)
       const savedId = result?.id || ""
-      pushHistory("切换了类型", [rowKey], `将「${oldName}」切换为${newTypeName}`, preRows, [{ rowKey, fields: ["record_type", "name"] }])
+      if (!savedId) throw new Error("新活动创建失败")
       // 新记录创建成功，删除旧记录
       if (row.record_id && !row.pendingCreate) {
         try {
-          if (row.record_type === "class") await classRecordApi.delete(row.record_id)
-          else if (row.record_type === "gcs") await groupCaseSessionApi.delete(row.record_id)
-          else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(row.record_id)
-          else if (row.record_type === "eks") await energyKnotSessionApi.delete(row.record_id)
-          else if (row.record_type === "ics") await internalCourseSessionApi.delete(row.record_id)
-          else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(row.record_id)
-        } catch (e) {
-          console.error("[ACT] 删除旧记录失败（新记录已创建）:", e)
+          await deleteRecordFromBackend(row, true)
+        } catch (deleteError) {
+          // 旧记录删除失败时撤销刚创建的新记录，避免刷新后出现重复活动。
+          await deleteRecordFromBackend({
+            ...updated,
+            record_id: savedId,
+            pendingCreate: false,
+          }, true).catch(() => {})
+          throw deleteError
+        }
+        // 旧专项类型的余额也要刷新，否则界面会暂时显示未返还。
+        if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+          void fetchRemaining(row.record_type, "all")
         }
       }
+      pushHistory("切换了类型", [rowKey], `将「${oldName}」切换为${newTypeName}`, preRows, [{ rowKey, fields: ["record_type", "name"] }])
     } catch {
       // 新记录创建失败，恢复旧行状态
-      setRows(prev => prev.map(r => r.key === rowKey ? row : r))
+      const restoredRows = rowsRef.current.map(r => r.key === rowKey ? row : r)
+      rowsRef.current = restoredRows
+      setRows(restoredRows)
+      rowStatusRef.current = { ...rowStatusRef.current, [rowKey]: row.record_id ? "saved" : "idle" }
       setRowStatus(prev => ({ ...prev, [rowKey]: row.record_id ? "saved" : "idle" }))
+    } finally {
+      typeChangeKeysRef.current.delete(rowKey)
     }
-  }, [spaceId, spaces, saveRow, pushHistory])
+  }, [deleteRecordFromBackend, fetchRemaining, saveRow, pushHistory])
 
   // 拖拽排序
   const handleDragStart = useCallback((key: number) => { dragKeyRef.current = key }, [])
@@ -1058,13 +1099,13 @@ export function ActivityBatchTable({
       if (src) {
         fresh.owner_id = src.owner_id
         fresh.owner_name = src.owner_name
-        fresh.description = src.description
-        fresh.deduction_count = parseEksDescription(src.description).count
+        fresh.billing_description = src.billing_description
+        fresh.deduction_count = parseEksDescription(src.billing_description).count
       }
     }
     // 先捕获 pre-change 快照（与 updateRow/handleTypeChange 一致）
     const preRows = rowsRef.current.map(r => ({ ...r }))
-    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "is_published", "space_id"]
+    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "membership_deduction_count", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "is_published", "space_id"]
     pushHistory("新增了活动", [fresh.key], `新增了「${newName}」`, preRows, [{ rowKey: fresh.key, fields: allFields }])
     setRows(prev => [...prev, fresh])
     setRowStatus(prev => ({ ...prev, [fresh.key]: "idle" }))
@@ -1131,7 +1172,7 @@ export function ActivityBatchTable({
         `}</style>
       )}
       <div className="overflow-x-auto scrollbar-visible">
-        <div className={hasOwnerType ? "min-w-[1409px]" : "min-w-[1253px]"}>
+        <div className={hasOwnerType ? "min-w-[1471px]" : "min-w-[1315px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
             <tr className="bg-[#f7f8fa] text-[#8f959e]">
@@ -1143,6 +1184,7 @@ export function ActivityBatchTable({
               {hasOwnerType && <th className="px-1 py-2 text-left font-normal w-[86px]">案主</th>}
               {hasEks && <th className="py-2 text-center font-normal w-[40px]">销卡</th>}
               <th className="px-1 py-2 text-left font-normal w-[57px]">方式</th>
+              <th className="px-1 py-2 text-center font-normal w-[62px]">扣卡次数</th>
               <th className="px-1 py-2 text-left font-normal w-[110px]">老师</th>
               <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
               <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
@@ -1185,7 +1227,17 @@ export function ActivityBatchTable({
                       <input
                         type="checkbox"
                         checked={row.is_public_welfare}
-                        onChange={(e) => updateRow(row.key, "is_public_welfare", e.target.checked)}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          updateRowMulti(
+                            row.key,
+                            {
+                              is_public_welfare: checked,
+                              membership_deduction_count: checked ? 0 : 1,
+                            },
+                            `编辑了「${row.name || ""}」的公益状态与扣卡次数`,
+                          )
+                        }}
                         className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#e8eaed] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Crect%20x%3D%223.5%22%20y%3D%223.5%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23a0a5ab%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
                       />
                     ) : null}
@@ -1218,6 +1270,7 @@ export function ActivityBatchTable({
                       value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
                       options={typeOptions}
                       onChange={(v) => handleTypeChange(row.key, v)}
+                      disabled={isLocked || rowStatus[row.key] === "saving"}
                       className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
                       hideChevron
                       dropdownWidth={110}
@@ -1280,24 +1333,24 @@ export function ActivityBatchTable({
                             if (!name) {
                               if (row.owner_id) prevOwnerRef.current[row.key] = row.owner_id
                               const currentRow = rowsRef.current.find(r => r.key === row.key)
-                              const eksDesc = parseEksDescription(currentRow?.description || row.description)
-                              updateRowMulti(row.key, { owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) })
+                              const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
+                              updateRowMulti(row.key, { owner_id: "", owner_name: "", billing_description: serializeEksDescription("", "", eksDesc.count) })
                             }
                           }}
                           onSelectItem={(c) => {
                             delete prevOwnerRef.current[row.key]
                             const currentRow = rowsRef.current.find(r => r.key === row.key)
-                            const eksDesc = parseEksDescription(currentRow?.description || row.description)
+                            const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
                             const newDesc = serializeEksDescription(c.id, c.nickname || c.name || "", eksDesc.count)
-                            lastEditedEksRef.current = { ...(currentRow || row), owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc }
-                            if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc })
-                            updateRowMulti(row.key, { owner_id: c.id, owner_name: c.nickname || c.name || "", description: newDesc })
+                            lastEditedEksRef.current = { ...(currentRow || row), owner_id: c.id, owner_name: c.nickname || c.name || "", billing_description: newDesc }
+                            if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: c.id, owner_name: c.nickname || c.name || "", billing_description: newDesc })
+                            updateRowMulti(row.key, { owner_id: c.id, owner_name: c.nickname || c.name || "", billing_description: newDesc })
                           }}
                           onBlur={(v) => {
                             if (v && !customers.some(c => c.nickname === v || c.name === v)) {
                               const currentRow = rowsRef.current.find(r => r.key === row.key)
-                              const eksDesc = parseEksDescription(currentRow?.description || row.description)
-                              updateRowMulti(row.key, { owner_id: "", owner_name: "", description: serializeEksDescription("", "", eksDesc.count) })
+                              const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
+                              updateRowMulti(row.key, { owner_id: "", owner_name: "", billing_description: serializeEksDescription("", "", eksDesc.count) })
                             }
                           }}
                           placeholder=""
@@ -1321,28 +1374,28 @@ export function ActivityBatchTable({
                             const raw = e.target.value
                             eksCountEditRef.current[`dc_${row.key}`] = raw
                             const currentRow = rowsRef.current.find(r => r.key === row.key)
-                            const eksDesc = parseEksDescription(currentRow?.description || row.description)
+                            const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
                             if (raw === "") {
                               const desc = serializeEksDescription(eksDesc.id, eksDesc.name, 0)
-                              lastEditedEksRef.current = { ...(currentRow || row), deduction_count: 0, description: desc }
-                              if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, description: desc })
-                              updateRowMulti(row.key, { deduction_count: 0, description: desc })
+                              lastEditedEksRef.current = { ...(currentRow || row), deduction_count: 0, billing_description: desc }
+                              if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, billing_description: desc })
+                              updateRowMulti(row.key, { deduction_count: 0, billing_description: desc })
                             } else {
                               const count = Math.max(1, parseInt(raw) || 1)
                               const desc = serializeEksDescription(eksDesc.id, eksDesc.name, count)
-                              lastEditedEksRef.current = { ...(currentRow || row), deduction_count: count, description: desc }
-                              if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, description: desc })
-                              updateRowMulti(row.key, { deduction_count: count, description: desc })
+                              lastEditedEksRef.current = { ...(currentRow || row), deduction_count: count, billing_description: desc }
+                              if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, billing_description: desc })
+                              updateRowMulti(row.key, { deduction_count: count, billing_description: desc })
                             }
                           }}
                           onBlur={() => {
                             delete eksCountEditRef.current[`dc_${row.key}`]
                             const currentRow = rowsRef.current.find(r => r.key === row.key)
-                            const eksDesc = parseEksDescription(currentRow?.description || row.description)
+                            const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
                             let count = eksDesc.count
                             if (count < 1) count = 1
                             if (count !== eksDesc.count) {
-                              updateRowMulti(row.key, { deduction_count: count, description: serializeEksDescription(eksDesc.id, eksDesc.name, count) })
+                              updateRowMulti(row.key, { deduction_count: count, billing_description: serializeEksDescription(eksDesc.id, eksDesc.name, count) })
                             }
                           }}
                           className="w-[34px] h-7 text-center rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1361,6 +1414,25 @@ export function ActivityBatchTable({
                       className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
                       hideChevron
                     />
+                  </td>
+
+                  {/* 扣卡次数 */}
+                  <td className={`px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "membership_deduction_count") ? "bg-[#f5eeff] rounded" : ""}`}>
+                    {row.record_type === "eks" || row.record_type === "ics" ? (
+                      <span className="inline-flex h-7 items-center text-[#c9cdd4]">-</span>
+                    ) : (
+                      <input
+                        type="number"
+                        min={row.is_public_welfare ? 0 : 1}
+                        value={row.is_public_welfare ? 0 : row.membership_deduction_count}
+                        disabled={row.is_public_welfare}
+                        onChange={(e) => {
+                          const count = Math.max(1, Number.parseInt(e.target.value, 10) || 1)
+                          updateRow(row.key, "membership_deduction_count", count)
+                        }}
+                        className="h-7 w-[48px] rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent text-center text-[12px] text-[#2b2f36] tabular-nums outline-none focus:border-[#3370ff] disabled:cursor-not-allowed disabled:bg-[#f7f8fa] disabled:text-[#8f959e] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    )}
                   </td>
 
                   {/* 老师 */}
@@ -1387,21 +1459,19 @@ export function ActivityBatchTable({
 
                   {/* 活动简介 */}
                   <td className={`px-1 py-0.5 align-middle ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {row.record_type === "eks" ? null : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDescriptionDraft(row.description)
-                          setEditingDescriptionKey(row.key)
-                        }}
-                        title={row.description}
-                        className="flex h-7 w-full items-center overflow-hidden rounded-[2px] border-[0.5px] border-input bg-transparent px-2 text-left text-[12px] text-[#2b2f36] outline-none hover:border-[#c9cdd4] focus:border-[#3370ff]"
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          {row.description.replace(/\s+/g, " ").trim()}
-                        </span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDescriptionDraft(row.description)
+                        setEditingDescriptionKey(row.key)
+                      }}
+                      title={row.description}
+                      className="flex h-7 w-full items-center overflow-hidden rounded-[2px] border-[0.5px] border-input bg-transparent px-2 text-left text-[12px] text-[#2b2f36] outline-none hover:border-[#c9cdd4] focus:border-[#3370ff]"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {row.description.replace(/\s+/g, " ").trim()}
+                      </span>
+                    </button>
                   </td>
 
                   {/* 老人 */}
