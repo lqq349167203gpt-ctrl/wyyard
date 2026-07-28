@@ -157,6 +157,8 @@ Page({
         }
       }
     }
+    const deductionSessions = Math.max(0, Number(a.membership_deduction_count) || 0)
+    const participationLocked = !!a.participation_locked
 
     return {
       ...a,
@@ -179,7 +181,9 @@ Page({
       detailImages,
       previewImages,
       durationText,
-      participationLocked: !!a.participation_locked,
+      deductionSessions,
+      showDeductionNotice: deductionSessions > 0 && !participationLocked && !expiredStatus,
+      participationLocked,
       participationRoleLabel: a.participation_role_label || '',
     }
   },
@@ -209,8 +213,8 @@ Page({
     const ratio = width / height
     if (ratio >= 0.75) return 660
 
-    const posterWidth = 570
-    const maxHeroHeight = 840
+    const posterWidth = 525
+    const maxHeroHeight = 940
     return Math.min(Math.round(posterWidth / ratio), maxHeroHeight)
   },
 
@@ -223,7 +227,7 @@ Page({
       }
     }
 
-    const posterWidth = 570
+    const posterWidth = 525
     const naturalHeight = posterWidth / ratio
     return {
       imageStyle: `width: ${posterWidth}rpx; height: ${heroHeight}rpx;`,

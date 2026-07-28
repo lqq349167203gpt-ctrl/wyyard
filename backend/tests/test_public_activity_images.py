@@ -87,6 +87,7 @@ def test_client_activity_returns_list_and_detail_images(monkeypatch):
         "data": {
             "course_type": "疗愈活动",
             "date": "2026-07-20",
+            "membership_deduction_count": 2,
         },
     }
 
@@ -97,6 +98,36 @@ def test_client_activity_returns_list_and_detail_images(monkeypatch):
         "/api/uploads/public-images/detail-1.png",
         "/api/uploads/public-images/detail-2.png",
     ]
+    assert result["membership_deduction_count"] == 2
+
+
+@pytest.mark.parametrize(
+    ("activity_type", "is_public_welfare"),
+    [
+        ("class", True),
+        ("ics", False),
+        ("eks", False),
+    ],
+)
+def test_client_hides_membership_deduction_for_free_activity_types(
+    monkeypatch,
+    activity_type,
+    is_public_welfare,
+):
+    monkeypatch.setattr(client_api.course_type_service, "list_course_types", lambda: [])
+    item = {
+        "id": "free-activity",
+        "type": activity_type,
+        "data": {
+            "date": "2026-07-20",
+            "is_public_welfare": is_public_welfare,
+            "membership_deduction_count": 2,
+        },
+    }
+
+    result = client_api._format_activity(item, {}, {}, {})
+
+    assert result["membership_deduction_count"] == 0
 
 
 def test_client_aggregates_only_published_activities(monkeypatch):

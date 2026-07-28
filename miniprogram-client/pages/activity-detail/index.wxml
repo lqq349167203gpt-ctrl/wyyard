@@ -107,6 +107,10 @@
 
   <!-- 底部报名区 -->
   <view wx:if="{{activity}}" class="bottom-bar">
+    <view wx:if="{{activity.showDeductionNotice}}" class="deduction-note">
+      <text>本场活动销卡 </text>
+      <text class="deduction-note-count">{{activity.deductionSessions}} 场次</text>
+    </view>
     <block wx:if="{{activity.participationLocked}}">
       <view class="signup-done">已参与</view>
       <text class="role-participation-note">本场{{activity.participationRoleLabel}} · 无需报名</text>

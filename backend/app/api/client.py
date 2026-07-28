@@ -206,6 +206,13 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
                 detail_images = [url for url in (ct.get("detail_images") or []) if isinstance(url, str) and url]
                 break
 
+    try:
+        membership_deduction_count = max(0, int(d.get("membership_deduction_count", 1)))
+    except (TypeError, ValueError):
+        membership_deduction_count = 1
+    if activity_type in {"ics", "eks"} or d.get("is_public_welfare", False):
+        membership_deduction_count = 0
+
     return {
         "id": item["id"],
         "type": activity_type,
@@ -226,6 +233,7 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
         "course_type": ct_name,
         "list_image": list_image,
         "detail_images": detail_images,
+        "membership_deduction_count": membership_deduction_count,
     }
 
 
