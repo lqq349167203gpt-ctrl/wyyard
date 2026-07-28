@@ -33,18 +33,19 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { hasPagePermission } from "@/lib/page-permissions"
 
 const businessItems = [
   { title: "提醒", icon: IconBellRinging, path: "/business-reminders", permission: "business-reminders" },
   { title: "数据记录", icon: IconChartArea, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
-  { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "statistics" },
-  { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "statistics" },
-  { title: "产品销售", icon: IconBasket, path: "/product-sales", permission: "statistics" },
+  { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "referral-statistics" },
+  { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "member-statistics" },
+  { title: "产品销售", icon: IconBasket, path: "/product-sales", permission: "product-sales" },
   { title: "服务数据", icon: IconStar, path: "/statistics", permission: "statistics" },
 ]
 
 const reportItems = [
-  { title: "每日报表", icon: IconClipboardText, path: "/daily-report", permission: "statistics" },
+  { title: "每日报表", icon: IconClipboardText, path: "/daily-report", permission: "daily-report" },
 ]
 
 const courseItems = [
@@ -62,8 +63,6 @@ const configItems = [
   { title: "空间配置", icon: IconSettings, path: "/courses/spaces", permission: "spaces" },
   { title: "提醒配置", icon: IconBell, path: "/config/reminders", permission: "reminders" },
 ]
-
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
 
 const accountItems = [
   { title: "账号管理", icon: IconUser, path: "/positions/management", permission: "position-management", clearTab: "tab_position-management" },
@@ -110,7 +109,7 @@ function MenuGroup({
 
   const filteredItems = items.filter(item => {
     if (!item.permission || isSuperAdmin) return true
-    return permissions.includes(item.permission)
+    return hasPagePermission(permissions, item.permission)
   })
 
   if (filteredItems.length === 0) return null
@@ -171,7 +170,7 @@ function FixedGroup({
 
   const filteredItems = items.filter(item => {
     if (!item.permission || isSuperAdmin) return true
-    return permissions.includes(item.permission)
+    return hasPagePermission(permissions, item.permission)
   })
 
   if (filteredItems.length === 0) return null
@@ -257,7 +256,7 @@ export function AppSidebar() {
         <FixedGroup label="数据" items={businessItems} />
         <FixedGroup label="报表" items={reportItems} />
         <FixedGroup label="业务" items={courseItems} />
-        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "", icon: IconFileText }]} accessCheck={(p, isSuper) => isSuper || PAYMENT_PERMISSIONS.some(perm => p.includes(perm))} />
+        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }]} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />

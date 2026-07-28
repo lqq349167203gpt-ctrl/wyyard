@@ -11,26 +11,29 @@ import {
 } from "@/components/ui/alert-dialog"
 import { positionApi, positionPermissionApi, memberIdentityApi, accountApi } from "@/lib/api"
 import type { Position, Account } from "@/lib/api"
+import { normalizePagePermissions, removePagePermissions } from "@/lib/page-permissions"
 import { AccountsContent } from "@/pages/accounts"
 
 const ALL_PAGES = [
   // 数据
   { key: "business-reminders", label: "提醒" },
   { key: "data-records", label: "数据记录" },
+  { key: "referral-statistics", label: "引流统计" },
+  { key: "member-statistics", label: "会员情况" },
+  { key: "product-sales", label: "产品销售" },
+  { key: "statistics", label: "服务数据" },
+  // 报表
+  { key: "daily-report", label: "每日报表" },
   // 业务
   { key: "healing-records", label: "客户资料" },
   { key: "class-records", label: "邀约" },
   { key: "daily-activities", label: "课表" },
   { key: "communication-records", label: "沟通记录" },
-  // 付费项目
+  { key: "followup-records", label: "回访记录" },
+  // 付费
   { key: "payment", label: "付费项目" },
-  { key: "membership-cards", label: "会员卡" },
-  { key: "group-cases", label: "觉醒游戏" },
-  { key: "emotional-releases", label: "情绪释放" },
-  { key: "oh-card-readings", label: "OH卡梳理" },
-  { key: "energy-knots", label: "能量结" },
-  { key: "internal-courses", label: "内部课程" },
-  { key: "other-projects", label: "其他项目" },
+  { key: "payment-deductions", label: "销卡" },
+  { key: "payment-refunds", label: "退费" },
   // 信息配置
   { key: "member-identities", label: "会员身份" },
   { key: "healing-identities", label: "疗愈老师" },
@@ -48,9 +51,10 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["business-reminders", "data-records"] },
-  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "communication-records"] },
-  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "other-projects"] },
+  { label: "数据", keys: ["business-reminders", "data-records", "referral-statistics", "member-statistics", "product-sales", "statistics"] },
+  { label: "报表", keys: ["daily-report"] },
+  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "communication-records", "followup-records"] },
+  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },
   { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password"] },
   { label: "系统配置", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
@@ -58,28 +62,25 @@ const PERMISSION_GROUPS = [
 
 const CUSTOMER_FILTER_PAGES = [
   "healing-records",
-  "class-records-visitors", "class-records-activities", "class-records-arrival",
-  "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses",
+  "class-records", "daily-activities",
+  "payment", "payment-deductions", "payment-refunds",
 ]
 
 const getSectionForPage = (pageKey: string): string | null => {
   if (pageKey === "healing-records") return "customers"
-  if (["class-records-visitors", "class-records-activities", "class-records-arrival"].includes(pageKey)) return "class_records"
-  if (["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"].includes(pageKey)) return "payment"
+  if (["class-records", "daily-activities"].includes(pageKey)) return "class_records"
+  if (["payment", "payment-deductions", "payment-refunds"].includes(pageKey)) return "payment"
   return null
 }
 
-// pageKey → 中文标签（用于"用户信息权限"分组渲染；含 class-records-* 等不在 ALL_PAGES 中的子键）
+// pageKey → 中文标签（用于"用户信息权限"分组渲染）
 const PAGE_LABELS: Record<string, string> = {
   "healing-records": "客户资料",
-  "class-records-visitors": "到场人员",
-  "class-records-activities": "当日活动",
-  "class-records-arrival": "到场确认",
-  "membership-cards": "会员卡",
-  "group-cases": "觉醒游戏",
-  "emotional-releases": "情绪释放",
-  "energy-knots": "能量结",
-  "internal-courses": "内部课程",
+  "class-records": "邀约",
+  "daily-activities": "课表",
+  payment: "付费项目",
+  "payment-deductions": "销卡",
+  "payment-refunds": "退费",
 }
 
 // 按 sidebar 顶层分组组织"用户信息权限"展示
@@ -88,13 +89,13 @@ const CUSTOMER_PERM_GROUPS = [
     label: "业务",
     sections: [
       { section: "customers" as const, pages: ["healing-records"] },
-      { section: "class_records" as const, pages: ["class-records-visitors", "class-records-activities", "class-records-arrival"] },
+      { section: "class_records" as const, pages: ["class-records", "daily-activities"] },
     ],
   },
   {
     label: "付费",
     sections: [
-      { section: "payment" as const, pages: ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"] },
+      { section: "payment" as const, pages: ["payment", "payment-deductions", "payment-refunds"] },
     ],
   },
 ]
@@ -186,27 +187,38 @@ export default function PositionManagementPage() {
     }
     const pos = positions.find(p => p.id === selectedPositionId)
     if (!pos) return
-    setFormPermissions(permissions[pos.name] || [])
+    setFormPermissions(normalizePagePermissions(permissions[pos.name] || []))
     // 加载按页面存储的权限
     const pagePerms: Record<string, string[]> = {}
+    const legacyPageKeys: Record<string, string[]> = {
+      "class-records": ["class-records-visitors", "class-records-activities", "class-records-arrival"],
+      "daily-activities": ["class-records-activities"],
+      payment: ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"],
+      "payment-deductions": ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"],
+      "payment-refunds": ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"],
+    }
     CUSTOMER_FILTER_PAGES.forEach(pageKey => {
-      pagePerms[pageKey] = pagePermissions[pageKey]?.[pos.name] || []
+      const directPermissions = pagePermissions[pageKey]
+      if (directPermissions && Object.prototype.hasOwnProperty.call(directPermissions, pos.name)) {
+        pagePerms[pageKey] = directPermissions[pos.name] || []
+        return
+      }
+      pagePerms[pageKey] = [
+        ...new Set((legacyPageKeys[pageKey] || []).flatMap((legacyKey) => pagePermissions[legacyKey]?.[pos.name] || [])),
+      ]
     })
     setFormPagePermissions(pagePerms)
     // 从 page_permissions 初始化 3 个 section state
     setFormCustomerPermissions(pagePerms["healing-records"] || [])
-    setFormCustomerPermissionsCR([
-      ...(pagePerms["class-records-visitors"] || []),
-      ...(pagePerms["class-records-activities"] || []),
-      ...(pagePerms["class-records-arrival"] || []),
-    ])
-    setFormCustomerPermissionsPay([
-      ...(pagePerms["membership-cards"] || []),
-      ...(pagePerms["group-cases"] || []),
-      ...(pagePerms["emotional-releases"] || []),
-      ...(pagePerms["energy-knots"] || []),
-      ...(pagePerms["internal-courses"] || []),
-    ])
+    setFormCustomerPermissionsCR([...new Set([
+      ...(pagePerms["class-records"] || []),
+      ...(pagePerms["daily-activities"] || []),
+    ])])
+    setFormCustomerPermissionsPay([...new Set([
+      ...(pagePerms["payment"] || []),
+      ...(pagePerms["payment-deductions"] || []),
+      ...(pagePerms["payment-refunds"] || []),
+    ])])
     // 仅当角色真正切换时才重置 permTab，避免保存后 loadData 刷新把用户拉回"页面权限"
     if (lastLoadedPositionId.current !== selectedPositionId) {
       lastLoadedPositionId.current = selectedPositionId
@@ -235,7 +247,7 @@ export default function PositionManagementPage() {
   const handleTogglePermission = (pageKey: string) => {
     if (isSystemRole) return
     setFormPermissions(prev => {
-      const next = prev.includes(pageKey) ? prev.filter(k => k !== pageKey) : [...prev, pageKey]
+      const next = prev.includes(pageKey) ? removePagePermissions(prev, [pageKey]) : [...prev, pageKey]
       if (next.includes(pageKey) && CUSTOMER_FILTER_PAGES.includes(pageKey)) {
         autoFillPagePerms(pageKey)
       }
@@ -463,7 +475,7 @@ export default function PositionManagementPage() {
                                       // 自动填充相关页面的用户信息权限
                                       group.keys.filter(k => CUSTOMER_FILTER_PAGES.includes(k)).forEach(k => autoFillPagePerms(k))
                                     } else {
-                                      setFormPermissions(prev => prev.filter(k => !group.keys.includes(k)))
+                                      setFormPermissions(prev => removePagePermissions(prev, group.keys))
                                     }
                                   }}
                                   className="rounded"

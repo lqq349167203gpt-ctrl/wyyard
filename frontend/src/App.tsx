@@ -40,9 +40,7 @@ import MemberStatisticsPage from "@/pages/member-statistics"
 import ReferralStatisticsPage from "@/pages/referral-statistics"
 import CommunicationRecordsPage from "@/pages/communication-records"
 import FollowupRecordsPage from "@/pages/followup-records"
-
-const PAYMENT_PERMISSIONS = ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"]
-const CLASS_RECORDS_PERMISSIONS = ["class-records-visitors", "class-records-activities", "class-records-arrival"]
+import { hasPagePermission } from "@/lib/page-permissions"
 
 const PATH_PERMISSIONS: Record<string, string> = {
 
@@ -52,10 +50,10 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/healing-records/new": "healing-records",
   "/healing-records/:id/edit": "healing-records",
   "/courses/class-records": "class-records",
-  "/courses/daily-activities": "class-records-activities",
+  "/courses/daily-activities": "daily-activities",
   "/payment": "payment",
-  "/payment-deductions": "payment",
-  "/payment-refunds": "payment",
+  "/payment-deductions": "payment-deductions",
+  "/payment-refunds": "payment-refunds",
   "/agents": "agents",
 
 
@@ -71,14 +69,14 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/config/reminders": "reminders",
   "/business-reminders": "business-reminders",
   "/data-records": "data-records",
-  "/referral-statistics": "statistics",
+  "/referral-statistics": "referral-statistics",
   "/chat-history": "chat-history",
   "/statistics": "statistics",
-  "/product-sales": "statistics",
-  "/member-statistics": "statistics",
+  "/product-sales": "product-sales",
+  "/member-statistics": "member-statistics",
   "/communication-records": "communication-records",
   "/followup-records": "followup-records",
-  "/daily-report": "statistics",
+  "/daily-report": "daily-report",
   "/positions/teacher": "position-management",
   "/agents/:id/chat": "agents",
   "/change-password": "change-password",
@@ -107,12 +105,7 @@ function ProtectedRoute() {
   const getFirstAllowedPath = useMemo(() => {
     for (const [path, permission] of Object.entries(PATH_PERMISSIONS)) {
       if (path.includes(":")) continue // 跳过动态路由模式
-      const hasPerm = permission === "payment"
-        ? PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
-        : permission === "class-records"
-          ? CLASS_RECORDS_PERMISSIONS.some(p => permissions.includes(p))
-          : permissions.includes(permission)
-      if (hasPerm) return path
+      if (hasPagePermission(permissions, permission)) return path
     }
     return "/login"
   }, [permissions])
@@ -141,12 +134,7 @@ function ProtectedRoute() {
     }
     return undefined
   })()
-    const hasPermission = requiredPermission === "payment"
-      ? PAYMENT_PERMISSIONS.some(p => permissions.includes(p))
-      : requiredPermission === "class-records"
-        ? CLASS_RECORDS_PERMISSIONS.some(p => permissions.includes(p))
-        : permissions.includes(requiredPermission)
-    if (requiredPermission && !hasPermission) {
+    if (requiredPermission && !hasPagePermission(permissions, requiredPermission)) {
       return <Navigate to={getFirstAllowedPath} replace />
     }
   }
