@@ -416,6 +416,7 @@ def get_effective_remaining(customer_id: str) -> Optional[int]:
 
     权益顺序：先使用会员卡；会员卡没有可用次数时，才由内部课程权益覆盖。
     返回 None 表示当前由不限次会员卡或内部课程权益覆盖。
+    没有可用权益的活动会登记为欠卡，剩余次数允许为负数。
     不再读 card.remaining_count 作为依据，仅用流水相减。
     """
     reconcile_customer_card_usage(customer_id)
@@ -428,13 +429,13 @@ def get_effective_remaining(customer_id: str) -> Optional[int]:
             return None
         manual = get_manual_deductions(customer_id)
         activity = get_activity_deductions(customer_id)
-        return 0 - manual - activity
+        return 0 - manual - activity - get_debt(customer_id)
     if any(c.remaining_count is None for c in active):
         return None
     total = get_grand_total(customer_id)
     manual = get_manual_deductions(customer_id)
     activity = get_activity_deductions(customer_id)
-    remaining = total - manual - activity
+    remaining = total - manual - activity - get_debt(customer_id)
     if remaining > 0:
         return remaining
     if internal_course_service.has_active_course(customer_id):

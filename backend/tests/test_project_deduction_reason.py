@@ -208,6 +208,40 @@ def test_activity_supports_configurable_membership_deduction_count(client, creat
     client.delete(f"/api/membership-cards/{card['id']}")
 
 
+def test_activity_without_membership_card_keeps_negative_remaining(client, created_customer):
+    from app.services import membership_card_service
+
+    activity_date = "2026-07-24"
+    activity = client.post("/api/class-records", json={
+        "date": activity_date,
+        "course_id": "test-no-card-multi-deduction",
+        "course_name": "无卡多次扣卡测试",
+        "participant_ids": [created_customer["id"]],
+        "membership_deduction_count": 2,
+    })
+    assert activity.status_code == 200
+
+    visit = client.post("/api/visits", json={
+        "visit_date": activity_date,
+        "customer_id": created_customer["id"],
+        "arrived": True,
+    })
+    assert visit.status_code == 200
+    assert membership_card_service.get_debt(created_customer["id"]) == 2
+
+    detail = client.get(f"/api/customer-detail/{created_customer['id']}")
+    assert detail.status_code == 200
+    membership_summary = next(
+        item for item in detail.json()["purchase_summary"]
+        if item["type"] == "会员卡"
+    )
+    assert membership_summary["effective_remaining"] == -2
+
+    client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
+    assert membership_card_service.get_effective_remaining(created_customer["id"]) == 0
+    client.delete(f"/api/class-records/{activity.json()['id']}")
+
+
 def test_activity_remaining_is_snapshot_after_that_deduction(client, created_customer):
     from app.middleware.jwt_auth import create_customer_token
 
