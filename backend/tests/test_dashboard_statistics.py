@@ -110,3 +110,35 @@ def test_referral_statistics_filters_referrer_and_groups_status(monkeypatch):
     assert result["status_totals"]["已成交"] == 0
     assert result["referrer_names"] == ["小林", "小周"]
     assert {member["id"] for member in result["members"]} == {"c1", "c2"}
+
+    # 会员类型多选筛选：选中"普通会员"时只统计 c1、c2
+    result_by_type = statistics.get_referral_statistics(
+        date_from="2026-07-01",
+        date_to="2026-07-31",
+        granularity="day",
+        referrer=None,
+        member_types="普通会员",
+    )
+    assert result_by_type["total_people"] == 2
+    assert {member["id"] for member in result_by_type["members"]} == {"c1", "c2"}
+    # 筛选选项保持全量，不随筛选塌缩
+    assert "普通会员" in result_by_type["member_type_names"]
+
+    # 选中多个类型时合并统计；选中的类型不存在时为空
+    result_multi = statistics.get_referral_statistics(
+        date_from="2026-07-01",
+        date_to="2026-07-31",
+        granularity="day",
+        referrer=None,
+        member_types="普通会员,体验会员",
+    )
+    assert result_multi["total_people"] == 2
+    result_empty = statistics.get_referral_statistics(
+        date_from="2026-07-01",
+        date_to="2026-07-31",
+        granularity="day",
+        referrer=None,
+        member_types="体验会员",
+    )
+    assert result_empty["total_people"] == 0
+    assert result_empty["members"] == []

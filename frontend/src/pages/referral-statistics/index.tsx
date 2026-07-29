@@ -93,8 +93,8 @@ export default function ReferralStatisticsPage() {
   const [endYear, setEndYear] = useState(now.getFullYear())
   const [endMonth, setEndMonth] = useState(now.getMonth() + 1)
   const [endDay, setEndDay] = useState(getDaysInMonth(now.getFullYear(), now.getMonth() + 1))
-  const [sortField, setSortField] = useState<keyof Member | null>(null)
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
+  const [sortField, setSortField] = useState<keyof Member | null>("created_date")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null)
   const [detailType, setDetailType] = useState<"invited" | "arrived" | "activity" | "payment" | null>(null)
@@ -111,20 +111,10 @@ export default function ReferralStatisticsPage() {
     to: `${endYear}-${String(endMonth).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`,
   }), [startYear, startMonth, startDay, endYear, endMonth, endDay])
 
-  // 会员类型筛选
-  const typeNames = useMemo(() => {
-    const set = new Set<string>()
-    data?.members.forEach(m => { if (m.member_type) set.add(m.member_type) })
-    return Array.from(set)
-  }, [data?.members])
+  // 会员类型筛选项（后端返回全量列表，不随筛选塌缩）
+  const typeNames = useMemo(() => data?.member_type_names ?? [], [data?.member_type_names])
 
-  useEffect(() => {
-    if (typeNames.length > 0 && selectedTypes.size === 0) {
-      setSelectedTypes(new Set(typeNames))
-    }
-  }, [typeNames])
-
-  const isAllTypeSelected = useMemo(() => typeNames.length > 0 && typeNames.every(t => selectedTypes.has(t)), [typeNames, selectedTypes])
+  const isAllTypeSelected = useMemo(() => selectedTypes.size === 0, [selectedTypes])
 
   const toggleType = (type: string) => {
     setSelectedTypes(prev => {
@@ -136,8 +126,7 @@ export default function ReferralStatisticsPage() {
   }
 
   const toggleAllTypes = () => {
-    if (isAllTypeSelected) setSelectedTypes(new Set())
-    else setSelectedTypes(new Set(typeNames))
+    setSelectedTypes(new Set())
   }
 
   const fetchData = useCallback(async (showLoading = true) => {
@@ -148,6 +137,7 @@ export default function ReferralStatisticsPage() {
         date_to: dateRange.to,
         granularity,
         referrer: selectedReferrer || undefined,
+        member_types: selectedTypes.size > 0 ? Array.from(selectedTypes).join(",") : undefined,
       })
       setData(result)
     } catch {
@@ -155,7 +145,7 @@ export default function ReferralStatisticsPage() {
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [dateRange, granularity, selectedReferrer])
+  }, [dateRange, granularity, selectedReferrer, selectedTypes])
 
   useEffect(() => {
     fetchData()
@@ -231,7 +221,8 @@ export default function ReferralStatisticsPage() {
   )
 
   const sortedMembers = useMemo(() => {
-    const members = (data?.members || []).filter(m => selectedTypes.size === 0 || selectedTypes.has(m.member_type))
+    // 会员类型筛选已由后端完成，这里只做排序
+    const members = [...(data?.members || [])]
     if (!sortField) return members
     return members.sort((a, b) => {
       const left = a[sortField] ?? ""
@@ -240,7 +231,7 @@ export default function ReferralStatisticsPage() {
       if (left > right) return sortOrder === "asc" ? 1 : -1
       return 0
     })
-  }, [data?.members, sortField, sortOrder, selectedTypes])
+  }, [data?.members, sortField, sortOrder])
 
   const {
     paginatedItems,
@@ -434,6 +425,30 @@ export default function ReferralStatisticsPage() {
           <div className="flex items-start gap-3">
             <span className="mt-1 inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
               <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
+              会员类型
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={toggleAllTypes}
+                className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${isAllTypeSelected ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+              >
+                全部
+              </button>
+              {typeNames.map(type => (
+                <button
+                  key={type}
+                  onClick={() => toggleType(type)}
+                  className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${isAllTypeSelected || selectedTypes.has(type) ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <span className="mt-1 inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
+              <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
               引流人
             </span>
             <div className="flex flex-wrap items-center gap-2">
@@ -450,30 +465,6 @@ export default function ReferralStatisticsPage() {
                   className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedReferrer === referrer ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
                 >
                   {referrer}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <span className="mt-1 inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
-              <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
-              会员类型
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={toggleAllTypes}
-                className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${isAllTypeSelected ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
-              >
-                全部
-              </button>
-              {typeNames.map(type => (
-                <button
-                  key={type}
-                  onClick={() => toggleType(type)}
-                  className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedTypes.has(type) ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
-                >
-                  {type}
                 </button>
               ))}
             </div>
@@ -720,7 +711,8 @@ export default function ReferralStatisticsPage() {
                 </colgroup>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="overflow-hidden pl-4">昵称</TableHead>
+                    <TableHead className="cursor-pointer select-none overflow-hidden pl-4" onClick={() => handleSort("created_date")}>创建日期<SortArrow field="created_date" /></TableHead>
+                    <TableHead className="overflow-hidden">昵称</TableHead>
                     <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("member_type")}>会员身份<SortArrow field="member_type" /></TableHead>
                     <TableHead className="overflow-hidden">引流人</TableHead>
                     <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("first_visit_date")}>首次到店<SortArrow field="first_visit_date" /></TableHead>
@@ -735,7 +727,8 @@ export default function ReferralStatisticsPage() {
                 <TableBody>
                   {paginatedItems.map(member => (
                     <TableRow key={member.id} className="group">
-                      <TableCell className="overflow-hidden pl-4">
+                      <TableCell className="overflow-hidden pl-4 tabular-nums">{member.created_date || <EmptyValue />}</TableCell>
+                      <TableCell className="overflow-hidden">
                         <button
                           className="block max-w-full truncate font-medium text-[#2b2f36] hover:text-[#3370ff]"
                           title={member.nickname}

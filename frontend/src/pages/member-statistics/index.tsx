@@ -33,6 +33,7 @@ export default function MemberStatisticsPage() {
   const [data, setData] = useState<MemberStatistics | null>(null)
   const [loading, setLoading] = useState(false)
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
+  const [selectedReferrer, setSelectedReferrer] = useState("")
   const [timeView, setTimeView] = useState<"year" | "month">("month")
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
   const [dataType, setDataType] = useState<"total" | "new">("total")
@@ -174,6 +175,7 @@ export default function MemberStatisticsPage() {
         date_from: dateRange.from,
         date_to: dateRange.to,
         granularity,
+        referrer: selectedReferrer || undefined,
       })
       setData(res)
     } catch {
@@ -181,7 +183,7 @@ export default function MemberStatisticsPage() {
     } finally {
       setLoading(false)
     }
-  }, [dateRange, granularity])
+  }, [dateRange, granularity, selectedReferrer])
 
   useEffect(() => {
     fetchData()
@@ -363,9 +365,31 @@ export default function MemberStatisticsPage() {
                   <button
                     key={t}
                     onClick={() => toggleType(t)}
-                    className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedTypes.has(t) ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
+                    className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${isAllSelected || selectedTypes.has(t) ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
                   >
                     {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 第五行：引流人 */}
+            <div className="flex items-start gap-3">
+              <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0 mt-1"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>引流人</span>
+              <div className="flex items-center flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedReferrer("")}
+                  className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedReferrer === "" ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  全部
+                </button>
+                {data?.referrer_names?.map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => setSelectedReferrer(name)}
+                    className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedReferrer === name ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
+                  >
+                    {name}
                   </button>
                 ))}
               </div>

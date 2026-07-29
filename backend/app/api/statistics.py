@@ -181,6 +181,28 @@ def _get_date_range(date_from: str | None, date_to: str | None):
     return date_from, date_to
 
 
+def _normalize_query_str(value) -> str | None:
+    """兼容直接调用函数的场景：FastAPI Query 默认值会是 Query 对象，统一归一化为 str | None"""
+    return value if isinstance(value, str) else None
+
+
+def _parse_member_types(member_types: str | None) -> set[str]:
+    """解析逗号分隔的会员类型多选筛选参数，空集合表示不筛选"""
+    member_types = _normalize_query_str(member_types)
+    if not member_types:
+        return set()
+    return {t.strip() for t in member_types.split(",") if t.strip()}
+
+
+def _sort_member_type_names(names: set[str]) -> list[str]:
+    """会员类型选项按身份配置顺序排列（与会员情况页一致），未配置的排在末尾"""
+    identities = member_identity_service.list_identities()
+    order = [identity.name for identity in reversed(identities)]
+    ordered = [name for name in order if name in names]
+    extras = sorted(name for name in names if name and name not in order)
+    return ordered + extras
+
+
 def _aggregate_by_granularity(data: dict[str, dict], granularity: str, date_from: str, date_to: str):
     """按粒度聚合数据"""
     if granularity == "day":
@@ -240,8 +262,37 @@ def get_overview(
     date_from: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
+    member_types: str | None = Query(None, description="会员类型筛选，逗号分隔多选"),
+    referrer: str | None = Query(None, description="引流人筛选"),
 ):
     date_from, date_to = _get_date_range(date_from, date_to)
+    type_filter = _parse_member_types(member_types)
+    referrer_filter = (_normalize_query_str(referrer) or "").strip()
+
+    customers_map = {c.id: c for c in customer_service.list_customers()}
+
+    def _visit_visible(v) -> bool:
+        """邀约/到访记录是否通过筛选：会员类型看客户资料，引流人看邀约记录上的邀约人"""
+        if type_filter:
+            c = customers_map.get(v.customer_id or "")
+            if not c or (c.member_type or "") not in type_filter:
+                return False
+        if referrer_filter and (v.referrer_handler or "").strip() != referrer_filter:
+            return False
+        return True
+
+    def _customer_visible(customer_id: str | None) -> bool:
+        """成交记录是否通过筛选：会员类型和引流人均看客户资料"""
+        if not type_filter and not referrer_filter:
+            return True
+        if not customer_id:
+            return False
+        c = customers_map.get(customer_id)
+        if type_filter and (not c or (c.member_type or "") not in type_filter):
+            return False
+        if referrer_filter and ((c.referrer if c else "") or "").strip() != referrer_filter:
+            return False
+        return True
 
     # 按日期聚合数据
     daily: dict[str, dict] = defaultdict(lambda: {"invited": 0, "arrived": 0, "converted": 0, "converted_amount": 0.0})
@@ -250,7 +301,7 @@ def get_overview(
     visits = visit_service.list_visits()
     for v in visits:
         visit_date = v.visit_date
-        if visit_date and date_from <= visit_date <= date_to:
+        if visit_date and date_from <= visit_date <= date_to and _visit_visible(v):
             daily[visit_date]["invited"] += 1
             if v.arrived:
                 daily[visit_date]["arrived"] += 1
@@ -262,7 +313,7 @@ def get_overview(
         for r in records:
             deal_date = _get_record_date(r)
             customer_id = getattr(r, "customer_id", None)
-            if deal_date and customer_id and date_from <= deal_date <= date_to:
+            if deal_date and customer_id and date_from <= deal_date <= date_to and _customer_visible(customer_id):
                 converted_by_date[deal_date].add(customer_id)
 
     for date_str, customer_ids in converted_by_date.items():
@@ -274,7 +325,8 @@ def get_overview(
             deal_date = _get_record_date(r)
             price = _get_record_amount(r)
             voided = getattr(r, "voided", False)
-            if deal_date and not voided and date_from <= deal_date <= date_to:
+            customer_id = getattr(r, "customer_id", None)
+            if deal_date and not voided and date_from <= deal_date <= date_to and _customer_visible(customer_id):
                 daily[deal_date]["converted_amount"] += price
 
     data = _aggregate_by_granularity(daily, granularity, date_from, date_to)
@@ -287,8 +339,12 @@ def get_details(
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
     status: str = Query(None, description="状态筛选: invited/arrived/converted"),
     total: bool = Query(False, description="是否统计总数据（不限日期范围）"),
+    member_types: str | None = Query(None, description="会员类型筛选，逗号分隔多选"),
+    referrer: str | None = Query(None, description="引流人筛选"),
 ):
     date_from, date_to = _get_date_range(date_from, date_to)
+    type_filter = _parse_member_types(member_types)
+    referrer_filter = (_normalize_query_str(referrer) or "").strip()
 
     # 1. 先构建成交人员集合（用于标记邀约/到访记录的成交状态）
     customers_map = {c.id: c for c in customer_service.list_customers()}
@@ -322,6 +378,9 @@ def get_details(
     # 2. 获取邀约到访人员（排除无客户关联的记录）
     invited_list = []
     arrived_list = []
+    # 筛选选项（在过滤前收集，保证选项不随筛选塌缩）
+    option_member_types: set[str] = set()
+    option_referrer_counts: dict[str, int] = defaultdict(int)
     visits = visit_service.list_visits()
     # nickname 缓存：customer_id → nickname，避免重复查库
     _cust_cache: dict[str, object] = {}
@@ -338,6 +397,16 @@ def get_details(
         nick = c.nickname if c else cid
         member_type = c.member_type if c and c.member_type else ""
         if visit_date and date_from <= visit_date <= date_to:
+            visit_referrer = (v.referrer_handler or "").strip()
+            if member_type:
+                option_member_types.add(member_type)
+            if visit_referrer:
+                option_referrer_counts[visit_referrer] += 1
+            # 会员类型看客户资料，引流人看邀约记录上的邀约人
+            if type_filter and member_type not in type_filter:
+                continue
+            if referrer_filter and visit_referrer != referrer_filter:
+                continue
             # 如果该客户在时间范围内有成交，状态标记为已成交
             is_converted = cid in converted_customer_ids
             invited_list.append({
@@ -347,7 +416,7 @@ def get_details(
                 "status": "converted" if is_converted else "invited",
                 "arrived": v.arrived,
                 "member_type": member_type,
-                "referrer_handler": v.referrer_handler or "",
+                "referrer_handler": visit_referrer,
             })
             if v.arrived:
                 arrived_list.append({
@@ -357,7 +426,7 @@ def get_details(
                     "status": "converted" if is_converted else "arrived",
                     "arrived": True,
                     "member_type": member_type,
-                    "referrer_handler": v.referrer_handler or "",
+                    "referrer_handler": visit_referrer,
                 })
 
     # 3. 获取成交人员
@@ -368,6 +437,17 @@ def get_details(
             customer_id = getattr(r, "customer_id", None)
             if deal_date and customer_id and date_from <= deal_date <= date_to:
                 c = customers_map.get(customer_id)
+                c_member_type = c.member_type if c and c.member_type else ""
+                c_referrer = ((c.referrer if c else "") or "").strip()
+                if c_member_type:
+                    option_member_types.add(c_member_type)
+                if c_referrer:
+                    option_referrer_counts[c_referrer] += 1
+                # 成交记录的会员类型和引流人均看客户资料
+                if type_filter and c_member_type not in type_filter:
+                    continue
+                if referrer_filter and c_referrer != referrer_filter:
+                    continue
                 # 按类型取项目名称
                 if type_name == "membership-cards":
                     name = r.card_type
@@ -394,8 +474,8 @@ def get_details(
                     "type": TYPE_LABELS.get(type_name, type_name),
                     "name": name,
                     "quantity": quantity,
-                    "member_type": c.member_type if c and c.member_type else "",
-                    "referrer_handler": c.referrer or "",
+                    "member_type": c_member_type,
+                    "referrer_handler": c_referrer,
                     "amount": getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0,
                 })
 
@@ -439,6 +519,9 @@ def get_details(
             "invited": invited_list,
             "arrived": arrived_list,
             "converted": converted_list,
+            # 全量筛选选项（不受会员类型/引流人筛选影响，避免选项塌缩）
+            "member_type_names": _sort_member_type_names(option_member_types),
+            "referrer_names": [name for name, _ in sorted(option_referrer_counts.items(), key=lambda item: (-item[1], item[0]))],
         }
 
 
@@ -1030,7 +1113,7 @@ def _aggregate_member_cumulative(cumulative_by_date: dict[str, dict[str, int]], 
             # 使用该日期的累计数据，如果没有则用最早的累计数据
             if date_str in cumulative_by_date:
                 cumulative = cumulative_by_date[date_str]
-            elif earliest_date < date_str:
+            elif cumulative_by_date and earliest_date < date_str:
                 # 找到小于等于当前日期的最新累计数据
                 latest_before = max([d for d in cumulative_by_date.keys() if d <= date_str], default=earliest_date)
                 cumulative = cumulative_by_date[latest_before]
@@ -1090,6 +1173,7 @@ def get_member_statistics(
     date_from: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
+    referrer: str | None = Query(None, description="引流人昵称"),
 ):
     """获取会员情况统计：各类型会员人数 + 新增人数变化趋势"""
     date_from, date_to = _get_date_range(date_from, date_to)
@@ -1098,19 +1182,33 @@ def get_member_statistics(
     identities = member_identity_service.list_identities()
     type_names = [identity.name for identity in reversed(identities)]
 
-    # 获取所有客户
-    customers = customer_service.list_customers()
+    # 获取所有客户，按引流人筛选
+    all_customers = customer_service.list_customers()
+    customers = [
+        c for c in all_customers
+        if not referrer or (c.referrer or "").strip() == referrer
+    ]
 
-    # 1. 统计当前各类型会员总人数
-    type_totals: dict[str, int] = {name: 0 for name in type_names}
-    total_members = 0
-    for c in customers:
-        mt = c.member_type or ""
-        if mt in type_totals:
-            type_totals[mt] += 1
-            total_members += 1
+    # 引流人选项（只统计选定时间范围内有数据的引流人，按人数降序排列）
+    referrer_counts: dict[str, int] = defaultdict(int)
+    for c in all_customers:
+        if isinstance(c.created_at, datetime):
+            created_date = c.created_at.strftime("%Y-%m-%d")
+        elif c.created_at:
+            created_date = str(c.created_at)[:10]
+        else:
+            continue
+        if not (date_from <= created_date <= date_to):
+            continue
+        name = (c.referrer or "").strip()
+        if name:
+            referrer_counts[name] += 1
+    referrer_names = [
+        name for name, _ in sorted(referrer_counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
 
-    # 2. 统计所有会员的注册日期（用于累计总数计算）
+    # 1. 统计所有会员的注册日期（用于累计总数计算）
+    valid_types = set(type_names)
     all_members_by_date: dict[str, dict[str, int]] = defaultdict(lambda: {name: 0 for name in type_names})
     for c in customers:
         created_at = c.created_at
@@ -1122,14 +1220,21 @@ def get_member_statistics(
             continue
 
         mt = c.member_type or ""
-        if mt in type_totals:
+        if mt in valid_types:
             all_members_by_date[date_str][mt] += 1
 
-    # 3. 按时间范围统计新增人数（用于新增模式）
+    # 2. 按时间范围统计新增人数（用于新增模式）
     daily_new_by_type: dict[str, dict[str, int]] = defaultdict(lambda: {name: 0 for name in type_names})
     for date_str, types in all_members_by_date.items():
         if date_from <= date_str <= date_to:
             daily_new_by_type[date_str] = types
+
+    # 3. 统计当前各类型会员总人数（只统计选定时间范围内新增的）
+    type_totals: dict[str, int] = {name: 0 for name in type_names}
+    for types in daily_new_by_type.values():
+        for name in type_names:
+            type_totals[name] += types.get(name, 0)
+    total_members = sum(type_totals.values())
 
     # 4. 计算累计总数（从最早会员到每一天）
     sorted_dates = sorted(all_members_by_date.keys())
@@ -1167,6 +1272,7 @@ def get_member_statistics(
         "total_members": total_members,
         "type_totals": type_totals,
         "type_names": type_names,
+        "referrer_names": referrer_names,
         "chart_new": chart_data_new,
         "chart_total": chart_data_total,
         "members": members_list,
@@ -1179,13 +1285,24 @@ def get_referral_statistics(
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人昵称"),
+    member_types: str | None = Query(None, description="会员类型筛选，逗号分隔多选"),
 ):
     """获取引流统计：跟进状态分布、变化趋势和人员明细。"""
     date_from, date_to = _get_date_range(date_from, date_to)
+    type_filter = _parse_member_types(member_types)
     status_names = [status.value for status in FollowUpStatus]
     all_customers = customer_service.list_customers()
+    # 引流人选项：只统计选定时间范围内有数据的引流人，按人数降序排列
     referrer_counts: dict[str, int] = defaultdict(int)
     for customer in all_customers:
+        if isinstance(customer.created_at, datetime):
+            created_date = customer.created_at.strftime("%Y-%m-%d")
+        elif customer.created_at:
+            created_date = str(customer.created_at)[:10]
+        else:
+            continue
+        if not (date_from <= created_date <= date_to):
+            continue
         referrer_name = (customer.referrer or "").strip()
         if referrer_name:
             referrer_counts[referrer_name] += 1
@@ -1199,18 +1316,17 @@ def get_referral_statistics(
     customers = [
         customer
         for customer in all_customers
-        if not referrer or (customer.referrer or "").strip() == referrer
+        if (not referrer or (customer.referrer or "").strip() == referrer)
+        and (not type_filter or (customer.member_type or "") in type_filter)
     ]
 
-    status_totals = {status: 0 for status in status_names}
     customers_by_date: dict[str, dict[str, int]] = defaultdict(
         lambda: {status: 0 for status in status_names}
     )
     for customer in customers:
         status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
-        if status not in status_totals:
+        if status not in status_names:
             status = FollowUpStatus.NEW.value
-        status_totals[status] += 1
         if isinstance(customer.created_at, datetime):
             created_date = customer.created_at.strftime("%Y-%m-%d")
         elif customer.created_at:
@@ -1219,11 +1335,16 @@ def get_referral_statistics(
             continue
         customers_by_date[created_date][status] += 1
 
+    # 按日期范围过滤：只统计选定时间范围内新建的客户
     daily_new = {
         created_date: values
         for created_date, values in customers_by_date.items()
         if date_from <= created_date <= date_to
     }
+    status_totals = {status: 0 for status in status_names}
+    for values in daily_new.values():
+        for status in status_names:
+            status_totals[status] += values.get(status, 0)
     cumulative_by_date: dict[str, dict[str, int]] = {}
     cumulative = {status: 0 for status in status_names}
     for created_date in sorted(customers_by_date):
@@ -1233,11 +1354,21 @@ def get_referral_statistics(
 
     members = []
     for customer in customers:
+        # 按日期范围过滤：只保留选定时间范围内新建的客户
+        if isinstance(customer.created_at, datetime):
+            created_date = customer.created_at.strftime("%Y-%m-%d")
+        elif customer.created_at:
+            created_date = str(customer.created_at)[:10]
+        else:
+            continue
+        if not (date_from <= created_date <= date_to):
+            continue
         stats = _get_customer_stats(customer.id, None, None)
         status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
         members.append({
             "id": customer.id,
             "nickname": customer.nickname or "",
+            "created_date": created_date,
             "member_type": customer.member_type or "",
             "referrer": customer.referrer or "",
             "follow_up_status": status,
@@ -1250,10 +1381,14 @@ def get_referral_statistics(
         })
 
     return {
-        "total_people": len(customers),
+        "total_people": sum(sum(v.values()) for v in daily_new.values()),
         "status_names": status_names,
         "status_totals": status_totals,
         "referrer_names": referrer_names,
+        # 全量会员类型选项（不受会员类型筛选影响，避免选项塌缩）
+        "member_type_names": _sort_member_type_names(
+            {c.member_type or "" for c in all_customers}
+        ),
         "chart_new": _aggregate_member_by_granularity(
             daily_new, granularity, date_from, date_to, status_names
         ),

@@ -2188,6 +2188,7 @@ export interface MemberStatistics {
   total_members: number
   type_totals: Record<string, number>
   type_names: string[]
+  referrer_names: string[]
   chart_new: Record<string, string | number>[]
   chart_total: Record<string, string | number>[]
   members: Array<{
@@ -2208,11 +2209,13 @@ export interface ReferralStatistics {
   status_names: CustomerFollowUpStatus[]
   status_totals: Record<CustomerFollowUpStatus, number>
   referrer_names: string[]
+  member_type_names: string[]
   chart_new: Record<string, string | number>[]
   chart_total: Record<string, string | number>[]
   members: Array<{
     id: string
     nickname: string
+    created_date: string
     member_type: string
     referrer: string
     follow_up_status: CustomerFollowUpStatus
@@ -2240,20 +2243,24 @@ export interface DashboardSummary {
 
 export const statisticsApi = {
   dashboard: () => request<DashboardSummary>("/api/statistics/dashboard"),
-  overview: (params: { date_from?: string; date_to?: string; granularity?: string }) => {
+  overview: (params: { date_from?: string; date_to?: string; granularity?: string; member_types?: string; referrer?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.granularity) searchParams.set("granularity", params.granularity)
+    if (params.member_types) searchParams.set("member_types", params.member_types)
+    if (params.referrer) searchParams.set("referrer", params.referrer)
     return request<{ data: StatisticsData[] }>(`/api/statistics/overview?${searchParams.toString()}`)
   },
-  details: (params: { date_from?: string; date_to?: string; status?: string; total?: boolean }) => {
+  details: (params: { date_from?: string; date_to?: string; status?: string; total?: boolean; member_types?: string; referrer?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.status) searchParams.set("status", params.status)
     if (params.total) searchParams.set("total", "true")
-    return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[] }>(`/api/statistics/details?${searchParams.toString()}`)
+    if (params.member_types) searchParams.set("member_types", params.member_types)
+    if (params.referrer) searchParams.set("referrer", params.referrer)
+    return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[]; member_type_names?: string[]; referrer_names?: string[] }>(`/api/statistics/details?${searchParams.toString()}`)
   },
   products: (params: { date_from?: string; date_to?: string; product_type?: string; name_filter?: string; granularity?: string }) => {
     const searchParams = new URLSearchParams()
@@ -2269,19 +2276,21 @@ export const statisticsApi = {
     if (params.product_type) searchParams.set("product_type", params.product_type)
     return request<{ data: Record<string, unknown>[] }>(`/api/statistics/products/details?${searchParams.toString()}`)
   },
-  members: (params: { date_from?: string; date_to?: string; granularity?: string }) => {
-    const searchParams = new URLSearchParams()
-    if (params.date_from) searchParams.set("date_from", params.date_from)
-    if (params.date_to) searchParams.set("date_to", params.date_to)
-    if (params.granularity) searchParams.set("granularity", params.granularity)
-    return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
-  },
-  referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string }) => {
+  members: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.granularity) searchParams.set("granularity", params.granularity)
     if (params.referrer) searchParams.set("referrer", params.referrer)
+    return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
+  },
+  referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; member_types?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.granularity) searchParams.set("granularity", params.granularity)
+    if (params.referrer) searchParams.set("referrer", params.referrer)
+    if (params.member_types) searchParams.set("member_types", params.member_types)
     return request<ReferralStatistics>(`/api/statistics/referrals?${searchParams.toString()}`)
   },
 }

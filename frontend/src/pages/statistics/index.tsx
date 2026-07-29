@@ -45,6 +45,9 @@ export default function StatisticsPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<StatisticsData[]>([])
   const [details, setDetails] = useState<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[] }>({ invited: [], arrived: [], converted: [] })
+  // 筛选项（后端返回全量列表，不随筛选塌缩）
+  const [typeNames, setTypeNames] = useState<string[]>([])
+  const [referrerNames, setReferrerNames] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"invited" | "arrived" | "converted" | "converted_amount">("invited")
   const detailsKey = activeTab === "converted_amount" ? "converted" : activeTab
@@ -98,19 +101,7 @@ export default function StatisticsPage() {
   }, [details, customerDedup])
 
   // 会员类型筛选逻辑
-  const typeNames = useMemo(() => {
-    const set = new Set<string>()
-    ;(details[detailsKey] || []).forEach(d => { if (d.member_type) set.add(d.member_type) })
-    return Array.from(set)
-  }, [details, detailsKey])
-
-  useEffect(() => {
-    if (typeNames.length > 0 && selectedTypes.size === 0) {
-      setSelectedTypes(new Set(typeNames))
-    }
-  }, [typeNames])
-
-  const isAllTypeSelected = useMemo(() => typeNames.length > 0 && typeNames.every(t => selectedTypes.has(t)), [typeNames, selectedTypes])
+  const isAllTypeSelected = useMemo(() => selectedTypes.size === 0, [selectedTypes])
 
   const toggleType = (type: string) => {
     setSelectedTypes(prev => {
@@ -122,28 +113,14 @@ export default function StatisticsPage() {
   }
 
   const toggleAllTypes = () => {
-    if (isAllTypeSelected) setSelectedTypes(new Set())
-    else setSelectedTypes(new Set(typeNames))
+    setSelectedTypes(new Set())
   }
 
-  // 引流人筛选逻辑
-  const referrerNames = useMemo(() => {
-    const set = new Set<string>()
-    ;(details[detailsKey] || []).forEach(d => { if (d.referrer_handler) set.add(d.referrer_handler) })
-    return Array.from(set)
-  }, [details, detailsKey])
-
-  // 排序后的列表
+  // 排序后的列表（会员类型/引流人筛选已由后端完成）
   const sortedDetails = useMemo(() => {
     let list = [...(dedupedDetails[detailsKey] || [])]
     if (activeTab === "converted_amount" && typeFilter !== "全部") {
       list = list.filter(item => item.type === typeFilter)
-    }
-    if (selectedTypes.size > 0) {
-      list = list.filter(item => selectedTypes.has(item.member_type || ""))
-    }
-    if (selectedReferrer) {
-      list = list.filter(item => item.referrer_handler === selectedReferrer)
     }
     if (!sortField) return list.sort((a, b) => (b.date || "").localeCompare(a.date || ""))
     return list.sort((a, b) => {
@@ -171,7 +148,7 @@ export default function StatisticsPage() {
       return 0
     })
     return list
-  }, [dedupedDetails, activeTab, sortField, sortOrder, typeFilter, selectedTypes, selectedReferrer])
+  }, [dedupedDetails, activeTab, sortField, sortOrder, typeFilter])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDetails, { pageSize: 10 })
 
@@ -208,27 +185,37 @@ export default function StatisticsPage() {
     try {
       // 按周时请求按天粒度，前端再聚合
       const requestGranularity = granularity === "week" ? "day" : granularity
+      const memberTypesParam = selectedTypes.size > 0 ? Array.from(selectedTypes).join(",") : undefined
+      const referrerParam = selectedReferrer || undefined
       const [overviewRes, detailsRes] = await Promise.all([
         statisticsApi.overview({
           date_from: dateRange.from,
           date_to: dateRange.to,
           granularity: requestGranularity,
+          member_types: memberTypesParam,
+          referrer: referrerParam,
         }),
         statisticsApi.details({
           date_from: dateRange.from,
           date_to: dateRange.to,
           total: statDimension === "total",
+          member_types: memberTypesParam,
+          referrer: referrerParam,
         }),
       ])
       setData(overviewRes.data)
-      setDetails(detailsRes)
+      setDetails({ invited: detailsRes.invited, arrived: detailsRes.arrived, converted: detailsRes.converted })
+      setTypeNames(detailsRes.member_type_names ?? [])
+      setReferrerNames(detailsRes.referrer_names ?? [])
     } catch {
       setData([])
       setDetails({ invited: [], arrived: [], converted: [] })
+      setTypeNames([])
+      setReferrerNames([])
     } finally {
       setLoading(false)
     }
-  }, [dateRange, granularity])
+  }, [dateRange, granularity, selectedTypes, selectedReferrer])
 
   // 仅刷新列表数据（切换统计维度时）
   const fetchDetails = useCallback(async () => {
@@ -237,12 +224,18 @@ export default function StatisticsPage() {
         date_from: dateRange.from,
         date_to: dateRange.to,
         total: statDimension === "total",
+        member_types: selectedTypes.size > 0 ? Array.from(selectedTypes).join(",") : undefined,
+        referrer: selectedReferrer || undefined,
       })
-      setDetails(detailsRes)
+      setDetails({ invited: detailsRes.invited, arrived: detailsRes.arrived, converted: detailsRes.converted })
+      setTypeNames(detailsRes.member_type_names ?? [])
+      setReferrerNames(detailsRes.referrer_names ?? [])
     } catch {
       setDetails({ invited: [], arrived: [], converted: [] })
+      setTypeNames([])
+      setReferrerNames([])
     }
-  }, [dateRange, statDimension])
+  }, [dateRange, statDimension, selectedTypes, selectedReferrer])
 
   useEffect(() => {
     fetchData()
@@ -566,7 +559,7 @@ export default function StatisticsPage() {
             </div>
 
             {/* 第五行：会员类型 */}
-            <div className="flex items-start gap-3 flex-wrap">
+            <div className="flex items-start gap-3">
               <span className="mt-1 inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>会员类型</span>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -579,7 +572,7 @@ export default function StatisticsPage() {
                   <button
                     key={type}
                     onClick={() => toggleType(type)}
-                    className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedTypes.has(type) ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                    className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${isAllTypeSelected || selectedTypes.has(type) ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
                   >
                     {type}
                   </button>
@@ -588,7 +581,7 @@ export default function StatisticsPage() {
             </div>
 
             {/* 第六行：引流人 */}
-            <div className="flex items-start gap-3 flex-wrap">
+            <div className="flex items-start gap-3">
               <span className="mt-1 inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>引流人</span>
               <div className="flex flex-wrap items-center gap-2">
                 <button
