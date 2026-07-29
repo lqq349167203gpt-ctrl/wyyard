@@ -47,6 +47,10 @@ Page({
     achieverName: '',
     // 公益（沙龙）
     isPublicWelfare: false,
+    // 扣卡次数
+    membershipDeductionCount: 1,
+    // 发布到客户端
+    isPublished: false,
     // 参与者
     participantIds: [],
     participantList: [],
@@ -55,6 +59,8 @@ Page({
     activityName: '',
     // 描述
     description: '',
+    // 销卡次数（eks）
+    deductionCount: 1,
     // 客户数据
     allCustomers: [],
     // 统一搜索弹窗
@@ -204,6 +210,7 @@ Page({
       achieverName: '',
       isPublicWelfare: false,
       activityModeIndex: 0,
+      membershipDeductionCount: (activityType === 'eks' || activityType === 'ics') ? 0 : 1,
     })
   },
 
@@ -235,6 +242,24 @@ Page({
   // 公益
   onPublicWelfareChange(e) {
     this.setData({ isPublicWelfare: e.detail.value })
+  },
+
+  // 扣卡次数
+  onDeductionCountInput(e) {
+    this.setData({ membershipDeductionCount: e.detail.value })
+  },
+
+  onEksDeductionInput(e) {
+    this.setData({ deductionCount: e.detail.value })
+  },
+
+  _serializeEksDescription(count) {
+    return JSON.stringify([{ id: '', name: '', count: Number(count) || 2 }])
+  },
+
+  // 发布到客户端
+  onPublishedChange(e) {
+    this.setData({ isPublished: e.detail.value })
   },
 
   // 名称
@@ -459,6 +484,8 @@ Page({
             course_description: this.data.description,
             teacher_ids: this.data.teacherIds,
             is_public_welfare: this.data.isPublicWelfare,
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+            is_published: this.data.isPublished,
           }))
           break
         }
@@ -471,6 +498,8 @@ Page({
             achiever_id: this.data.achieverId,
             achiever_name: this.data.achieverName,
             teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+            is_published: this.data.isPublished,
           }))
           break
         case 'ers':
@@ -482,6 +511,8 @@ Page({
             achiever_id: this.data.achieverId,
             achiever_name: this.data.achieverName,
             teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+            is_published: this.data.isPublished,
           }))
           break
         case 'eks':
@@ -489,10 +520,13 @@ Page({
             owner_id: this.data.ownerId,
             owner_name: this.data.ownerName,
             name: this.data.activityName,
-            description: this.data.description,
+            description: this._serializeEksDescription(this.data.deductionCount),
+            course_description: this.data.description,
             teacher_ids: this.data.teacherIds,
             host_id: '',
             host_name: '',
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
+            is_published: this.data.isPublished,
           }))
           break
         case 'ics':
@@ -503,6 +537,8 @@ Page({
             teacher_ids: this.data.teacherIds,
             host_id: '',
             host_name: '',
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
+            is_published: this.data.isPublished,
           }))
           break
         case 'ocr':
@@ -514,6 +550,8 @@ Page({
             achiever_id: this.data.achieverId,
             achiever_name: this.data.achieverName,
             teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+            is_published: this.data.isPublished,
           }))
           break
       }

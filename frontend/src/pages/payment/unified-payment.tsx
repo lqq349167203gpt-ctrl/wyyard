@@ -1084,101 +1084,98 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
 
   return (
     <>
-      {/* 搜索栏 */}
-      <div className="flex items-end gap-3 flex-wrap">
-        <div className="w-44">
-          <CustomerSearchInput
-            customers={customers}
-            value={searchNickname}
-            onChange={(v) => handleFilterChange("nickname", typeof v === "string" ? v : "")}
-            placeholder="搜索用户"
-            filterSelected={false}
-          />
-        </div>
-        <div className="w-36">
-          {isMembershipOnly ? (
-            <SelectDropdown
-              value={mcTypeFilter}
-              options={[
-                { value: "all", label: "全部卡类型" },
-                ...Object.keys(MEMBERSHIP_CARD_TYPES).map(t => ({ value: t, label: t })),
-              ]}
-              onChange={setMcTypeFilter}
+      {/* 搜索栏 + 表格 卡片 */}
+      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
+        {/* 搜索栏 */}
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
+          <div className="w-[172px]">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchNickname}
+              onChange={(v) => handleFilterChange("nickname", typeof v === "string" ? v : "")}
+              placeholder="搜索用户"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
             />
-          ) : (
-            <SelectDropdown
-              value={activeType}
-              options={filterTypes
-                ? filterTypes.map(key => ({ value: key, label: PROJECT_TYPES[key].label }))
-                : [
-                    { value: "all", label: "全部类型" },
-                    ...(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
-                      value: key,
-                      label: PROJECT_TYPES[key].label,
-                    })),
-                  ]}
-              onChange={(v) => setActiveType(v as ProjectTypeKey | "all")}
+          </div>
+          <div className="w-[138px]">
+            {isMembershipOnly ? (
+              <SelectDropdown
+                className="w-[138px]"
+                buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+                rounded="7px"
+                value={mcTypeFilter}
+                options={[
+                  { value: "all", label: "全部卡类型" },
+                  ...Object.keys(MEMBERSHIP_CARD_TYPES).map(t => ({ value: t, label: t })),
+                ]}
+                textColor={mcTypeFilter && mcTypeFilter !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+                onChange={setMcTypeFilter}
+              />
+            ) : (
+              <SelectDropdown
+                className="w-[138px]"
+                buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+                rounded="7px"
+                value={activeType}
+                options={filterTypes
+                  ? filterTypes.map(key => ({ value: key, label: PROJECT_TYPES[key].label }))
+                  : [
+                      { value: "all", label: "全部类型" },
+                      ...(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
+                        value: key,
+                        label: PROJECT_TYPES[key].label,
+                      })),
+                    ]}
+                textColor={activeType && activeType !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+                onChange={(v) => setActiveType(v as ProjectTypeKey | "all")}
+              />
+            )}
+          </div>
+          <div className="w-[172px]">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchCloserName}
+              onChange={(v) => handleFilterChange("closer", typeof v === "string" ? v : "")}
+              placeholder="搜索成交人"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
             />
-          )}
+          </div>
+          <button onClick={handleClearSearch} className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]">
+            <X className="h-3.5 w-3.5" /> 清空
+          </button>
+          <div className="flex-1" />
+          <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleOpenCreate}>
+            <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新增
+          </Button>
         </div>
-        <div className="w-44">
-          <CustomerSearchInput
-            customers={customers}
-            value={searchCloserName}
-            onChange={(v) => handleFilterChange("closer", typeof v === "string" ? v : "")}
-            placeholder="搜索成交人"
-            filterSelected={false}
-          />
-        </div>
-        <button onClick={handleClearSearch} className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1">
-          <X className="h-3.5 w-3.5" /> 清空
-        </button>
-        <div className="flex-1" />
-        <button onClick={handleDownloadTemplate} className="h-8 px-3 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1">
-          <Download className="h-3.5 w-3.5" /> 下载模板
-        </button>
-        {/* 导入功能暂时隐藏
-        <button onClick={() => fileInputRef.current?.click()} className="h-8 px-3 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1">
-          <Upload className="h-3.5 w-3.5" /> 导入
-        </button>
-        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-        */}
-        <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新增
-        </Button>
-      </div>
 
-      {/* 统计 */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground mt-[6px]">
-          {totalItems > 0 && <span>共 {totalItems} 条记录</span>}
-        </p>
-      </div>
-
-      {/* 表格 */}
-      <div className="bg-white rounded-lg">
+        {/* 表格 */}
         {loading || !customersReady ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
         ) : paginatedItems.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">暂无记录</div>
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-4">成交日期</TableHead>
-                  <TableHead>用户</TableHead>
-                  {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && <TableHead>项目名称</TableHead>}
-                  <TableHead>金额</TableHead>
-                  <TableHead>购买场次</TableHead>
-                  <TableHead>生效日期</TableHead>
-                  <TableHead>到期日期</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>剩余次数</TableHead>
-                  <TableHead>成交人</TableHead>
-                  <TableHead>支付方式</TableHead>
-                  <TableHead>创建人</TableHead>
-                  <TableHead className="text-right pr-4">操作</TableHead>
+            <Table style={{ tableLayout: "fixed" }}>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-4" style={{ width: "100px" }}>成交日期</TableHead>
+                <TableHead style={{ width: "100px" }}>用户</TableHead>
+                {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && <TableHead style={{ width: "120px" }}>项目名称</TableHead>}
+                <TableHead style={{ width: "80px" }}>金额</TableHead>
+                <TableHead style={{ width: "80px" }}>购买场次</TableHead>
+                <TableHead style={{ width: "100px" }}>生效日期</TableHead>
+                <TableHead style={{ width: "100px" }}>到期日期</TableHead>
+                <TableHead style={{ width: "70px" }}>状态</TableHead>
+                <TableHead style={{ width: "80px" }}>剩余次数</TableHead>
+                <TableHead style={{ width: "130px" }}>成交人</TableHead>
+                <TableHead style={{ width: "80px" }}>支付方式</TableHead>
+                <TableHead style={{ width: "70px" }}>创建人</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -81,6 +81,18 @@
       </view>
     </view>
 
+    <!-- 销卡（仅 eks） -->
+    <view class="form-item" wx:if="{{activityType === 'eks'}}">
+      <text class="form-label">销卡</text>
+      <input class="form-input" type="number" placeholder="2" placeholder-style="color: #b0b5bb;" value="{{deductionCount}}" bindinput="onEksDeductionInput" />
+    </view>
+
+    <!-- 扣卡次数（eks/ics 不显示） -->
+    <view class="form-item" wx:if="{{activityType !== 'eks' && activityType !== 'ics'}}">
+      <text class="form-label">扣卡次数</text>
+      <input class="form-input" type="number" placeholder="1" placeholder-style="color: #b0b5bb;" value="{{membershipDeductionCount}}" bindinput="onDeductionCountInput" />
+    </view>
+
     <!-- 老师（多选：class/eks/ics） -->
     <view class="form-item last" wx:if="{{activityType === 'class' || activityType === 'eks' || activityType === 'ics'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
@@ -90,12 +102,22 @@
       </view>
     </view>
 
-    <!-- 成就君（单选：gcs/ers/ocr） -->
+    <!-- 老师（单选：gcs/ers/ocr） -->
     <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
         <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || '选择老师'}}</text>
         <text class="picker-clear" wx:if="{{achieverId}}" catchtap="onAchieverClear">x</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 发布到客户端 -->
+  <view class="form-card">
+    <view class="form-item last switch-row">
+      <text class="form-label">发布</text>
+      <view style="flex: 1; display: flex; justify-content: flex-end;">
+        <switch checked="{{isPublished}}" bindchange="onPublishedChange" color="#3370ff" />
       </view>
     </view>
   </view>

@@ -1,18 +1,17 @@
 <view class="page">
-  <!-- 日历 -->
-  <view class="calendar">
-    <view class="calendar-header">
-      <text class="summary-date" bindtap="onCalendarToggle">{{currentDateShort}} {{currentWeekday}}</text>
-      <picker class="space-picker" catchtap="" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-        <text class="summary-space">{{currentSpaceName}}</text>
+  <!-- 头部 -->
+  <view class="head">
+    <view class="head-row">
+      <view class="head-date" bindtap="onCalendarToggle">
+        <text>{{currentDateShort}}</text>
+        <text class="wk">{{currentWeekday}}</text>
+        <text class="drop">{{calendarExpanded ? '▴' : '▾'}}</text>
+      </view>
+      <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <text>{{currentSpaceName}} ▾</text>
       </picker>
     </view>
-    <view class="participants-row">
-      <view class="participants-divider"></view>
-      <text class="participants-label">参与者</text>
-      <text class="participants-names" wx:if="{{participantText}}">{{participantText}}</text>
-      <text class="participants-empty" wx:else>暂无</text>
-    </view>
+    <view class="head-parti">今日 <text class="cnt">{{participants.length}}</text> 位参与者</view>
     <!-- 下拉日历 -->
     <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
       <view class="calendar-nav">
@@ -41,28 +40,33 @@
   <!-- 遮罩 -->
   <view class="calendar-mask" wx:if="{{calendarExpanded}}" bindtap="onCalendarClose"></view>
 
-  <!-- 活动列表 -->
-  <view class="activity-list" wx:if="{{!loading && records.length > 0}}">
-    <view class="activity-card" wx:for="{{records}}" wx:key="id" bindtap="onActivityTap" data-record="{{item}}">
-      <view class="card-body">
-        <view class="card-header">
-          <view class="card-title">
-            <view class="badge" style="background-color: {{item.color}}20; color: {{item.color}};">
-              <text>{{item.badge}}</text>
-            </view>
-            <view wx:if="{{item.isPublicWelfare}}" class="badge" style="background-color: #f0f5ff; color: #3370ff;">
-              <text>公益</text>
-            </view>
-            <text class="card-name" wx:if="{{item.name}}">{{item.name}}</text>
-            <text class="card-time" wx:if="{{item.time}}">{{item.time}}</text>
+  <!-- 活动列表（按时段分组） -->
+  <view class="list" wx:if="{{!loading && records.length > 0}}">
+    <view class="group" wx:for="{{timeGroups}}" wx:key="label" wx:for-item="group">
+      <view class="group-label">{{group.label}}</view>
+      <view
+        class="card"
+        wx:for="{{group.items}}"
+        wx:key="key"
+        wx:for-item="item"
+        bindtap="onActivityTap"
+        data-record="{{item}}"
+      >
+        <view class="card-time">
+          <text class="t1">{{item.startTime || '--'}}</text>
+          <text class="t2">{{item.endTime}}</text>
+        </view>
+        <view class="card-mid">
+          <view class="card-line1">
+            <view class="dot" style="background-color: {{item.color}};"></view>
+            <text class="name">{{item.displayName}}</text>
+            <text class="type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
           </view>
+          <view class="card-line2">{{item.metaText || ''}}</view>
         </view>
-        <view class="card-info">
-          <text class="info-item" wx:if="{{item.teacher}}">{{item.teacher}}</text>
-        </view>
-        <view class="card-arrow-wrap">
-          <text class="card-participants">参与{{item.participants}}人</text>
-          <view class="card-arrow">›</view>
+        <view class="card-right">
+          <text class="ppl" wx:if="{{item.participants > 0}}">{{item.participants}} 人</text>
+          <text class="status" wx:if="{{item.isPublished}}">已发布</text>
         </view>
       </view>
     </view>

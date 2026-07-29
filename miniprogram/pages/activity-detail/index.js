@@ -55,6 +55,9 @@ Page({
     achieverId: '',
     achieverName: '',
     isPublicWelfare: false,
+    membershipDeductionCount: 1,
+    deductionCount: 1,
+    isPublished: false,
     participantIds: [],
     participantList: [],
     dayVisitors: [],
@@ -108,12 +111,15 @@ Page({
       endTime: raw.end_time || '10:00',
       activityName: raw.activity_name || raw.name || raw.course_name || '',
       description: raw.description || raw.course_description || '',
+      deductionCount: this._parseEksDeductionCount(raw.description, activityType),
       ownerId: raw.owner_id || '',
       ownerName: raw.owner_name || '',
       teacherIds: raw.teacher_ids || [],
       achieverId: raw.achiever_id || raw.host_id || (raw.teacher_ids || [])[0] || '',
-      achieverName: raw.achiever_name || raw.host_name || (raw.teacher_names || [])[0] || '',
+      achieverName: (raw.teacher_names || [])[0] || raw.achiever_name || raw.host_name || '',
       isPublicWelfare: raw.is_public_welfare || false,
+      membershipDeductionCount: raw.membership_deduction_count != null ? raw.membership_deduction_count : 1,
+      isPublished: raw.is_published || false,
       participantIds: raw.participant_ids || [],
       activityModeIndex: (raw.activity_mode === '线上') ? 1 : 0,
       icsCourseType: (activityType === 'ics') ? (raw.course_type || '') : '',
@@ -336,6 +342,34 @@ Page({
     this.setData({ isPublicWelfare: e.detail.value })
   },
 
+  onDeductionCountInput(e) {
+    this.setData({ membershipDeductionCount: e.detail.value })
+  },
+
+  onEksDeductionInput(e) {
+    this.setData({ deductionCount: e.detail.value })
+  },
+
+  _parseEksDeductionCount(desc, type) {
+    if (type !== 'eks' || !desc) return 1
+    try {
+      const items = JSON.parse(desc)
+      if (Array.isArray(items) && items.length > 0) {
+        const c = items[0].count
+        return (c != null && !isNaN(c)) ? Math.max(1, c) : 2
+      }
+    } catch {}
+    return 2
+  },
+
+  _serializeEksDescription(count) {
+    return JSON.stringify([{ id: '', name: '', count: Number(count) || 2 }])
+  },
+
+  onPublishedChange(e) {
+    this.setData({ isPublished: e.detail.value })
+  },
+
   onNameInput(e) {
     this.setData({ activityName: e.detail.value })
   },
@@ -498,6 +532,8 @@ Page({
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
           is_public_welfare: this.data.isPublicWelfare,
+          membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+          is_published: this.data.isPublished,
         })
         break
       }
@@ -512,6 +548,8 @@ Page({
           achiever_id: this.data.achieverId,
           achiever_name: this.data.achieverName,
           teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
+          membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+          is_published: this.data.isPublished,
         })
         break
       case 'eks':
@@ -519,8 +557,11 @@ Page({
           owner_id: this.data.ownerId,
           owner_name: this.data.ownerName,
           name: this.data.activityName,
-          description: this.data.description,
+          description: this._serializeEksDescription(this.data.deductionCount),
+          course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
+          membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
+          is_published: this.data.isPublished,
         })
         break
       case 'ics':
@@ -529,6 +570,8 @@ Page({
           course_type: this.data.icsCourseType || '',
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
+          membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
+          is_published: this.data.isPublished,
         })
         break
     }

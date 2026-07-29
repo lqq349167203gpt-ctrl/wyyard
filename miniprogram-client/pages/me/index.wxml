@@ -66,6 +66,7 @@
               <view class="r2-l2">
                 <text class="m-time {{act.timeUndecided ? 'undecided' : ''}}">{{act.timeRange}}</text>
                 <text class="role-tag">· {{act.roleLabel}}</text>
+                <text wx:if="{{act.membership_deduction_count > 0 && !act.is_public_welfare}}" class="role-tag"> · 扣卡{{act.membership_deduction_count}}次</text>
                 <text
                   class="followup-btn {{act.has_followup ? 'done' : ''}}"
                   catchtap="onFollowupTap"

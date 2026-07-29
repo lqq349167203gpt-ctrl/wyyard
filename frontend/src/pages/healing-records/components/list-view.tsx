@@ -132,7 +132,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
           <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4" style={{ width: "160px" }}>客户</TableHead>
+                <TableHead className="pl-4" style={{ width: "140px" }}>客户</TableHead>
                 <TableHead style={{ width: "110px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("member_type")}>
                     会员身份<SortArrow field="member_type" sortField={sortField} sortOrder={sortOrder} />

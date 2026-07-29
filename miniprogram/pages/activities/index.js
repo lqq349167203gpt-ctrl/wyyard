@@ -46,6 +46,25 @@ function buildCalendar(year, month, selectedDate, calendarCounts) {
   return days
 }
 
+// 按时段分组：上午 <12:00 / 下午 12:00-18:00 / 晚上 >=18:00 / 其他（无时间）
+function groupByTimeSlot(records) {
+  const slots = [
+    { label: '上午', items: [] },
+    { label: '下午', items: [] },
+    { label: '晚上', items: [] },
+    { label: '其他', items: [] },
+  ]
+  records.forEach(r => {
+    const m = /^(\d{1,2})/.exec(r.startTime || '')
+    const h = m ? parseInt(m[1], 10) : NaN
+    if (isNaN(h)) slots[3].items.push(r)
+    else if (h < 12) slots[0].items.push(r)
+    else if (h < 18) slots[1].items.push(r)
+    else slots[2].items.push(r)
+  })
+  return slots.filter(s => s.items.length > 0)
+}
+
 Page({
   data: {
     currentDate: '',
@@ -61,6 +80,7 @@ Page({
     spaceId: '',
     currentSpaceName: '',
     records: [],
+    timeGroups: [],
     participants: [],
     participantText: '',
     loading: true,
@@ -210,10 +230,12 @@ Page({
             color: BADGE_COLORS[badge] || BADGE_COLORS['沙龙'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
+            deductionCount: r.membership_deduction_count,
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'class_record',
             isPublicWelfare: r.is_public_welfare || false,
+            isPublished: r.is_published || false,
           })
         })
       }
@@ -227,10 +249,12 @@ Page({
             name: r.name || (owner ? `觉醒游戏·${owner}` : '觉醒游戏'),
             color: BADGE_COLORS['觉醒'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
+            teacher: (r.teacher_names || [])[0] || r.achiever_name || r.host_name || '',
+            deductionCount: r.membership_deduction_count,
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'group_case',
+            isPublished: r.is_published || false,
           })
         })
       }
@@ -244,10 +268,12 @@ Page({
             name: r.name || (achiever ? `情绪释放·${achiever}` : '情绪释放'),
             color: BADGE_COLORS['情绪释放'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
+            teacher: (r.teacher_names || [])[0] || r.achiever_name || r.host_name || '',
+            deductionCount: r.membership_deduction_count,
             participants: 0,
             space: r.space_name || '',
             source: 'emotional_release',
+            isPublished: r.is_published || false,
           })
         })
       }
@@ -262,9 +288,11 @@ Page({
             color: BADGE_COLORS['能量结'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
+            deductionCount: r.membership_deduction_count,
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'energy_knot',
+            isPublished: r.is_published || false,
           })
         })
       }
@@ -278,9 +306,11 @@ Page({
             color: BADGE_COLORS['内部课程'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || (r.teacher_names || [])[0] || '',
+            deductionCount: r.membership_deduction_count,
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'internal_course',
+            isPublished: r.is_published || false,
           })
         })
       }
@@ -294,15 +324,35 @@ Page({
             name: r.name || (achiever ? `OH卡·${achiever}` : 'OH卡'),
             color: BADGE_COLORS['OH卡'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: r.achiever_name || r.host_name || (r.teacher_names || [])[0] || '',
+            teacher: (r.teacher_names || [])[0] || r.achiever_name || r.host_name || '',
+            deductionCount: r.membership_deduction_count,
             participants: r.participant_ids?.length || 0,
             space: r.space_name || '',
             source: 'oh_card',
+            isPublished: r.is_published || false,
           })
         })
       }
 
       records.sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+
+      // 补充列表展示字段
+      records.forEach(r => {
+        const parts = (r.time || '').split('-')
+        r.startTime = parts[0] || ''
+        r.endTime = parts.length > 1 ? parts[1] : ''
+        r.key = `${r.source}_${r.id}`
+        r.displayName = r.name || r.badge
+        const typeParts = []
+        if (r.name) typeParts.push(r.badge)
+        if (r.isPublicWelfare) typeParts.push('公益')
+        r.typeText = typeParts.join(' · ')
+        const metaParts = []
+        if (r.teacher) metaParts.push(r.teacher)
+        if (r.deductionCount > 0) metaParts.push(`扣卡 ${r.deductionCount} 次`)
+        r.metaText = metaParts.join(' · ')
+      })
+      const timeGroups = groupByTimeSlot(records)
 
       // 收集当天所有参与者（去重）
       const allSources = (dashboard.class_records || [])
@@ -321,7 +371,7 @@ Page({
       // 保存日历计数，供展开时使用
       this._calendarCounts = dashboard.calendar_counts || {}
       this._rawMap = rawMap
-      this.setData({ records, participants, participantText: participants.join('、'), loading: false })
+      this.setData({ records, timeGroups, participants, participantText: participants.join('、'), loading: false })
     } catch (e) {
       console.error('加载活动失败:', e)
       if (requestSeq === this._loadSeq) this.setData({ loading: false })

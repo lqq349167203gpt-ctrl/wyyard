@@ -62,8 +62,8 @@
   <!-- 记录 -->
   <view class="form-card">
     <view class="form-item column textarea-row">
-      <text class="form-label" style="margin-bottom: 16rpx;">客户收获</text>
-      <textarea class="form-textarea" style="height: 126rpx;" value="{{feedback}}" bindinput="onFeedbackInput" placeholder="客户收获" placeholder-class="form-textarea-placeholder" />
+      <text class="form-label" style="margin-bottom: 16rpx;">客户信息</text>
+      <textarea class="form-textarea" style="height: 126rpx;" value="{{feedback}}" bindinput="onFeedbackInput" placeholder="客户信息" placeholder-class="form-textarea-placeholder" />
     </view>
     <view class="form-item column textarea-row">
       <text class="form-label" style="margin-bottom: 16rpx;">跟进点</text>

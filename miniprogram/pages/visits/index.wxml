@@ -1,11 +1,17 @@
 <view class="page">
-  <!-- 日历 -->
-  <view class="calendar">
-    <view class="calendar-header">
-      <text class="summary-date" bindtap="onCalendarToggle">{{currentDateShort}} {{currentWeekday}}</text>
-      <picker class="space-picker" catchtap="" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-        <text class="summary-space">{{currentSpaceName}}</text>
+  <!-- 头部 -->
+  <view class="head">
+    <view class="head-row">
+      <view class="head-date" bindtap="onCalendarToggle">
+        <text>{{currentDateShort}}</text>
+        <text class="wk">{{currentWeekday}}</text>
+        <text class="drop">{{calendarExpanded ? '▴' : '▾'}}</text>
+      </view>
+      <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+        <text>{{currentSpaceName}} ▾</text>
       </picker>
+    </view>
+    <view class="head-row2">
       <view class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
         <text>{{editMode ? '完成' : '排序'}}</text>
       </view>

@@ -525,7 +525,7 @@ export default function DetailView({
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className={`min-w-0 flex-1 text-[13.5px] font-bold ${notArrived ? "text-[#79838f]" : "text-[#212631]"}`}>{a.name || <span className="text-[#d0d3d6]">-</span>}</span>
                                   {a.membership_deduction_count != null && a.membership_deduction_count > 0 && !a.is_public_welfare && (
-                                    <span className="ml-auto shrink-0 text-[11.5px] tabular-nums text-[#8f959e]">会员扣卡{a.membership_deduction_count}次</span>
+                                    <span className="ml-auto shrink-0 text-[11.5px] tabular-nums text-[#8f959e]">扣卡{a.membership_deduction_count}次</span>
                                   )}
                                   {a.is_public_welfare && <span className="whitespace-nowrap rounded-md bg-[#dcf5e4] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#157a3c]">公益</span>}
                                   {notArrived && <span className="whitespace-nowrap rounded-md bg-[#f1f0ed] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#79838f]">未参加</span>}

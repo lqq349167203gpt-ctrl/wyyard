@@ -54,7 +54,7 @@ def _sync_financial_notifications(customer_id: str) -> None:
             type="purchase",
             title="购买信息",
             content="\n".join(content_lines),
-            created_at=notification_created_at,
+            created_at=source_created_at,
             activity_name=payment.get("name") or "",
             activity_date=payment.get("effective_date") or "",
             operator=payment.get("closer_name") or "",

@@ -148,7 +148,7 @@
           <text class="heal-value">{{item.growth_record}}</text>
         </view>
         <view class="heal-row" wx:if="{{item.feedback || item.experience}}">
-          <text class="heal-label">客户收获</text>
+          <text class="heal-label">客户信息</text>
           <text class="heal-value">{{item.feedback || item.experience}}</text>
         </view>
       </view>

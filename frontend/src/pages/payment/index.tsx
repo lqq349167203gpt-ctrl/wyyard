@@ -28,15 +28,16 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="px-6 pt-4 pb-6 space-y-3">
+    <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
 
-      {/* Tab 切换 */}
-      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 mb-6 min-h-[39px]">
+      {/* Tab 切换 — 占据标题栏位置 */}
+      <div className="flex items-center rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
         <div className="flex items-center gap-6">
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              className={`relative px-1 pb-2 text-[14px] transition-colors ${
+              className={`relative px-1 pb-0 text-[14px] transition-colors ${
                 activeTab === tab.key
                   ? "text-[#3370ff]"
                   : "text-[#2b2f36] hover:text-[#4e535a]"
@@ -45,7 +46,7 @@ export default function PaymentPage() {
             >
               {tab.label}
               {activeTab === tab.key && (
-                <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
+                <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
               )}
             </button>
           ))}

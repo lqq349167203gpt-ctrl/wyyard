@@ -74,6 +74,10 @@ Page({
         remainNum = '0'
         remainClass = 'zero'
         remainLabel = '次数 · 用完咯'
+      } else if (rc < 0) {
+        remainNum = String(rc)
+        remainClass = 'zero'
+        remainLabel = '次数 · 用完咯'
       } else {
         remainNum = String(rc)
       }

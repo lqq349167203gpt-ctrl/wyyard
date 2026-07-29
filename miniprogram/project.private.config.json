@@ -1,7 +1,19 @@
 {
   "libVersion": "3.16.1",
   "projectname": "miniprogram",
-  "condition": {},
+  "condition": {
+    "miniprogram": {
+      "list": [
+        {
+          "name": "pages/visits/index",
+          "pathName": "pages/visits/index",
+          "query": "",
+          "scene": null,
+          "launchMode": "default"
+        }
+      ]
+    }
+  },
   "setting": {
     "urlCheck": false,
     "coverView": true,
