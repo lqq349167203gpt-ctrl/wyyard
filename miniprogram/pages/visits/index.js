@@ -391,14 +391,30 @@ Page({
           wx.showToast({ title: '导出失败', icon: 'none' })
           return
         }
-        wx.openDocument({
-          filePath: res.tempFilePath,
-          fileType: 'xlsx',
-          showMenu: true,
-          success: () => { wx.hideLoading() },
-          fail: () => {
-            wx.hideLoading()
-            wx.showToast({ title: '无法打开文件', icon: 'none' })
+        // downloadFile 存的是随机临时名，打开/转发前重命名为中文文件名
+        const [y, m, d] = (this.data.currentDate || '').split('-')
+        const fileName = y ? `${y}年${Number(m)}月${Number(d)}日邀约名单.xlsx` : '邀约名单.xlsx'
+        const newPath = `${wx.env.USER_DATA_PATH}/${fileName}`
+        const fs = wx.getFileSystemManager()
+        const openFile = (p) => {
+          wx.hideLoading()
+          wx.openDocument({
+            filePath: p,
+            fileType: 'xlsx',
+            showMenu: true,
+            fail: () => wx.showToast({ title: '无法打开文件', icon: 'none' }),
+          })
+        }
+        // 同名旧文件先删再 rename；任何一步失败都降级直接打开临时文件
+        fs.unlink({
+          filePath: newPath,
+          complete: () => {
+            fs.rename({
+              oldPath: res.tempFilePath,
+              newPath,
+              success: () => openFile(newPath),
+              fail: () => openFile(res.tempFilePath),
+            })
           },
         })
       },
