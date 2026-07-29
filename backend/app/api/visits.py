@@ -224,7 +224,12 @@ async def export_visits(date: str = None, space_id: str = None):
 
     # HTTP 头部只支持 latin-1，中文文件名需按 RFC 5987 用 filename* 百分号编码
     from urllib.parse import quote
-    filename = f"邀约到场_{date or 'all'}.xlsx"
+    if date:
+        y, m, d = date.split('-')
+        date_text = f"{int(y)}年{int(m)}月{int(d)}日"
+    else:
+        date_text = "全部"
+    filename = f"{date_text}邀约名单.xlsx"
     disposition = f"attachment; filename=\"visits_{date or 'all'}.xlsx\"; filename*=UTF-8''{quote(filename)}"
     return StreamingResponse(
         buf,
