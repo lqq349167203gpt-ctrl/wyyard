@@ -376,4 +376,36 @@ Page({
       },
     })
   },
+
+  // ---- 导出 ----
+
+  onExportTap() {
+    const url = visitApi.export(this.data.currentDate, this.data.spaceId || undefined)
+    wx.showLoading({ title: '正在导出...' })
+    wx.downloadFile({
+      url,
+      header: { Authorization: 'Bearer ' + (wx.getStorageSync('auth_token') || '') },
+      success: (res) => {
+        if (res.statusCode !== 200) {
+          wx.hideLoading()
+          wx.showToast({ title: '导出失败', icon: 'none' })
+          return
+        }
+        wx.openDocument({
+          filePath: res.tempFilePath,
+          fileType: 'xlsx',
+          showMenu: true,
+          success: () => { wx.hideLoading() },
+          fail: () => {
+            wx.hideLoading()
+            wx.showToast({ title: '无法打开文件', icon: 'none' })
+          },
+        })
+      },
+      fail: () => {
+        wx.hideLoading()
+        wx.showToast({ title: '下载失败', icon: 'none' })
+      },
+    })
+  },
 })

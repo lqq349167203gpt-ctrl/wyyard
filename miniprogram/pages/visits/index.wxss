@@ -183,11 +183,18 @@
   padding: 164rpx 0 20rpx;
 }
 
-/* 浮动按钮 */
-.fab {
+/* 浮动按钮组 */
+.fab-group {
   position: fixed;
   right: 32rpx;
   bottom: 200rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.fab {
   width: 112rpx;
   height: 112rpx;
   border-radius: 28rpx;
@@ -196,6 +203,17 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 8rpx 32rpx rgba(51, 112, 255, 0.25);
+}
+
+.fab-export {
+  background-color: #ffffff;
+  border: 1rpx solid #d0d3d6;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+}
+
+.fab-export .fab-icon {
+  color: #4e535a;
+  font-size: 40rpx;
 }
 
 .fab-icon {

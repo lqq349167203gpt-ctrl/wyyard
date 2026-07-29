@@ -179,6 +179,12 @@ const visitApi = {
   },
   searchCustomers: (q) => request(`/api/visits/search-customers?q=${encodeURIComponent(q)}`),
   reorder: (ids) => request('/api/visits/reorder', { method: 'POST', data: { ids } }),
+  export: (date, spaceId) => {
+    const params = []
+    if (date) params.push(`date=${date}`)
+    if (spaceId) params.push(`space_id=${spaceId}`)
+    return `${BASE_URL}/api/visits/export${params.length ? '?' + params.join('&') : ''}`
+  },
 }
 
 // 活动 API

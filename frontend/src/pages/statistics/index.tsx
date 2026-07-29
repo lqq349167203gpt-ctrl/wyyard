@@ -60,6 +60,10 @@ export default function StatisticsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("全部")
   // 同一客户去重模式
   const [customerDedup, setCustomerDedup] = useState<"all" | "unique">("all")
+  // 会员类型筛选
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
+  // 引流人筛选
+  const [selectedReferrer, setSelectedReferrer] = useState("")
 
   // 排序
   const [sortField, setSortField] = useState<string | null>(null)
@@ -93,11 +97,53 @@ export default function StatisticsPage() {
     }
   }, [details, customerDedup])
 
+  // 会员类型筛选逻辑
+  const typeNames = useMemo(() => {
+    const set = new Set<string>()
+    ;(details[detailsKey] || []).forEach(d => { if (d.member_type) set.add(d.member_type) })
+    return Array.from(set)
+  }, [details, detailsKey])
+
+  useEffect(() => {
+    if (typeNames.length > 0 && selectedTypes.size === 0) {
+      setSelectedTypes(new Set(typeNames))
+    }
+  }, [typeNames])
+
+  const isAllTypeSelected = useMemo(() => typeNames.length > 0 && typeNames.every(t => selectedTypes.has(t)), [typeNames, selectedTypes])
+
+  const toggleType = (type: string) => {
+    setSelectedTypes(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) next.delete(type)
+      else next.add(type)
+      return next
+    })
+  }
+
+  const toggleAllTypes = () => {
+    if (isAllTypeSelected) setSelectedTypes(new Set())
+    else setSelectedTypes(new Set(typeNames))
+  }
+
+  // 引流人筛选逻辑
+  const referrerNames = useMemo(() => {
+    const set = new Set<string>()
+    ;(details[detailsKey] || []).forEach(d => { if (d.referrer_handler) set.add(d.referrer_handler) })
+    return Array.from(set)
+  }, [details, detailsKey])
+
   // 排序后的列表
   const sortedDetails = useMemo(() => {
     let list = [...(dedupedDetails[detailsKey] || [])]
     if (activeTab === "converted_amount" && typeFilter !== "全部") {
       list = list.filter(item => item.type === typeFilter)
+    }
+    if (selectedTypes.size > 0) {
+      list = list.filter(item => selectedTypes.has(item.member_type || ""))
+    }
+    if (selectedReferrer) {
+      list = list.filter(item => item.referrer_handler === selectedReferrer)
     }
     if (!sortField) return list.sort((a, b) => (b.date || "").localeCompare(a.date || ""))
     return list.sort((a, b) => {
@@ -125,7 +171,7 @@ export default function StatisticsPage() {
       return 0
     })
     return list
-  }, [dedupedDetails, activeTab, sortField, sortOrder, typeFilter])
+  }, [dedupedDetails, activeTab, sortField, sortOrder, typeFilter, selectedTypes, selectedReferrer])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDetails, { pageSize: 10 })
 
@@ -210,6 +256,16 @@ export default function StatisticsPage() {
       fetchDetails()
     }
   }, [statDimension, fetchDetails])
+
+  // 切换数据类型时重置会员类型和引流人筛选
+  const prevActiveTab = useRef(activeTab)
+  useEffect(() => {
+    if (prevActiveTab.current !== activeTab) {
+      prevActiveTab.current = activeTab
+      setSelectedTypes(new Set())
+      setSelectedReferrer("")
+    }
+  }, [activeTab])
 
   // 点击数字列加载客户详情
   const handleStatClick = async (type: "invited" | "visits" | "activities" | "payments" | "day_activities", customerId: string, date?: string) => {
@@ -507,6 +563,50 @@ export default function StatisticsPage() {
               </div>
               {customerDedup === "all" && <span className="text-[11px] text-[#b0b5bd]">全部记录 - 在统计时间范围内，来几次记作几人，重复统计</span>}
               {customerDedup === "unique" && <span className="text-[11px] text-[#b0b5bd]">显示一次 - 在统计时间范围内，不管来几次，都只记作1人</span>}
+            </div>
+
+            {/* 第五行：会员类型 */}
+            <div className="flex items-start gap-3 flex-wrap">
+              <span className="mt-1 inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>会员类型</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={toggleAllTypes}
+                  className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${isAllTypeSelected ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  全部
+                </button>
+                {typeNames.map(type => (
+                  <button
+                    key={type}
+                    onClick={() => toggleType(type)}
+                    className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedTypes.has(type) ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 第六行：引流人 */}
+            <div className="flex items-start gap-3 flex-wrap">
+              <span className="mt-1 inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>引流人</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setSelectedReferrer("")}
+                  className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedReferrer === "" ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  全部
+                </button>
+                {referrerNames.map(name => (
+                  <button
+                    key={name}
+                    onClick={() => setSelectedReferrer(name)}
+                    className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedReferrer === name ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

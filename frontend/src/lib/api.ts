@@ -2140,6 +2140,7 @@ export interface StatisticsDetail {
   quantity?: number | string
   remaining?: number | string
   member_type?: string
+  referrer_handler?: string
   invited_count?: number
   visit_count?: number
   activity_count?: number

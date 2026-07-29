@@ -86,6 +86,7 @@ export default function ReferralStatisticsPage() {
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
   const [dataType, setDataType] = useState<"total" | "new">("total")
   const [selectedReferrer, setSelectedReferrer] = useState("")
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
   const [startYear, setStartYear] = useState(now.getFullYear())
   const [startMonth, setStartMonth] = useState(now.getMonth() + 1)
   const [startDay, setStartDay] = useState(1)
@@ -109,6 +110,35 @@ export default function ReferralStatisticsPage() {
     from: `${startYear}-${String(startMonth).padStart(2, "0")}-${String(startDay).padStart(2, "0")}`,
     to: `${endYear}-${String(endMonth).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`,
   }), [startYear, startMonth, startDay, endYear, endMonth, endDay])
+
+  // 会员类型筛选
+  const typeNames = useMemo(() => {
+    const set = new Set<string>()
+    data?.members.forEach(m => { if (m.member_type) set.add(m.member_type) })
+    return Array.from(set)
+  }, [data?.members])
+
+  useEffect(() => {
+    if (typeNames.length > 0 && selectedTypes.size === 0) {
+      setSelectedTypes(new Set(typeNames))
+    }
+  }, [typeNames])
+
+  const isAllTypeSelected = useMemo(() => typeNames.length > 0 && typeNames.every(t => selectedTypes.has(t)), [typeNames, selectedTypes])
+
+  const toggleType = (type: string) => {
+    setSelectedTypes(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) next.delete(type)
+      else next.add(type)
+      return next
+    })
+  }
+
+  const toggleAllTypes = () => {
+    if (isAllTypeSelected) setSelectedTypes(new Set())
+    else setSelectedTypes(new Set(typeNames))
+  }
 
   const fetchData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -201,7 +231,7 @@ export default function ReferralStatisticsPage() {
   )
 
   const sortedMembers = useMemo(() => {
-    const members = [...(data?.members || [])]
+    const members = (data?.members || []).filter(m => selectedTypes.size === 0 || selectedTypes.has(m.member_type))
     if (!sortField) return members
     return members.sort((a, b) => {
       const left = a[sortField] ?? ""
@@ -210,7 +240,7 @@ export default function ReferralStatisticsPage() {
       if (left > right) return sortOrder === "asc" ? 1 : -1
       return 0
     })
-  }, [data?.members, sortField, sortOrder])
+  }, [data?.members, sortField, sortOrder, selectedTypes])
 
   const {
     paginatedItems,
@@ -420,6 +450,30 @@ export default function ReferralStatisticsPage() {
                   className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedReferrer === referrer ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
                 >
                   {referrer}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <span className="mt-1 inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
+              <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
+              会员类型
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={toggleAllTypes}
+                className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${isAllTypeSelected ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+              >
+                全部
+              </button>
+              {typeNames.map(type => (
+                <button
+                  key={type}
+                  onClick={() => toggleType(type)}
+                  className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedTypes.has(type) ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  {type}
                 </button>
               ))}
             </div>

@@ -1,4 +1,6 @@
+import io
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from app.models.visit import VisitRecordCreate
 from app.services import visit_service
@@ -143,6 +145,89 @@ async def reorder_visits(data: dict):
         raise HTTPException(status_code=400, detail="ids 不能为空")
     visit_service.reorder_visits(ids)
     return {"message": "排序已更新"}
+
+
+@router.get("/export")
+async def export_visits(date: str = None, space_id: str = None):
+    """导出邀约到场 xlsx，格式与 PC 端一致"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    records = visit_service.list_visits(date, space_id=space_id)
+    items = [_fill_member_type(r) for r in records]
+
+    # 构建组长映射（复用 PC 端逻辑）
+    role_map = {}
+    for r in items:
+        if r.get("is_leader"):
+            role_map[r["customer_id"]] = "组长"
+
+    rows = []
+    for v in items:
+        role = role_map.get(v["customer_id"], "")
+        rows.append({
+            "引流人": v.get("referrer") or "-",
+            "客户昵称": v.get("nickname") or "",
+            "预计时间": v.get("visit_time") or "",
+            "参与次数": v.get("visit_count") or 0,
+            "会员身份": v.get("member_type") or "",
+            "当日需求": v.get("needs") or "",
+            "组长情况": role or "-",
+            "组长获得的信息": "",
+            "邀约人": v.get("referrer_handler") or "",
+        })
+
+    if not rows:
+        # 空表也返回有效 xlsx（只有表头）
+        rows = []
+
+    headers = ["引流人", "客户昵称", "预计时间", "参与次数", "会员身份", "当日需求", "组长情况", "组长获得的信息", "邀约人"]
+    col_widths = [10, 12, 10, 10, 12, 40, 10, 30, 10]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "邀约到场"
+    ws.sheet_view.showGridLines = False
+
+    # 设置列宽
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    # 写表头
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="D0D3D6", end_color="D0D3D6", fill_type="solid")
+    thin_border = Border(
+        left=Side(style="thin", color="C0C4CC"),
+        right=Side(style="thin", color="C0C4CC"),
+        top=Side(style="thin", color="C0C4CC"),
+        bottom=Side(style="thin", color="C0C4CC"),
+    )
+
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=c, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = thin_border
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    # 写数据行
+    for r, row_data in enumerate(rows, 2):
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=r, column=c, value=row_data[h])
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    # 输出到内存
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"邀约到场_{date or 'all'}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{visit_id}")

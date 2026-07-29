@@ -347,6 +347,7 @@ def get_details(
                 "status": "converted" if is_converted else "invited",
                 "arrived": v.arrived,
                 "member_type": member_type,
+                "referrer_handler": v.referrer_handler or "",
             })
             if v.arrived:
                 arrived_list.append({
@@ -356,6 +357,7 @@ def get_details(
                     "status": "converted" if is_converted else "arrived",
                     "arrived": True,
                     "member_type": member_type,
+                    "referrer_handler": v.referrer_handler or "",
                 })
 
     # 3. 获取成交人员
@@ -393,6 +395,7 @@ def get_details(
                     "name": name,
                     "quantity": quantity,
                     "member_type": c.member_type if c and c.member_type else "",
+                    "referrer_handler": c.referrer or "",
                     "amount": getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0,
                 })
 
