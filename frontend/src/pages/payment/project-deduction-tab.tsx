@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, useCallback } from "react"
-import { CreditCard, Download, Pencil, Trash2, Upload } from "lucide-react"
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { CreditCard, Download, Inbox, Pencil, Trash2, Upload, X } from "lucide-react"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import ExcelJS from "exceljs"
@@ -8,7 +8,6 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -37,6 +36,10 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "energy-knots": "能量结",
   "internal-courses": "内部课程",
   "other-projects": "其他项目",
+}
+
+function EmptyValue({ className }: { className?: string }) {
+  return <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className ?? ""}`} />
 }
 
 const CARD_TYPE_OPTIONS = [
@@ -68,6 +71,12 @@ export function ProjectDeductionTab() {
 
   const cpRef = useRef(cp)
   cpRef.current = cp
+
+  const nicknameToCustomer = useMemo(() => {
+    const map: Record<string, Customer> = {}
+    customers.forEach(c => { if (c.nickname) map[c.nickname] = c })
+    return map
+  }, [customers])
 
   // 搜索
   const [searchNickname, setSearchNickname] = useState("")
@@ -539,124 +548,133 @@ export function ProjectDeductionTab() {
   }
 
   return (
-    <>
-      {/* 搜索 + 操作栏 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-44">
+    <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
+      {/* 标题栏 */}
+      <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
+        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">销卡</span>
+        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部销卡记录</span>
+      </div>
+      {/* 表格卡：筛选条 + 数据表 */}
+      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
+          <div className="w-[172px]">
             <CustomerSearchInput
               customers={customers}
               value={searchNickname}
               onChange={(v) => handleFilterChange(typeof v === "string" ? v : "")}
               placeholder="搜索用户"
               filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
             />
           </div>
-          <div className="w-36">
-            <SelectDropdown
-              value={searchProjectType}
-              options={[
-                { value: "all", label: "全部类型" },
-                ...PROJECT_TYPE_OPTIONS,
-              ]}
-              onChange={handleTypeChange}
-            />
-          </div>
+          <SelectDropdown
+            className="w-[138px]"
+            buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+            rounded="7px"
+            value={searchProjectType}
+            options={[
+              { value: "all", label: "全部类型" },
+              ...PROJECT_TYPE_OPTIONS,
+            ]}
+            textColor={searchProjectType !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+            onChange={handleTypeChange}
+          />
           {searchProjectType === "membership-cards" && (
-            <div className="w-32">
-              <SelectDropdown
-                value={searchCardType}
-                options={[
-                  { value: "all", label: "全部卡类型" },
-                  ...CARD_TYPE_OPTIONS,
-                ]}
-                onChange={handleCardTypeChange}
-              />
-            </div>
+            <SelectDropdown
+              className="w-[138px]"
+              buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+              rounded="7px"
+              value={searchCardType}
+              options={[
+                { value: "all", label: "全部卡类型" },
+                ...CARD_TYPE_OPTIONS,
+              ]}
+              textColor={searchCardType !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+              onChange={handleCardTypeChange}
+            />
           )}
-          <button onClick={handleClearSearch} className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]">
+          <button
+            onClick={handleClearSearch}
+            className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+          >
+            <X className="h-3.5 w-3.5" />
             清空
           </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleDownloadTemplate}>
-            <Download className="mr-1 h-3.5 w-3.5" /> 下载模板
-          </Button>
-          {/* 导入功能暂时隐藏
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-            <Upload className="mr-1 h-3.5 w-3.5" /> 导入
-          </Button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-          */}
-          <Button size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(true)}>
-            <CreditCard className="mr-1 h-3.5 w-3.5" /> 销卡
+          <div className="flex-1" />
+          <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={() => setDialogOpen(true)}>
+            <CreditCard className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 销卡
           </Button>
         </div>
-      </div>
-
-      {/* 统计 */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground mt-[6px]">
-          {totalItems > 0 && <span>共 {totalItems} 条记录</span>}
-        </p>
-      </div>
-
-      {/* 扣次记录表格 */}
-      <div className="bg-white rounded-lg">
         {deductionsLoading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
         ) : totalItems === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <CreditCard className="h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">暂无销卡记录</p>
-            <p className="text-xs text-muted-foreground mt-1">点击上方"销卡"按钮操作</p>
-          </div>
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
         ) : (
-          <Table>
+          <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">昵称</TableHead>
-                <TableHead>项目类型</TableHead>
-                <TableHead>项目名称</TableHead>
-                <TableHead>销卡次数</TableHead>
-                <TableHead>销卡日期</TableHead>
+                <TableHead className="pl-4" style={{ width: "140px" }}>昵称</TableHead>
+                <TableHead style={{ width: "100px" }}>项目类型</TableHead>
+                <TableHead style={{ width: "130px" }}>项目名称</TableHead>
+                <TableHead style={{ width: "80px" }}>销卡次数</TableHead>
+                <TableHead style={{ width: "100px" }}>销卡日期</TableHead>
                 <TableHead>销卡内容</TableHead>
-                <TableHead>该卡剩余</TableHead>
-                <TableHead>创建人</TableHead>
-                <TableHead className="w-20">操作</TableHead>
+                <TableHead style={{ width: "80px" }}>该卡剩余</TableHead>
+                <TableHead style={{ width: "80px" }}>创建人</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {deductions.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="pl-4 text-[#2b2f36]">{d.nickname}</TableCell>
+                <TableRow key={d.id} className="group hover:bg-[#f7f8fa]">
+                  <TableCell className="pl-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef0f2] text-[12px] font-medium text-[#646a73]">
+                        {(d.nickname || "客").charAt(0)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-medium text-[#212631]">{d.nickname || <EmptyValue />}</span>
+                        {nicknameToCustomer[d.nickname] && (
+                          <span className="mt-0.5 block truncate text-[12px] text-[#a8b1bd]">
+                            {[nicknameToCustomer[d.nickname].name && nicknameToCustomer[d.nickname].name !== d.nickname ? nicknameToCustomer[d.nickname].name : "", nicknameToCustomer[d.nickname].gender].filter(Boolean).join(" · ") || <EmptyValue />}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="text-[11px] font-normal">
+                    <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">
                       {PROJECT_TYPE_LABELS[d.project_type] || d.project_type}
-                    </Badge>
+                    </span>
                   </TableCell>
-                  <TableCell className="text-[#2b2f36]">{d.project_name}</TableCell>
-                  <TableCell className="text-[#2b2f36]">{d.count} 次</TableCell>
-                  <TableCell className="text-[#2b2f36]">{d.deduction_date}</TableCell>
-                  <TableCell className={d.reason ? "text-[#4e535a]" : "text-[#d0d3d6]"}>
-                    {d.reason || "-"}
+                  <TableCell>
+                    <span className="text-[12px] text-[#2b2f36] truncate block" title={d.project_name}>{d.project_name}</span>
                   </TableCell>
-                  <TableCell className="text-[#2b2f36]">
+                  <TableCell className="tabular-nums text-[12px] text-[#2b2f36]">{d.count} 次</TableCell>
+                  <TableCell className="text-[12px] text-[#2b2f36] tabular-nums">{d.deduction_date}</TableCell>
+                  <TableCell className="text-[12px]">
+                    {d.reason ? <span className="text-[#4e535a]">{d.reason}</span> : <EmptyValue />}
+                  </TableCell>
+                  <TableCell className="tabular-nums text-[12px] text-[#2b2f36]">
                     {d.remaining_after === null || d.remaining_after === undefined ? "不限" : d.remaining_after < 0 ? <span className="text-[#c4506a]">{d.remaining_after} 次</span> : `${d.remaining_after} 次`}
                   </TableCell>
-                  <TableCell className="text-[#8f959e]">{d.created_by || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <button className="p-1 hover:bg-[#f0f1f2] rounded" onClick={() => {
-                        setEditTarget(d)
-                        setEditCount(String(d.count))
-                        setEditReason(d.reason || "")
-                      }}>
-                        <Pencil className="h-3.5 w-3.5 text-[#8f959e]" />
-                      </button>
-                      <button className="p-1 hover:bg-[#fef0f0] rounded" onClick={() => setDeleteTarget(d)}>
-                        <Trash2 className="h-3.5 w-3.5 text-[#c4506a]" />
-                      </button>
+                  <TableCell className="text-[12px] text-[#a8b1bd]">{d.created_by || <EmptyValue />}</TableCell>
+                  <TableCell className="text-right pr-4">
+                    <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                          setEditTarget(d)
+                          setEditCount(String(d.count))
+                          setEditReason(d.reason || "")
+                        }}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(d)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -664,8 +682,6 @@ export function ProjectDeductionTab() {
             </TableBody>
           </Table>
         )}
-      </div>
-      {totalItems > 0 && (
         <PaginationBar
           currentPage={currentPage}
           totalPages={totalPages}
@@ -674,7 +690,7 @@ export function ProjectDeductionTab() {
           endIndex={endIndex}
           onPageChange={goToPage}
         />
-      )}
+      </div>
 
       {/* 销卡弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -855,6 +871,6 @@ export function ProjectDeductionTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }

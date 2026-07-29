@@ -39,6 +39,7 @@ export default function ProductSalesPage() {
   const [productType, setProductType] = useState<string>("全部")
   const [nameFilter, setNameFilter] = useState<string>("")
   const [dataType, setDataType] = useState<"amount" | "count" | "persons">("amount")
+  const [selectedReferrer, setSelectedReferrer] = useState("")
   const [timeView, setTimeView] = useState<"year" | "month">("month")
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
 
@@ -187,6 +188,7 @@ export default function ProductSalesPage() {
         product_type: productType,
         name_filter: nameFilter || undefined,
         granularity,
+        referrer: selectedReferrer || undefined,
       })
       setProductData(res)
     } catch {
@@ -194,7 +196,7 @@ export default function ProductSalesPage() {
     } finally {
       setLoading(false)
     }
-  }, [dateRange, productType, nameFilter, granularity])
+  }, [dateRange, productType, nameFilter, granularity, selectedReferrer])
 
   useEffect(() => {
     fetchData()
@@ -335,6 +337,28 @@ export default function ProductSalesPage() {
                 >
                   成交人数
                 </button>
+              </div>
+            </div>
+
+            {/* 第五行：引流人 */}
+            <div className="flex items-start gap-3">
+              <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0 mt-1"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>引流人</span>
+              <div className="flex items-center flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedReferrer("")}
+                  className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedReferrer === "" ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  全部
+                </button>
+                {productData?.referrer_names?.map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => setSelectedReferrer(name)}
+                    className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedReferrer === name ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
+                  >
+                    {name}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

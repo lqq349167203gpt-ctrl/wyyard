@@ -105,6 +105,10 @@ interface UnifiedItem {
   _raw?: any
 }
 
+function EmptyValue({ className }: { className?: string }) {
+  return <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className ?? ""}`} />
+}
+
 function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
   const base: UnifiedItem = {
     id: item.id,
@@ -1163,37 +1167,37 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
             <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4" style={{ width: "100px" }}>成交日期</TableHead>
+                <TableHead className="pl-4" style={{ width: "90px" }}>成交日期</TableHead>
                 <TableHead style={{ width: "100px" }}>用户</TableHead>
                 {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && <TableHead style={{ width: "120px" }}>项目名称</TableHead>}
-                <TableHead style={{ width: "80px" }}>金额</TableHead>
-                <TableHead style={{ width: "80px" }}>购买场次</TableHead>
-                <TableHead style={{ width: "100px" }}>生效日期</TableHead>
-                <TableHead style={{ width: "100px" }}>到期日期</TableHead>
-                <TableHead style={{ width: "70px" }}>状态</TableHead>
-                <TableHead style={{ width: "80px" }}>剩余次数</TableHead>
-                <TableHead style={{ width: "130px" }}>成交人</TableHead>
-                <TableHead style={{ width: "80px" }}>支付方式</TableHead>
-                <TableHead style={{ width: "70px" }}>创建人</TableHead>
-                <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
+                <TableHead style={{ width: "70px" }}>金额</TableHead>
+                <TableHead style={{ width: "70px" }}>购买场次</TableHead>
+                <TableHead style={{ width: "80px" }}>生效日期</TableHead>
+                <TableHead style={{ width: "80px" }}>到期日期</TableHead>
+                <TableHead style={{ width: "60px" }}>状态</TableHead>
+                <TableHead style={{ width: "70px" }}>剩余次数</TableHead>
+                <TableHead style={{ width: "100px" }}>成交人</TableHead>
+                <TableHead style={{ width: "70px" }}>支付方式</TableHead>
+                <TableHead style={{ width: "60px" }}>创建人</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "80px" }}>操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedItems.map((item) => (
                   <TableRow key={`${item.type}-${item.id}`} className="group hover:bg-[#f7f8fa]">
-                    <TableCell className="pl-4 text-[#2b2f36]">{item.deal_date || "-"}</TableCell>
-                    <TableCell className="text-[#2b2f36]">{item.nickname}</TableCell>
+                    <TableCell className="pl-4 text-[#2b2f36]">{item.deal_date || <EmptyValue />}</TableCell>
+                    <TableCell className="text-[#2b2f36] truncate" title={item.nickname}>{item.nickname}</TableCell>
                     {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && (
-                      <TableCell className="text-[#2b2f36]">
+                      <TableCell className="text-[#2b2f36] truncate" title={item.type === "other" ? [item.category, item.project_name].filter(Boolean).join(" / ") : item.detail}>
                         {item.type === "other"
-                          ? [item.category, item.project_name].filter(Boolean).join(" / ") || "-"
-                          : (item.detail || "-")}
+                          ? [item.category, item.project_name].filter(Boolean).join(" / ") || <EmptyValue />
+                          : (item.detail || <EmptyValue />)}
                       </TableCell>
                     )}
                     <TableCell className="text-[#2b2f36]">¥{item.price.toLocaleString()}</TableCell>
                     <TableCell className="text-[#2b2f36]">
                       {(item.type === "group_case" || item.type === "emotional_release" || item.type === "oh_card_reading" || item.type === "energy_knot") && (
-                        item.purchase_count ? `${item.purchase_count} 次` : "-"
+                        item.purchase_count ? `${item.purchase_count} 次` : <EmptyValue />
                       )}
                       {item.type === "membership_card" && (() => {
                         if (item.remaining_count === null || item.total_count == null) return "不限"
@@ -1203,8 +1207,8 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                         (item.total_count === null || item.total_count === undefined) && item.remaining_count === null ? "不限" : `${(item.total_count ?? item.remaining_count) ?? 0} 次`
                       )}
                     </TableCell>
-                    <TableCell className="text-[#2b2f36]">{item.effective_date || "-"}</TableCell>
-                    <TableCell className="text-[#2b2f36]">{item.expiry_date || "-"}</TableCell>
+                    <TableCell className="text-[#2b2f36]">{item.effective_date || <EmptyValue />}</TableCell>
+                    <TableCell className="text-[#2b2f36]">{item.expiry_date || <EmptyValue />}</TableCell>
                     <TableCell className="text-[12px]">
                       {(() => {
                         const today = new Date().toISOString().slice(0,10)
@@ -1212,7 +1216,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                         if (item.effective_date && item.effective_date > today) return <span className="text-[#8f959e]">未开始</span>
                         if (item.expiry_date && item.expiry_date < today) return <span className="text-[#c4506a]">已过期</span>
                         if (item.effective_date || item.expiry_date) return <span className="text-[#3370ff]">生效中</span>
-                        return <span className="text-[#8f959e]">-</span>
+                        return <EmptyValue />
                       })()}
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">
@@ -1227,16 +1231,16 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                       ) : (
                         item.effective_remaining !== null && item.effective_remaining !== undefined
                           ? `${item.effective_remaining} 次`
-                          : "-"
+                          : <EmptyValue />
                       )}
                     </TableCell>
                     <TableCell className="text-[#2b2f36]">
                       {item.closers?.length
                         ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、")
-                        : (item.closer_name || "-")}
+                        : (item.closer_name || <EmptyValue />)}
                     </TableCell>
-                    <TableCell className="text-[#2b2f36]">{item.payment_method || "-"}</TableCell>
-                    <TableCell className="text-[#8f959e]">{item.created_by || "-"}</TableCell>
+                    <TableCell className="text-[#2b2f36]">{item.payment_method || <EmptyValue />}</TableCell>
+                    <TableCell className="text-[#8f959e]">{item.created_by || <EmptyValue />}</TableCell>
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(item)}>

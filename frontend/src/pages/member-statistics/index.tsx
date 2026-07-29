@@ -14,6 +14,7 @@ interface MemberStatistics {
   total_members: number
   type_totals: Record<string, number>
   type_names: string[]
+  referrer_names: string[]
   chart_new: Array<Record<string, string | number>>
   chart_total: Array<Record<string, string | number>>
   members: Array<{

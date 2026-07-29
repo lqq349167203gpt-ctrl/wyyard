@@ -2182,6 +2182,7 @@ export interface StatisticsProducts {
   other_project_chart_amount: Record<string, string | number>[]
   other_project_chart_count: Record<string, string | number>[]
   other_project_chart_persons: Record<string, string | number>[]
+  referrer_names: string[]
 }
 
 export interface MemberStatistics {
@@ -2262,13 +2263,14 @@ export const statisticsApi = {
     if (params.referrer) searchParams.set("referrer", params.referrer)
     return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[]; member_type_names?: string[]; referrer_names?: string[] }>(`/api/statistics/details?${searchParams.toString()}`)
   },
-  products: (params: { date_from?: string; date_to?: string; product_type?: string; name_filter?: string; granularity?: string }) => {
+  products: (params: { date_from?: string; date_to?: string; product_type?: string; name_filter?: string; granularity?: string; referrer?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.product_type) searchParams.set("product_type", params.product_type)
     if (params.name_filter) searchParams.set("name_filter", params.name_filter)
     if (params.granularity) searchParams.set("granularity", params.granularity)
+    if (params.referrer) searchParams.set("referrer", params.referrer)
     return request<StatisticsProducts>(`/api/statistics/products?${searchParams.toString()}`)
   },
   productDetails: (params: { date: string; type: string; product_type?: string }) => {

@@ -1,12 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from "react"
-import { Banknote, Pencil, Trash2 } from "lucide-react"
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { Banknote, Inbox, Pencil, Trash2, X } from "lucide-react"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -17,6 +16,10 @@ import { customerApi, projectRefundApi, type Customer, type ProjectRefund } from
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
+
+function EmptyValue({ className }: { className?: string }) {
+  return <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className ?? ""}`} />
+}
 
 const PROJECT_TYPE_OPTIONS = [
   { value: "membership-cards", label: "会员卡" },
@@ -44,6 +47,12 @@ export function RefundTab() {
 
   const cpRef = useRef(cp)
   cpRef.current = cp
+
+  const nicknameToCustomer = useMemo(() => {
+    const map: Record<string, Customer> = {}
+    customers.forEach(c => { if (c.nickname) map[c.nickname] = c })
+    return map
+  }, [customers])
 
   // 搜索
   const [searchNickname, setSearchNickname] = useState("")
@@ -226,91 +235,109 @@ export function RefundTab() {
   }
 
   return (
-    <>
-      {/* 搜索 + 操作栏 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-44">
+    <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
+      {/* 标题栏 */}
+      <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
+        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">退费</span>
+        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部退费记录</span>
+      </div>
+      {/* 表格卡：筛选条 + 数据表 */}
+      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
+          <div className="w-[172px]">
             <CustomerSearchInput
               customers={customers}
               value={searchNickname}
               onChange={(v) => handleFilterChange(typeof v === "string" ? v : "")}
               placeholder="搜索用户"
               filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
             />
           </div>
-          <div className="w-36">
-            <SelectDropdown
-              value={searchProjectType}
-              options={[
-                { value: "all", label: "全部类型" },
-                ...PROJECT_TYPE_OPTIONS,
-              ]}
-              onChange={handleTypeChange}
-            />
-          </div>
-          <button onClick={handleClearSearch} className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]">
+          <SelectDropdown
+            className="w-[138px]"
+            buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+            rounded="7px"
+            value={searchProjectType}
+            options={[
+              { value: "all", label: "全部类型" },
+              ...PROJECT_TYPE_OPTIONS,
+            ]}
+            textColor={searchProjectType !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+            onChange={handleTypeChange}
+          />
+          <button
+            onClick={handleClearSearch}
+            className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+          >
+            <X className="h-3.5 w-3.5" />
             清空
           </button>
+          <div className="flex-1" />
+          <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={() => setDialogOpen(true)}>
+            <Banknote className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 退费
+          </Button>
         </div>
-        <Button size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(true)}>
-          <Banknote className="mr-1 h-3.5 w-3.5" /> 退费
-        </Button>
-      </div>
-
-      {/* 统计 */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground mt-[6px]">
-          {totalItems > 0 && <span>共 {totalItems} 条记录</span>}
-        </p>
-      </div>
-
-      {/* 退费记录表格 */}
-      <div className="bg-white rounded-lg">
         {refundsLoading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
         ) : totalItems === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Banknote className="h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">暂无退费记录</p>
-            <p className="text-xs text-muted-foreground mt-1">点击上方"退费"按钮操作</p>
-          </div>
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
         ) : (
-          <Table>
+          <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">昵称</TableHead>
-                <TableHead>项目类型</TableHead>
-                <TableHead>项目名称</TableHead>
-                <TableHead>已付金额</TableHead>
-                <TableHead>退费金额</TableHead>
-                <TableHead>退费日期</TableHead>
-                <TableHead>创建人</TableHead>
-                <TableHead className="w-20">操作</TableHead>
+                <TableHead className="pl-4" style={{ width: "140px" }}>昵称</TableHead>
+                <TableHead style={{ width: "100px" }}>项目类型</TableHead>
+                <TableHead style={{ width: "140px" }}>项目名称</TableHead>
+                <TableHead style={{ width: "90px" }}>已付金额</TableHead>
+                <TableHead style={{ width: "90px" }}>退费金额</TableHead>
+                <TableHead style={{ width: "100px" }}>退费日期</TableHead>
+                <TableHead style={{ width: "80px" }}>创建人</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {refunds.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="pl-4 text-[#2b2f36]">{r.nickname}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="text-[11px] font-normal">
-                      {PROJECT_TYPE_LABELS[r.project_type] || r.project_type}
-                    </Badge>
+                <TableRow key={r.id} className="group hover:bg-[#f7f8fa]">
+                  <TableCell className="pl-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef0f2] text-[12px] font-medium text-[#646a73]">
+                        {(r.nickname || "客").charAt(0)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-medium text-[#212631]">{r.nickname || <EmptyValue />}</span>
+                        {nicknameToCustomer[r.nickname] && (
+                          <span className="mt-0.5 block truncate text-[12px] text-[#a8b1bd]">
+                            {[nicknameToCustomer[r.nickname].name && nicknameToCustomer[r.nickname].name !== r.nickname ? nicknameToCustomer[r.nickname].name : "", nicknameToCustomer[r.nickname].gender].filter(Boolean).join(" · ") || <EmptyValue />}
+                          </span>
+                        )}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell className="text-[#2b2f36]">{r.project_name}</TableCell>
-                  <TableCell className="text-[#2b2f36]">¥{r.paid_amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-[#c4506a]">¥{r.refund_amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-[#2b2f36]">{r.refund_date}</TableCell>
-                  <TableCell className="text-[#8f959e]">{r.created_by || "-"}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      <button className="p-1 hover:bg-[#f0f1f2] rounded" onClick={() => { setEditTarget(r); setEditAmount(String(r.refund_amount)) }}>
-                        <Pencil className="h-3.5 w-3.5 text-[#8f959e]" />
-                      </button>
-                      <button className="p-1 hover:bg-[#fef0f0] rounded" onClick={() => setDeleteTarget(r)}>
-                        <Trash2 className="h-3.5 w-3.5 text-[#c4506a]" />
-                      </button>
+                    <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">
+                      {PROJECT_TYPE_LABELS[r.project_type] || r.project_type}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-[12px] text-[#2b2f36] truncate block" title={r.project_name}>{r.project_name}</span>
+                  </TableCell>
+                  <TableCell className="tabular-nums text-[12px] text-[#2b2f36]">¥{r.paid_amount.toLocaleString()}</TableCell>
+                  <TableCell className="tabular-nums text-[12px] text-[#c4506a]">¥{r.refund_amount.toLocaleString()}</TableCell>
+                  <TableCell className="text-[12px] text-[#2b2f36] tabular-nums">{r.refund_date}</TableCell>
+                  <TableCell className="text-[12px] text-[#a8b1bd]">{r.created_by || <EmptyValue />}</TableCell>
+                  <TableCell className="text-right pr-4">
+                    <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditTarget(r); setEditAmount(String(r.refund_amount)) }}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(r)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -318,8 +345,6 @@ export function RefundTab() {
             </TableBody>
           </Table>
         )}
-      </div>
-      {totalItems > 0 && (
         <PaginationBar
           currentPage={currentPage}
           totalPages={totalPages}
@@ -328,7 +353,7 @@ export function RefundTab() {
           endIndex={endIndex}
           onPageChange={goToPage}
         />
-      )}
+      </div>
 
       {/* 退费弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -472,6 +497,6 @@ export function RefundTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }

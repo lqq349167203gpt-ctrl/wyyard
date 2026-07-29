@@ -546,8 +546,11 @@ def get_products(
     product_type: str | None = Query(None, description="产品类型筛选"),
     name_filter: str | None = Query(None, description="子类型名称筛选（会员卡卡类型/内部课程课程类型/其他项目项目名称）"),
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
+    referrer: str | None = Query(None, description="引流人筛选"),
 ):
     date_from, date_to = _get_date_range(date_from, date_to)
+    referrer_filter = (_normalize_query_str(referrer) or "").strip()
+    customers_map = {c.id: c for c in customer_service.list_customers()}
 
     def _get_amount(r):
         return getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0
@@ -613,6 +616,9 @@ def get_products(
     daily_other_project_persons: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     other_project_name_set: set[str] = set()
 
+    # 引流人统计（不受 referrer_filter 影响，用于生成筛选选项）
+    option_referrer_counts: dict[str, int] = defaultdict(int)
+
     for type_name, records in services:
         label = PRODUCT_TYPE_MAP[type_name]
         if product_type and product_type != "全部" and label != product_type:
@@ -622,6 +628,12 @@ def get_products(
             customer_id = getattr(r, "customer_id", None)
             voided = getattr(r, "voided", False)
             if deal_date and not voided and date_from <= deal_date <= date_to:
+                # 引流人筛选
+                c_referrer = ((customers_map.get(customer_id).referrer if customers_map.get(customer_id) else None) or "").strip()
+                if c_referrer:
+                    option_referrer_counts[c_referrer] += 1
+                if referrer_filter and c_referrer != referrer_filter:
+                    continue
                 amount = _get_amount(r)
 
                 # 判断是否应该计入 daily_table（项目名称筛选，仅其他项目）
@@ -801,6 +813,7 @@ def get_products(
         "other_project_chart_amount": other_project_chart_amount,
         "other_project_chart_count": other_project_chart_count,
         "other_project_chart_persons": other_project_chart_persons,
+        "referrer_names": [name for name, _ in sorted(option_referrer_counts.items(), key=lambda item: (-item[1], item[0]))],
     }
 
 
