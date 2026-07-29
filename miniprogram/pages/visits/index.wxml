@@ -15,6 +15,9 @@
       <view class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
         <text>{{editMode ? '完成' : '排序'}}</text>
       </view>
+      <view class="export-btn" catchtap="onExportTap">
+        <text>导出</text>
+      </view>
     </view>
     <!-- 下拉日历 -->
     <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
@@ -77,14 +80,9 @@
     <text>加载中...</text>
   </view>
 
-  <!-- 浮动按钮组 -->
-  <view class="fab-group" wx:if="{{!editMode}}">
-    <view class="fab fab-export" bindtap="onExportTap">
-      <text class="fab-icon">↓</text>
-    </view>
-    <view class="fab" bindtap="onAddTap" bindlongpress="onFabLongPress">
-      <text class="fab-icon">+</text>
-    </view>
+  <!-- 浮动添加按钮 -->
+  <view class="fab" wx:if="{{!editMode}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
+    <text class="fab-icon">+</text>
   </view>
 
 </view>

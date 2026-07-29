@@ -161,13 +161,13 @@
 
 /* 活动列表 */
 .list {
-  padding: 156rpx 0 20rpx;
+  padding: 152rpx 0 20rpx;
 }
 
 .group-label {
   font-size: 22rpx;
   color: #8f959e;
-  padding: 4rpx 32rpx 10rpx;
+  padding: 0 32rpx 10rpx;
 }
 
 .group:first-child .group-label {

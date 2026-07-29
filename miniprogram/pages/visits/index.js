@@ -391,7 +391,6 @@ Page({
           wx.showToast({ title: '导出失败', icon: 'none' })
           return
         }
-        // downloadFile 存的是随机临时名，打开/转发前重命名为中文文件名
         const [y, m, d] = (this.data.currentDate || '').split('-')
         const fileName = y ? `${y}年${Number(m)}月${Number(d)}日邀约名单.xlsx` : '邀约名单.xlsx'
         const newPath = `${wx.env.USER_DATA_PATH}/${fileName}`
@@ -402,20 +401,23 @@ Page({
             filePath: p,
             fileType: 'xlsx',
             showMenu: true,
+            success: () => {},
             fail: () => wx.showToast({ title: '无法打开文件', icon: 'none' }),
           })
         }
-        // 同名旧文件先删再 rename；任何一步失败都降级直接打开临时文件
-        fs.unlink({
-          filePath: newPath,
-          complete: () => {
-            fs.rename({
-              oldPath: res.tempFilePath,
-              newPath,
+        // 读取临时文件，写入中文文件名路径后打开
+        fs.readFile({
+          filePath: res.tempFilePath,
+          success: (data) => {
+            fs.writeFile({
+              filePath: newPath,
+              data: data.data,
+              encoding: 'binary',
               success: () => openFile(newPath),
               fail: () => openFile(res.tempFilePath),
             })
           },
+          fail: () => openFile(res.tempFilePath),
         })
       },
       fail: () => {
