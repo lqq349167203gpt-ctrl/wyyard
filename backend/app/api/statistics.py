@@ -1363,7 +1363,11 @@ def get_referral_statistics(
     for created_date in sorted(customers_by_date):
         for status in status_names:
             cumulative[status] += customers_by_date[created_date].get(status, 0)
-        cumulative_by_date[created_date] = dict(cumulative)
+        if date_from <= created_date <= date_to:
+            if not cumulative_by_date:
+                # 范围内第一天：重置累计，只统计范围内新增
+                cumulative = {status: customers_by_date[created_date].get(status, 0) for status in status_names}
+            cumulative_by_date[created_date] = dict(cumulative)
 
     members = []
     for customer in customers:

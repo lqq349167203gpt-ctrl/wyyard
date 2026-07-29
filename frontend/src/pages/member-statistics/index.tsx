@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { statisticsApi, customerDetailApi, type ActivityRecord, type PaymentRecord } from "@/lib/api"
 import DetailView from "@/pages/healing-records/components/detail-view"
@@ -76,9 +76,11 @@ export default function MemberStatisticsPage() {
     return { from, to }
   }, [startYear, startMonth, startDay, endYear, endMonth, endDay])
 
-  // 当数据加载后，初始化选中所有类型
+  // 当数据加载后，初始化选中所有类型（仅首次）
+  const typesInitializedRef = useRef(false)
   useEffect(() => {
-    if (data?.type_names && selectedTypes.size === 0) {
+    if (data?.type_names && !typesInitializedRef.current) {
+      typesInitializedRef.current = true
       setSelectedTypes(new Set(data.type_names))
     }
   }, [data?.type_names])
@@ -416,7 +418,7 @@ export default function MemberStatisticsPage() {
               </div>
 
               {/* 各类型会员卡片 */}
-              {data?.type_names?.map((typeName) => (
+              {data?.type_names?.filter(t => selectedTypes.has(t)).map((typeName) => (
                 <div key={typeName} className="bg-white border border-[#e8eaed] rounded-[2px] px-3 py-1.5">
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="w-[6px] h-[6px] rounded-[2px] bg-[#3370ff]"></span>

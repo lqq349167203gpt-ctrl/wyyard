@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Area,
   Bar,
@@ -87,6 +87,8 @@ export default function ReferralStatisticsPage() {
   const [dataType, setDataType] = useState<"total" | "new">("total")
   const [selectedReferrer, setSelectedReferrer] = useState("")
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
+  const [persistedTypeNames, setPersistedTypeNames] = useState<string[]>([])
+  const [persistedReferrerNames, setPersistedReferrerNames] = useState<string[]>([])
   const [startYear, setStartYear] = useState(now.getFullYear())
   const [startMonth, setStartMonth] = useState(now.getMonth() + 1)
   const [startDay, setStartDay] = useState(1)
@@ -112,11 +114,32 @@ export default function ReferralStatisticsPage() {
   }), [startYear, startMonth, startDay, endYear, endMonth, endDay])
 
   // 会员类型筛选项（后端返回全量列表，不随筛选塌缩）
-  const typeNames = useMemo(() => data?.member_type_names ?? [], [data?.member_type_names])
+  const typeNames = useMemo(() => data?.member_type_names ?? persistedTypeNames, [data?.member_type_names, persistedTypeNames])
+  const referrerNames = useMemo(() => data?.referrer_names ?? persistedReferrerNames, [data?.referrer_names, persistedReferrerNames])
 
-  const isAllTypeSelected = useMemo(() => selectedTypes.size === 0, [selectedTypes])
+  // 数据加载后初始化选中所有类型
+  const typesInitializedRef = useRef(false)
+  const userHasInteractedRef = useRef(false)
+  useEffect(() => {
+    if (typeNames.length > 0 && !typesInitializedRef.current) {
+      typesInitializedRef.current = true
+      setSelectedTypes(new Set(typeNames))
+    }
+  }, [typeNames])
+
+  // 空 Set = 全选（初始状态），用户主动清空后需要特殊处理
+  const isAllTypeSelected = useMemo(() => {
+    if (!userHasInteractedRef.current) return true
+    return typeNames.length > 0 && typeNames.every(t => selectedTypes.has(t))
+  }, [selectedTypes, typeNames])
+
+  // 用户是否主动清空了所有类型
+  const hasNoSelection = useMemo(() => {
+    return userHasInteractedRef.current && selectedTypes.size === 0
+  }, [selectedTypes])
 
   const toggleType = (type: string) => {
+    userHasInteractedRef.current = true
     setSelectedTypes(prev => {
       const next = new Set(prev)
       if (next.has(type)) next.delete(type)
@@ -126,10 +149,20 @@ export default function ReferralStatisticsPage() {
   }
 
   const toggleAllTypes = () => {
-    setSelectedTypes(new Set())
+    userHasInteractedRef.current = true
+    if (isAllTypeSelected) {
+      setSelectedTypes(new Set())
+    } else {
+      setSelectedTypes(new Set(typeNames))
+    }
   }
 
   const fetchData = useCallback(async (showLoading = true) => {
+    // 全不选时直接清空数据，不请求后端
+    if (selectedTypes.size === 0 && userHasInteractedRef.current) {
+      setData(null)
+      return
+    }
     if (showLoading) setLoading(true)
     try {
       const result = await statisticsApi.referrals({
@@ -140,12 +173,14 @@ export default function ReferralStatisticsPage() {
         member_types: selectedTypes.size > 0 ? Array.from(selectedTypes).join(",") : undefined,
       })
       setData(result)
+      if (result.member_type_names) setPersistedTypeNames(result.member_type_names)
+      if (result.referrer_names) setPersistedReferrerNames(result.referrer_names)
     } catch {
       if (showLoading) setData(null)
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [dateRange, granularity, selectedReferrer, selectedTypes])
+  }, [dateRange, granularity, selectedReferrer, selectedTypes, hasNoSelection])
 
   useEffect(() => {
     fetchData()
@@ -205,11 +240,27 @@ export default function ReferralStatisticsPage() {
     }))
   }, [data?.chart_new, data?.chart_total, dataType, granularity])
 
-  const distributionData = useMemo(() => STATUS_META.map(status => ({
-    name: status.name,
-    value: data?.status_totals[status.name] ?? 0,
-    color: status.color,
-  })), [data?.status_totals])
+  // 前端过滤会员类型（后端 member_types=None 时返回全量，需前端再过滤）
+  const filteredMembers = useMemo(() => {
+    const all = data?.members || []
+    if (isAllTypeSelected) return all
+    if (selectedTypes.size === 0) return []
+    return all.filter(m => selectedTypes.has(m.member_type))
+  }, [data?.members, isAllTypeSelected, selectedTypes])
+
+  const distributionData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    filteredMembers.forEach(m => {
+      counts[m.follow_up_status] = (counts[m.follow_up_status] || 0) + 1
+    })
+    return STATUS_META.map(status => ({
+      name: status.name,
+      value: counts[status.name] ?? 0,
+      color: status.color,
+    }))
+  }, [filteredMembers])
+
+  const filteredTotalPeople = useMemo(() => filteredMembers.length, [filteredMembers])
 
   const lineYAxisWidth = useMemo(
     () => calcYAxisWidth(chartData, STATUS_META.map(status => status.name)),
@@ -221,8 +272,7 @@ export default function ReferralStatisticsPage() {
   )
 
   const sortedMembers = useMemo(() => {
-    // 会员类型筛选已由后端完成，这里只做排序
-    const members = [...(data?.members || [])]
+    const members = [...filteredMembers]
     if (!sortField) return members
     return members.sort((a, b) => {
       const left = a[sortField] ?? ""
@@ -231,7 +281,7 @@ export default function ReferralStatisticsPage() {
       if (left > right) return sortOrder === "asc" ? 1 : -1
       return 0
     })
-  }, [data?.members, sortField, sortOrder])
+  }, [filteredMembers, sortField, sortOrder])
 
   const {
     paginatedItems,
@@ -458,7 +508,7 @@ export default function ReferralStatisticsPage() {
               >
                 全部
               </button>
-              {data?.referrer_names.map(referrer => (
+              {referrerNames.map(referrer => (
                 <button
                   key={referrer}
                   onClick={() => setSelectedReferrer(referrer)}
@@ -483,7 +533,7 @@ export default function ReferralStatisticsPage() {
               <span className="text-[12px] text-[#4e535a]">总人数</span>
             </div>
             <span className="text-lg font-medium tabular-nums text-[#1f2329]">
-              {loading ? "..." : data?.total_people ?? 0}
+              {loading ? "..." : filteredTotalPeople}
               <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
             </span>
           </div>
@@ -494,7 +544,7 @@ export default function ReferralStatisticsPage() {
                 <span className="truncate text-[12px] text-[#4e535a]">{status.name}</span>
               </div>
               <span className="text-lg font-medium tabular-nums text-[#1f2329]">
-                {loading ? "..." : data?.status_totals[status.name] ?? 0}
+                {loading ? "..." : distributionData.find(d => d.name === status.name)?.value ?? 0}
                 <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
               </span>
             </div>
@@ -686,7 +736,7 @@ export default function ReferralStatisticsPage() {
       <section className="rounded-[4px] bg-white px-[22px] py-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-[12px] font-medium text-[#4e535a]">
-            人员列表<span className="font-normal text-[#8f959e]">（{data?.members.length ?? 0}人）</span>
+            人员列表<span className="font-normal text-[#8f959e]">（{filteredMembers.length}人）</span>
           </div>
           {statusError && <span className="text-[12px] text-[#c4506a]">{statusError}</span>}
         </div>

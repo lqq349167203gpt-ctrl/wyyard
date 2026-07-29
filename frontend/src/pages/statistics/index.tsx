@@ -81,9 +81,40 @@ export default function StatisticsPage() {
     }
   }
 
+  // 会员类型筛选逻辑
+  const typesInitializedRef = useRef(false)
+  const userHasInteractedRef = useRef(false)
+  useEffect(() => {
+    if (typeNames.length > 0 && !typesInitializedRef.current) {
+      typesInitializedRef.current = true
+      setSelectedTypes(new Set(typeNames))
+    }
+  }, [typeNames])
+
+  const isAllTypeSelected = useMemo(() => {
+    if (!userHasInteractedRef.current) return true
+    return typeNames.length > 0 && typeNames.every(t => selectedTypes.has(t))
+  }, [selectedTypes, typeNames])
+
+  const hasNoSelection = useMemo(() => {
+    return userHasInteractedRef.current && selectedTypes.size === 0
+  }, [selectedTypes])
+
+  // 前端过滤会员类型（后端 member_types=None 时返回全量，需前端再过滤）
+  const filteredDetails = useMemo(() => {
+    if (isAllTypeSelected) return details
+    if (selectedTypes.size === 0) return { invited: [], arrived: [], converted: [] }
+    const filterList = (list: StatisticsDetail[]) => list.filter(item => item.member_type && selectedTypes.has(item.member_type))
+    return {
+      invited: filterList(details.invited),
+      arrived: filterList(details.arrived),
+      converted: filterList(details.converted),
+    }
+  }, [details, isAllTypeSelected, selectedTypes])
+
   // 同一客户去重：按 customer_id 去重，保留最新日期（已排序）
   const dedupedDetails = useMemo(() => {
-    if (customerDedup === "all") return details
+    if (customerDedup === "all") return filteredDetails
     const dedupList = (list: StatisticsDetail[]) => {
       const seen = new Set<string>()
       return list.filter(item => {
@@ -94,16 +125,14 @@ export default function StatisticsPage() {
       })
     }
     return {
-      invited: dedupList(details.invited),
-      arrived: dedupList(details.arrived),
-      converted: dedupList(details.converted),
+      invited: dedupList(filteredDetails.invited),
+      arrived: dedupList(filteredDetails.arrived),
+      converted: dedupList(filteredDetails.converted),
     }
-  }, [details, customerDedup])
-
-  // 会员类型筛选逻辑
-  const isAllTypeSelected = useMemo(() => selectedTypes.size === 0, [selectedTypes])
+  }, [filteredDetails, customerDedup])
 
   const toggleType = (type: string) => {
+    userHasInteractedRef.current = true
     setSelectedTypes(prev => {
       const next = new Set(prev)
       if (next.has(type)) next.delete(type)
@@ -113,7 +142,12 @@ export default function StatisticsPage() {
   }
 
   const toggleAllTypes = () => {
-    setSelectedTypes(new Set())
+    userHasInteractedRef.current = true
+    if (isAllTypeSelected) {
+      setSelectedTypes(new Set())
+    } else {
+      setSelectedTypes(new Set(typeNames))
+    }
   }
 
   // 排序后的列表（会员类型/引流人筛选已由后端完成）
@@ -181,6 +215,12 @@ export default function StatisticsPage() {
   }, [startYear, startMonth, startDay, endYear, endMonth, endDay])
 
   const fetchData = useCallback(async () => {
+    // 全不选时直接清空数据，不请求后端
+    if (selectedTypes.size === 0 && userHasInteractedRef.current) {
+      setData([])
+      setDetails({ invited: [], arrived: [], converted: [] })
+      return
+    }
     setLoading(true)
     try {
       // 按周时请求按天粒度，前端再聚合
@@ -210,15 +250,17 @@ export default function StatisticsPage() {
     } catch {
       setData([])
       setDetails({ invited: [], arrived: [], converted: [] })
-      setTypeNames([])
-      setReferrerNames([])
     } finally {
       setLoading(false)
     }
-  }, [dateRange, granularity, selectedTypes, selectedReferrer])
+  }, [dateRange, granularity, selectedTypes, selectedReferrer, hasNoSelection, isAllTypeSelected])
 
   // 仅刷新列表数据（切换统计维度时）
   const fetchDetails = useCallback(async () => {
+    if (selectedTypes.size === 0 && userHasInteractedRef.current) {
+      setDetails({ invited: [], arrived: [], converted: [] })
+      return
+    }
     try {
       const detailsRes = await statisticsApi.details({
         date_from: dateRange.from,
@@ -232,10 +274,8 @@ export default function StatisticsPage() {
       setReferrerNames(detailsRes.referrer_names ?? [])
     } catch {
       setDetails({ invited: [], arrived: [], converted: [] })
-      setTypeNames([])
-      setReferrerNames([])
     }
-  }, [dateRange, statDimension, selectedTypes, selectedReferrer])
+  }, [dateRange, statDimension, selectedTypes, selectedReferrer, hasNoSelection, isAllTypeSelected])
 
   useEffect(() => {
     fetchData()
