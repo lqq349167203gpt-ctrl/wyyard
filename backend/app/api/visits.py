@@ -222,11 +222,14 @@ async def export_visits(date: str = None, space_id: str = None):
     wb.save(buf)
     buf.seek(0)
 
+    # HTTP 头部只支持 latin-1，中文文件名需按 RFC 5987 用 filename* 百分号编码
+    from urllib.parse import quote
     filename = f"邀约到场_{date or 'all'}.xlsx"
+    disposition = f"attachment; filename=\"visits_{date or 'all'}.xlsx\"; filename*=UTF-8''{quote(filename)}"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": disposition},
     )
 
 
