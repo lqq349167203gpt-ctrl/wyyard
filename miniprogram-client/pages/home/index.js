@@ -532,6 +532,7 @@ Page({
       name: teacher.name || '',
       initial: (teacher.name || '').slice(0, 1),
       avatarUrl: resolveResourceUrl(teacher.avatar_url),
+      sourceUrl: resolveResourceUrl(teacher.avatar_url),
     }))
     const location = (item.location || '').trim()
     // 只显示老师名字，不显示地址
@@ -590,6 +591,7 @@ Page({
     return {
       ...item,
       list_image: listImage,
+      list_image_remote: listImage,
       typeLabel: item.course_type || '',
       typeClass: item.course_type ? `tag-t${this._hashIndex(item.course_type) + 1}` : '',
       isOnline: item.activity_mode === '线上',
@@ -616,12 +618,14 @@ Page({
 
   _cacheActivityImages(items) {
     Promise.all(items.map(item => {
-      const listImagePromise = item.list_image
-        ? cacheImage(item.list_image)
-        : Promise.resolve(item.list_image)
+      const listImageSource = item.list_image_remote || item.list_image
+      const listImagePromise = listImageSource
+        ? cacheImage(listImageSource)
+        : Promise.resolve(listImageSource)
       const teachersPromise = Promise.all((item.teacherPreview || []).map(teacher => {
-        if (!teacher.avatarUrl) return Promise.resolve(teacher)
-        return cacheImage(teacher.avatarUrl).then(avatarUrl => (
+        const sourceUrl = teacher.sourceUrl || teacher.avatarUrl
+        if (!sourceUrl) return Promise.resolve(teacher)
+        return cacheImage(sourceUrl).then(avatarUrl => (
           avatarUrl === teacher.avatarUrl ? teacher : { ...teacher, avatarUrl }
         ))
       }))
@@ -645,6 +649,33 @@ Page({
         activities: localItems,
         grouped: this._groupForDate(localItems, this.data.selectedStr || this.data.todayStr),
       }, () => this._measureGroups())
+    })
+  },
+
+  onActivityImageError(e) {
+    const activityId = e.currentTarget.dataset.id
+    if (!activityId) return
+    const activity = this.data.activities.find(item => item.id === activityId)
+    if (
+      !activity
+      || !activity.list_image_remote
+      || activity.list_image === activity.list_image_remote
+    ) return
+
+    if (activity.list_image.startsWith(wx.env.USER_DATA_PATH)) {
+      wx.getFileSystemManager().unlink({
+        filePath: activity.list_image,
+        fail: () => {},
+      })
+    }
+    const activities = this.data.activities.map(item => (
+      item.id === activityId
+        ? { ...item, list_image: item.list_image_remote }
+        : item
+    ))
+    this.setData({
+      activities,
+      grouped: this._groupForDate(activities, this.data.selectedStr || this.data.todayStr),
     })
   },
 

@@ -30,7 +30,6 @@ def _format_amount(value) -> str:
 
 def _sync_financial_notifications(customer_id: str) -> None:
     """把购买记录幂等同步到消息通知，兼容历史数据。"""
-    notification_created_at = datetime.now(timezone.utc)
     for payment in _build_payment_records(customer_id):
         source_id = payment.get("source_id")
         if not source_id:

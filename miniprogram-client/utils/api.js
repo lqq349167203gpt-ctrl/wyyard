@@ -2,6 +2,7 @@
 
 // 后端地址由 utils/config.js 的 DEV 总开关决定（上线/提审前切为 false 即指向生产）
 const { DEV, BASE_URL } = require('./config')
+const imageCacheTasks = {}
 
 function resolveResourceUrl(url) {
   if (!url) return ''
@@ -23,39 +24,95 @@ function _resourceCachePath(url) {
   return `${wx.env.USER_DATA_PATH}/activity-image-${hash.toString(16)}.${ext}`
 }
 
-// 真机开发预览时，本地 HTTP 图片可能被 image 组件拦截；通过 request 落盘后展示本地文件
-function cacheImage(url) {
-  const absoluteUrl = resolveResourceUrl(url)
-  if (!absoluteUrl || !DEV) return Promise.resolve(absoluteUrl)
-
-  const filePath = _resourceCachePath(absoluteUrl)
-  const fs = wx.getFileSystemManager()
+function _validateCachedImage(filePath) {
   return new Promise(resolve => {
-    fs.access({
-      path: filePath,
-      success: () => resolve(filePath),
-      fail: () => {
-        wx.request({
-          url: absoluteUrl,
-          method: 'GET',
-          responseType: 'arraybuffer',
-          success(res) {
-            if (res.statusCode < 200 || res.statusCode >= 300) {
-              resolve(absoluteUrl)
-              return
-            }
-            fs.writeFile({
-              filePath,
-              data: res.data,
-              success: () => resolve(filePath),
-              fail: () => resolve(absoluteUrl),
+    wx.getImageInfo({
+      src: filePath,
+      success: info => resolve(!!(info && info.width && info.height)),
+      fail: () => resolve(false),
+    })
+  })
+}
+
+function _removeCachedFile(fs, filePath) {
+  return new Promise(resolve => {
+    fs.unlink({
+      filePath,
+      success: resolve,
+      fail: resolve,
+    })
+  })
+}
+
+function _downloadImageToCache(fs, absoluteUrl, filePath) {
+  return new Promise(resolve => {
+    wx.request({
+      url: absoluteUrl,
+      method: 'GET',
+      responseType: 'arraybuffer',
+      success(res) {
+        const headers = res.header || {}
+        const contentTypeKey = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
+        const contentType = contentTypeKey ? String(headers[contentTypeKey]) : ''
+        const hasImageContentType = !contentType || /^image\//i.test(contentType)
+        const hasData = !!(res.data && res.data.byteLength)
+        if (res.statusCode < 200 || res.statusCode >= 300 || !hasImageContentType || !hasData) {
+          resolve(absoluteUrl)
+          return
+        }
+        fs.writeFile({
+          filePath,
+          data: res.data,
+          success: () => {
+            _validateCachedImage(filePath).then(valid => {
+              if (valid) {
+                resolve(filePath)
+                return
+              }
+              _removeCachedFile(fs, filePath).then(() => resolve(absoluteUrl))
             })
           },
           fail: () => resolve(absoluteUrl),
         })
       },
+      fail: () => resolve(absoluteUrl),
     })
   })
+}
+
+// 真机开发预览时，本地 HTTP 图片可能被 image 组件拦截；通过 request 落盘后展示本地文件
+function cacheImage(url) {
+  const absoluteUrl = resolveResourceUrl(url)
+  if (!absoluteUrl || !DEV) return Promise.resolve(absoluteUrl)
+  if (absoluteUrl.startsWith(wx.env.USER_DATA_PATH)) return Promise.resolve(absoluteUrl)
+  if (imageCacheTasks[absoluteUrl]) return imageCacheTasks[absoluteUrl]
+
+  const filePath = _resourceCachePath(absoluteUrl)
+  const fs = wx.getFileSystemManager()
+  const task = new Promise(resolve => {
+    fs.access({
+      path: filePath,
+      success: () => {
+        _validateCachedImage(filePath).then(valid => {
+          if (valid) {
+            resolve(filePath)
+            return
+          }
+          _removeCachedFile(fs, filePath).then(() => {
+            _downloadImageToCache(fs, absoluteUrl, filePath).then(resolve)
+          })
+        })
+      },
+      fail: () => _downloadImageToCache(fs, absoluteUrl, filePath).then(resolve),
+    })
+  })
+  imageCacheTasks[absoluteUrl] = task
+  task.then(() => {
+    if (imageCacheTasks[absoluteUrl] === task) {
+      delete imageCacheTasks[absoluteUrl]
+    }
+  })
+  return task
 }
 
 function request(options) {

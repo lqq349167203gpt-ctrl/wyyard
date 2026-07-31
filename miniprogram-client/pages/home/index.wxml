@@ -92,7 +92,14 @@
         data-id="{{act.id}}"
       >
         <view class="ev-cover">
-          <image wx:if="{{act.list_image}}" class="ev-cover-img" src="{{act.list_image}}" mode="aspectFill" />
+          <image
+            wx:if="{{act.list_image}}"
+            class="ev-cover-img"
+            src="{{act.list_image}}"
+            mode="aspectFill"
+            data-id="{{act.id}}"
+            binderror="onActivityImageError"
+          />
           <view wx:else class="ev-cover-placeholder"></view>
           <view class="ev-signup-mask">
             <text class="ev-signup-text">{{act.signup_count || 0}}人</text>

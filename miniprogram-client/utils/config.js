@@ -1,10 +1,11 @@
 // 全局环境总开关
-//   DEV = true  → 后端连本机 localhost:8000
+//   DEV = true  → 后端连电脑局域网地址，模拟器和同一 Wi-Fi 下的手机均可访问
 //   DEV = false → 后端连生产 https://www.wyteahouse.cn
 const DEV = true
+const DEV_HOST = '192.168.31.60'
 
 const BASE_URL = DEV
-  ? 'http://localhost:8000'
+  ? `http://${DEV_HOST}:8000`
   : 'https://www.wyteahouse.cn'
 
-module.exports = { DEV, BASE_URL }
+module.exports = { DEV, DEV_HOST, BASE_URL }
