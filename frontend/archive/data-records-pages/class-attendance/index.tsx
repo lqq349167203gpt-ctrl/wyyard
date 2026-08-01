@@ -1,3 +1,4 @@
+// [已归档] 原“数据记录”页面内容，2026-08-01 起退出构建。
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { X } from "lucide-react"
 import {

@@ -1,3 +1,4 @@
+// [已归档] 原“数据记录”页面内容，2026-08-01 起退出构建。
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { classRecordApi, customerApi, type UnifiedRecord, type CustomerLight } from "@/lib/api"

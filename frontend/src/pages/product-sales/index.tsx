@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { statisticsApi, type StatisticsProducts } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { EmptyValue } from "@/components/empty-value"
 import { calcYAxisWidth } from "@/lib/utils"
 import { formatPeriodLabel, getDatePeriodKey } from "@/lib/chart-period"
 
@@ -653,13 +654,13 @@ export default function ProductSalesPage() {
             ) : null}
           </div>
           {periodDailyTable.length === 0 ? (
-            <div className="text-center text-[#8f959e] py-8">暂无数据</div>
+            <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无数据</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px] table-fixed">
+              <table className="w-full table-fixed border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-[#f0f0f0]">
-                    <th className="text-left py-2 px-3 text-[#8f959e] font-normal w-12">序号</th>
+                  <tr className="h-9 border-b border-[#f0f0f0] bg-[#fafafa] text-[11px] font-normal text-[#8f959e]">
+                    <th className="w-12 px-3 font-normal">序号</th>
                     {[
                       { key: "date", label: "日期", w: "w-28" },
                       { key: "invited", label: "邀约人数", w: "w-24" },
@@ -669,7 +670,7 @@ export default function ProductSalesPage() {
                       ...(["觉醒游戏", "情绪释放", "OH卡梳理", "能量结", "其他项目"].includes(productType) ? [{ key: "purchase_count", label: "售出产品数", w: "w-24" }] : []),
                       { key: "converted_amount", label: "成交金额", w: "w-28" },
                     ].map(({ key, label, w }) => (
-                      <th key={key} className={`text-left py-2 px-3 text-[#8f959e] font-normal ${w}`}>
+                      <th key={key} className={`px-3 font-normal ${w}`}>
                         <span className="inline-flex items-center gap-1 cursor-pointer select-none" onClick={() => handleSort(key)}>
                           <span>{label}</span>
                           <span className="inline-flex flex-col leading-none">
@@ -683,17 +684,17 @@ export default function ProductSalesPage() {
                 </thead>
                 <tbody>
                   {paginatedDaily.map((row, index) => (
-                    <tr key={row.date} className="border-b border-[#f0f0f0] hover:bg-[#f7f8fa]">
-                      <td className="py-2 px-3 text-[#4e535a]">{startIndex + index}</td>
-                      <td className="py-2 px-3 text-[#4e535a]">{row.date}</td>
-                      <td className={`py-2 px-3 ${row.invited ? "cursor-pointer hover:text-[#2e7d32] text-[#4e535a]" : "text-[#4e535a]"}`} onClick={() => row.invited && handleCellClick("invited", row.date)}>{row.invited || "-"}</td>
-                      <td className={`py-2 px-3 ${row.arrived ? "cursor-pointer hover:text-[#2e7d32] text-[#4e535a]" : "text-[#4e535a]"}`} onClick={() => row.arrived && handleCellClick("arrived", row.date)}>{row.arrived || "-"}</td>
-                      <td className={`py-2 px-3 ${row.converted_persons ? "cursor-pointer hover:text-[#2e7d32] text-[#4e535a]" : "text-[#4e535a]"}`} onClick={() => row.converted_persons && handleCellClick("persons", row.date)}>{row.converted_persons || "-"}</td>
-                      <td className={`py-2 px-3 ${row.converted_count ? "cursor-pointer hover:text-[#2e7d32] text-[#4e535a]" : "text-[#4e535a]"}`} onClick={() => row.converted_count && handleCellClick("count", row.date)}>{row.converted_count || "-"}</td>
+                    <tr key={row.date} className="h-11 border-b border-[#f0f0f0] text-[12px] text-[#4e535a] last:border-b-0 hover:bg-[#f7f8fa]">
+                      <td className="truncate px-3 tabular-nums">{startIndex + index}</td>
+                      <td className="truncate px-3 tabular-nums">{row.date}</td>
+                      <td className={`truncate px-3 tabular-nums ${row.invited ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.invited && handleCellClick("invited", row.date)}>{row.invited || <EmptyValue />}</td>
+                      <td className={`truncate px-3 tabular-nums ${row.arrived ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.arrived && handleCellClick("arrived", row.date)}>{row.arrived || <EmptyValue />}</td>
+                      <td className={`truncate px-3 tabular-nums ${row.converted_persons ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_persons && handleCellClick("persons", row.date)}>{row.converted_persons || <EmptyValue />}</td>
+                      <td className={`truncate px-3 tabular-nums ${row.converted_count ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_count && handleCellClick("count", row.date)}>{row.converted_count || <EmptyValue />}</td>
                       {["觉醒游戏", "情绪释放", "OH卡梳理", "能量结", "其他项目"].includes(productType) && (
-                        <td className={`py-2 px-3 ${row.purchase_count ? "cursor-pointer hover:text-[#2e7d32] text-[#4e535a]" : "text-[#4e535a]"}`} onClick={() => row.purchase_count && handleCellClick("purchase", row.date)}>{row.purchase_count || "-"}</td>
+                        <td className={`truncate px-3 tabular-nums ${row.purchase_count ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.purchase_count && handleCellClick("purchase", row.date)}>{row.purchase_count || <EmptyValue />}</td>
                       )}
-                      <td className={`py-2 px-3 ${row.converted_amount ? "cursor-pointer hover:text-[#2e7d32] text-[#4e535a]" : "text-[#4e535a]"}`} onClick={() => row.converted_amount && handleCellClick("amount", row.date)}>{row.converted_amount ? `¥${row.converted_amount}` : "-"}</td>
+                      <td className={`truncate px-3 tabular-nums ${row.converted_amount ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_amount && handleCellClick("amount", row.date)}>{row.converted_amount ? `¥${row.converted_amount}` : <EmptyValue />}</td>
                     </tr>
                   ))}
                 </tbody>

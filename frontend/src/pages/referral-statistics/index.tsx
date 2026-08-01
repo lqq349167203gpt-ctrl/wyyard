@@ -16,6 +16,7 @@ import {
 
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
+import { EmptyValue } from "@/components/empty-value"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import {
   Table,
@@ -75,10 +76,6 @@ function formatChartLabel(date: string, granularity: "day" | "week" | "month") {
   }
   return date
 }
-
-const EmptyValue = () => (
-  <span className="inline-block h-[2px] w-[4px] shrink-0 rounded-full bg-[#e5e8eb] align-middle" />
-)
 
 export default function ReferralStatisticsPage() {
   const now = new Date()
@@ -772,39 +769,40 @@ export default function ReferralStatisticsPage() {
           <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无数据</div>
         ) : (
           <>
-              <Table className="w-full table-fixed">
+              <Table className="w-full table-fixed border-collapse text-left">
                 <colgroup>
-                  <col className="w-[11%]" />
                   <col className="w-[10%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[9%]" />
                   <col className="w-[10%]" />
-                  <col className="w-[12%]" />
+                  <col className="w-[9%]" />
                   <col className="w-[8%]" />
                   <col className="w-[8%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[8%]" />
                   <col className="w-[10%]" />
-                  <col className="w-[11%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[10%]" />
                 </colgroup>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="cursor-pointer select-none overflow-hidden pl-4" onClick={() => handleSort("created_date")}>创建日期<SortArrow field="created_date" /></TableHead>
-                    <TableHead className="overflow-hidden">昵称</TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("member_type")}>会员身份<SortArrow field="member_type" /></TableHead>
-                    <TableHead className="overflow-hidden">引流人</TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("first_visit_date")}>首次到店<SortArrow field="first_visit_date" /></TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("invited_count")}>受邀次数<SortArrow field="invited_count" /></TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("visit_count")}>到店次数<SortArrow field="visit_count" /></TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("visit_interval")}>平均到店间隔<SortArrow field="visit_interval" /></TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("activity_count")}>参与活动<SortArrow field="activity_count" /></TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden" onClick={() => handleSort("total_consumption")}>消费总额<SortArrow field="total_consumption" /></TableHead>
-                    <TableHead className="cursor-pointer select-none overflow-hidden pr-4" onClick={() => handleSort("follow_up_status")}>跟进状态<SortArrow field="follow_up_status" /></TableHead>
+                <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
+                  <TableRow className="h-9 bg-[#fafafa] text-[11px] font-normal text-[#8f959e] hover:bg-[#fafafa]">
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 pl-4 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("created_date")}>创建日期<SortArrow field="created_date" /></TableHead>
+                    <TableHead className="h-9 overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]">昵称</TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("member_type")}>会员身份<SortArrow field="member_type" /></TableHead>
+                    <TableHead className="h-9 overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]">引流人</TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("first_visit_date")}>首次到店<SortArrow field="first_visit_date" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("invited_count")}>受邀次数<SortArrow field="invited_count" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("visit_count")}>到店次数<SortArrow field="visit_count" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("visit_interval")}>平均到店间隔<SortArrow field="visit_interval" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("activity_count")}>参与活动<SortArrow field="activity_count" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("total_consumption")}>消费总额<SortArrow field="total_consumption" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 pr-4 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("follow_up_status")}>跟进状态<SortArrow field="follow_up_status" /></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedItems.map(member => (
-                    <TableRow key={member.id} className="group">
-                      <TableCell className="overflow-hidden pl-4 tabular-nums">{member.created_date || <EmptyValue />}</TableCell>
-                      <TableCell className="overflow-hidden">
+                    <TableRow key={member.id} className="group h-11 border-[#f0f0f0] text-[12px] text-[#4e535a] last:border-b-0 hover:bg-[#f7f8fa]">
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 pl-4 text-[12px] tabular-nums">{member.created_date || <EmptyValue />}</TableCell>
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px]">
                         <button
                           className="block max-w-full truncate font-medium text-[#2b2f36] hover:text-[#3370ff]"
                           title={member.nickname}
@@ -813,37 +811,41 @@ export default function ReferralStatisticsPage() {
                           {member.nickname || <EmptyValue />}
                         </button>
                       </TableCell>
-                      <TableCell className="overflow-hidden">
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px]">
                         <span className="block truncate" title={member.member_type}>{member.member_type || <EmptyValue />}</span>
                       </TableCell>
-                      <TableCell className="overflow-hidden">
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px]">
                         <span className="block truncate" title={member.referrer}>{member.referrer || <EmptyValue />}</span>
                       </TableCell>
-                      <TableCell className="overflow-hidden tabular-nums">{member.first_visit_date === "-" ? <EmptyValue /> : member.first_visit_date}</TableCell>
-                      <TableCell className="overflow-hidden tabular-nums">
-                        <button
-                          className="block max-w-full truncate text-left text-[#4e535a] hover:underline"
-                          onClick={() => {
-                            setDetailCustomerId(member.id)
-                            setDetailType("invited")
-                          }}
-                        >
-                          {member.invited_count}次
-                        </button>
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px] tabular-nums">{member.first_visit_date === "-" ? <EmptyValue /> : member.first_visit_date}</TableCell>
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px] tabular-nums">
+                        {member.invited_count === 0 ? <EmptyValue /> : (
+                          <button
+                            className="block max-w-full truncate text-left text-[#4e535a] hover:underline"
+                            onClick={() => {
+                              setDetailCustomerId(member.id)
+                              setDetailType("invited")
+                            }}
+                          >
+                            {member.invited_count}次
+                          </button>
+                        )}
                       </TableCell>
-                      <TableCell className="overflow-hidden tabular-nums">
-                        <button
-                          className="block max-w-full truncate text-left text-[#4e535a] hover:underline"
-                          onClick={() => {
-                            setDetailCustomerId(member.id)
-                            setDetailType("arrived")
-                          }}
-                        >
-                          {member.visit_count}次
-                        </button>
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px] tabular-nums">
+                        {member.visit_count === 0 ? <EmptyValue /> : (
+                          <button
+                            className="block max-w-full truncate text-left text-[#4e535a] hover:underline"
+                            onClick={() => {
+                              setDetailCustomerId(member.id)
+                              setDetailType("arrived")
+                            }}
+                          >
+                            {member.visit_count}次
+                          </button>
+                        )}
                       </TableCell>
-                      <TableCell className="overflow-hidden tabular-nums">{member.visit_interval === "-" ? <EmptyValue /> : member.visit_interval}</TableCell>
-                      <TableCell className="overflow-hidden tabular-nums">
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px] tabular-nums">{member.visit_interval === "-" ? <EmptyValue /> : member.visit_interval}</TableCell>
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px] tabular-nums">
                         <button
                           className="block max-w-full truncate text-left text-[#4e535a] hover:underline"
                           onClick={() => {
@@ -854,7 +856,7 @@ export default function ReferralStatisticsPage() {
                           {member.activity_count}场
                         </button>
                       </TableCell>
-                      <TableCell className="overflow-hidden tabular-nums">
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px] tabular-nums">
                         <button
                           className="block max-w-full truncate text-left text-[#4e535a] hover:underline"
                           onClick={() => {
@@ -865,7 +867,7 @@ export default function ReferralStatisticsPage() {
                           ¥{member.total_consumption.toLocaleString()}
                         </button>
                       </TableCell>
-                      <TableCell className="overflow-hidden pr-4">
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 pr-4 text-[12px]">
                         <SelectDropdown
                           value={member.follow_up_status}
                           options={STATUS_META.map(status => ({ value: status.name, label: status.name }))}

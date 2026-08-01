@@ -49,7 +49,7 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
     purchase_summary = _build_purchase_summary(customer_id)
     # date 参数：只返回该日期的活动
     if date:
-        activities = _build_activities(customer_id, {date})
+        activities = _build_activities(customer_id, date_filter={date})
     else:
         activities = _build_activities(customer_id)
     healing_records = [
@@ -350,8 +350,12 @@ def _resolve_activity_role(
     return ""
 
 
-def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
-    """合并客户参与的全部活动，按日期倒序；不按客户端发布状态过滤。"""
+def _build_activities(
+    customer_id: str,
+    arrived_dates: set | None = None,
+    date_filter: set[str] | None = None,
+) -> list:
+    """合并客户参与的活动，可按活动日期过滤；不按客户端发布状态过滤。"""
     # 未指定到达日期时，从到访记录自动计算
     if arrived_dates is None:
         arrived_dates = {
@@ -533,6 +537,12 @@ def _build_activities(customer_id: str, arrived_dates: set = None) -> list:
             f"{activity['activity_type']}:{activity['session_id']}"
         )
 
+    if date_filter is not None:
+        activities = [
+            activity
+            for activity in activities
+            if activity.get("date") in date_filter
+        ]
     activities.sort(key=lambda a: a["date"], reverse=True)
     return activities
 

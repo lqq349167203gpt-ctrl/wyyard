@@ -1,3 +1,4 @@
+// [已归档] 原“数据记录”页面内容，2026-08-01 起退出构建。
 import { useEffect, useState, useRef, useMemo } from "react"
 import { TrendingUp, X } from "lucide-react"
 import { SelectDropdown } from "@/components/select-dropdown"

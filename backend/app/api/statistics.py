@@ -164,9 +164,15 @@ def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to:
     arrived_visits = [v for v in range_visits if v.arrived]
     visit_count = len(arrived_visits)
 
-    # 参与活动次数：使用详情页相同的 _build_activities 逻辑（必须实际到店）
+    # 参与活动次数：与详情弹窗使用同一活动集合，并按统计范围过滤活动日期
     arrived_dates = {v.visit_date for v in arrived_visits}
-    activities = _build_activities(customer_id, arrived_dates)
+    activities = _build_activities(customer_id)
+    if date_from and date_to:
+        activities = [
+            activity
+            for activity in activities
+            if activity.get("date") and date_from <= activity["date"] <= date_to
+        ]
     activity_count = len(activities)
 
     # 消费总额：使用详情页相同的 _build_payment_records 逻辑（排除已作废）
@@ -530,7 +536,10 @@ def get_details(
             continue
         cache_key = f"{cid}|{deal_date}"
         if cache_key not in _daily_activity_cache:
-            _daily_activity_cache[cache_key] = _build_activities(cid, {deal_date})
+            _daily_activity_cache[cache_key] = _build_activities(
+                cid,
+                date_filter={deal_date},
+            )
         r["activity_count"] = len(_daily_activity_cache[cache_key])
 
     # 根据状态筛选
@@ -905,7 +914,10 @@ def get_product_details(
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 activity_count = 0
                 if v.customer_id and v.arrived:
-                    activities = _build_activities(v.customer_id, {date})
+                    activities = _build_activities(
+                        v.customer_id,
+                        date_filter={date},
+                    )
                     activity_count = len(activities)
                 records.append({
                     "nickname": c.nickname if c else (v.customer_id or "-"),
@@ -923,7 +935,10 @@ def get_product_details(
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 activity_count = 0
                 if v.customer_id:
-                    activities = _build_activities(v.customer_id, {date})
+                    activities = _build_activities(
+                        v.customer_id,
+                        date_filter={date},
+                    )
                     activity_count = len(activities)
                 records.append({
                     "nickname": c.nickname if c else (v.customer_id or "-"),
@@ -984,7 +999,10 @@ def get_product_details(
                     if type == "persons":
                         if customer_id and customer_id not in seen_persons:
                             seen_persons.add(customer_id)
-                            activities = _build_activities(customer_id, {date})
+                            activities = _build_activities(
+                                customer_id,
+                                date_filter={date},
+                            )
                             activity_names = [
                                 f"{a['name']}（{a['host']}）" if a.get("host") else a.get("name", "")
                                 for a in activities if a.get("name")

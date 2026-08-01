@@ -62,7 +62,7 @@ async def create_account(data: AccountCreate, request: StarletteRequest, _admin:
 
 ALL_PAGE_KEYS = [
     # 数据
-    "business-reminders", "data-records", "referral-statistics",
+    "business-reminders", "referral-statistics",
     "member-statistics", "course-statistics", "product-sales", "statistics",
     # 报表
     "daily-report",

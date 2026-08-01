@@ -17,7 +17,6 @@ import { AccountsContent } from "@/pages/accounts"
 const ALL_PAGES = [
   // 数据
   { key: "business-reminders", label: "提醒" },
-  { key: "data-records", label: "数据记录" },
   { key: "referral-statistics", label: "引流统计" },
   { key: "member-statistics", label: "会员情况" },
   { key: "course-statistics", label: "课程" },
@@ -52,7 +51,7 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["business-reminders", "data-records", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
+  { label: "数据", keys: ["business-reminders", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
   { label: "报表", keys: ["daily-report"] },
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "communication-records", "followup-records"] },
   { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },

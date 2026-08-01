@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom"
 import { useMemo, useState, useEffect } from "react"
 import {
   IconBellRinging,
-  IconChartArea,
   IconBasket,
   IconStar,
   IconCalendarEvent,
@@ -36,9 +35,16 @@ import {
 } from "@/components/ui/sidebar"
 import { hasPagePermission } from "@/lib/page-permissions"
 
+type SidebarItem = {
+  title: string
+  icon: typeof IconBellRinging
+  path: string
+  permission: string
+  clearTab?: string
+}
+
 const businessItems = [
   { title: "提醒", icon: IconBellRinging, path: "/business-reminders", permission: "business-reminders" },
-  { title: "数据记录", icon: IconChartArea, path: "/data-records", permission: "data-records", clearTab: "tab_data-records" },
   { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "referral-statistics" },
   { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "member-statistics" },
   { title: "课程", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
@@ -101,7 +107,7 @@ function MenuGroup({
   onToggle,
 }: {
   label: string
-  items: typeof businessItems
+  items: SidebarItem[]
   isOpen: boolean
   onToggle: () => void
 }) {
@@ -161,7 +167,7 @@ function FixedGroup({
   accessCheck,
 }: {
   label: string
-  items: typeof businessItems
+  items: SidebarItem[]
   accessCheck?: (permissions: string[], isSuperAdmin: boolean) => boolean
 }) {
   const location = useLocation()

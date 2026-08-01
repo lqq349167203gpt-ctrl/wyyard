@@ -32,7 +32,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/healing-identities": "无忧 - 疗愈老师",
   "/organizations": "无忧 - 组织信息",
   "/operation-logs": "无忧 - 操作日志",
-  "/data-records": "无忧 - 数据记录",
   "/referral-statistics": "无忧 - 引流统计",
   "/course-statistics": "无忧 - 课程",
   "/communication-records": "无忧 - 沟通记录",

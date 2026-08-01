@@ -48,7 +48,6 @@ wyyard/
 | 侧边栏分组 | 页面 | 路由 |
 |------------|------|------|
 | 数据 | 提醒 | /business-reminders |
-| 数据 | 数据记录 | /data-records |
 | 数据 | 会员情况 | /member-statistics |
 | 数据 | 产品销售 | /product-sales |
 | 数据 | 服务数据 | /statistics |

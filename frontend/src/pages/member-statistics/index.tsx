@@ -5,6 +5,7 @@ import DetailView from "@/pages/healing-records/components/detail-view"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { EmptyValue } from "@/components/empty-value"
 import { formatPeriodLabel, getDatePeriodKey } from "@/lib/chart-period"
 
 function getDaysInMonth(year: number, month: number) {
@@ -514,68 +515,72 @@ export default function MemberStatisticsPage() {
             </div>
           </div>
           {loading ? (
-            <div className="flex items-center justify-center h-[100px] text-[#8f959e] text-[12px]">加载中...</div>
+            <div className="py-16 text-center text-[12px] text-[#8f959e]">加载中...</div>
           ) : filteredMembers.length === 0 ? (
-            <div className="flex items-center justify-center h-[100px] text-[#8f959e] text-[12px]">暂无数据</div>
+            <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无数据</div>
           ) : (
             <div>
               <div className="overflow-x-auto">
-                <table className="w-full text-[12px]">
+                <table className="w-full table-fixed border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-[#e8eaed]">
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] align-middle w-[100px]">昵称</th>
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] cursor-pointer select-none align-middle w-[100px]" onClick={() => handleSort("member_type")}>
+                    <tr className="h-9 border-b border-[#f0f0f0] bg-[#fafafa] text-[11px] font-normal text-[#8f959e]">
+                      <th className="w-[100px] px-3 font-normal">昵称</th>
+                      <th className="w-[100px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("member_type")}>
                         会员身份<SortArrow field="member_type" />
                       </th>
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] cursor-pointer select-none align-middle w-[100px]" onClick={() => handleSort("first_visit_date")}>
+                      <th className="w-[100px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("first_visit_date")}>
                         首次到店<SortArrow field="first_visit_date" />
                       </th>
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] align-middle w-[80px]">受邀次数</th>
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] cursor-pointer select-none align-middle w-[80px]" onClick={() => handleSort("visit_count")}>
+                      <th className="w-[80px] px-3 font-normal">受邀次数</th>
+                      <th className="w-[80px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("visit_count")}>
                         到店次数<SortArrow field="visit_count" />
                       </th>
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] cursor-pointer select-none align-middle w-[110px]" onClick={() => handleSort("visit_interval")}>
+                      <th className="w-[110px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("visit_interval")}>
                         平均到店间隔<SortArrow field="visit_interval" />
                       </th>
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] cursor-pointer select-none align-middle w-[90px]" onClick={() => handleSort("activity_count")}>
+                      <th className="w-[90px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("activity_count")}>
                         参与活动<SortArrow field="activity_count" />
                       </th>
-                      <th className="text-left py-2 px-3 font-medium text-[#646a73] cursor-pointer select-none align-middle w-[100px]" onClick={() => handleSort("total_consumption")}>
+                      <th className="w-[100px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("total_consumption")}>
                         消费总额<SortArrow field="total_consumption" />
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedMembers.map((member) => (
-                      <tr key={member.id} className="border-b border-[#f0f1f3] hover:bg-[#f7f8fa]">
-                        <td className="py-2 px-3">
+                      <tr key={member.id} className="h-11 border-b border-[#f0f0f0] text-[12px] text-[#4e535a] last:border-b-0 hover:bg-[#f7f8fa]">
+                        <td className="truncate px-3">
                           <button
                             onClick={() => setSelectedCustomerId(member.id)}
                             className="text-[#4e535a] hover:underline text-left"
                           >
-                            {member.nickname || "-"}
+                            {member.nickname || <EmptyValue />}
                           </button>
                         </td>
-                        <td className="py-2 px-3 text-[#4e535a]">{member.member_type || "-"}</td>
-                        <td className="py-2 px-3 text-[#4e535a]">{member.first_visit_date || "-"}</td>
-                        <td className="py-2 px-3">
-                          <button
-                            onClick={() => { setDetailCustomerId(member.id); setDetailType("invited") }}
-                            className="text-[#4e535a] hover:underline text-left"
-                          >
-                            {member.invited_count}次
-                          </button>
+                        <td className="truncate px-3">{member.member_type || <EmptyValue />}</td>
+                        <td className="truncate px-3 tabular-nums">{member.first_visit_date || <EmptyValue />}</td>
+                        <td className="truncate px-3 tabular-nums">
+                          {member.invited_count === 0 ? <EmptyValue /> : (
+                            <button
+                              onClick={() => { setDetailCustomerId(member.id); setDetailType("invited") }}
+                              className="text-left text-[#4e535a] hover:underline"
+                            >
+                              {member.invited_count}次
+                            </button>
+                          )}
                         </td>
-                        <td className="py-2 px-3">
-                          <button
-                            onClick={() => { setDetailCustomerId(member.id); setDetailType("arrived") }}
-                            className="text-[#4e535a] hover:underline text-left"
-                          >
-                            {member.visit_count}次
-                          </button>
+                        <td className="truncate px-3 tabular-nums">
+                          {member.visit_count === 0 ? <EmptyValue /> : (
+                            <button
+                              onClick={() => { setDetailCustomerId(member.id); setDetailType("arrived") }}
+                              className="text-left text-[#4e535a] hover:underline"
+                            >
+                              {member.visit_count}次
+                            </button>
+                          )}
                         </td>
-                        <td className="py-2 px-3 text-[#4e535a]">{member.visit_interval || "-"}</td>
-                        <td className="py-2 px-3">
+                        <td className="truncate px-3 tabular-nums">{member.visit_interval || <EmptyValue />}</td>
+                        <td className="truncate px-3 tabular-nums">
                           <button
                             onClick={() => { setDetailCustomerId(member.id); setDetailType("activity") }}
                             className="text-[#4e535a] hover:underline text-left"
@@ -583,7 +588,7 @@ export default function MemberStatisticsPage() {
                             {member.activity_count}场
                           </button>
                         </td>
-                        <td className="py-2 px-3">
+                        <td className="truncate px-3 tabular-nums">
                           <button
                             onClick={() => { setDetailCustomerId(member.id); setDetailType("payment") }}
                             className="text-[#4e535a] hover:underline text-left"
