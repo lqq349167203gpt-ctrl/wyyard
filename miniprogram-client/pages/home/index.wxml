@@ -38,13 +38,24 @@
       <text class="theme-week-label">本周主题</text>
       <text class="theme-week-text">{{themeWeek}}</text>
     </view>
-    <view wx:if="{{themeTitle}}" class="theme-main">
-      <text class="theme-eyebrow">当日主题</text>
-      <text class="theme-title">{{themeTitle}}</text>
-      <text class="theme-copy" wx:if="{{themeDesc}}">{{themeDesc}}</text>
-      <!-- 周一至周日：按当前选中日期切换蜡笔装饰 -->
-      <image class="theme-deco" src="{{themeDecoSrc}}" mode="aspectFit" />
+    <view wx:if="{{themeTitle}}" class="hero-card {{heroExpanded ? 'expanded' : ''}}">
+      <image wx:if="{{heroImage}}" class="hero-bg" src="{{heroImage}}" mode="aspectFill" />
+      <view class="hero-mask"></view>
+      <view class="hero-chip" catchtap="onToggleHero">{{heroExpanded ? '收起' : '展开'}}</view>
+      <view class="hero-in">
+        <view class="hero-eyebrow-row">
+          <text class="theme-eyebrow"><text class="hero-lime-dot"></text>当日主题</text>
+        </view>
+        <text class="theme-title">{{themeTitle}}</text>
+        <text class="theme-copy" wx:if="{{themeDesc}}">{{themeDesc}}</text>
+      </view>
     </view>
+  </view>
+
+  <!-- 分割线：今日全部活动 -->
+  <view class="list-divider">
+    <text class="list-divider-text">今日全部活动</text>
+    <view class="list-divider-line"></view>
   </view>
 
   <!-- 加载中 -->

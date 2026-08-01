@@ -33,6 +33,8 @@ Page({
     themeTitle: '',
     themeDesc: '',
     themeDecoSrc: '/assets/weekly-mon.png',
+    heroImage: '',
+    heroExpanded: false,
     themeCount: 0,
     todayStr: '',
     selectedStr: '',
@@ -192,6 +194,7 @@ Page({
       heroText: `${selDate.getMonth() + 1}月${selDate.getDate()}日`,
       heroWeek,
       themeDecoSrc: THEME_DECO_BY_WEEKDAY[selDate.getDay()],
+      heroImage: this._heroImageForDay(sel),
       themeCount: dayActs.length,
       todayStr: this._fmtDate(now),
       selectedStr: sel,
@@ -254,13 +257,19 @@ Page({
       .catch(() => {})
   },
 
+  // 取某日第一个有图片的活动作为 hero 背景图
+  _heroImageForDay(dateStr) {
+    const act = this.data.activities.find(a => a.date === dateStr && a.list_image)
+    return act ? act.list_image : ''
+  },
+
   // 刷新今日主题：从后端拉取 day_theme
   _refreshTheme() {
     const sel = this.data.selectedStr || this.data.todayStr
     const requestSeq = (this._themeRequestSeq || 0) + 1
     this._themeRequestSeq = requestSeq
     const dayActs = this.data.activities.filter(a => a.date === sel)
-    this.setData({ themeCount: dayActs.length })
+    this.setData({ themeCount: dayActs.length, heroImage: this._heroImageForDay(sel) })
     // 拉取该天的主题
     clientApi.getActivityThemes(sel, sel)
       .then(res => {
@@ -312,6 +321,7 @@ Page({
         heroText,
         heroWeek,
         themeDecoSrc: THEME_DECO_BY_WEEKDAY[d.getDay()],
+        heroImage: this._heroImageForDay(dateStr),
         themeCount: dayActs.length,
       })
       this._refreshTheme()
@@ -728,6 +738,10 @@ Page({
 
   _isSameDay(a, b) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  },
+
+  onToggleHero() {
+    this.setData({ heroExpanded: !this.data.heroExpanded })
   },
 
   onTapActivity(e) {

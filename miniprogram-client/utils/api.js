@@ -131,11 +131,16 @@ function request(options) {
         ...options.header,
       },
       success(res) {
+        const headers = res.header || {}
+        const newTokenKey = Object.keys(headers).find(key => key.toLowerCase() === 'x-new-token')
+        if (newTokenKey && headers[newTokenKey]) {
+          app.updateToken(headers[newTokenKey])
+        }
+
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
         } else if (res.statusCode === 401) {
-          wx.removeStorageSync('client_token')
-          app.globalData.token = ''
+          app.clearLogin()
           wx.showToast({ title: '请先登录', icon: 'none' })
           reject(new Error('请先登录'))
         } else {

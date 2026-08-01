@@ -228,8 +228,6 @@ Page({
   },
 
   onGoLogin() {
-    const app = getApp()
-    app.globalData.token = ''
     wx.navigateTo({ url: '/pages/login/index' })
   },
 
