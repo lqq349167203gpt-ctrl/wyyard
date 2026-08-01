@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { FileText } from "lucide-react"
-import { ComposedChart, Line, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import { ComposedChart, Line, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { statisticsApi, memberIdentityApi, customerDetailApi, type StatisticsData, type StatisticsDetail, type MemberIdentity } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { calcYAxisWidth } from "@/lib/utils"
+import { formatPeriodLabel, getDatePeriodKey } from "@/lib/chart-period"
 
 const COLORS = {
   invited: "#5b8ff9",
@@ -67,6 +68,11 @@ export default function StatisticsPage() {
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
   // 引流人筛选
   const [selectedReferrer, setSelectedReferrer] = useState("")
+  const [selectedTrendPeriod, setSelectedTrendPeriod] = useState("")
+  // 时间维度：year 或 month
+  const [timeView, setTimeView] = useState<"year" | "month">("month")
+  // 时间单位：day、week、month
+  const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
 
   // 排序
   const [sortField, setSortField] = useState<string | null>(null)
@@ -156,6 +162,9 @@ export default function StatisticsPage() {
     if (activeTab === "converted_amount" && typeFilter !== "全部") {
       list = list.filter(item => item.type === typeFilter)
     }
+    if (selectedTrendPeriod) {
+      list = list.filter(item => getDatePeriodKey(item.date, granularity) === selectedTrendPeriod)
+    }
     if (!sortField) return list.sort((a, b) => (b.date || "").localeCompare(a.date || ""))
     return list.sort((a, b) => {
       let va: any, vb: any
@@ -182,7 +191,7 @@ export default function StatisticsPage() {
       return 0
     })
     return list
-  }, [dedupedDetails, activeTab, sortField, sortOrder, typeFilter])
+  }, [dedupedDetails, activeTab, sortField, sortOrder, typeFilter, selectedTrendPeriod, granularity])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDetails, { pageSize: 10 })
 
@@ -192,11 +201,6 @@ export default function StatisticsPage() {
   const [popupLoading, setPopupLoading] = useState(false)
   const [popupCustomerId, setPopupCustomerId] = useState<string | null>(null)
   const [popupDate, setPopupDate] = useState<string | null>(null)
-
-  // 时间维度：year 或 month
-  const [timeView, setTimeView] = useState<"year" | "month">("month")
-  // 时间单位：day、week、month
-  const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
 
   // 当前选择的时间范围
   const now = new Date()
@@ -213,6 +217,11 @@ export default function StatisticsPage() {
     const to = `${endYear}-${String(endMonth).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`
     return { from, to }
   }, [startYear, startMonth, startDay, endYear, endMonth, endDay])
+
+  useEffect(() => {
+    setSelectedTrendPeriod("")
+    goToPage(1)
+  }, [dateRange, granularity, selectedReferrer, selectedTypes, activeTab, statDimension])
 
   const fetchData = useCallback(async () => {
     // 全不选时直接清空数据，不请求后端
@@ -333,6 +342,7 @@ export default function StatisticsPage() {
       // 按月：显示月份
       return data.map((item) => ({
         ...item,
+        periodKey: item.date,
         label: `${parseInt(item.date.split("-")[1])}月`,
       }))
     }
@@ -341,6 +351,7 @@ export default function StatisticsPage() {
       // 按天：显示日期
       return data.map((item) => ({
         ...item,
+        periodKey: item.date,
         label: item.date,
       }))
     }
@@ -396,7 +407,7 @@ export default function StatisticsPage() {
         }),
         { date: week.label, invited: 0, arrived: 0, converted: 0, converted_amount: 0 }
       )
-      return { ...aggregated, label: week.label }
+      return { ...aggregated, periodKey: getDatePeriodKey(week.data[0]?.date || "", "week"), label: week.label }
     })
   }, [data, granularity, startYear, startMonth, endYear, endMonth])
 
@@ -532,32 +543,30 @@ export default function StatisticsPage() {
                   className="h-[26px] pl-2 pr-1 text-[11px] bg-white rounded-[2px] border-none outline-none"
                 />
               </div>
-            </div>
-
-            {/* 第二行：时间单位 */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>时间单位</span>
-              <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
-                {timeView === "month" && (
+              <div className="ml-1 flex items-center gap-2">
+                <span className="text-[12px] text-[#8f959e]">时间单位</span>
+                <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
+                  {timeView === "month" && (
+                    <button
+                      onClick={() => setGranularity("day")}
+                      className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "day" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    >
+                      日
+                    </button>
+                  )}
                   <button
-                    onClick={() => setGranularity("day")}
-                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "day" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    onClick={() => setGranularity("week")}
+                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "week" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
                   >
-                    日
+                    周
                   </button>
-                )}
-                <button
-                  onClick={() => setGranularity("week")}
-                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "week" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  周
-                </button>
-                <button
-                  onClick={() => setGranularity("month")}
-                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "month" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  月
-                </button>
+                  <button
+                    onClick={() => setGranularity("month")}
+                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "month" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                  >
+                    月
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -704,7 +713,18 @@ export default function StatisticsPage() {
             <div className="flex items-center justify-center h-[400px] text-[#8f959e]">暂无数据</div>
           ) : (
             <ResponsiveContainer width="100%" height={160} tabIndex={-1}>
-              <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 2 }}>
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 0, bottom: 2 }}
+                className="cursor-pointer"
+                onClick={(state) => {
+                  if (state.activeLabel !== undefined) {
+                    const period = String(state.activeLabel)
+                    setSelectedTrendPeriod(period)
+                    goToPage(1)
+                  }
+                }}
+              >
                 <defs>
                   <linearGradient id="gradInvited" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={COLORS.invited} stopOpacity={0.4} />
@@ -725,24 +745,26 @@ export default function StatisticsPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
                 <XAxis
-                  dataKey="label"
+                  dataKey="periodKey"
                   tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }}
                   tickLine={false}
                   axisLine={{ stroke: "#d0d3d6" }}
                   height={20}
                   interval={granularity === "month" ? 0 : Math.max(0, Math.floor(chartData.length / 8))}
                   tickFormatter={(v) => {
+                    const label = chartData.find(item => item.periodKey === v)?.label || v
                     if (granularity === "day") {
-                      const parts = v.split("-")
+                      const parts = String(label).split("-")
                       return `${parts[1]}/${parts[2]}`
                     }
                     if (granularity === "week") {
                       // "7/1-7/7" → "7/1"
-                      return v.split("-")[0]
+                      return String(label).split("-")[0]
                     }
-                    return v
+                    return label
                   }}
                 />
+                {selectedTrendPeriod && <ReferenceLine x={selectedTrendPeriod} stroke="#3370ff" strokeDasharray="3 3" />}
                 <YAxis tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }} allowDecimals={false} ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={lineYAxisWidth} />
                 <Tooltip
                   content={({ active, payload, label }) => {
@@ -758,7 +780,7 @@ export default function StatisticsPage() {
                     const sorted = filtered.sort((a, b) => order.indexOf(String(a.dataKey) as typeof order[number]) - order.indexOf(String(b.dataKey) as typeof order[number]))
                     return (
                       <div style={{ fontSize: 12, background: "#fff", border: "1px solid #e8eaed", borderRadius: 4, padding: "6px 10px" }}>
-                        <div style={{ color: "#8f959e", marginBottom: 4 }}>{label}</div>
+                        <div style={{ color: "#8f959e", marginBottom: 4 }}>{payload[0]?.payload?.label || label}</div>
                         {sorted.map((item) => {
                           const key = String(item.dataKey) as typeof order[number]
                           const color = COLORS[key]
@@ -821,7 +843,11 @@ export default function StatisticsPage() {
         {/* 人员列表 */}
         <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4 min-h-[400px]">
           <div className="mb-3">
-            <div className="text-[12px] font-medium text-[#4e535a] mb-2">{{ invited: "邀约到访列表", arrived: "实际到访列表", converted: "成交人员列表", converted_amount: "成交账单列表" }[activeTab]}<span className="font-normal text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
+            <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-[#4e535a]">
+              <span>{{ invited: "邀约到访列表", arrived: "实际到访列表", converted: "成交人员列表", converted_amount: "成交账单列表" }[activeTab]}</span>
+              <span className="font-normal text-[#8f959e]">（{selectedTrendPeriod ? formatPeriodLabel(selectedTrendPeriod, granularity) : `${dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~${dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}`}）</span>
+              {selectedTrendPeriod && <button className="font-normal text-[#3370ff] hover:text-[#245bdb]" onClick={() => { setSelectedTrendPeriod(""); goToPage(1) }}>查看全部</button>}
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-[#8f959e]">统计维度</span>
               {activeTab === "converted_amount" ? (

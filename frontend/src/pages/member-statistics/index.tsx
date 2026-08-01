@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { statisticsApi, customerDetailApi, type ActivityRecord, type PaymentRecord } from "@/lib/api"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { formatPeriodLabel, getDatePeriodKey } from "@/lib/chart-period"
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -21,6 +22,7 @@ interface MemberStatistics {
     id: string
     nickname: string
     member_type: string
+    created_date: string
     first_visit_date: string
     invited_count: number
     visit_count: number
@@ -35,6 +37,7 @@ export default function MemberStatisticsPage() {
   const [loading, setLoading] = useState(false)
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
   const [selectedReferrer, setSelectedReferrer] = useState("")
+  const [selectedTrendPeriod, setSelectedTrendPeriod] = useState("")
   const [timeView, setTimeView] = useState<"year" | "month">("month")
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
   const [dataType, setDataType] = useState<"total" | "new">("total")
@@ -125,6 +128,9 @@ export default function MemberStatisticsPage() {
   const filteredMembers = useMemo(() => {
     if (!data?.members) return []
     let list = data.members.filter(m => selectedTypes.has(m.member_type))
+    if (selectedTrendPeriod) {
+      list = list.filter(member => getDatePeriodKey(member.created_date, granularity) === selectedTrendPeriod)
+    }
     if (sortField) {
       list = [...list].sort((a, b) => {
         let va: number | string = 0
@@ -141,9 +147,14 @@ export default function MemberStatisticsPage() {
       })
     }
     return list
-  }, [data?.members, selectedTypes, sortField, sortOrder])
+  }, [data?.members, selectedTypes, selectedTrendPeriod, granularity, sortField, sortOrder])
 
   const { paginatedItems: paginatedMembers, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredMembers, { pageSize: 10 })
+
+  useEffect(() => {
+    setSelectedTrendPeriod("")
+    goToPage(1)
+  }, [dateRange, granularity, selectedReferrer, selectedTypes])
 
   // 图表数据：根据所选类型和数据类型计算
   const chartData = useMemo(() => {
@@ -306,32 +317,30 @@ export default function MemberStatisticsPage() {
                   className="h-[26px] pl-2 pr-1 text-[11px] bg-white rounded-[2px] border-none outline-none"
                 />
               </div>
-            </div>
-
-            {/* 第二行：时间单位 */}
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>时间单位</span>
-              <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
-                {timeView === "month" && (
+              <div className="ml-1 flex items-center gap-2">
+                <span className="text-[12px] text-[#8f959e]">时间单位</span>
+                <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
+                  {timeView === "month" && (
+                    <button
+                      onClick={() => setGranularity("day")}
+                      className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "day" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    >
+                      日
+                    </button>
+                  )}
                   <button
-                    onClick={() => setGranularity("day")}
-                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "day" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    onClick={() => setGranularity("week")}
+                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "week" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
                   >
-                    日
+                    周
                   </button>
-                )}
-                <button
-                  onClick={() => setGranularity("week")}
-                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "week" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  周
-                </button>
-                <button
-                  onClick={() => setGranularity("month")}
-                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "month" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  月
-                </button>
+                  <button
+                    onClick={() => setGranularity("month")}
+                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "month" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                  >
+                    月
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -442,16 +451,29 @@ export default function MemberStatisticsPage() {
               <div className="flex items-center justify-center h-[200px] text-[#8f959e] text-[12px]">暂无数据</div>
             ) : (
               <ResponsiveContainer width="100%" height={180} tabIndex={-1}>
-                <LineChart data={chartData} margin={{ top: 10, right: 14, left: 2, bottom: 2 }}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 10, right: 14, left: 2, bottom: 2 }}
+                  className="cursor-pointer"
+                  onClick={(state) => {
+                    if (state.activeLabel !== undefined) {
+                      const period = String(state.activeLabel)
+                      setSelectedTrendPeriod(period)
+                      goToPage(1)
+                    }
+                  }}
+                >
                   <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
                   <XAxis
-                  dataKey="label"
+                    dataKey="date"
                   tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }}
                   tickLine={false}
                   axisLine={{ stroke: "#d0d3d6" }}
                   height={20}
-                  interval={granularity === "month" ? 0 : Math.max(0, Math.floor(chartData.length / 8))}
-                />
+                    interval={granularity === "month" ? 0 : Math.max(0, Math.floor(chartData.length / 8))}
+                    tickFormatter={value => chartData.find(item => item.date === value)?.label || String(value)}
+                  />
+                  {selectedTrendPeriod && <ReferenceLine x={selectedTrendPeriod} stroke="#3370ff" strokeDasharray="3 3" />}
                 <YAxis
                   tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }}
                   allowDecimals={false}
@@ -485,7 +507,11 @@ export default function MemberStatisticsPage() {
         {/* 人员列表 */}
         <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4">
           <div className="mb-3">
-            <div className="text-[12px] font-medium text-[#4e535a]">人员列表<span className="font-normal text-[#8f959e]">（{filteredMembers.length}人）</span></div>
+            <div className="flex items-center gap-2 text-[12px] font-medium text-[#4e535a]">
+              <span>人员列表<span className="font-normal text-[#8f959e]">（{filteredMembers.length}人）</span></span>
+              {selectedTrendPeriod && <span className="font-normal text-[#8f959e]">{formatPeriodLabel(selectedTrendPeriod, granularity)}</span>}
+              {selectedTrendPeriod && <button className="font-normal text-[#3370ff] hover:text-[#245bdb]" onClick={() => { setSelectedTrendPeriod(""); goToPage(1) }}>查看全部</button>}
+            </div>
           </div>
           {loading ? (
             <div className="flex items-center justify-center h-[100px] text-[#8f959e] text-[12px]">加载中...</div>

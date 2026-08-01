@@ -656,7 +656,11 @@ export function ActivityBatchTable({
           createData.owner_name = row.owner_name || ""
           createData.name = row.name || ""
           createData.teacher_ids = row.host_ids
-          createData.description = row.billing_description || ""
+          createData.description = serializeEksDescription(
+            row.owner_id,
+            row.owner_name,
+            Math.max(1, Number(row.deduction_count) || 1),
+          )
           createData.course_description = row.description || ""
         } else if (type === "ics") {
           createData.course_type = row.ics_course_key?.replace("ics:", "") || ""
@@ -734,7 +738,11 @@ export function ActivityBatchTable({
             owner_name: row.owner_name || "",
             name: row.name || "",
             teacher_ids: row.host_ids,
-            description: row.billing_description,
+            description: serializeEksDescription(
+              row.owner_id,
+              row.owner_name,
+              Math.max(1, Number(row.deduction_count) || 1),
+            ),
             course_description: row.description,
             participant_ids: row.participant_ids,
           })
@@ -1376,14 +1384,16 @@ export function ActivityBatchTable({
                             eksCountEditRef.current[`dc_${row.key}`] = raw
                             const currentRow = rowsRef.current.find(r => r.key === row.key)
                             const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
+                            const ownerId = currentRow?.owner_id ?? row.owner_id
+                            const ownerName = currentRow?.owner_name ?? row.owner_name
                             if (raw === "") {
-                              const desc = serializeEksDescription(eksDesc.id, eksDesc.name, 0)
+                              const desc = serializeEksDescription(ownerId, ownerName, 0)
                               lastEditedEksRef.current = { ...(currentRow || row), deduction_count: 0, billing_description: desc }
                               if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, billing_description: desc })
                               updateRowMulti(row.key, { deduction_count: 0, billing_description: desc })
                             } else {
                               const count = Math.max(1, parseInt(raw) || 1)
-                              const desc = serializeEksDescription(eksDesc.id, eksDesc.name, count)
+                              const desc = serializeEksDescription(ownerId, ownerName, count)
                               lastEditedEksRef.current = { ...(currentRow || row), deduction_count: count, billing_description: desc }
                               if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: row.owner_id, owner_name: row.owner_name, billing_description: desc })
                               updateRowMulti(row.key, { deduction_count: count, billing_description: desc })
@@ -1393,10 +1403,12 @@ export function ActivityBatchTable({
                             delete eksCountEditRef.current[`dc_${row.key}`]
                             const currentRow = rowsRef.current.find(r => r.key === row.key)
                             const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
+                            const ownerId = currentRow?.owner_id ?? row.owner_id
+                            const ownerName = currentRow?.owner_name ?? row.owner_name
                             let count = eksDesc.count
                             if (count < 1) count = 1
-                            if (count !== eksDesc.count) {
-                              updateRowMulti(row.key, { deduction_count: count, billing_description: serializeEksDescription(eksDesc.id, eksDesc.name, count) })
+                            if (count !== eksDesc.count || eksDesc.id !== ownerId || eksDesc.name !== ownerName) {
+                              updateRowMulti(row.key, { deduction_count: count, billing_description: serializeEksDescription(ownerId, ownerName, count) })
                             }
                           }}
                           className="w-[34px] h-7 text-center rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"

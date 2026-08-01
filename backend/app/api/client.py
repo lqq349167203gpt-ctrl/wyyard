@@ -1,4 +1,3 @@
-import json
 import uuid
 from datetime import date as date_cls
 from datetime import datetime
@@ -965,19 +964,6 @@ def _resolve_usage_benefit(item: dict) -> tuple[str, str]:
     return benefit_name, benefit_type or "legacy"
 
 
-def _energy_knot_usage_count(session, customer_id: str) -> int:
-    """能量结按详情中的部位数量计次，旧记录无详情时按一次。"""
-    try:
-        descriptions = json.loads(session.description or "[]")
-    except (json.JSONDecodeError, TypeError):
-        descriptions = []
-    if isinstance(descriptions, list):
-        for description in descriptions:
-            if isinstance(description, dict) and description.get("id") == customer_id:
-                return max(1, int(description.get("count", 1) or 1))
-    return 1
-
-
 def _build_special_project_usage_records(customer_id: str) -> list[dict]:
     """将专项项目案主的课表使用转换为销卡记录。"""
     configs = [
@@ -999,7 +985,7 @@ def _build_special_project_usage_records(customer_id: str) -> list[dict]:
             if session.owner_id != customer_id:
                 continue
             count = (
-                _energy_knot_usage_count(session, customer_id)
+                energy_knot_session_service.get_session_deduction_count(session, customer_id)
                 if project_type == "energy-knots"
                 else 1
             )

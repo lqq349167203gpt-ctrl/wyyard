@@ -44,6 +44,7 @@ class SystemHelperRequest(StrictBaseModel):
 # 权限与页面的映射关系
 PERMISSION_PAGE_MAP = {
     "business-reminders": ("业务提醒", "/business-reminders"),
+    "course-statistics": ("课程", "/course-statistics"),
     "traffic-records": ("引流记录", "/traffic-records"),
     "activity-records": ("活动记录", "/activity-records"),
     "healing-records": ("客户信息", "/healing-records"),

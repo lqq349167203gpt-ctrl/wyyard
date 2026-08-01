@@ -11,6 +11,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  ReferenceLine,
 } from "recharts"
 
 import { PaginationBar } from "@/components/pagination-bar"
@@ -33,6 +34,7 @@ import {
   type ReferralStatistics,
 } from "@/lib/api"
 import { calcYAxisWidth } from "@/lib/utils"
+import { formatPeriodLabel, getDatePeriodKey } from "@/lib/chart-period"
 import DetailView from "@/pages/healing-records/components/detail-view"
 
 function generateColors(count: number, hueStart = 0): string[] {
@@ -86,6 +88,7 @@ export default function ReferralStatisticsPage() {
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
   const [dataType, setDataType] = useState<"total" | "new">("total")
   const [selectedReferrer, setSelectedReferrer] = useState("")
+  const [selectedTrendPeriod, setSelectedTrendPeriod] = useState("")
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
   const [persistedTypeNames, setPersistedTypeNames] = useState<string[]>([])
   const [persistedReferrerNames, setPersistedReferrerNames] = useState<string[]>([])
@@ -248,6 +251,13 @@ export default function ReferralStatisticsPage() {
     return all.filter(m => selectedTypes.has(m.member_type))
   }, [data?.members, isAllTypeSelected, selectedTypes])
 
+  const periodFilteredMembers = useMemo(
+    () => selectedTrendPeriod
+      ? filteredMembers.filter(member => getDatePeriodKey(member.created_date, granularity) === selectedTrendPeriod)
+      : filteredMembers,
+    [filteredMembers, granularity, selectedTrendPeriod],
+  )
+
   const distributionData = useMemo(() => {
     const counts: Record<string, number> = {}
     filteredMembers.forEach(m => {
@@ -272,7 +282,7 @@ export default function ReferralStatisticsPage() {
   )
 
   const sortedMembers = useMemo(() => {
-    const members = [...filteredMembers]
+    const members = [...periodFilteredMembers]
     if (!sortField) return members
     return members.sort((a, b) => {
       const left = a[sortField] ?? ""
@@ -281,7 +291,7 @@ export default function ReferralStatisticsPage() {
       if (left > right) return sortOrder === "asc" ? 1 : -1
       return 0
     })
-  }, [filteredMembers, sortField, sortOrder])
+  }, [periodFilteredMembers, sortField, sortOrder])
 
   const {
     paginatedItems,
@@ -292,6 +302,11 @@ export default function ReferralStatisticsPage() {
     startIndex,
     endIndex,
   } = usePagination(sortedMembers, { pageSize: 10 })
+
+  useEffect(() => {
+    setSelectedTrendPeriod("")
+    goToPage(1)
+  }, [dateRange, granularity, selectedReferrer, selectedTypes])
 
   const handleSort = (field: keyof Member) => {
     if (sortField === field) {
@@ -420,34 +435,30 @@ export default function ReferralStatisticsPage() {
                 className="h-[26px] rounded-[2px] border-none bg-white px-2 text-[11px] outline-none"
               />
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
-              <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
-              时间单位
-            </span>
-            <div className="flex items-center rounded-[4px] bg-[#f0f1f3] p-0.5">
-              {timeView === "month" && (
+            <div className="ml-1 flex items-center gap-2">
+              <span className="text-[12px] text-[#8f959e]">时间单位</span>
+              <div className="flex items-center rounded-[4px] bg-[#f0f1f3] p-0.5">
+                {timeView === "month" && (
+                  <button
+                    onClick={() => setGranularity("day")}
+                    className={`h-[26px] rounded-[2px] px-3 text-[11px] ${granularity === "day" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                  >
+                    日
+                  </button>
+                )}
                 <button
-                  onClick={() => setGranularity("day")}
-                  className={`h-[26px] rounded-[2px] px-3 text-[11px] ${granularity === "day" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                  onClick={() => setGranularity("week")}
+                  className={`h-[26px] rounded-[2px] px-3 text-[11px] ${granularity === "week" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
                 >
-                  日
+                  周
                 </button>
-              )}
-              <button
-                onClick={() => setGranularity("week")}
-                className={`h-[26px] rounded-[2px] px-3 text-[11px] ${granularity === "week" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
-              >
-                周
-              </button>
-              <button
-                onClick={() => setGranularity("month")}
-                className={`h-[26px] rounded-[2px] px-3 text-[11px] ${granularity === "month" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
-              >
-                月
-              </button>
+                <button
+                  onClick={() => setGranularity("month")}
+                  className={`h-[26px] rounded-[2px] px-3 text-[11px] ${granularity === "month" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                >
+                  月
+                </button>
+              </div>
             </div>
           </div>
 
@@ -602,7 +613,18 @@ export default function ReferralStatisticsPage() {
             <div className="flex h-[160px] items-center justify-center text-[12px] text-[#8f959e]">暂无数据</div>
           ) : (
             <ResponsiveContainer width="100%" height={160} tabIndex={-1}>
-              <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 2 }}>
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 0, bottom: 2 }}
+                className="cursor-pointer"
+                onClick={(state) => {
+                  if (state.activeLabel !== undefined) {
+                    const period = String(state.activeLabel)
+                    setSelectedTrendPeriod(period)
+                    goToPage(1)
+                  }
+                }}
+              >
                 <defs>
                   {STATUS_META.map((status, index) => (
                     <linearGradient key={status.name} id={`referral-status-gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
@@ -613,13 +635,15 @@ export default function ReferralStatisticsPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
                 <XAxis
-                  dataKey="label"
+                  dataKey="date"
                   tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }}
                   tickLine={false}
                   axisLine={{ stroke: "#d0d3d6" }}
                   height={20}
                   interval={granularity === "month" ? 0 : Math.max(0, Math.floor(chartData.length / 8))}
+                  tickFormatter={value => formatChartLabel(String(value), granularity)}
                 />
+                {selectedTrendPeriod && <ReferenceLine x={selectedTrendPeriod} stroke="#3370ff" strokeDasharray="3 3" />}
                 <YAxis
                   tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }}
                   allowDecimals={false}
@@ -735,8 +759,10 @@ export default function ReferralStatisticsPage() {
 
       <section className="rounded-[4px] bg-white px-[22px] py-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-[12px] font-medium text-[#4e535a]">
-            人员列表<span className="font-normal text-[#8f959e]">（{filteredMembers.length}人）</span>
+          <div className="flex items-center gap-2 text-[12px] font-medium text-[#4e535a]">
+            <span>人员列表<span className="font-normal text-[#8f959e]">（{periodFilteredMembers.length}人）</span></span>
+            {selectedTrendPeriod && <span className="font-normal text-[#8f959e]">{formatPeriodLabel(selectedTrendPeriod, granularity)}</span>}
+            {selectedTrendPeriod && <button className="font-normal text-[#3370ff] hover:text-[#245bdb]" onClick={() => { setSelectedTrendPeriod(""); goToPage(1) }}>查看全部</button>}
           </div>
           {statusError && <span className="text-[12px] text-[#c4506a]">{statusError}</span>}
         </div>

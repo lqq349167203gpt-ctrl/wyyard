@@ -2183,6 +2183,7 @@ export interface StatisticsProducts {
   other_project_chart_count: Record<string, string | number>[]
   other_project_chart_persons: Record<string, string | number>[]
   referrer_names: string[]
+  teachers: { id: string; name: string }[]
 }
 
 export interface MemberStatistics {
@@ -2196,12 +2197,84 @@ export interface MemberStatistics {
     id: string
     nickname: string
     member_type: string
+    created_date: string
     first_visit_date: string
     invited_count: number
     visit_count: number
     visit_interval: string
     activity_count: number
     total_consumption: number
+  }>
+}
+
+export interface CourseStatistics {
+  date_from: string
+  date_to: string
+  granularity: "day" | "week" | "month"
+  selected_activity_type: string
+  activity_types: Array<{ value: string; label: string }>
+  organizations: Array<{ id: string; name: string }>
+  teachers: Array<{ id: string; name: string }>
+  statistics: Array<{
+    type: string
+    label: string
+    course_count: number
+    class_hours: number
+    participant_count: number
+  }>
+  salon_subtype_statistics: Array<{
+    type: string
+    label: string
+    course_count: number
+    class_hours: number
+    participant_count: number
+  }>
+  subtype_statistics: Array<{
+    type: string
+    label: string
+    course_count: number
+    class_hours: number
+    participant_count: number
+  }>
+  trend: Array<{
+    date: string
+    course_count: number
+    class_hours: number
+    participant_count: number
+    transaction_amount: number
+  }>
+  teacher_statistics: Array<{
+    id: string
+    name: string
+    course_count: number
+    class_hours: number
+    participant_count: number
+    transaction_amount: number
+  }>
+  courses: Array<{
+    id: string
+    activity_type: string
+    activity_type_label: string
+    name: string
+    date: string
+    start_time: string
+    end_time: string
+    class_hours: number
+    teachers: string[]
+    participant_count: number
+    new_count: number
+    old_count: number
+    daily_transaction_amount: number
+    participants: Array<{
+      id: string
+      nickname: string
+      member_type: string
+      identity_group: "新人" | "老人" | string
+      participation_role: string
+      daily_need: string
+      daily_transaction_amount: number
+      closers: string
+    }>
   }>
 }
 
@@ -2263,7 +2336,7 @@ export const statisticsApi = {
     if (params.referrer) searchParams.set("referrer", params.referrer)
     return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[]; member_type_names?: string[]; referrer_names?: string[] }>(`/api/statistics/details?${searchParams.toString()}`)
   },
-  products: (params: { date_from?: string; date_to?: string; product_type?: string; name_filter?: string; granularity?: string; referrer?: string }) => {
+  products: (params: { date_from?: string; date_to?: string; product_type?: string; name_filter?: string; granularity?: string; referrer?: string; teacher_id?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
@@ -2271,11 +2344,14 @@ export const statisticsApi = {
     if (params.name_filter) searchParams.set("name_filter", params.name_filter)
     if (params.granularity) searchParams.set("granularity", params.granularity)
     if (params.referrer) searchParams.set("referrer", params.referrer)
+    if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
     return request<StatisticsProducts>(`/api/statistics/products?${searchParams.toString()}`)
   },
-  productDetails: (params: { date: string; type: string; product_type?: string }) => {
+  productDetails: (params: { date: string; type: string; product_type?: string; referrer?: string; teacher_id?: string }) => {
     const searchParams = new URLSearchParams({ date: params.date, type: params.type })
     if (params.product_type) searchParams.set("product_type", params.product_type)
+    if (params.referrer) searchParams.set("referrer", params.referrer)
+    if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
     return request<{ data: Record<string, unknown>[] }>(`/api/statistics/products/details?${searchParams.toString()}`)
   },
   members: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string }) => {
@@ -2285,6 +2361,17 @@ export const statisticsApi = {
     if (params.granularity) searchParams.set("granularity", params.granularity)
     if (params.referrer) searchParams.set("referrer", params.referrer)
     return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
+  },
+  courses: (params: { date_from?: string; date_to?: string; granularity?: string; organization_id?: string; activity_type?: string; course_subtype?: string; teacher_id?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params.date_from) searchParams.set("date_from", params.date_from)
+    if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.granularity) searchParams.set("granularity", params.granularity)
+    if (params.organization_id) searchParams.set("organization_id", params.organization_id)
+    if (params.activity_type && params.activity_type !== "all") searchParams.set("activity_type", params.activity_type)
+    if (params.course_subtype) searchParams.set("course_subtype", params.course_subtype)
+    if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
+    return request<CourseStatistics>(`/api/statistics/courses?${searchParams.toString()}`)
   },
   referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; member_types?: string }) => {
     const searchParams = new URLSearchParams()

@@ -688,8 +688,8 @@ def test_energy_knot_count_applies_without_arrival_and_never_deducts_participant
         "owner_name": created_customer["nickname"],
         "participant_ids": [participant["id"]],
         "description": json.dumps([{
-            "id": created_customer["id"],
-            "name": created_customer["nickname"],
+            "id": "",
+            "name": "",
             "count": 2,
         }], ensure_ascii=False),
     })

@@ -1,6 +1,7 @@
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   "referral-statistics": ["statistics"],
   "member-statistics": ["statistics"],
+  "course-statistics": ["statistics"],
   "product-sales": ["statistics"],
   "daily-report": ["statistics"],
   "class-records": ["class-records-visitors", "class-records-activities", "class-records-arrival"],
@@ -34,6 +35,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
 const LEGACY_STATISTICS_PAGES = [
   "referral-statistics",
   "member-statistics",
+  "course-statistics",
   "product-sales",
   "daily-report",
 ]

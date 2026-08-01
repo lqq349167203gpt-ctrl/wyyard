@@ -20,6 +20,7 @@ const ALL_PAGES = [
   { key: "data-records", label: "数据记录" },
   { key: "referral-statistics", label: "引流统计" },
   { key: "member-statistics", label: "会员情况" },
+  { key: "course-statistics", label: "课程" },
   { key: "product-sales", label: "产品销售" },
   { key: "statistics", label: "服务数据" },
   // 报表
@@ -51,7 +52,7 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["business-reminders", "data-records", "referral-statistics", "member-statistics", "product-sales", "statistics"] },
+  { label: "数据", keys: ["business-reminders", "data-records", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
   { label: "报表", keys: ["daily-report"] },
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "communication-records", "followup-records"] },
   { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },

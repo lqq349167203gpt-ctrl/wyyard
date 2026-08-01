@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { ComposedChart, Line, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from "recharts"
+import { ComposedChart, Line, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { statisticsApi, type StatisticsProducts } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { calcYAxisWidth } from "@/lib/utils"
+import { formatPeriodLabel, getDatePeriodKey } from "@/lib/chart-period"
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -40,6 +41,8 @@ export default function ProductSalesPage() {
   const [nameFilter, setNameFilter] = useState<string>("")
   const [dataType, setDataType] = useState<"amount" | "count" | "persons">("amount")
   const [selectedReferrer, setSelectedReferrer] = useState("")
+  const [selectedTeacherId, setSelectedTeacherId] = useState("")
+  const [selectedTrendPeriod, setSelectedTrendPeriod] = useState("")
   const [timeView, setTimeView] = useState<"year" | "month">("month")
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
 
@@ -133,6 +136,12 @@ export default function ProductSalesPage() {
   const barYAxisWidth = useMemo(() => calcYAxisWidth(chartData, ["value"]), [chartData])
 
   const dailyTable = useMemo(() => (productData?.daily_table ?? []).filter((row: any) => row.converted_persons > 0 || row.converted_count > 0 || row.converted_amount > 0 || row.purchase_count > 0), [productData])
+  const periodDailyTable = useMemo(
+    () => selectedTrendPeriod
+      ? dailyTable.filter(row => getDatePeriodKey(row.date, granularity) === selectedTrendPeriod)
+      : dailyTable,
+    [dailyTable, granularity, selectedTrendPeriod],
+  )
 
   // 排序
   const [sortField, setSortField] = useState<string | null>(null)
@@ -147,15 +156,15 @@ export default function ProductSalesPage() {
   }
 
   const sortedDailyTable = useMemo(() => {
-    if (!sortField) return dailyTable
-    return [...dailyTable].sort((a, b) => {
+    if (!sortField) return periodDailyTable
+    return [...periodDailyTable].sort((a, b) => {
       const va = (a as any)[sortField] ?? 0
       const vb = (b as any)[sortField] ?? 0
       if (va < vb) return sortOrder === "asc" ? -1 : 1
       if (va > vb) return sortOrder === "asc" ? 1 : -1
       return 0
     })
-  }, [dailyTable, sortField, sortOrder])
+  }, [periodDailyTable, sortField, sortOrder])
 
   const { paginatedItems: paginatedDaily, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDailyTable, { pageSize: 10 })
 
@@ -170,7 +179,13 @@ export default function ProductSalesPage() {
     setPopupDate(date)
     setPopupLoading(true)
     try {
-      const res = await statisticsApi.productDetails({ date, type, product_type: productType })
+      const res = await statisticsApi.productDetails({
+        date,
+        type,
+        product_type: productType,
+        referrer: selectedReferrer || undefined,
+        teacher_id: selectedTeacherId || undefined,
+      })
       setPopupData(res.data)
     } catch {
       setPopupData([])
@@ -189,6 +204,7 @@ export default function ProductSalesPage() {
         name_filter: nameFilter || undefined,
         granularity,
         referrer: selectedReferrer || undefined,
+        teacher_id: selectedTeacherId || undefined,
       })
       setProductData(res)
     } catch {
@@ -196,11 +212,16 @@ export default function ProductSalesPage() {
     } finally {
       setLoading(false)
     }
-  }, [dateRange, productType, nameFilter, granularity, selectedReferrer])
+  }, [dateRange, productType, nameFilter, granularity, selectedReferrer, selectedTeacherId])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  useEffect(() => {
+    setSelectedTrendPeriod("")
+    goToPage(1)
+  }, [dateRange, productType, nameFilter, granularity, selectedReferrer, selectedTeacherId])
 
   return (
     <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
@@ -270,32 +291,30 @@ export default function ProductSalesPage() {
                   className="h-[26px] pl-2 pr-1 text-[11px] bg-white rounded-[2px] border-none outline-none"
                 />
               </div>
-            </div>
-
-            {/* 第二行：时间单位 */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>时间单位</span>
-              <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
-                {timeView === "month" && (
+              <div className="ml-1 flex items-center gap-2">
+                <span className="text-[12px] text-[#8f959e]">时间单位</span>
+                <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
+                  {timeView === "month" && (
+                    <button
+                      onClick={() => setGranularity("day")}
+                      className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "day" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    >
+                      日
+                    </button>
+                  )}
                   <button
-                    onClick={() => setGranularity("day")}
-                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "day" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                    onClick={() => setGranularity("week")}
+                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "week" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
                   >
-                    日
+                    周
                   </button>
-                )}
-                <button
-                  onClick={() => setGranularity("week")}
-                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "week" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  周
-                </button>
-                <button
-                  onClick={() => setGranularity("month")}
-                  className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "month" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
-                >
-                  月
-                </button>
+                  <button
+                    onClick={() => setGranularity("month")}
+                    className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${granularity === "month" ? "bg-white text-[#1f2329] " : "text-[#646a73] hover:text-[#4e535a]"}`}
+                  >
+                    月
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -357,6 +376,28 @@ export default function ProductSalesPage() {
                     className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedReferrer === name ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
                   >
                     {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 第六行：老师（按成交人筛选） */}
+            <div className="flex items-start gap-3">
+              <span className="inline-flex items-center gap-[10px] text-[12px] text-[#8f959e] w-[62px] shrink-0 mt-1"><span className="w-[2.5px] h-3 bg-[#d0d3d6] rounded-[1px]"></span>老师</span>
+              <div className="flex items-center flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedTeacherId("")}
+                  className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedTeacherId === "" ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  全部
+                </button>
+                {productData?.teachers?.map((teacher) => (
+                  <button
+                    key={teacher.id}
+                    onClick={() => setSelectedTeacherId(teacher.id)}
+                    className={`inline-flex items-center px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${selectedTeacherId === teacher.id ? "bg-[#fafcff] border border-[#b3d4ff] text-[#3370ff]" : "bg-white border border-[#e8eaed] text-[#646a73] hover:border-[#c0c4cc]"}`}
+                  >
+                    {teacher.name}
                   </button>
                 ))}
               </div>
@@ -455,7 +496,18 @@ export default function ProductSalesPage() {
                 <div className="flex items-center justify-center h-[160px] text-[#8f959e] text-[12px]">暂无数据</div>
               ) : (
                 <ResponsiveContainer width="100%" height={160} tabIndex={-1}>
-                  <ComposedChart data={lineChartData} margin={{ top: 10, right: 10, left: 0, bottom: 2 }}>
+                  <ComposedChart
+                    data={lineChartData}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 2 }}
+                    className="cursor-pointer"
+                    onClick={(state) => {
+                      if (state.activeLabel !== undefined) {
+                        const period = String(state.activeLabel)
+                        setSelectedTrendPeriod(period)
+                        goToPage(1)
+                      }
+                    }}
+                  >
                     <defs>
                       {lineTypes.map((t, i) => (
                         <linearGradient key={`grad-${t.key}`} id={`grad-${t.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -466,13 +518,15 @@ export default function ProductSalesPage() {
                     </defs>
                     <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
                     <XAxis
-                      dataKey="label"
+                      dataKey="date"
                       tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }}
                       tickLine={false}
                       axisLine={{ stroke: "#d0d3d6" }}
                       height={20}
                       interval={granularity === "month" ? 0 : Math.max(0, Math.floor(lineChartData.length / 8))}
+                      tickFormatter={(value) => String(lineChartData.find(row => row.date === value)?.label || value)}
                     />
+                    {selectedTrendPeriod && <ReferenceLine x={selectedTrendPeriod} stroke="#3370ff" strokeDasharray="3 3" />}
                     <YAxis
                       tick={{ fontSize: 11, fill: "#b0b5bd", fontWeight: "normal" }}
                       allowDecimals={false}
@@ -569,7 +623,11 @@ export default function ProductSalesPage() {
         {/* 每日列表 */}
         <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4 min-h-[400px]">
           <div className="mb-3">
-            <div className="text-[12px] font-medium text-[#4e535a]">每日成交数据<span className="font-normal text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
+            <div className="flex items-center gap-2 text-[12px] font-medium text-[#4e535a]">
+              <span>每日成交数据</span>
+              <span className="font-normal text-[#8f959e]">（{selectedTrendPeriod ? formatPeriodLabel(selectedTrendPeriod, granularity) : `${dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~${dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}`}）</span>
+              {selectedTrendPeriod && <button className="font-normal text-[#3370ff] hover:text-[#245bdb]" onClick={() => { setSelectedTrendPeriod(""); goToPage(1) }}>查看全部</button>}
+            </div>
             {/* 项目名称筛选（仅其他项目时显示） */}
             {productType === "其他项目" && productData?.other_project_names?.length ? (
               <div className="flex items-center gap-2 mt-2">
@@ -594,7 +652,7 @@ export default function ProductSalesPage() {
               </div>
             ) : null}
           </div>
-          {dailyTable.length === 0 ? (
+          {periodDailyTable.length === 0 ? (
             <div className="text-center text-[#8f959e] py-8">暂无数据</div>
           ) : (
             <div className="overflow-x-auto">

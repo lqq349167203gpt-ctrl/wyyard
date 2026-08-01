@@ -8,11 +8,7 @@ import { customerApi, type Customer } from "@/lib/api"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
-
-/** 空值占位：极淡极短圆角小横（4×2），与详情页 DvEmpty 一致 */
-const DvEmpty = ({ className = "" }: { className?: string }) => (
-  <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className}`} />
-)
+import { EmptyValue } from "@/components/empty-value"
 
 const SORT_FIELDS = ["member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "created_at"] as const
 type SortField = typeof SORT_FIELDS[number]
@@ -182,10 +178,10 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] font-medium text-[#212631]">
-                        {c.nickname || c.name || <DvEmpty />}
+                        {c.nickname || c.name || <EmptyValue />}
                       </span>
                       <span className="mt-0.5 block truncate text-[12px] text-[#a8b1bd]">
-                        {[c.name && c.name !== c.nickname ? c.name : "", c.gender].filter(Boolean).join(" · ") || <DvEmpty />}
+                        {[c.name && c.name !== c.nickname ? c.name : "", c.gender].filter(Boolean).join(" · ") || <EmptyValue />}
                       </span>
                     </span>
                   </div>
@@ -194,29 +190,29 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                   {c.member_type ? (
                     <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{c.member_type}</span>
                   ) : (
-                    <DvEmpty />
+                    <EmptyValue />
                   )}
                 </TableCell>
                 <TableCell className="tabular-nums text-[#2b2f36]">
-                  {c.visit_count ? `${c.visit_count} 次` : <DvEmpty />}
+                  {c.visit_count ? `${c.visit_count} 次` : <EmptyValue />}
                 </TableCell>
                 <TableCell className="tabular-nums text-[#2b2f36]">
-                  {c.activity_count ? `${c.activity_count} 场` : <DvEmpty />}
+                  {c.activity_count ? `${c.activity_count} 场` : <EmptyValue />}
                 </TableCell>
                 <TableCell className="tabular-nums text-[#2b2f36]">¥{(c.total_payment ?? 0).toLocaleString()}</TableCell>
                 <TableCell className="text-[12px] text-[#8f959e] tabular-nums">
-                  {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString("zh-CN") : <DvEmpty />}
+                  {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString("zh-CN") : <EmptyValue />}
                 </TableCell>
                 <TableCell>
-                  <span className="text-[#2b2f36]">{c.referrer || <DvEmpty />}</span>
+                  <span className="text-[#2b2f36]">{c.referrer || <EmptyValue />}</span>
                   <span className="mx-1.5 text-[#d0d3d6]">/</span>
-                  <span className="text-[#8f959e]">{c.referrer_handler || <DvEmpty />}</span>
+                  <span className="text-[#8f959e]">{c.referrer_handler || <EmptyValue />}</span>
                 </TableCell>
                 <TableCell className="text-[12px] text-[#a8b1bd] tabular-nums">
-                  {c.created_at ? new Date(c.created_at).toLocaleDateString("zh-CN") : <DvEmpty />}
+                  {c.created_at ? new Date(c.created_at).toLocaleDateString("zh-CN") : <EmptyValue />}
                 </TableCell>
                 <TableCell className="text-[12px] text-[#a8b1bd]">
-                  {c.created_by || <DvEmpty />}
+                  {c.created_by || <EmptyValue />}
                 </TableCell>
                 <TableCell className="text-right pr-4">
                   <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>

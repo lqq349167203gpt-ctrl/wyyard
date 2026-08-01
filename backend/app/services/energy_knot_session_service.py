@@ -198,6 +198,33 @@ def search_customers(keyword: str) -> list:
     return results
 
 
+def get_session_deduction_count(session, customer_id: str | None = None) -> int:
+    """读取单场能量结的实际销卡数，兼容历史记录中案主 ID 未写入详情的情况。"""
+    try:
+        descriptions = json.loads(session.description or "[]")
+    except (json.JSONDecodeError, TypeError):
+        descriptions = []
+    items = [item for item in descriptions if isinstance(item, dict)] if isinstance(descriptions, list) else []
+
+    target_id = customer_id or (getattr(session, "owner_id", "") or "")
+    matched_items = [item for item in items if target_id and item.get("id") == target_id]
+    if customer_id and not matched_items and getattr(session, "owner_id", "") != customer_id:
+        return 0
+    if not matched_items and items:
+        # 旧版课表可能只保存 count、未保存案主 ID；单场只有一个案主，使用首项销卡数。
+        matched_items = items[:1]
+    if not matched_items:
+        return 1
+
+    count = 0
+    for item in matched_items:
+        try:
+            count += max(1, int(item.get("count", 1) or 1))
+        except (TypeError, ValueError):
+            count += 1
+    return max(1, count)
+
+
 def get_remaining_count(customer_id: str) -> int:
     """计算某用户的能量结剩余次数；保存活动后立即按部位数扣除。"""
     knots = energy_knot_service.list_knots()
@@ -206,18 +233,7 @@ def get_remaining_count(customer_id: str) -> int:
     for s in _sessions.values():
         if s.is_deleted:
             continue
-        found_in_desc = False
-        try:
-            descs = json.loads(s.description or "[]")
-            if isinstance(descs, list):
-                for d in descs:
-                    if isinstance(d, dict) and d.get("id") == customer_id:
-                        used += max(1, d.get("count", 1))
-                        found_in_desc = True
-        except (json.JSONDecodeError, TypeError):
-            pass
-        if not found_in_desc and s.owner_id == customer_id:
-            used += 1
+        used += get_session_deduction_count(s, customer_id)
     from app.services import project_deduction_service
     manual_deductions = project_deduction_service.get_deduction_total(customer_id, "energy-knots")
     return total_purchased - used - manual_deductions

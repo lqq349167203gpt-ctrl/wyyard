@@ -7,19 +7,30 @@ from fastapi import APIRouter, Query
 from app.api.customer_detail import _build_activities, _build_payment_records
 from app.models.customer import FollowUpStatus
 from app.services import (
+    class_record_service,
+    course_service,
+    course_type_service,
     customer_service,
     emotional_release_service,
+    emotional_release_session_service,
     energy_knot_service,
+    energy_knot_session_service,
     group_case_service,
+    group_case_session_service,
     internal_course_service,
+    internal_course_session_service,
     member_identity_service,
     membership_card_service,
     oh_card_reading_service,
+    oh_card_reading_session_service,
+    organization_service,
     other_project_service,
     visit_service,
 )
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
+
+HEALING_TEACHER_POSITIONS = {"成就君", "能量结老师", "课程老师"}
 
 
 def _get_record_date(r) -> str | None:
@@ -56,6 +67,21 @@ def _payment_record_groups() -> list[list]:
         oh_card_reading_service.list_readings(),
         other_project_service.list_projects(),
     ]
+
+
+def _record_matches_teacher(record, teacher_id: str, teacher_names: set[str]) -> bool:
+    """成交记录是否归属于指定疗愈老师，兼容新旧成交人字段。"""
+    if not teacher_id:
+        return True
+    closers = getattr(record, "closers", None) or []
+    for closer in closers:
+        closer_id = str(closer.get("id") or "").strip()
+        closer_name = str(closer.get("name") or "").strip()
+        if closer_id == teacher_id or (closer_name and closer_name in teacher_names):
+            return True
+    legacy_id = str(getattr(record, "closer_id", None) or "").strip()
+    legacy_name = str(getattr(record, "closer_name", None) or "").strip()
+    return legacy_id == teacher_id or bool(legacy_name and legacy_name in teacher_names)
 
 
 def _build_dashboard_summary(today: date) -> dict:
@@ -547,10 +573,30 @@ def get_products(
     name_filter: str | None = Query(None, description="子类型名称筛选（会员卡卡类型/内部课程课程类型/其他项目项目名称）"),
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人筛选"),
+    teacher_id: str | None = Query(None, description="疗愈老师客户ID（按成交人筛选）"),
 ):
     date_from, date_to = _get_date_range(date_from, date_to)
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
+    teacher_filter = (_normalize_query_str(teacher_id) or "").strip()
     customers_map = {c.id: c for c in customer_service.list_customers()}
+    teacher_course_hours = _course_teacher_hours_in_range(date_from, date_to)
+    teachers = sorted(
+        (
+            {"id": customer.id, "name": customer.nickname or customer.name or customer.id}
+            for customer in customers_map.values()
+            if HEALING_TEACHER_POSITIONS.intersection(customer.positions or [])
+        ),
+        key=lambda item: (-teacher_course_hours.get(item["id"], 0), item["name"], item["id"]),
+    )
+    selected_teacher = customers_map.get(teacher_filter)
+    teacher_names = {
+        value.strip()
+        for value in (
+            selected_teacher.nickname if selected_teacher else "",
+            selected_teacher.name if selected_teacher else "",
+        )
+        if value and value.strip()
+    }
 
     def _get_amount(r):
         return getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0
@@ -633,6 +679,8 @@ def get_products(
                 if c_referrer:
                     option_referrer_counts[c_referrer] += 1
                 if referrer_filter and c_referrer != referrer_filter:
+                    continue
+                if teacher_filter and not _record_matches_teacher(r, teacher_filter, teacher_names):
                     continue
                 amount = _get_amount(r)
 
@@ -814,6 +862,7 @@ def get_products(
         "other_project_chart_count": other_project_chart_count,
         "other_project_chart_persons": other_project_chart_persons,
         "referrer_names": [name for name, _ in sorted(option_referrer_counts.items(), key=lambda item: (-item[1], item[0]))],
+        "teachers": teachers,
     }
 
 
@@ -822,11 +871,32 @@ def get_product_details(
     date: str = Query(..., description="日期 YYYY-MM-DD"),
     type: str = Query(..., description="详情类型: invited/arrived/persons/amount/count/purchase"),
     product_type: str | None = Query(None, description="产品类型筛选"),
+    referrer: str | None = Query(None, description="引流人筛选"),
+    teacher_id: str | None = Query(None, description="疗愈老师客户ID（按成交人筛选）"),
 ):
     """获取产品数据某天某列的详情"""
 
     def _get_amount(r):
         return getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0
+
+    referrer_filter = (_normalize_query_str(referrer) or "").strip()
+    teacher_filter = (_normalize_query_str(teacher_id) or "").strip()
+    customers_map = {c.id: c for c in customer_service.list_customers()}
+    selected_teacher = customers_map.get(teacher_filter)
+    teacher_names = {
+        value.strip()
+        for value in (
+            selected_teacher.nickname if selected_teacher else "",
+            selected_teacher.name if selected_teacher else "",
+        )
+        if value and value.strip()
+    }
+
+    def _record_visible(record) -> bool:
+        customer = customers_map.get(getattr(record, "customer_id", None) or "")
+        if referrer_filter and ((customer.referrer if customer else "") or "").strip() != referrer_filter:
+            return False
+        return _record_matches_teacher(record, teacher_filter, teacher_names)
 
     if type == "invited":
         records = []
@@ -893,7 +963,7 @@ def get_product_details(
             for r in svc_records:
                 deal_date = _get_record_date(r)
                 voided = getattr(r, "voided", False)
-                if deal_date == date and not voided:
+                if deal_date == date and not voided and _record_visible(r):
                     customer_id = getattr(r, "customer_id", None)
                     if customer_id:
                         product_name = getattr(r, "card_type", None) or getattr(r, "project_name", None) or getattr(r, "course_type", None) or ""
@@ -908,7 +978,7 @@ def get_product_details(
             for r in svc_records:
                 deal_date = _get_record_date(r)
                 voided = getattr(r, "voided", False)
-                if deal_date == date and not voided:
+                if deal_date == date and not voided and _record_visible(r):
                     customer_id = getattr(r, "customer_id", None)
                     c = customer_service.get_customer(customer_id) if customer_id else None
                     if type == "persons":
@@ -1273,6 +1343,11 @@ def get_member_statistics(
             "id": c.id,
             "nickname": c.nickname or "",
             "member_type": mt,
+            "created_date": (
+                c.created_at.strftime("%Y-%m-%d")
+                if isinstance(c.created_at, datetime)
+                else str(c.created_at)[:10] if c.created_at else ""
+            ),
             "first_visit_date": stats.get("first_visit_date", "-"),
             "invited_count": stats.get("invited_count", 0),
             "visit_count": stats.get("visit_count", 0),
@@ -1289,6 +1364,647 @@ def get_member_statistics(
         "chart_new": chart_data_new,
         "chart_total": chart_data_total,
         "members": members_list,
+    }
+
+
+# ============ 课程数据统计 ============
+
+COURSE_ACTIVITY_TYPES = (
+    ("class", "沙龙活动", class_record_service.list_records),
+    ("gcs", "觉醒游戏", group_case_session_service.list_sessions),
+    ("ers", "情绪释放", emotional_release_session_service.list_sessions),
+    ("ocr", "OH卡梳理", oh_card_reading_session_service.list_sessions),
+    ("eks", "能量结", energy_knot_session_service.list_sessions),
+    ("ics", "内部课程", internal_course_session_service.list_sessions),
+)
+
+INTERNAL_COURSE_SUBTYPES = ("疗愈师课程", "商业框架陪跑", "落地赋能班")
+
+
+def _course_subtype_name(activity_type: str, activity) -> str:
+    """统一课程二级分类名称，兼容内部课程的新旧长名称。"""
+    subtype = (getattr(activity, "course_type", "") or "未分类").strip()
+    if activity_type != "ics":
+        return subtype
+    if subtype.startswith("疗愈师"):
+        return "疗愈师课程"
+    if subtype.startswith("商业框架") or subtype.startswith("陪跑"):
+        return "商业框架陪跑"
+    if subtype.startswith("落地赋能") or subtype.startswith("赋能"):
+        return "落地赋能班"
+    return subtype
+
+
+def _course_participant_ids(activity_type: str, activity) -> set[str]:
+    """只保留参与者身份；组长仍属于参与者，排除老师、案主等特殊身份。"""
+    if activity_type == "class":
+        return set(class_record_service._get_group_member_ids(activity))
+
+    participant_ids = set(getattr(activity, "participant_ids", []) or [])
+    participant_ids -= set(getattr(activity, "teacher_ids", []) or [])
+    for field in ("owner_id", "host_id", "achiever_id"):
+        special_id = getattr(activity, field, "")
+        if special_id:
+            participant_ids.discard(special_id)
+    return participant_ids
+
+
+def _course_activity_teacher_ids(activity) -> set[str]:
+    """课程负责人包含老师；未配置老师的专项活动使用成就君。"""
+    teacher_ids = set(getattr(activity, "teacher_ids", []) or [])
+    achiever_id = getattr(activity, "achiever_id", "")
+    if achiever_id:
+        teacher_ids.add(achiever_id)
+    return teacher_ids
+
+
+def _course_participant_roles(activity_type: str, activity) -> dict[str, str]:
+    """返回参与者在单场课程中的身份，组长优先于副组长和普通参与者。"""
+    roles = {participant_id: "参与者" for participant_id in _course_participant_ids(activity_type, activity)}
+    if activity_type != "class":
+        return roles
+    for group in getattr(activity, "groups", []) or []:
+        deputy_id = getattr(group, "deputy_id", "")
+        leader_id = getattr(group, "leader_id", "")
+        if deputy_id in roles:
+            roles[deputy_id] = "副组长"
+        if leader_id in roles:
+            roles[leader_id] = "组长"
+    return roles
+
+
+def _course_activity_organization_ids(
+    activity_type: str,
+    activity,
+    course_organizations: dict[str, str],
+    course_name_organizations: dict[str, str],
+    type_organizations: dict[str, str],
+    member_organizations: dict[str, set[str]],
+) -> set[str]:
+    """优先读取课程配置所属组织，系统活动回退到老师所在组织。"""
+    organization_ids: set[str] = set()
+    if activity_type == "class":
+        course_id = getattr(activity, "course_id", "")
+        course_name = getattr(activity, "course_name", "")
+        course_type = getattr(activity, "course_type", "")
+        if course_id and course_organizations.get(course_id):
+            organization_ids.add(course_organizations[course_id])
+        if course_name and course_name_organizations.get(course_name):
+            organization_ids.add(course_name_organizations[course_name])
+        if course_type and type_organizations.get(course_type):
+            organization_ids.add(type_organizations[course_type])
+    elif activity_type == "ics":
+        course_type = getattr(activity, "course_type", "")
+        if course_type and type_organizations.get(course_type):
+            organization_ids.add(type_organizations[course_type])
+
+    for teacher_id in _course_activity_teacher_ids(activity):
+        organization_ids.update(member_organizations.get(teacher_id, set()))
+    return organization_ids
+
+
+def _course_period_key(date_str: str, granularity: str) -> str:
+    """将活动日期归入日、ISO 周或自然月。"""
+    if granularity == "day":
+        return date_str
+    value = datetime.strptime(date_str, "%Y-%m-%d")
+    if granularity == "week":
+        iso_year, iso_week, _ = value.isocalendar()
+        return f"{iso_year}-W{iso_week:02d}"
+    return value.strftime("%Y-%m")
+
+
+def _course_trend_rows(
+    grouped: dict[str, dict[str, int | float]],
+    date_from: str,
+    date_to: str,
+    granularity: str,
+) -> list[dict]:
+    """补齐范围内无课程的时间点，保证折线图时间轴连续。"""
+    keys: list[str] = []
+    seen: set[str] = set()
+    current = datetime.strptime(date_from, "%Y-%m-%d")
+    end = datetime.strptime(date_to, "%Y-%m-%d")
+    while current <= end:
+        key = _course_period_key(current.strftime("%Y-%m-%d"), granularity)
+        if key not in seen:
+            seen.add(key)
+            keys.append(key)
+        current += timedelta(days=1)
+    return [
+        {
+            "date": key,
+            "course_count": grouped[key]["course_count"],
+            "class_hours": grouped[key]["class_hours"],
+            "participant_count": grouped[key]["participant_count"],
+            "transaction_amount": round(grouped[key]["transaction_amount"], 2),
+        }
+        for key in keys
+    ]
+
+
+def _teacher_transaction_amounts(
+    teachers: list,
+    date_from: str,
+    date_to: str,
+    payment_groups: list[list] | None = None,
+    allowed_customer_dates: set[tuple[str, str]] | None = None,
+) -> dict[str, float]:
+    """按付费记录成交人归集老师成交额，多成交人使用各自填写的分摊金额。"""
+    teacher_ids = {teacher.id for teacher in teachers}
+    teacher_by_name: dict[str, str] = {}
+    for teacher in teachers:
+        for name in (teacher.nickname, teacher.name):
+            normalized = (name or "").strip()
+            if normalized:
+                teacher_by_name[normalized] = teacher.id
+
+    amounts: dict[str, float] = defaultdict(float)
+    for records in payment_groups or _payment_record_groups():
+        for record in records:
+            record_date = _get_record_date(record)
+            if (
+                not record_date
+                or not date_from <= record_date <= date_to
+                or getattr(record, "voided", False)
+            ):
+                continue
+            customer_id = getattr(record, "customer_id", "") or ""
+            if allowed_customer_dates is not None and (record_date, customer_id) not in allowed_customer_dates:
+                continue
+
+            record_amount = _get_record_amount(record)
+            closers = getattr(record, "closers", []) or []
+            matched_closers: list[tuple[str, float]] = []
+            for closer in closers:
+                closer_id = (closer.get("id") or "").strip()
+                if closer_id not in teacher_ids:
+                    closer_id = teacher_by_name.get((closer.get("name") or "").strip(), "")
+                if closer_id:
+                    matched_closers.append((closer_id, float(closer.get("amount") or 0)))
+
+            if matched_closers:
+                if len(closers) == 1 and matched_closers[0][1] == 0:
+                    teacher_id, _amount = matched_closers[0]
+                    amounts[teacher_id] += record_amount
+                else:
+                    for teacher_id, amount in matched_closers:
+                        amounts[teacher_id] += amount
+                continue
+
+            closer_id = (getattr(record, "closer_id", None) or "").strip()
+            if closer_id not in teacher_ids:
+                closer_id = teacher_by_name.get(
+                    (getattr(record, "closer_name", None) or "").strip(),
+                    "",
+                )
+            if closer_id:
+                amounts[closer_id] += record_amount
+
+    return amounts
+
+
+def _course_customer_daily_context(
+    date_from: str,
+    date_to: str,
+    payment_groups: list[list],
+) -> tuple[dict[tuple[str, str], dict], dict[tuple[str, str], str]]:
+    """构建客户每日成交与需求索引，供趋势和课程人员弹窗共用。"""
+    payments: dict[tuple[str, str], dict] = defaultdict(
+        lambda: {"amount": 0.0, "closers": set()}
+    )
+    for records in payment_groups:
+        for record in records:
+            record_date = _get_record_date(record)
+            customer_id = getattr(record, "customer_id", "")
+            if (
+                not record_date
+                or not customer_id
+                or not date_from <= record_date <= date_to
+                or getattr(record, "voided", False)
+            ):
+                continue
+            key = (record_date, customer_id)
+            payments[key]["amount"] += _get_record_amount(record)
+            closer_names = {
+                (closer.get("name") or "").strip()
+                for closer in (getattr(record, "closers", []) or [])
+                if (closer.get("name") or "").strip()
+            }
+            legacy_closer = (getattr(record, "closer_name", None) or "").strip()
+            if legacy_closer:
+                closer_names.add(legacy_closer)
+            payments[key]["closers"].update(closer_names)
+
+    needs_by_customer_date: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for visit in visit_service.list_visits():
+        visit_date = getattr(visit, "visit_date", "")
+        customer_id = getattr(visit, "customer_id", "")
+        needs = (getattr(visit, "needs", None) or "").strip()
+        if date_from <= visit_date <= date_to and customer_id and needs:
+            key = (visit_date, customer_id)
+            if needs not in needs_by_customer_date[key]:
+                needs_by_customer_date[key].append(needs)
+    return payments, {
+        key: "；".join(values)
+        for key, values in needs_by_customer_date.items()
+    }
+
+
+def _course_activity_name(activity_type: str, label: str, activity) -> str:
+    if activity_type == "class":
+        return getattr(activity, "activity_name", "") or getattr(activity, "course_name", "") or label
+    return getattr(activity, "name", "") or getattr(activity, "course_name", "") or label
+
+
+def _course_activity_hours(activity_type: str, activity) -> int:
+    """课程课时：能量结按案主实际销卡数，其他活动按会员扣卡次数。"""
+    if activity_type == "eks":
+        return energy_knot_session_service.get_session_deduction_count(activity)
+    try:
+        return max(0, int(getattr(activity, "membership_deduction_count", 1) or 0))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _course_teacher_hours(activities_by_type: dict[str, list]) -> dict[str, int]:
+    """按课程实际课时汇总每位老师，用于老师筛选项排序。"""
+    hours_by_teacher: dict[str, int] = defaultdict(int)
+    for activity_type, activities in activities_by_type.items():
+        for activity in activities:
+            activity_hours = _course_activity_hours(activity_type, activity)
+            for activity_teacher_id in _course_activity_teacher_ids(activity):
+                hours_by_teacher[activity_teacher_id] += activity_hours
+    return dict(hours_by_teacher)
+
+
+def _course_teacher_hours_in_range(date_from: str, date_to: str) -> dict[str, int]:
+    activities_by_type = {
+        type_key: list(loader(start_date=date_from, end_date=date_to))
+        for type_key, _label, loader in COURSE_ACTIVITY_TYPES
+    }
+    return _course_teacher_hours(activities_by_type)
+
+
+@router.get("/courses")
+def get_course_statistics(
+    date_from: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
+    granularity: str = Query("day", description="时间单位: day/week/month"),
+    organization_id: str | None = Query(None, description="所属组织 ID"),
+    activity_type: str | None = Query(None, description="活动类型编码"),
+    course_subtype: str | None = Query(None, description="沙龙活动或内部课程二级类目"),
+    teacher_id: str | None = Query(None, description="疗愈老师客户 ID"),
+):
+    """获取课程数、课时数及参与人数统计。"""
+    date_from, date_to = _get_date_range(date_from, date_to)
+    if granularity not in {"day", "week", "month"}:
+        granularity = "day"
+    organization_filter = (_normalize_query_str(organization_id) or "").strip()
+    course_subtype_filter = (_normalize_query_str(course_subtype) or "").strip()
+
+    organizations = organization_service.list_organizations()
+    member_organizations: dict[str, set[str]] = defaultdict(set)
+    for organization in organizations:
+        for member_id in organization.member_ids:
+            member_organizations[member_id].add(organization.id)
+
+    courses = course_service.list_courses()
+    course_organizations = {
+        course.id: course.organization_id
+        for course in courses
+        if course.organization_id
+    }
+    course_name_organizations = {
+        course.name: course.organization_id
+        for course in courses
+        if course.name and course.organization_id
+    }
+    course_type_configs = course_type_service.list_course_types()
+    type_organizations = {
+        item.get("name", ""): item.get("organization_id", "")
+        for item in course_type_configs
+        if item.get("name") and item.get("organization_id")
+    }
+
+    all_customers = customer_service.list_customers()
+    customer_map = {customer.id: customer for customer in all_customers}
+    identity_groups = {
+        identity.name: identity.type
+        for identity in member_identity_service.list_identities()
+    }
+    teachers = [
+        customer
+        for customer in all_customers
+        if HEALING_TEACHER_POSITIONS.intersection(customer.positions or [])
+        and (
+            not organization_filter
+            or organization_filter in member_organizations.get(customer.id, set())
+        )
+    ]
+
+    selected_types = {
+        key
+        for key, _label, _loader in COURSE_ACTIVITY_TYPES
+        if not activity_type or activity_type == "all" or key == activity_type
+    }
+    activities_by_type = {
+        type_key: list(loader(start_date=date_from, end_date=date_to))
+        for type_key, _label, loader in COURSE_ACTIVITY_TYPES
+    }
+
+    def _matches_organization(type_key: str, activity) -> bool:
+        activity_organization_ids = _course_activity_organization_ids(
+            type_key,
+            activity,
+            course_organizations,
+            course_name_organizations,
+            type_organizations,
+            member_organizations,
+        )
+        return not organization_filter or organization_filter in activity_organization_ids
+
+    def _matches_common_filters(type_key: str, activity) -> bool:
+        activity_teacher_ids = _course_activity_teacher_ids(activity)
+        if teacher_id and teacher_id not in activity_teacher_ids:
+            return False
+        return _matches_organization(type_key, activity)
+
+    teacher_course_hours = _course_teacher_hours({
+        type_key: [
+            activity
+            for activity in activities
+            if type_key in selected_types
+            and _matches_organization(type_key, activity)
+            and not (
+                type_key in {"class", "ics"}
+                and course_subtype_filter
+                and _course_subtype_name(type_key, activity) != course_subtype_filter
+            )
+        ]
+        for type_key, activities in activities_by_type.items()
+    })
+    teachers.sort(key=lambda customer: (
+        -teacher_course_hours.get(customer.id, 0),
+        customer.nickname or customer.name or "",
+        customer.id,
+    ))
+
+    base_activities_by_type = {
+        type_key: [
+            activity
+            for activity in activities
+            if _matches_common_filters(type_key, activity)
+        ]
+        for type_key, activities in activities_by_type.items()
+    }
+    selected_activities_by_type = {
+        type_key: [
+            activity
+            for activity in base_activities_by_type[type_key]
+            if not (
+                type_key in {"class", "ics"}
+                and course_subtype_filter
+                and _course_subtype_name(type_key, activity) != course_subtype_filter
+            )
+        ]
+        for type_key in selected_types
+    }
+
+    subtype_activity_type = activity_type if activity_type in {"class", "ics"} else ""
+    if subtype_activity_type == "class":
+        subtype_names = [
+            item.get("name", "")
+            for item in course_type_configs
+            if item.get("name") and item.get("category") != "other"
+        ]
+    elif subtype_activity_type == "ics":
+        subtype_names = list(INTERNAL_COURSE_SUBTYPES)
+    else:
+        subtype_names = []
+    for activity in base_activities_by_type.get(subtype_activity_type, []):
+        subtype_name = _course_subtype_name(subtype_activity_type, activity)
+        if subtype_name and subtype_name not in subtype_names:
+            subtype_names.append(subtype_name)
+    subtype_totals = {
+        subtype_name: {"course_count": 0, "class_hours": 0, "participant_count": 0}
+        for subtype_name in subtype_names
+    }
+    for activity in base_activities_by_type.get(subtype_activity_type, []):
+        subtype_name = _course_subtype_name(subtype_activity_type, activity)
+        if subtype_name not in subtype_totals:
+            subtype_totals[subtype_name] = {"course_count": 0, "class_hours": 0, "participant_count": 0}
+            subtype_names.append(subtype_name)
+        activity_hours = _course_activity_hours(subtype_activity_type, activity)
+        subtype_totals[subtype_name]["course_count"] += 1
+        subtype_totals[subtype_name]["class_hours"] += activity_hours
+        subtype_totals[subtype_name]["participant_count"] += len(
+            _course_participant_ids(subtype_activity_type, activity)
+        )
+    payment_groups = _payment_record_groups()
+    daily_payments, daily_needs = _course_customer_daily_context(
+        date_from,
+        date_to,
+        payment_groups,
+    )
+    trend_grouped: dict[str, dict[str, int | float]] = defaultdict(
+        lambda: {
+            "course_count": 0,
+            "class_hours": 0,
+            "participant_count": 0,
+            "transaction_amount": 0.0,
+        }
+    )
+    filtered_participants_by_date: dict[str, set[str]] = defaultdict(set)
+    course_rows: list[dict] = []
+    statistics = []
+    for type_key, label, loader in COURSE_ACTIVITY_TYPES:
+        if type_key not in selected_types:
+            continue
+
+        course_count = 0
+        class_hours = 0
+        participant_count = 0
+        for activity in selected_activities_by_type[type_key]:
+            teacher_ids = _course_activity_teacher_ids(activity)
+            course_count += 1
+            activity_hours = _course_activity_hours(type_key, activity)
+            participant_roles = _course_participant_roles(type_key, activity)
+            participant_ids = set(participant_roles)
+            activity_participants = len(participant_ids)
+            class_hours += activity_hours
+            participant_count += activity_participants
+            filtered_participants_by_date[activity.date].update(participant_ids)
+            period_key = _course_period_key(activity.date, granularity)
+            trend_grouped[period_key]["course_count"] += 1
+            trend_grouped[period_key]["class_hours"] += activity_hours
+            trend_grouped[period_key]["participant_count"] += activity_participants
+
+            participant_details = []
+            for participant_id in participant_ids:
+                customer = customer_map.get(participant_id)
+                member_type = getattr(customer, "member_type", "") if customer else ""
+                identity_group = identity_groups.get(member_type, "") or "老人"
+                payment = daily_payments.get(
+                    (activity.date, participant_id),
+                    {"amount": 0.0, "closers": set()},
+                )
+                participant_details.append({
+                    "id": participant_id,
+                    "nickname": (
+                        getattr(customer, "nickname", "")
+                        or getattr(customer, "name", "")
+                        or participant_id
+                    ),
+                    "member_type": member_type,
+                    "identity_group": identity_group,
+                    "participation_role": participant_roles[participant_id],
+                    "daily_need": daily_needs.get((activity.date, participant_id), ""),
+                    "daily_transaction_amount": round(payment["amount"], 2),
+                    "closers": "、".join(sorted(payment["closers"])),
+                })
+            participant_details.sort(key=lambda item: (item["nickname"], item["id"]))
+            teacher_names = []
+            for activity_teacher_id in teacher_ids:
+                teacher = customer_map.get(activity_teacher_id)
+                name = (
+                    getattr(teacher, "nickname", "")
+                    or getattr(teacher, "name", "")
+                    or (
+                        getattr(activity, "achiever_name", "")
+                        if activity_teacher_id == getattr(activity, "achiever_id", "")
+                        else ""
+                    )
+                    or activity_teacher_id
+                )
+                if name not in teacher_names:
+                    teacher_names.append(name)
+            course_rows.append({
+                "id": f"{type_key}:{activity.id}",
+                "activity_type": type_key,
+                "activity_type_label": label,
+                "name": _course_activity_name(type_key, label, activity),
+                "date": activity.date,
+                "start_time": getattr(activity, "start_time", "") or "",
+                "end_time": getattr(activity, "end_time", "") or "",
+                "class_hours": activity_hours,
+                "teachers": teacher_names,
+                "participant_count": activity_participants,
+                "new_count": sum(
+                    item["identity_group"] == "新人"
+                    for item in participant_details
+                ),
+                "old_count": sum(
+                    item["identity_group"] != "新人"
+                    for item in participant_details
+                ),
+                "daily_transaction_amount": round(sum(
+                    item["daily_transaction_amount"]
+                    for item in participant_details
+                ), 2),
+                "participants": participant_details,
+            })
+
+        statistics.append({
+            "type": type_key,
+            "label": label,
+            "course_count": course_count,
+            "class_hours": class_hours,
+            "participant_count": participant_count,
+        })
+
+    for activity_date, participant_ids in filtered_participants_by_date.items():
+        period_key = _course_period_key(activity_date, granularity)
+        trend_grouped[period_key]["transaction_amount"] += sum(
+            daily_payments.get(
+                (activity_date, participant_id),
+                {"amount": 0.0},
+            )["amount"]
+            for participant_id in participant_ids
+        )
+    course_rows.sort(
+        key=lambda item: (item["date"], item["start_time"], item["id"]),
+        reverse=True,
+    )
+
+    teacher_statistics = {
+        teacher.id: {
+            "id": teacher.id,
+            "name": teacher.nickname or teacher.name or teacher.id,
+            "course_count": 0,
+            "class_hours": 0,
+            "participant_count": 0,
+            "transaction_amount": 0.0,
+        }
+        for teacher in teachers
+    }
+    for type_key in selected_types:
+        for activity in selected_activities_by_type[type_key]:
+            activity_hours = _course_activity_hours(type_key, activity)
+            activity_participant_count = len(_course_participant_ids(type_key, activity))
+            for activity_teacher_id in _course_activity_teacher_ids(activity):
+                if activity_teacher_id not in teacher_statistics:
+                    continue
+                teacher_statistics[activity_teacher_id]["course_count"] += 1
+                teacher_statistics[activity_teacher_id]["class_hours"] += activity_hours
+                teacher_statistics[activity_teacher_id]["participant_count"] += activity_participant_count
+
+    for transaction_teacher_id, amount in _teacher_transaction_amounts(
+        teachers,
+        date_from,
+        date_to,
+        payment_groups,
+        {
+            (activity_date, participant_id)
+            for activity_date, participant_ids in filtered_participants_by_date.items()
+            for participant_id in participant_ids
+        } if activity_type == "class" else None,
+    ).items():
+        teacher_statistics[transaction_teacher_id]["transaction_amount"] = round(amount, 2)
+
+    return {
+        "date_from": date_from,
+        "date_to": date_to,
+        "granularity": granularity,
+        "selected_activity_type": activity_type or "all",
+        "activity_types": [
+            {"value": key, "label": label}
+            for key, label, _loader in COURSE_ACTIVITY_TYPES
+        ],
+        "organizations": [
+            {"id": organization.id, "name": organization.name}
+            for organization in organizations
+        ],
+        "teachers": [
+            {
+                "id": teacher.id,
+                "name": teacher.nickname or teacher.name or teacher.id,
+            }
+            for teacher in teachers
+        ],
+        "statistics": statistics,
+        "subtype_statistics": [
+            {
+                "type": subtype_name,
+                "label": subtype_name,
+                **subtype_totals[subtype_name],
+            }
+            for subtype_name in subtype_names
+        ],
+        "salon_subtype_statistics": [
+            {
+                "type": subtype_name,
+                "label": subtype_name,
+                **subtype_totals[subtype_name],
+            }
+            for subtype_name in subtype_names
+        ] if activity_type == "class" else [],
+        "trend": _course_trend_rows(trend_grouped, date_from, date_to, granularity),
+        "teacher_statistics": sorted(
+            teacher_statistics.values(),
+            key=lambda item: (-item["course_count"], -item["class_hours"], item["name"]),
+        ),
+        "courses": course_rows,
     }
 
 
