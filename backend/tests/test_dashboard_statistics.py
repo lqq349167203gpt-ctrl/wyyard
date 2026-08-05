@@ -68,7 +68,8 @@ def test_referral_statistics_filters_referrer_and_groups_status(monkeypatch):
             member_type="普通会员",
             referrer="小林",
             follow_up_status="新添加",
-            created_at=datetime(2026, 7, 3),
+            referral_date="2026-07-03",
+            created_at=datetime(2026, 6, 23),
         ),
         SimpleNamespace(
             id="c2",
@@ -76,7 +77,8 @@ def test_referral_statistics_filters_referrer_and_groups_status(monkeypatch):
             member_type="普通会员",
             referrer="小林",
             follow_up_status="沟通中",
-            created_at=datetime(2026, 7, 4),
+            referral_date="2026-07-04",
+            created_at=datetime(2026, 6, 24),
         ),
         SimpleNamespace(
             id="c3",
@@ -84,7 +86,8 @@ def test_referral_statistics_filters_referrer_and_groups_status(monkeypatch):
             member_type="",
             referrer="小周",
             follow_up_status="已成交",
-            created_at=datetime(2026, 7, 5),
+            referral_date="2026-07-05",
+            created_at=datetime(2026, 6, 25),
         ),
     ]
     monkeypatch.setattr(statistics.customer_service, "list_customers", lambda: customers)
@@ -110,6 +113,7 @@ def test_referral_statistics_filters_referrer_and_groups_status(monkeypatch):
     assert result["status_totals"]["已成交"] == 0
     assert result["referrer_names"] == ["小林", "小周"]
     assert {member["id"] for member in result["members"]} == {"c1", "c2"}
+    assert {member["referral_date"] for member in result["members"]} == {"2026-07-03", "2026-07-04"}
 
     # 会员类型多选筛选：选中"普通会员"时只统计 c1、c2
     result_by_type = statistics.get_referral_statistics(

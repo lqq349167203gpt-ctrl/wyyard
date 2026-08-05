@@ -25,6 +25,13 @@ const LABELS: Record<string, string> = {
   converted_amount: "成交金额",
 }
 
+const DATE_COLUMN_LABELS = {
+  invited: "邀约日期",
+  arrived: "到访日期",
+  converted: "成交日期",
+  converted_amount: "成交日期",
+} as const
+
 // 获取某月的天数
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -902,7 +909,7 @@ export default function StatisticsPage() {
                       ["name", "项目名称", "w-24"],
                       ["quantity", "购买场次", "w-20"],
                       ["amount", "成交金额", "w-24"],
-                      ["date", "成交日期", "w-24"],
+                      ["date", DATE_COLUMN_LABELS[activeTab], "w-24"],
                     ] : [
                       ["member_type", "身份", "w-20"],
                       ["invited_count", "受邀次数", "w-20"],
@@ -912,7 +919,7 @@ export default function StatisticsPage() {
                       ["total_consumption", "消费总额", "w-24"],
                       ["arrived", "是否到店", "w-20"],
                       ["status", "是否成交", "w-20"],
-                      ["date", "日期", "w-24"],
+                      ["date", DATE_COLUMN_LABELS[activeTab], "w-24"],
                     ] as const).map(([field, label, w]) => (
                       <th key={field} className={`px-3 font-normal ${w}`}>
                         <span className="inline-flex items-center gap-0.5">

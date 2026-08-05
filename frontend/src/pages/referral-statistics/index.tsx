@@ -95,7 +95,7 @@ export default function ReferralStatisticsPage() {
   const [endYear, setEndYear] = useState(now.getFullYear())
   const [endMonth, setEndMonth] = useState(now.getMonth() + 1)
   const [endDay, setEndDay] = useState(getDaysInMonth(now.getFullYear(), now.getMonth() + 1))
-  const [sortField, setSortField] = useState<keyof Member | null>("created_date")
+  const [sortField, setSortField] = useState<keyof Member | null>("referral_date")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null)
@@ -250,7 +250,7 @@ export default function ReferralStatisticsPage() {
 
   const periodFilteredMembers = useMemo(
     () => selectedTrendPeriod
-      ? filteredMembers.filter(member => getDatePeriodKey(member.created_date, granularity) === selectedTrendPeriod)
+      ? filteredMembers.filter(member => getDatePeriodKey(member.referral_date, granularity) === selectedTrendPeriod)
       : filteredMembers,
     [filteredMembers, granularity, selectedTrendPeriod],
   )
@@ -785,7 +785,7 @@ export default function ReferralStatisticsPage() {
                 </colgroup>
                 <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
                   <TableRow className="h-9 bg-[#fafafa] text-[11px] font-normal text-[#8f959e] hover:bg-[#fafafa]">
-                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 pl-4 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("created_date")}>创建日期<SortArrow field="created_date" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 pl-4 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("referral_date")}>引流日期<SortArrow field="referral_date" /></TableHead>
                     <TableHead className="h-9 overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]">昵称</TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("member_type")}>会员身份<SortArrow field="member_type" /></TableHead>
                     <TableHead className="h-9 overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]">引流人</TableHead>
@@ -801,7 +801,7 @@ export default function ReferralStatisticsPage() {
                 <TableBody>
                   {paginatedItems.map(member => (
                     <TableRow key={member.id} className="group h-11 border-[#f0f0f0] text-[12px] text-[#4e535a] last:border-b-0 hover:bg-[#f7f8fa]">
-                      <TableCell className="h-11 overflow-hidden px-3 py-0 pl-4 text-[12px] tabular-nums">{member.created_date || <EmptyValue />}</TableCell>
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 pl-4 text-[12px] tabular-nums">{member.referral_date || <EmptyValue />}</TableCell>
                       <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px]">
                         <button
                           className="block max-w-full truncate font-medium text-[#2b2f36] hover:text-[#3370ff]"

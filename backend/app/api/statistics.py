@@ -2039,16 +2039,13 @@ def get_referral_statistics(
     type_filter = _parse_member_types(member_types)
     status_names = [status.value for status in FollowUpStatus]
     all_customers = customer_service.list_customers()
-    # 引流人选项：只统计选定时间范围内有数据的引流人，按人数降序排列
+    # 引流人选项：只统计选定引流日期范围内有数据的引流人，按人数降序排列
     referrer_counts: dict[str, int] = defaultdict(int)
     for customer in all_customers:
-        if isinstance(customer.created_at, datetime):
-            created_date = customer.created_at.strftime("%Y-%m-%d")
-        elif customer.created_at:
-            created_date = str(customer.created_at)[:10]
-        else:
+        referral_date = (customer.referral_date or "").strip()
+        if not referral_date:
             continue
-        if not (date_from <= created_date <= date_to):
+        if not (date_from <= referral_date <= date_to):
             continue
         referrer_name = (customer.referrer or "").strip()
         if referrer_name:
@@ -2074,19 +2071,16 @@ def get_referral_statistics(
         status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
         if status not in status_names:
             status = FollowUpStatus.NEW.value
-        if isinstance(customer.created_at, datetime):
-            created_date = customer.created_at.strftime("%Y-%m-%d")
-        elif customer.created_at:
-            created_date = str(customer.created_at)[:10]
-        else:
+        referral_date = (customer.referral_date or "").strip()
+        if not referral_date:
             continue
-        customers_by_date[created_date][status] += 1
+        customers_by_date[referral_date][status] += 1
 
-    # 按日期范围过滤：只统计选定时间范围内新建的客户
+    # 按引流日期范围过滤：只统计选定时间范围内引流的客户
     daily_new = {
-        created_date: values
-        for created_date, values in customers_by_date.items()
-        if date_from <= created_date <= date_to
+        referral_date: values
+        for referral_date, values in customers_by_date.items()
+        if date_from <= referral_date <= date_to
     }
     status_totals = {status: 0 for status in status_names}
     for values in daily_new.values():
@@ -2094,32 +2088,29 @@ def get_referral_statistics(
             status_totals[status] += values.get(status, 0)
     cumulative_by_date: dict[str, dict[str, int]] = {}
     cumulative = {status: 0 for status in status_names}
-    for created_date in sorted(customers_by_date):
+    for referral_date in sorted(customers_by_date):
         for status in status_names:
-            cumulative[status] += customers_by_date[created_date].get(status, 0)
-        if date_from <= created_date <= date_to:
+            cumulative[status] += customers_by_date[referral_date].get(status, 0)
+        if date_from <= referral_date <= date_to:
             if not cumulative_by_date:
                 # 范围内第一天：重置累计，只统计范围内新增
-                cumulative = {status: customers_by_date[created_date].get(status, 0) for status in status_names}
-            cumulative_by_date[created_date] = dict(cumulative)
+                cumulative = {status: customers_by_date[referral_date].get(status, 0) for status in status_names}
+            cumulative_by_date[referral_date] = dict(cumulative)
 
     members = []
     for customer in customers:
-        # 按日期范围过滤：只保留选定时间范围内新建的客户
-        if isinstance(customer.created_at, datetime):
-            created_date = customer.created_at.strftime("%Y-%m-%d")
-        elif customer.created_at:
-            created_date = str(customer.created_at)[:10]
-        else:
+        # 按引流日期范围过滤：只保留选定时间范围内引流的客户
+        referral_date = (customer.referral_date or "").strip()
+        if not referral_date:
             continue
-        if not (date_from <= created_date <= date_to):
+        if not (date_from <= referral_date <= date_to):
             continue
         stats = _get_customer_stats(customer.id, None, None)
         status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
         members.append({
             "id": customer.id,
             "nickname": customer.nickname or "",
-            "created_date": created_date,
+            "referral_date": referral_date,
             "member_type": customer.member_type or "",
             "referrer": customer.referrer or "",
             "follow_up_status": status,

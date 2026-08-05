@@ -2291,7 +2291,7 @@ export interface ReferralStatistics {
   members: Array<{
     id: string
     nickname: string
-    created_date: string
+    referral_date: string
     member_type: string
     referrer: string
     follow_up_status: CustomerFollowUpStatus
