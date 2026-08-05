@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from "react"
-import { ChevronRight, Edit, Trash2 } from "lucide-react"
+import { Edit, Archive } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -221,10 +221,9 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDeleteCustomer(c.id, c.nickname || c.name || c.id)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <Archive className="h-3.5 w-3.5" />
                     </Button>
                     </div>
-                    <ChevronRight className="ml-1 h-3.5 w-3.5 text-[#c9cdd4] transition-colors group-hover:text-[#79838f]" />
                   </div>
                 </TableCell>
                 </TableRow>
