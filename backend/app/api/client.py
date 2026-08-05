@@ -403,19 +403,16 @@ def list_activities(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
 ):
-    """客户端活动列表 — 默认只返回未来活动;指定日期范围时按范围返回(含过去)"""
+    """客户端活动列表 — 返回全部已发布活动，可按日期范围筛选。"""
     items = _aggregate_published_activities()
 
-    if start_date or end_date:
-        # 指定日期范围(含过去日期),用于客户端按周/按日查询
+    has_date_range = bool(start_date or end_date)
+    if has_date_range:
+        # 指定日期范围，用于客户端按周/按日查询
         if start_date:
             items = [i for i in items if i["date"] >= start_date]
         if end_date:
             items = [i for i in items if i["date"] <= end_date]
-    else:
-        # 默认只保留未来活动（今天及以后）
-        today = date_cls.today().isoformat()
-        items = [i for i in items if i["date"] >= today]
 
     # 注入名称
     customer_map = _build_customer_map()
@@ -428,8 +425,22 @@ def list_activities(
         activity["signup_count"] = _activity_signup_count(item, signups_by_activity.get(item["id"], []))
         formatted.append(activity)
 
-    # 按日期升序，同日期按开始时间升序
-    formatted.sort(key=lambda x: (x["date"], x["start_time"] or ""))
+    if has_date_range:
+        # 日历范围内按日期、时间顺序展示
+        formatted.sort(key=lambda x: (x["date"], x["start_time"] or ""))
+    else:
+        # 默认列表优先最近的未来活动；没有未来活动时紧接最近的历史活动
+        today = date_cls.today().isoformat()
+        upcoming = sorted(
+            (item for item in formatted if item["date"] >= today),
+            key=lambda x: (x["date"], x["start_time"] or ""),
+        )
+        past = sorted(
+            (item for item in formatted if item["date"] < today),
+            key=lambda x: (x["date"], x["start_time"] or ""),
+            reverse=True,
+        )
+        formatted = upcoming + past
 
     # 分页
     total = len(formatted)
@@ -535,7 +546,9 @@ def signup_activity(activity_id: str, request: Request):
         raise HTTPException(status_code=409, detail=f"你是本场{role_label}，已自动参与，无需报名")
 
     customer = get_customer(customer_id)
-    nickname = customer.nickname if customer else ""
+    if not customer or customer.is_deleted:
+        raise HTTPException(status_code=404, detail="客户不存在")
+    nickname = customer.nickname or ""
 
     # 检查活动是否已开始或结束：date + start_time / end_time 已过则不允许报名
     act_date = item["data"].get("date", "")

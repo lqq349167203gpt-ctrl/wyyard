@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.group_case_session import GroupCaseSessionCreate
 from app.services import activity_assignment_notification_service, group_case_session_service
-from app.services.customer_service import list_customers
+from app.services.customer_service import list_all_customers
 from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/group-case-sessions", tags=["group-case-sessions"])
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/group-case-sessions", tags=["group-case-sessions
 def _fill_session_names(sessions: list) -> list:
     """从客户信息实时填充 owner_name / host_name，并回填 space_name / room_name"""
     from app.services import space_service
-    customers = list_customers()
+    customers = list_all_customers()
     cmap = {c.id: c for c in customers}
     _space_map: dict[str, str] = {}
     _room_map: dict[str, str] = {}

@@ -19,6 +19,15 @@ export default function DisabledCustomersPage() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
 
+  const isAdmin = useMemo(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      return user.role === "超级管理员"
+    } catch {
+      return false
+    }
+  }, [])
+
   // 启用确认
   const [restoreTarget, setRestoreTarget] = useState<DisabledCustomer | null>(null)
   // 彻底删除确认
@@ -89,6 +98,8 @@ export default function DisabledCustomersPage() {
       <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : paginatedItems.length === 0 ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">暂无停用客户</div>
         ) : (
           <>
             <Table>
@@ -100,31 +111,25 @@ export default function DisabledCustomersPage() {
                   <TableHead>会员身份</TableHead>
                   <TableHead>停用时间</TableHead>
                   <TableHead>操作人</TableHead>
-                  <TableHead className="text-right pr-4">操作</TableHead>
+                  {isAdmin && <TableHead className="text-right pr-4">操作</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedItems.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={7} className="text-center py-16 text-sm text-muted-foreground">
-                      暂无停用客户
+                {paginatedItems.map((c) => (
+                  <TableRow key={c.id} className="hover:bg-[#f7f8fa]">
+                    <TableCell className="pl-4 font-medium text-[#212631]">{c.nickname || "-"}</TableCell>
+                    <TableCell className="text-[#4e535a]">{c.name || "-"}</TableCell>
+                    <TableCell className="text-[#4e535a]">{c.phone || "-"}</TableCell>
+                    <TableCell>
+                      {c.member_type ? (
+                        <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{c.member_type}</span>
+                      ) : "-"}
                     </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedItems.map((c) => (
-                    <TableRow key={c.id} className="hover:bg-[#f7f8fa]">
-                      <TableCell className="pl-4 font-medium text-[#212631]">{c.nickname || "-"}</TableCell>
-                      <TableCell className="text-[#4e535a]">{c.name || "-"}</TableCell>
-                      <TableCell className="text-[#4e535a]">{c.phone || "-"}</TableCell>
-                      <TableCell>
-                        {c.member_type ? (
-                          <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{c.member_type}</span>
-                        ) : "-"}
-                      </TableCell>
-                      <TableCell className="text-[12px] text-[#a8b1bd]">
-                        {c.deleted_at ? new Date(c.deleted_at).toLocaleDateString("zh-CN") : "-"}
-                      </TableCell>
-                      <TableCell className="text-[#4e535a]">{c.deleted_by || "-"}</TableCell>
+                    <TableCell className="text-[12px] text-[#a8b1bd]">
+                      {c.deleted_at ? new Date(c.deleted_at).toLocaleDateString("zh-CN") : "-"}
+                    </TableCell>
+                    <TableCell className="text-[#4e535a]">{c.deleted_by || "-"}</TableCell>
+                    {isAdmin && (
                       <TableCell className="text-right pr-4">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => setRestoreTarget(c)}>
@@ -135,9 +140,9 @@ export default function DisabledCustomersPage() {
                           </Button>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                    )}
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
             <PaginationBar

@@ -130,7 +130,7 @@ def _fill_visit_count(customer):
     return data
 
 
-_SORTABLE_FIELDS = {"member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "created_at"}
+_SORTABLE_FIELDS = {"member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "created_at", "referral_date"}
 _NUMERIC_SORT_FIELDS = {"visit_count", "activity_count", "total_payment"}
 
 
@@ -285,11 +285,16 @@ async def get_customer(customer_id: str):
     customer = customer_service.get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
+    if customer.is_deleted:
+        raise HTTPException(status_code=404, detail="客户不存在")
     return _fill_visit_count(customer)
 
 
 @router.patch("/{customer_id}")
 async def update_customer(customer_id: str, data: CustomerUpdate):
+    customer = customer_service.get_customer(customer_id)
+    if not customer or customer.is_deleted:
+        raise HTTPException(status_code=404, detail="客户不存在")
     try:
         customer = customer_service.update_customer(customer_id, data)
     except ValueError as e:

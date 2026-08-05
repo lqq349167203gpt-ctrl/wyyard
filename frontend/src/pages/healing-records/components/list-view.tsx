@@ -11,7 +11,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import { EmptyValue } from "@/components/empty-value"
 
-const SORT_FIELDS = ["member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "created_at"] as const
+const SORT_FIELDS = ["member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "referral_date"] as const
 type SortField = typeof SORT_FIELDS[number]
 
 /** 列排序箭头 */
@@ -157,8 +157,8 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                 </TableHead>
                 <TableHead style={{ width: "130px" }}>引流 / 承接</TableHead>
                 <TableHead style={{ width: "110px" }}>
-                  <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("created_at")}>
-                    创建日期<SortArrow field="created_at" sortField={sortField} sortOrder={sortOrder} />
+                  <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("referral_date")}>
+                    引流日期<SortArrow field="referral_date" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
                 <TableHead style={{ width: "80px" }}>创建人</TableHead>
@@ -210,7 +210,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                   <span className="text-[#8f959e]">{c.referrer_handler || <EmptyValue />}</span>
                 </TableCell>
                 <TableCell className="text-[12px] text-[#a8b1bd] tabular-nums">
-                  {c.created_at ? new Date(c.created_at).toLocaleDateString("zh-CN") : <EmptyValue />}
+                  {c.referral_date ? new Date(c.referral_date).toLocaleDateString("zh-CN") : <EmptyValue />}
                 </TableCell>
                 <TableCell className="text-[12px] text-[#a8b1bd]">
                   {c.created_by || <EmptyValue />}

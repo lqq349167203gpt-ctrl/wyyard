@@ -41,11 +41,13 @@ def list_disabled_customers() -> List[Customer]:
     return [v for v in _customers.values() if v.is_deleted]
 
 
+def list_all_customers() -> List[Customer]:
+    """列出所有客户（含已停用），用于活动记录中的名称解析"""
+    return list(_customers.values())
+
+
 def get_customer(customer_id: str) -> Optional[Customer]:
-    customer = _customers.get(customer_id)
-    if customer and customer.is_deleted:
-        return None
-    return customer
+    return _customers.get(customer_id)
 
 
 def get_by_phone(phone: str) -> Optional[Customer]:

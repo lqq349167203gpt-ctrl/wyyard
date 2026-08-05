@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.base import StrictBaseModel
 from app.services import activity_assignment_notification_service, class_record_service
-from app.services.customer_service import get_customer, list_customers
+from app.services.customer_service import get_customer, list_all_customers
 from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
@@ -25,7 +25,7 @@ def _fill_visit_nicknames(visits):
 
 def _fill_names(items: list) -> list:
     """从客户信息实时填充 owner_name / host_name"""
-    customers = list_customers()
+    customers = list_all_customers()
     customer_map = {c.id: c for c in customers}
 
     def get_name(cid: str) -> str:
@@ -555,7 +555,7 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         _fill_room_name(lst)
 
     # 填充 host_name / achiever_name / teacher_names
-    customers = list_customers()
+    customers = list_all_customers()
     customer_map = {c.id: c.nickname for c in customers}
     for s in records_gcs + records_ers + records_ocr:
         if s.host_id and not s.host_name:

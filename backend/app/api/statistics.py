@@ -301,7 +301,7 @@ def get_overview(
     type_filter = _parse_member_types(member_types)
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
 
-    customers_map = {c.id: c for c in customer_service.list_customers()}
+    customers_map = {c.id: c for c in customer_service.list_all_customers()}
 
     def _visit_visible(v) -> bool:
         """邀约/到访记录是否通过筛选：会员类型看客户资料，引流人看邀约记录上的邀约人"""
@@ -379,7 +379,7 @@ def get_details(
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
 
     # 1. 先构建成交人员集合（用于标记邀约/到访记录的成交状态）
-    customers_map = {c.id: c for c in customer_service.list_customers()}
+    customers_map = {c.id: c for c in customer_service.list_all_customers()}
     TYPE_LABELS = {
         "membership-cards": "会员卡",
         "group-cases": "觉醒游戏",
@@ -587,7 +587,7 @@ def get_products(
     date_from, date_to = _get_date_range(date_from, date_to)
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
     teacher_filter = (_normalize_query_str(teacher_id) or "").strip()
-    customers_map = {c.id: c for c in customer_service.list_customers()}
+    customers_map = {c.id: c for c in customer_service.list_all_customers()}
     teacher_course_hours = _course_teacher_hours_in_range(date_from, date_to)
     teachers = sorted(
         (
@@ -890,7 +890,7 @@ def get_product_details(
 
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
     teacher_filter = (_normalize_query_str(teacher_id) or "").strip()
-    customers_map = {c.id: c for c in customer_service.list_customers()}
+    customers_map = {c.id: c for c in customer_service.list_all_customers()}
     selected_teacher = customers_map.get(teacher_filter)
     teacher_names = {
         value.strip()

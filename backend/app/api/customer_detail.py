@@ -40,7 +40,7 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
             if state_customer_id != customer_id:
                 raise HTTPException(status_code=403, detail="权限不足")
     customer = customer_service.get_customer(customer_id)
-    if not customer:
+    if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
 
     basic = customer.model_dump(mode="json")

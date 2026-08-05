@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.emotional_release_session import EmotionalReleaseSessionCreate
 from app.services import activity_assignment_notification_service, emotional_release_session_service
-from app.services.customer_service import list_customers
+from app.services.customer_service import list_all_customers
 from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/emotional-release-sessions", tags=["emotional-release-sessions"])
@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/emotional-release-sessions", tags=["emotional-re
 
 def _fill_ers_names(sessions: list) -> list:
     from app.services import space_service
-    customers = list_customers()
+    customers = list_all_customers()
     cmap = {c.id: c for c in customers}
     _space_map: dict[str, str] = {}
     _room_map: dict[str, str] = {}

@@ -119,7 +119,7 @@ async def get_visit_counts(
     if member_types is not None:
         types = [m for m in member_types.split(",") if m]
         if types:
-            customers = customer_service.list_customers()
+            customers = customer_service.list_all_customers()
             ids = [c.id for c in customers if c.member_type in types]
             if not ids:
                 return {}
