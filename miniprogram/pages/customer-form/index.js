@@ -18,7 +18,7 @@ Page({
     service_teacher: '',
     referrer: '',
     referrer_handler: '',
-    follow_up_status: '',
+    follow_up_status: '新添加',
     traffic_source: '',
     traffic_source_detail: '',
     needTrafficDetail: false,

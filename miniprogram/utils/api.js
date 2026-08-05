@@ -95,6 +95,33 @@ function _ensureLogin() {
   return _loginPromise
 }
 
+function _extractErrorMessage(data) {
+  const error = data?.detail || data?.message || data?.error
+  if (!error) return '请求失败'
+  if (typeof error === 'string') return error
+
+  if (Array.isArray(error)) {
+    const messages = error
+      .map(item => {
+        if (typeof item === 'string') return item
+        if (!item || typeof item !== 'object') return ''
+        const message = item.msg || item.message || item.detail || ''
+        return typeof message === 'string'
+          ? message.replace(/^Value error,\s*/i, '')
+          : ''
+      })
+      .filter(Boolean)
+    return messages.join('；') || '请求参数有误'
+  }
+
+  if (typeof error === 'object') {
+    const message = error.msg || error.message || error.detail
+    return typeof message === 'string' ? message : '请求失败'
+  }
+
+  return String(error)
+}
+
 async function request(path, options = {}) {
   const app = getApp()
   // devMode 下：先尽力确保有有效 JWT（skipAuth 的请求跳过，如登录类请求）。
@@ -137,7 +164,7 @@ async function request(path, options = {}) {
           setTimeout(() => wx.reLaunch({ url: '/pages/login/index' }), 1500)
           reject(new Error('登录已过期'))
         } else {
-          const msg = res.data?.detail || res.data?.message || res.data?.error || '请求失败'
+          const msg = _extractErrorMessage(res.data)
           console.error('[request] 请求失败:', path, 'status:', res.statusCode, 'msg:', msg)
           if (!options.silent) wx.showToast({ title: msg, icon: 'none' })
           reject(new Error(msg))
