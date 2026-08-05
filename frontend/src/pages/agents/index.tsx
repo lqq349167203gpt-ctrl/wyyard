@@ -23,6 +23,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 export default function AgentsPage() {
   const enterToNext = useEnterToNext()
   const navigate = useNavigate()
+  const isProductionConsole = window.location.hostname === "www.wyteahouse.cn"
   const [agents, setAgents] = useState<Agent[]>([])
   const [providers, setProviders] = useState<Record<string, { base_url: string; model: string }>>({})
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
@@ -307,12 +308,12 @@ export default function AgentsPage() {
               <Settings className="mr-1 h-3 w-3" /> 配置
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">客户、邀约、课表三个小程序 AI 功能共用的模型和参数</p>
+          <p className="text-xs text-muted-foreground">客户、邀约、课表共用此对话模型；语音转文字由服务器本地完成，无需单独配置</p>
         </CardHeader>
         <CardContent className="px-5 pb-4 pt-0">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">当前模型：</span>
-            <Badge variant="secondary" className="text-xs">{miniappConfig?.model || "glm-5"}</Badge>
+            <Badge variant="secondary" className="text-xs">{miniappConfig?.model || "glm-5.2"}</Badge>
             <span className="text-muted-foreground text-xs">({PROVIDER_LABELS[miniappConfig?.provider || "glm"]})</span>
           </div>
         </CardContent>
@@ -324,11 +325,20 @@ export default function AgentsPage() {
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">小程序 AI 配置</DialogTitle>
           </DialogHeader>
+          {!isProductionConsole && (
+            <div className="border-b border-[#f0f0f0] bg-[#f7f8fa] px-6 py-2 text-[12px] text-[#646a73]">
+              当前为本地后台，配置只写入本地数据；正式员工端小程序请在正式后台配置。
+            </div>
+          )}
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             {miniappLoading ? (
               <div className="py-8 text-center text-sm text-muted-foreground">加载中...</div>
             ) : miniappConfig ? (
               <>
+                <div>
+                  <div className="text-[13px] font-medium text-[#2b2f36]">对话模型</div>
+                  <p className="mt-1 text-[12px] text-[#8f959e]">录音会先由服务器上的免费本地模型转成文字，再交给这里配置的模型处理。</p>
+                </div>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <Label className="text-[12px] text-[#4e535a] font-light text-right">厂商</Label>
                   <Select value={miniappConfig.provider} onValueChange={handleMiniappProviderChange}>
@@ -349,7 +359,7 @@ export default function AgentsPage() {
                     <Label className="text-[12px] text-[#4e535a] font-light text-right">Key</Label>
                     <div className="flex items-center gap-2">
                       <Input type="password" value={miniappConfig.api_key} onChange={(e) => setMiniappConfig({ ...miniappConfig, api_key: e.target.value })} placeholder="留空则不修改已配置的 Key" />
-                      {miniappConfig.has_api_key && <span className="text-xs text-[#07c160] whitespace-nowrap">已配置</span>}
+                      {miniappConfig.has_api_key && <span className="text-xs text-[#3370ff] whitespace-nowrap">已配置</span>}
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class AIConfigBase(SafeBaseModel):
@@ -45,14 +46,14 @@ PROVIDER_DEFAULTS = {
     },
     "glm": {
         "base_url": "https://open.bigmodel.cn/api/paas/v4/",
-        "model": "glm-5",
+        "model": "glm-5.2",
     },
     "deepseek": {
-        "base_url": "https://api.deepseek.com/v1/",
-        "model": "deepseek-chat",
+        "base_url": "https://api.deepseek.com",
+        "model": "deepseek-v4-flash",
     },
     "xiaomi": {
-        "base_url": "https://api.xiaomi.com/v1/",
+        "base_url": "https://api.xiaomimimo.com/v1/",
         "model": "mimo-v2.5-pro",
     },
 }

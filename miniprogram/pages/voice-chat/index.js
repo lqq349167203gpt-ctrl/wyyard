@@ -190,6 +190,7 @@ Page({
       const base64 = fs.readFileSync(tempFilePath, 'base64')
       const asrResult = await request('/api/voice/transcribe', {
         method: 'POST',
+        timeout: 180000,
         data: { audio_base64: base64, format: 'mp3' },
       })
       this._removeThinking()

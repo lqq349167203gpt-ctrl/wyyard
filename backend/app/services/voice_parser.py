@@ -1,8 +1,9 @@
 import asyncio
+import base64
+import binascii
 import json
 import re
 
-import httpx
 from fastapi import HTTPException
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -10,6 +11,7 @@ from langchain_openai import ChatOpenAI
 from app.config.settings import settings
 from app.models.customer import CustomerCreate
 from app.services.customer_ai_config_service import get_config as get_customer_ai_config
+from app.services.local_speech_service import transcribe as transcribe_locally
 from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
 
 
@@ -24,35 +26,16 @@ def _escape_xml(text: str) -> str:
 
 
 def transcribe_audio(audio_base64: str, audio_format: str = "mp3") -> str:
-    """调用 Zhipu ASR 将音频转为文字"""
-    import base64
+    """使用服务器本地 Whisper 将音频转为文字。"""
+    try:
+        audio_bytes = base64.b64decode(audio_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="音频数据格式不正确") from exc
 
-    model_config = get_miniapp_ai_config()
-    api_key = model_config.api_key or settings.llm_api_key
-    base_url = model_config.base_url or settings.llm_base_url or "https://open.bigmodel.cn/api/paas/v4"
-
-    if not api_key:
-        raise HTTPException(status_code=500, detail="系统未配置 LLM API Key，请在 AI 配置中设置")
-
-    url = f"{base_url.rstrip('/')}/audio/transcriptions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-    }
-    audio_bytes = base64.b64decode(audio_base64)
-    content_type = f"audio/{audio_format}"
-    files = {"file": (f"audio.{audio_format}", audio_bytes, content_type)}
-    data = {"model": "glm-asr"}
-
-    resp = httpx.post(url, headers=headers, files=files, data=data, timeout=60)
-    if resp.status_code != 200:
-        error_msg = resp.json().get("error", {}).get("message", resp.text) if resp.text else resp.text
-        raise HTTPException(status_code=500, detail=f"语音识别失败: {error_msg}")
-    result = resp.json()
-
-    text = result.get("result", {}).get("text", "")
-    if not text:
-        text = result.get("text", "")
-    return text.strip()
+    try:
+        return transcribe_locally(audio_bytes)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 async def parse_voice_input(text: str) -> dict:

@@ -1,14 +1,16 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
-from pydantic import Field
 from typing import Optional
+
+from pydantic import Field
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class MiniappAIConfig(SafeBaseModel):
-    """小程序 AI 共享模型配置（客户/邀约/课表共用），全局唯一"""
+    """小程序 AI 共享配置（客户/邀约/课表共用），全局唯一。"""
     id: str = "default"
     provider: str = "glm"
-    model: str = "glm-5"
+    model: str = "glm-5.2"
     api_key: str = ""
     base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
     temperature: float = Field(default=0.1, ge=0, le=2)

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.visit_ai_config import VisitAIConfig, VisitAIConfigUpdate
-from app.services.storage import load_data, save_item
+from app.services.storage import load_item, save_item
 
 FILENAME = "visit_ai_config.json"
 _config: Optional[VisitAIConfig] = None
@@ -10,7 +10,7 @@ _config: Optional[VisitAIConfig] = None
 
 def _load():
     global _config
-    data = load_data(FILENAME)
+    data = load_item(FILENAME, "default")
     if data:
         _config = VisitAIConfig(**data)
 

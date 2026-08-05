@@ -1,5 +1,5 @@
-from pydantic_settings import BaseSettings
 from pydantic import model_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
     llm_model: str = "glm-5"
+
+    # 本地语音识别（无需第三方 API Key，首次使用会下载开源模型）
+    local_asr_model: str = "small"
+    local_asr_device: str = "cpu"
+    local_asr_compute_type: str = "int8"
+    local_asr_cpu_threads: int = 2
 
     # Anthropic（备用）
     anthropic_api_key: str = ""

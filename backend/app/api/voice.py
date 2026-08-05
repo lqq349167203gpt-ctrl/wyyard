@@ -1,16 +1,16 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from starlette.requests import Request as StarletteRequest
 
 from app.middleware.rate_limit import limiter
-from app.services import voice_parser
-from app.services import visit_chat as visit_chat_service
-from app.services import activity_chat as activity_chat_service
-from app.services import customer_chat as customer_chat_service
-from app.services import customer_service
-from app.services import chat_history_service
-from app.models.customer import CustomerCreate
 from app.models.chat_history import ChatRecordCreate
+from app.models.customer import CustomerCreate
+from app.services import activity_chat as activity_chat_service
+from app.services import chat_history_service, customer_service, voice_parser
+from app.services import customer_chat as customer_chat_service
+from app.services import visit_chat as visit_chat_service
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
@@ -56,7 +56,7 @@ async def transcribe_audio(req: VoiceAudioRequest, request: StarletteRequest):
     if not req.audio_base64:
         raise HTTPException(status_code=400, detail="音频数据为空")
     _check_audio_size(req.audio_base64)
-    text = voice_parser.transcribe_audio(req.audio_base64, req.format)
+    text = await asyncio.to_thread(voice_parser.transcribe_audio, req.audio_base64, req.format)
     if not text:
         raise HTTPException(status_code=400, detail="语音识别为空，请重新录音")
     return {"text": text}
@@ -70,7 +70,7 @@ async def parse_customer_audio(req: VoiceAudioRequest, request: StarletteRequest
         raise HTTPException(status_code=400, detail="音频数据为空")
     _check_audio_size(req.audio_base64)
     # 1. 音频转文字
-    text = voice_parser.transcribe_audio(req.audio_base64, req.format)
+    text = await asyncio.to_thread(voice_parser.transcribe_audio, req.audio_base64, req.format)
     if not text:
         raise HTTPException(status_code=400, detail="语音识别为空，请重新录音")
     # 2. 文字提取客户信息

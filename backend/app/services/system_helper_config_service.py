@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.system_helper_config import SystemHelperConfig, SystemHelperConfigUpdate
-from app.services.storage import load_data, save_item
+from app.services.storage import load_item, save_item
 
 FILENAME = "system_helper_config.json"
 _config: Optional[SystemHelperConfig] = None
@@ -10,7 +10,7 @@ _config: Optional[SystemHelperConfig] = None
 
 def _load():
     global _config
-    data = load_data(FILENAME)
+    data = load_item(FILENAME, "default")
     if data:
         _config = SystemHelperConfig(**data)
 
