@@ -983,7 +983,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
 
     name = entity_name or get_entity_id(path) or "记录"
     # 邀约：entity_id 是 visit_id，从 customer_id 反查客户昵称；找不到则标注"人员为空"
-    if "/api/visits" in path and name and name != "记录":
+    # 仅当 entity_name 未被上面的 visit 分支解析时才走此逻辑（name 是 UUID 而非昵称）
+    if "/api/visits" in path and name and name != "记录" and not entity_name:
         try:
             from app.services import visit_service
             visit = visit_service.get_visit(name)
