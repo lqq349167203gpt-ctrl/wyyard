@@ -9,7 +9,7 @@ import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { customerApi, type CustomerCreate, type CustomerLight } from "@/lib/api"
 
 const emptyCustomer: Record<string, any> = {
-  nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "",
+  nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
   follow_up_status: "新添加",
   member_type: "", paid_content: [], visit_count: 0,
   basic_info: "", assessment: "", tags: "", traffic_source: "", traffic_source_detail: "",
@@ -17,7 +17,7 @@ const emptyCustomer: Record<string, any> = {
 
 const UPDATE_FIELDS = [
   "nickname", "name", "gender", "phone", "wechat", "age",
-  "service_teacher", "referrer", "referrer_handler",
+  "service_teacher", "referrer", "referral_date", "referrer_handler",
   "follow_up_status",
   "traffic_source", "traffic_source_detail",
   "work_status", "work_description",
@@ -256,6 +256,16 @@ export default function CustomerFormPage() {
                 </div>
               </div>
               {referrerError && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{referrerError}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">引流日期</label>
+              <Input
+                type="date"
+                value={form.referral_date || ""}
+                onChange={(e) => setField("referral_date", e.target.value)}
+                className={`w-[200px] ${form.referral_date ? "" : "date-empty"}`}
+                style={{ color: form.referral_date ? "#2b2f36" : "#c0c4cc" }}
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

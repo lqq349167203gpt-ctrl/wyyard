@@ -90,7 +90,7 @@ const FIELD_CN: Record<string, string> = {
   arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "疗愈师回复",
   needs: "需求",
   visit_date: "到访日期", visit_time: "预计时间", visit_count: "到店次数",
-  referrer: "引流人", traffic_source: "流量来源", paid_content: "付费内容",
+  referrer: "引流人", referral_date: "引流日期", traffic_source: "流量来源", paid_content: "付费内容",
   basic_info: "基础信息", assessment: "客户评估", tags: "标签", self_tags: "个人标签",
   work_status: "工作状态", work_description: "工作描述",
   positions: "疗愈老师", position: "职位", role: "角色", permissions: "权限",

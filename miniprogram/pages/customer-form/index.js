@@ -17,6 +17,7 @@ Page({
     age: '',
     service_teacher: '',
     referrer: '',
+    referral_date: '',
     referrer_handler: '',
     follow_up_status: '新添加',
     traffic_source: '',
@@ -91,6 +92,7 @@ Page({
         age: c.age || '',
         service_teacher: c.service_teacher || '',
         referrer: c.referrer || '',
+        referral_date: c.referral_date || '',
         referrer_handler: c.referrer_handler || '',
         follow_up_status: c.follow_up_status || '',
         traffic_source: ts,
@@ -130,6 +132,10 @@ Page({
   onFollowUpStatusChange(e) {
     const statuses = ['新添加', '沟通中', '已到店', '已成交', '沉默/流失']
     this.setData({ follow_up_status: statuses[e.detail.value] })
+  },
+
+  onReferralDateChange(e) {
+    this.setData({ referral_date: e.detail.value })
   },
 
   onWorkStatusChange(e) {
@@ -219,6 +225,7 @@ Page({
         age: this.data.age.trim(),
         service_teacher: this.data.service_teacher.trim(),
         referrer: this.data.referrer.trim(),
+        referral_date: this.data.referral_date,
         referrer_handler: this.data.referrer_handler.trim(),
         follow_up_status: this.data.follow_up_status,
         traffic_source: this.data.traffic_source.trim(),

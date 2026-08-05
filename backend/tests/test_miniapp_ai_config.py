@@ -2,8 +2,11 @@ import base64
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
-from app.services import local_speech_service, miniapp_ai_config_service, voice_parser
+from app.config.settings import settings
+from app.middleware.jwt_auth import decode_token
+from app.services import local_speech_service, miniapp_ai_config_service, session_service, voice_parser
 
 
 def test_loads_singleton_record_without_losing_saved_key(monkeypatch):
@@ -71,3 +74,23 @@ def test_voice_parser_rejects_invalid_base64():
         voice_parser.transcribe_audio("not-base64", "mp3")
 
     assert exc_info.value.status_code == 400
+
+
+def test_dev_login_token_can_access_protected_api(client, monkeypatch):
+    monkeypatch.setattr(settings, "debug", True)
+    monkeypatch.setattr(settings, "enable_dev_login", True)
+
+    local_client = TestClient(client.app, client=("127.0.0.1", 50000))
+    response = local_client.post("/api/wechat/dev-login", json={"username": "pytest_admin"})
+
+    assert response.status_code == 200
+    token = response.json()["token"]
+    jti = decode_token(token)["jti"]
+    try:
+        protected_response = local_client.get(
+            "/api/miniapp-ai-config/providers",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert protected_response.status_code == 200
+    finally:
+        session_service.delete_session(jti)

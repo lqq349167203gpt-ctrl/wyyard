@@ -102,7 +102,7 @@ def _build_enriched_items(customers) -> list[dict]:
     _SLIM_FIELDS = (
         "id", "nickname", "name", "gender", "phone", "wechat", "age",
         "member_type", "positions", "self_tags", "paid_content",
-        "referrer", "referrer_handler", "service_teacher",
+        "referrer", "referral_date", "referrer_handler", "service_teacher",
         "follow_up_status",
         "traffic_source", "traffic_source_detail",
         "need_tags", "follow_up_node", "follow_up_action",
@@ -235,6 +235,7 @@ async def list_customers_light():
             "traffic_source": c.traffic_source or "",
             "traffic_source_detail": c.traffic_source_detail or "",
             "referrer": c.referrer or "",
+            "referral_date": c.referral_date or "",
             "position_sort_orders": c.position_sort_orders or {},
             "space_id": c.space_id or "",
         }

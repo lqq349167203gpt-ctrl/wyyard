@@ -261,6 +261,7 @@ export interface Customer {
   wechat: string
   age: string
   referrer: string
+  referral_date: string
   referrer_handler: string
   follow_up_status: CustomerFollowUpStatus
   member_type: string
@@ -305,6 +306,7 @@ export interface CustomerLight {
   traffic_source: string
   traffic_source_detail: string
   referrer: string
+  referral_date: string
   space_id: string
 }
 

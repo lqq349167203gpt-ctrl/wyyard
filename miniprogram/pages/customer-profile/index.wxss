@@ -77,6 +77,12 @@
   color: #1f2329;
 }
 
+.stat-empty {
+  height: 42rpx;
+  display: flex;
+  align-items: center;
+}
+
 .stat-label {
   font-size: 22rpx;
   color: #b0b5bb;
@@ -130,6 +136,19 @@
 
 .row-value.empty-val {
   color: #d0d3d6;
+}
+
+.row-empty {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.empty-line {
+  width: 8rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background-color: #d0d3d6;
 }
 
 .empty-val {

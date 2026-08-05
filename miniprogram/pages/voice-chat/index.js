@@ -126,7 +126,7 @@ Page({
       if (data.id) {
         const UPDATE_FIELDS = [
           'nickname', 'name', 'gender', 'phone', 'wechat', 'age',
-          'service_teacher', 'referrer', 'referrer_handler',
+          'service_teacher', 'referrer', 'referral_date', 'referrer_handler',
           'traffic_source', 'traffic_source_detail',
           'work_status', 'work_description',
           'basic_info', 'core_situation', 'tags', 'other_info',
@@ -322,7 +322,7 @@ Page({
     const FIELD_LABELS = {
       nickname: '昵称', name: '姓名', gender: '性别', phone: '电话',
       wechat: '微信', age: '年龄', service_teacher: '服务老师',
-      referrer: '引流人', referrer_handler: '承接人',
+      referrer: '引流人', referral_date: '引流日期', referrer_handler: '承接人',
       traffic_source: '流量来源', traffic_source_detail: '来源详情',
       work_status: '工作情况', work_description: '工作描述',
       basic_info: '创伤经历', core_situation: '当下卡点',

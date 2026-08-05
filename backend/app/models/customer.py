@@ -1,10 +1,22 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
 from pydantic import Field, field_validator, model_validator
 
 from app.models.base import SafeBaseModel, StrictBaseModel
+
+
+def _validate_iso_date(value: str) -> str:
+    if not value:
+        return value
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("引流日期格式不正确") from exc
+    if parsed.isoformat() != value:
+        raise ValueError("引流日期格式不正确")
+    return value
 
 
 class PaidItem(str, Enum):
@@ -54,6 +66,7 @@ class CustomerBase(SafeBaseModel):
     age: str = Field(default="", max_length=10)
     service_teacher: str = Field(default="", max_length=50)
     referrer: str = Field(default="", max_length=50)
+    referral_date: str = Field(default="", max_length=10)
     referrer_handler: str = Field(default="", max_length=50)
     follow_up_status: FollowUpStatus = FollowUpStatus.NEW
     member_type: str = Field(default="", max_length=50)
@@ -96,6 +109,11 @@ class CustomerBase(SafeBaseModel):
             raise ValueError("手机号格式不正确")
         return v
 
+    @field_validator("referral_date")
+    @classmethod
+    def validate_referral_date(cls, v: str) -> str:
+        return _validate_iso_date(v)
+
     @field_validator("age")
     @classmethod
     def validate_age(cls, v: str) -> str:
@@ -133,6 +151,7 @@ class CustomerUpdate(StrictBaseModel):
     age: Optional[str] = Field(default=None, max_length=10)
     service_teacher: Optional[str] = Field(default=None, max_length=50)
     referrer: Optional[str] = Field(default=None, max_length=50)
+    referral_date: Optional[str] = Field(default=None, max_length=10)
     referrer_handler: Optional[str] = Field(default=None, max_length=50)
     follow_up_status: Optional[FollowUpStatus] = None
     member_type: Optional[str] = Field(default=None, max_length=50)
@@ -182,6 +201,11 @@ class CustomerUpdate(StrictBaseModel):
         if v is not None and v and not v.replace("+", "").replace("-", "").replace(" ", "").isdigit():
             raise ValueError("手机号格式不正确")
         return v
+
+    @field_validator("referral_date")
+    @classmethod
+    def validate_referral_date(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_iso_date(v) if v is not None else v
 
     @field_validator("age")
     @classmethod

@@ -24,7 +24,8 @@
       </view>
       <view class="stat-divider"></view>
       <view class="stat">
-        <text class="stat-num">{{firstVisit || '-'}}</text>
+        <text class="stat-num" wx:if="{{firstVisit}}">{{firstVisit}}</text>
+        <view class="stat-empty" wx:else><view class="empty-line"></view></view>
         <text class="stat-label">首次到访</text>
       </view>
     </view>
@@ -68,6 +69,11 @@
       <text class="row-label">引流人</text>
       <text class="row-value" wx:if="{{customer.referrer}}">{{customer.referrer}}</text>
       <text class="row-value empty-val" wx:else>-</text>
+    </view>
+    <view class="row">
+      <text class="row-label">引流日期</text>
+      <text class="row-value" wx:if="{{customer.referral_date}}">{{customer.referral_date}}</text>
+      <view class="row-value row-empty" wx:else><view class="empty-line"></view></view>
     </view>
     <view class="row">
       <text class="row-label">承接人</text>

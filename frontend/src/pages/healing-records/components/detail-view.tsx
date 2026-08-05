@@ -250,9 +250,15 @@ export default function DetailView({
                 <div className="text-[#a8b1bd] text-[10.5px] mt-px">累计消费</div>
               </div>
             </div>
-            <div className="mt-[11px] pt-[9px] border-t border-dashed border-[#eceef0] flex items-baseline justify-between text-[11.5px] text-[#a8b1bd]">
-              <span>首次到访</span>
-              <b className="text-[#212631] font-semibold tabular-nums">{firstVisit || "-"}</b>
+            <div className="mt-[11px] pt-[9px] border-t border-dashed border-[#eceef0] space-y-[7px] text-[11.5px] text-[#a8b1bd]">
+              <div className="flex items-baseline justify-between">
+                <span>引流日期</span>
+                <b className="text-[#212631] font-semibold tabular-nums">{c.referral_date || <DvEmpty />}</b>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span>首次到访</span>
+                <b className="text-[#212631] font-semibold tabular-nums">{firstVisit || <DvEmpty />}</b>
+              </div>
             </div>
           </div>
 

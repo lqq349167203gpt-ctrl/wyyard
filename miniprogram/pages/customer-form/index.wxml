@@ -41,6 +41,15 @@
         <text class="picker-clear" wx:if="{{referrer}}" catchtap="onPickerClear" data-field="referrer">x</text>
       </view>
     </view>
+    <view class="form-item">
+      <text class="form-label">引流日期</text>
+      <view class="picker-value-wrap">
+        <picker class="form-picker" mode="date" value="{{referral_date}}" bindchange="onReferralDateChange">
+          <view class="picker-display" style="color: {{referral_date ? '#1f2329' : '#b0b5bb'}};">{{referral_date || '选择日期'}}</view>
+        </picker>
+        <text class="picker-clear" wx:if="{{referral_date}}" catchtap="onPickerClear" data-field="referral_date">x</text>
+      </view>
+    </view>
     <view class="form-item" bindtap="onPickerOpen" data-field="referrer_handler">
       <text class="form-label">承接人</text>
       <view class="picker-value-wrap">

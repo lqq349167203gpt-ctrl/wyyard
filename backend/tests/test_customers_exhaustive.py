@@ -1,6 +1,7 @@
 """客户模块穷举测试 — 覆盖每个字段、每种流量来源、每种边界情况"""
-import pytest
 import uuid
+
+import pytest
 
 
 def _u():
@@ -69,6 +70,29 @@ class TestCustomerCreateFields:
         })
         assert resp.status_code == 200
         assert resp.json()["referrer"] == "张三推荐"
+
+    def test_referral_date_field(self, client):
+        """引流日期支持创建和修改，并严格校验 ISO 日期。"""
+        response = client.post(
+            "/api/customers",
+            json={"nickname": f"引流日期_{_u()}", "referral_date": "2026-08-05"},
+        )
+        assert response.status_code == 200
+        customer_id = response.json()["id"]
+        assert response.json()["referral_date"] == "2026-08-05"
+
+        update_response = client.patch(
+            f"/api/customers/{customer_id}",
+            json={"referral_date": "2026-08-06"},
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["referral_date"] == "2026-08-06"
+
+        invalid_response = client.patch(
+            f"/api/customers/{customer_id}",
+            json={"referral_date": "2026-02-30"},
+        )
+        assert invalid_response.status_code == 422
 
     def test_tags_field(self, client):
         """标签字段：多标签/空/特殊字符"""

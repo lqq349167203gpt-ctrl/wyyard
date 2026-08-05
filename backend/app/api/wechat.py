@@ -1,9 +1,15 @@
 from fastapi import APIRouter, HTTPException, Request
-from app.models.base import StrictBaseModel
 
-from app.config.settings import settings
-from app.services import account_service, wechat_service, position_permission_service, position_customer_permission_service, customer_service
 from app.api.accounts import ALL_PAGE_KEYS
+from app.config.settings import settings
+from app.models.base import StrictBaseModel
+from app.services import (
+    account_service,
+    customer_service,
+    position_customer_permission_service,
+    position_permission_service,
+    wechat_service,
+)
 
 router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 
@@ -46,9 +52,10 @@ def _build_login_response(account) -> dict:
 
 def _make_jwt_token(account) -> str:
     """为账号生成 JWT token（与 accounts/login 一致，全局中间件只认 JWT）"""
+    import uuid
+
     from app.middleware.jwt_auth import create_access_token
     from app.services import session_service
-    import uuid
     token = create_access_token(
         account_id=account.id,
         username=account.username,
@@ -140,14 +147,9 @@ async def dev_login(data: DevLoginRequest, request: Request):
         raise HTTPException(status_code=404, detail="账号不存在")
     if not account.enabled:
         raise HTTPException(status_code=403, detail="账号已禁用")
-    # 生成 JWT（与 accounts/login 一致），而非 UUID session
-    from app.middleware.jwt_auth import create_access_token
-    token = create_access_token(
-        account_id=account.id,
-        username=account.username,
-        owner=account.owner or "",
-        role=account.role,
-    )
+    # 与正式登录共用同一套 JWT + session 登记逻辑，
+    # 否则中间件会将未登记的 jti 判定为无效会话。
+    token = _make_jwt_token(account)
     resp = _build_login_response(account)
     resp["token"] = token
     resp["bound"] = True
