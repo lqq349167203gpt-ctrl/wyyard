@@ -81,7 +81,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/positions/teacher": "position-management",
   "/agents/:id/chat": "agents",
   "/change-password": "change-password",
-  "/disabled-customers": "position-management",
+  "/disabled-customers": "disabled-customers",
 }
 
 function ProtectedRoute() {
