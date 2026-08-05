@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect, useState } from "react"
-import { Edit, Archive } from "lucide-react"
+import { Edit } from "lucide-react"
+import banCircleIcon from "@/assets/ban-circle.svg"
 import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -221,7 +222,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onDeleteCustomer(c.id, c.nickname || c.name || c.id)}>
-                      <Archive className="h-3.5 w-3.5" />
+                      <img src={banCircleIcon} alt="停用" className="h-3.5 w-3.5" />
                     </Button>
                     </div>
                   </div>
