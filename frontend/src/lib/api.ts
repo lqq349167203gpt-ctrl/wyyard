@@ -310,6 +310,16 @@ export interface CustomerLight {
   space_id: string
 }
 
+export interface DisabledCustomer {
+  id: string
+  nickname: string
+  name: string
+  member_type: string
+  phone: string
+  deleted_at: string
+  deleted_by: string
+}
+
 let _customerLightCache: CustomerLight[] | null = null
 
 export const customerApi = {
@@ -340,6 +350,9 @@ export const customerApi = {
   create: (data: Partial<CustomerCreate>) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
   update: (id: string, data: Partial<CustomerCreate>) => request<Customer>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
   delete: (id: string) => request<{ message: string }>(`/api/customers/${id}`, { method: "DELETE" }).then(r => { _customerLightCache = null; return r }),
+  listDisabled: () => request<DisabledCustomer[]>(`/api/customers/disabled`),
+  restore: (id: string) => request<Customer>(`/api/customers/${id}/restore`, { method: "POST" }).then(r => { _customerLightCache = null; return r }),
+  permanentDelete: (id: string) => request<{ message: string }>(`/api/customers/${id}/permanent`, { method: "DELETE" }),
   generateTags: (tags: string) => request<{ tags: string }>("/api/customers/generate-tags", { method: "POST", body: JSON.stringify({ tags }) }),
 }
 
@@ -2191,6 +2204,8 @@ export interface StatisticsProducts {
 export interface MemberStatistics {
   total_members: number
   type_totals: Record<string, number>
+  total_members_all: number
+  type_totals_all: Record<string, number>
   type_names: string[]
   referrer_names: string[]
   chart_new: Record<string, string | number>[]
@@ -2200,6 +2215,7 @@ export interface MemberStatistics {
     nickname: string
     member_type: string
     created_date: string
+    referral_date: string
     first_visit_date: string
     invited_count: number
     visit_count: number
@@ -2356,12 +2372,13 @@ export const statisticsApi = {
     if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
     return request<{ data: Record<string, unknown>[] }>(`/api/statistics/products/details?${searchParams.toString()}`)
   },
-  members: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string }) => {
+  members: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; time_by?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.granularity) searchParams.set("granularity", params.granularity)
     if (params.referrer) searchParams.set("referrer", params.referrer)
+    if (params.time_by) searchParams.set("time_by", params.time_by)
     return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
   },
   courses: (params: { date_from?: string; date_to?: string; granularity?: string; organization_id?: string; activity_type?: string; course_subtype?: string; teacher_id?: string }) => {

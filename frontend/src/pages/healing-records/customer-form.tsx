@@ -25,6 +25,10 @@ const UPDATE_FIELDS = [
   "member_type", "paid_content", "visit_count",
 ]
 
+function getTodayDate(): string {
+  return new Date().toLocaleDateString("sv-SE")
+}
+
 function buildPayload(form: Record<string, any>, changedFields?: Record<string, any>): Record<string, any> {
   const range = form.age_range
   const ageValue = range ? (form.age ? `${form.age} (${range})` : range) : form.age
@@ -48,7 +52,10 @@ export default function CustomerFormPage() {
   const isEdit = !!id
   const enterToNext = useEnterToNext()
 
-  const [form, setForm] = useState<Record<string, any>>(emptyCustomer)
+  const [form, setForm] = useState<Record<string, any>>(() => ({
+    ...emptyCustomer,
+    referral_date: id ? "" : getTodayDate(),
+  }))
   const [customers, setCustomers] = useState<CustomerLight[]>([])
   const [referrerError, setReferrerError] = useState("")
   const [referrerHandlerError, setReferrerHandlerError] = useState("")
@@ -73,7 +80,12 @@ export default function CustomerFormPage() {
         if (draft) {
           const parsed = JSON.parse(draft)
           if (parsed && Object.keys(parsed).some(k => parsed[k])) {
-            setForm(prev => ({ ...prev, ...parsed }))
+            setForm(prev => ({
+              ...prev,
+              ...parsed,
+              // 新建页每次进入时默认今天，避免旧草稿中的空值覆盖。
+              referral_date: parsed.referral_date || getTodayDate(),
+            }))
           }
         }
       } catch {}

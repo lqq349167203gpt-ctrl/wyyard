@@ -1275,9 +1275,21 @@ def get_member_statistics(
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人昵称"),
+    time_by: str = Query("created", description="时间计算依据: created/referral"),
 ):
     """获取会员情况统计：各类型会员人数 + 新增人数变化趋势"""
     date_from, date_to = _get_date_range(date_from, date_to)
+    use_referral_date = time_by == "referral"
+
+    def _get_time_key(c) -> str | None:
+        if use_referral_date:
+            raw = (c.referral_date or "").strip()
+            return raw if raw else None
+        if isinstance(c.created_at, datetime):
+            return c.created_at.strftime("%Y-%m-%d")
+        elif c.created_at:
+            return str(c.created_at)[:10]
+        return None
 
     # 获取所有会员身份类型（倒序）
     identities = member_identity_service.list_identities()
@@ -1293,13 +1305,8 @@ def get_member_statistics(
     # 引流人选项（只统计选定时间范围内有数据的引流人，按人数降序排列）
     referrer_counts: dict[str, int] = defaultdict(int)
     for c in all_customers:
-        if isinstance(c.created_at, datetime):
-            created_date = c.created_at.strftime("%Y-%m-%d")
-        elif c.created_at:
-            created_date = str(c.created_at)[:10]
-        else:
-            continue
-        if not (date_from <= created_date <= date_to):
+        time_key = _get_time_key(c)
+        if not time_key or not (date_from <= time_key <= date_to):
             continue
         name = (c.referrer or "").strip()
         if name:
@@ -1312,12 +1319,8 @@ def get_member_statistics(
     valid_types = set(type_names)
     all_members_by_date: dict[str, dict[str, int]] = defaultdict(lambda: {name: 0 for name in type_names})
     for c in customers:
-        created_at = c.created_at
-        if isinstance(created_at, datetime):
-            date_str = created_at.strftime("%Y-%m-%d")
-        elif created_at:
-            date_str = str(created_at)[:10]
-        else:
+        date_str = _get_time_key(c)
+        if not date_str:
             continue
 
         mt = c.member_type or ""
@@ -1330,14 +1333,22 @@ def get_member_statistics(
         if date_from <= date_str <= date_to:
             daily_new_by_type[date_str] = types
 
-    # 3. 统计当前各类型会员总人数（只统计选定时间范围内新增的）
+    # 3. 统计全部会员总人数（不限日期范围，用于"总数"模式）
+    type_totals_all: dict[str, int] = {name: 0 for name in type_names}
+    for c in customers:
+        mt = c.member_type or ""
+        if mt in valid_types:
+            type_totals_all[mt] += 1
+    total_members_all = sum(type_totals_all.values())
+
+    # 4. 统计日期范围内新增人数（用于"新增"模式）
     type_totals: dict[str, int] = {name: 0 for name in type_names}
     for types in daily_new_by_type.values():
         for name in type_names:
             type_totals[name] += types.get(name, 0)
     total_members = sum(type_totals.values())
 
-    # 4. 计算累计总数（从最早会员到每一天）
+    # 5. 计算累计总数（从最早会员到每一天）
     sorted_dates = sorted(all_members_by_date.keys())
     cumulative_by_date: dict[str, dict[str, int]] = {}
     cumulative = {name: 0 for name in type_names}
@@ -1350,9 +1361,12 @@ def get_member_statistics(
     chart_data_new = _aggregate_member_by_granularity(daily_new_by_type, granularity, date_from, date_to, type_names)
     chart_data_total = _aggregate_member_cumulative(cumulative_by_date, granularity, date_from, date_to, type_names)
 
-    # 6. 获取所有客户的详细统计信息（用于人员列表）
+    # 6. 获取所有客户的详细统计信息（用于人员列表，按日期范围筛选）
     members_list = []
     for c in customers:
+        time_key = _get_time_key(c)
+        if not time_key or not (date_from <= time_key <= date_to):
+            continue
         mt = c.member_type or ""
         if mt not in type_totals:
             continue
@@ -1366,6 +1380,7 @@ def get_member_statistics(
                 if isinstance(c.created_at, datetime)
                 else str(c.created_at)[:10] if c.created_at else ""
             ),
+            "referral_date": (c.referral_date or "").strip(),
             "first_visit_date": stats.get("first_visit_date", "-"),
             "invited_count": stats.get("invited_count", 0),
             "visit_count": stats.get("visit_count", 0),
@@ -1377,6 +1392,8 @@ def get_member_statistics(
     return {
         "total_members": total_members,
         "type_totals": type_totals,
+        "total_members_all": total_members_all,
+        "type_totals_all": type_totals_all,
         "type_names": type_names,
         "referrer_names": referrer_names,
         "chart_new": chart_data_new,

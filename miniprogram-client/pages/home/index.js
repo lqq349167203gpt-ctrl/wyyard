@@ -101,7 +101,7 @@ Page({
     return clientApi.listActivities(1, this.data.pageSize)
       .then(res => {
         const items = (res.items || []).map(item => this._decorate(item))
-        const selectedDate = this.data.selectedStr || this.data.todayStr
+        const selectedDate = this._pickInitialDate(items)
         this.setData({
           activities: items,
           grouped: this._groupForDate(items, selectedDate),
@@ -111,10 +111,14 @@ Page({
           loading: false,
           weekCount: this._countInRange(items, this.data.weekStart, this.data.weekEnd),
         }, () => {
+          const shouldMoveToActivityDate = selectedDate && selectedDate !== this.data.selectedStr
+          if (shouldMoveToActivityDate) {
+            this._syncSelected(selectedDate)
+          }
           this._measureGroups()
           this._cacheActivityImages(items)
           this._refreshWeekDots()
-          this._refreshTheme()
+          if (!shouldMoveToActivityDate) this._refreshTheme()
         })
       })
       .catch(() => {
@@ -363,6 +367,9 @@ Page({
   onCalClose() {
     this.setData({ calVisible: false })
   },
+
+  // 拦截日历内容区点击，避免事件冒泡到遮罩后关闭弹窗
+  onCalContentTap() {},
 
   onCalPrev() {
     let { calYear, calMonth } = this.data
@@ -709,6 +716,23 @@ Page({
 
   _groupForDate(items, dateStr) {
     return this._groupByDate(items.filter(item => item.date === dateStr))
+  },
+
+  // 默认优先今天，其次最近的未来活动；没有未来活动时定位到最近一场历史活动
+  _pickInitialDate(items) {
+    const today = this.data.todayStr || this._fmtDate(new Date())
+    if (items.some(item => item.date === today)) return today
+    const future = items
+      .map(item => item.date)
+      .filter(date => date && date > today)
+      .sort()
+    if (future.length) return future[0]
+    const past = items
+      .map(item => item.date)
+      .filter(date => date && date < today)
+      .sort()
+      .reverse()
+    return past[0] || today
   },
 
   _countInRange(items, start, end) {

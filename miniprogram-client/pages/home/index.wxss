@@ -439,35 +439,11 @@
   min-width: 0;
 }
 
-.ev-teacher-avatars {
-  display: flex;
+.ev-course-icon {
   flex-shrink: 0;
-  margin-right: 6rpx;
-}
-
-.ev-teacher-avatar {
-  box-sizing: border-box;
-  width: 26rpx;
-  height: 26rpx;
-  border: 1rpx solid #c9f24b;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 0 1rpx rgba(33, 38, 49, 0.06);
-}
-
-.ev-teacher-avatar + .ev-teacher-avatar {
-  margin-left: -4rpx;
-}
-
-.ev-teacher-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 25rpx;
-  padding-top: 1rpx;
-  color: #697078;
-  font-size: 12rpx;
-  font-weight: 500;
+  width: 28rpx;
+  height: 28rpx;
+  margin-right: 8rpx;
 }
 
 .ev-teacher {

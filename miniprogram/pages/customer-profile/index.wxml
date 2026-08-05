@@ -86,7 +86,7 @@
       <text class="row-value empty-val" wx:else>-</text>
     </view>
     <view class="row">
-      <text class="row-label">流量链接</text>
+      <text class="row-label">{{trafficDetailLabel}}</text>
       <text class="row-value break" wx:if="{{customer.traffic_source_detail}}">{{customer.traffic_source_detail}}</text>
       <text class="row-value empty-val" wx:else>-</text>
     </view>

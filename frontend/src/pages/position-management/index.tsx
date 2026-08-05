@@ -43,6 +43,7 @@ const ALL_PAGES = [
   // 账号管理
   { key: "position-management", label: "账号管理" },
   { key: "change-password", label: "密码修改" },
+  { key: "disabled-customers", label: "停用客户" },
   // 系统配置
   { key: "agents", label: "AI 配置" },
   { key: "chat-history", label: "沟通记录" },
@@ -56,7 +57,7 @@ const PERMISSION_GROUPS = [
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "communication-records", "followup-records"] },
   { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },
   { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },
-  { label: "账号管理", keys: ["position-management", "change-password"] },
+  { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
   { label: "系统配置", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
 ]
 

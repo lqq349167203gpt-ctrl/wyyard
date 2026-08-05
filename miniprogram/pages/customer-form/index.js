@@ -3,6 +3,14 @@ const { customerApi } = require('../../utils/api')
 const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
 const TRAFFIC_NEED_LINK = ['小红书', '抖音', '公众号', '视频号']
 
+function getTodayDate() {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 Page({
   data: {
     id: '',
@@ -17,7 +25,7 @@ Page({
     age: '',
     service_teacher: '',
     referrer: '',
-    referral_date: '',
+    referral_date: getTodayDate(),
     referrer_handler: '',
     follow_up_status: '新添加',
     traffic_source: '',
@@ -46,6 +54,7 @@ Page({
       wx.setNavigationBarTitle({ title: '编辑客户' })
       this.loadCustomer(options.id)
     } else {
+      this.setData({ referral_date: getTodayDate() })
       wx.setNavigationBarTitle({ title: '新增客户' })
     }
     this.loadCustomers()
@@ -189,18 +198,18 @@ Page({
 
   onDelete() {
     wx.showModal({
-      title: '确认删除',
-      content: '确定要删除该客户吗？',
+      title: '确认停用',
+      content: '停用后客户资料将隐藏，历史关联数据保留，可随时恢复。',
       confirmColor: '#f54a45',
       success: async (res) => {
         if (!res.confirm) return
         this.setData({ deleting: true })
         try {
           await customerApi.delete(this.data.id)
-          wx.showToast({ title: '已删除' })
+          wx.showToast({ title: '已停用' })
           wx.navigateBack()
         } catch (e) {
-          wx.showToast({ title: '删除失败', icon: 'none' })
+          wx.showToast({ title: '停用失败', icon: 'none' })
         } finally {
           this.setData({ deleting: false })
         }

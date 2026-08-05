@@ -13,6 +13,7 @@ Page({
     healingRecords: [],
     purchaseSummary: [],
     paymentRecords: [],
+    trafficDetailLabel: '流量链接',
     activeTab: 'healing',
     tabs: [
       { key: 'healing', label: '跟进点' },
@@ -64,7 +65,14 @@ Page({
       // 交易记录
       const paymentRecords = (detail.payment_records || []).sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''))
 
-      this.setData({ customer: c, healerText, firstVisit, totalPayment, activities, healingRecords, purchaseSummary, paymentRecords, loading: false })
+      // 流量来源对应的详情标签
+      const ts = c.traffic_source || ''
+      let trafficDetailLabel = '流量链接'
+      if (ts === '好友推荐') trafficDetailLabel = '推荐好友'
+      else if (ts === '朋友圈') trafficDetailLabel = '所属人'
+      else if (['小红书', '抖音', '公众号', '视频号'].includes(ts)) trafficDetailLabel = '内容链接'
+
+      this.setData({ customer: c, healerText, firstVisit, totalPayment, activities, healingRecords, purchaseSummary, paymentRecords, trafficDetailLabel, loading: false })
 
       // 加载沟通记录
       if (c.nickname) {

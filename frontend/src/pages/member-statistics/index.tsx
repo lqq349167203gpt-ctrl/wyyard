@@ -15,6 +15,8 @@ function getDaysInMonth(year: number, month: number) {
 interface MemberStatistics {
   total_members: number
   type_totals: Record<string, number>
+  total_members_all: number
+  type_totals_all: Record<string, number>
   type_names: string[]
   referrer_names: string[]
   chart_new: Array<Record<string, string | number>>
@@ -24,6 +26,7 @@ interface MemberStatistics {
     nickname: string
     member_type: string
     created_date: string
+    referral_date: string
     first_visit_date: string
     invited_count: number
     visit_count: number
@@ -115,15 +118,16 @@ export default function MemberStatisticsPage() {
     }
   }
 
-  // 计算选中类型的总人数
+  // 计算选中类型的总人数（根据数据类型切换全部/新增）
   const selectedTotal = useMemo(() => {
-    if (!data?.type_totals) return 0
+    const totals = dataType === "total" ? data?.type_totals_all : data?.type_totals
+    if (!totals) return 0
     let total = 0
     for (const type of selectedTypes) {
-      total += data.type_totals[type] || 0
+      total += totals[type] || 0
     }
     return total
-  }, [data?.type_totals, selectedTypes])
+  }, [data?.type_totals, data?.type_totals_all, selectedTypes, dataType])
 
   // 筛选选中类型的人员列表
   const filteredMembers = useMemo(() => {
@@ -191,6 +195,7 @@ export default function MemberStatisticsPage() {
         date_to: dateRange.to,
         granularity,
         referrer: selectedReferrer || undefined,
+        time_by: "referral",
       })
       setData(res)
     } catch {
@@ -434,7 +439,7 @@ export default function MemberStatisticsPage() {
                     <span className="w-[6px] h-[6px] rounded-[2px] bg-[#3370ff]"></span>
                     <span className="text-[12px] text-[#4e535a] truncate">{typeName}</span>
                   </div>
-                  <span className="text-[18px] font-medium text-[#1f2329]">{loading ? "..." : data?.type_totals[typeName] ?? 0}<span className="text-[10px] text-[#8f959e] ml-1">人</span></span>
+                  <span className="text-[18px] font-medium text-[#1f2329]">{loading ? "..." : (dataType === "total" ? data?.type_totals_all[typeName] : data?.type_totals[typeName]) ?? 0}<span className="text-[10px] text-[#8f959e] ml-1">人</span></span>
                 </div>
               ))}
             </div>
@@ -544,6 +549,7 @@ export default function MemberStatisticsPage() {
                       <th className="w-[100px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("total_consumption")}>
                         消费总额<SortArrow field="total_consumption" />
                       </th>
+                      <th className="w-[100px] px-3 font-normal">引流日期</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -596,6 +602,7 @@ export default function MemberStatisticsPage() {
                             {member.total_consumption.toLocaleString()}
                           </button>
                         </td>
+                        <td className="truncate px-3 tabular-nums">{member.referral_date || <EmptyValue />}</td>
                       </tr>
                     ))}
                   </tbody>

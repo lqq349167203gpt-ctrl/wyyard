@@ -141,10 +141,12 @@ function request(options) {
           resolve(res.data)
         } else if (res.statusCode === 401) {
           app.clearLogin()
-          wx.showToast({ title: '请先登录', icon: 'none' })
+          if (!options.silentAuth) {
+            wx.showToast({ title: '请先登录', icon: 'none' })
+          }
           reject(new Error('请先登录'))
         } else {
-          const msg = res.data?.detail || '请求失败'
+          const msg = res.data?.detail || res.data?.message || res.data?.error || '请求失败'
           wx.showToast({ title: msg, icon: 'none' })
           reject(new Error(msg))
         }
@@ -157,8 +159,8 @@ function request(options) {
   })
 }
 
-function get(url) {
-  return request({ url, method: 'GET' })
+function get(url, options = {}) {
+  return request({ ...options, url, method: 'GET' })
 }
 
 function post(url, data) {
@@ -209,11 +211,12 @@ const clientApi = {
   },
 
   // 消息通知
-  getNotifications() {
+  getNotifications(options) {
     return request({
       url: `/api/client/notifications?_t=${Date.now()}`,
       method: 'GET',
       header: { 'Cache-Control': 'no-cache' },
+      ...options,
     })
   },
 
@@ -227,8 +230,8 @@ const clientApi = {
   },
 
   // 活动记录
-  getActivityRecords() {
-    return get('/api/client/activity-records')
+  getActivityRecords(options) {
+    return get('/api/client/activity-records', options)
   },
 
   // 活动回访（同一场活动重复提交会更新原记录）
@@ -241,8 +244,8 @@ const clientApi = {
   },
 
   // 剩余次数
-  getRemaining() {
-    return get('/api/client/remaining')
+  getRemaining(options) {
+    return get('/api/client/remaining', options)
   },
 
   // 销卡记录

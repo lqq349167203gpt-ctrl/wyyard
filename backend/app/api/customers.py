@@ -262,6 +262,24 @@ async def batch_customers(data: BatchRequest):
     ]
 
 
+@router.get("/disabled")
+async def list_disabled_customers():
+    """列出所有已停用的客户"""
+    customers = customer_service.list_disabled_customers()
+    return [
+        {
+            "id": c.id,
+            "nickname": c.nickname,
+            "name": c.name or "",
+            "member_type": c.member_type or "",
+            "phone": c.phone or "",
+            "deleted_at": c.deleted_at.isoformat() if c.deleted_at else "",
+            "deleted_by": c.deleted_by or "",
+        }
+        for c in customers
+    ]
+
+
 @router.get("/{customer_id}")
 async def get_customer(customer_id: str):
     customer = customer_service.get_customer(customer_id)
@@ -282,18 +300,28 @@ async def update_customer(customer_id: str, data: CustomerUpdate):
 
 
 @router.delete("/{customer_id}")
-async def delete_customer(customer_id: str):
-    if not customer_service.delete_customer(customer_id):
+async def delete_customer(customer_id: str, request: Request):
+    deleted_by = getattr(request.state, "user_name", "") or "未知"
+    if not customer_service.delete_customer(customer_id, deleted_by):
         raise HTTPException(status_code=404, detail="客户不存在")
-    return {"message": "已删除"}
+    return {"message": "已停用"}
 
 
 @router.post("/{customer_id}/restore")
 async def restore_customer(customer_id: str, _admin: str = Depends(require_admin)):
     customer = customer_service.restore_customer(customer_id)
     if not customer:
-        raise HTTPException(status_code=404, detail="客户不存在或未被删除")
+        raise HTTPException(status_code=404, detail="客户不存在或未被停用")
     return _fill_visit_count(customer)
+
+
+@router.delete("/{customer_id}/permanent")
+async def permanent_delete_customer(customer_id: str, _admin: str = Depends(require_admin)):
+    """彻底删除客户（仅限无关联记录的客户）"""
+    ok, error = customer_service.permanent_delete_customer(customer_id)
+    if not ok:
+        raise HTTPException(status_code=400, detail=error)
+    return {"message": "已彻底删除"}
 
 
 @router.post("/cleanup-deleted")

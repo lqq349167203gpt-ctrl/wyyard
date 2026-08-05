@@ -52,9 +52,9 @@
     </view>
   </view>
 
-  <!-- 分割线：今日全部活动 -->
+  <!-- 分割线：当前所选日期的全部活动 -->
   <view class="list-divider">
-    <text class="list-divider-text">今日全部活动</text>
+    <text class="list-divider-text">当日全部活动</text>
     <view class="list-divider-line"></view>
   </view>
 
@@ -131,12 +131,7 @@
             </view>
           </view>
           <view wx:if="{{act.locationText}}" class="ev-teacher-row">
-            <view class="ev-teacher-avatars">
-              <block wx:for="{{act.teacherPreview}}" wx:key="index" wx:for-item="teacher">
-                <image wx:if="{{teacher.avatarUrl}}" class="ev-teacher-avatar" src="{{teacher.avatarUrl}}" mode="aspectFill" />
-                <view wx:else class="ev-teacher-avatar ev-teacher-fallback">{{teacher.initial}}</view>
-              </block>
-            </view>
+            <image class="ev-course-icon" src="/assets/reading-icon-a.svg" mode="aspectFit" />
             <text class="ev-teacher">{{act.locationText}}</text>
           </view>
           <text wx:if="{{act.introText}}" class="ev-desc">{{act.introText}}</text>
@@ -157,7 +152,7 @@
 
   <!-- 月历选择弹层 -->
   <view wx:if="{{calVisible}}" class="cal-mask" bindtap="onCalClose">
-    <view class="cal-sheet" catchtap="">
+    <view class="cal-sheet" catchtap="onCalContentTap">
       <view class="cal-grab"></view>
       <view class="cal-head">
         <text class="cal-title">{{calYear}}年{{calMonth}}月</text>

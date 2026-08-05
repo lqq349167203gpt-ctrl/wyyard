@@ -80,7 +80,7 @@ export default function HealingRecordsPage() {
       setDeleteConfirmName("")
       setRefreshKey(k => k + 1)
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "删除失败")
+      setDeleteError(e instanceof Error ? e.message : "停用失败")
     }
   }
 
@@ -200,14 +200,14 @@ export default function HealingRecordsPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmName(""); setDeleteError("") } }}>
         <DialogContent className="w-[360px] max-w-[90vw] p-0 gap-0">
           <div className="px-5 py-3 border-b border-[#f0f0f0]">
-            <h3 className="text-[14px] font-normal">删除客户</h3>
+            <h3 className="text-[14px] font-normal">停用客户</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
             <p className="text-[12px] text-[#2b2f36]">
-              确定要删除「<span className="font-medium">{deleteTarget?.nickname || deleteTarget?.id}</span>」吗？删除后不可恢复。
+              确定要停用「<span className="font-medium">{deleteTarget?.nickname || deleteTarget?.id}</span>」吗？停用后客户资料将隐藏，历史关联数据保留，可随时恢复。
             </p>
             <div>
-              <label className="text-[11px] text-[#8f959e] mb-1 block">请输入客户昵称确认删除</label>
+              <label className="text-[11px] text-[#8f959e] mb-1 block">请输入客户昵称确认停用</label>
               <Input
                 value={deleteConfirmName}
                 onChange={(e) => { setDeleteConfirmName(e.target.value); setDeleteError("") }}
@@ -225,7 +225,7 @@ export default function HealingRecordsPage() {
               onClick={handleConfirmDelete}
               disabled={!deleteTarget?.nickname || deleteConfirmName !== deleteTarget?.nickname}
             >
-              确定删除
+              确定停用
             </Button>
           </div>
         </DialogContent>

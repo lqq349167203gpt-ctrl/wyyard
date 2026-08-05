@@ -14,6 +14,9 @@ Page({
     memberTypes: [],
     memberTypeList: [],
     selectedMemberTypes: [],
+    // 引流人
+    referrerList: [],
+    selectedReferrers: [],
     // 到店间隔
     rangeMin: 0,
     rangeMax: 60,
@@ -56,11 +59,30 @@ Page({
     this.setData({ memberTypeList: list })
   },
 
+  // 更新引流人列表（从已加载客户中提取，按人数从多到少排列）
+  updateReferrerList() {
+    const { customers, selectedReferrers } = this.data
+    const countMap = {}
+    for (const c of customers) {
+      const name = (c.referrer || '').trim()
+      if (name) {
+        countMap[name] = (countMap[name] || 0) + 1
+      }
+    }
+    const referrers = Object.keys(countMap).sort((a, b) => countMap[b] - countMap[a])
+    const list = referrers.map(r => ({
+      name: r,
+      selected: selectedReferrers.includes(r),
+    }))
+    this.setData({ referrerList: list })
+  },
+
   // 计算激活的筛选条件数量
   checkActiveFilter() {
-    const { selectedMemberTypes, daysFilterMin, daysFilterMax } = this.data
+    const { selectedMemberTypes, selectedReferrers, daysFilterMin, daysFilterMax } = this.data
     let count = 0
     if (selectedMemberTypes.length > 0) count++
+    if (selectedReferrers.length > 0) count++
     if (daysFilterMin > 0 || daysFilterMax < 60) count++
     this.setData({ filterCount: count })
   },
@@ -118,6 +140,7 @@ Page({
       })
 
       this.setData({ customers, page, total, hasMore: customers.length < total, initialized: true })
+      this.updateReferrerList()
       this.applyFilters()
     } catch (e) {
       console.error('[loadData] 加载客户失败:', e.message, e)
@@ -133,6 +156,12 @@ Page({
     const { selectedMemberTypes } = this.data
     if (selectedMemberTypes && selectedMemberTypes.length > 0) {
       filtered = filtered.filter(c => selectedMemberTypes.includes(c.member_type || ''))
+    }
+
+    // 按引流人筛选（多选）
+    const { selectedReferrers } = this.data
+    if (selectedReferrers && selectedReferrers.length > 0) {
+      filtered = filtered.filter(c => selectedReferrers.includes(c.referrer || ''))
     }
 
     // 按到店间隔区间筛选
@@ -184,6 +213,7 @@ Page({
       // 打开时保存当前状态快照
       this._filterSnapshot = {
         selectedMemberTypes: this.data.selectedMemberTypes.slice(),
+        selectedReferrers: this.data.selectedReferrers.slice(),
         rangeMin: this.data.rangeMin,
         rangeMax: this.data.rangeMax,
       }
@@ -197,13 +227,29 @@ Page({
       this.setData({
         showFilterPanel: false,
         selectedMemberTypes: this._filterSnapshot.selectedMemberTypes,
+        selectedReferrers: this._filterSnapshot.selectedReferrers,
         rangeMin: this._filterSnapshot.rangeMin,
         rangeMax: this._filterSnapshot.rangeMax,
       })
       this.updateMemberTypeList()
+      this.updateReferrerList()
     } else {
       this.setData({ showFilterPanel: false })
     }
+  },
+
+  // 引流人选择
+  onToggleReferrer(e) {
+    const name = e.currentTarget.dataset.name
+    let { selectedReferrers } = this.data
+    const index = selectedReferrers.indexOf(name)
+    if (index > -1) {
+      selectedReferrers.splice(index, 1)
+    } else {
+      selectedReferrers.push(name)
+    }
+    this.setData({ selectedReferrers })
+    this.updateReferrerList()
   },
 
   // 身份选择
@@ -260,6 +306,7 @@ Page({
     this._filterSnapshot = null
     this.setData({
       selectedMemberTypes: [],
+      selectedReferrers: [],
       rangeMin: 0,
       rangeMax: 60,
       daysFilterMin: 0,
@@ -268,6 +315,7 @@ Page({
       filterCount: 0,
     })
     this.updateMemberTypeList()
+    this.updateReferrerList()
     this.applyFilters()
   },
 

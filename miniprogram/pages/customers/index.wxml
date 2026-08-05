@@ -75,6 +75,25 @@
         </view>
       </view>
 
+      <!-- 引流人选择 -->
+      <view class="filter-section">
+        <view class="filter-section-title">引流人</view>
+        <view class="tags-wrap">
+          <view
+            class="tag-item {{item.selected ? 'active' : ''}}"
+            wx:for="{{referrerList}}"
+            wx:key="name"
+            bindtap="onToggleReferrer"
+            data-name="{{item.name}}"
+          >
+            {{item.name}}
+          </view>
+        </view>
+        <view class="filter-section-empty" wx:if="{{referrerList.length === 0}}">
+          <text>暂无引流人数据</text>
+        </view>
+      </view>
+
       <!-- 操作按钮 -->
       <view class="filter-actions">
         <text class="filter-reset" bindtap="onResetFilter">重置</text>

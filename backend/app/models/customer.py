@@ -229,6 +229,7 @@ class Customer(CustomerBase):
     updated_at: datetime
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None
+    deleted_by: Optional[str] = None
 
 
 class ChatLogParseRequest(StrictBaseModel):

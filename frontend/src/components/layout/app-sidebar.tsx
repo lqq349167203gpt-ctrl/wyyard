@@ -14,6 +14,7 @@ import {
   IconSettings,
   IconBell,
   IconLock,
+  IconUserOff,
   IconStars,
   IconMessageCircle,
   IconFileText,
@@ -75,6 +76,7 @@ const configItems = [
 const accountItems = [
   { title: "账号管理", icon: IconUser, path: "/positions/management", permission: "position-management", clearTab: "tab_position-management" },
   { title: "密码修改", icon: IconLock, path: "/change-password", permission: "change-password" },
+  { title: "停用客户", icon: IconUserOff, path: "/disabled-customers", permission: "position-management" },
 ]
 
 const systemItems = [

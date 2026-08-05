@@ -36,6 +36,11 @@ def list_customers() -> List[Customer]:
     return [v for v in _customers.values() if not v.is_deleted]
 
 
+def list_disabled_customers() -> List[Customer]:
+    """列出所有已停用（软删除）的客户"""
+    return [v for v in _customers.values() if v.is_deleted]
+
+
 def get_customer(customer_id: str) -> Optional[Customer]:
     customer = _customers.get(customer_id)
     if customer and customer.is_deleted:
@@ -188,24 +193,93 @@ def cleanup_all_deleted_customers():
     return len(deleted_ids)
 
 
-def delete_customer(customer_id: str) -> bool:
+def delete_customer(customer_id: str, deleted_by: str = "") -> bool:
+    """归档客户（软删除）：仅标记 is_deleted，不清理任何关联数据。
+    课程、邀约、消费、销卡记录全部保留，恢复后自动可见。"""
     with _customer_lock:
         customer = _customers.get(customer_id)
         if not customer:
             return False
         if customer.is_deleted:
-            return True  # 幂等：已删除返回 True
+            return True  # 幂等：已归档返回 True
         customer.is_deleted = True
         customer.deleted_at = datetime.now(timezone.utc)
+        customer.deleted_by = deleted_by
         _save(customer_id)
-    # 锁外调用，避免死锁
-    _cleanup_customer_from_activities(customer_id)
+    # 锁外调用
     try:
         from app.services.member_identity_service import refresh_member_type
         refresh_member_type(customer_id)
     except Exception:
         pass
     return True
+
+
+def permanent_delete_customer(customer_id: str) -> tuple[bool, str]:
+    """彻底删除客户。仅当客户没有任何关联记录（课程/邀约/消费/销卡）时才允许。
+    返回 (成功, 错误信息)。"""
+    from app.services.storage import load_data
+
+    # 检查邀约记录
+    visits = load_data("visits.json")
+    for v in visits.values():
+        if v.get("customer_id") == customer_id and not v.get("is_deleted"):
+            return False, "该客户有关联邀约记录，无法彻底删除。请使用归档功能。"
+
+    # 检查消费/付费记录
+    payment_files = [
+        "membership_cards.json", "group_cases.json", "emotional_releases.json",
+        "oh_card_readings.json", "energy_knots.json", "internal_courses.json",
+        "other_projects.json",
+    ]
+    for fn in payment_files:
+        try:
+            records = load_data(fn)
+            for r in records.values():
+                if r.get("customer_id") == customer_id and not r.get("is_deleted"):
+                    return False, "该客户有关联付费记录，无法彻底删除。请使用归档功能。"
+        except Exception:
+            pass
+
+    # 检查销卡记录
+    try:
+        deductions = load_data("project_deductions.json")
+        for d in deductions.values():
+            if d.get("customer_id") == customer_id and not d.get("is_deleted"):
+                return False, "该客户有关联销卡记录，无法彻底删除。请使用归档功能。"
+    except Exception:
+        pass
+
+    # 检查活动参与
+    activity_files = [
+        "class_records.json", "group_case_sessions.json",
+        "emotional_release_sessions.json", "energy_knot_sessions.json",
+        "internal_course_sessions.json", "oh_card_reading_sessions.json",
+    ]
+    for fn in activity_files:
+        try:
+            records = load_data(fn)
+            for r in records.values():
+                if r.get("is_deleted"):
+                    continue
+                if customer_id in (r.get("participant_ids") or []):
+                    return False, "该客户有关联活动记录，无法彻底删除。请使用归档功能。"
+                if customer_id in (r.get("teacher_ids") or []):
+                    return False, "该客户有关联活动记录，无法彻底删除。请使用归档功能。"
+                if r.get("host_id") == customer_id or r.get("owner_id") == customer_id:
+                    return False, "该客户有关联活动记录，无法彻底删除。请使用归档功能。"
+        except Exception:
+            pass
+
+    # 无关联记录，允许彻底删除
+    with _customer_lock:
+        customer = _customers.get(customer_id)
+        if not customer:
+            return False, "客户不存在"
+        _cleanup_customer_from_activities(customer_id)
+        del _customers[customer_id]
+        save_data(FILENAME, {k: v.model_dump(mode="json") for k, v in _customers.items()})
+    return True, ""
 
 
 def restore_customer(customer_id: str) -> Optional[Customer]:

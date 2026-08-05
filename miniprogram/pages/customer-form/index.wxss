@@ -86,6 +86,24 @@
   flex-shrink: 0;
 }
 
+/* 日期选择前后保持固定行高，避免清除按钮出现时撑高表单行 */
+.date-picker-value,
+.date-picker-value .form-picker,
+.date-picker-value .picker-display,
+.date-picker-clear {
+  height: 40rpx;
+}
+
+.date-picker-value .picker-display,
+.date-picker-clear {
+  line-height: 40rpx;
+}
+
+.date-picker-clear {
+  box-sizing: border-box;
+  padding: 0 16rpx;
+}
+
 /* 弹窗 */
 .picker-mask {
   position: fixed;

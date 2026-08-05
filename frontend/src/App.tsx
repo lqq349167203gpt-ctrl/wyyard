@@ -29,6 +29,7 @@ import SystemLogsPage from "@/pages/system-logs"
 import HealingIdentitiesPage from "@/pages/healing-identities"
 import ArrivalFeedbackPage from "@/pages/arrival-feedback"
 import ChangePasswordPage from "@/pages/change-password"
+import DisabledCustomersPage from "@/pages/disabled-customers"
 import RemindersPage from "@/pages/reminders"
 import BusinessRemindersPage from "@/pages/business-reminders"
 import ChatHistoryPage from "@/pages/chat-history"
@@ -80,6 +81,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/positions/teacher": "position-management",
   "/agents/:id/chat": "agents",
   "/change-password": "change-password",
+  "/disabled-customers": "position-management",
 }
 
 function ProtectedRoute() {
@@ -176,6 +178,7 @@ function App() {
 
               <Route path="/system-logs" element={<SystemLogsPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
+              <Route path="/disabled-customers" element={<DisabledCustomersPage />} />
               <Route path="/healing-identities" element={<HealingIdentitiesPage />} />
               <Route path="/operation-logs" element={<OperationLogsPage />} />
               <Route path="/config/reminders" element={<RemindersPage />} />
