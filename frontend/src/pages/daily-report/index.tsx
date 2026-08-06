@@ -315,7 +315,7 @@ export default function DailyReportPage() {
           ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
         ]
         for (const id of [...new Set(allIds)]) {
-          activityDeductionMap[id] = (activityDeductionMap[id] || 0) + 1
+          activityDeductionMap[id] = (activityDeductionMap[id] || 0) + (a.membership_deduction_count || 1)
         }
       }
 

@@ -325,10 +325,10 @@ Page({
         id: v.id,
         customer_id: v.customer_id,
         nickname: v.nickname || '',
-        identityText: identityTypeMap[v.member_type] === '新人' ? '新人' : '会员',
-        identityGrey: identityTypeMap[v.member_type] === '新人',
+        identityText: v.member_type || '',
+        hasIdentity: !!v.member_type,
         arrived: !!v.arrived,
-        amountText: (v.daily_amount || 0) > 0 ? '¥' + formatMoney(v.daily_amount) : '—',
+        amountText: (v.daily_amount || 0) > 0 ? '¥' + formatMoney(v.daily_amount) : '-',
         hasAmount: (v.daily_amount || 0) > 0,
         invitedCount: v.invitation_count || 0,
         arrivedCount: v.arrived_count || 0,
@@ -344,6 +344,8 @@ Page({
         open: false,
       }
     })
+    // 默认排序：已到店在前，未到店在后（与 PC 端 arrived desc 一致）
+    customerRows.sort((a, b) => (b.arrived ? 1 : 0) - (a.arrived ? 1 : 0))
 
     // 财务 tab
     const finance = this._buildFinance(payment, date, customerMap)
@@ -403,6 +405,7 @@ Page({
         newText: newMembers.join('、'),
         allIds: uniqueIds,
         open: false,
+        membershipDeductionCount: r.membership_deduction_count || 1,
       }
     }
 
@@ -505,7 +508,7 @@ Page({
         remaining_count: remainingCount,
         purchaseCountText: purchaseCount != null && purchaseCount > 0 ? '购买 ' + purchaseCount + ' 次' : '',
         remainingText: remainingCount === -999 ? '不限'
-          : remainingCount != null ? remainingCount + '次'
+          : remainingCount != null ? '剩余 ' + remainingCount + ' 次'
           : type === 'membership_card' ? '不限'
           : '',
         closer_name: closerNames,
@@ -533,16 +536,22 @@ Page({
 
   _buildDeductions(payment, activities, date, customerMap) {
     const cardDeductionMap = {}
+    const manualCardNameMap = {}
+    const manualRemainingMap = {}
     for (const d of payment.deductions || []) {
       if (d.deduction_date === date && d.project_type === 'membership-cards') {
         cardDeductionMap[d.customer_id] = (cardDeductionMap[d.customer_id] || 0) + (d.count || 1)
+        if (!(d.customer_id in manualCardNameMap)) {
+          manualCardNameMap[d.customer_id] = d.project_name || ''
+          manualRemainingMap[d.customer_id] = d.remaining_after
+        }
       }
     }
     const activityDeductionMap = {}
     for (const a of activities) {
       if (a.isWelfare) continue
       for (const id of a.allIds) {
-        activityDeductionMap[id] = (activityDeductionMap[id] || 0) + 1
+        activityDeductionMap[id] = (activityDeductionMap[id] || 0) + (a.membershipDeductionCount || 1)
       }
     }
     const customerCardMap = {}
@@ -574,6 +583,8 @@ Page({
         has_card: hasCard,
         manualText: manual > 0 ? manual + '次' : '',
         activityText: act > 0 ? act + '次' : '',
+        manualCardName: manualCardNameMap[cid] || '',
+        manualRemainingText: (manualRemainingMap[cid] == null || manualRemainingMap[cid] === -999) ? '不限' : manualRemainingMap[cid] + '次',
         remainingText: !hasCard ? '未办卡' : (remaining == null || remaining === -999) ? '不限' : remaining + '次',
         manualMuted: manual === 0,
         activityMuted: act === 0,
