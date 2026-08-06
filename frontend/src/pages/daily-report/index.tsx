@@ -6,10 +6,10 @@ import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import DetailView from "@/pages/healing-records/components/detail-view"
 
-const today = new Date().toISOString().split("T")[0]
+const today = new Date().toLocaleDateString("sv-SE")
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0]
+  return d.toLocaleDateString("sv-SE")
 }
 function addDays(d: Date, n: number): Date {
   const r = new Date(d); r.setDate(r.getDate() + n); return r

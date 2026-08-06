@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, memo } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-const today = new Date().toISOString().split("T")[0]
+const today = new Date().toLocaleDateString("sv-SE")
 
 function formatDateChinese(d: string): string {
   const [y, m, day] = d.split("-")

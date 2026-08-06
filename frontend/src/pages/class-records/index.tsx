@@ -15,10 +15,10 @@ import CustomerDetailView from "@/pages/healing-records/components/detail-view"
 import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 
-const today = new Date().toISOString().split("T")[0]
+const today = new Date().toLocaleDateString("sv-SE")
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0]
+  return d.toLocaleDateString("sv-SE")
 }
 function addDays(d: Date, n: number): Date {
   const r = new Date(d); r.setDate(r.getDate() + n); return r

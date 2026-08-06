@@ -762,12 +762,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <div className="text-[12px] text-[#8f959e] text-center py-8">暂无历史记录</div>
             ) : (
               (() => {
-                const todayStr = new Date().toISOString().split("T")[0]
-                const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0]
+                const todayStr = new Date().toLocaleDateString("sv-SE")
+                const yesterdayStr = new Date(Date.now() - 86400000).toLocaleDateString("sv-SE")
                 const dayMap = new Map<string, VisitDayGroup>()
                 for (const entry of mergedHistory) {
                   const d = new Date(entry.timestamp)
-                  const dateKey = d.toISOString().split("T")[0]
+                  const dateKey = d.toLocaleDateString("sv-SE")
                   const hourKey = String(d.getHours()).padStart(2, "0")
                   if (!dayMap.has(dateKey)) {
                     const label = dateKey === todayStr ? "今天" : dateKey === yesterdayStr ? "昨天" : `${parseInt(dateKey.split("-")[1])}月${parseInt(dateKey.split("-")[2])}日`
