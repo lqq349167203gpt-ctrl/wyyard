@@ -810,7 +810,7 @@ export default function DetailView({
                   <TableHead className="!h-7 text-[12px]">成交人</TableHead>
                 </TableRow></TableHeader><TableBody>
                   {paginatedRecords.map((r,i)=>{
-                    const today = new Date().toISOString().slice(0,10)
+                    const today = new Date().toLocaleDateString("sv-SE")
                     let status: React.ReactNode = <span className="text-[#d0d3d6]">-</span>
                     let statusClass = ""
                     if (r.voided) {

@@ -1211,7 +1211,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                     <TableCell className="text-[#2b2f36]">{item.expiry_date || <EmptyValue />}</TableCell>
                     <TableCell className="text-[12px]">
                       {(() => {
-                        const today = new Date().toISOString().slice(0,10)
+                        const today = new Date().toLocaleDateString("sv-SE")
                         if (item.type === "membership_card" && item.voided) return <span className="text-[#c4506a]">已退费</span>
                         if (item.effective_date && item.effective_date > today) return <span className="text-[#8f959e]">未开始</span>
                         if (item.expiry_date && item.expiry_date < today) return <span className="text-[#c4506a]">已过期</span>
