@@ -113,6 +113,11 @@ Page({
     this.setData({ isLeader: e.detail.value })
   },
 
+  onOpenEditor(e) {
+    const { field, label } = e.currentTarget.dataset
+    wx.navigateTo({ url: `/pages/text-editor/index?field=${field}&label=${label}` })
+  },
+
   onNeedsInput(e) { this.setData({ needs: e.detail.value }) },
   onFeedbackInput(e) { this.setData({ feedback: e.detail.value }) },
   onHealingNotesInput(e) { this.setData({ healingNotes: e.detail.value }) },

@@ -117,19 +117,31 @@
     </view>
     <view class="form-item column last">
       <text class="form-label" style="margin-bottom: 16rpx;">创伤经历</text>
-      <textarea class="form-textarea short" placeholder="创伤经历" placeholder-class="form-textarea-placeholder" value="{{basic_info}}" bindinput="onInput" data-field="basic_info" />
+      <view class="text-preview" bindtap="onOpenEditor" data-field="basic_info" data-label="创伤经历">
+        <text class="text-preview-content {{basic_info ? '' : 'text-preview-placeholder'}}">{{basic_info || '点击输入创伤经历'}}</text>
+        <text class="text-preview-count">{{basic_info.length}} 字</text>
+      </view>
     </view>
     <view class="form-item column last">
       <text class="form-label" style="margin-bottom: 16rpx;">当下卡点</text>
-      <textarea class="form-textarea short" placeholder="当下卡点" placeholder-class="form-textarea-placeholder" value="{{core_situation}}" bindinput="onInput" data-field="core_situation" />
+      <view class="text-preview" bindtap="onOpenEditor" data-field="core_situation" data-label="当下卡点">
+        <text class="text-preview-content {{core_situation ? '' : 'text-preview-placeholder'}}">{{core_situation || '点击输入当下卡点'}}</text>
+        <text class="text-preview-count">{{core_situation.length}} 字</text>
+      </view>
     </view>
     <view class="form-item column last">
       <text class="form-label" style="margin-bottom: 16rpx;">到访目的</text>
-      <textarea class="form-textarea short" placeholder="到访目的" placeholder-class="form-textarea-placeholder" value="{{tags}}" bindinput="onInput" data-field="tags" />
+      <view class="text-preview" bindtap="onOpenEditor" data-field="tags" data-label="到访目的">
+        <text class="text-preview-content {{tags ? '' : 'text-preview-placeholder'}}">{{tags || '点击输入到访目的'}}</text>
+        <text class="text-preview-count">{{tags.length}} 字</text>
+      </view>
     </view>
     <view class="form-item column last">
       <text class="form-label" style="margin-bottom: 16rpx;">其他信息</text>
-      <textarea class="form-textarea short" placeholder="其他信息" placeholder-class="form-textarea-placeholder" value="{{other_info}}" bindinput="onInput" data-field="other_info" />
+      <view class="text-preview" bindtap="onOpenEditor" data-field="other_info" data-label="其他信息">
+        <text class="text-preview-content {{other_info ? '' : 'text-preview-placeholder'}}">{{other_info || '点击输入其他信息'}}</text>
+        <text class="text-preview-count">{{other_info.length}} 字</text>
+      </view>
     </view>
   </view>
 

@@ -509,7 +509,7 @@ export function ActivityBatchTable({
 
   // 动态构建类型选项
   const typeOptions = useMemo(() => {
-    const classChildren = courseTypes.map(t => ({ value: `class:${t.name}`, label: t.name }))
+    const classChildren = courseTypes.filter(t => t.category !== "other").map(t => ({ value: `class:${t.name}`, label: t.name }))
     return [
       { value: "class", label: "沙龙活动", children: classChildren },
       { value: "gcs", label: "觉醒游戏" },

@@ -63,15 +63,24 @@
   <view class="form-card">
     <view class="form-item column textarea-row">
       <text class="form-label" style="margin-bottom: 16rpx;">客户信息</text>
-      <textarea class="form-textarea" style="height: 126rpx;" value="{{feedback}}" bindinput="onFeedbackInput" placeholder="客户信息" placeholder-class="form-textarea-placeholder" />
+      <view class="text-preview" bindtap="onOpenEditor" data-field="feedback" data-label="客户信息">
+        <text class="text-preview-content {{feedback ? '' : 'text-preview-placeholder'}}">{{feedback || '点击输入客户信息'}}</text>
+        <text class="text-preview-count">{{feedback.length}} 字</text>
+      </view>
     </view>
     <view class="form-item column textarea-row">
       <text class="form-label" style="margin-bottom: 16rpx;">跟进点</text>
-      <textarea class="form-textarea" style="height: 126rpx;" value="{{healingNotes}}" bindinput="onHealingNotesInput" placeholder="跟进点" placeholder-class="form-textarea-placeholder" />
+      <view class="text-preview" bindtap="onOpenEditor" data-field="healingNotes" data-label="跟进点">
+        <text class="text-preview-content {{healingNotes ? '' : 'text-preview-placeholder'}}">{{healingNotes || '点击输入跟进点'}}</text>
+        <text class="text-preview-count">{{healingNotes.length}} 字</text>
+      </view>
     </view>
     <view class="form-item column textarea-row last">
       <text class="form-label" style="margin-bottom: 16rpx;">组长反馈</text>
-      <textarea class="form-textarea" style="height: 126rpx;" value="{{groupLeaderFeedback}}" bindinput="onGroupLeaderFeedbackInput" placeholder="组长反馈" placeholder-class="form-textarea-placeholder" />
+      <view class="text-preview" bindtap="onOpenEditor" data-field="groupLeaderFeedback" data-label="组长反馈">
+        <text class="text-preview-content {{groupLeaderFeedback ? '' : 'text-preview-placeholder'}}">{{groupLeaderFeedback || '点击输入组长反馈'}}</text>
+        <text class="text-preview-count">{{groupLeaderFeedback.length}} 字</text>
+      </view>
     </view>
   </view>
 

@@ -1,0 +1,49 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #ffffff;
+}
+
+.editor-body {
+  flex: 1;
+  padding: 24rpx 32rpx;
+  overflow: hidden;
+}
+
+.editor-textarea {
+  width: 100%;
+  height: 100%;
+  font-size: 30rpx;
+  line-height: 48rpx;
+  color: #1f2329;
+}
+
+.editor-placeholder {
+  color: #b0b5bb;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid #f0f1f2;
+  flex-shrink: 0;
+}
+
+.char-count {
+  font-size: 24rpx;
+  color: #b0b5bb;
+}
+
+.save-btn {
+  padding: 8rpx 24rpx;
+}
+
+.save-btn text {
+  font-size: 30rpx;
+  color: #3370ff;
+  font-weight: 500;
+}

@@ -124,6 +124,11 @@ Page({
     this.setData({ [field]: e.detail.value })
   },
 
+  onOpenEditor(e) {
+    const { field, label } = e.currentTarget.dataset
+    wx.navigateTo({ url: `/pages/text-editor/index?field=${field}&label=${label}` })
+  },
+
   onGenderChange(e) {
     const genders = ['男', '女', '其他']
     this.setData({ gender: genders[e.detail.value] })

@@ -108,6 +108,11 @@ Page({
     this.setData({ needs: e.detail.value })
   },
 
+  onOpenEditor(e) {
+    const { field, label } = e.currentTarget.dataset
+    wx.navigateTo({ url: `/pages/text-editor/index?field=${field}&label=${label}` })
+  },
+
   onFeedbackInput(e) {
     this.setData({ feedback: e.detail.value })
   },

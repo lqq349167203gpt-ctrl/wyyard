@@ -675,10 +675,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input rounded="[2px]"
+                    <textarea
                       value={row.needs}
                       onChange={(e) => updateRow(row.key, "needs", e.target.value)}
-                      className="h-7 text-[12px] [&]:border-[0.5px]"
+                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
+                      rows={1}
                     />
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "referrer_handler") ? "bg-[#f5eeff] rounded" : ""}`}>
@@ -713,24 +714,27 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     </span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input rounded="[2px]"
+                    <textarea
                       value={row.feedback}
                       onChange={(e) => updateRow(row.key, "feedback", e.target.value)}
-                      className="h-7 text-[12px] [&]:border-[0.5px]"
+                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
+                      rows={1}
                     />
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input rounded="[2px]"
+                    <textarea
                       value={row.healing_notes}
                       onChange={(e) => updateRow(row.key, "healing_notes", e.target.value)}
-                      className="h-7 text-[12px] [&]:border-[0.5px]"
+                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
+                      rows={1}
                     />
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "group_leader_feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <Input rounded="[2px]"
+                    <textarea
                       value={row.group_leader_feedback}
                       onChange={(e) => updateRow(row.key, "group_leader_feedback", e.target.value)}
-                      className="h-7 text-[12px] [&]:border-[0.5px]"
+                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
+                      rows={1}
                     />
                   </td>
                   <td className="px-1.5 py-1.5">

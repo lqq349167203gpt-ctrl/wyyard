@@ -101,7 +101,7 @@ export default function DailyReportPage() {
       th{background:#f7f8fa;color:#8f959e;font-weight:normal}
       .section{font-size:13px;font-weight:bold;background:#f0f1f3}
       .section td{padding:6px}
-      .wrap{white-space:normal;word-wrap:break-word;word-break:break-all}
+      .wrap{white-space:pre-wrap;word-wrap:break-word;word-break:break-all}
     </style>`
     let html = `<html><head><meta charset="utf-8">${style}</head><body>`
     // 第一部分：当日客户
@@ -300,10 +300,10 @@ export default function DailyReportPage() {
       projectDeductionApi.list().catch(() => []),
       visitApi.list(detailDate).catch(() => []),
     ]).then(([cards, groups, emotions, ohs, energies, courses, others, deductions, todayVisits]) => {
-      const deductionMap: Record<string, number> = {}
+      const cardDeductionMap: Record<string, number> = {}
       for (const d of deductions as any[]) {
-        if (d.deduction_date === detailDate) {
-          deductionMap[d.project_id] = (deductionMap[d.project_id] || 0) + (d.count || 1)
+        if (d.deduction_date === detailDate && d.project_type === "membership-cards") {
+          cardDeductionMap[d.customer_id] = (cardDeductionMap[d.customer_id] || 0) + (d.count || 1)
         }
       }
       // 每个客户的当日活动销卡次数（公益活动不扣卡）
@@ -426,18 +426,14 @@ export default function DailyReportPage() {
       }
       // 合并所有有销卡的客户
       const deductionCustomerIds = new Set([
-        ...Object.keys(deductionMap).map(id => (cards as any[]).find(c => c.id === id)?.customer_id).filter(Boolean),
+        ...Object.keys(cardDeductionMap),
         ...Object.keys(activityDeductionMap),
       ])
       const dRows: DeductionRow[] = []
       for (const cid of deductionCustomerIds) {
         const customer = customerMap[cid]
         const card = customerCardMap[cid]
-        // 人工销卡：该客户所有当日项目的人工销卡总和
-        let manualCount = 0
-        for (const c of cards as any[]) {
-          if (c.customer_id === cid && deductionMap[c.id]) manualCount += deductionMap[c.id]
-        }
+        const manualCount = cardDeductionMap[cid] || 0
         const activityCount = activityDeductionMap[cid] || 0
         if (manualCount === 0 && activityCount === 0) continue
         dRows.push({
@@ -557,10 +553,10 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_all", v.customer_id, v.nickname)}>{v.activity_count}场</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_today", v.customer_id, v.nickname)}>{todayActivityCountMap[v.customer_id] || 0}场</td>
                     <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-normal break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-normal break-words"}`}>{v.feedback || v.experience || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-normal break-words"}`}>{customers.find(c => c.id === v.customer_id)?.follow_up_node || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-normal break-words"}`}>{v.group_leader_feedback || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || v.experience || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{customers.find(c => c.id === v.customer_id)?.follow_up_node || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.group_leader_feedback || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#1f2329] border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => v.daily_amount > 0 && openDetail("payment", v.customer_id, v.nickname)}>{v.daily_amount > 0 ? `¥${v.daily_amount.toLocaleString()}` : <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[5px] pr-[1px] py-2 text-[#6b7178] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer_handler || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[1px] pr-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">
@@ -755,10 +751,10 @@ export default function DailyReportPage() {
                   <div key={v.id} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
                     <span className="w-32 shrink-0">{v.visit_date}</span>
                     <span className="w-20 shrink-0 truncate">{v.referrer_handler || "-"}</span>
-                    <span className="w-24 shrink-0">{v.needs || "-"}</span>
-                    <span className="flex-1">{v.feedback || v.experience || "-"}</span>
-                    <span className="w-24 shrink-0">{v.healing_notes || "-"}</span>
-                    <span className="w-24 shrink-0">{v.group_leader_feedback || "-"}</span>
+                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.needs || "-"}</span>
+                    <span className="flex-1 whitespace-pre-wrap">{v.feedback || v.experience || "-"}</span>
+                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.healing_notes || "-"}</span>
+                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.group_leader_feedback || "-"}</span>
                   </div>
                 ))}
               </>
@@ -781,10 +777,10 @@ export default function DailyReportPage() {
                   <div key={v.id} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
                     <span className="w-40 shrink-0">{v.visit_date}{!v.arrived && <span className="ml-1 text-[#a0a4ab]">（未参与）</span>}</span>
                     <span className="w-20 shrink-0 truncate">{v.referrer_handler || "-"}</span>
-                    <span className="w-24 shrink-0">{v.needs || "-"}</span>
-                    <span className="flex-1">{v.feedback || v.experience || "-"}</span>
-                    <span className="w-24 shrink-0">{v.healing_notes || "-"}</span>
-                    <span className="w-24 shrink-0">{v.group_leader_feedback || "-"}</span>
+                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.needs || "-"}</span>
+                    <span className="flex-1 whitespace-pre-wrap">{v.feedback || v.experience || "-"}</span>
+                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.healing_notes || "-"}</span>
+                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.group_leader_feedback || "-"}</span>
                   </div>
                 ))}
               </>

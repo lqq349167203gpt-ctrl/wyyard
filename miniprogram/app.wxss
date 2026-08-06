@@ -56,7 +56,7 @@ page {
 
 .form-textarea {
   width: 100%;
-  min-height: 140rpx;
+  min-height: 200rpx;
   font-size: 28rpx;
   color: #1f2329;
   padding: 20rpx;
@@ -68,6 +68,44 @@ page {
 
 .form-textarea-placeholder {
   color: #b0b5bb;
+}
+
+/* 文本预览卡片（点击进入全屏编辑） */
+.text-preview {
+  width: 100%;
+  min-height: 200rpx;
+  padding: 20rpx;
+  border: 1rpx solid #e8eaed;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+  background-color: #fafbfc;
+  display: flex;
+  flex-direction: column;
+}
+
+.text-preview:active {
+  background-color: #f0f1f2;
+}
+
+.text-preview-content {
+  flex: 1;
+  font-size: 28rpx;
+  line-height: 44rpx;
+  color: #1f2329;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.text-preview-placeholder {
+  color: #b0b5bb;
+}
+
+.text-preview-count {
+  font-size: 22rpx;
+  color: #b0b5bb;
+  text-align: right;
+  margin-top: 16rpx;
+  flex-shrink: 0;
 }
 
 /* 按钮 */

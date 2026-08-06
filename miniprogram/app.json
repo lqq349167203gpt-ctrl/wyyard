@@ -18,7 +18,8 @@
     "pages/me/index",
     "pages/communication-records/index",
     "pages/communication-records/form",
-    "pages/voice-chat/index"
+    "pages/voice-chat/index",
+    "pages/text-editor/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",

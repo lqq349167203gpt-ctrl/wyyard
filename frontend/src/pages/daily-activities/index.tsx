@@ -2415,7 +2415,7 @@ export default function DailyActivitiesPage() {
   }, [])
 
   const load = () => {
-    courseTypeApi.list().then(data => setCourses(data.map(t => ({ id: t.name, name: t.name })))).catch(() => {})
+    courseTypeApi.list().then(data => setCourses(data.filter(t => t.category !== "other").map(t => ({ id: t.name, name: t.name })))).catch(() => {})
     spaceApi.list().then((list) => {
       setSpaces(list)
       if (list.length > 0) {
