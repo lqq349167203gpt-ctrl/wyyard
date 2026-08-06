@@ -449,7 +449,7 @@ export default function DailyReportPage() {
       }
       setDeductionRows(dRows)
     })
-  }, [detailDate, customers])
+  }, [detailDate, customers, activities])
 
   return (
     <div className="px-6 pt-4 pb-6 min-w-0 overflow-auto" style={{ height: 'calc(100vh - 48px)' }}>
