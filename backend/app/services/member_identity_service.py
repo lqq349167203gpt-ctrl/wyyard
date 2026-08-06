@@ -282,7 +282,7 @@ def refresh_member_type(customer_id: str):
         return
 
     identities = list_identities()
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_str = datetime.now().strftime("%Y-%m-%d")
 
     # 预计算用户数据
     from app.services import (
@@ -408,7 +408,7 @@ def refresh_all():
     )
 
     identities = list_identities()
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_str = datetime.now().strftime("%Y-%m-%d")
 
     # 全局数据只加载一次
     all_cards = membership_card_service.list_cards()

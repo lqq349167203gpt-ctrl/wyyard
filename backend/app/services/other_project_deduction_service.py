@@ -49,7 +49,7 @@ def _fill_current_remaining(deductions: List[OtherProjectDeduction]):
 
 def get_available_projects(customer_id: str) -> list:
     """返回用户可销卡的其他项目（有剩余次数且未过期）"""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now().strftime("%Y-%m-%d")
     projects = other_project_service.list_projects()
     available = []
     for p in projects:

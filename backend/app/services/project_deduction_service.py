@@ -124,7 +124,7 @@ def get_available_items(customer_id: str, project_type: str) -> list:
         oh_card_reading_session_service,
     )
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now().strftime("%Y-%m-%d")
 
     if project_type == "membership-cards":
         cards = membership_card_service.list_cards()
