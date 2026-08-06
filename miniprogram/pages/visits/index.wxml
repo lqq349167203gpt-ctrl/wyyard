@@ -1,4 +1,9 @@
 <view class="page">
+  <!-- 无权限 -->
+  <view class="no-permission" wx:if="{{!hasPagePermission}}">
+    <text class="no-permission-text">无权限访问此页面</text>
+  </view>
+  <block wx:else>
   <!-- 头部 -->
   <view class="head">
     <view class="head-row">
@@ -84,5 +89,5 @@
   <view class="fab" wx:if="{{!editMode}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
   </view>
-
+  </block>
 </view>

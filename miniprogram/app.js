@@ -4,6 +4,15 @@ console.log('[app.js] 文件已加载')
 // 提审前 DEV 切为 false 后，dev 自动登录等全部调试逻辑随之关闭。
 const { DEV } = require('./utils/config')
 
+// 页面权限别名（与 PC 端 page-permissions.ts 保持一致）
+var PERMISSION_ALIASES = {
+  'class-records': ['class-records-visitors', 'class-records-activities', 'class-records-arrival'],
+  'daily-activities': ['class-records-activities'],
+  'payment': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses'],
+  'payment-deductions': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses'],
+  'payment-refunds': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses'],
+}
+
 App({
   globalData: {
     token: '',
@@ -70,6 +79,19 @@ App({
       return false
     }
     return true
+  },
+
+  // 检查页面权限（与 PC 端 hasPagePermission 逻辑一致）
+  checkPagePermission(pageKey) {
+    var user = this.globalData.currentUser
+    if (user && user.role === '超级管理员') return true
+    var permissions = this.globalData.permissions || []
+    if (permissions.indexOf(pageKey) !== -1) return true
+    var aliases = PERMISSION_ALIASES[pageKey] || []
+    for (var i = 0; i < aliases.length; i++) {
+      if (permissions.indexOf(aliases[i]) !== -1) return true
+    }
+    return false
   },
 
   logout() {

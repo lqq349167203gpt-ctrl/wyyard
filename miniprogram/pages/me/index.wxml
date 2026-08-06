@@ -28,12 +28,16 @@
 
   <!-- 功能入口 -->
   <view class="menu-card">
-    <view class="menu-item" bindtap="onPaymentTap">
+    <view class="menu-item" bindtap="onPaymentTap" wx:if="{{canPayment}}">
       <text class="menu-label">付费项目</text>
       <text class="menu-arrow">›</text>
     </view>
-    <view class="menu-item" bindtap="onCommRecordsTap">
+    <view class="menu-item" bindtap="onCommRecordsTap" wx:if="{{canCommRecords}}">
       <text class="menu-label">沟通记录</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="onDailyReportTap">
+      <text class="menu-label">每日报表</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>

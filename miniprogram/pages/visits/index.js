@@ -47,6 +47,7 @@ function buildCalendar(year, month, selectedDate, calendarCounts) {
 
 Page({
   data: {
+    hasPagePermission: true,
     currentDate: '',
     currentDateShort: '',
     currentWeekday: '',
@@ -68,6 +69,10 @@ Page({
 
   async onLoad() {
     if (!getApp().checkLogin()) return
+    if (!getApp().checkPagePermission('class-records')) {
+      this.setData({ hasPagePermission: false })
+      return
+    }
     const now = new Date()
     const savedDate = wx.getStorageSync('visit_selected_date')
     const date = savedDate || formatDate(now)

@@ -30,6 +30,7 @@ function buildPrice(item, type) {
 
 Page({
   data: {
+    hasPagePermission: true,
     tabs: TABS,
     activeTab: 0,
     items: [],
@@ -38,6 +39,10 @@ Page({
 
   onLoad() {
     if (!getApp().checkLogin()) return
+    if (!getApp().checkPagePermission('payment')) {
+      this.setData({ hasPagePermission: false })
+      return
+    }
     this.loadItems()
   },
 

@@ -2,6 +2,7 @@ const { customerApi, memberIdentityApi } = require('../../utils/api')
 
 Page({
   data: {
+    hasPagePermission: true,
     customers: [],
     groupedCustomers: [],
     loading: false,
@@ -31,6 +32,10 @@ Page({
 
   onLoad() {
     if (!getApp().checkLogin()) return
+    if (!getApp().checkPagePermission('healing-records')) {
+      this.setData({ hasPagePermission: false })
+      return
+    }
     this.loadMemberTypes()
     this.loadData(true)
   },

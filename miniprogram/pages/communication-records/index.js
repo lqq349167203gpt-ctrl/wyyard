@@ -2,6 +2,7 @@ const { communicationRecordApi, customerApi, memberIdentityApi } = require('../.
 
 Page({
   data: {
+    hasPagePermission: true,
     records: [],
     filtered: [],
     keyword: '',
@@ -15,6 +16,10 @@ Page({
   },
 
   onShow() {
+    if (!getApp().checkPagePermission('communication-records')) {
+      this.setData({ hasPagePermission: false })
+      return
+    }
     this.loadList()
     this.loadIdentities()
   },

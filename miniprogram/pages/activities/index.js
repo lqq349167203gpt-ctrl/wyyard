@@ -67,6 +67,7 @@ function groupByTimeSlot(records) {
 
 Page({
   data: {
+    hasPagePermission: true,
     currentDate: '',
     currentDateShort: '',
     currentWeekday: '',
@@ -88,6 +89,10 @@ Page({
 
   async onLoad(options) {
     if (!getApp().checkLogin()) return
+    if (!getApp().checkPagePermission('daily-activities')) {
+      this.setData({ hasPagePermission: false })
+      return
+    }
     const date = options.date || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
     const d = new Date(date)
     this.setData({

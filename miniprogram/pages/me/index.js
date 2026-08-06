@@ -2,6 +2,8 @@ Page({
   data: {
     user: null,
     role: '',
+    canPayment: false,
+    canCommRecords: false,
   },
 
   onShow() {
@@ -11,6 +13,8 @@ Page({
     this.setData({
       user,
       role: user?.role || '',
+      canPayment: app.checkPagePermission('payment'),
+      canCommRecords: app.checkPagePermission('communication-records'),
     })
   },
 
@@ -20,6 +24,10 @@ Page({
 
   onCommRecordsTap() {
     wx.navigateTo({ url: '/pages/communication-records/index' })
+  },
+
+  onDailyReportTap() {
+    wx.navigateTo({ url: '/pages/daily-report/index' })
   },
 
   onLogout() {
