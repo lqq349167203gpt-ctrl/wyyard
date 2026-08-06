@@ -394,7 +394,7 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
             project_id=data.project_id,
             project_name=project_name,
             count=data.count,
-            deduction_date=now.strftime("%Y-%m-%d"),
+            deduction_date=datetime.now().strftime("%Y-%m-%d"),
             remaining_after=remaining_after,
             reason=reason,
             created_by=data.created_by,
