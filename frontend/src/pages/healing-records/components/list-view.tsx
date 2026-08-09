@@ -124,51 +124,51 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
   }, [sortField, sortOrder, resetPage])
 
   return (
-      <div className="dv-list overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
-        <style>{`.dv-list th, .dv-list td { font-size: 13px; }`}</style>
+      <div className="dv-list w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
+        <style>{`.dv-list th, .dv-list td { overflow: hidden; font-size: 13px; }`}</style>
         {loading || !permReady ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
         ) : paginatedItems.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">暂无数据</div>
         ) : (
-          <Table style={{ tableLayout: "fixed" }}>
+          <Table className="w-full min-w-0" style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4" style={{ width: "170px" }}>客户</TableHead>
-                <TableHead style={{ width: "110px" }}>
+                <TableHead className="pl-4" style={{ width: "14%" }}>客户</TableHead>
+                <TableHead style={{ width: "9%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("member_type")}>
                     会员身份<SortArrow field="member_type" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead style={{ width: "130px" }}>客户标签</TableHead>
-                <TableHead style={{ width: "90px" }}>
+                <TableHead style={{ width: "10%" }}>客户标签</TableHead>
+                <TableHead style={{ width: "7%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("visit_count")}>
                     到店<SortArrow field="visit_count" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead style={{ width: "90px" }}>
+                <TableHead style={{ width: "7%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("activity_count")}>
                     活动<SortArrow field="activity_count" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead style={{ width: "100px" }}>
+                <TableHead style={{ width: "8%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("total_payment")}>
                     消费<SortArrow field="total_payment" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead style={{ width: "110px" }}>
+                <TableHead style={{ width: "9%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("last_visit_date")}>
                     最近到访<SortArrow field="last_visit_date" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead style={{ width: "130px" }}>引流 / 承接</TableHead>
-                <TableHead style={{ width: "110px" }}>
+                <TableHead style={{ width: "12%" }}>引流 / 承接</TableHead>
+                <TableHead style={{ width: "9%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("referral_date")}>
                     引流日期<SortArrow field="referral_date" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
-                <TableHead style={{ width: "80px" }}>创建人</TableHead>
-                <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
+                <TableHead style={{ width: "7%" }}>创建人</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "8%" }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -223,9 +223,11 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                   {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString("zh-CN") : <EmptyValue />}
                 </TableCell>
                 <TableCell>
-                  <span className="text-[#2b2f36]">{c.referrer || <EmptyValue />}</span>
-                  <span className="mx-1.5 text-[#d0d3d6]">/</span>
-                  <span className="text-[#8f959e]">{c.referrer_handler || <EmptyValue />}</span>
+                  <span className="flex min-w-0 items-center" title={`${c.referrer || "-"} / ${c.referrer_handler || "-"}`}>
+                    <span className="min-w-0 truncate text-[#2b2f36]">{c.referrer || <EmptyValue />}</span>
+                    <span className="mx-1.5 shrink-0 text-[#d0d3d6]">/</span>
+                    <span className="min-w-0 truncate text-[#8f959e]">{c.referrer_handler || <EmptyValue />}</span>
+                  </span>
                 </TableCell>
                 <TableCell className="text-[11px] text-[#a8b1bd] tabular-nums">
                   {c.referral_date ? new Date(c.referral_date).toLocaleDateString("zh-CN") : <EmptyValue />}

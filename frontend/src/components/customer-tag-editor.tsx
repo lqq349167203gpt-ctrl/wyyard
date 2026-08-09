@@ -40,7 +40,7 @@ export function CustomerTagField({ tags, value, onChange, onTagCreated, disabled
 
   return (
     <div className="flex basis-full items-start gap-2">
-      <label className="mt-2 w-12 flex-shrink-0 text-right text-[12px] font-normal text-[#4e535a]">客户标签</label>
+      <label className="mt-2 w-12 flex-shrink-0 text-right text-[12px] font-light text-[#4e535a]">客户标签</label>
       <div className="flex min-w-0 flex-1 flex-wrap items-start gap-2 pr-[96px]">
         <SelectDropdown
           multi

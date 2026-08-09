@@ -64,8 +64,8 @@ export default function CustomerFormPage() {
   const [entityId, setEntityId] = useState<string | null>(id || null)
   const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
-  const [tagsLoaded, setTagsLoaded] = useState(!id)
-  const [tagsLoading, setTagsLoading] = useState(!!id)
+  const [tagsLoaded, setTagsLoaded] = useState(false)
+  const [tagsLoading, setTagsLoading] = useState(true)
   const [tagLoadError, setTagLoadError] = useState("")
   const initializedRef = useRef(false)
 
@@ -114,19 +114,31 @@ export default function CustomerFormPage() {
       navigate("/healing-records")
     }).finally(() => setLoading(false))
 
-    Promise.all([customerTagApi.list(), customerTagApi.listForCustomer(id)])
+  }, [id, navigate])
+
+  // 新建和编辑页面都加载可选标签；编辑时额外加载客户已有标签。
+  useEffect(() => {
+    let cancelled = false
+    setTagsLoading(true)
+    Promise.all([
+      customerTagApi.list(),
+      id ? customerTagApi.listForCustomer(id) : Promise.resolve([] as CustomerTag[]),
+    ])
       .then(([tags, selectedTags]) => {
+        if (cancelled) return
         setAvailableTags(tags)
         setSelectedTagIds(selectedTags.map(tag => tag.id))
         setTagsLoaded(true)
         setTagLoadError("")
       })
       .catch(error => {
+        if (cancelled) return
         setTagsLoaded(false)
         setTagLoadError(error instanceof Error ? error.message : "标签加载失败")
       })
-      .finally(() => setTagsLoading(false))
-  }, [id, navigate])
+      .finally(() => { if (!cancelled) setTagsLoading(false) })
+    return () => { cancelled = true }
+  }, [id])
 
   // 草稿本地存储
   const draftKey = id ? `customer-draft-${id}` : "customer-draft-new"
@@ -170,6 +182,9 @@ export default function CustomerFormPage() {
         if (tagsLoaded) await customerTagApi.setForCustomer(entityId, selectedTagIds)
       } else {
         const result = await customerApi.create(payload as Partial<CustomerCreate>)
+        if (tagsLoaded && selectedTagIds.length > 0) {
+          await customerTagApi.setForCustomer(result.id, selectedTagIds)
+        }
         setEntityId(result.id)
         navigate(`/healing-records/${result.id}/edit`, { replace: true })
       }
@@ -184,7 +199,7 @@ export default function CustomerFormPage() {
     } finally {
       setSaving(false)
     }
-  }, [form, entityId, navigate, selectedTagIds, tagsLoaded])
+  }, [form, entityId, navigate, selectedTagIds, tagsLoaded, customers, draftKey])
 
   // 引流人/承接人验证（blur 时检查）
   const validateReferrer = (value: string, field: "referrer" | "referrer_handler") => {
@@ -320,19 +335,6 @@ export default function CustomerFormPage() {
                 className="w-[200px]"
               />
             </div>
-            {isEdit && (
-              <CustomerTagField
-                tags={availableTags}
-                value={selectedTagIds}
-                onChange={setSelectedTagIds}
-                onTagCreated={tag => setAvailableTags(current => [...current, tag])}
-                disabled={!tagsLoaded}
-                loading={tagsLoading}
-              />
-            )}
-            {isEdit && tagLoadError && (
-              <p className="basis-full ml-[60px] text-[12px] text-[#c4506a]">{tagLoadError}，本次保存不会修改客户标签</p>
-            )}
             <div className="flex basis-full items-center gap-2">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">流量来源</label>
               <SelectDropdown
@@ -356,6 +358,17 @@ export default function CustomerFormPage() {
                 </div>
               )}
             </div>
+            <CustomerTagField
+              tags={availableTags}
+              value={selectedTagIds}
+              onChange={setSelectedTagIds}
+              onTagCreated={tag => setAvailableTags(current => [...current, tag])}
+              disabled={!tagsLoaded}
+              loading={tagsLoading}
+            />
+            {tagLoadError && (
+              <p className="basis-full ml-[60px] text-[12px] text-[#c4506a]">{tagLoadError}，本次保存不会修改客户标签</p>
+            )}
           </div>
         </div>
 

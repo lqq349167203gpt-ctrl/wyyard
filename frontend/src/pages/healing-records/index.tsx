@@ -100,36 +100,36 @@ export default function HealingRecordsPage() {
   }
 
   return (
-    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4">
+    <div className="min-h-full w-full min-w-0 max-w-full space-y-3 overflow-x-hidden bg-[#f4f5f6] p-4">
       {/* V2 页眉横条：标题 + 统计 */}
       <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
-        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">客户资料</span>
+        <span className="text-[15px] font-medium text-[#212631] whitespace-nowrap">客户资料</span>
         <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部客户关系档案</span>
         <span className="ml-auto flex items-center flex-wrap gap-y-1">
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
             <span className="text-[11px] text-[#79838f]"><span className="inline-block w-[7px] h-[7px] rounded-full bg-[#3370ff] mr-1 align-[1px]" />客户总数</span>
-            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? summary.total_customers.toLocaleString() : "-"}</span>
+            <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? summary.total_customers.toLocaleString() : "-"}</span>
           </span>
           <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
             <span className="text-[11px] text-[#79838f]">本月到店</span>
-            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? `${summary.arrived_customers_this_month.toLocaleString()} 人` : "-"}</span>
+            <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? `${summary.arrived_customers_this_month.toLocaleString()} 人` : "-"}</span>
           </span>
           <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
             <span className="text-[11px] text-[#79838f]">本月消费额</span>
-            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? `¥${summary.revenue_this_month.toLocaleString()}` : "-"}</span>
+            <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? `¥${summary.revenue_this_month.toLocaleString()}` : "-"}</span>
           </span>
           <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
             <span className="text-[11px] text-[#79838f]">待跟进</span>
-            <span className="text-[14px] font-semibold text-[#212631] tabular-nums">{summary ? `${summary.not_arrived_customers.toLocaleString()} 人` : "-"}</span>
+            <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? `${summary.not_arrived_customers.toLocaleString()} 人` : "-"}</span>
           </span>
         </span>
       </div>
 
       {/* 表格卡：筛选条 + 数据表 */}
-      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden">
+      <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
           <div className="w-[172px]">
             <CustomerSearchInput
