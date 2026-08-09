@@ -7,6 +7,14 @@ def _u():
     return uuid.uuid4().hex[:12]
 
 
+@pytest.fixture
+def bypass_owner_invitation_validation(monkeypatch):
+    """这些穷举用例只验证场次字段；邀约规则由专项规则测试覆盖。"""
+    from app.services import visit_service
+
+    monkeypatch.setattr(visit_service, "validate_activity_owner", lambda date, customer_id: None)
+
+
 # ===== 沙龙记录 (Class Records) =====
 
 class TestClassRecordFull:
@@ -184,6 +192,7 @@ class TestClassRecordFull:
 
 # ===== 觉醒游戏场次 (Group Case Sessions) =====
 
+@pytest.mark.usefixtures("bypass_owner_invitation_validation")
 class TestGroupCaseSessionFull:
     """觉醒游戏场次完整测试"""
 
@@ -361,6 +370,7 @@ class TestGroupCaseSessionFull:
 
 # ===== 情绪释放场次 =====
 
+@pytest.mark.usefixtures("bypass_owner_invitation_validation")
 class TestEmotionalReleaseSessionFull:
     def test_create_basic(self, client, created_customer):
         resp = client.post("/api/emotional-release-sessions", json={
@@ -469,6 +479,7 @@ class TestEmotionalReleaseSessionFull:
 
 # ===== 能量结场次 =====
 
+@pytest.mark.usefixtures("bypass_owner_invitation_validation")
 class TestEnergyKnotSessionFull:
     def test_create_basic(self, client, created_customer):
         resp = client.post("/api/energy-knot-sessions", json={

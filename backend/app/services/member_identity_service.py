@@ -209,7 +209,7 @@ def _check_condition(condition, customer_id: str,
                 total = sum(c.purchase_count for c in customer_energy_knots)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True
-            elif cat == "OH卡梳理":
+            elif cat == "OH卡诊断":
                 total = sum(c.purchase_count for c in customer_oh_card_readings)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True
@@ -298,6 +298,8 @@ def refresh_member_type(customer_id: str):
         membership_card_service,
         oh_card_reading_service,
         other_project_service,
+        tea_seat_fee_service,
+        offline_course_service,
         visit_service,
     )
 
@@ -318,6 +320,12 @@ def refresh_member_type(customer_id: str):
 
     all_oh_card_readings = oh_card_reading_service.list_readings()
     customer_oh_card_readings = [c for c in all_oh_card_readings if c.customer_id == customer_id]
+
+    all_offline_courses = offline_course_service.list_courses()
+    customer_offline_courses = [c for c in all_offline_courses if c.customer_id == customer_id]
+
+    all_tea_seat_fees = tea_seat_fee_service.list_fees()
+    customer_tea_seat_fees = [c for c in all_tea_seat_fees if c.customer_id == customer_id]
 
     all_other_projects = other_project_service.list_projects()
     customer_other_projects = [c for c in all_other_projects if c.customer_id == customer_id]
@@ -357,6 +365,10 @@ def refresh_member_type(customer_id: str):
         customer_total_payment += c.price
     for r in customer_oh_card_readings:
         customer_total_payment += r.amount
+    for t in customer_tea_seat_fees:
+        customer_total_payment += t.amount
+    for c in customer_offline_courses:
+        customer_total_payment += c.amount
     for p in customer_other_projects:
         customer_total_payment += p.fee
     for r in project_refund_service.list_refunds(customer_id=customer_id):
@@ -404,6 +416,8 @@ def refresh_all():
         membership_card_service,
         oh_card_reading_service,
         other_project_service,
+        tea_seat_fee_service,
+        offline_course_service,
         visit_service,
     )
 
@@ -417,6 +431,8 @@ def refresh_all():
     all_emotional_releases = emotional_release_service.list_releases()
     all_energy_knots = energy_knot_service.list_knots()
     all_oh_card_readings = oh_card_reading_service.list_readings()
+    all_offline_courses = offline_course_service.list_courses()
+    all_tea_seat_fees = tea_seat_fee_service.list_fees()
     all_other_projects = other_project_service.list_projects()
     all_visits = visit_service.list_visits()
     all_records = class_record_service.list_records()
@@ -502,6 +518,8 @@ def refresh_all():
         customer_emotional_releases = [x for x in all_emotional_releases if x.customer_id == c.id]
         customer_energy_knots = [x for x in all_energy_knots if x.customer_id == c.id]
         customer_oh_card_readings = [x for x in all_oh_card_readings if x.customer_id == c.id]
+        customer_tea_seat_fees = [x for x in all_tea_seat_fees if x.customer_id == c.id]
+        customer_offline_courses = [x for x in all_offline_courses if x.customer_id == c.id]
         customer_other_projects = [x for x in all_other_projects if x.customer_id == c.id]
         arrival_count = arrival_map.get(c.id, 0)
         activity_count = len(activity_dates_map.get(c.id, set()))
@@ -521,6 +539,10 @@ def refresh_all():
         for x in customer_courses:
             customer_total_payment += x.price
         for x in customer_oh_card_readings:
+            customer_total_payment += x.amount
+        for x in customer_tea_seat_fees:
+            customer_total_payment += x.amount
+        for x in customer_offline_courses:
             customer_total_payment += x.amount
         for x in customer_other_projects:
             customer_total_payment += x.fee

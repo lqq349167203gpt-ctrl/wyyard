@@ -83,8 +83,8 @@ def delete_release(release_id: str) -> tuple[bool, str]:
     if not release:
         return False, "记录不存在"
     from app.services import emotional_release_session_service
-    remaining = emotional_release_session_service.get_remaining_count(release.customer_id)
-    if remaining - release.purchase_count < 0:
+    purchase_remaining = emotional_release_session_service.get_purchase_remaining(release_id)
+    if purchase_remaining < release.purchase_count:
         return False, "该记录中有正在被使用的次数，无法删除"
     release.is_deleted = True
     release.deleted_at = datetime.now(timezone.utc)

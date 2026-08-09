@@ -1,4 +1,4 @@
-const { customerApi } = require('../../utils/api')
+const { customerApi, customerTagApi } = require('../../utils/api')
 
 const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
 const TRAFFIC_NEED_LINK = ['小红书', '抖音', '公众号', '视频号']
@@ -9,6 +9,12 @@ function getTodayDate() {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function markPreviousPageForRefresh() {
+  const pages = getCurrentPages()
+  const previousPage = pages.length > 1 ? pages[pages.length - 2] : null
+  if (previousPage) previousPage._needRefresh = true
 }
 
 Page({
@@ -39,6 +45,15 @@ Page({
     other_info: '',
     trafficSources: TRAFFIC_SOURCES,
     followUpStatuses: ['新添加', '沟通中', '已到店', '已成交', '沉默/流失'],
+    customerTags: [],
+    selectedTagIds: [],
+    selectedTagText: '',
+    tagPickerItems: [],
+    showTagPicker: false,
+    tagLoading: false,
+    tagsLoaded: false,
+    newPrivateTagName: '',
+    creatingTag: false,
     // 搜索选择弹窗
     allCustomers: [],
     showPicker: false,
@@ -49,6 +64,7 @@ Page({
   },
 
   onLoad(options) {
+    if (!getApp().checkLogin()) return
     if (options.id) {
       this.setData({ id: options.id, isEdit: true })
       wx.setNavigationBarTitle({ title: '编辑客户' })
@@ -57,6 +73,7 @@ Page({
       this.setData({ referral_date: getTodayDate() })
       wx.setNavigationBarTitle({ title: '新增客户' })
     }
+    this.loadCustomerTags(options.id || '')
     this.loadCustomers()
 
     // 语音录入预填
@@ -76,6 +93,99 @@ Page({
         getApp().globalData._voicePrefill = null
       }
     }
+  },
+
+  async loadCustomerTags(customerId) {
+    this.setData({ tagLoading: true })
+    try {
+      const tags = await customerTagApi.list()
+      const selectedTags = customerId
+        ? await customerTagApi.listForCustomer(customerId)
+        : []
+      const selectedTagIds = (selectedTags || []).map(tag => tag.id)
+      this.setData({
+        customerTags: tags || [],
+        selectedTagIds,
+        selectedTagText: this.buildTagText(tags || [], selectedTagIds),
+        tagsLoaded: true,
+      })
+    } catch (e) {
+      this.setData({ tagsLoaded: false })
+    } finally {
+      this.setData({ tagLoading: false })
+    }
+  },
+
+  buildTagText(tags, selectedIds) {
+    const selected = new Set(selectedIds || [])
+    return (tags || []).filter(tag => selected.has(tag.id)).map(tag => tag.name).join('、')
+  },
+
+  async onTagPickerOpen() {
+    if (this.data.tagLoading) return
+    if (!this.data.tagsLoaded) {
+      await this.loadCustomerTags(this.data.id)
+      if (!this.data.tagsLoaded) {
+        wx.showToast({ title: '标签加载失败，请稍后重试', icon: 'none' })
+        return
+      }
+    }
+    const selected = new Set(this.data.selectedTagIds)
+    this.setData({
+      showTagPicker: true,
+      newPrivateTagName: '',
+      tagPickerItems: this.data.customerTags.map(tag => Object.assign({}, tag, {
+        selected: selected.has(tag.id),
+        scopeText: tag.scope === 'private' ? '仅自己可见' : '公共',
+      })),
+    })
+  },
+
+  onTagPickerClose() {
+    this.setData({ showTagPicker: false, newPrivateTagName: '', tagPickerItems: [] })
+  },
+
+  onTagSelectionChange(e) {
+    const selected = new Set(e.detail.value || [])
+    this.setData({
+      tagPickerItems: this.data.tagPickerItems.map(tag => Object.assign({}, tag, {
+        selected: selected.has(tag.id),
+      })),
+    })
+  },
+
+  onPrivateTagNameInput(e) {
+    this.setData({ newPrivateTagName: e.detail.value })
+  },
+
+  async onCreatePrivateTag() {
+    const name = (this.data.newPrivateTagName || '').trim()
+    if (!name || this.data.creatingTag) return
+    this.setData({ creatingTag: true })
+    try {
+      const tag = await customerTagApi.createPrivate(name)
+      const customerTags = this.data.customerTags.concat([tag])
+      const tagPickerItems = this.data.tagPickerItems.concat([Object.assign({}, tag, {
+        selected: true,
+        scopeText: '仅自己可见',
+      })])
+      this.setData({ customerTags, tagPickerItems, newPrivateTagName: '' })
+    } catch (e) {
+      wx.showToast({ title: e.message || '新增标签失败', icon: 'none' })
+    } finally {
+      this.setData({ creatingTag: false })
+    }
+  },
+
+  onTagPickerConfirm() {
+    const selectedTagIds = this.data.tagPickerItems.filter(tag => tag.selected).map(tag => tag.id)
+    this.setData({
+      selectedTagIds,
+      selectedTagText: this.buildTagText(this.data.customerTags, selectedTagIds),
+      showTagPicker: false,
+      tagPickerItems: [],
+      newPrivateTagName: '',
+    })
   },
 
   async loadCustomers() {
@@ -211,6 +321,7 @@ Page({
         this.setData({ deleting: true })
         try {
           await customerApi.delete(this.data.id)
+          markPreviousPageForRefresh()
           wx.showToast({ title: '已停用' })
           wx.navigateBack()
         } catch (e) {
@@ -254,11 +365,18 @@ Page({
 
       if (this.data.isEdit) {
         await customerApi.update(this.data.id, data)
+        if (this.data.tagsLoaded) {
+          await customerTagApi.setForCustomer(this.data.id, this.data.selectedTagIds)
+        }
         wx.showToast({ title: '已保存' })
       } else {
-        await customerApi.create(data)
+        const customer = await customerApi.create(data)
+        if (this.data.tagsLoaded && this.data.selectedTagIds.length > 0) {
+          await customerTagApi.setForCustomer(customer.id, this.data.selectedTagIds)
+        }
         wx.showToast({ title: '已添加' })
       }
+      markPreviousPageForRefresh()
       wx.navigateBack()
     } catch (e) {
       const msg = e.message || '保存失败'

@@ -89,6 +89,9 @@
 
 /* 筛选面板 */
 .filter-dropdown {
+  box-sizing: border-box;
+  max-height: calc(100vh - 112rpx);
+  overflow-y: auto;
   padding: 24rpx 32rpx 0;
 }
 
@@ -108,6 +111,22 @@
   font-weight: 500;
   color: #1f2329;
   margin-bottom: 20rpx;
+}
+
+.filter-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-title-row .filter-section-title {
+  margin-bottom: 20rpx;
+}
+
+.filter-section-hint {
+  margin-bottom: 20rpx;
+  color: #8f959e;
+  font-size: 21rpx;
 }
 
 .filter-section-empty {
@@ -158,6 +177,30 @@
   background-color: #e8f0fe;
   color: #1677ff;
   font-weight: 500;
+}
+
+.customer-filter-tag {
+  display: flex;
+  align-items: center;
+  max-width: 280rpx;
+  gap: 8rpx;
+}
+
+.customer-filter-tag-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-filter-tag-scope {
+  flex-shrink: 0;
+  color: #8f959e;
+  font-size: 19rpx;
+}
+
+.customer-filter-tag.active .customer-filter-tag-scope {
+  color: #5f7fb2;
 }
 
 .range-panel-content {
@@ -305,9 +348,28 @@
 }
 
 .item-nickname {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 30rpx;
   font-weight: 400;
   color: #1f2329;
+}
+
+.item-customer-tag {
+  flex-shrink: 0;
+  max-width: 150rpx;
+  overflow: hidden;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  background-color: #f0f4ff;
+  color: #3370ff;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-days {

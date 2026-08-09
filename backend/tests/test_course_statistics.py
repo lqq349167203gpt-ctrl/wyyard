@@ -65,7 +65,6 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         ("class", "沙龙活动", lambda **_kwargs: [salon]),
         ("gcs", "觉醒游戏", lambda **_kwargs: [awakening]),
         ("ers", "情绪释放", empty_loader),
-        ("ocr", "OH卡梳理", empty_loader),
         ("eks", "能量结", empty_loader),
         ("ics", "内部课程", empty_loader),
     ))

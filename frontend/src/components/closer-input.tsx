@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import { X, Plus } from "lucide-react"
+import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { type Customer, type CustomerLight } from "@/lib/api"

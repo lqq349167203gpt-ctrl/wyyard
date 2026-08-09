@@ -4,7 +4,7 @@ from typing import Optional
 
 
 class ActivityRegistrationCreate(StrictBaseModel):
-    activity_type: str  # class_record / gcs / ers / eks / ics / ocr
+    activity_type: str  # class_record / gcs / ers / eks / ics
     activity_id: str
     activity_name: str
     activity_date: str

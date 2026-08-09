@@ -83,10 +83,10 @@ def delete_reading(reading_id: str) -> tuple[bool, str]:
     reading = _readings.get(reading_id)
     if not reading:
         return False, "记录不存在"
-    from app.services import oh_card_reading_session_service
-    remaining = oh_card_reading_session_service.get_remaining_count(reading.customer_id)
-    if remaining - reading.purchase_count < 0:
-        return False, "该记录中有正在被使用的次数，无法删除"
+    from app.services import project_deduction_service
+    deducted = project_deduction_service.get_deduction_total_for_project(reading_id)
+    if deducted > 0:
+        return False, "该记录已有销卡记录，无法删除"
     reading.is_deleted = True
     reading.deleted_at = datetime.now(timezone.utc)
     _save(reading_id)

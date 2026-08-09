@@ -12,14 +12,14 @@ function getDaysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
 }
 
-const PRODUCT_TYPES = ["全部", "会员卡", "觉醒游戏", "情绪释放", "OH卡梳理", "能量结", "内部课程", "其他项目"]
+const PRODUCT_TYPES = ["全部", "会员卡", "觉醒游戏", "情绪释放", "OH卡诊断", "能量结", "内部课程", "其他项目"]
 
 const TYPE_KEYS = [
   { label: "总金额", key: "total" },
   { label: "会员卡", key: "会员卡" },
   { label: "觉醒游戏", key: "觉醒游戏" },
   { label: "情绪释放", key: "情绪释放" },
-  { label: "OH卡梳理", key: "OH卡梳理" },
+  { label: "OH卡诊断", key: "OH卡诊断" },
   { label: "能量结", key: "能量结" },
   { label: "内部课程", key: "内部课程" },
   { label: "其他项目", key: "其他项目" },
@@ -225,9 +225,8 @@ export default function ProductSalesPage() {
   }, [dateRange, productType, nameFilter, granularity, selectedReferrer, selectedTeacherId])
 
   return (
-    <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
-      <div>
-        <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
+    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4">
+      <div className="bg-white rounded-xl px-[22px] py-4">
           <h1 className="text-[16px] font-medium text-[#1f2329] mb-4">产品销售</h1>
 
           {/* 筛选栏 */}
@@ -349,7 +348,7 @@ export default function ProductSalesPage() {
                   onClick={() => setDataType("count")}
                   className={`px-3 h-[26px] text-[11px] rounded-[2px] transition-all ${dataType === "count" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
                 >
-                  成交量
+                  成交单数
                 </button>
                 <button
                   onClick={() => setDataType("persons")}
@@ -407,7 +406,7 @@ export default function ProductSalesPage() {
         </div>
 
         {/* 汇总卡片 */}
-        <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
+        <div className="bg-white rounded-xl px-[22px] py-4">
           <div className="flex gap-3">
             <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
               <div className="flex items-center gap-1.5 mb-0.5">
@@ -425,27 +424,27 @@ export default function ProductSalesPage() {
             <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#5b8ff9" }}></span>
-                <span className="text-[12px] text-[#4e535a]">总成交量</span>
+                <span className="text-[12px] text-[#4e535a]">总成交单数</span>
               </div>
               <div className="flex items-baseline gap-1">
                 {loading ? (
                   <span className="text-[14px] text-[#b0b5bd]">...</span>
                 ) : (
-                  <span className="text-[20px] font-medium text-[#1f2329]">{productData?.total_count ?? 0}<span className="text-[10px] text-[#8f959e] ml-1">笔</span></span>
+                  <span className="text-[20px] font-medium text-[#1f2329]">{productData?.total_count ?? 0}<span className="text-[10px] text-[#8f959e] ml-1">单</span></span>
                 )}
               </div>
             </div>
-            {["觉醒游戏", "情绪释放", "OH卡梳理", "能量结", "其他项目"].includes(productType) && (
+            {["觉醒游戏", "情绪释放", "OH卡诊断", "能量结", "其他项目"].includes(productType) && (
               <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#9254de" }}></span>
-                  <span className="text-[12px] text-[#4e535a]">售出产品数</span>
+                  <span className="text-[12px] text-[#4e535a]">{productType === "OH卡诊断" ? "总时长" : productType === "能量结" ? "总部位数" : productType === "觉醒游戏" || productType === "情绪释放" ? "总场次数" : "售出产品数"}</span>
                 </div>
                 <div className="flex items-baseline gap-1">
                   {loading ? (
                     <span className="text-[14px] text-[#b0b5bd]">...</span>
                   ) : (
-                    <span className="text-[20px] font-medium text-[#1f2329]">{productData?.total_purchase_count ?? 0}<span className="text-[10px] text-[#8f959e] ml-1">次</span></span>
+                    <span className="text-[20px] font-medium text-[#1f2329]">{productData?.total_purchase_count ?? 0}<span className="text-[10px] text-[#8f959e] ml-1">{productType === "能量结" ? "个" : productType === "觉醒游戏" || productType === "情绪释放" ? "场" : "次"}</span></span>
                   )}
                 </div>
               </div>
@@ -468,11 +467,11 @@ export default function ProductSalesPage() {
 
         {/* 折线图 + 柱状图 */}
         {true && (
-          <div className={`flex gap-1.5 mt-1.5`}>
+          <div className="flex gap-1.5">
             {/* 折线图 */}
-            <div className={`min-w-0 bg-white rounded-[4px] px-[22px] py-4 select-none *:outline-none *:focus:outline-none ${productType === "全部" || productType === "会员卡" ? "flex-1" : "flex-1"}`} onMouseDown={(e) => e.preventDefault()}>
+            <div className={`min-w-0 bg-white rounded-xl px-[22px] py-4 select-none *:outline-none *:focus:outline-none ${productType === "全部" || productType === "会员卡" ? "flex-1" : "flex-1"}`} onMouseDown={(e) => e.preventDefault()}>
               <div className="mb-[18px]">
-                <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}{dataType === "amount" ? "金额" : dataType === "count" ? "成交量" : "成交人数"}变化</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
+                <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}{dataType === "amount" ? "金额" : dataType === "count" ? "成交单数" : "成交人数"}变化</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
                 <div className="flex items-center gap-4 flex-wrap">
                   {lineTypes.map((t, i) => (
                     <label key={t.key} className="flex items-center gap-1 cursor-pointer select-none" onClick={() => setVisibleLines((prev) => ({ ...prev, [t.key]: !prev[t.key] }))}>
@@ -576,9 +575,9 @@ export default function ProductSalesPage() {
 
             {/* 右侧：柱状图 — 全部、会员卡、内部课程、其他项目时显示 */}
             {(productType === "全部" || productType === "会员卡" || productType === "内部课程" || productType === "其他项目") && (
-              <div className="flex-1 min-w-0 bg-white rounded-[4px] px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
+              <div className="flex-1 min-w-0 bg-white rounded-xl px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
                 <div className="mb-[18px]">
-                  <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">产品类型{dataType === "amount" ? "金额" : dataType === "count" ? "成交量" : "成交人数"}</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
+                  <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">产品类型{dataType === "amount" ? "金额" : dataType === "count" ? "成交单数" : "成交人数"}</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
                 </div>
                 {loading ? (
                   <div className="flex items-center justify-center h-[160px] text-[#8f959e] text-[12px]">加载中...</div>
@@ -604,7 +603,7 @@ export default function ProductSalesPage() {
                         tickFormatter={(v) => Number(v) >= 10000 ? `${(Number(v) / 10000).toFixed(0)}万` : String(v)}
                       />
                       <Tooltip
-                        formatter={(value) => [dataType === "amount" ? `¥${value}` : dataType === "count" ? `${value}笔` : `${value}人`, dataType === "amount" ? "金额" : dataType === "count" ? "成交量" : "成交人数"]}
+                        formatter={(value) => [dataType === "amount" ? `¥${value}` : dataType === "count" ? `${value}单` : `${value}人`, dataType === "amount" ? "金额" : dataType === "count" ? "成交单数" : "成交人数"]}
                         contentStyle={{ fontSize: 12, borderRadius: 4 }}
                         cursor={{ fill: "transparent" }}
                       />
@@ -622,7 +621,7 @@ export default function ProductSalesPage() {
         )}
 
         {/* 每日列表 */}
-        <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4 min-h-[400px]">
+        <div className="bg-white rounded-xl px-[22px] py-4 min-h-[400px]">
           <div className="mb-3">
             <div className="flex items-center gap-2 text-[12px] font-medium text-[#4e535a]">
               <span>每日成交数据</span>
@@ -666,8 +665,8 @@ export default function ProductSalesPage() {
                       { key: "invited", label: "邀约人数", w: "w-24" },
                       { key: "arrived", label: "实际到访", w: "w-24" },
                       { key: "converted_persons", label: "成交人数", w: "w-24" },
-                      { key: "converted_count", label: "成交量", w: "w-24" },
-                      ...(["觉醒游戏", "情绪释放", "OH卡梳理", "能量结", "其他项目"].includes(productType) ? [{ key: "purchase_count", label: "售出产品数", w: "w-24" }] : []),
+                      { key: "converted_count", label: "成交单数", w: "w-24" },
+                      ...(["觉醒游戏", "情绪释放", "OH卡诊断", "能量结", "其他项目"].includes(productType) ? [{ key: "purchase_count", label: productType === "OH卡诊断" ? "总时长" : productType === "能量结" ? "总部位数" : productType === "觉醒游戏" || productType === "情绪释放" ? "总场次数" : "售出产品数", w: "w-24" }] : []),
                       { key: "converted_amount", label: "成交金额", w: "w-28" },
                     ].map(({ key, label, w }) => (
                       <th key={key} className={`px-3 font-normal ${w}`}>
@@ -691,8 +690,8 @@ export default function ProductSalesPage() {
                       <td className={`truncate px-3 tabular-nums ${row.arrived ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.arrived && handleCellClick("arrived", row.date)}>{row.arrived || <EmptyValue />}</td>
                       <td className={`truncate px-3 tabular-nums ${row.converted_persons ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_persons && handleCellClick("persons", row.date)}>{row.converted_persons || <EmptyValue />}</td>
                       <td className={`truncate px-3 tabular-nums ${row.converted_count ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_count && handleCellClick("count", row.date)}>{row.converted_count || <EmptyValue />}</td>
-                      {["觉醒游戏", "情绪释放", "OH卡梳理", "能量结", "其他项目"].includes(productType) && (
-                        <td className={`truncate px-3 tabular-nums ${row.purchase_count ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.purchase_count && handleCellClick("purchase", row.date)}>{row.purchase_count || <EmptyValue />}</td>
+                      {["觉醒游戏", "情绪释放", "OH卡诊断", "能量结", "其他项目"].includes(productType) && (
+                        <td className={`truncate px-3 tabular-nums ${row.purchase_count ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.purchase_count && handleCellClick("purchase", row.date)}>{productType === "OH卡诊断" ? (row.purchase_count ? `${row.purchase_count * 0.5}小时` : <EmptyValue />) : (row.purchase_count || <EmptyValue />)}</td>
                       )}
                       <td className={`truncate px-3 tabular-nums ${row.converted_amount ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_amount && handleCellClick("amount", row.date)}>{row.converted_amount ? `¥${row.converted_amount}` : <EmptyValue />}</td>
                     </tr>
@@ -710,14 +709,12 @@ export default function ProductSalesPage() {
             onPageChange={goToPage}
           />
         </div>
-      </div>
-
       {/* 详情弹窗 */}
       <Dialog open={popupType !== null} onOpenChange={(open) => { if (!open) { setPopupType(null); setPopupData([]); setPopupDate(null) } }}>
-        <DialogContent className={`${popupType === "persons" ? "max-w-[780px]" : popupType === "amount" || popupType === "count" || popupType === "purchase" ? "max-w-[680px]" : "max-w-[580px]"} max-h-[60vh] overflow-y-auto p-0 gap-0`} initialFocus={false}>
+        <DialogContent className={`${popupType === "persons" ? "max-w-[780px]" : popupType === "amount" || popupType === "count" || popupType === "purchase" ? "max-w-[780px]" : "max-w-[580px]"} max-h-[60vh] overflow-y-auto p-0 gap-0`} initialFocus={false}>
           <div className="px-4 py-3 border-b border-[#f0f0f0]">
             <span className="text-[14px] font-medium text-[#1f2329]">
-              {popupType ? { invited: "邀约到访", arrived: "实际到访", persons: "成交人数", amount: "成交金额", count: "成交量", purchase: "售出产品数" }[popupType] : ""}
+              {popupType ? { invited: "邀约到访", arrived: "实际到访", persons: "成交人数", amount: "成交金额", count: "成交单数", purchase: productType === "OH卡诊断" ? "总时长" : productType === "能量结" ? "总部位数" : productType === "觉醒游戏" || productType === "情绪释放" ? "总场次数" : "售出产品数" }[popupType] : ""}
             </span>
             {popupDate && <span className="text-[12px] text-[#8f959e] ml-2">{popupDate}</span>}
           </div>
@@ -793,15 +790,26 @@ export default function ProductSalesPage() {
                   })}
                 </>
               )}
-              {(popupType === "amount" || popupType === "count" || popupType === "purchase") && (
+              {(popupType === "amount" || popupType === "count" || popupType === "purchase") && (() => {
+                const isOHCard = productType === "OH卡诊断"
+                const isEnergyKnot = productType === "能量结"
+                const isSession = productType === "觉醒游戏" || productType === "情绪释放"
+                const formatOHDuration = (dd: unknown) => {
+                  if (dd == null) return "-"
+                  const n = Number(dd)
+                  if (isNaN(n)) return "-"
+                  return `${n * 0.5}小时`
+                }
+                return (
                 <>
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-24 shrink-0">昵称</span>
                     <span className="w-20 shrink-0">项目类型</span>
                     <span className="flex-1 min-w-0">项目名称</span>
-                    <span className="w-20 shrink-0">购买场次</span>
+                    <span className="w-20 shrink-0">{isOHCard ? "时长" : isEnergyKnot ? "部位数" : isSession ? "场次数" : "购买场次"}</span>
                     <span className="w-20 shrink-0">金额</span>
-                    <span className="w-36 shrink-0">成交人</span>
+                    <span className="w-28 shrink-0">成交人</span>
+                    <span className="w-[100px] shrink-0">备注</span>
                   </div>
                   {popupData.map((r, i) => {
                     const closers = (r.closers as { name: string; amount: number }[]) || []
@@ -810,14 +818,16 @@ export default function ProductSalesPage() {
                         <span className="w-24 shrink-0 truncate">{r.nickname as string}</span>
                         <span className="w-20 shrink-0 text-[#8f959e]">{r.type as string}</span>
                         <span className="flex-1 min-w-0 truncate">{r.name as string || "-"}</span>
-                        <span className="w-20 shrink-0">{r.purchase_count != null ? String(r.purchase_count) : "-"}</span>
+                        <span className="w-20 shrink-0">{isOHCard ? formatOHDuration(r.diagnosis_duration) : (r.purchase_count != null ? String(r.purchase_count) : "-")}</span>
                         <span className="w-20 shrink-0">¥{r.amount as number}</span>
-                        <span className="w-36 shrink-0 text-[#8f959e]">{closers.length > 0 ? closers.map(cl => `${cl.name} ¥${cl.amount}`).join("、") : "-"}</span>
+                        <span className="w-28 shrink-0 text-[#8f959e] truncate">{closers.length > 0 ? closers.map(cl => `${cl.name} ¥${cl.amount}`).join("、") : "-"}</span>
+                        <span className="w-[100px] shrink-0 truncate">{(r.notes as string) || <span className="text-[#c9cdd4]">-</span>}</span>
                       </div>
                     )
                   })}
                 </>
-              )}
+                )
+              })()}
             </div>
           )}
         </DialogContent>

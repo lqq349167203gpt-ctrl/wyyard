@@ -342,3 +342,19 @@ def require_admin(request: Request):
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="权限不足")
     return user_role
+
+
+def require_page_permission(page_key: str):
+    """FastAPI 依赖：要求超级管理员或当前角色拥有指定页面权限。"""
+    def dependency(request: Request):
+        user_role = getattr(request.state, "user_role", "")
+        if user_role == "超级管理员":
+            return user_role
+
+        from app.services import position_permission_service
+        if page_key not in position_permission_service.get_permissions(user_role):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="权限不足")
+        return user_role
+
+    return dependency

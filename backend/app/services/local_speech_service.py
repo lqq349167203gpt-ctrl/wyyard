@@ -11,7 +11,7 @@ _model: Any = None
 _model_lock = threading.Lock()
 _transcribe_lock = threading.Lock()
 
-DOMAIN_PROMPT = "无忧茶苑，客户，邀约，课表，沙龙活动，觉醒游戏，情绪释放，OH卡梳理，能量结，内部课程。"
+DOMAIN_PROMPT = "无忧茶苑，客户，邀约，课表，沙龙活动，觉醒游戏，情绪释放，能量结，内部课程。"
 
 
 def _get_model():

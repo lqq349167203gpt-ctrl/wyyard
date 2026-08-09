@@ -30,8 +30,10 @@ import { usePagination } from "@/hooks/use-pagination"
 import {
   customerApi,
   customerDetailApi,
+  customerTagApi,
   statisticsApi,
   type CustomerFollowUpStatus,
+  type CustomerTag,
   type ReferralStatistics,
 } from "@/lib/api"
 import { calcYAxisWidth } from "@/lib/utils"
@@ -85,6 +87,9 @@ export default function ReferralStatisticsPage() {
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
   const [dataType, setDataType] = useState<"total" | "new">("total")
   const [selectedReferrer, setSelectedReferrer] = useState("")
+  const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [tagMatch, setTagMatch] = useState<"any" | "all">("any")
   const [selectedTrendPeriod, setSelectedTrendPeriod] = useState("")
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
   const [persistedTypeNames, setPersistedTypeNames] = useState<string[]>([])
@@ -107,6 +112,10 @@ export default function ReferralStatisticsPage() {
   )
   const [savingStatusCustomerId, setSavingStatusCustomerId] = useState<string | null>(null)
   const [statusError, setStatusError] = useState("")
+
+  useEffect(() => {
+    customerTagApi.list().then(setCustomerTags).catch(() => setCustomerTags([]))
+  }, [])
 
   const dateRange = useMemo(() => ({
     from: `${startYear}-${String(startMonth).padStart(2, "0")}-${String(startDay).padStart(2, "0")}`,
@@ -171,6 +180,8 @@ export default function ReferralStatisticsPage() {
         granularity,
         referrer: selectedReferrer || undefined,
         member_types: selectedTypes.size > 0 ? Array.from(selectedTypes).join(",") : undefined,
+        tag_ids: selectedTagIds.length > 0 ? selectedTagIds.join(",") : undefined,
+        tag_match: tagMatch,
       })
       setData(result)
       if (result.member_type_names) setPersistedTypeNames(result.member_type_names)
@@ -180,7 +191,7 @@ export default function ReferralStatisticsPage() {
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [dateRange, granularity, selectedReferrer, selectedTypes, hasNoSelection])
+  }, [dateRange, granularity, selectedReferrer, selectedTagIds, selectedTypes, tagMatch, hasNoSelection])
 
   useEffect(() => {
     fetchData()
@@ -303,7 +314,7 @@ export default function ReferralStatisticsPage() {
   useEffect(() => {
     setSelectedTrendPeriod("")
     goToPage(1)
-  }, [dateRange, granularity, selectedReferrer, selectedTypes])
+  }, [dateRange, granularity, selectedReferrer, selectedTagIds, selectedTypes, tagMatch])
 
   const handleSort = (field: keyof Member) => {
     if (sortField === field) {
@@ -526,6 +537,40 @@ export default function ReferralStatisticsPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
+              <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
+              客户标签
+            </span>
+            <SelectDropdown
+              multi
+              value={selectedTagIds}
+              options={customerTags.map(tag => ({
+                value: tag.id,
+                label: tag.scope === "private" ? `${tag.name} · 我的` : tag.name,
+              }))}
+              placeholder="全部标签"
+              onChange={setSelectedTagIds}
+              className="w-[180px]"
+              buttonClassName="border-[#dee0e3] bg-white px-2.5"
+              rounded="4px"
+              clearable
+            />
+            {selectedTagIds.length > 1 && (
+              <SelectDropdown
+                value={tagMatch}
+                options={[
+                  { value: "any", label: "任一标签" },
+                  { value: "all", label: "全部满足" },
+                ]}
+                onChange={value => setTagMatch(value as "any" | "all")}
+                className="w-[108px]"
+                buttonClassName="border-[#dee0e3] bg-white px-2.5"
+                rounded="4px"
+              />
+            )}
           </div>
         </div>
       </div>

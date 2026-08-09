@@ -30,11 +30,13 @@ interface Props {
   filterIdentity: string
   filterReferrer: string
   filterReferrerHandler: string
+  filterTagIds: string[]
+  filterTagMatch: "any" | "all"
   refreshKey?: number
   summary?: import("@/lib/api").DashboardSummary | null
 }
 
-export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, refreshKey = 0, summary = null }: Props) {
+export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, refreshKey = 0, summary = null }: Props) {
   const { permissions: cpCustomers, ready: permReady } = useCustomerPermissions("customers")
 
   // Keep latest permission values in refs so the fetch function always reads current state
@@ -81,11 +83,13 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
       member_type: filterIdentity || undefined,
       referrer: filterReferrer || undefined,
       referrer_handler: filterReferrerHandler || undefined,
+      tag_ids: filterTagIds.length ? filterTagIds.join(",") : undefined,
+      tag_match: filterTagMatch,
       member_types: memberTypes,
       sort_by: sortField || undefined,
       sort_order: sortOrder,
     })
-  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, sortField, sortOrder])
+  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, sortField, sortOrder])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, resetPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
 
@@ -112,7 +116,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
   useEffect(() => {
     if (filterInitRef.current) { filterInitRef.current = false; return }
     resetPage()
-  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, resetPage])
+  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, resetPage])
 
   // 排序变化时回到第一页
   useEffect(() => {
@@ -120,7 +124,8 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
   }, [sortField, sortOrder, resetPage])
 
   return (
-      <div className="overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
+      <div className="dv-list overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
+        <style>{`.dv-list th, .dv-list td { font-size: 13px; }`}</style>
         {loading || !permReady ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
         ) : paginatedItems.length === 0 ? (
@@ -129,12 +134,13 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
           <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4" style={{ width: "140px" }}>客户</TableHead>
+                <TableHead className="pl-4" style={{ width: "170px" }}>客户</TableHead>
                 <TableHead style={{ width: "110px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("member_type")}>
                     会员身份<SortArrow field="member_type" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
+                <TableHead style={{ width: "130px" }}>客户标签</TableHead>
                 <TableHead style={{ width: "90px" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("visit_count")}>
                     到店<SortArrow field="visit_count" sortField={sortField} sortOrder={sortOrder} />
@@ -174,14 +180,14 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
               >
                 <TableCell className="pl-4">
                   <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef0f2] text-[12px] font-medium text-[#646a73]">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef0f2] text-[11px] font-medium text-[#646a73]">
                       {(c.nickname || c.name || "客").charAt(0)}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium text-[#212631]">
+                      <span className="block truncate text-[12px] font-medium text-[#212631]">
                         {c.nickname || c.name || <EmptyValue />}
                       </span>
-                      <span className="mt-0.5 block truncate text-[12px] text-[#a8b1bd]">
+                      <span className="mt-0.5 block truncate text-[11px] text-[#a8b1bd]">
                         {[c.name && c.name !== c.nickname ? c.name : "", c.gender].filter(Boolean).join(" · ") || <EmptyValue />}
                       </span>
                     </span>
@@ -189,7 +195,19 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                 </TableCell>
                 <TableCell>
                   {c.member_type ? (
-                    <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{c.member_type}</span>
+                    <span className="inline-block max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[11px] text-[#4e535a]">{c.member_type}</span>
+                  ) : (
+                    <EmptyValue />
+                  )}
+                </TableCell>
+                <TableCell>
+                  {c.customer_tags?.length ? (
+                    <span
+                      className="block w-full truncate text-[12px] text-[#4e535a]"
+                      title={c.customer_tags.map(tag => tag.name).join("、")}
+                    >
+                      {c.customer_tags.map(tag => tag.name).join("、")}
+                    </span>
                   ) : (
                     <EmptyValue />
                   )}
@@ -201,7 +219,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                   {c.activity_count ? `${c.activity_count} 场` : <EmptyValue />}
                 </TableCell>
                 <TableCell className="tabular-nums text-[#2b2f36]">¥{(c.total_payment ?? 0).toLocaleString()}</TableCell>
-                <TableCell className="text-[12px] text-[#8f959e] tabular-nums">
+                <TableCell className="text-[11px] text-[#8f959e] tabular-nums">
                   {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString("zh-CN") : <EmptyValue />}
                 </TableCell>
                 <TableCell>
@@ -209,10 +227,10 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                   <span className="mx-1.5 text-[#d0d3d6]">/</span>
                   <span className="text-[#8f959e]">{c.referrer_handler || <EmptyValue />}</span>
                 </TableCell>
-                <TableCell className="text-[12px] text-[#a8b1bd] tabular-nums">
+                <TableCell className="text-[11px] text-[#a8b1bd] tabular-nums">
                   {c.referral_date ? new Date(c.referral_date).toLocaleDateString("zh-CN") : <EmptyValue />}
                 </TableCell>
-                <TableCell className="text-[12px] text-[#a8b1bd]">
+                <TableCell className="text-[11px] text-[#a8b1bd]">
                   {c.created_by || <EmptyValue />}
                 </TableCell>
                 <TableCell className="text-right pr-4">

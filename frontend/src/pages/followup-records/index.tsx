@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { X } from "lucide-react"
+import { X, Inbox } from "lucide-react"
 import { followupRecordApi, customerApi, type ActivityFollowup, type Customer } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
@@ -58,68 +58,76 @@ export default function FollowupRecordsPage() {
   }
 
   return (
-    <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-lg font-semibold">回访记录</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">查看所有客户的活动回访记录</p>
+    <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
+      {/* 标题栏 */}
+      <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
+        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">回访记录</span>
+        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">查看所有客户的活动回访记录</span>
       </div>
-
-      {/* 搜索栏 */}
-      <div className="flex items-end gap-3 flex-wrap">
-        <div className="w-44">
-          <CustomerSearchInput
-            customers={customers}
-            value={searchCustomerId ? (customerIdToName[searchCustomerId] || "") : ""}
-            onChange={(v) => {
-              if (typeof v === "string") {
-                const matched = customers.find(c => c.nickname === v)
-                setSearchCustomerId(matched?.id || "")
-              } else {
-                setSearchCustomerId("")
-              }
-            }}
-            placeholder="搜索客户昵称"
-            filterSelected={false}
-          />
+      {/* 表格卡：筛选条 + 数据表 */}
+      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
+          <div className="w-[172px]">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchCustomerId ? (customerIdToName[searchCustomerId] || "") : ""}
+              onChange={(v) => {
+                if (typeof v === "string") {
+                  const matched = customers.find(c => c.nickname === v)
+                  setSearchCustomerId(matched?.id || "")
+                } else {
+                  setSearchCustomerId("")
+                }
+              }}
+              placeholder="搜索昵称"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
+            />
+          </div>
+          <button
+            onClick={handleClear}
+            className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+          >
+            <X className="h-3.5 w-3.5" />
+            清空
+          </button>
         </div>
-        <button
-          onClick={handleClear}
-          className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
-        >
-          <X className="h-3.5 w-3.5" />
-          清空
-        </button>
-      </div>
-
-      {/* 表格 */}
-      <div className="bg-white rounded-lg">
         {loading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
         ) : filteredRecords.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">暂无数据</div>
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
         ) : (
-          <Table>
+          <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4 w-[100px]">客户</TableHead>
-                <TableHead className="w-[140px]">活动名称</TableHead>
-                <TableHead className="w-[100px]">活动日期</TableHead>
-                <TableHead className="w-[80px]">老师</TableHead>
-                <TableHead className="w-[80px]">角色</TableHead>
+                <TableHead className="pl-4" style={{ width: "130px" }}>客户</TableHead>
+                <TableHead style={{ width: "150px" }}>活动名称</TableHead>
+                <TableHead style={{ width: "100px" }}>活动日期</TableHead>
+                <TableHead style={{ width: "80px" }}>老师</TableHead>
+                <TableHead style={{ width: "80px" }}>角色</TableHead>
                 <TableHead>回访内容</TableHead>
-                <TableHead className="w-[140px]">回访时间</TableHead>
+                <TableHead className="pr-4" style={{ width: "140px" }}>回访时间</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedItems.map((record) => (
-                <TableRow key={record.id} className="group">
-                  <TableCell className="pl-4 text-[#2b2f36]">{customerIdToName[record.customer_id] || "-"}</TableCell>
-                  <TableCell className="text-[#2b2f36]">{record.activity_name || "-"}</TableCell>
-                  <TableCell className="text-[#8f959e] tabular-nums">{record.activity_date || "-"}</TableCell>
-                  <TableCell className="text-[#8f959e]">{record.teacher || "-"}</TableCell>
-                  <TableCell className="text-[#8f959e]">{record.customer_role || "-"}</TableCell>
-                  <TableCell className="text-[#2b2f36] max-w-[300px] truncate">{record.content}</TableCell>
-                  <TableCell className="text-[#8f959e] tabular-nums">{formatTime(record.updated_at)}</TableCell>
+                <TableRow key={record.id} className="group hover:bg-[#f7f8fa]">
+                  <TableCell className="pl-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef0f2] text-[12px] font-medium text-[#646a73]">
+                        {(customerIdToName[record.customer_id] || "客").charAt(0)}
+                      </span>
+                      <span className="block truncate text-[13px] font-medium text-[#212631]">{customerIdToName[record.customer_id] || "-"}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-[12px] text-[#2b2f36]">{record.activity_name || "-"}</TableCell>
+                  <TableCell className="text-[12px] text-[#8f959e] tabular-nums">{record.activity_date || "-"}</TableCell>
+                  <TableCell className="text-[12px] text-[#8f959e]">{record.teacher || "-"}</TableCell>
+                  <TableCell className="text-[12px] text-[#8f959e]">{record.customer_role || "-"}</TableCell>
+                  <TableCell className="text-[12px] text-[#4e535a] whitespace-normal break-words">{record.content}</TableCell>
+                  <TableCell className="pr-4 text-[12px] text-[#a8b1bd] tabular-nums">{formatTime(record.updated_at)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

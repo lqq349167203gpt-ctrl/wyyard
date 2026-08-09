@@ -263,3 +263,24 @@
   color: #8f959e;
   text-align: right;
 }
+
+/* 有效期行（线下落地课程）：数字输入框 + "个月" */
+.pf-inline {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.pf-input-short {
+  width: 120rpx;
+  flex: none;
+  text-align: right;
+}
+
+.pf-suffix {
+  font-size: 28rpx;
+  color: #1f2329;
+  margin-left: 8rpx;
+  flex-shrink: 0;
+}

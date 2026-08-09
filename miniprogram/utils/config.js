@@ -5,7 +5,7 @@
 const DEV = false
 
 const BASE_URL = DEV
-  ? 'http://192.168.31.141:8000'
+  ? 'http://127.0.0.1:8000'
   : 'https://www.wyteahouse.cn'
 
 module.exports = { DEV, BASE_URL }

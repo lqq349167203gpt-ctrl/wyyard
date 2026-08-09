@@ -447,6 +447,8 @@ async def customer_chat(message: str, history: list, operator: str = "") -> dict
     for _round in range(5):
         if not response.tool_calls:
             break
+        # 先把 assistant 的 tool_use 响应加入历史，否则 tool 消息前没有对应的 assistant 消息，API 会报 400
+        messages.append(response)
         for tc in response.tool_calls:
             tool_fn = TOOL_MAP.get(tc["name"])
             if tool_fn:

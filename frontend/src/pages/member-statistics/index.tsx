@@ -256,9 +256,8 @@ export default function MemberStatisticsPage() {
   }, [detailCustomerId, detailType])
 
   return (
-    <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
-      <div>
-        <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
+    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4">
+      <div className="bg-white rounded-xl px-[22px] py-4">
           <h1 className="text-[16px] font-medium text-[#1f2329] mb-4">会员情况</h1>
 
           {/* 筛选栏 */}
@@ -418,7 +417,7 @@ export default function MemberStatisticsPage() {
         {/* 卡片区域 + 折线图左右布局 */}
         <div className="flex gap-1.5">
           {/* 左侧：卡片区域 */}
-          <div className="w-[650px] bg-white rounded-[4px] px-[22px] py-4">
+          <div className="w-[650px] bg-white rounded-xl px-[22px] py-4">
             <div className="mb-3">
               <div className="text-[12px] font-medium text-[#4e535a]">会员人数<span className="font-normal text-[#8f959e]">（当前统计）</span></div>
             </div>
@@ -446,7 +445,7 @@ export default function MemberStatisticsPage() {
           </div>
 
           {/* 右侧：折线图 */}
-          <div className="flex-1 min-w-0 bg-white rounded-[4px] py-4">
+          <div className="flex-1 min-w-0 bg-white rounded-xl py-4">
             <div className="mb-[18px] px-[22px]">
               <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}{dataType === "new" ? "新增会员" : "会员总数"}变化</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
               <div className="text-[11px] text-[#8f959e]">已选中 {selectedTypes.size} 个类型</div>
@@ -511,7 +510,7 @@ export default function MemberStatisticsPage() {
         </div>
 
         {/* 人员列表 */}
-        <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4">
+        <div className="bg-white rounded-xl px-[22px] py-4">
           <div className="mb-3">
             <div className="flex items-center gap-2 text-[12px] font-medium text-[#4e535a]">
               <span>人员列表<span className="font-normal text-[#8f959e]">（{filteredMembers.length}人）</span></span>
@@ -619,7 +618,6 @@ export default function MemberStatisticsPage() {
             </div>
           )}
         </div>
-      </div>
 
       {/* 客户详情弹窗 */}
       <Dialog open={!!selectedCustomerId} onOpenChange={(open) => { if (!open) setSelectedCustomerId(null) }}>
@@ -693,7 +691,7 @@ export default function MemberStatisticsPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-24 shrink-0">项目</span>
                     <span className="w-16 shrink-0 text-right">金额</span>
-                    <span className="w-12 shrink-0 text-right">次数</span>
+                    <span className="w-12 shrink-0">次数</span>
                     <span className="w-20 shrink-0">成交日期</span>
                     <span className="w-20 shrink-0">生效日期</span>
                     <span className="w-20 shrink-0">结束日期</span>
@@ -703,7 +701,7 @@ export default function MemberStatisticsPage() {
                     <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
                       <span className="w-24 shrink-0 truncate">{String(r.project)}</span>
                       <span className="w-16 shrink-0 text-right">¥{Number(r.amount).toLocaleString()}</span>
-                      <span className="w-12 shrink-0 text-right">{String(r.times)}</span>
+                      <span className="w-12 shrink-0">{String(r.times)}</span>
                       <span className="w-20 shrink-0">{String(r.deal_date)}</span>
                       <span className="w-20 shrink-0">{String(r.effective_date)}</span>
                       <span className="w-20 shrink-0">{String(r.expiry_date)}</span>

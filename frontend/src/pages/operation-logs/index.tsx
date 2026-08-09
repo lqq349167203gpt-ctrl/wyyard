@@ -23,20 +23,40 @@ const PAGE_LABELS: Record<string, string> = {
   "class-records-activities": "当日活动",
   "class-records-arrival": "到场确认",
   "daily-activities": "活动安排",
+  "offline-course-records": "落地课程",
+  "communication-records": "沟通记录",
+  "followup-records": "回访记录",
+  "referral-statistics": "引流统计",
+  "member-statistics": "会员情况",
+  "course-statistics": "课程",
+  "product-sales": "产品销售",
+  "statistics": "服务数据",
+  "daily-report": "每日报表",
   "payment": "付费项目",
+  "payment-deductions": "销卡",
+  "payment-refunds": "退费",
+  "expenses": "支出",
+  "debt-records": "欠卡记录",
   "membership-cards": "会员卡",
   "group-cases": "觉醒游戏",
   "emotional-releases": "情绪释放",
+  "oh-card-readings": "OH卡诊断",
   "energy-knots": "能量结",
   "internal-courses": "内部课程",
+  "tea-seat-fees": "茶位费",
+  "offline-courses": "线下落地课程",
   "other-projects": "其他项目",
   "agents": "AI 配置",
+  "chat-history": "沟通记录",
   "business-reminders": "业务提醒",
   "system-logs": "系统日志",
   "operation-logs": "操作日志",
   "member-identities": "会员身份",
+  "customer-tags": "客户标签",
   "healing-identities": "疗愈老师",
   "position-management": "账号管理",
+  "change-password": "密码修改",
+  "disabled-customers": "停用客户",
   "courses": "活动配置",
   "organizations": "组织信息",
   "spaces": "疗愈空间",
@@ -80,6 +100,7 @@ const FIELD_CN: Record<string, string> = {
   note: "备注", description: "描述", content: "内容", section: "板块",
   status: "状态", type: "类型", date: "日期", start_time: "开始时间", end_time: "结束时间",
   enabled: "启用状态",
+  scope: "可见范围", customer_tags: "客户标签",
   teacher_ids: "老师", teachers: "老师", course_name: "沙龙名称", course_type: "课程类型", course_description: "沙龙描述",
   owner_name: "案主", owner_id: "案主", host_name: "主持人", host_names: "主持人", host_id: "主持人", host_ids: "主持人",
   participant_ids: "参与者", achiever_name: "成就君", achiever_id: "成就君",
@@ -114,11 +135,12 @@ const FIELD_CN: Record<string, string> = {
   effective_date: "生效日期", themes: "主题",
   duration_type: "时长类型", duration_value: "时长", expiry_date: "到期日期",
   fee: "费用金额", project_name: "项目名称",
+  expense_time: "支出时间", purchase_content: "购买内容", platform: "平台", notes: "备注",
   daily_card_usage: "每日扣费",
 }
 
 const SECTION_OPTIONS = [
-  "客户资料", "邀约", "课表", "付费项目", "活动配置", "会员身份",
+  "客户资料", "邀约", "课表", "付费项目", "支出", "活动配置", "会员身份", "客户标签",
   "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
@@ -132,6 +154,7 @@ const ALL_PAGES = [
   { key: "class-records-arrival", label: "到场确认" },
   { key: "daily-activities", label: "活动安排" },
   { key: "payment", label: "付费项目" },
+  { key: "expenses", label: "支出" },
   { key: "membership-cards", label: "会员卡" },
   { key: "group-cases", label: "觉醒游戏" },
   { key: "emotional-releases", label: "情绪释放" },
@@ -143,6 +166,7 @@ const ALL_PAGES = [
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
   { key: "member-identities", label: "会员身份" },
+  { key: "customer-tags", label: "客户标签" },
   { key: "healing-identities", label: "疗愈老师" },
   { key: "position-management", label: "账号管理" },
   { key: "courses", label: "活动配置" },
@@ -154,8 +178,8 @@ const ALL_PAGES = [
 const PERMISSION_GROUPS = [
   { label: "业务数据", keys: ["healing-records", "activity-records", "traffic-records"] },
   { label: "人员安排", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
-  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"] },
-  { label: "信息配置", keys: ["courses", "organizations", "member-identities", "healing-identities", "spaces", "reminders"] },
+  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects", "expenses"] },
+  { label: "信息配置", keys: ["courses", "organizations", "member-identities", "customer-tags", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management"] },
   { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs"] },
 ]
@@ -167,6 +191,11 @@ const CUSTOMER_FILTER_PAGES = [
 ]
 
 const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
+
+const getMethodLabel = (log: Pick<OperationLog, "method" | "path">) => {
+  if (log.method === "DELETE" && log.path.startsWith("/api/customer-tags/")) return "停用"
+  return METHOD_LABELS[log.method] || log.method
+}
 
 export default function OperationLogsPage() {
   const navigate = useNavigate()
@@ -442,6 +471,10 @@ export default function OperationLogsPage() {
       if (s === "all") return "全部满足"
       if (s === "any") return "满足任意一项"
     }
+    if (key === "scope") {
+      if (s === "public") return "团队共享"
+      if (s === "private") return "仅自己可见"
+    }
     if (s.length >= 8 && /^[0-9a-f-]+$/i.test(s)) return getNameById(s)
     return s
   }
@@ -449,7 +482,7 @@ export default function OperationLogsPage() {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-lg font-semibold">操作日志</h1>
+        <h1 className="text-lg font-medium">操作日志</h1>
         <p className="text-xs text-muted-foreground mt-0.5">记录每个账号对系统的操作</p>
       </div>
 
@@ -561,12 +594,12 @@ export default function OperationLogsPage() {
                           METHOD_COLORS[log.method] || "bg-gray-50 text-gray-600"
                         }`}
                       >
-                        {METHOD_LABELS[log.method] || log.method}
+                        {getMethodLabel(log)}
                       </span>
                       <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 shrink-0">
                         {formatSectionLabel(log.section)}
                       </span>
-                      {log.source && log.source !== "pc" && (
+                      {log.source && (
                         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${SOURCE_COLORS[log.source] || "bg-gray-50 text-gray-600"}`}>
                           {SOURCE_LABELS[log.source] || log.source}
                         </span>
@@ -613,7 +646,7 @@ export default function OperationLogsPage() {
                 </div>
                 <div>
                   <span className="text-[#8f959e]">操作类型：</span>
-                  <span className="text-[#2b2b2b]">{METHOD_LABELS[selectedLog.method] || selectedLog.method}</span>
+                  <span className="text-[#2b2b2b]">{getMethodLabel(selectedLog)}</span>
                 </div>
                 <div>
                   <span className="text-[#8f959e]">板块：</span>

@@ -1,9 +1,10 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom"
-import { useEffect, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useState, type CSSProperties } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { Button } from "@/components/ui/button"
-import { clearAuthState } from "@/lib/api"
+import { clearAuthState, positionPermissionApi } from "@/lib/api"
+import { storePagePermissions } from "@/hooks/use-page-permissions"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SystemHelperChat, type ChatMessage } from "@/components/system-helper-chat"
 import { LogOut } from "lucide-react"
@@ -28,6 +29,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/system-logs": "无忧 - 系统日志",
   "/positions/management": "无忧 - 账号管理",
   "/config/member-identities": "无忧 - 会员身份",
+  "/config/customer-tags": "无忧 - 客户标签",
   "/courses/spaces": "无忧 - 疗愈空间",
   "/healing-identities": "无忧 - 疗愈老师",
   "/organizations": "无忧 - 组织信息",
@@ -45,6 +47,7 @@ export function AppLayout() {
   const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
   const userId = currentUser.id || "anonymous"
   const ownerName = currentUser.owner || ""
+  const userRole = currentUser.role || ""
 
   const [helperOpen, setHelperOpen] = useState(false)
   const [helperMessages, setHelperMessages] = useState<ChatMessage[]>(() => {
@@ -62,6 +65,22 @@ export function AppLayout() {
     const title = PAGE_TITLES[location.pathname] || "无忧茶苑"
     document.title = title
   }, [location.pathname])
+
+  const syncPagePermissions = useCallback(() => {
+    if (!userRole || userRole === "超级管理员") return
+    positionPermissionApi.get(userRole)
+      .then(result => storePagePermissions(result.pages || []))
+      .catch(() => {})
+  }, [userRole])
+
+  useEffect(() => {
+    syncPagePermissions()
+  }, [location.pathname, syncPagePermissions])
+
+  useEffect(() => {
+    window.addEventListener("focus", syncPagePermissions)
+    return () => window.removeEventListener("focus", syncPagePermissions)
+  }, [syncPagePermissions])
 
   const handleLogout = () => {
     clearAuthState()

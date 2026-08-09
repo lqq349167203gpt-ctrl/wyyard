@@ -100,10 +100,21 @@ def get_available_items(customer_id: str, project_type: str) -> list:
         items = [r for r in readings if r.customer_id == customer_id and not r.is_deleted]
         return [{
             "id": r.id,
-            "name": f"OH卡梳理（{r.purchase_count}次）",
+            "name": f"OH卡诊断（{r.purchase_count}次）",
             "paid_amount": r.amount,
             "detail": f"¥{r.amount}",
         } for r in items if not is_project_refunded("oh-card-readings", r.id)]
+
+    elif project_type == "tea-seat-fees":
+        from app.services import tea_seat_fee_service
+        fees = tea_seat_fee_service.list_fees()
+        items = [f for f in fees if f.customer_id == customer_id and not f.is_deleted]
+        return [{
+            "id": f.id,
+            "name": f"茶位费（{f.quantity}位）",
+            "paid_amount": f.amount,
+            "detail": f"¥{f.amount}",
+        } for f in items if not is_project_refunded("tea-seat-fees", f.id)]
 
     elif project_type == "energy-knots":
         knots = energy_knot_service.list_knots()
@@ -193,8 +204,9 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
             type_labels = {
                 "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放",
-                "oh-card-readings": "OH卡梳理",
+                "oh-card-readings": "OH卡诊断",
                 "energy-knots": "能量结",
+                "tea-seat-fees": "茶位费",
             }
             project_name = type_labels.get(data.project_type, data.project_type)
 
@@ -204,12 +216,14 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
             from app.services import (
                 group_case_service, emotional_release_service,
                 oh_card_reading_service, energy_knot_service,
+                tea_seat_fee_service,
             )
             svc_map = {
                 "group-cases": (group_case_service, "get_case"),
                 "emotional-releases": (emotional_release_service, "get_release"),
                 "oh-card-readings": (oh_card_reading_service, "get_reading"),
                 "energy-knots": (energy_knot_service, "get_knot"),
+                "tea-seat-fees": (tea_seat_fee_service, "get_fee"),
             }
             if data.project_type in svc_map:
                 svc, method = svc_map[data.project_type]

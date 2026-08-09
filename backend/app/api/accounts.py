@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request as StarletteRequest
 
-from app.middleware.jwt_auth import create_access_token, decode_token, require_admin
+from app.middleware.jwt_auth import create_access_token, decode_token, require_page_permission
 from app.middleware.rate_limit import limiter
 from app.models.account import AccountCreate, AccountUpdate, RoleCreate, RoleUpdate
 from app.models.base import StrictBaseModel
@@ -13,6 +13,7 @@ from app.services import (
 )
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
+require_account_manager = require_page_permission("position-management")
 
 
 class LoginRequest(StrictBaseModel):
@@ -32,7 +33,7 @@ class AdminResetPasswordRequest(StrictBaseModel):
 # ===== 账号 =====
 
 @router.get("")
-async def list_accounts(_admin: str = Depends(require_admin)):
+async def list_accounts(_manager_role: str = Depends(require_account_manager)):
     accounts = account_service.list_accounts()
     return [acc.model_dump(exclude={"password"}) for acc in accounts]
 
@@ -46,13 +47,19 @@ async def list_accounts_light():
 
 @router.post("")
 @limiter.limit("3/minute")
-async def create_account(data: AccountCreate, request: StarletteRequest, _admin: str = Depends(require_admin)):
+async def create_account(
+    data: AccountCreate,
+    request: StarletteRequest,
+    manager_role: str = Depends(require_account_manager),
+):
     if len(data.password) < 8:
         raise HTTPException(status_code=400, detail="密码至少8位")
     if len(data.password) > 128:
         raise HTTPException(status_code=400, detail="密码最多128位")
     if not any(c.isalpha() for c in data.password) or not any(c.isdigit() for c in data.password):
         raise HTTPException(status_code=400, detail="密码必须包含字母和数字")
+    if manager_role != "超级管理员" and data.role == "超级管理员":
+        raise HTTPException(status_code=403, detail="只有超级管理员可以创建超级管理员账号")
     try:
         result = account_service.create_account(data)
     except ValueError as e:
@@ -69,16 +76,16 @@ ALL_PAGE_KEYS = [
     # 业务
     "healing-records", "class-records-visitors", "class-records-activities",
     "class-records-arrival", "class-records", "daily-activities",
-    "communication-records", "followup-records",
+    "communication-records", "followup-records", "offline-course-records",
     # 付费
-    "payment-deductions", "payment-refunds",
+    "payment-deductions", "payment-refunds", "expenses", "debt-records",
     "payment", "membership-cards", "group-cases",
     "emotional-releases", "oh-card-readings",
-    "energy-knots", "internal-courses", "other-projects",
+    "energy-knots", "internal-courses", "tea-seat-fees", "offline-courses", "other-projects",
     # 信息配置
-    "member-identities", "healing-identities", "organizations", "spaces", "reminders",
+    "member-identities", "customer-tags", "healing-identities", "organizations", "spaces", "reminders",
     # 账号管理
-    "position-management", "change-password",
+    "position-management", "change-password", "disabled-customers",
     # 系统配置
     "agents", "chat-history", "system-logs", "operation-logs",
 ]
@@ -136,11 +143,22 @@ async def login(data: LoginRequest, request: StarletteRequest):
 
 
 @router.patch("/{account_id}")
-async def update_account(account_id: str, data: AccountUpdate, request: StarletteRequest, _admin: str = Depends(require_admin)):
+async def update_account(
+    account_id: str,
+    data: AccountUpdate,
+    request: StarletteRequest,
+    manager_role: str = Depends(require_account_manager),
+):
     # 仅管理员可改账号资料（role/enabled/owner 等）；自助改密走 POST /{id}/change-password
     # 改密码必须走 POST /{id}/change-password，需要验证旧密码
     if data.password is not None:
         raise HTTPException(status_code=400, detail="修改密码请使用专门的密码修改接口")
+    target = account_service.get_account(account_id)
+    if manager_role != "超级管理员":
+        if target and (target.role == "超级管理员" or target.is_system):
+            raise HTTPException(status_code=403, detail="只有超级管理员可以修改超级管理员账号")
+        if data.role == "超级管理员":
+            raise HTTPException(status_code=403, detail="只有超级管理员可以授予超级管理员角色")
     try:
         result = account_service.update_account(account_id, data)
     except ValueError as e:
@@ -151,8 +169,11 @@ async def update_account(account_id: str, data: AccountUpdate, request: Starlett
 
 
 @router.delete("/{account_id}")
-async def delete_account(account_id: str, _admin: str = Depends(require_admin)):
+async def delete_account(account_id: str, manager_role: str = Depends(require_account_manager)):
     # 仅管理员可删除账号
+    target = account_service.get_account(account_id)
+    if manager_role != "超级管理员" and target and (target.role == "超级管理员" or target.is_system):
+        raise HTTPException(status_code=403, detail="只有超级管理员可以删除超级管理员账号")
     if not account_service.delete_account(account_id):
         raise HTTPException(status_code=404, detail="账号不存在")
     return {"message": "已删除"}
@@ -185,7 +206,12 @@ async def change_password(account_id: str, data: ChangePasswordRequest, request:
 
 @router.post("/{account_id}/reset-password")
 @limiter.limit("3/minute")
-async def admin_reset_password(account_id: str, data: AdminResetPasswordRequest, request: StarletteRequest, _admin: str = Depends(require_admin)):
+async def admin_reset_password(
+    account_id: str,
+    data: AdminResetPasswordRequest,
+    request: StarletteRequest,
+    manager_role: str = Depends(require_account_manager),
+):
     """管理员重置密码（不需要旧密码，仅管理员可用）"""
     current_user_id = getattr(request.state, "user_id", "")
     if account_id == current_user_id:
@@ -196,6 +222,9 @@ async def admin_reset_password(account_id: str, data: AdminResetPasswordRequest,
         raise HTTPException(status_code=400, detail="密码最多128位")
     if not any(c.isalpha() for c in data.new_password) or not any(c.isdigit() for c in data.new_password):
         raise HTTPException(status_code=400, detail="密码必须包含字母和数字")
+    target = account_service.get_account(account_id)
+    if manager_role != "超级管理员" and target and (target.role == "超级管理员" or target.is_system):
+        raise HTTPException(status_code=403, detail="只有超级管理员可以重置超级管理员账号密码")
     try:
         result = account_service.admin_reset_password(account_id, data.new_password)
     except ValueError as e:
@@ -238,13 +267,13 @@ async def list_roles():
 
 
 @router.post("/roles")
-async def create_role(data: RoleCreate, _admin: str = Depends(require_admin)):
+async def create_role(data: RoleCreate, _manager_role: str = Depends(require_account_manager)):
     # 仅管理员可新增角色
     return account_service.create_role(data)
 
 
 @router.patch("/roles/{role_id}")
-async def update_role(role_id: str, data: RoleUpdate, _admin: str = Depends(require_admin)):
+async def update_role(role_id: str, data: RoleUpdate, _manager_role: str = Depends(require_account_manager)):
     # 仅管理员可修改角色
     result = account_service.update_role(role_id, data)
     if not result:
@@ -253,7 +282,7 @@ async def update_role(role_id: str, data: RoleUpdate, _admin: str = Depends(requ
 
 
 @router.delete("/roles/{role_id}")
-async def delete_role(role_id: str, _admin: str = Depends(require_admin)):
+async def delete_role(role_id: str, _manager_role: str = Depends(require_account_manager)):
     # 仅管理员可删除角色
     if not account_service.delete_role(role_id):
         raise HTTPException(status_code=404, detail="角色不存在")

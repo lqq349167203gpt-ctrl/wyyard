@@ -1,4 +1,4 @@
-const { customerApi, memberIdentityApi } = require('../../utils/api')
+const { customerApi, customerTagApi, memberIdentityApi } = require('../../utils/api')
 
 Page({
   data: {
@@ -15,6 +15,11 @@ Page({
     memberTypes: [],
     memberTypeList: [],
     selectedMemberTypes: [],
+    // 客户标签
+    customerTags: [],
+    customerTagList: [],
+    selectedTagIds: [],
+    tagLoading: false,
     // 引流人
     referrerList: [],
     selectedReferrers: [],
@@ -37,6 +42,7 @@ Page({
       return
     }
     this.loadMemberTypes()
+    this.loadCustomerTags()
     this.loadData(true)
   },
 
@@ -64,6 +70,33 @@ Page({
     this.setData({ memberTypeList: list })
   },
 
+  async loadCustomerTags() {
+    if (this.data.tagLoading) return
+    this.setData({ tagLoading: true })
+    try {
+      const tags = await customerTagApi.list()
+      const customerTags = tags || []
+      const visibleIds = new Set(customerTags.map(tag => tag.id))
+      const selectedTagIds = this.data.selectedTagIds.filter(id => visibleIds.has(id))
+      this.setData({ customerTags, selectedTagIds })
+      this.updateCustomerTagList()
+      this.checkActiveFilter()
+    } catch (e) {
+      this.setData({ customerTags: [], customerTagList: [] })
+    } finally {
+      this.setData({ tagLoading: false })
+    }
+  },
+
+  updateCustomerTagList() {
+    const selected = new Set(this.data.selectedTagIds)
+    this.setData({
+      customerTagList: this.data.customerTags.map(tag => Object.assign({}, tag, {
+        selected: selected.has(tag.id),
+      })),
+    })
+  },
+
   // 更新引流人列表（从已加载客户中提取，按人数从多到少排列）
   updateReferrerList() {
     const { customers, selectedReferrers } = this.data
@@ -84,16 +117,18 @@ Page({
 
   // 计算激活的筛选条件数量
   checkActiveFilter() {
-    const { selectedMemberTypes, selectedReferrers, daysFilterMin, daysFilterMax } = this.data
+    const { selectedMemberTypes, selectedReferrers, selectedTagIds, daysFilterMin, daysFilterMax } = this.data
     let count = 0
     if (selectedMemberTypes.length > 0) count++
     if (selectedReferrers.length > 0) count++
+    if (selectedTagIds.length > 0) count++
     if (daysFilterMin > 0 || daysFilterMax < 60) count++
     this.setData({ filterCount: count })
   },
 
-  onShow() {
+  async onShow() {
     if (!getApp().checkLogin()) return
+    if (this.data.initialized) await this.loadCustomerTags()
     if (this._needRefresh) {
       this._needRefresh = false
       this.loadData(true)
@@ -102,8 +137,10 @@ Page({
     }
   },
 
-  onPullDownRefresh() {
-    this.loadData(true).then(() => wx.stopPullDownRefresh())
+  async onPullDownRefresh() {
+    await this.loadCustomerTags()
+    await this.loadData(true)
+    wx.stopPullDownRefresh()
   },
 
   onReachBottom() {
@@ -124,6 +161,8 @@ Page({
         page,
         page_size: this.data.pageSize,
         nickname: this.data.keyword || undefined,
+        tag_ids: this.data.selectedTagIds.length > 0 ? this.data.selectedTagIds.join(',') : undefined,
+        tag_match: this.data.selectedTagIds.length > 0 ? 'any' : undefined,
       })
       console.log('[loadData] 请求成功, items数量:', res?.items?.length ?? res?.length ?? 'N/A')
 
@@ -219,6 +258,7 @@ Page({
       this._filterSnapshot = {
         selectedMemberTypes: this.data.selectedMemberTypes.slice(),
         selectedReferrers: this.data.selectedReferrers.slice(),
+        selectedTagIds: this.data.selectedTagIds.slice(),
         rangeMin: this.data.rangeMin,
         rangeMax: this.data.rangeMax,
       }
@@ -233,11 +273,13 @@ Page({
         showFilterPanel: false,
         selectedMemberTypes: this._filterSnapshot.selectedMemberTypes,
         selectedReferrers: this._filterSnapshot.selectedReferrers,
+        selectedTagIds: this._filterSnapshot.selectedTagIds,
         rangeMin: this._filterSnapshot.rangeMin,
         rangeMax: this._filterSnapshot.rangeMax,
       })
       this.updateMemberTypeList()
       this.updateReferrerList()
+      this.updateCustomerTagList()
     } else {
       this.setData({ showFilterPanel: false })
     }
@@ -269,6 +311,20 @@ Page({
     }
     this.setData({ selectedMemberTypes })
     this.updateMemberTypeList()
+  },
+
+  // 客户标签选择（多选时匹配任一标签）
+  onToggleCustomerTag(e) {
+    const id = e.currentTarget.dataset.id
+    const selectedTagIds = this.data.selectedTagIds.slice()
+    const index = selectedTagIds.indexOf(id)
+    if (index > -1) {
+      selectedTagIds.splice(index, 1)
+    } else {
+      selectedTagIds.push(id)
+    }
+    this.setData({ selectedTagIds })
+    this.updateCustomerTagList()
   },
 
   // 到店间隔
@@ -312,6 +368,7 @@ Page({
     this.setData({
       selectedMemberTypes: [],
       selectedReferrers: [],
+      selectedTagIds: [],
       rangeMin: 0,
       rangeMax: 60,
       daysFilterMin: 0,
@@ -321,7 +378,8 @@ Page({
     })
     this.updateMemberTypeList()
     this.updateReferrerList()
-    this.applyFilters()
+    this.updateCustomerTagList()
+    this.loadData(true)
   },
 
   // 确认筛选
@@ -334,12 +392,16 @@ Page({
       showFilterPanel: false,
     })
     this.checkActiveFilter()
-    this.applyFilters()
+    this.loadData(true)
   },
 
   onCustomerTap(e) {
-    const customer = e.currentTarget.dataset.customer
-    wx.navigateTo({ url: `/pages/customer-profile/index?id=${customer.id}` })
+    const id = e.currentTarget.dataset.id
+    if (!id) {
+      wx.showToast({ title: '客户信息异常，请刷新后重试', icon: 'none' })
+      return
+    }
+    wx.navigateTo({ url: `/pages/customer-profile/index?id=${id}` })
   },
 
   onEditTap(e) {

@@ -484,9 +484,8 @@ export default function StatisticsPage() {
   const barYAxisWidth = useMemo(() => calcYAxisWidth(identityData, ["value"]), [identityData])
 
   return (
-    <div className="min-h-full bg-[#f7f8fa] px-2.5 pt-2.5 pb-6">
-      <div>
-        <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
+    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4">
+      <div className="bg-white rounded-xl px-[22px] py-4">
           <h1 className="text-[16px] font-medium text-[#1f2329] mb-4">服务数据</h1>
 
           {/* 筛选栏 */}
@@ -662,7 +661,7 @@ export default function StatisticsPage() {
         </div>
 
         {/* 汇总卡片 */}
-        <div className="bg-white rounded-[4px] px-[22px] py-4 mb-1.5">
+        <div className="bg-white rounded-xl px-[22px] py-4">
           <div className="flex gap-3">
             <div className="w-[230px] bg-[#f7f8fa] rounded-lg py-[15px] px-3 pl-[24px]">
               <div className="flex items-center gap-1.5 mb-0.5"><span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: "#5b8ff9" }}></span><span className="text-[12px] text-[#4e535a]">邀约到访</span></div>
@@ -692,9 +691,9 @@ export default function StatisticsPage() {
         </div>
 
         {/* 折线图 + 身份分布 */}
-        <div className="flex gap-1.5 mt-1.5">
+        <div className="flex gap-1.5">
           {/* 左侧：折线图 */}
-          <div className="flex-1 min-w-0 bg-white rounded-[4px] px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
+          <div className="flex-1 min-w-0 bg-white rounded-xl px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
             <div className="mb-[18px]">
               <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}变化</span><span className="text-[#8f959e]">（{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
               <div className="flex items-center gap-4">
@@ -819,7 +818,7 @@ export default function StatisticsPage() {
           </div>
 
           {/* 右侧：身份分布竖向柱状图 */}
-          <div className="flex-1 min-w-0 bg-white rounded-[4px] px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
+          <div className="flex-1 min-w-0 bg-white rounded-xl px-[22px] py-4 select-none *:outline-none *:focus:outline-none" onMouseDown={(e) => e.preventDefault()}>
             <div className="mb-[18px]">
               <div className="text-[12px] text-[#4e535a] mb-2"><span className="font-medium">会员身份人数</span><span className="text-[#8f959e]">（{LABELS[activeTab]}<span className="text-[#c8ccd0]"> · </span>{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）</span></div>
               <div className="flex items-center gap-3 text-[11px]">
@@ -849,7 +848,7 @@ export default function StatisticsPage() {
         </div>
 
         {/* 人员列表 */}
-        <div className="mt-1.5 bg-white rounded-[4px] px-[22px] py-4 min-h-[400px]">
+        <div className="bg-white rounded-xl px-[22px] py-4 min-h-[400px]">
           <div className="mb-3">
             <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-[#4e535a]">
               <span>{{ invited: "邀约到访列表", arrived: "实际到访列表", converted: "成交人员列表", converted_amount: "成交账单列表" }[activeTab]}</span>
@@ -860,7 +859,7 @@ export default function StatisticsPage() {
               <span className="text-[11px] text-[#8f959e]">统计维度</span>
               {activeTab === "converted_amount" ? (
                 <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
-                  {["全部", "会员卡", "觉醒游戏", "情绪释放", "OH卡", "其他项目"].map(t => (
+                  {["全部", "会员卡", "觉醒游戏", "情绪释放", "其他项目"].map(t => (
                     <button
                       key={t}
                       onClick={() => setTypeFilter(t)}
@@ -1013,8 +1012,6 @@ export default function StatisticsPage() {
             onPageChange={goToPage}
           />
         </div>
-      </div>
-
       {/* 数字列详情弹窗 */}
       <Dialog open={popupType !== null} onOpenChange={(open) => { if (!open) { setPopupType(null); setPopupData(null); setPopupCustomerId(null); setPopupDate(null) } }}>
         <DialogContent className={`${popupType === "payments" ? "max-w-[680px]" : "max-w-[580px]"} max-h-[60vh] overflow-y-auto p-0 gap-0`} initialFocus={false}>

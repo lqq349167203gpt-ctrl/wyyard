@@ -78,7 +78,7 @@
     </view>
 
     <!-- 案主 -->
-    <view class="form-item" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr' || activityType === 'eks'}}" bindtap="onOwnerPickerOpen">
+    <view class="form-item" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'eks'}}" bindtap="onOwnerPickerOpen">
       <text class="form-label">案主</text>
       <view class="picker-value-wrap">
         <text style="{{ownerName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{ownerName || '选择案主'}}</text>
@@ -108,7 +108,7 @@
     </view>
 
     <!-- 老师（单选：gcs/ers/ocr） -->
-    <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'ocr'}}" bindtap="onTeacherPickerOpen">
+    <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
         <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || '选择老师'}}</text>
@@ -220,7 +220,7 @@
         <text class="picker-item-check" wx:if="{{item._selected}}">✓</text>
       </view>
       <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
-        <text>无匹配结果</text>
+        <text>{{pickerMode === 'owner' && dayVisitors.length === 0 ? '当天暂无邀约人员' : '无匹配结果'}}</text>
       </view>
     </scroll-view>
   </view>

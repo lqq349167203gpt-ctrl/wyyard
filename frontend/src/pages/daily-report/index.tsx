@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, startTransition } from "react"
 import { ChevronRight, ChevronLeft, ChevronUp, ChevronDown } from "lucide-react"
-import { visitApi, classRecordApi, customerApi, memberIdentityApi, membershipCardApi, groupCaseApi, emotionalReleaseApi, ohCardReadingApi, energyKnotApi, internalCourseApi, otherProjectApi, projectDeductionApi, customerDetailApi, type VisitRecord, type ClassRecord, type Customer, type MemberIdentity, type CustomerDetail, type ActivityRecord } from "@/lib/api"
+import { visitApi, classRecordApi, customerApi, memberIdentityApi, membershipCardApi, groupCaseApi, emotionalReleaseApi, ohCardReadingApi, energyKnotApi, internalCourseApi, otherProjectApi, projectDeductionApi, customerDetailApi, groupCaseSessionApi, emotionalReleaseSessionApi, energyKnotSessionApi, type VisitRecord, type ClassRecord, type Customer, type MemberIdentity, type CustomerDetail, type ActivityRecord } from "@/lib/api"
 import { Download } from "lucide-react"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -45,9 +45,11 @@ export default function DailyReportPage() {
     nickname: string
     item_name: string
     item_type: string
-    purchase_count: number | null
+    purchase_count: string | number | null
     amount: number
-    remaining_count: number | null
+    effective_date: string
+    expiry_date: string
+    notes: string
     closer_name: string
     payment_method: string
   }
@@ -57,10 +59,10 @@ export default function DailyReportPage() {
     id: string
     customer_id: string
     nickname: string
-    card_type: string
+    card_name: string
+    deduction_type: string
     has_card: boolean
-    manual_count: number
-    activity_count: number
+    count: number
     remaining_count: number | null
   }
   const [deductionRows, setDeductionRows] = useState<DeductionRow[]>([])
@@ -83,7 +85,7 @@ export default function DailyReportPage() {
     setDetailOpen(true)
     setDetailLoading(true)
     try {
-      const data = await customerDetailApi.get(customerId, type === "activity_today" ? detailDate : undefined)
+      const data = await customerDetailApi.get(customerId, type === "activity_today" || type === "payment" ? detailDate : undefined)
       setDetailData(data)
     } catch {
       setDetailData(null)
@@ -159,36 +161,37 @@ export default function DailyReportPage() {
     html += `</table><br>`
     // 第三部分：当日财务报表
     const totalAmount = financeRows.reduce((s, r) => s + r.amount, 0)
-    html += `<table><colgroup><col width="60"><col width="80"><col width="70"><col width="100"><col width="60"><col width="60"><col width="60"><col width="70"><col width="80"><col width="80"></colgroup>`
-    html += `<tr class="section"><td colspan="10">当日财务报表</td></tr>`
-    html += `<tr><th>引流</th><th>昵称</th><th>项目类型</th><th>项目名称</th><th>购买场次</th><th>剩余卡次</th><th>成交人</th><th>付费方式</th><th>小计</th><th></th></tr>`
+    html += `<table><colgroup><col width="60"><col width="80"><col width="70"><col width="100"><col width="60"><col width="80"><col width="80"><col width="70"><col width="70"><col width="60"><col width="100"></colgroup>`
+    html += `<tr class="section"><td colspan="11">当日财务报表</td></tr>`
+    html += `<tr><th>引流</th><th>昵称</th><th>项目类型</th><th>项目名称</th><th>场次/时长/部位</th><th>生效日期</th><th>到期日期</th><th>成交人</th><th>付费方式</th><th>小计</th><th>备注</th></tr>`
     for (const r of financeRows) {
       html += `<tr>
         <td>${esc(r.referrer || "-")}</td>
         <td>${esc(r.nickname)}</td>
         <td>${esc(r.item_type)}</td>
         <td>${esc(r.item_name)}</td>
-        <td>${r.purchase_count != null ? r.purchase_count + "次" : "-"}</td>
-        <td>${r.remaining_count == null || r.remaining_count === -999 ? "不限" : r.remaining_count + "次"}</td>
+        <td>${r.purchase_count != null ? (typeof r.purchase_count === "string" ? r.purchase_count : r.purchase_count + "次") : "-"}</td>
+        <td>${r.effective_date || "-"}</td>
+        <td>${r.expiry_date || "-"}</td>
         <td>${esc(r.closer_name || "-")}</td>
         <td>${esc(r.payment_method || "-")}</td>
         <td>¥${r.amount.toLocaleString()}</td>
-        <td></td>
+        <td>${esc(r.notes || "-")}</td>
       </tr>`
     }
-    html += `<tr style="background:#f7f8fa;font-weight:bold"><td colspan="8">合计</td><td></td><td>¥${totalAmount.toLocaleString()}</td></tr>`
+    html += `<tr style="background:#f7f8fa;font-weight:bold"><td colspan="9">合计</td><td>¥${totalAmount.toLocaleString()}</td><td></td></tr>`
     html += `</table><br>`
     // 第四部分：当日销卡
     if (deductionRows.length > 0) {
       html += `<table><colgroup><col width="80"><col width="80"><col width="70"><col width="70"><col width="70"></colgroup>`
       html += `<tr class="section"><td colspan="5">当日销卡</td></tr>`
-      html += `<tr><th>昵称</th><th>卡类型</th><th>人工销卡</th><th>活动销卡</th><th>剩余卡次</th></tr>`
+      html += `<tr><th>昵称</th><th>卡名称</th><th>销卡类型</th><th>销卡次数</th><th>剩余次数</th></tr>`
       for (const r of deductionRows) {
         html += `<tr>
           <td>${esc(r.nickname)}</td>
-          <td>${esc(r.card_type || "未办卡")}</td>
-          <td>${r.manual_count > 0 ? r.manual_count + "次" : "-"}</td>
-          <td>${r.activity_count > 0 ? r.activity_count + "次" : "-"}</td>
+          <td>${esc(r.card_name || "未办卡")}</td>
+          <td>${esc(r.deduction_type)}</td>
+          <td>${r.count}次</td>
           <td>${!r.has_card ? "未办卡" : r.remaining_count == null || r.remaining_count === -999 ? "不限" : r.remaining_count + "次"}</td>
         </tr>`
       }
@@ -299,14 +302,31 @@ export default function DailyReportPage() {
       otherProjectApi.list().catch(() => []),
       projectDeductionApi.list().catch(() => []),
       visitApi.list(detailDate).catch(() => []),
-    ]).then(([cards, groups, emotions, ohs, energies, courses, others, deductions, todayVisits]) => {
-      const cardDeductionMap: Record<string, number> = {}
+      groupCaseSessionApi.list(detailDate).catch(() => []),
+      emotionalReleaseSessionApi.list(detailDate).catch(() => []),
+      energyKnotSessionApi.list(detailDate).catch(() => []),
+    ]).then(([cards, groups, emotions, ohs, energies, courses, others, deductions, todayVisits, gcsSessions, ersSessions, eksSessions]) => {
+      // 人工销卡：按 (customer_id, project_type, project_id) 分组，所有项目类型
+      const manualDeductionMap = new Map<string, { customer_id: string; nickname: string; project_type: string; project_id: string; project_name: string; count: number; remaining_after: number | null }>()
       for (const d of deductions as any[]) {
-        if (d.deduction_date === detailDate && d.project_type === "membership-cards") {
-          cardDeductionMap[d.customer_id] = (cardDeductionMap[d.customer_id] || 0) + (d.count || 1)
+        if (d.deduction_date !== detailDate) continue
+        const key = `${d.customer_id}|${d.project_type}|${d.project_id}`
+        const existing = manualDeductionMap.get(key)
+        if (existing) {
+          existing.count += (d.count || 1)
+        } else {
+          manualDeductionMap.set(key, {
+            customer_id: d.customer_id,
+            nickname: d.nickname,
+            project_type: d.project_type,
+            project_id: d.project_id,
+            project_name: d.project_name,
+            count: d.count || 1,
+            remaining_after: d.remaining_after ?? null,
+          })
         }
       }
-      // 每个客户的当日活动销卡次数（公益活动不扣卡）
+      // 会员卡活动销卡：class_records 所有参与者
       const activityDeductionMap: Record<string, number> = {}
       for (const a of activities) {
         if (a.is_public_welfare) continue
@@ -318,6 +338,40 @@ export default function DailyReportPage() {
           activityDeductionMap[id] = (activityDeductionMap[id] || 0) + (a.membership_deduction_count || 1)
         }
       }
+      // session 的普通参与者也走会员卡销卡
+      for (const sessions of [gcsSessions as any[], ersSessions as any[], eksSessions as any[]]) {
+        for (const s of sessions) {
+          for (const pid of (s.participant_ids || [])) {
+            activityDeductionMap[pid] = (activityDeductionMap[pid] || 0) + (s.membership_deduction_count || 1)
+          }
+        }
+      }
+      // 案主活动销卡：session 的 owner 扣对应项目类型（觉醒游戏/情绪释放/能量结）
+      const activityProjectDeductionMaps: Record<string, Record<string, number>> = {}
+      // 觉醒游戏、情绪释放：案主每次扣 1
+      for (const [sessions, projectType] of [[gcsSessions as any[], "group-cases"], [ersSessions as any[], "emotional-releases"]] as const) {
+        for (const s of sessions) {
+          if (!s.owner_id) continue
+          const map = activityProjectDeductionMaps[projectType] || (activityProjectDeductionMaps[projectType] = {})
+          map[s.owner_id] = (map[s.owner_id] || 0) + 1
+        }
+      }
+      // 能量结：案主扣部位数（与后端 get_session_deduction_count 逻辑一致）
+      for (const s of eksSessions as any[]) {
+        if (!s.owner_id) continue
+        const map = activityProjectDeductionMaps["energy-knots"] || (activityProjectDeductionMaps["energy-knots"] = {})
+        let count = 1
+        try {
+          const desc = JSON.parse(s.description || "[]")
+          if (Array.isArray(desc)) {
+            const ownerItems = desc.filter((item: any) => item.id === s.owner_id)
+            if (ownerItems.length > 0) {
+              count = ownerItems.reduce((sum: number, item: any) => sum + Math.max(1, parseInt(item.count) || 1), 0)
+            }
+          }
+        } catch {}
+        map[s.owner_id] = (map[s.owner_id] || 0) + count
+      }
 
       const rows: FinanceRow[] = []
       const addItem = (item: any, type: string) => {
@@ -328,15 +382,16 @@ export default function DailyReportPage() {
         let itemName = ""
         let itemType = ""
         let amount = 0
-        let purchaseCount: number | null = null
-        let remainingCount: number | null = null
+        let purchaseCount: string | number | null = null
+        let effectiveDate = item.effective_date || ""
+        let expiryDate = item.expiry_date || ""
+        let notes = item.notes || ""
         switch (type) {
           case "membership_card":
             itemType = "会员卡"
             itemName = item.card_type || ""
             amount = item.price || 0
             purchaseCount = item.total_count ?? null
-            remainingCount = item.remaining_count
             break
           case "group_case":
             itemType = "觉醒游戏"
@@ -351,10 +406,12 @@ export default function DailyReportPage() {
             purchaseCount = item.purchase_count || 0
             break
           case "oh_card_reading":
-            itemType = "OH卡梳理"
+            itemType = "OH卡诊断"
             itemName = "-"
             amount = item.amount || 0
-            purchaseCount = item.purchase_count || 0
+            purchaseCount = item.diagnosis_duration ? `${item.diagnosis_duration * 0.5}小时` : null
+            effectiveDate = ""
+            expiryDate = ""
             break
           case "energy_knot":
             itemType = "能量结"
@@ -372,7 +429,6 @@ export default function DailyReportPage() {
             itemName = item.project_name || item.category || ""
             amount = item.fee || 0
             purchaseCount = item.total_count ?? null
-            remainingCount = item.remaining_count
             break
         }
         const closerNames = (item.closers || []).map((c: any) => c.name).filter(Boolean).join("、")
@@ -386,7 +442,9 @@ export default function DailyReportPage() {
           item_type: itemType,
           purchase_count: purchaseCount,
           amount,
-          remaining_count: remainingCount,
+          effective_date: effectiveDate,
+          expiry_date: expiryDate,
+          notes,
           closer_name: closerNames,
           payment_method: item.payment_method || "",
         })
@@ -424,28 +482,96 @@ export default function DailyReportPage() {
           courseCustomerIds.add(c.customer_id)
         }
       }
-      // 合并所有有销卡的客户
-      const deductionCustomerIds = new Set([
-        ...Object.keys(cardDeductionMap),
-        ...Object.keys(activityDeductionMap),
-      ])
+      // 项目数据查询（案主活动销卡行的剩余次数）
+      const projectLabelMap: Record<string, string> = {
+        "group-cases": "觉醒游戏",
+        "emotional-releases": "情绪释放",
+        "energy-knots": "能量结",
+      }
+      const projectDataMap: Record<string, Record<string, { purchase_count: number; id: string }>> = {}
+      for (const item of groups as any[]) {
+        if (item.is_deleted) continue
+        const m = projectDataMap["group-cases"] || (projectDataMap["group-cases"] = {})
+        m[item.customer_id] = { purchase_count: item.purchase_count || 0, id: item.id }
+      }
+      for (const item of emotions as any[]) {
+        if (item.is_deleted) continue
+        const m = projectDataMap["emotional-releases"] || (projectDataMap["emotional-releases"] = {})
+        m[item.customer_id] = { purchase_count: item.purchase_count || 0, id: item.id }
+      }
+      for (const item of energies as any[]) {
+        if (item.is_deleted) continue
+        const m = projectDataMap["energy-knots"] || (projectDataMap["energy-knots"] = {})
+        m[item.customer_id] = { purchase_count: item.purchase_count || 0, id: item.id }
+      }
+      // 各项目历史总销卡次数（用于计算剩余）
+      const totalDeductionByProject: Record<string, number> = {}
+      for (const d of deductions as any[]) {
+        const k = `${d.project_type}|${d.project_id}`
+        totalDeductionByProject[k] = (totalDeductionByProject[k] || 0) + (d.count || 1)
+      }
+
+      // 构建销卡行（不合并，各来源独立一行）
+      const typeLabels: Record<string, string> = {
+        "group-cases": "觉醒游戏",
+        "emotional-releases": "情绪释放",
+        "energy-knots": "能量结",
+      }
       const dRows: DeductionRow[] = []
-      for (const cid of deductionCustomerIds) {
+
+      // 人工销卡行
+      for (const [key, entry] of manualDeductionMap) {
+        const customer = customerMap[entry.customer_id]
+        dRows.push({
+          id: key,
+          customer_id: entry.customer_id,
+          nickname: customer?.nickname || entry.nickname,
+          card_name: entry.project_name,
+          deduction_type: "人工销卡",
+          has_card: true,
+          count: entry.count,
+          remaining_count: entry.remaining_after,
+        })
+      }
+
+      // 会员卡活动销卡行
+      for (const [cid, activityCount] of Object.entries(activityDeductionMap)) {
         const customer = customerMap[cid]
         const card = customerCardMap[cid]
-        const manualCount = cardDeductionMap[cid] || 0
-        const activityCount = activityDeductionMap[cid] || 0
-        if (manualCount === 0 && activityCount === 0) continue
+        const hasCard = !!card || courseCustomerIds.has(cid)
         dRows.push({
-          id: cid,
+          id: `${cid}|activity`,
           customer_id: cid,
           nickname: customer?.nickname || "",
-          card_type: card?.card_type || (courseCustomerIds.has(cid) ? "疗愈师" : ""),
-          has_card: !!card || courseCustomerIds.has(cid),
-          manual_count: manualCount,
-          activity_count: activityCount,
+          card_name: card?.card_type || (courseCustomerIds.has(cid) ? "疗愈师" : "会员卡"),
+          deduction_type: "活动销卡",
+          has_card: hasCard,
+          count: activityCount,
           remaining_count: card?.remaining_count ?? null,
         })
+      }
+
+      // 案主活动销卡行（觉醒游戏/情绪释放/能量结）
+      for (const [projectType, dedupMap] of Object.entries(activityProjectDeductionMaps)) {
+        for (const [cid, activityCount] of Object.entries(dedupMap)) {
+          const customer = customerMap[cid]
+          const projData = projectDataMap[projectType]?.[cid]
+          let remaining: number | null = null
+          if (projData) {
+            const totalDeducted = totalDeductionByProject[`${projectType}|${projData.id}`] || 0
+            remaining = projData.purchase_count - totalDeducted
+          }
+          dRows.push({
+            id: `${cid}|activity|${projectType}`,
+            customer_id: cid,
+            nickname: customer?.nickname || "",
+            card_name: projectLabelMap[projectType] || projectType,
+            deduction_type: projectLabelMap[projectType] || projectType,
+            has_card: !!projData,
+            count: activityCount,
+            remaining_count: remaining,
+          })
+        }
       }
       setDeductionRows(dRows)
     })
@@ -645,11 +771,13 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-left font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">昵称</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">项目类型</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[90px] border-b-[0.5px] border-[#e8eaed]">项目名称</th>
-                  <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">购买场次</th>
-                  <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">剩余卡次</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">场次/时长/部位</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">生效日期</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">到期日期</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">成交人</th>
-                  <th className="px-[5px] py-2 text-left font-normal w-[100px] border-b-[0.5px] border-[#e8eaed]">付费方式</th>
-                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">小计</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">付费方式</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">小计</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[100px] border-b-[0.5px] border-[#e8eaed]">备注</th>
                 </tr>
               </thead>
               <tbody>
@@ -658,29 +786,21 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.referrer || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#1f2329] truncate border-b-[0.5px] border-[#e8eaed]">{r.nickname}</td>
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.item_type}</td>
-                    <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.item_name}</td>
-                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.purchase_count != null ? `${r.purchase_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{r.remaining_count == null || r.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{r.remaining_count}次</span>}</td>
+                    <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.item_name || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.purchase_count != null ? (typeof r.purchase_count === "string" ? r.purchase_count : `${r.purchase_count}次`) : <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.effective_date || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.expiry_date || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.closer_name || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.payment_method || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-left text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">¥{r.amount.toLocaleString()}</td>
+                    <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{r.notes || <span className="text-[#c9cdd4]">-</span>}</td>
                   </tr>
                 ))}
                 {/* 汇总行 */}
                 <tr className="bg-[#f7f8fa] font-medium">
-                  <td colSpan={7} className="px-[5px] py-2 text-left text-[#1f2329] border-b-[0.5px] border-[#e8eaed]">合计</td>
-                  <td className="px-[5px] py-2 text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">
-                    {(() => {
-                      const methodTotals: Record<string, number> = {}
-                      for (const r of financeRows) {
-                        if (r.payment_method) {
-                          methodTotals[r.payment_method] = (methodTotals[r.payment_method] || 0) + r.amount
-                        }
-                      }
-                      return Object.entries(methodTotals).map(([m, v]) => `${m} ¥${v.toLocaleString()}`).join("、") || "-"
-                    })()}
-                  </td>
+                  <td colSpan={9} className="px-[5px] py-2 text-left text-[#1f2329] border-b-[0.5px] border-[#e8eaed]">合计</td>
                   <td className="px-[5px] py-2 text-left text-[#1f2329] border-b-[0.5px] border-[#e8eaed]">¥{financeRows.reduce((s, r) => s + r.amount, 0).toLocaleString()}</td>
+                  <td className="px-[5px] py-2 border-b-[0.5px] border-[#e8eaed]"></td>
                 </tr>
               </tbody>
             </table>
@@ -699,19 +819,19 @@ export default function DailyReportPage() {
               <thead>
                 <tr className="bg-[#f7f8fa] text-[#8f959e]">
                   <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">昵称</th>
-                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">卡类型</th>
-                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">人工销卡</th>
-                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">活动销卡</th>
-                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">剩余卡次</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">卡名称</th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed]">销卡类型</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">销卡次数</th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">剩余次数</th>
                 </tr>
               </thead>
               <tbody>
                 {deductionRows.map((r, i) => (
                   <tr key={r.id} className={i % 2 === 0 ? "bg-white hover:bg-[#f7f8fa]" : "bg-[#fcfcfd] hover:bg-[#f0f1f3]"}>
                     <td className="px-[5px] py-2 text-[#1f2329] truncate border-b-[0.5px] border-[#e8eaed]">{r.nickname}</td>
-                    <td className="px-[5px] py-2 truncate border-b-[0.5px] border-[#e8eaed]">{r.card_type ? <span className="text-[#4e535a]">{r.card_type}</span> : <span className="text-[#c9cdd4]">未办卡</span>}</td>
-                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.manual_count > 0 ? `${r.manual_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.activity_count > 0 ? `${r.activity_count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 truncate border-b-[0.5px] border-[#e8eaed]">{r.card_name ? <span className="text-[#4e535a]">{r.card_name}</span> : <span className="text-[#c9cdd4]">未办卡</span>}</td>
+                    <td className="px-[5px] py-2 truncate border-b-[0.5px] border-[#e8eaed]"><span className="text-[#4e535a]">{r.deduction_type}</span></td>
+                    <td className="px-[5px] py-2 text-center text-[#4e535a] border-b-[0.5px] border-[#e8eaed]">{r.count > 0 ? `${r.count}次` : <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!r.has_card ? <span className="text-[#c9cdd4]">未办卡</span> : r.remaining_count == null || r.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{r.remaining_count}次</span>}</td>
                   </tr>
                 ))}
@@ -723,7 +843,7 @@ export default function DailyReportPage() {
 
       {/* 详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-[712px] max-h-[70vh] overflow-auto">
+        <DialogContent className="max-w-[912px] max-h-[70vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="text-[14px]">
               {detailNickname} — {detailType === "visit" ? "到店记录" : detailType === "invited" ? "受邀记录" : detailType === "activity_all" ? "总参与记录" : detailType === "payment" ? "成交详情" : "今日参与记录"}
@@ -792,19 +912,25 @@ export default function DailyReportPage() {
             ) : (
               <>
                 <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
-                  <span className="w-16 shrink-0">项目类型</span>
-                  <span className="flex-1">项目名称</span>
-                  <span className="w-16 shrink-0 text-center">购买场次</span>
-                  <span className="w-20 shrink-0 text-right">金额</span>
-                  <span className="w-16 shrink-0 text-right">成交人</span>
+                  <span className="w-[82px] shrink-0">项目类型</span>
+                  <span className="w-[142px] shrink-0">项目名称</span>
+                  <span className="w-[102px] shrink-0">生效日期</span>
+                  <span className="w-[102px] shrink-0">到期日期</span>
+                  <span className="w-[92px] shrink-0">场次/时长/部位</span>
+                  <span className="w-[92px] shrink-0">金额</span>
+                  <span className="w-[102px] shrink-0">成交人</span>
+                  <span className="flex-1 pl-2">备注</span>
                 </div>
                 {records.map((r, i) => (
                   <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
-                    <span className="w-16 shrink-0">{r.type || "-"}</span>
-                    <span className="flex-1 truncate">{r.name || "-"}</span>
-                    <span className="w-16 shrink-0 text-center">{r.quantity != null ? `${r.quantity}次` : "-"}</span>
-                    <span className="w-20 shrink-0 text-right">¥{r.amount.toLocaleString()}</span>
-                    <span className="w-16 shrink-0 text-right truncate">{r.closer_name || "-"}</span>
+                    <span className="w-[82px] shrink-0">{r.type || "-"}</span>
+                    <span className="w-[142px] shrink-0 truncate">{(r.name && r.name !== r.type) ? r.name : <span className="text-[#c9cdd4]">-</span>}</span>
+                    <span className="w-[102px] shrink-0">{r.effective_date || <span className="text-[#c9cdd4]">-</span>}</span>
+                    <span className="w-[102px] shrink-0">{r.expiry_date || <span className="text-[#c9cdd4]">-</span>}</span>
+                    <span className="w-[92px] shrink-0">{r.quantity != null ? (typeof r.quantity === "string" ? r.quantity : `${r.quantity}次`) : <span className="text-[#c9cdd4]">-</span>}</span>
+                    <span className="w-[92px] shrink-0">¥{r.amount.toLocaleString()}</span>
+                    <span className="w-[102px] shrink-0 truncate">{r.closer_name || "-"}</span>
+                    <span className="flex-1 truncate pl-2">{r.notes || <span className="text-[#c9cdd4]">-</span>}</span>
                   </div>
                 ))}
               </>

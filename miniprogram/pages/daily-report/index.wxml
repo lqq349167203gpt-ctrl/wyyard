@@ -64,31 +64,36 @@
   <view class="r-body" wx:if="{{activeTab === 'customers'}}">
     <block wx:if="{{!loading}}">
       <view
-        class="c-card {{item.identityGrey ? 'n' : 'm'}} {{item.open ? 'open' : ''}}"
+        class="c-card {{item.arrived ? 'green' : 'grey'}} {{item.open ? 'open' : ''}}"
         wx:for="{{visits}}"
         wx:key="id"
         bindtap="onVisitToggle"
         data-index="{{index}}"
       >
         <view class="c-l1">
-          <text class="c-name">{{item.nickname}}</text>
-          <text class="c-id {{item.identityGrey ? 'grey' : ''}}">{{item.identityText}}</text>
-          <text class="c-pill {{item.arrived ? 'ok' : 'no'}}">{{item.arrived ? '已到店' : '未到店'}}</text>
-          <text class="c-amount {{item.hasAmount ? '' : 'none'}}">{{item.amountText}}</text>
+          <text class="c-time" wx:if="{{item.visitTimeText}}">{{item.visitTimeText}}</text>
+          <text class="c-name" catchtap="onNicknameTap" data-customer-id="{{item.customer_id}}">{{item.nickname}}</text>
+          <text class="c-id" wx:if="{{item.hasIdentity}}">{{item.identityText}}</text>
+          <text class="c-amount {{item.hasAmount ? '' : 'none'}}" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="payment" data-nickname="{{item.nickname}}">{{item.amountText}}</text>
         </view>
         <view class="c-l2">
-          <text>受邀 <text class="b">{{item.invitedCount}}</text></text>
-          <text>到店 <text class="b">{{item.arrivedCount}}</text></text>
-          <text>今日活动 <text class="b">{{item.todayActCount}}</text></text>
-          <text>剩 <text class="b">{{item.remainingText}}</text></text>
-          <text class="c-more-hint">展开 ∨</text>
+          <view class="stat" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="invited" data-nickname="{{item.nickname}}"><text class="l">受邀</text><text class="b">{{item.invitedCount}}</text></view>
+          <view class="stat" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="visit" data-nickname="{{item.nickname}}"><text class="l">到店</text><text class="b">{{item.arrivedCount}}</text></view>
+          <view class="stat" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="activity_today" data-nickname="{{item.nickname}}"><text class="l">今日活动</text><text class="b">{{item.todayActCount}}</text></view>
+          <view class="stat"><text class="l">剩余</text><text class="b">{{item.remainingText}}</text></view>
+          <view class="c-more-hint">
+            <text>展开</text>
+            <view class="arrow {{item.open ? 'up' : ''}}"></view>
+          </view>
         </view>
-        <view class="c-l3" wx:if="{{item.needText}}"><text class="k">需求</text>{{item.needText}}</view>
+        <view class="c-l3"><text class="k">当日需求</text><text class="v">{{item.needText || ''}}<text class="dash" wx:if="{{!item.needText}}">-</text></text></view>
         <view class="c-detail">
-          <view class="d-row" wx:if="{{item.infoText}}"><text class="d-label">客户信息</text><text class="d-val">{{item.infoText}}</text></view>
-          <view class="d-row" wx:if="{{item.followText}}"><text class="d-label">跟进点</text><text class="d-val">{{item.followText}}</text></view>
-          <view class="d-row" wx:if="{{item.leaderText}}"><text class="d-label">组长反馈</text><text class="d-val">{{item.leaderText}}</text></view>
-          <view class="d-row"><text class="d-label">引流/邀约</text><text class="d-val">{{item.refText || '自然到店'}}<text wx:if="{{item.refHandlerText}}"> ／ {{item.refHandlerText}}</text><text wx:if="{{item.visitTimeText}}"> · {{item.visitTimeText}}</text></text></view>
+          <view class="d-row"><text class="d-label">客户信息</text><text class="d-val">{{item.infoText || ''}}<text class="dash" wx:if="{{!item.infoText}}">-</text></text></view>
+          <view class="d-row"><text class="d-label">跟进点</text><text class="d-val">{{item.followText || ''}}<text class="dash" wx:if="{{!item.followText}}">-</text></text></view>
+          <view class="d-row"><text class="d-label">组长反馈</text><text class="d-val">{{item.leaderText || ''}}<text class="dash" wx:if="{{!item.leaderText}}">-</text></text></view>
+          <view class="d-divider"></view>
+          <view class="d-row"><text class="d-label">引流</text><text class="d-val">{{item.refText || '自然到店'}}</text></view>
+          <view class="d-row"><text class="d-label">邀约</text><text class="d-val">{{item.refHandlerText || ''}}<text class="dash" wx:if="{{!item.refHandlerText}}">-</text></text></view>
         </view>
       </view>
       <view class="empty-state" wx:if="{{visits.length === 0}}">
@@ -149,9 +154,20 @@
           <text wx:if="{{item.item_name}}">{{item.item_name}}</text>
           <text wx:if="{{item.purchaseCountText}}">{{item.purchaseCountText}}</text>
           <text wx:if="{{item.remainingText}}">{{item.remainingText}}</text>
-          <text wx:if="{{item.closer_name}}">成交人：{{item.closer_name}}</text>
-          <text wx:if="{{item.payment_method}}">{{item.payment_method}}</text>
-          <text wx:if="{{item.referrer}}">引流：{{item.referrer}}</text>
+        </view>
+        <view class="f-l3">
+          <view class="fi">
+            <text class="lbl">成交人：</text>
+            <text class="val">{{item.closer_name || ''}}<text class="dash" wx:if="{{!item.closer_name}}">-</text></text>
+          </view>
+          <view class="fi">
+            <text class="lbl">付费方式：</text>
+            <text class="val">{{item.payment_method || ''}}<text class="dash" wx:if="{{!item.payment_method}}">-</text></text>
+          </view>
+          <view class="fi">
+            <text class="lbl">引流：</text>
+            <text class="val">{{item.referrer || ''}}<text class="dash" wx:if="{{!item.referrer}}">-</text></text>
+          </view>
         </view>
       </view>
       <view class="empty-state" wx:if="{{financeRows.length === 0}}">
@@ -164,17 +180,17 @@
   <view class="r-body" wx:if="{{activeTab === 'deductions'}}">
     <block wx:if="{{!loading}}">
       <view class="section-note">仅显示当日有销卡的客户，公益活动不计入</view>
-      <view class="ded-wrap" wx:if="{{deductionRows.length > 0}}">
-        <view class="ded-head">
-          <text class="ded-c1">昵称</text><text class="ded-c2">卡类型</text>
-          <text class="ded-c3">人工销</text><text class="ded-c4">活动销</text><text class="ded-c5">剩余</text>
+      <view class="f-card" wx:for="{{deductionRows}}" wx:key="id">
+        <view class="f-l1">
+          <text class="f-name">{{item.nickname}}</text>
         </view>
-        <view class="ded-row" wx:for="{{deductionRows}}" wx:key="customer_id">
-          <text class="ded-c1">{{item.nickname}}</text>
-          <text class="ded-c2 {{item.cardMuted ? 'muted' : ''}}">{{item.card_type || '未办卡'}}</text>
-          <text class="ded-c3 {{item.manualMuted ? 'muted' : ''}}">{{item.manualText || '—'}}</text>
-          <text class="ded-c4 {{item.activityMuted ? 'muted' : ''}}">{{item.activityText || '—'}}</text>
-          <text class="ded-c5 {{item.cardMuted ? 'muted' : ''}}">{{item.remainingText}}</text>
+        <view class="d-cols">
+          <view class="dc"><text class="d-label">卡名称：</text><text class="d-val {{item.has_card ? '' : 'muted'}}">{{item.card_name || '未办卡'}}</text></view>
+          <view class="dc"><text class="d-label">销卡类型：</text><text class="d-val">{{item.deduction_type}}</text></view>
+        </view>
+        <view class="d-cols">
+          <view class="dc"><text class="d-label">销卡次数：</text><text class="d-val">{{item.count}} 次</text></view>
+          <view class="dc"><text class="d-label">剩余卡次：</text><text class="d-val {{item.has_card ? '' : 'muted'}}">{{item.remainingText}}</text></view>
         </view>
       </view>
       <view class="empty-state" wx:if="{{deductionRows.length === 0}}">
@@ -187,4 +203,27 @@
   <view class="loading" wx:if="{{loading}}">
     <text>加载中...</text>
   </view>  </block>
+
+  <!-- 客户详情弹窗 -->
+  <view class="detail-mask" wx:if="{{detailOpen}}" bindtap="onDetailClose"></view>
+  <view class="detail-panel" wx:if="{{detailOpen}}">
+    <view class="detail-head" bindtap="onDetailClose">
+      <text class="detail-title">{{detailNickname}} — {{detailTitle}}</text>
+      <view class="detail-close">✕</view>
+    </view>
+    <view class="detail-body">
+      <scroll-view scroll-y class="detail-scroll">
+        <view class="detail-row thead">
+          <text wx:for="{{detailHeader}}" wx:key="index" class="{{item.cls}}">{{item.text}}</text>
+        </view>
+        <view class="detail-empty" wx:if="{{detailLoading}}">加载中...</view>
+        <view class="detail-empty" wx:if="{{!detailLoading && detailRows.length === 0}}">暂无记录</view>
+        <block wx:if="{{!detailLoading && detailRows.length > 0}}">
+          <view wx:for="{{detailRows}}" wx:key="index" class="{{item.rowClass}}">
+            <text wx:for="{{item.cols}}" wx:for-item="col" wx:key="index" class="{{col.cls}}">{{col.text}}<text class="unarrived" wx:if="{{col.unarrived}}">（未参与）</text><text class="dash" wx:if="{{!col.text}}">-</text></text>
+          </view>
+        </block>
+      </scroll-view>
+    </view>
+  </view>
 </view>

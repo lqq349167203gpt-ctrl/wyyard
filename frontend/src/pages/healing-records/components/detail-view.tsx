@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { uploadApi, customerApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord } from "@/lib/api"
+import { uploadApi, customerApi, customerTagApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type CustomerTag, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord, type PurchaseSummaryItem } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -48,17 +48,21 @@ export default function DetailView({
   const [loading, setLoading] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editingRec, setEditingRec] = useState<HealingRec | null>(null)
-  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "communication" | "followups" | "payment" | "purchase">(defaultTab)
+  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "communication" | "followups" | "payment" | "purchase" | "offline_course">(defaultTab)
   const [activitiesPage, setActivitiesPage] = useState(1)
   const [healingPage, setHealingPage] = useState(1)
   const [paymentPage, setPaymentPage] = useState(1)
   const [purchasePage, setPurchasePage] = useState(1)
+  const [offlineCoursePage, setOfflineCoursePage] = useState(1)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [commRecords, setCommRecords] = useState<CommunicationRecord[]>([])
   const [commPage, setCommPage] = useState(1)
   const [followupsPage, setFollowupsPage] = useState(1)
+  const [activityTypeFilter, setActivityTypeFilter] = useState<string>("全部")
+  const [activityRoleFilter, setActivityRoleFilter] = useState<string>("全部")
+  const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
   const loadSeqRef = useRef(0)
 
   useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
@@ -70,11 +74,16 @@ export default function DetailView({
     setLoading(true)
     setLoadError(null)
     setCopied(false)
-    setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1); setFollowupsPage(1)
+    setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1); setFollowupsPage(1); setOfflineCoursePage(1)
     try {
       const data = await customerDetailApi.get(cid)
       if (seq !== loadSeqRef.current) return
       setDetail(data)
+      customerTagApi.listForCustomer(cid).then(tags => {
+        if (seq === loadSeqRef.current) setCustomerTags(tags)
+      }).catch(() => {
+        if (seq === loadSeqRef.current) setCustomerTags([])
+      })
       // 加载沟通记录
       const nickname = data.customer?.nickname
       if (nickname) {
@@ -178,9 +187,15 @@ export default function DetailView({
   const todayStr = new Date().toLocaleDateString("sv-SE")
   // 次数余量摘要：余量为 0 或已过期的项目不显示；内部课程按不限次展示
   const remainSummary = (detail?.purchase_summary || [])
-    .filter(s => !(typeof s.remaining === "number" && s.remaining === 0))
-    .filter(s => !s.expiry_date || s.expiry_date >= todayStr)
-    .slice(0, 4)
+    .filter(s => {
+      const r = s.effective_remaining !== undefined ? s.effective_remaining : s.remaining
+      // 数字：余量 > 0 才显示
+      if (typeof r === "number") return r > 0
+      // 非数字（null/不限）：需检查卡本身是否在有效期内
+      if (s.expiry_date && s.expiry_date < todayStr) return false
+      if (s.effective_date && s.effective_date > todayStr) return false
+      return true
+    })
   const trafficLabel = c.traffic_source === "朋友圈" ? "所属人" : c.traffic_source === "好友推荐" ? "好友昵称" : "流量链接"
 
 
@@ -234,6 +249,15 @@ export default function DetailView({
               ) : (
                 <span className="px-[9px] py-[2px] rounded-full text-[11px] font-semibold bg-[#f1f0ed] text-[#a8b1bd]">服务老师 -</span>
               )}
+            </div>
+            <div className="mt-2.5 border-t border-[#f0f0f0] pt-2.5">
+              <div className="flex min-w-0 flex-wrap gap-1.5">
+                {customerTags.length > 0 ? customerTags.map(tag => (
+                  <span key={tag.id} className="inline-flex max-w-[108px] items-center rounded-full border border-[#e1e4e7] bg-[#fafbfc] px-2 py-0.5 text-[10.5px] font-normal text-[#646a73]">
+                    <span className="truncate">{tag.name}</span>
+                  </span>
+                )) : <span className="text-[11px] text-[#a8b1bd]">暂无客户标签</span>}
+              </div>
             </div>
             {/* 指标：累计到店 → 参与活动 → 累计消费（.stat 左对齐，padding 9/12/8） */}
             <div className="grid grid-cols-3 gap-2 mt-3">
@@ -294,37 +318,43 @@ export default function DetailView({
             <div className="bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-4 pt-3 pb-[13px] flex-1">
               <h3 className="text-[12.5px] font-bold text-[#212631] mb-0.5">次数余量</h3>
               {remainSummary.map((s, i) => {
-                const unlimited = s.remaining === "不限" || s.total_purchased === "不限" || s.type === "内部课程"
+                const eff = s.effective_remaining !== undefined ? s.effective_remaining : s.remaining
+                const effTotal = s.total_purchased
+                const unlimited = s.remaining === "不限" || s.total_purchased === "不限" || s.type === "内部课程" || s.type === "线下落地课程"
                 return (
                 <div key={i} className="pt-[7px] pb-[9px] border-b border-[#f3f4f5] last:border-b-0">
                   <div className="flex items-baseline justify-between gap-2 mb-[5px] text-[12px]">
                     <span className="font-semibold text-[#212631] truncate" title={s.name || s.type}>{s.name || s.type}</span>
                     <span className="tabular-nums text-[#79838f] text-[11px] shrink-0">
                       {unlimited
-                        ? <><b className="text-[13px] font-extrabold text-[#212631]">∞</b> 不限次</>
-                        : <>剩余 <b className={`text-[13px] font-extrabold ${typeof s.remaining === "number" && s.remaining <= 1 ? "text-[#f08a3c]" : "text-[#212631]"}`}>{typeof s.remaining === "number" ? Math.max(0, s.remaining) : s.remaining}</b> / {s.total_purchased}</>
+                        ? (s.type === "线下落地课程"
+                          ? <><b className="text-[13px] font-extrabold text-[#212631]">{s.effective_date || "?"} ~ {s.expiry_date || "?"}</b></>
+                          : <><b className="text-[13px] font-extrabold text-[#212631]">∞</b> 不限次</>)
+                        : <>剩余 <b className={`text-[13px] font-extrabold ${typeof eff === "number" && eff < 0 ? "text-[#c4506a]" : typeof eff === "number" && eff <= 1 ? "text-[#f08a3c]" : "text-[#212631]"}`}>{typeof eff === "number" ? eff : eff}</b> / {effTotal}</>
                       }
                     </span>
                   </div>
                   {unlimited ? (
                     <div className="h-[5px] rounded-full bg-[#3370ff]" />
                   ) : (
-                    typeof s.remaining === "number" && typeof s.total_purchased === "number" && s.total_purchased > 0 && (
+                    typeof eff === "number" && typeof effTotal === "number" && effTotal > 0 && (
                       <div className="h-[5px] rounded-full bg-[#eef0f2] overflow-hidden">
                         <i
-                          className={`block h-full rounded-full ${s.remaining <= 1 ? "bg-[#f08a3c]" : "bg-[#212631]"}`}
-                          style={{ width: `${Math.min(100, Math.max(0, s.remaining) / s.total_purchased * 100)}%` }}
+                          className={`block h-full rounded-full ${eff <= 1 ? "bg-[#f08a3c]" : "bg-[#212631]"}`}
+                          style={{ width: `${Math.min(100, Math.max(0, eff) / effTotal * 100)}%` }}
                         />
                       </div>
                     )
                   )}
-                  {s.expiry_date && (
+                  {s.earliest_expiry && s.earliest_expiry_count ? (
+                    <div className="mt-[5px] text-[10.5px] tabular-nums text-[#a8b1bd]">最快 {s.earliest_expiry_count} 次 {s.earliest_expiry} 到期</div>
+                  ) : s.expiry_date && (
                     <div className="mt-[5px] text-[10.5px] tabular-nums text-[#a8b1bd]">{s.expiry_date} 到期</div>
                   )}
                 </div>
                 )
               })}
-              <div className="mt-[9px] pt-2 border-t border-dashed border-[#eceef0] text-[10.5px] text-[#a8b1bd]">详细见剩余次数 tab</div>
+              <div className="mt-[9px] pt-2 border-t border-dashed border-[#eceef0] text-[10.5px] text-[#a8b1bd]">详细见卡次统计 tab</div>
             </div>
           )}
         </aside>
@@ -355,7 +385,8 @@ export default function DetailView({
                 { key: "communication" as const, label: "沟通记录", cnt: commRecords.length },
                 { key: "activities" as const, label: "活动记录", cnt: (detail?.activities || []).length },
                 { key: "followups" as const, label: "用户回访", cnt: (detail?.activity_followups || []).length },
-                { key: "purchase" as const, label: "剩余次数", cnt: null as number | null },
+                { key: "purchase" as const, label: "卡次统计", cnt: null as number | null },
+                { key: "offline_course" as const, label: "线下落地课程", cnt: (detail?.offline_course_records || []).length },
                 { key: "payment" as const, label: "交易记录", cnt: (detail?.payment_records || []).length },
               ].map(tab => (
                 <button
@@ -367,6 +398,7 @@ export default function DetailView({
                     setPaymentPage(1)
                     setPurchasePage(1)
                     setFollowupsPage(1)
+                    setOfflineCoursePage(1)
                   }}
                   className={`relative px-3.5 pt-3 pb-2.5 text-[13px] whitespace-nowrap transition-colors ${
                     activeTab === tab.key
@@ -478,9 +510,17 @@ export default function DetailView({
           {/* 活动记录：V2 时间线卡片（按天分组，同日多场在同一日期节点下纵向堆叠） */}
           {activeTab === "activities" && (() => {
             const activities = detail?.activities || []
+            // 筛选
+            const allTypes = [...new Set(activities.map(a => a.type).filter(Boolean))]
+            const allRoles = [...new Set(activities.map(a => a.role).filter(Boolean))]
+            const filtered = activities.filter(a => {
+              if (activityTypeFilter !== "全部" && a.type !== activityTypeFilter) return false
+              if (activityRoleFilter !== "全部" && a.role !== activityRoleFilter) return false
+              return true
+            })
             // 按日期倒序分组：同一天的活动合并到同一个日期节点
             const dayGroups: { date: string; items: ActivityRecord[] }[] = []
-            ;[...activities].sort((a, b) => b.date.localeCompare(a.date)).forEach((a) => {
+            ;[...filtered].sort((a, b) => b.date.localeCompare(a.date)).forEach((a) => {
               const last = dayGroups[dayGroups.length - 1]
               if (last && last.date === a.date) last.items.push(a)
               else dayGroups.push({ date: a.date, items: [a] })
@@ -494,8 +534,35 @@ export default function DetailView({
                 : role === "协助者" ? "text-[#6a48d8] bg-[#ece6ff]"
                 : role === "案主" ? "text-[#c25a1b] bg-[#ffe8d9]"
                 : "text-[#79838f] bg-[#f1f0ed]"
+            const filterBadge = (label: string, value: string, selected: string, onChange: (v: string) => void) => (
+              <button
+                className={`shrink-0 px-2 py-0.5 rounded-[4px] text-[11px] transition-colors ${selected === value ? "bg-[#3370ff] text-white font-medium" : "bg-[#f2f3f5] text-[#4e535a] hover:bg-[#e8eaed]"}`}
+                onClick={() => { onChange(value); setActivitiesPage(1) }}
+              >
+                {label}
+              </button>
+            )
             return activities.length===0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
               <div>
+                {/* 筛选栏 */}
+                {(allTypes.length > 1 || allRoles.length > 1) && (
+                  <div className="flex items-center gap-3 px-4 pt-2 pb-1 flex-wrap">
+                    {allTypes.length > 1 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-[#8f959e] shrink-0">类型</span>
+                        {filterBadge("全部", "全部", activityTypeFilter, setActivityTypeFilter)}
+                        {allTypes.map(t => filterBadge(t, t, activityTypeFilter, setActivityTypeFilter))}
+                      </div>
+                    )}
+                    {allRoles.length > 1 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-[#8f959e] shrink-0">角色</span>
+                        {filterBadge("全部", "全部", activityRoleFilter, setActivityRoleFilter)}
+                        {allRoles.map(r => filterBadge(r, r, activityRoleFilter, setActivityRoleFilter))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="relative px-4 pt-3 pb-1">
                   {/* 时间线竖轨：对齐每个日期节点圆点的圆心 */}
                   <div className="absolute left-[116px] top-6 bottom-4 w-[2px] rounded-full bg-[#eef0f2]" />
@@ -523,18 +590,17 @@ export default function DetailView({
                         {/* 右侧活动卡片：同日多场纵向堆叠 */}
                         <div className="flex min-w-0 flex-1 flex-col gap-[10px] -ml-1">
                           {g.items.map((a, i) => {
-                            const notArrived = !arrivedDates.has(a.date)
+                            const notArrived = a.participated === undefined ? !arrivedDates.has(a.date) : !a.participated
                             return (
                               <div key={`${g.date}-${i}`} className={notArrived
                                 ? "rounded-[14px] border border-dashed border-[#e8eaec] bg-[#fbfbfa] px-4 py-3"
                                 : "rounded-[14px] border border-[#f0f1f3] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(33,38,49,.03)]"}>
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className={`min-w-0 flex-1 text-[13.5px] font-bold ${notArrived ? "text-[#79838f]" : "text-[#212631]"}`}>{a.name || <span className="text-[#d0d3d6]">-</span>}</span>
-                                  {a.membership_deduction_count != null && a.membership_deduction_count > 0 && !a.is_public_welfare && (
-                                    <span className="ml-auto shrink-0 text-[11.5px] tabular-nums text-[#8f959e]">扣卡{a.membership_deduction_count}次</span>
+                                  {a.deduction_summary && (
+                                    <span className={`ml-auto shrink-0 text-[11.5px] tabular-nums ${notArrived ? "text-[#9ba2aa]" : "text-[#5d6673]"}`}>{a.deduction_summary}</span>
                                   )}
                                   {a.is_public_welfare && <span className="whitespace-nowrap rounded-md bg-[#dcf5e4] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#157a3c]">公益</span>}
-                                  {notArrived && <span className="whitespace-nowrap rounded-md bg-[#f1f0ed] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#79838f]">未参加</span>}
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-[14px] gap-y-1 text-[11.5px] text-[#79838f]">
                                   <span className="inline-flex items-center gap-[5px]">
@@ -643,13 +709,20 @@ export default function DetailView({
             const today = new Date().toLocaleDateString("sv-SE")
             const allItems = detail?.purchase_summary || []
             const memberItems = allItems.filter(s => s.type === "会员卡")
-            const otherItems = allItems.filter(s => s.type !== "会员卡")
+            const otherItems = allItems.filter(s => s.type !== "会员卡" && s.type !== "OH卡诊断")
 
-            // 会员卡：未过期在前，已过期在后
+            // 排序：生效中（到期近优先）→ 未生效 → 已过期
             const memberSorted = [...memberItems].sort((a, b) => {
-              const aExpired = a.expiry_date && a.expiry_date < today
-              const bExpired = b.expiry_date && b.expiry_date < today
-              return (aExpired ? 1 : 0) - (bExpired ? 1 : 0)
+              const status = (x: any) => {
+                if (x.expiry_date && x.expiry_date < today) return 2
+                if (x.effective_date && x.effective_date > today) return 1
+                return 0
+              }
+              const sa = status(a), sb = status(b)
+              if (sa !== sb) return sa - sb
+              if (sa === 0) return ((a.expiry_date as string) || "9999").localeCompare((b.expiry_date as string) || "9999")
+              if (sa === 1) return ((a.effective_date as string) || "").localeCompare((b.effective_date as string) || "")
+              return ((b.expiry_date as string) || "").localeCompare((a.expiry_date as string) || "")
             })
             // 总次数 = 所有卡 total_count 之和
             const firstItem = memberItems[0]
@@ -673,6 +746,33 @@ export default function DetailView({
               return !expired && !notStarted && s.remaining === "不限"
             })
 
+            const debtDetails = (item?: PurchaseSummaryItem) => {
+              const debtCount = item?.debt_count || 0
+              const activities = item?.debt_activities || []
+              if (debtCount <= 0) return null
+              return (
+                <div className="mt-2 border-t border-[#f0f0f0] pt-2">
+                  <div className="mb-1.5 text-[12px] font-medium text-[#c4506a] tabular-nums">历史欠卡{debtCount}次</div>
+                  <div className="space-y-1">
+                    {activities.map((activity, index) => (
+                      <div key={`${activity.label}-${activity.date || ""}-${index}`} className="flex items-center gap-2 text-[12px] text-[#646a73]">
+                        <span className="min-w-0 flex-1 truncate" title={`${activity.label}${activity.date ? ` ${activity.date}` : ""}`}>
+                          {activity.label || "活动"}
+                        </span>
+                        <span className="shrink-0 text-[#8f959e] tabular-nums">{activity.date || "-"}</span>
+                        <span className="w-[58px] shrink-0 text-right text-[#c4506a] tabular-nums">欠卡{activity.count}次</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+
+            const countLabel = (value: number | string | undefined) => {
+              if (value === "不限") return "不限次"
+              return `${value ?? 0}次`
+            }
+
             // 其他类型排序
             const sortedOthers = [...otherItems].sort((a, b) => {
               const aExpired = a.expiry_date && a.expiry_date < today
@@ -688,102 +788,207 @@ export default function DetailView({
 
             return (
               <div>
-                {/* 会员卡 — 无卡不显示 */}
-                {memberItems.length > 0 && (
-                <div className="flex items-center gap-2 py-3 border-b border-[#f0f0f0]">
-                  <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">会员卡</span>
-                  <div className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
-                    {(() => {
-                      const totalManual = memberItems.reduce((sum, s) => sum + (s.manual_deductions || 0), 0)
-                      const advanceDeductions = memberItems[0]?.advance_deductions || 0
-                      const icDeduct = memberItems[0]?.internal_course_deductions || 0
-                      const cardDeductions = memberItems
-                        .filter(s => !s.voided)
-                        .map(s => {
-                          const isUnlimited = s.remaining === "不限" || s.total_purchased === "不限"
-                          const count = isUnlimited ? (s.unlimited_deductions || 0) : (s.activity_deductions || 0)
-                          return count > 0 ? `${s.name}扣卡${count}次` : ''
-                        })
-                        .filter(Boolean)
-                      const parts: string[] = []
-                      if (!memberHasUnlimited) parts.push(`总${memberGrandTotal}次`)
-                      else parts.push("不限")
-                      parts.push(...cardDeductions)
-                      if (totalManual > 0) parts.push(`销卡${totalManual}次`)
-                      if (advanceDeductions > 0) parts.push(`预支扣卡${advanceDeductions}次`)
-                      if (icDeduct > 0) parts.push(`内部课程抵扣${icDeduct}次`)
-                      return (
-                        <span>
-                          {memberHasUnlimited ? "不限次" : (typeof memberTotal === "number" && memberTotal < 0 ? <span className="text-[#c4506a]">剩余{memberTotal}次</span> : `剩余${memberTotal}次`)}
-                          <span className="ml-1 text-[11px] text-[#8f959e]">（{parts.join("/")}）</span>
+                {/* 会员卡 */}
+                {memberItems.length > 0 && (() => {
+                  const totalManual = memberItems.reduce((sum, s) => sum + (s.manual_deductions || 0), 0)
+                  const advanceDeductions = memberItems[0]?.advance_deductions || 0
+                  const currentRemaining = firstItem?.current_remaining ?? memberTotal
+                  const currentTotal = firstItem?.current_total ?? memberGrandTotal
+                  const debtCount = firstItem?.debt_count || advanceDeductions
+                  const icDeduct = memberItems[0]?.internal_course_deductions || 0
+                  const cardDeductions = memberItems
+                    .filter(s => !s.voided)
+                    .map(s => {
+                      const isUnlimited = s.remaining === "不限" || s.total_purchased === "不限"
+                      const count = isUnlimited ? (s.unlimited_deductions || 0) : (s.activity_deductions || 0)
+                      return count > 0 ? `${s.name}扣卡${count}次` : ''
+                    })
+                    .filter(Boolean)
+                  const noteParts: string[] = []
+                  if (!memberHasUnlimited) noteParts.push(`总${memberGrandTotal}次`)
+                  else noteParts.push("不限")
+                  noteParts.push(...cardDeductions)
+                  if (totalManual > 0) noteParts.push(`销卡${totalManual}次`)
+                  if (icDeduct > 0) noteParts.push(`内部课程抵扣${icDeduct}次`)
+                  return (
+                    <div className="bg-[#fafbfc] border border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px]">
+                      <div className="flex items-baseline gap-[10px] pb-[7px]">
+                        <span className="text-[13px] font-medium text-[#1f2329]">会员卡</span>
+                        <span className="ml-auto text-[12px] text-[#8f959e] tabular-nums">
+                          {memberHasUnlimited
+                            ? <>当前剩余 <span className="font-medium text-[#1f2329]">不限次</span> / 总 <span className="font-medium text-[#1f2329]">不限次</span></>
+                            : <>当前剩余 <span className="font-medium text-[#1f2329]">{countLabel(currentRemaining)}</span> / 总 <span className="font-medium text-[#1f2329]">{countLabel(currentTotal)}</span>{debtCount > 0 && <> · <span className="text-[#c4506a]">历史欠卡{debtCount}次</span></>}</>
+                          }
                         </span>
-                      )
-                    })()}
-                    {memberSorted.length > 0 && memberSorted.map((s, i) => {
-                      const expired = s.expiry_date && s.expiry_date < today
-                      const notStarted = s.effective_date && s.effective_date > today
-                      const voided = s.voided === true
-                      return (
-                        <span key={i} className="ml-3 text-[11px] text-[#8f959e]">
-                          <span className={voided ? "text-[#c4506a] line-through" : expired ? "text-[#c4506a]" : notStarted ? "text-[#8f959e]" : ""}>
-                            {s.name}
-                            {voided
-                              ? " 已退费"
-                              : s.remaining === "不限" || s.total_purchased === "不限"
-                                ? " 不限次"
-                                : typeof s.remaining === "number" && typeof s.total_purchased === "number"
-                                  ? ` ${Math.max(0, s.remaining)}次/${s.total_purchased}次`
-                                  : ''}
-                            {s.effective_date && ` ${s.effective_date}~${s.expiry_date || "不限"}`}
-                            {expired && "（已过期）"}
-                            {notStarted && "（未生效）"}
-                          </span>
-                        </span>
-                      )
-                    })}
-                  </div>
-                </div>
-                )}
+                      </div>
+                      {noteParts.length > 0 && (
+                        <div className="text-[12px] text-[#a8b1bd] tabular-nums pb-[7px]">{noteParts.join(" · ")}</div>
+                      )}
+                      {memberSorted.map((s, i) => {
+                        const expired = s.expiry_date && s.expiry_date < today
+                        const notStarted = s.effective_date && s.effective_date > today
+                        const voided = s.voided === true
+                        const noCount = !voided && !expired && !notStarted && typeof s.remaining === "number" && s.remaining === 0
+                        let pillLabel = ""
+                        let pillClass = ""
+                        if (voided) { pillLabel = "已退费"; pillClass = "text-[#c4506a] bg-[#fdeeee]" }
+                        else if (expired) { pillLabel = "已过期"; pillClass = "text-[#c4506a] bg-[#fdeeee]" }
+                        else if (notStarted) { pillLabel = "未生效"; pillClass = "text-[#79838f] bg-[#f1f0ed]" }
+                        else if (noCount) { pillLabel = "无次数"; pillClass = "text-[#79838f] bg-[#f1f0ed]" }
+                        else { pillLabel = "生效中"; pillClass = "text-[#157a3c] bg-[#dcf5e4]" }
+                        return (
+                          <div key={i} className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
+                            <span className={`text-[12.5px] truncate ${voided ? "text-[#c4506a] line-through" : "text-[#212631]"}`}>{s.name}</span>
+                            <span className="text-[12px] text-[#8f959e] tabular-nums">
+                              {voided
+                                ? <span className="text-[#c4506a]">已退费</span>
+                                : s.remaining === "不限" || s.total_purchased === "不限"
+                                  ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
+                                  : <><b className="text-[12.5px] font-semibold text-[#212631]">{Math.max(0, s.remaining as number)}</b> / {s.total_purchased}</>
+                              }
+                            </span>
+                            <span className="text-[12px] text-[#a8b1bd] tabular-nums">{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
+                            <span className={`text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap ${pillClass}`}>{pillLabel}</span>
+                          </div>
+                        )
+                      })}
+                      {debtDetails(firstItem)}
+                    </div>
+                  )
+                })()}
 
                 {/* 其他类型 */}
                 {sortedOthers.length > 0 ? (
-                  <div className="divide-y divide-[#f0f0f0]">
+                  <>
                     {paginatedOthers.map((s, i) => {
                       const expired = s.expiry_date && s.expiry_date < today
+                      const notStarted = s.effective_date && s.effective_date > today
                       const noCount = typeof s.remaining === "number" && s.remaining === 0
+                      const er = s.effective_remaining !== undefined ? s.effective_remaining : s.remaining
+                      const currentRemaining = s.current_remaining ?? er
+                      const currentTotal = s.current_total ?? s.total_purchased
+                      const debtCount = s.debt_count || 0
+                      const purchases = (s.purchases || []).slice().sort((a: any, b: any) => {
+                        const status = (x: any) => {
+                          if (x.expiry_date && x.expiry_date < today) return 2
+                          if (x.effective_date && x.effective_date > today) return 1
+                          return 0
+                        }
+                        const sa = status(a), sb = status(b)
+                        if (sa !== sb) return sa - sb
+                        if (sa === 0) return ((a.expiry_date as string) || "9999").localeCompare((b.expiry_date as string) || "9999")
+                        if (sa === 1) return ((a.effective_date as string) || "").localeCompare((b.effective_date as string) || "")
+                        return ((b.expiry_date as string) || "").localeCompare((a.expiry_date as string) || "")
+                      })
                       return (
-                        <div key={i} className="flex items-center gap-2 py-3">
-                          <span className="text-[12px] text-[#8f959e] tracking-widest shrink-0 w-[60px] text-right">{s.type}</span>
-                          <span className="text-[12px] text-[#2b2f36] flex-1 min-w-0 pl-[6px]">
-                            {s.type === "内部课程" ? (
-                              <span className="inline-flex items-baseline gap-2">
-                                <span>{s.name}</span>
-                                <span className="tabular-nums text-[11px] text-[#79838f]"><b className="text-[13px] font-extrabold text-[#212631]">∞</b> 不限次</span>
-                                <span>{s.effective_date || <span className="text-[#d0d3d6]">-</span>}/{s.expiry_date || <span className="text-[#d0d3d6]">-</span>}</span>
+                        <div key={i} className="bg-[#fafbfc] border border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px]">
+                          <div className="flex items-baseline gap-[10px] pb-[7px]">
+                            <span className="text-[13px] font-medium text-[#1f2329]">{s.type}</span>
+                            <span className="ml-auto text-[12px] text-[#8f959e] tabular-nums">
+                              {s.type === "线下落地课程"
+                                ? <>已上课<span className="font-medium text-[#1f2329]">{s.attended_count || 0}</span>次</>
+                                : <>当前剩余 <span className="font-medium text-[#1f2329]">{countLabel(currentRemaining)}</span> / 总 <span className="font-medium text-[#1f2329]">{countLabel(currentTotal)}</span>{debtCount > 0 && <> · <span className="text-[#c4506a]">历史欠卡{debtCount}次</span></>}</>
+                              }
+                            </span>
+                          </div>
+                          {purchases.length > 0 ? purchases.map((p: any, pi: number) => {
+                            const pExpired = p.expiry_date && p.expiry_date < today
+                            const pNotStarted = p.effective_date && p.effective_date > today
+                            const pNoCount = !pExpired && !pNotStarted && typeof p.remaining === "number" && p.remaining === 0
+                            let pillLabel = ""
+                            let pillClass = ""
+                            if (pExpired) { pillLabel = "已过期"; pillClass = "text-[#c4506a] bg-[#fdeeee]" }
+                            else if (pNotStarted) { pillLabel = "未生效"; pillClass = "text-[#79838f] bg-[#f1f0ed]" }
+                            else if (pNoCount) { pillLabel = "无次数"; pillClass = "text-[#79838f] bg-[#f1f0ed]" }
+                            else { pillLabel = "生效中"; pillClass = "text-[#157a3c] bg-[#dcf5e4]" }
+                            const rem = typeof p.remaining === "number" ? p.remaining : p.purchase_count
+                            return (
+                              <div key={pi} className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
+                                <span className="text-[12.5px] text-[#212631] truncate">
+                                  {s.type === "内部课程" ? p.name
+                                    : s.type === "其他项目" ? <>{p.name}<span className="text-[12px] text-[#a8b1bd] ml-[5px]">{s.activity_mode || "线下"}</span></>
+                                    : `购买 ${p.purchase_count} 次`}
+                                </span>
+                                <span className="text-[12px] text-[#8f959e] tabular-nums">
+                                  {s.type === "内部课程"
+                                    ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
+                                    : <><b className="text-[12.5px] font-semibold text-[#212631]">{rem}</b> / {p.purchase_count}</>
+                                  }
+                                </span>
+                                <span className="text-[12px] text-[#a8b1bd] tabular-nums">{p.effective_date || "-"}~{p.expiry_date || "不限"}</span>
+                                <span className={`text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap ${pillClass}`}>{pillLabel}</span>
+                              </div>
+                            )
+                          }) : (
+                            <div className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
+                              <span className="text-[12.5px] text-[#212631] truncate">
+                                {s.type === "内部课程" ? s.name
+                                  : s.type === "其他项目" ? <>{s.name}<span className="text-[12px] text-[#a8b1bd] ml-[5px]">{s.activity_mode || "线下"}</span></>
+                                  : s.name}
                               </span>
-                            ) : s.type === "其他项目" ? (
-                              <span className="inline-flex items-baseline gap-2">
-                                <span>{s.name}</span>
-                                <span>{s.activity_mode || "线下"}</span>
-                                <span>{s.remaining === "不限" ? "不限次" : (typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`)}</span>
-                                <span>{s.effective_date || <span className="text-[#d0d3d6]">-</span>}~{s.expiry_date || "不限"}</span>
+                              <span className="text-[12px] text-[#8f959e] tabular-nums">
+                                {s.type === "内部课程"
+                                  ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
+                                  : s.type === "线下落地课程"
+                                    ? <><b className="text-[12.5px] font-semibold text-[#212631]">{s.validity_value || 1} 个月</b></>
+                                  : s.remaining === "不限"
+                                    ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
+                                    : <><b className="text-[12.5px] font-semibold text-[#212631]">{typeof s.remaining === "number" ? s.remaining : String(s.remaining)}</b> / {s.total_purchased}</>
+                                }
                               </span>
-                            ) : (
-                              <span>{typeof s.remaining === "number" && s.remaining < 0 ? <span className="text-[#c4506a]">剩余{s.remaining}次/共{s.total_purchased}次</span> : `剩余${s.remaining}次/共${s.total_purchased}次`}</span>
-                            )}
-                          </span>
-                          {expired && <span className="text-[12px] text-[#c4506a] bg-[#fef0f0] px-1.5 py-0.5 rounded shrink-0">已过期</span>}
-                          {noCount && !expired && <span className="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded shrink-0">无次数</span>}
+                              <span className="text-[12px] text-[#a8b1bd] tabular-nums">{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
+                              <span>
+                                {expired && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#c4506a] bg-[#fdeeee]">已过期</span>}
+                                {notStarted && !expired && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">未生效</span>}
+                                {!expired && !notStarted && s.type === "线下落地课程" && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#157a3c] bg-[#dcf5e4]">生效中</span>}
+                                {noCount && !expired && !notStarted && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">无次数</span>}
+                              </span>
+                            </div>
+                          )}
+                          {debtDetails(s)}
                         </div>
                       )
                     })}
-                  </div>
+                    {totalPages > 1 && (
+                      <div className="px-4 py-2">
+                        <PaginationBar currentPage={purchasePage} totalPages={totalPages} totalItems={sortedOthers.length} startIndex={(purchasePage-1)*pageSize+1} endIndex={Math.min(purchasePage*pageSize, sortedOthers.length)} onPageChange={setPurchasePage} />
+                      </div>
+                    )}
+                  </>
                 ) : memberItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
                 ) : null}
+              </div>
+            )
+          })()}
+
+          {/* 线下落地课程 */}
+          {activeTab === "offline_course" && (() => {
+            const courseRecords = detail?.offline_course_records || []
+            const pageSize = 5
+            const totalPages = Math.ceil(courseRecords.length / pageSize)
+            const paginatedRecords = courseRecords.slice((offlineCoursePage - 1) * pageSize, offlineCoursePage * pageSize)
+            return courseRecords.length === 0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
+              <div>
+                <Table className="border-b border-[#f0f0f0]"><TableHeader className="[&_tr]:!h-8">
+                  <TableRow className="hover:bg-transparent !h-8">
+                  <TableHead className="pl-4 !h-7 text-[12px]">上课日期</TableHead>
+                  <TableHead className="!h-7 text-[12px]">课程老师</TableHead>
+                  <TableHead className="!h-7 text-[12px]">上课内容</TableHead>
+                  <TableHead className="!h-7 text-[12px]">上课结果</TableHead>
+                </TableRow></TableHeader><TableBody>
+                  {paginatedRecords.map((r, i) => (
+                    <TableRow key={i} className="!h-9">
+                      <TableCell className="pl-4 py-1 text-[12px]">{r.record_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
+                      <TableCell className="py-1 text-[12px]">{r.teacher || <span className="text-[#d0d3d6]">-</span>}</TableCell>
+                      <TableCell className="py-1 text-[12px] max-w-[200px] truncate" title={r.content}>{r.content || <span className="text-[#d0d3d6]">-</span>}</TableCell>
+                      <TableCell className="py-1 text-[12px] max-w-[200px] truncate" title={r.result}>{r.result || <span className="text-[#d0d3d6]">-</span>}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody></Table>
                 {totalPages > 1 && (
                   <div className="px-4 py-2">
-                    <PaginationBar currentPage={purchasePage} totalPages={totalPages} totalItems={sortedOthers.length} startIndex={(purchasePage-1)*pageSize+1} endIndex={Math.min(purchasePage*pageSize, sortedOthers.length)} onPageChange={setPurchasePage} />
+                    <PaginationBar currentPage={offlineCoursePage} totalPages={totalPages} totalItems={courseRecords.length} startIndex={(offlineCoursePage-1)*pageSize+1} endIndex={Math.min(offlineCoursePage*pageSize, courseRecords.length)} onPageChange={setOfflineCoursePage} />
                   </div>
                 )}
               </div>
@@ -804,6 +1009,7 @@ export default function DetailView({
                   <TableHead className="!h-7 text-[12px]">名称</TableHead>
                   <TableHead className="!h-7 text-[12px]">数量</TableHead>
                   <TableHead className="!h-7 text-[12px]">金额</TableHead>
+                  <TableHead className="!h-7 text-[12px]">成交日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">生效日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">到期日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">状态</TableHead>
@@ -832,6 +1038,7 @@ export default function DetailView({
                       <TableCell className="py-1 text-[12px]">{r.name || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.quantity}</TableCell>
                       <TableCell className="py-1 text-[12px]">¥{r.amount.toLocaleString()}</TableCell>
+                      <TableCell className="py-1 text-[12px]">{r.deal_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.effective_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员卡" ? "不限" : <span className="text-[#d0d3d6]">-</span>)}</TableCell>
                       <TableCell className={`py-1 text-[12px] ${statusClass}`}>{status}</TableCell>

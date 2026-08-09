@@ -259,13 +259,6 @@ const internalCourseSessionApi = {
   delete: (id) => request(`/api/internal-course-sessions/${id}`, { method: 'DELETE' }),
 }
 
-// OH卡 API
-const ohCardReadingSessionApi = {
-  create: (data) => request('/api/oh-card-reading-sessions', { method: 'POST', data }),
-  update: (id, data) => request(`/api/oh-card-reading-sessions/${id}`, { method: 'PATCH', data }),
-  delete: (id) => request(`/api/oh-card-reading-sessions/${id}`, { method: 'DELETE' }),
-}
-
 // 分组 API
 const dailyGroupingApi = {
   get: (date) => request(`/api/daily-groupings?date=${date}`),
@@ -275,7 +268,7 @@ const dailyGroupingApi = {
 // 客户 API
 const customerApi = {
   light: (limit) => request(`/api/customers/light${limit ? '?limit=' + limit : ''}`),
-  detail: (id) => request(`/api/customer-detail/${id}`),
+  detail: (id, date) => request(`/api/customer-detail/${id}${date ? '?date=' + date : ''}`),
   list: (params = {}) => {
     const qs = Object.entries(params)
       .filter(([_, v]) => v !== undefined && v !== null && v !== '')
@@ -286,6 +279,28 @@ const customerApi = {
   create: (data) => request('/api/customers', { method: 'POST', data }),
   update: (id, data) => request(`/api/customers/${id}`, { method: 'PATCH', data }),
   delete: (id) => request(`/api/customers/${id}`, { method: 'DELETE' }),
+}
+
+// 客户标签 API（公共标签 + 当前账号私有标签）
+const customerTagApi = {
+  list: () => request('/api/customer-tags'),
+  create: (data) => request('/api/customer-tags', { method: 'POST', data }),
+  update: (tagId, data) => request(`/api/customer-tags/${tagId}`, { method: 'PUT', data }),
+  archive: (tagId) => request(`/api/customer-tags/${tagId}`, { method: 'DELETE' }),
+  listForCustomer: (customerId) => request(`/api/customer-tags/customers/${customerId}`),
+  setForCustomer: (customerId, tagIds) => request(`/api/customer-tags/customers/${customerId}`, {
+    method: 'PUT',
+    data: { tag_ids: tagIds },
+  }),
+  createPrivate: (name) => request('/api/customer-tags', {
+    method: 'POST',
+    data: { name, scope: 'private', description: '' },
+  }),
+}
+
+// 角色页面权限 API（用于同步 PC 端角色权限配置）
+const positionPermissionApi = {
+  get: (position) => request(`/api/position-permissions/${encodeURIComponent(position)}`, { silent: true }),
 }
 
 // 空间 API
@@ -322,9 +337,11 @@ const PAYMENT_PROJECT_TYPES = [
   { key: 'membership_card', label: '会员卡', apiPath: 'membership-cards' },
   { key: 'group_case', label: '觉醒游戏', apiPath: 'group-cases' },
   { key: 'emotional_release', label: '情绪释放', apiPath: 'emotional-releases' },
-  { key: 'oh_card_reading', label: 'OH卡梳理', apiPath: 'oh-card-readings' },
+  { key: 'oh_card_reading', label: 'OH卡诊断', apiPath: 'oh-card-readings' },
   { key: 'energy_knot', label: '能量结', apiPath: 'energy-knots' },
   { key: 'internal_course', label: '内部课程', apiPath: 'internal-courses' },
+  { key: 'tea_seat_fee', label: '茶位费', apiPath: 'tea-seat-fees' },
+  { key: 'offline_course', label: '线下落地课程', apiPath: 'offline-courses' },
   { key: 'other', label: '其他项目', apiPath: 'other-projects' },
 ]
 
@@ -360,6 +377,8 @@ const paymentApi = {
   ohCardReadings: _projectApi('/api/oh-card-readings'),
   energyKnots: _projectApi('/api/energy-knots'),
   internalCourses: _projectApi('/api/internal-courses'),
+  teaSeatFees: _projectApi('/api/tea-seat-fees'),
+  offlineCourses: _projectApi('/api/offline-courses'),
   otherProjects: Object.assign(_projectApi('/api/other-projects'), {
     getAvailableProjects: (customerId) => request(`/api/other-projects/${customerId}/available-projects`),
     deduct: (data) => request('/api/other-projects/deductions', { method: 'POST', data }),
@@ -368,6 +387,8 @@ const paymentApi = {
       return request(`/api/other-projects/deductions${qs}`)
     },
   }),
+
+  export: () => `${BASE_URL}/api/payment-exports/export`,
 
   // 项目类型 → API 映射
   getByType(type) {
@@ -378,6 +399,8 @@ const paymentApi = {
       oh_card_reading: this.ohCardReadings,
       energy_knot: this.energyKnots,
       internal_course: this.internalCourses,
+      tea_seat_fee: this.teaSeatFees,
+      offline_course: this.offlineCourses,
       other: this.otherProjects,
     }
     return map[type]
@@ -435,11 +458,28 @@ const communicationRecordApi = {
   delete: (id) => request(`/api/communication-records/${id}`, { method: 'DELETE' }),
 }
 
+// 支出记录
+const expenseApi = {
+  list: (params = {}) => {
+    const qs = Object.entries(params)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join('&')
+    return request(`/api/expenses${qs ? '?' + qs : ''}`)
+  },
+  get: (id) => request(`/api/expenses/${id}`),
+  create: (data) => request('/api/expenses', { method: 'POST', data }),
+  update: (id, data) => request(`/api/expenses/${id}`, { method: 'PUT', data }),
+  delete: (id) => request(`/api/expenses/${id}`, { method: 'DELETE' }),
+}
+
 module.exports = {
   request,
   visitApi,
   classRecordApi,
   customerApi,
+  customerTagApi,
+  positionPermissionApi,
   spaceApi,
   organizationApi,
   memberIdentityApi,
@@ -451,7 +491,7 @@ module.exports = {
   emotionalReleaseSessionApi,
   energyKnotSessionApi,
   internalCourseSessionApi,
-  ohCardReadingSessionApi,
   paymentApi,
   communicationRecordApi,
+  expenseApi,
 }

@@ -85,6 +85,12 @@ def test_all_activity_types_notify_assigned_customer(client, created_customer):
     customer_id = created_customer["id"]
     nickname = created_customer["nickname"]
     date = "2026-08-19"
+    invite = client.post("/api/visits", json={
+        "visit_date": date,
+        "customer_id": customer_id,
+        "arrived": False,
+    })
+    assert invite.status_code == 200
     activity_specs = [
         (
             "/api/class-records",
@@ -140,17 +146,6 @@ def test_all_activity_types_notify_assigned_customer(client, created_customer):
             },
             "通知内部课",
             "老师",
-        ),
-        (
-            "/api/oh-card-reading-sessions",
-            {
-                "date": date,
-                "name": f"通知OH卡_{suffix}",
-                "owner_id": customer_id,
-                "owner_name": nickname,
-            },
-            "通知OH卡",
-            "案主",
         ),
     ]
     created = []

@@ -2,13 +2,13 @@ import logging
 import threading
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
+
+from app.models.visit import ActivityInfo, CustomerSearchResult, VisitRecord, VisitRecordCreate
+from app.services.customer_service import get_customer, list_customers
+from app.services.storage import delete_item, load_data, save_data, save_item
 
 logger = logging.getLogger(__name__)
-
-from app.models.visit import VisitRecord, VisitRecordCreate, CustomerSearchResult, ActivityInfo
-from app.services.customer_service import list_customers, get_customer
-from app.services.storage import load_data, save_data, save_item, delete_item
 
 FILENAME = "visits.json"
 _visits: Dict[str, VisitRecord] = {}
@@ -60,6 +60,35 @@ def get_arrived_customer_ids(date_from: str, date_to: str) -> set[str]:
     }
 
 
+def get_invited_customer_ids(date: str) -> set[str]:
+    """获取指定日期邀约名单中的客户 ID（包含未到场）。"""
+    return {
+        v.customer_id
+        for v in _visits.values()
+        if not v.is_deleted and v.visit_date == date
+    }
+
+
+def is_customer_arrived(date: str, customer_id: str) -> bool:
+    """判断客户是否在指定日期的邀约中被标记为已到场。"""
+    return any(
+        not v.is_deleted
+        and v.visit_date == date
+        and v.customer_id == customer_id
+        and v.arrived
+        for v in _visits.values()
+    )
+
+
+def validate_activity_owner(date: str, customer_id: str) -> None:
+    """确保三类专项活动的案主来自当天邀约名单。"""
+    # 课表允许先保存活动类型草稿；一旦选择案主，就必须来自当天邀约名单。
+    if not customer_id:
+        return
+    if customer_id not in get_invited_customer_ids(date):
+        raise ValueError("案主只能选择当天邀约名单中的客户")
+
+
 def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> List[ActivityInfo]:
     """从5个模块收集某客户在指定日期的活动（单客户版本，供详情页使用）"""
     result = _build_all_activities(date)
@@ -67,14 +96,13 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
 
 
 def _build_all_activities(date: Optional[str] = None) -> dict[str, list[ActivityInfo]]:
-    """批量构建指定日期所有客户的活动映射 {customer_id: [ActivityInfo]}，一次遍历 6 个模块"""
+    """批量构建指定日期所有客户的活动映射 {customer_id: [ActivityInfo]}，一次遍历 5 个模块"""
     from app.services import (
         class_record_service,
         group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
         customer_service,
     )
     from collections import defaultdict
@@ -161,21 +189,6 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
             elif cid in s.participant_ids:
                 result[cid].append(ActivityInfo(name=s.course_name, role=_role(cid), type="内部课", owner_name=teacher_names))
 
-    # 6. OH卡梳理（owner > teacher > participant）
-    for s in oh_card_reading_session_service.list_sessions(date):
-        all_ids = set()
-        if s.owner_id:
-            all_ids.add(s.owner_id)
-        all_ids.update(s.teacher_ids)
-        all_ids.update(s.participant_ids)
-        for cid in all_ids:
-            if cid == s.owner_id:
-                result[cid].append(ActivityInfo(name="OH卡梳理", role="案主", type="OH卡", owner_name=s.owner_name or ""))
-            elif cid in s.teacher_ids:
-                result[cid].append(ActivityInfo(name="OH卡梳理", role="老师", type="OH卡", owner_name=s.owner_name or ""))
-            elif cid in s.participant_ids:
-                result[cid].append(ActivityInfo(name="OH卡梳理", role=_role(cid), type="OH卡", owner_name=s.owner_name or ""))
-
     final = dict(result)
     print(f"[_build_all_activities] date={date}, customers={len(final)}, total_acts={sum(len(v) for v in final.values())}", flush=True)
     return final
@@ -206,7 +219,6 @@ def _build_customer_activity_counts() -> dict[str, int]:
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
     )
     counts: dict[str, int] = defaultdict(int)
     for cr in class_record_service.list_records():
@@ -229,10 +241,6 @@ def _build_customer_activity_counts() -> dict[str, int]:
         for cid in (s.participant_ids + s.teacher_ids):
             if cid:
                 counts[cid] += 1
-    for s in oh_card_reading_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id] + s.teacher_ids):
-            if cid:
-                counts[cid] += 1
     result = dict(counts)
     _activity_counts_cache = result
     _activity_counts_ts = now
@@ -252,7 +260,6 @@ def _count_customer_activities_by_type(customer_id: str, activity_type: str) -> 
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
     )
     if activity_type == "membership":
         count = 0
@@ -282,12 +289,6 @@ def _count_customer_activities_by_type(customer_id: str, activity_type: str) -> 
         count = 0
         for s in internal_course_session_service.list_sessions():
             if customer_id in (s.participant_ids + s.teacher_ids):
-                count += 1
-        return count
-    if activity_type == "oh_card":
-        count = 0
-        for s in oh_card_reading_session_service.list_sessions():
-            if customer_id in (s.participant_ids + [s.owner_id] + s.teacher_ids):
                 count += 1
         return count
     return 0
@@ -408,7 +409,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
     all_activity_counts = _build_customer_activity_counts()
     all_welfare_counts = _build_customer_welfare_counts()
 
-    # 按日期分组，批量构建活动详情（每个日期只遍历 6 个模块一次）
+    # 按日期分组，批量构建活动详情（每个日期只遍历 5 个模块一次）
     dates = {r.visit_date for r in records}
     all_activities: dict[tuple, list] = {}
     try:
@@ -630,7 +631,6 @@ def _deduct_for_arrival(visit):
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
     )
     cid = visit.customer_id
     date = visit.visit_date
@@ -663,17 +663,6 @@ def _deduct_for_arrival(visit):
                     membership_card_service._do_sync_activity_count(
                         cid,
                         f"eks:{s.id}",
-                        membership_card_service.get_activity_deduction_count(s),
-                    )
-
-        for s in oh_card_reading_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = set(s.participant_ids)
-                chargeable.discard(s.owner_id)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(
-                        cid,
-                        f"ocr:{s.id}",
                         membership_card_service.get_activity_deduction_count(s),
                     )
 
@@ -710,7 +699,6 @@ def _restore_for_arrival(visit):
         emotional_release_session_service,
         energy_knot_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
     )
     cid = visit.customer_id
     date = visit.visit_date
@@ -733,13 +721,6 @@ def _restore_for_arrival(visit):
                 chargeable = energy_knot_session_service._get_chargeable_ids(s)
                 if cid in chargeable:
                     membership_card_service._do_sync_activity_count(cid, f"eks:{s.id}", 0)
-
-        for s in oh_card_reading_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = set(s.participant_ids)
-                chargeable.discard(s.owner_id)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(cid, f"ocr:{s.id}", 0)
 
         for s in internal_course_session_service.list_sessions():
             if s.date == date and not s.is_deleted:
@@ -772,7 +753,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
     from app.services import (
         class_record_service, group_case_session_service,
         emotional_release_session_service, energy_knot_session_service,
-        internal_course_session_service, oh_card_reading_session_service,
+        internal_course_session_service,
     )
     from app.services import membership_card_service
 
@@ -879,27 +860,6 @@ def _cleanup_activity_records(customer_id: str, date: str):
                 internal_course_session_service._save(s.id)
     except Exception:
         logger.exception("清理内部课程记录失败 customer=%s date=%s", customer_id, date)
-
-    # OH卡梳理：host_id, teacher_ids, participant_ids
-    try:
-        for s in oh_card_reading_session_service.list_sessions(date=date):
-            changed = False
-            if s.host_id == customer_id:
-                s.host_id = ""
-                s.host_name = ""
-                changed = True
-            if customer_id in s.teacher_ids:
-                s.teacher_ids = [x for x in s.teacher_ids if x != customer_id]
-                changed = True
-            if customer_id in s.participant_ids:
-                if customer_id != s.owner_id:
-                    membership_card_service._do_sync_activity_count(customer_id, f"ocr:{s.id}", 0)
-                s.participant_ids = [x for x in s.participant_ids if x != customer_id]
-                changed = True
-            if changed:
-                oh_card_reading_session_service._save(s.id)
-    except Exception:
-        logger.exception("清理OH卡梳理记录失败 customer=%s date=%s", customer_id, date)
 
     # 统一保存扣费/欠费数据
     membership_card_service._save_deductions()

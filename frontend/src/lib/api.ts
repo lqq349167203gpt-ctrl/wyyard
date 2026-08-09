@@ -53,7 +53,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (res.status === 401) { handle401(); throw new Error("登录已过期") }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(data.detail || `请求失败: ${res.status}`)
+    const detail = data.detail
+    const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ") : (detail || `请求失败: ${res.status}`)
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -147,7 +149,9 @@ export const systemHelperApi = {
     if (res.status === 401) { handle401(); throw new Error("登录已过期") }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      throw new Error(data.detail || `请求失败: ${res.status}`)
+      const detail = data.detail
+      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ") : (detail || `请求失败: ${res.status}`)
+      throw new Error(msg)
     }
 
     const reader = res.body?.getReader()
@@ -252,6 +256,27 @@ export interface PaidContentItem {
 
 export type CustomerFollowUpStatus = "新添加" | "沟通中" | "已到店" | "已成交" | "沉默/流失"
 
+export type CustomerTagScope = "public" | "private"
+
+export interface CustomerTag {
+  id: string
+  name: string
+  scope: CustomerTagScope
+  description: string
+  created_by_id: string
+  created_by_name: string
+  enabled: boolean
+  usage_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerTagCreate {
+  name: string
+  scope: CustomerTagScope
+  description: string
+}
+
 export interface Customer {
   id: string
   nickname: string
@@ -291,6 +316,7 @@ export interface Customer {
   created_by: string
   created_at: string
   updated_at: string
+  customer_tags?: CustomerTag[]
 }
 
 export type CustomerCreate = Omit<Customer, "id" | "created_at" | "updated_at">
@@ -332,7 +358,7 @@ export const customerApi = {
     })
   },
   batch: (ids: string[]) => request<CustomerLight[]>("/api/customers/batch", { method: "POST", body: JSON.stringify({ ids }) }),
-  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; member_types?: string; sort_by?: string; sort_order?: string }) => {
+  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
     const params = new URLSearchParams()
     params.set("page", String(page))
     params.set("page_size", String(pageSize))
@@ -341,6 +367,8 @@ export const customerApi = {
     if (filters?.referrer) params.set("referrer", filters.referrer)
     if (filters?.referrer_handler) params.set("referrer_handler", filters.referrer_handler)
     if (filters?.member_types) params.set("member_types", filters.member_types)
+    if (filters?.tag_ids) params.set("tag_ids", filters.tag_ids)
+    if (filters?.tag_match) params.set("tag_match", filters.tag_match)
     if (filters?.sort_by) params.set("sort_by", filters.sort_by)
     if (filters?.sort_order) params.set("sort_order", filters.sort_order)
     return request<PaginatedResponse<Customer>>(`/api/customers?${params.toString()}`)
@@ -354,6 +382,15 @@ export const customerApi = {
   restore: (id: string) => request<Customer>(`/api/customers/${id}/restore`, { method: "POST" }).then(r => { _customerLightCache = null; return r }),
   permanentDelete: (id: string) => request<{ message: string }>(`/api/customers/${id}/permanent`, { method: "DELETE" }),
   generateTags: (tags: string) => request<{ tags: string }>("/api/customers/generate-tags", { method: "POST", body: JSON.stringify({ tags }) }),
+}
+
+export const customerTagApi = {
+  list: (includeDisabled = false) => request<CustomerTag[]>(`/api/customer-tags${includeDisabled ? "?include_disabled=true" : ""}`),
+  create: (data: CustomerTagCreate) => request<CustomerTag>("/api/customer-tags", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Omit<CustomerTagCreate, "scope">> & { enabled?: boolean }) => request<CustomerTag>(`/api/customer-tags/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/customer-tags/${id}`, { method: "DELETE" }),
+  listForCustomer: (customerId: string) => request<CustomerTag[]>(`/api/customer-tags/customers/${customerId}`),
+  setForCustomer: (customerId: string, tagIds: string[]) => request<CustomerTag[]>(`/api/customer-tags/customers/${customerId}`, { method: "PUT", body: JSON.stringify({ tag_ids: tagIds }) }),
 }
 
 // AI Config
@@ -682,7 +719,9 @@ export const uploadApi = {
     }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      throw new Error(data.detail || `服务器返回错误（${res.status}）`)
+      const detail = data.detail
+      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ") : (detail || `服务器返回错误（${res.status}）`)
+      throw new Error(msg)
     }
     return res.json()
   },
@@ -775,7 +814,7 @@ export interface DashboardData {
   ers_sessions: EmotionalReleaseSession[]
   eks_sessions: EnergyKnotSession[]
   ics_sessions: InternalCourseSession[]
-  ocr_sessions: OhCardReadingSession[]
+
   visits: VisitRecord[]
   visit_counts: Record<string, number>
   calendar_counts: Record<string, number>
@@ -783,7 +822,7 @@ export interface DashboardData {
 }
 
 export interface UnifiedRecord {
-  type: "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"
+  type: "class" | "gcs" | "ers" | "eks" | "ics"
   data: any
   date: string
 }
@@ -795,12 +834,15 @@ export interface GroupCase {
   nickname: string
   purchase_count: number
   amount: number
+  notes: string
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   payment_method?: string
   organization_id: string | null
   deal_date: string | null
+  effective_date: string | null
+  expiry_date: string | null
   created_at: string
   updated_at: string
 }
@@ -810,10 +852,13 @@ export interface GroupCaseCreate {
   nickname: string
   purchase_count?: number
   amount?: number
+  notes?: string
   closer_id?: string | null
   closer_name?: string | null
   closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
+  effective_date?: string | null
+  expiry_date?: string | null
 }
 
 export const groupCaseApi = {
@@ -887,7 +932,7 @@ export const groupCaseSessionApi = {
   create: (data: GroupCaseSessionCreate, conversion = false) => request<GroupCaseSession>(`/api/group-case-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<GroupCaseSessionCreate>) => request<GroupCaseSession & { warnings?: string[] }>(`/api/group-case-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string, conversion = false) => request<{ message: string }>(`/api/group-case-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
-  searchCustomers: (keyword: string) => request<GroupCaseCustomerSearchResult[]>(`/api/group-case-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
+  searchCustomers: (keyword: string, date?: string) => request<GroupCaseCustomerSearchResult[]>(`/api/group-case-sessions/search-customers?q=${encodeURIComponent(keyword)}${date ? `&date=${encodeURIComponent(date)}` : ""}`),
 }
 
 // OH Card Readings
@@ -896,7 +941,10 @@ export interface OhCardReading {
   customer_id: string
   nickname: string
   purchase_count: number
+  diagnosis_duration: number
   amount: number
+  notes: string
+  diagnosis_teacher: string
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
@@ -911,7 +959,10 @@ export interface OhCardReadingCreate {
   customer_id: string
   nickname: string
   purchase_count?: number
+  diagnosis_duration?: number
+  diagnosis_teacher?: string
   amount?: number
+  notes?: string
   closer_id?: string | null
   closer_name?: string | null
   closers?: { id: string; name: string; amount: number }[]
@@ -927,69 +978,14 @@ export const ohCardReadingApi = {
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/oh-card-readings/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
-// OH Card Reading Sessions
-export interface OhCardReadingSession {
-  id: string
-  date: string
-  start_time: string | null
-  end_time: string | null
-  name: string
-  owner_id: string
-  owner_name: string
-  description: string
-  participant_ids: string[]
-  teacher_ids: string[]
-  host_id: string
-  host_name: string
-  materials: Material[]
-  is_published: boolean
-  activity_mode?: string
-  membership_deduction_count: number
-  space_id: string
-  room_id: string
-  room_name: string
-  space_name: string
-  created_at: string
-  updated_at: string
-}
-
-export interface OhCardReadingSessionCreate {
-  date: string
-  start_time?: string | null
-  end_time?: string | null
-  name?: string
-  owner_id: string
-  owner_name: string
-  description?: string
-  participant_ids?: string[]
-  teacher_ids?: string[]
-  host_id?: string
-  host_name?: string
-  is_published?: boolean
-  activity_mode?: string
-  membership_deduction_count?: number
-  space_id?: string
-  room_id?: string
-  room_name?: string
-  space_name?: string
-}
-
-export const ohCardReadingSessionApi = {
-  list: (date?: string) => request<OhCardReadingSession[]>(`/api/oh-card-reading-sessions${date ? `?date=${date}` : ""}`),
-  listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<OhCardReadingSession>>(`/api/oh-card-reading-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
-  create: (data: OhCardReadingSessionCreate, conversion = false) => request<OhCardReadingSession>(`/api/oh-card-reading-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<OhCardReadingSessionCreate>) => request<OhCardReadingSession & { warnings?: string[] }>(`/api/oh-card-reading-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string, conversion = false) => request<{ message: string }>(`/api/oh-card-reading-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
-  searchCustomers: (keyword: string) => request<GroupCaseCustomerSearchResult[]>(`/api/oh-card-reading-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
-}
-
-// Energy Knots
-export interface EnergyKnot {
+// Tea Seat Fee
+export interface TeaSeatFee {
   id: string
   customer_id: string
   nickname: string
-  purchase_count: number
+  quantity: number
   amount: number
+  notes: string
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
@@ -1000,15 +996,112 @@ export interface EnergyKnot {
   updated_at: string
 }
 
+export interface TeaSeatFeeCreate {
+  customer_id: string
+  nickname: string
+  quantity?: number
+  amount?: number
+  notes?: string
+  closer_id?: string | null
+  closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
+  payment_method?: string
+  organization_id?: string | null
+  deal_date?: string | null
+}
+
+export const teaSeatFeeApi = {
+  list: () => request<TeaSeatFee[]>("/api/tea-seat-fees"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<TeaSeatFee>>(`/api/tea-seat-fees?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  create: (data: TeaSeatFeeCreate) => request<TeaSeatFee>("/api/tea-seat-fees", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<TeaSeatFeeCreate>) => request<TeaSeatFee>(`/api/tea-seat-fees/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/tea-seat-fees/${id}`, { method: "DELETE" }),
+  searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/tea-seat-fees/search-customers?q=${encodeURIComponent(keyword)}`),
+}
+
+// Offline Courses
+export interface OfflineCourse {
+  id: string
+  customer_id: string
+  nickname: string
+  effective_date: string
+  validity_value: number
+  validity_unit: string
+  amount: number
+  notes: string
+  closer_id: string | null
+  closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
+  organization_id: string | null
+  deal_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OfflineCourseCreate {
+  customer_id: string
+  nickname: string
+  effective_date?: string
+  validity_value?: number
+  validity_unit?: string
+  amount?: number
+  notes?: string
+  closer_id?: string | null
+  closer_name?: string | null
+  closers?: { id: string; name: string; amount: number }[]
+  payment_method?: string
+  organization_id?: string | null
+  deal_date?: string | null
+}
+
+export const offlineCourseApi = {
+  list: () => request<OfflineCourse[]>("/api/offline-courses"),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => {
+    const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
+    return request<PaginatedResponse<OfflineCourse>>(`/api/offline-courses?${qs}`)
+  },
+  create: (data: OfflineCourseCreate) =>
+    request<OfflineCourse>("/api/offline-courses", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<OfflineCourseCreate>) =>
+    request<OfflineCourse>(`/api/offline-courses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/offline-courses/${id}`, { method: "DELETE" }),
+  searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/offline-courses/search-customers?q=${encodeURIComponent(keyword)}`),
+}
+
+// Energy Knots
+export interface EnergyKnot {
+  id: string
+  customer_id: string
+  nickname: string
+  purchase_count: number
+  amount: number
+  notes: string
+  closer_id: string | null
+  closer_name: string | null
+  closers: { id: string; name: string; amount: number }[]
+  payment_method?: string
+  organization_id: string | null
+  deal_date: string | null
+  effective_date: string | null
+  expiry_date: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface EnergyKnotCreate {
   customer_id: string
   nickname: string
   purchase_count?: number
   amount?: number
+  notes?: string
   closer_id?: string | null
   closer_name?: string | null
   closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
+  effective_date?: string | null
+  expiry_date?: string | null
 }
 
 export const energyKnotApi = {
@@ -1027,12 +1120,15 @@ export interface EmotionalRelease {
   nickname: string
   purchase_count: number
   amount: number
+  notes: string
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
   payment_method?: string
   organization_id: string | null
   deal_date: string | null
+  effective_date: string | null
+  expiry_date: string | null
   created_at: string
   updated_at: string
 }
@@ -1042,10 +1138,13 @@ export interface EmotionalReleaseCreate {
   nickname: string
   purchase_count?: number
   amount?: number
+  notes?: string
   closer_id?: string | null
   closer_name?: string | null
   closers?: { id: string; name: string; amount: number }[]
   organization_id?: string | null
+  effective_date?: string | null
+  expiry_date?: string | null
 }
 
 export const emotionalReleaseApi = {
@@ -1119,7 +1218,7 @@ export const emotionalReleaseSessionApi = {
   create: (data: EmotionalReleaseSessionCreate, conversion = false) => request<EmotionalReleaseSession>(`/api/emotional-release-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EmotionalReleaseSessionCreate>) => request<EmotionalReleaseSession & { warnings?: string[] }>(`/api/emotional-release-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string, conversion = false) => request<{ message: string }>(`/api/emotional-release-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
-  searchCustomers: (keyword: string) => request<EmotionalReleaseCustomerSearchResult[]>(`/api/emotional-release-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
+  searchCustomers: (keyword: string, date?: string) => request<EmotionalReleaseCustomerSearchResult[]>(`/api/emotional-release-sessions/search-customers?q=${encodeURIComponent(keyword)}${date ? `&date=${encodeURIComponent(date)}` : ""}`),
 }
 
 // Energy Knot Sessions
@@ -1184,7 +1283,7 @@ export const energyKnotSessionApi = {
   create: (data: EnergyKnotSessionCreate, conversion = false) => request<EnergyKnotSession>(`/api/energy-knot-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EnergyKnotSessionCreate>) => request<EnergyKnotSession & { warnings?: string[] }>(`/api/energy-knot-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string, conversion = false) => request<{ message: string }>(`/api/energy-knot-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
-  searchCustomers: (keyword: string) => request<EnergyKnotCustomerSearchResult[]>(`/api/energy-knot-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
+  searchCustomers: (keyword: string, date?: string) => request<EnergyKnotCustomerSearchResult[]>(`/api/energy-knot-sessions/search-customers?q=${encodeURIComponent(keyword)}${date ? `&date=${encodeURIComponent(date)}` : ""}`),
 }
 
 // Internal Course Sessions
@@ -1257,6 +1356,7 @@ export interface InternalCourse {
   price: number
   effective_date: string
   expiry_date: string | null
+  notes: string
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
@@ -1277,6 +1377,7 @@ export interface InternalCourseCreate {
   closer_id?: string | null
   closer_name?: string | null
   closers?: { id: string; name: string; amount: number }[]
+  notes?: string
   organization_id?: string | null
 }
 
@@ -1307,6 +1408,7 @@ export interface MembershipCard {
   payment_method?: string
   organization_id: string | null
   deal_date: string | null
+  notes: string
   created_at: string
   updated_at: string
   voided?: boolean
@@ -1326,6 +1428,7 @@ export interface MembershipCardCreate {
   closer_id?: string | null
   closer_name?: string | null
   closers?: { id: string; name: string; amount: number }[]
+  notes?: string
   organization_id?: string | null
 }
 
@@ -1352,6 +1455,7 @@ export interface OtherProject {
   duration_value: number | null
   remaining_count: number | null
   expiry_date: string | null
+  notes: string
   closer_id: string | null
   closer_name: string | null
   closers: { id: string; name: string; amount: number }[]
@@ -1377,6 +1481,7 @@ export interface OtherProjectCreate {
   closer_id?: string | null
   closer_name?: string | null
   closers?: { id: string; name: string; amount: number }[]
+  notes?: string
   organization_id?: string | null
 }
 
@@ -1475,6 +1580,42 @@ export const projectRefundApi = {
     request<{ id: string; name: string; paid_amount: number; detail?: string; card_type?: string }[]>(
       `/api/project-refunds/available-items?customer_id=${customerId}&project_type=${projectType}`
     ),
+}
+
+export interface Expense {
+  id: string
+  expense_time: string
+  purchase_content: string
+  amount: number
+  platform: string
+  notes: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ExpenseInput {
+  expense_time: string
+  purchase_content: string
+  amount: number
+  platform: string
+  notes: string
+}
+
+export const expenseApi = {
+  listPaginated: (page: number, pageSize: number, params?: { date_from?: string; date_to?: string }) => {
+    const searchParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params?.date_from) searchParams.set("date_from", params.date_from)
+    if (params?.date_to) searchParams.set("date_to", params.date_to)
+    return request<PaginatedResponse<Expense>>(`/api/expenses?${searchParams.toString()}`)
+  },
+  create: (data: ExpenseInput) =>
+    request<Expense>("/api/expenses", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: ExpenseInput) =>
+    request<Expense>(`/api/expenses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/api/expenses/${id}`, { method: "DELETE" }),
 }
 
 // Space
@@ -1639,6 +1780,15 @@ export interface PurchaseSummaryItem {
   used: number | string
   remaining: number | string
   effective_remaining?: number | string
+  current_remaining?: number | string
+  current_total?: number | string
+  attended_count?: number
+  debt_count?: number
+  debt_activities?: {
+    label: string
+    date?: string
+    count: number
+  }[]
   manual_deductions?: number
   activity_deductions?: number
   advance_deductions?: number
@@ -1648,8 +1798,19 @@ export interface PurchaseSummaryItem {
   effective_date?: string
   expiry_date?: string
   activity_mode?: string
+  validity_value?: number
   voided?: boolean
   voided_at?: string
+  earliest_expiry?: string
+  earliest_expiry_count?: number
+  purchases?: {
+    purchase_count: number
+    amount: number
+    deal_date: string
+    effective_date: string
+    expiry_date: string
+    remaining: number
+  }[]
 }
 
 export interface ActivityRecord {
@@ -1662,7 +1823,9 @@ export interface ActivityRecord {
   host: string
   session_id: string
   is_public_welfare?: boolean
+  participated?: boolean
   membership_deduction_count?: number
+  deduction_summary?: string
 }
 
 export interface ActivityFollowup {
@@ -1686,13 +1849,15 @@ export interface ActivityFollowup {
 export interface PaymentRecord {
   type: string
   name: string
-  quantity: number
+  quantity: number | string
   amount: number
+  deal_date: string
   effective_date: string
   expiry_date: string
   closer_name: string
   created_at: string
   voided?: boolean
+  notes?: string
 }
 
 export interface CustomerDetail {
@@ -1702,6 +1867,7 @@ export interface CustomerDetail {
   activity_followups: ActivityFollowup[]
   healing_records: HealingRecord[]
   payment_records: PaymentRecord[]
+  offline_course_records: OfflineCourseRecord[]
   visit_records: VisitRecord[]
 }
 
@@ -2392,13 +2558,15 @@ export const statisticsApi = {
     if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
     return request<CourseStatistics>(`/api/statistics/courses?${searchParams.toString()}`)
   },
-  referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; member_types?: string }) => {
+  referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all" }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.granularity) searchParams.set("granularity", params.granularity)
     if (params.referrer) searchParams.set("referrer", params.referrer)
     if (params.member_types) searchParams.set("member_types", params.member_types)
+    if (params.tag_ids) searchParams.set("tag_ids", params.tag_ids)
+    if (params.tag_match) searchParams.set("tag_match", params.tag_match)
     return request<ReferralStatistics>(`/api/statistics/referrals?${searchParams.toString()}`)
   },
 }
@@ -2426,4 +2594,47 @@ export const communicationRecordApi = {
 
 export const followupRecordApi = {
   list: (customerId?: string) => request<{ items: ActivityFollowup[]; total: number }>(`/api/followup-records${customerId ? `?customer_id=${customerId}` : ""}`),
+}
+
+// Offline Course Records
+export interface OfflineCourseRecord {
+  id: string
+  customer_id: string
+  customer_nickname: string
+  record_date: string
+  teacher: string
+  content: string
+  result: string
+  creator: string
+  created_at: string
+}
+
+export interface OfflineCourseRecordCreate {
+  customer_id: string
+  customer_nickname: string
+  record_date: string
+  teacher: string
+  content: string
+  result: string
+}
+
+export const offlineCourseRecordApi = {
+  list: (customerId?: string) => request<OfflineCourseRecord[]>(`/api/offline-course-records${customerId ? `?customer_id=${encodeURIComponent(customerId)}` : ""}`),
+  create: (data: OfflineCourseRecordCreate) => request<OfflineCourseRecord>("/api/offline-course-records", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: OfflineCourseRecordCreate) => request<OfflineCourseRecord>(`/api/offline-course-records/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/api/offline-course-records/${id}`, { method: "DELETE" }),
+}
+
+export interface DebtRecord {
+  customer_id: string
+  nickname: string
+  member_type: string
+  total_count: number
+  deducted_count: number
+  debt_count: number
+  activity_labels: string[]
+}
+
+export const debtRecordApi = {
+  list: (type: string) => request<DebtRecord[]>(`/api/debt-records?type=${encodeURIComponent(type)}`),
 }

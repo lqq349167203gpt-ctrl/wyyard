@@ -14,7 +14,7 @@ const TYPE_NAMES = {
   membership_card: '会员卡',
   group_case: '觉醒游戏',
   emotional_release: '情绪释放',
-  oh_card_reading: 'OH卡梳理',
+  oh_card_reading: 'OH卡诊断',
   energy_knot: '能量结',
   internal_course: '内部课程',
   other: '其他项目',

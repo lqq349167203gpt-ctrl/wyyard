@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { customerApi, type CustomerCreate, type CustomerLight } from "@/lib/api"
+import { customerApi, customerTagApi, type CustomerCreate, type CustomerLight, type CustomerTag } from "@/lib/api"
+import { CustomerTagField } from "@/components/customer-tag-editor"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
@@ -61,6 +62,11 @@ export default function CustomerFormPage() {
   const [referrerHandlerError, setReferrerHandlerError] = useState("")
   const [loading, setLoading] = useState(false)
   const [entityId, setEntityId] = useState<string | null>(id || null)
+  const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [tagsLoaded, setTagsLoaded] = useState(!id)
+  const [tagsLoading, setTagsLoading] = useState(!!id)
+  const [tagLoadError, setTagLoadError] = useState("")
   const initializedRef = useRef(false)
 
   // 加载客户列表（供搜索输入用）
@@ -107,6 +113,19 @@ export default function CustomerFormPage() {
       alert("加载客户信息失败")
       navigate("/healing-records")
     }).finally(() => setLoading(false))
+
+    Promise.all([customerTagApi.list(), customerTagApi.listForCustomer(id)])
+      .then(([tags, selectedTags]) => {
+        setAvailableTags(tags)
+        setSelectedTagIds(selectedTags.map(tag => tag.id))
+        setTagsLoaded(true)
+        setTagLoadError("")
+      })
+      .catch(error => {
+        setTagsLoaded(false)
+        setTagLoadError(error instanceof Error ? error.message : "标签加载失败")
+      })
+      .finally(() => setTagsLoading(false))
   }, [id, navigate])
 
   // 草稿本地存储
@@ -148,6 +167,7 @@ export default function CustomerFormPage() {
       }
       if (entityId) {
         await customerApi.update(entityId, payload as Partial<CustomerCreate>)
+        if (tagsLoaded) await customerTagApi.setForCustomer(entityId, selectedTagIds)
       } else {
         const result = await customerApi.create(payload as Partial<CustomerCreate>)
         setEntityId(result.id)
@@ -164,7 +184,7 @@ export default function CustomerFormPage() {
     } finally {
       setSaving(false)
     }
-  }, [form, entityId, navigate])
+  }, [form, entityId, navigate, selectedTagIds, tagsLoaded])
 
   // 引流人/承接人验证（blur 时检查）
   const validateReferrer = (value: string, field: "referrer" | "referrer_handler") => {
@@ -300,6 +320,19 @@ export default function CustomerFormPage() {
                 className="w-[200px]"
               />
             </div>
+            {isEdit && (
+              <CustomerTagField
+                tags={availableTags}
+                value={selectedTagIds}
+                onChange={setSelectedTagIds}
+                onTagCreated={tag => setAvailableTags(current => [...current, tag])}
+                disabled={!tagsLoaded}
+                loading={tagsLoading}
+              />
+            )}
+            {isEdit && tagLoadError && (
+              <p className="basis-full ml-[60px] text-[12px] text-[#c4506a]">{tagLoadError}，本次保存不会修改客户标签</p>
+            )}
             <div className="flex basis-full items-center gap-2">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">流量来源</label>
               <SelectDropdown
@@ -366,7 +399,7 @@ export default function CustomerFormPage() {
             <Button variant="outline" size="sm" className="h-[34px] text-xs w-[140px]" onClick={() => navigate("/healing-records")}>
               返回
             </Button>
-            <Button size="sm" className="h-[34px] text-xs w-[140px]" onClick={handleSave} disabled={saving}>
+            <Button size="sm" className="h-[34px] text-xs w-[140px]" onClick={handleSave} disabled={saving || (isEdit && tagsLoading)}>
               保存
             </Button>
           </div>

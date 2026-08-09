@@ -70,7 +70,6 @@ def list_unified(
         energy_knot_session_service,
         group_case_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
     )
 
     items = []
@@ -93,10 +92,6 @@ def list_unified(
     # Internal course sessions
     for s in internal_course_session_service.list_sessions(None, start_date, end_date):
         items.append({"type": "ics", "data": s.model_dump(mode="json") if hasattr(s, "model_dump") else s, "date": s.get("date", "") if isinstance(s, dict) else getattr(s, "date", "")})
-
-    # OH card reading sessions
-    for s in oh_card_reading_session_service.list_sessions(None, start_date, end_date):
-        items.append({"type": "ocr", "data": s.model_dump(mode="json") if hasattr(s, "model_dump") else s, "date": s.get("date", "") if isinstance(s, dict) else getattr(s, "date", "")})
 
     # 从客户数据实时填充名称
     items = _fill_names(items)
@@ -146,9 +141,6 @@ def list_unified(
                 title = f"能量结【{'丨'.join(names)}】" if names else f"能量结【{owner or '未分配'}】"
             elif i["type"] == "ics":
                 title = i["data"].get("course_name", "") if isinstance(i["data"], dict) else getattr(i["data"], "course_name", "")
-            elif i["type"] == "ocr":
-                owner = i["data"].get("owner_name", "") if isinstance(i["data"], dict) else getattr(i["data"], "owner_name", "")
-                title = f"OH卡梳理【{owner or '未分配'}】"
             if name_lower in title.lower():
                 filtered.append(i)
         items = filtered
@@ -451,7 +443,6 @@ def calendar_counts():
         energy_knot_session_service,
         group_case_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
     )
     counts: dict[str, int] = defaultdict(int)
 
@@ -470,9 +461,6 @@ def calendar_counts():
     for s in internal_course_session_service.list_sessions():
         if s.date:
             counts[s.date] += 1
-    for s in oh_card_reading_session_service.list_sessions():
-        if s.date:
-            counts[s.date] += 1
 
     return dict(counts)
 
@@ -488,7 +476,6 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         energy_knot_session_service,
         group_case_session_service,
         internal_course_session_service,
-        oh_card_reading_session_service,
         visit_service,
     )
 
@@ -534,30 +521,24 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     for s in internal_course_session_service.list_sessions():
         if s.date and _match_space(s):
             cal_counts[s.date] += 1
-    for s in oh_card_reading_session_service.list_sessions():
-        if s.date and _match_space(s):
-            cal_counts[s.date] += 1
-
     records_cr = class_record_service.list_records(date)
     records_gcs = group_case_session_service.list_sessions(date)
     records_ers = emotional_release_session_service.list_sessions(date)
     records_eks = energy_knot_session_service.list_sessions(date)
     records_ics = internal_course_session_service.list_sessions(date)
-    records_ocr = oh_card_reading_session_service.list_sessions(date)
     if space_id:
         records_cr = [r for r in records_cr if _match_space(r)]
         records_gcs = [r for r in records_gcs if _match_space(r)]
         records_ers = [r for r in records_ers if _match_space(r)]
         records_eks = [r for r in records_eks if _match_space(r)]
         records_ics = [r for r in records_ics if _match_space(r)]
-        records_ocr = [r for r in records_ocr if _match_space(r)]
-    for lst in (records_cr, records_gcs, records_ers, records_eks, records_ics, records_ocr):
+    for lst in (records_cr, records_gcs, records_ers, records_eks, records_ics):
         _fill_room_name(lst)
 
     # 填充 host_name / achiever_name / teacher_names
     customers = list_all_customers()
     customer_map = {c.id: c.nickname for c in customers}
-    for s in records_gcs + records_ers + records_ocr:
+    for s in records_gcs + records_ers:
         if s.host_id and not s.host_name:
             s.host_name = customer_map.get(s.host_id, "")
         if s.achiever_id and not s.achiever_name:
@@ -569,11 +550,10 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     # 通过 dict 注入 teacher_names（Pydantic 模型无此字段）
     gcs_dicts = [s.model_dump(mode="json") for s in records_gcs]
     ers_dicts = [s.model_dump(mode="json") for s in records_ers]
-    ocr_dicts = [s.model_dump(mode="json") for s in records_ocr]
     eks_dicts = [s.model_dump(mode="json") for s in records_eks]
     ics_dicts = [s.model_dump(mode="json") for s in records_ics]
     cr_dicts = [r.model_dump(mode="json") for r in records_cr]
-    for d in gcs_dicts + ers_dicts + ocr_dicts + eks_dicts + ics_dicts + cr_dicts:
+    for d in gcs_dicts + ers_dicts + eks_dicts + ics_dicts + cr_dicts:
         ids = d.get("teacher_ids", []) or []
         d["teacher_names"] = [customer_map.get(tid, "") for tid in ids if customer_map.get(tid)]
         pids = d.get("participant_ids", []) or []
@@ -585,7 +565,6 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         "ers_sessions": ers_dicts,
         "eks_sessions": eks_dicts,
         "ics_sessions": ics_dicts,
-        "ocr_sessions": ocr_dicts,
         "visits": _fill_visit_nicknames(visit_service.list_visits(date, space_id=space_id if space_id else None)),
         "visit_counts": visit_service.get_date_counts(start_date=start_date, end_date=end_date, space_id=space_id if space_id else None),
         "calendar_counts": dict(cal_counts),

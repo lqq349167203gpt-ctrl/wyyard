@@ -500,6 +500,8 @@ async def visit_chat(message: str, history: list, date: str, space_id: str, oper
     for _round in range(5):  # 最多 5 轮，防止死循环
         if not response.tool_calls:
             break
+        # 先把 assistant 的 tool_use 响应加入历史，否则 tool 消息前没有对应的 assistant 消息，API 会报 400
+        messages.append(response)
         for tc in response.tool_calls:
             tool_fn = TOOL_MAP.get(tc["name"])
             if tool_fn:

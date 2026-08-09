@@ -63,6 +63,13 @@
         <view class="picker-display {{follow_up_status ? '' : 'placeholder'}}">{{follow_up_status || '选择状态'}}</view>
       </picker>
     </view>
+    <view class="form-item" bindtap="onTagPickerOpen">
+      <text class="form-label">客户标签</text>
+      <view class="tag-field-value">
+        <text class="tag-field-text {{selectedTagText ? '' : 'placeholder'}}">{{tagLoading ? '加载中...' : (selectedTagText || '选择标签')}}</text>
+        <text class="tag-field-arrow">›</text>
+      </view>
+    </view>
     <view class="form-item {{(traffic_source === '好友推荐' || traffic_source === '朋友圈' || (traffic_source && needTrafficDetail)) ? '' : 'last'}}">
       <text class="form-label">流量来源</text>
       <picker class="form-picker" mode="selector" range="{{trafficSources}}" bindchange="onTrafficSourceChange">
@@ -79,6 +86,35 @@
     <view class="form-item last" wx:if="{{traffic_source && needTrafficDetail}}">
       <text class="form-label">内容链接</text>
       <input class="form-input" placeholder="链接地址" placeholder-class="form-input-placeholder" value="{{traffic_source_detail}}" bindinput="onInput" data-field="traffic_source_detail" />
+    </view>
+  </view>
+
+  <!-- 客户标签选择弹窗 -->
+  <view class="tag-picker-mask" wx:if="{{showTagPicker}}" bindtap="onTagPickerClose"></view>
+  <view class="tag-picker-popup" wx:if="{{showTagPicker}}">
+    <view class="tag-picker-header">
+      <text class="tag-picker-title">选择客户标签</text>
+      <text class="tag-picker-close" bindtap="onTagPickerClose">关闭</text>
+    </view>
+    <scroll-view class="tag-picker-list" scroll-y>
+      <checkbox-group bindchange="onTagSelectionChange">
+        <label class="tag-picker-item" wx:for="{{tagPickerItems}}" wx:key="id">
+          <view class="tag-picker-copy">
+            <text class="tag-picker-name">{{item.name}}</text>
+            <text class="tag-picker-scope">{{item.scopeText}}</text>
+          </view>
+          <checkbox value="{{item.id}}" checked="{{item.selected}}" color="#3370ff" />
+        </label>
+      </checkbox-group>
+      <view class="tag-picker-empty" wx:if="{{tagPickerItems.length === 0}}">暂无可用标签</view>
+    </scroll-view>
+    <view class="tag-create-row">
+      <input class="tag-create-input" maxlength="30" placeholder="新建我的标签（仅自己可见）" value="{{newPrivateTagName}}" bindinput="onPrivateTagNameInput" />
+      <button class="tag-create-button" size="mini" bindtap="onCreatePrivateTag" loading="{{creatingTag}}" disabled="{{creatingTag || !newPrivateTagName}}">新增</button>
+    </view>
+    <view class="tag-picker-footer">
+      <button class="tag-picker-cancel" bindtap="onTagPickerClose">取消</button>
+      <button class="tag-picker-confirm" bindtap="onTagPickerConfirm">确定</button>
     </view>
   </view>
 
@@ -147,9 +183,9 @@
 
   <view class="btn-row" wx:if="{{isEdit}}">
     <button class="btn-danger" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">停    用</button>
-    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving || tagLoading}}">保    存</button>
   </view>
   <view class="btn-row" wx:else>
-    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">添    加</button>
+    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving || tagLoading}}">添    加</button>
   </view>
 </view>

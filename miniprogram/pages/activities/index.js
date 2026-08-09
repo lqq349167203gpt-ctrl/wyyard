@@ -320,25 +320,6 @@ Page({
         })
       }
 
-      if (dashboard.ocr_sessions) {
-        dashboard.ocr_sessions.forEach(r => {
-          const achiever = r.achiever_name || ''
-          rawMap[`oh_card_${r.id}`] = r
-          records.push({
-            id: r.id, badge: 'OH卡',
-            name: r.name || (achiever ? `OH卡·${achiever}` : 'OH卡'),
-            color: BADGE_COLORS['OH卡'],
-            time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
-            teacher: (r.teacher_names || [])[0] || r.achiever_name || r.host_name || '',
-            deductionCount: r.membership_deduction_count,
-            participants: r.participant_ids?.length || 0,
-            space: r.space_name || '',
-            source: 'oh_card',
-            isPublished: r.is_published || false,
-          })
-        })
-      }
-
       records.sort((a, b) => (a.time || '').localeCompare(b.time || ''))
 
       // 补充列表展示字段
@@ -365,7 +346,6 @@ Page({
         .concat(dashboard.ers_sessions || [])
         .concat(dashboard.eks_sessions || [])
         .concat(dashboard.ics_sessions || [])
-        .concat(dashboard.ocr_sessions || [])
       const participantSet = new Set()
       allSources.forEach(r => {
         (r.participant_names || []).forEach(name => { if (name) participantSet.add(name) })

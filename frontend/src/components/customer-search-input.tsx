@@ -172,6 +172,7 @@ export function CustomerSearchInput({
       }
       setOpen(false)
       setSearch("")
+      inputRef.current?.focus()
     }
   }
 
@@ -196,6 +197,11 @@ export function CustomerSearchInput({
             onChange={(e) => { setSearch(e.target.value); calcPos(); setOpen(true) }}
             onFocus={() => { calcPos(); setOpen(true) }}
             onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                // 搜索框的 Enter 不参与 enterToNext 跳焦
+                e.stopPropagation()
+                return
+              }
               if ((e.key === "Backspace" || e.key === "Delete") && search === "" && selectedNames.length > 0) {
                 e.preventDefault()
                 removeItem(selectedNames[selectedNames.length - 1])
@@ -210,6 +216,7 @@ export function CustomerSearchInput({
         // Single select: show input with X clear button
         <div className="relative">
           <Input
+            ref={inputRef}
             style={{ borderRadius: radiusValue }}
             value={typeof value === "string" && value ? value : search}
             onChange={(e) => {
@@ -222,6 +229,11 @@ export function CustomerSearchInput({
             onFocus={() => { calcPos(); setOpen(true) }}
             onBlur={() => { setTimeout(() => onBlur?.(typeof value === "string" ? value : ""), 150) }}
             onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                // 搜索框的 Enter 不参与 enterToNext 跳焦
+                e.stopPropagation()
+                return
+              }
               if (e.key === "Backspace" && !search && typeof value === "string" && value) {
                 e.preventDefault()
                 onChange("")
@@ -252,15 +264,16 @@ export function CustomerSearchInput({
             const showCreate = onNoResultsClick && !exactMatch
             if (filtered.length === 0 && !showCreate) return null
             return (
-              <div className="bg-white border border-[#e8eaed] shadow-lg overflow-y-auto" style={{ ...pos, borderRadius: radiusValue }}>
+              <div className="bg-white border border-[#dee0e3] overflow-y-auto" style={{ ...pos, borderRadius: radiusValue }}>
                 {filtered.slice(0, MAX_VISIBLE).map(c => {
                   const q = search.toLowerCase()
                   const nameMatch = c.name && c.name.toLowerCase().includes(q) && !c.nickname.toLowerCase().includes(q)
                   return (
                     <div
                       key={c.id}
-                      className="px-3 py-2 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"
-                      onMouseDown={(e) => { e.preventDefault(); selectItem(c) }}
+                      className="px-2 py-1.5 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseUp={(e) => { e.preventDefault(); selectItem(c) }}
                     >
                       <span>{c.nickname}</span>
                       {nameMatch && <span className="text-[10px] text-[#8f959e]">（{c.name}）</span>}
@@ -272,8 +285,9 @@ export function CustomerSearchInput({
                 })}
                 {showCreate && (
                   <div
-                    className="px-3 py-2 text-[12px] text-[#3370ff] hover:bg-[#f0f5ff] cursor-pointer text-left border-t border-[#f0f1f2]"
-                    onMouseDown={(e) => { e.preventDefault(); onNoResultsClick(search.trim()); setOpen(false); setSearch("") }}
+                    className="px-2 py-1.5 text-[12px] text-[#3370ff] hover:bg-[#f0f5ff] cursor-pointer text-left border-t border-[#f0f1f2]"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseUp={(e) => { e.preventDefault(); onNoResultsClick(search.trim()); setOpen(false); setSearch("") }}
                   >
                     新增用户「{search.trim()}」
                   </div>
@@ -284,7 +298,7 @@ export function CustomerSearchInput({
 
           {/* No results without onNoResultsClick */}
           {filtered.length === 0 && !onNoResultsClick && (
-            <div className="bg-white border border-[#e8eaed] shadow-lg px-3 py-2 text-[12px] text-[#8f959e]" style={{ ...pos, borderRadius: radiusValue }}>
+            <div className="bg-white border border-[#dee0e3] px-2 py-1.5 text-[12px] text-[#8f959e]" style={{ ...pos, borderRadius: radiusValue }}>
               无匹配结果
             </div>
           )}

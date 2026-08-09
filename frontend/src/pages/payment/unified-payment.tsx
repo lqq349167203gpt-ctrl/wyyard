@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { forwardRef, useEffect, useState, useRef, useCallback, useImperativeHandle, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, CreditCard, X, Wallet, Heart, Layers, Zap, GraduationCap, Package, Download, Upload } from "lucide-react"
+import { Plus, Trash2, Edit, CreditCard, X, Wallet, Heart, Layers, Zap, GraduationCap, Package, Coffee, BookOpen } from "lucide-react"
 import ExcelJS from "exceljs"
 import { sheetToRows } from "@/lib/excel"
 import {
@@ -17,13 +17,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   customerApi, membershipCardApi, groupCaseApi, emotionalReleaseApi,
-  ohCardReadingApi, energyKnotApi, internalCourseApi, otherProjectApi,
+  ohCardReadingApi, teaSeatFeeApi, offlineCourseApi, energyKnotApi, internalCourseApi, otherProjectApi, projectRefundApi,
   type Customer, type MembershipCard, type GroupCase, type EmotionalRelease,
-  type OhCardReading, type EnergyKnot, type InternalCourse, type OtherProject,
+  type OhCardReading, type TeaSeatFee, type OfflineCourse, type EnergyKnot, type InternalCourse, type OtherProject,
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { CloserInput, type Closer } from "@/components/closer-input"
 import { SelectDropdown } from "@/components/select-dropdown"
+import { POSITION_COURSE_TEACHER } from "@/lib/positions"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
@@ -35,13 +36,27 @@ const PROJECT_TYPES = {
   membership_card:   { label: "会员卡", color: "#3370ff", icon: CreditCard, api: membershipCardApi },
   group_case:        { label: "觉醒游戏", color: "#7b61ff", icon: Wallet, api: groupCaseApi },
   emotional_release: { label: "情绪释放", color: "#00b2a9", icon: Heart, api: emotionalReleaseApi },
-  oh_card_reading:   { label: "OH卡梳理", color: "#f5a623", icon: Layers, api: ohCardReadingApi },
+  oh_card_reading:   { label: "OH卡诊断", color: "#f5a623", icon: Layers, api: ohCardReadingApi },
   energy_knot:       { label: "能量结", color: "#e02020", icon: Zap, api: energyKnotApi },
   internal_course:   { label: "内部课程", color: "#34c724", icon: GraduationCap, api: internalCourseApi },
+  tea_seat_fee:      { label: "茶位费", color: "#c8a96e", icon: Coffee, api: teaSeatFeeApi },
+  offline_course:    { label: "线下落地课程", color: "#e8794a", icon: BookOpen, api: offlineCourseApi },
   other:             { label: "其他项目", color: "#8f959e", icon: Package, api: otherProjectApi },
 } as const
 
 type ProjectTypeKey = keyof typeof PROJECT_TYPES
+
+const PROJECT_TYPE_TO_REFUND_KEY: Record<ProjectTypeKey, string> = {
+  membership_card: "membership-cards",
+  group_case: "group-cases",
+  emotional_release: "emotional-releases",
+  oh_card_reading: "oh-card-readings",
+  energy_knot: "energy-knots",
+  tea_seat_fee: "tea-seat-fees",
+  offline_course: "offline-courses",
+  internal_course: "internal-courses",
+  other: "other-projects",
+}
 
 const MEMBERSHIP_CARD_TYPES: Record<string, { price: number; defaultCount?: number; unlimited?: boolean; duration?: string }> = {
   "次卡": { price: 198, defaultCount: 1, duration: "1 个月" },
@@ -98,9 +113,19 @@ interface UnifiedItem {
   // 其他项目专属
   category?: string
   project_name?: string
-  // 觉醒/情绪/OH/能量专属
+  // 觉醒/情绪/能量专属
   purchase_count?: number
   amount?: number
+  // OH卡诊断专属
+  diagnosis_duration?: number
+  diagnosis_teacher?: string
+  // 线下课程专属
+  validity_value?: number
+  validity_unit?: string
+  // 茶位费专属
+  quantity?: number
+  // 备注（所有类型共用）
+  notes?: string
   // 原始数据（编辑时用）
   _raw?: any
 }
@@ -130,16 +155,33 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
   }
   switch (type) {
     case "membership_card":
-      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, effective_remaining: item.effective_remaining, duration_type: item.duration_type, duration_value: item.duration_value, created_by: item.created_by, voided: item.voided }
+      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, effective_remaining: item.effective_remaining, duration_type: item.duration_type, duration_value: item.duration_value, created_by: item.created_by, voided: item.voided, notes: item.notes }
+    case "oh_card_reading": {
+      const dd = item.diagnosis_duration || 1
+      const totalHours = dd * 0.5
+      const durText = totalHours + "小时"
+      return { ...base, detail: durText, price: item.amount, amount: item.amount, diagnosis_duration: dd, diagnosis_teacher: item.diagnosis_teacher || "", notes: item.notes, created_by: item.created_by }
+    }
     case "group_case":
     case "emotional_release":
-    case "oh_card_reading":
     case "energy_knot":
-      return { ...base, detail: `${item.purchase_count} 次`, price: item.amount, purchase_count: item.purchase_count, amount: item.amount, effective_remaining: item.effective_remaining, created_by: item.created_by }
+      return { ...base, detail: `${item.purchase_count} 次`, price: item.amount, purchase_count: item.purchase_count, amount: item.amount, effective_date: item.effective_date, expiry_date: item.expiry_date, effective_remaining: item.effective_remaining, notes: item.notes, created_by: item.created_by }
     case "internal_course":
-      return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, course_type: item.course_type, created_by: item.created_by }
+      return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, course_type: item.course_type, created_by: item.created_by, notes: item.notes }
+    case "tea_seat_fee":
+      return { ...base, detail: `${item.quantity || 1} 位`, price: item.amount, quantity: item.quantity, amount: item.amount, created_by: item.created_by, notes: item.notes }
+    case "offline_course": {
+      let expiry_date: string | null = null
+      if (item.effective_date && item.validity_value) {
+        const eff = new Date(item.effective_date)
+        eff.setMonth(eff.getMonth() + item.validity_value)
+        eff.setDate(eff.getDate() - 1)
+        expiry_date = eff.toLocaleDateString("sv-SE")
+      }
+      return { ...base, detail: `${item.validity_value || 1} 个月`, price: item.amount, amount: item.amount, effective_date: item.effective_date, expiry_date, validity_value: item.validity_value, validity_unit: item.validity_unit, created_by: item.created_by, notes: item.notes }
+    }
     case "other":
-      return { ...base, detail: item.category || "", price: item.fee, effective_date: item.effective_date, remaining_count: item.remaining_count, total_count: item.total_count, category: item.category, project_name: item.project_name, duration_type: item.duration_type, duration_value: item.duration_value, effective_remaining: item.effective_remaining, created_by: item.created_by }
+      return { ...base, detail: item.category || "", price: item.fee, effective_date: item.effective_date, remaining_count: item.remaining_count, total_count: item.total_count, category: item.category, project_name: item.project_name, duration_type: item.duration_type, duration_value: item.duration_value, effective_remaining: item.effective_remaining, created_by: item.created_by, notes: item.notes }
   }
 }
 
@@ -147,9 +189,55 @@ function getApi(type: ProjectTypeKey) {
   return PROJECT_TYPES[type].api as any
 }
 
+function getExportDetail(item: UnifiedItem) {
+  switch (item.type) {
+    case "membership_card":
+      return item.card_type || ""
+    case "internal_course":
+      return item.course_type || ""
+    case "oh_card_reading":
+      return item.diagnosis_teacher ? `诊断老师：${item.diagnosis_teacher}` : "OH卡诊断"
+    case "other":
+      return [item.category, item.project_name].filter(Boolean).join(" / ")
+    default:
+      return PROJECT_TYPES[item.type].label
+  }
+}
+
+function getExportQuantity(item: UnifiedItem) {
+  switch (item.type) {
+    case "membership_card":
+      return item.total_count == null ? "不限" : `${item.total_count}次`
+    case "group_case":
+    case "emotional_release":
+      return `${item.purchase_count || 0}次`
+    case "energy_knot":
+      return `${item.purchase_count || 0}个`
+    case "oh_card_reading":
+      return `${(item.diagnosis_duration || 1) * 0.5}小时`
+    case "tea_seat_fee":
+      return `${item.quantity || 1}位`
+    case "offline_course":
+      return `${item.validity_value || 1}个月`
+    case "other":
+      return item.total_count == null ? "不限" : `${item.total_count}次`
+    default:
+      return ""
+  }
+}
+
+export interface UnifiedPaymentHandle {
+  exportAllPayments: () => Promise<number>
+}
+
+interface UnifiedPaymentContentProps {
+  embedded?: boolean
+  filterTypes?: ProjectTypeKey[]
+}
+
 /* ========== 组件 ========== */
 
-export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: boolean; filterTypes?: ProjectTypeKey[] } = {}) {
+export const UnifiedPaymentContent = forwardRef<UnifiedPaymentHandle, UnifiedPaymentContentProps>(function UnifiedPaymentContent({ embedded, filterTypes }, ref) {
   const enterToNext = useEnterToNext()
   const navigate = useNavigate()
 
@@ -191,9 +279,29 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
   const [formUnlimited, setFormUnlimited] = useState(false)
   const [formPrice, setFormPrice] = useState("")
 
-  // 觉醒/情绪/OH/能量表单
+  // 觉醒/情绪/能量表单
   const [formPurchaseCount, setFormPurchaseCount] = useState("")
   const [formAmount, setFormAmount] = useState("")
+  const [formProjectEffectiveDate, setFormProjectEffectiveDate] = useState(today)
+  const [formProjectValidityValue, setFormProjectValidityValue] = useState("")
+  const [formProjectValidityUnit, setFormProjectValidityUnit] = useState<string | null>("day")
+
+  // OH卡诊断表单
+  const [formDiagnosisDuration, setFormDiagnosisDuration] = useState(1)
+  const [formOhAmount, setFormOhAmount] = useState("298")
+  const [formDiagnosisTeacher, setFormDiagnosisTeacher] = useState("")
+
+  // 茶位费表单
+  const [formTeaQuantity, setFormTeaQuantity] = useState("1")
+  const [formTeaAmount, setFormTeaAmount] = useState("68")
+
+  // 线下课程表单
+  const [formOfflineEffectiveDate, setFormOfflineEffectiveDate] = useState(today)
+  const [formOfflineValidityValue, setFormOfflineValidityValue] = useState("1")
+  const [formOfflineAmount, setFormOfflineAmount] = useState("")
+
+  // 备注（所有类型共用）
+  const [formNotes, setFormNotes] = useState("")
 
   // 内部课程表单
   const [formCourseType, setFormCourseType] = useState("")
@@ -225,7 +333,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
   const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customersReady, setCustomersReady] = useState(false)
-  const { organizations, hasAnyOrganization } = useOrganizations()
+  const { organizations, hasAnyOrganization, loading: organizationsLoading } = useOrganizations()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
   const [noAssignmentDialogOpen, setNoAssignmentDialogOpen] = useState(false)
 
@@ -234,6 +342,12 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
   const customersRef = useRef<Customer[]>([])
   const customersReadyRef = useRef(false)
   const isSuperAdminRef = useRef(false)
+  const [refundedKeys, setRefundedKeys] = useState(new Set<string>())
+
+  const courseTeachers = useMemo(() =>
+    customers.filter(c => c.positions?.includes(POSITION_COURSE_TEACHER))
+      .sort((a, b) => (a.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999)),
+    [customers])
 
   // 分页数据获取
   const fetchFn = useCallback(async (page: number, pageSize: number) => {
@@ -300,6 +414,13 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
       customersReadyRef.current = true
       setCustomersReady(true)
       refresh()
+      // 加载退费记录，构建已退费项目集合
+      projectRefundApi.listPaginated(1, 100).then((res: any) => {
+        const refunds = res?.items || res || []
+        const keys = new Set<string>()
+        ;(Array.isArray(refunds) ? refunds : []).forEach((r: any) => keys.add(`${r.project_type}:${r.project_id}`))
+        setRefundedKeys(keys)
+      }).catch(() => {})
     }).catch(() => {
       customersReadyRef.current = true
       setCustomersReady(true)
@@ -322,6 +443,116 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     appliedCloserNameRef.current = ""
     refresh()
   }
+
+  const handleExportAllPayments = useCallback(async () => {
+    if (!customersReadyRef.current || organizationsLoading) {
+      throw new Error("数据仍在加载，请稍后再试")
+    }
+
+    const params: { customer_ids?: string } = {}
+    if (!isSuperAdminRef.current) {
+      const allowedCustomers = customersRef.current
+      if (allowedCustomers.length === 0) {
+        throw new Error("当前账号没有可导出的客户数据")
+      }
+      params.customer_ids = allowedCustomers.map(customer => customer.id).join(",")
+    }
+    const apiParams = Object.keys(params).length > 0 ? params : undefined
+
+    const fetchAllForType = async (type: ProjectTypeKey) => {
+      const records: UnifiedItem[] = []
+      let page = 1
+      let totalPages = 1
+      do {
+        const response = await getApi(type).listPaginated(page, 100, apiParams)
+        records.push(...response.items.map((item: any) => toUnified(item, type)))
+        totalPages = response.total_pages || 1
+        page += 1
+      } while (page <= totalPages)
+      return records
+    }
+
+    const types = Object.keys(PROJECT_TYPES) as ProjectTypeKey[]
+    const records = (await Promise.all(types.map(fetchAllForType))).flat()
+    records.sort((a, b) => {
+      const dateOrder = (b.deal_date || b._raw?.created_at || "").localeCompare(a.deal_date || a._raw?.created_at || "")
+      if (dateOrder !== 0) return dateOrder
+      return (b._raw?.created_at || "").localeCompare(a._raw?.created_at || "")
+    })
+
+    if (records.length === 0) {
+      throw new Error("暂无可导出的付费记录")
+    }
+
+    const organizationNames = new Map(organizations.map(organization => [organization.id, organization.name]))
+    const workbook = new ExcelJS.Workbook()
+    workbook.creator = "无忧茶苑"
+    workbook.created = new Date()
+    const worksheet = workbook.addWorksheet("全部付费记录")
+    worksheet.columns = [
+      { header: "成交日期", key: "deal_date", width: 13 },
+      { header: "付费类型", key: "type", width: 16 },
+      { header: "用户昵称", key: "nickname", width: 16 },
+      { header: "项目内容", key: "detail", width: 30 },
+      { header: "数量/期限", key: "quantity", width: 14 },
+      { header: "金额", key: "amount", width: 14 },
+      { header: "生效日期", key: "effective_date", width: 13 },
+      { header: "到期日期", key: "expiry_date", width: 13 },
+      { header: "成交人", key: "closers", width: 24 },
+      { header: "支付方式", key: "payment_method", width: 14 },
+      { header: "所属组织", key: "organization", width: 18 },
+      { header: "备注", key: "notes", width: 30 },
+      { header: "创建人", key: "created_by", width: 14 },
+      { header: "录入时间", key: "created_at", width: 20 },
+    ]
+
+    records.forEach(item => {
+      worksheet.addRow({
+        deal_date: item.deal_date || "",
+        type: PROJECT_TYPES[item.type].label,
+        nickname: item.nickname,
+        detail: getExportDetail(item),
+        quantity: getExportQuantity(item),
+        amount: item.price,
+        effective_date: item.effective_date || "",
+        expiry_date: item.expiry_date || "",
+        closers: item.closers?.length
+          ? item.closers.map(closer => `${closer.name} ¥${closer.amount.toLocaleString()}`).join("、")
+          : (item.closer_name || ""),
+        payment_method: item.payment_method || "",
+        organization: item.organization_id ? (organizationNames.get(item.organization_id) || "") : "",
+        notes: item.notes || "",
+        created_by: item.created_by || "",
+        created_at: (item._raw?.created_at || "").replace("T", " ").slice(0, 19),
+      })
+    })
+
+    worksheet.views = [{ state: "frozen", ySplit: 1 }]
+    worksheet.autoFilter = { from: "A1", to: "N1" }
+    worksheet.getRow(1).height = 24
+    worksheet.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, color: { argb: "FF2B2F36" } }
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7F8FA" } }
+      cell.alignment = { vertical: "middle" }
+    })
+    worksheet.getColumn("amount").numFmt = '¥#,##0.00'
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return
+      row.alignment = { vertical: "middle" }
+    })
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `付费项目_${new Date().toLocaleDateString("sv-SE")}.xlsx`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    return records.length
+  }, [organizations, organizationsLoading])
+
+  useImperativeHandle(ref, () => ({ exportAllPayments: handleExportAllPayments }), [handleExportAllPayments])
 
   // 会员卡类型选择
   const handleSelectCardType = (type: string) => {
@@ -407,6 +638,20 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     // 觉醒等
     setFormPurchaseCount("")
     setFormAmount("")
+    setFormProjectEffectiveDate(today)
+    setFormProjectValidityValue("")
+    setFormProjectValidityUnit("day")
+    // OH卡诊断
+    setFormDiagnosisDuration(1)
+    setFormOhAmount("298")
+    setFormDiagnosisTeacher("")
+    // 茶位费
+    setFormTeaQuantity("1")
+    setFormTeaAmount("68")
+    // 线下课程
+    setFormOfflineEffectiveDate(today)
+    setFormOfflineValidityValue("1")
+    setFormOfflineAmount("")
     // 内部课程
     setFormCourseType("")
     setFormCourseAmount(0)
@@ -428,6 +673,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     setFormClosers([])
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
     setFormPaymentMethod("")
+    setFormNotes("")
     setCloserError(false)
     // 会员卡
     setFormCardType("")
@@ -441,6 +687,20 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     // 觉醒等
     setFormPurchaseCount("")
     setFormAmount("")
+    setFormProjectEffectiveDate(today)
+    setFormProjectValidityValue("")
+    setFormProjectValidityUnit("day")
+    // OH卡诊断
+    setFormDiagnosisDuration(1)
+    setFormOhAmount("298")
+    setFormDiagnosisTeacher("")
+    // 茶位费
+    setFormTeaQuantity("1")
+    setFormTeaAmount("68")
+    // 线下课程
+    setFormOfflineEffectiveDate(today)
+    setFormOfflineValidityValue("1")
+    setFormOfflineAmount("")
     // 内部课程
     setFormCourseType("")
     setFormCourseAmount(0)
@@ -462,9 +722,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     setFormCustomerId(item.customer_id)
     setFormNickname(item.nickname)
     setFormDealDate(item.deal_date || "")
-    setFormClosers(item.closers?.length ? item.closers : (item.closer_id ? [{ id: item.closer_id, name: item.closer_name || "", amount: 0 }] : []))
+    setFormClosers(item.closers?.length ? item.closers.map((c: any) => ({ ...c, amount: Number(c.amount) || 0 })) : (item.closer_id ? [{ id: item.closer_id, name: item.closer_name || "", amount: 0 }] : []))
     setFormOrganizationId(item.organization_id || "")
     setFormPaymentMethod(item.payment_method || "")
+    setFormNotes(item.notes || "")
     setCloserError(false)
 
     switch (item.type) {
@@ -477,18 +738,52 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         setFormTotalCount(item.total_count !== null && item.total_count !== undefined ? String(item.total_count) : "")
         setFormUnlimited(item.remaining_count === null || item.remaining_count === undefined)
         setFormPrice(String(item.price))
+        setFormNotes(item.notes || "")
+        break
+      case "oh_card_reading":
+        setFormDiagnosisDuration(item.diagnosis_duration || 1)
+        setFormOhAmount(String(item.amount || 298))
+        setFormDiagnosisTeacher(item.diagnosis_teacher || "")
         break
       case "group_case":
       case "emotional_release":
-      case "oh_card_reading":
       case "energy_knot":
         setFormPurchaseCount(String(item.purchase_count || 0))
         setFormAmount(String(item.amount || 0))
+        setFormProjectEffectiveDate(item.effective_date || today)
+        setFormProjectValidityValue("")
+        setFormProjectValidityUnit("day")
+        setFormNotes(item.notes || "")
+        // 从 expiry_date 反推有效期（仅当两者都存在且是同一天时无法反推，简单设为空）
+        if (item.effective_date && item.expiry_date) {
+          const eff = new Date(item.effective_date)
+          const exp = new Date(item.expiry_date)
+          const diffDays = Math.round((exp.getTime() - eff.getTime()) / (1000 * 60 * 60 * 24))
+          if (diffDays > 0 && diffDays % 30 === 0) {
+            setFormProjectValidityValue(String(diffDays / 30))
+            setFormProjectValidityUnit("month")
+          } else if (diffDays > 0) {
+            setFormProjectValidityValue(String(diffDays))
+            setFormProjectValidityUnit("day")
+          }
+        }
         break
       case "internal_course":
         setFormCourseType(item.course_type || "")
         setFormCourseAmount(item.price)
         setFormEffectiveDate(item.effective_date || "")
+        setFormNotes(item.notes || "")
+        break
+      case "tea_seat_fee":
+        setFormTeaQuantity(String(item.quantity || 1))
+        setFormTeaAmount(String(item.amount || 68))
+        setFormNotes(item.notes || "")
+        break
+      case "offline_course":
+        setFormOfflineEffectiveDate(item.effective_date || today)
+        setFormOfflineValidityValue(String(item.validity_value || 1))
+        setFormOfflineAmount(String(item.amount || ""))
+        setFormNotes(item.notes || "")
         break
       case "other":
         setFormCategory(item.category || "")
@@ -499,6 +794,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         setFormOtherDurationValue(item.duration_value ? String(item.duration_value) : "")
         setFormOtherRemainingCount(item.total_count !== null && item.total_count !== undefined ? String(item.total_count) : (item.remaining_count !== null && item.remaining_count !== undefined ? String(item.remaining_count) : ""))
         setFormOtherUnlimited(item.total_count === null && item.remaining_count === null)
+        setFormNotes(item.notes || "")
         break
     }
     setDialogOpen(true)
@@ -510,9 +806,11 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
       case "membership_card": return parseFloat(formPrice) || 0
       case "group_case":
       case "emotional_release":
-      case "oh_card_reading":
       case "energy_knot": return parseFloat(formAmount) || 0
+      case "oh_card_reading": return parseFloat(formOhAmount) || 0
       case "internal_course": return formCourseAmount || 0
+      case "tea_seat_fee": return parseFloat(formTeaAmount) || 0
+      case "offline_course": return parseFloat(formOfflineAmount) || 0
       case "other": return parseFloat(formFee) || 0
     }
   }
@@ -523,9 +821,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     if (!editingItem && formClosers.length === 0) { setCloserError(true); return }
     setCloserError(false)
     const amt = getFormAmount()
-    if (formClosers.length > 0 && formClosers.reduce((sum, c) => sum + c.amount, 0) !== amt) return
+    if (formClosers.length > 0 && Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - amt) > 0.01) return
     if (formType === "membership_card" && !formCardType) return
     if (formType === "internal_course" && !formCourseType) return
+    if (formType === "tea_seat_fee" && !parseInt(formTeaQuantity)) return
     if (formType === "other" && !formProjectName) return
     setConfirmOpen(true)
   }
@@ -550,6 +849,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           closer_id, closer_name, closers, organization_id, deal_date,
           payment_method: formPaymentMethod || null,
           created_by: createdBy,
+          notes: formNotes || "",
         }
         // 仅新建卡时才允许带 remaining_count；编辑卡时 PATCH 端点拒绝修改次数字段，
         // 因为 remaining_count 是流水派生缓存，不允许直接改写
@@ -567,28 +867,106 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         }
         return payload
       }
-      case "group_case":
-      case "emotional_release":
       case "oh_card_reading":
-      case "energy_knot":
         return {
           customer_id: formCustomerId, nickname: formNickname,
-          // purchase_count 允许编辑修正（后端校验非负整数，剩余次数实时派生）；created_by 仅新建时写入
+          diagnosis_teacher: formDiagnosisTeacher || "",
+          diagnosis_duration: formDiagnosisDuration || 1,
+          ...(editingItem ? {} : { created_by: createdBy }),
+          amount: parseFloat(formOhAmount) || 0,
+          closer_id, closer_name, closers, organization_id, deal_date,
+          payment_method: formPaymentMethod || null,
+          notes: formNotes || "",
+        }
+      case "group_case":
+      case "emotional_release":
+      case "energy_knot": {
+        let expiry_date: string | null = null
+        const val = parseInt(formProjectValidityValue)
+        if (formProjectEffectiveDate && formProjectValidityValue && !isNaN(val) && val > 0) {
+          const eff = new Date(formProjectEffectiveDate)
+          if (formProjectValidityUnit === "month") {
+            eff.setMonth(eff.getMonth() + val)
+            eff.setDate(eff.getDate() - 1)
+          } else {
+            eff.setDate(eff.getDate() + val)
+          }
+          expiry_date = eff.toLocaleDateString("sv-SE")
+        }
+        return {
+          customer_id: formCustomerId, nickname: formNickname,
           purchase_count: parseInt(formPurchaseCount) || 0,
           ...(editingItem ? {} : { created_by: createdBy }),
           amount: parseFloat(formAmount) || 0,
           closer_id, closer_name, closers, organization_id, deal_date,
           payment_method: formPaymentMethod || null,
+          effective_date: formProjectEffectiveDate || null,
+          expiry_date,
+          notes: formNotes || "",
         }
-      case "internal_course":
+      }
+      case "internal_course": {
+        let expiry_date: string | null = null
+        if (formEffectiveDate && formCourseType) {
+          const cfg = COURSE_TYPES[formCourseType]
+          if (cfg) {
+            const m = cfg.duration.match(/^(\d+)\s*(年|个月)/)
+            if (m) {
+              const val = parseInt(m[1])
+              const unit = m[2]
+              const eff = new Date(formEffectiveDate)
+              if (unit === "月" || unit === "个月") {
+                eff.setMonth(eff.getMonth() + val)
+                eff.setDate(eff.getDate() - 1)
+              } else {
+                eff.setFullYear(eff.getFullYear() + val)
+                eff.setDate(eff.getDate() - 1)
+              }
+              expiry_date = eff.toLocaleDateString("sv-SE")
+            }
+          }
+        }
         return {
           customer_id: formCustomerId, nickname: formNickname,
           course_type: formCourseType, price: formCourseAmount,
-          effective_date: formEffectiveDate,
+          effective_date: formEffectiveDate, expiry_date,
           closer_id, closer_name, closers, organization_id, deal_date,
           payment_method: formPaymentMethod || null,
           ...(!editingItem && { created_by: createdBy }),
+          notes: formNotes || "",
         }
+      }
+      case "tea_seat_fee":
+        return {
+          customer_id: formCustomerId, nickname: formNickname,
+          quantity: parseInt(formTeaQuantity) || 1,
+          amount: parseFloat(formTeaAmount) || 68,
+          closer_id, closer_name, closers, organization_id, deal_date,
+          payment_method: formPaymentMethod || null,
+          ...(editingItem ? {} : { created_by: createdBy }),
+          notes: formNotes || "",
+        }
+      case "offline_course": {
+        let expiry_date: string | null = null
+        const val = parseInt(formOfflineValidityValue)
+        if (formOfflineEffectiveDate && !isNaN(val) && val > 0) {
+          const eff = new Date(formOfflineEffectiveDate)
+          eff.setMonth(eff.getMonth() + val)
+          eff.setDate(eff.getDate() - 1)
+          expiry_date = eff.toLocaleDateString("sv-SE")
+        }
+        return {
+          customer_id: formCustomerId, nickname: formNickname,
+          effective_date: formOfflineEffectiveDate || null,
+          validity_value: val || 1,
+          validity_unit: "month",
+          amount: parseFloat(formOfflineAmount) || 0,
+          closer_id, closer_name, closers, organization_id, deal_date,
+          payment_method: formPaymentMethod || null,
+          ...(editingItem ? {} : { created_by: createdBy }),
+          notes: formNotes || "",
+        }
+      }
       case "other": {
         const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname,
@@ -599,6 +977,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
           closer_id, closer_name, closers, organization_id, deal_date,
           payment_method: formPaymentMethod || null,
           ...(!editingItem && { created_by: createdBy }),
+          notes: formNotes || "",
         }
         payload.total_count = formOtherUnlimited ? null : (formOtherRemainingCount ? parseInt(formOtherRemainingCount) : null)
         return payload
@@ -667,14 +1046,15 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
     oh_card_reading: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
-      { header: "购买场次", key: "purchase_count", width: 10, example: "3" },
-      { header: "金额", key: "amount", width: 10, example: "500" },
+      { header: "诊断时长（半小时为单位）", key: "diagnosis_duration", width: 16, example: "2（=1小时）" },
+      { header: "金额", key: "amount", width: 10, example: "298" },
       { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
+      { header: "备注", key: "notes", width: 18, example: "" },
     ],
     energy_knot: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
-      { header: "购买场次", key: "purchase_count", width: 10, example: "3" },
+      { header: "购买部位", key: "purchase_count", width: 10, example: "3" },
       { header: "金额", key: "amount", width: 10, example: "500" },
       { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
@@ -684,6 +1064,21 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
       { header: "课程类型", key: "course_type", width: 24, example: "疗愈师课程：自爱力构建" },
       { header: "金额", key: "price", width: 10, example: "20000" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
+      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
+    ],
+    tea_seat_fee: [
+      { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
+      { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
+      { header: "数量", key: "quantity", width: 10, example: "1" },
+      { header: "金额", key: "amount", width: 10, example: "68" },
+      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
+    ],
+    offline_course: [
+      { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
+      { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
+      { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
+      { header: "有效期（月）", key: "validity_value", width: 10, example: "1" },
+      { header: "金额", key: "amount", width: 10, example: "500" },
       { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     other: [
@@ -869,14 +1264,30 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         payload = { ...base, purchase_count: parseInt(get("购买场次")) || 0, amount }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
-      case "oh_card_reading":
-        payload = { ...base, purchase_count: parseInt(get("购买场次")) || 0, amount }
+      case "oh_card_reading": {
+        const ddStr = get("诊断时长（半小时为单位）")
+        const dd = ddStr ? parseInt(ddStr) || 1 : 1
+        const notes = get("备注")
+        payload = { ...base, diagnosis_duration: dd, amount, notes: notes || "" }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
+      }
       case "energy_knot":
-        payload = { ...base, purchase_count: parseInt(get("购买场次")) || 0, amount }
+        payload = { ...base, purchase_count: parseInt(get("购买部位") || get("购买场次")) || 0, amount }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
+      case "tea_seat_fee": {
+        const qty = parseInt(get("数量")) || 1
+        payload = { ...base, quantity: qty, amount }
+        dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
+        break
+      }
+      case "offline_course": {
+        const vv = parseInt(get("有效期（月）")) || 1
+        payload = { ...base, effective_date: get("生效日期") || today, validity_value: vv, amount }
+        dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
+        break
+      }
       case "internal_course": {
         const courseType = get("课程类型")
         payload = { ...base, course_type: courseType, price: amount, effective_date: get("生效日期") || today }
@@ -1061,7 +1472,26 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "会员卡", value: formCardType || "-" })
       rows.push({ label: "费用金额", value: `¥${parseFloat(formPrice || "0").toLocaleString()}` })
-      if (mcShowDurationInfo) rows.push({ label: "有效期", value: `${formDurationValue || MEMBERSHIP_CARD_TYPES[formCardType]?.duration} 个月，${MEMBERSHIP_CARD_TYPES[formCardType]?.unlimited ? "次数不限" : `${formTotalCount || MEMBERSHIP_CARD_TYPES[formCardType]?.defaultCount} 次`}` })
+      const cardCfg = formCardType ? MEMBERSHIP_CARD_TYPES[formCardType] : null
+      const dv = mcShowDuration ? formDurationValue : (cardCfg?.duration || "")
+      const dt = mcShowDuration ? formDurationType : "month"
+      if (dv) {
+        const unitName = dt === "month" ? "个月" : "天"
+        rows.push({ label: "有效期", value: `${dv} ${unitName}` })
+        if (formEffectiveDate) {
+          const eff = new Date(formEffectiveDate)
+          const val = parseInt(dv)
+          if (!isNaN(eff.getTime()) && !isNaN(val) && val > 0) {
+            if (dt === "month") {
+              eff.setMonth(eff.getMonth() + val)
+              eff.setDate(eff.getDate() - 1)
+            } else {
+              eff.setDate(eff.getDate() + val)
+            }
+            rows.push({ label: "结束日期", value: eff.toLocaleDateString("sv-SE") })
+          }
+        }
+      }
     } else if (formType === "internal_course") {
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "课程类型", value: formCourseType || "-" })
@@ -1077,14 +1507,54 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
         v += formOtherUnlimited ? "次数不限" : formOtherRemainingCount ? `${formOtherRemainingCount} 次` : ""
         rows.push({ label: "有效期", value: v })
       }
+    } else if (formType === "oh_card_reading") {
+      rows.push({ label: "诊断老师", value: formDiagnosisTeacher || "-" })
+      rows.push({ label: "诊断时长", value: `${formDiagnosisDuration * 0.5}小时` })
+      rows.push({ label: "付费金额", value: `¥${parseFloat(formOhAmount || "0").toLocaleString()}` })
+      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+    } else if (formType === "tea_seat_fee") {
+      rows.push({ label: "数量", value: `${formTeaQuantity || "1"} 位` })
+      rows.push({ label: "付费金额", value: `¥${parseFloat(formTeaAmount || "0").toLocaleString()}` })
+      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+    } else if (formType === "offline_course") {
+      rows.push({ label: "生效日期", value: formOfflineEffectiveDate || "-" })
+      rows.push({ label: "有效期", value: `${formOfflineValidityValue || "1"} 个月` })
+      rows.push({ label: "付费金额", value: `¥${parseFloat(formOfflineAmount || "0").toLocaleString()}` })
+      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+    } else if (formType === "group_case" || formType === "emotional_release" || formType === "energy_knot") {
+      const countLabel = formType === "energy_knot" ? "部位数" : "购买场次"
+      const countUnit = formType === "energy_knot" ? "个" : "次"
+      rows.push({ label: countLabel, value: `${formPurchaseCount || "0"} ${countUnit}` })
+      rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
+      rows.push({ label: "生效日期", value: formProjectEffectiveDate || "-" })
+      if (formProjectValidityValue && formProjectValidityUnit) {
+        const val = parseInt(formProjectValidityValue)
+        if (!isNaN(val) && val > 0) {
+          const unitName = formProjectValidityUnit === "month" ? "个月" : "天"
+          rows.push({ label: "有效期", value: `${val} ${unitName}` })
+          if (formProjectEffectiveDate) {
+            const eff = new Date(formProjectEffectiveDate)
+            if (!isNaN(eff.getTime())) {
+              if (formProjectValidityUnit === "month") {
+                eff.setMonth(eff.getMonth() + val)
+                eff.setDate(eff.getDate() - 1)
+              } else {
+                eff.setDate(eff.getDate() + val)
+              }
+              rows.push({ label: "结束日期", value: eff.toLocaleDateString("sv-SE") })
+            }
+          }
+        }
+      }
     } else {
-      rows.push({ label: "购买场次", value: `${formPurchaseCount || "0"} 次` })
+      rows.push({ label: formType === "energy_knot" ? "部位数" : "购买场次", value: `${formPurchaseCount || "0"} ${formType === "energy_knot" ? "个" : "次"}` })
       rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
     }
     rows.push({ label: "所属组织", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
     rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : "-" })
+    rows.push({ label: "备注", value: formNotes || "-" })
     return rows
-  }, [formType, formDealDate, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited])
+  }, [formType, formDealDate, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formOhAmount, formDiagnosisTeacher, formDiagnosisDuration, formTeaQuantity, formTeaAmount, formOfflineEffectiveDate, formOfflineValidityValue, formOfflineAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited, formNotes, formPaymentMethod, formProjectEffectiveDate, formProjectValidityValue, formProjectValidityUnit])
 
   return (
     <>
@@ -1169,15 +1639,17 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4" style={{ width: "90px" }}>成交日期</TableHead>
                 <TableHead style={{ width: "100px" }}>用户</TableHead>
+                {activeType === "oh_card_reading" && <TableHead style={{ width: "100px" }}>诊断老师</TableHead>}
                 {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && <TableHead style={{ width: "120px" }}>项目名称</TableHead>}
-                <TableHead style={{ width: "70px" }}>金额</TableHead>
-                <TableHead style={{ width: "70px" }}>购买场次</TableHead>
-                <TableHead style={{ width: "80px" }}>生效日期</TableHead>
-                <TableHead style={{ width: "80px" }}>到期日期</TableHead>
+                {activeType !== "offline_course" && <TableHead style={{ width: "70px" }}>{activeType === "oh_card_reading" ? "诊断时长" : activeType === "energy_knot" ? "购买部位" : activeType === "tea_seat_fee" ? "数量" : "购买场次"}</TableHead>}
+                {activeType !== "oh_card_reading" && activeType !== "tea_seat_fee" && <TableHead style={{ width: "80px" }}>生效日期</TableHead>}
+                {activeType !== "oh_card_reading" && activeType !== "tea_seat_fee" && <TableHead style={{ width: "80px" }}>到期日期</TableHead>}
                 <TableHead style={{ width: "60px" }}>状态</TableHead>
-                <TableHead style={{ width: "70px" }}>剩余次数</TableHead>
+                {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && <TableHead style={{ width: "70px" }}>{activeType === "energy_knot" ? "剩余部位" : "剩余次数"}</TableHead>}
+                <TableHead style={{ width: "70px" }}>金额</TableHead>
                 <TableHead style={{ width: "100px" }}>成交人</TableHead>
                 <TableHead style={{ width: "70px" }}>支付方式</TableHead>
+                <TableHead style={{ width: "100px" }}>备注</TableHead>
                 <TableHead style={{ width: "60px" }}>创建人</TableHead>
                 <TableHead className="text-right pr-4" style={{ width: "80px" }}>操作</TableHead>
                 </TableRow>
@@ -1185,8 +1657,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
               <TableBody>
                 {paginatedItems.map((item) => (
                   <TableRow key={`${item.type}-${item.id}`} className="group hover:bg-[#f7f8fa]">
-                    <TableCell className="pl-4 text-[#2b2f36]">{item.deal_date || <EmptyValue />}</TableCell>
+                    <TableCell className="pl-4 text-[#2b2f36] truncate">{item.deal_date || <EmptyValue />}</TableCell>
                     <TableCell className="text-[#2b2f36] truncate" title={item.nickname}>{item.nickname}</TableCell>
+                    {activeType === "oh_card_reading" && <TableCell className="text-[#2b2f36] truncate" title={item.diagnosis_teacher}>{item.diagnosis_teacher || <EmptyValue />}</TableCell>}
                     {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && (
                       <TableCell className="text-[#2b2f36] truncate" title={item.type === "other" ? [item.category, item.project_name].filter(Boolean).join(" / ") : item.detail}>
                         {item.type === "other"
@@ -1194,32 +1667,43 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                           : (item.detail || <EmptyValue />)}
                       </TableCell>
                     )}
-                    <TableCell className="text-[#2b2f36]">¥{item.price.toLocaleString()}</TableCell>
-                    <TableCell className="text-[#2b2f36]">
-                      {(item.type === "group_case" || item.type === "emotional_release" || item.type === "oh_card_reading" || item.type === "energy_knot") && (
-                        item.purchase_count ? `${item.purchase_count} 次` : <EmptyValue />
-                      )}
-                      {item.type === "membership_card" && (() => {
-                        if (item.remaining_count === null || item.total_count == null) return "不限"
-                        return `${item.total_count} 次`
-                      })()}
-                      {item.type === "other" && (
-                        (item.total_count === null || item.total_count === undefined) && item.remaining_count === null ? "不限" : `${(item.total_count ?? item.remaining_count) ?? 0} 次`
-                      )}
-                    </TableCell>
-                    <TableCell className="text-[#2b2f36]">{item.effective_date || <EmptyValue />}</TableCell>
-                    <TableCell className="text-[#2b2f36]">{item.expiry_date || <EmptyValue />}</TableCell>
-                    <TableCell className="text-[12px]">
+                    {activeType !== "offline_course" && (
+                      <TableCell className="text-[#2b2f36] truncate">
+                        {item.type === "oh_card_reading" && (
+                          item.diagnosis_duration ? `${item.diagnosis_duration * 0.5}小时` : <EmptyValue />
+                        )}
+                        {(item.type === "group_case" || item.type === "emotional_release" || item.type === "energy_knot") && (
+                          item.purchase_count ? `${item.purchase_count} ${item.type === "energy_knot" ? "个" : "次"}` : <EmptyValue />
+                        )}
+                        {item.type === "tea_seat_fee" && (
+                          item.quantity ? `${item.quantity} 位` : <EmptyValue />
+                        )}
+                        {item.type === "membership_card" && (() => {
+                          if (item.remaining_count === null || item.total_count == null) return "不限"
+                          return `${item.total_count} 次`
+                        })()}
+                        {item.type === "other" && (
+                          (item.total_count === null || item.total_count === undefined) && item.remaining_count === null ? "不限" : `${(item.total_count ?? item.remaining_count) ?? 0} 次`
+                        )}
+                      </TableCell>
+                    )}
+                    {activeType !== "oh_card_reading" && activeType !== "tea_seat_fee" && <TableCell className="text-[#2b2f36] truncate">{item.effective_date || <EmptyValue />}</TableCell>}
+                    {activeType !== "oh_card_reading" && activeType !== "tea_seat_fee" && <TableCell className="text-[#2b2f36] truncate">{item.expiry_date || <EmptyValue />}</TableCell>}
+                    <TableCell className="text-[12px] truncate">
                       {(() => {
                         const today = new Date().toLocaleDateString("sv-SE")
-                        if (item.type === "membership_card" && item.voided) return <span className="text-[#c4506a]">已退费</span>
+                        const refunded = item.type === "membership_card"
+                          ? item.voided
+                          : refundedKeys.has(`${PROJECT_TYPE_TO_REFUND_KEY[item.type]}:${item.id}`)
+                        if (refunded) return <span className="text-[#c4506a]">已退费</span>
                         if (item.effective_date && item.effective_date > today) return <span className="text-[#8f959e]">未开始</span>
                         if (item.expiry_date && item.expiry_date < today) return <span className="text-[#c4506a]">已过期</span>
                         if (item.effective_date || item.expiry_date) return <span className="text-[#3370ff]">生效中</span>
+                        if (item.type === "tea_seat_fee" || item.type === "oh_card_reading") return <span className="text-[#8f959e]">已完结</span>
                         return <EmptyValue />
                       })()}
                     </TableCell>
-                    <TableCell className="text-[#2b2f36]">
+                    {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && <TableCell className="text-[#2b2f36] truncate">
                       {item.type === "membership_card" ? (
                         item.voided
                           ? <span className="text-[#c4506a]">已退费</span>
@@ -1230,17 +1714,19 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                         item.remaining_count === null ? "不限" : `${item.remaining_count} 次`
                       ) : (
                         item.effective_remaining !== null && item.effective_remaining !== undefined
-                          ? `${item.effective_remaining} 次`
+                          ? `${item.effective_remaining} ${item.type === "energy_knot" ? "个" : "次"}`
                           : <EmptyValue />
                       )}
-                    </TableCell>
-                    <TableCell className="text-[#2b2f36]">
+                    </TableCell>}
+                    <TableCell className="text-[#2b2f36] truncate">¥{item.price.toLocaleString()}</TableCell>
+                    <TableCell className="text-[#2b2f36] truncate" title={item.closers?.length ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : (item.closer_name || "")}>
                       {item.closers?.length
                         ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、")
                         : (item.closer_name || <EmptyValue />)}
                     </TableCell>
-                    <TableCell className="text-[#2b2f36]">{item.payment_method || <EmptyValue />}</TableCell>
-                    <TableCell className="text-[#8f959e]">{item.created_by || <EmptyValue />}</TableCell>
+                    <TableCell className="text-[#2b2f36] truncate">{item.payment_method || <EmptyValue />}</TableCell>
+                    <TableCell className="text-[#2b2f36] truncate" title={item.notes}>{item.notes || <EmptyValue />}</TableCell>
+                    <TableCell className="text-[#8f959e] truncate">{item.created_by || <EmptyValue />}</TableCell>
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(item)}>
@@ -1356,6 +1842,27 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
               </div>
             )}
 
+            {/* ===== 觉醒游戏/情绪释放/能量结专属字段 ===== */}
+            {(formType === "group_case" || formType === "emotional_release" || formType === "energy_knot") && (
+              <>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
+                  <Input type="date" value={formProjectEffectiveDate} onChange={(e) => setFormProjectEffectiveDate(e.target.value)} className="h-8 text-xs" />
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">有效期</span>
+                  <div className="flex gap-2">
+                    <Input type="number" value={formProjectValidityValue} onChange={(e) => setFormProjectValidityValue(e.target.value)} placeholder="输入时长" className="h-8 text-xs flex-1" min="1" />
+                    <div className="flex gap-1">
+                      {DURATION_OPTIONS.map((opt) => (
+                        <button key={opt.type} type="button" className={`px-3 h-8 rounded border text-[12px] transition-colors ${formProjectValidityUnit === opt.type ? "border-[#3370ff] bg-[#f0f5ff] text-[#3370ff]" : "border-[#e0e0e0] text-[#4e535a] hover:border-[#c0c0c0]"}`} onClick={() => setFormProjectValidityUnit(opt.type)}>{opt.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* ===== 会员卡专属字段 ===== */}
             {formType === "membership_card" && (
               <>
@@ -1420,15 +1927,84 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
                 <Input type="text" inputMode="decimal" value={formPrice} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={MEMBERSHIP_CARD_TYPES[formCardType] ? `${MEMBERSHIP_CARD_TYPES[formCardType].price}` : ""} className="h-8 text-xs" />
               </div>
             )}
-            {(formType === "group_case" || formType === "emotional_release" || formType === "oh_card_reading" || formType === "energy_knot") && (
+            {(formType === "group_case" || formType === "emotional_release" || formType === "energy_knot") && (
               <>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">购买场次</span>
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">{formType === "energy_knot" ? "部位数" : "购买场次"}</span>
                   <Input type="number" value={formPurchaseCount} onChange={(e) => setFormPurchaseCount(e.target.value)} placeholder="0" min="0" className="h-8 text-xs" />
                 </div>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} placeholder="0" min="0" step="0.01" className="h-8 text-xs" />
+                </div>
+              </>
+            )}
+
+            {/* ===== OH卡诊断专属字段 ===== */}
+            {formType === "oh_card_reading" && (
+              <>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">诊断老师</span>
+                  <SelectDropdown
+                    value={formDiagnosisTeacher}
+                    options={courseTeachers.map(c => ({ value: c.nickname, label: c.nickname }))}
+                    placeholder="选择诊断老师"
+                    onChange={setFormDiagnosisTeacher}
+                  />
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">诊断时长</span>
+                  <SelectDropdown
+                    value={String(formDiagnosisDuration)}
+                    options={[
+                      { value: "1", label: "0.5小时" },
+                      { value: "2", label: "1小时" },
+                      { value: "3", label: "1.5小时" },
+                      { value: "4", label: "2小时" },
+                      { value: "5", label: "2.5小时" },
+                      { value: "6", label: "3小时" },
+                    ]}
+                    onChange={(v) => setFormDiagnosisDuration(parseInt(v) || 1)}
+                  />
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
+                  <Input type="number" value={formOhAmount} onChange={(e) => setFormOhAmount(e.target.value)} placeholder="298" min="0" step="0.01" className="h-8 text-xs" />
+                </div>
+              </>
+            )}
+
+            {/* ===== 茶位费专属字段 ===== */}
+            {formType === "tea_seat_fee" && (
+              <>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">数量</span>
+                  <Input type="number" value={formTeaQuantity} onChange={(e) => setFormTeaQuantity(e.target.value)} placeholder="1" min="1" step="1" className="h-8 text-xs" />
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
+                  <Input type="number" value={formTeaAmount} onChange={(e) => setFormTeaAmount(e.target.value)} placeholder="68" min="0" step="0.01" className="h-8 text-xs" />
+                </div>
+              </>
+            )}
+
+            {/* ===== 线下课程专属字段 ===== */}
+            {formType === "offline_course" && (
+              <>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
+                  <Input type="date" value={formOfflineEffectiveDate} onChange={(e) => setFormOfflineEffectiveDate(e.target.value)} className="h-8 text-xs" />
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">有效期</span>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" value={formOfflineValidityValue} onChange={(e) => setFormOfflineValidityValue(e.target.value)} placeholder="1" min="1" step="1" className="h-8 text-xs w-20" />
+                    <span className="text-[12px] text-[#4e535a]">个月</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
+                  <Input type="number" value={formOfflineAmount} onChange={(e) => setFormOfflineAmount(e.target.value)} placeholder="输入金额" min="0" step="0.01" className="h-8 text-xs" />
                 </div>
               </>
             )}
@@ -1500,12 +2076,12 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
             )}
 
             {/* ===== 公共字段：成交人 ===== */}
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交人</span>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest mt-2">成交人</span>
               <div>
                 <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={getFormAmount()} />
                 {closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}
-                {formClosers.length > 0 && formClosers.reduce((sum, c) => sum + c.amount, 0) !== getFormAmount() && (
+                {formClosers.length > 0 && Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - getFormAmount()) > 0.01 && (
                   <span className="text-[11px] text-[#f54a45] mt-0.5 block">成交人总金额与付费金额不一致</span>
                 )}
               </div>
@@ -1514,16 +2090,22 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
             {/* ===== 公共字段：支付方式 ===== */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">支付方式</span>
-              <select
-                className="h-7 border border-[#e8eaed] rounded-[2px] px-2 text-[12px] text-[#1f2329] bg-white outline-none focus:border-[#3370ff]"
+              <SelectDropdown
                 value={formPaymentMethod}
-                onChange={(e) => setFormPaymentMethod(e.target.value)}
-              >
-                <option value="">请选择</option>
-                <option value="支付宝">支付宝</option>
-                <option value="微信">微信</option>
-                <option value="其他">其他</option>
-              </select>
+                options={[
+                  { value: "支付宝", label: "支付宝" },
+                  { value: "微信", label: "微信" },
+                  { value: "其他", label: "其他" },
+                ]}
+                placeholder="请选择"
+                onChange={setFormPaymentMethod}
+              />
+            </div>
+
+            {/* ===== 公共字段：备注 ===== */}
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">备注</span>
+              <Input type="text" value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="额外信息（可选）" className="h-8 text-xs" />
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">
@@ -1546,7 +2128,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
             {confirmContent.map((row, i) => (
               <div key={i} className="grid grid-cols-[70px_1fr] items-center gap-2">
                 <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">{row.label}</span>
-                <span className="text-[12px] text-[#2b2f36] pl-2.5">{row.value}</span>
+                <span className={`text-[12px] pl-2.5 ${row.value === "-" ? "text-[#c0c4cc]" : "text-[#2b2f36]"}`}>{row.value === "-" ? "-" : row.value}</span>
               </div>
             ))}
             <div className="flex justify-end gap-2 pt-2 border-t">
@@ -1659,4 +2241,4 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: { embedded?: bo
       </AlertDialog>
     </>
   )
-}
+})

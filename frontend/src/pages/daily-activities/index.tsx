@@ -16,9 +16,9 @@ import {
   emotionalReleaseSessionApi,
   energyKnotSessionApi, energyKnotApi,
   internalCourseSessionApi, courseTypeApi, customerApi, uploadApi, spaceApi,
-  activityThemeApi, ohCardReadingSessionApi, memberIdentityApi,
+  activityThemeApi, memberIdentityApi,
   type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession,
-  type EnergyKnotSession, type InternalCourseSession, type OhCardReadingSession,
+  type EnergyKnotSession, type InternalCourseSession,
   type CourseType, type CustomerLight, type Space,
   type InternalCourseSessionCustomerSearchResult,
   type GroupCaseCustomerSearchResult,
@@ -98,10 +98,6 @@ export interface CardCallbacks {
   onEditIcs: (s: InternalCourseSession) => void
   onDeleteIcs: (id: string) => void
   onMaterialsIcs: (s: InternalCourseSession) => void
-  onCreateOcr: () => void
-  onEditOcr: (s: OhCardReadingSession) => void
-  onDeleteOcr: (id: string) => void
-  onMaterialsOcr: (s: OhCardReadingSession) => void
   teachers: CustomerLight[]
   spaces: Space[]
   courseMap: Record<string, string>
@@ -147,7 +143,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
         setRoomId(session.room_id || "")
         setSearchKeyword(""); setOwnerRemaining(null)
         if (session.owner_id && session.owner_name) {
-          groupCaseSessionApi.searchCustomers(session.owner_name).then(results => {
+          groupCaseSessionApi.searchCustomers(session.owner_name, session.date).then(results => {
             const found = results.find(r => r.id === session.owner_id)
             if (found) setOwnerRemaining(found.remaining)
           }).catch(() => {})
@@ -172,7 +168,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
     const fetchId = ++remainingFetchRef.current
     const timer = window.setTimeout(async () => {
       try {
-        const results = await groupCaseSessionApi.searchCustomers(searchKeyword)
+        const results = await groupCaseSessionApi.searchCustomers(searchKeyword, formDate)
         if (fetchId !== remainingFetchRef.current) return
         const map: Record<string, number> = {}
         results.forEach(r => { map[r.id] = r.remaining })
@@ -180,7 +176,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
       } catch {}
     }, 200)
     return () => clearTimeout(timer)
-  }, [searchKeyword, formOwnerId])
+  }, [searchKeyword, formOwnerId, formDate])
 
   // Click outside to close dropdowns
   useEffect(() => {
@@ -298,7 +294,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
               {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
                 const filtered = allCustomers.filter(c =>
-                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
+                  remainingMap[c.id] !== undefined && ((c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
                   const sa = isDepleted(ra) ? 1 : 0
@@ -389,7 +385,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
         setRoomId(session.room_id || "")
         setSearchKeyword(""); setOwnerRemaining(null)
         if (session.owner_id && session.owner_name) {
-          emotionalReleaseSessionApi.searchCustomers(session.owner_name).then(results => {
+          emotionalReleaseSessionApi.searchCustomers(session.owner_name, session.date).then(results => {
             const found = results.find(r => r.id === session.owner_id)
             if (found) setOwnerRemaining(found.remaining)
           }).catch(() => {})
@@ -413,7 +409,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
     const fetchId = ++remainingFetchRef.current
     const timer = window.setTimeout(async () => {
       try {
-        const results = await emotionalReleaseSessionApi.searchCustomers(searchKeyword)
+        const results = await emotionalReleaseSessionApi.searchCustomers(searchKeyword, formDate)
         if (fetchId !== remainingFetchRef.current) return
         const map: Record<string, number> = {}
         results.forEach(r => { map[r.id] = r.remaining })
@@ -421,7 +417,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
       } catch {}
     }, 200)
     return () => clearTimeout(timer)
-  }, [searchKeyword, formOwnerId])
+  }, [searchKeyword, formOwnerId, formDate])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -534,7 +530,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
               {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
                 const filtered = allCustomers.filter(c =>
-                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
+                  remainingMap[c.id] !== undefined && ((c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
                   const sa = isDepleted(ra) ? 1 : 0
@@ -588,241 +584,6 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
   )
 })
 
-// ===== OCR Dialog (独立组件) =====
-const OcrDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpaceId, onClose, onSaved }: {
-  open: boolean; date: string; spaces: Space[]; allCustomers: CustomerLight[]
-  session?: OhCardReadingSession | null; defaultSpaceId?: string; onClose: () => void
-  onSaved: (record: OhCardReadingSession) => void
-}) => {
-  const enterToNext = useEnterToNext()
-  const [editingRecord, setEditingRecord] = useState<OhCardReadingSession | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [formDate, setFormDate] = useState(date)
-  const [formStartTime, setFormStartTime] = useState("09:00")
-  const [formEndTime, setFormEndTime] = useState("10:00")
-  const [formOwnerId, setFormOwnerId] = useState("")
-  const [formOwnerName, setFormOwnerName] = useState("")
-  const [formDescription, setFormDescription] = useState("")
-  const [formActivityMode, setFormActivityMode] = useState("线下")
-  const [searchKeyword, setSearchKeyword] = useState("")
-  const [ownerRemaining, setOwnerRemaining] = useState<number | null>(null)
-  const [remainingMap, setRemainingMap] = useState<Record<string, number>>({})
-  const [spaceId, setSpaceId] = useState("")
-  const [roomId, setRoomId] = useState("")
-  const remainingFetchRef = useRef(0)
-
-  useEffect(() => {
-    if (open) {
-      if (session) {
-        setEditingRecord(session)
-        setFormDate(session.date)
-        setFormStartTime(session.start_time || "09:00")
-        setFormEndTime(session.end_time || "10:00")
-        setFormOwnerId(session.owner_id); setFormOwnerName(session.owner_name || "")
-        setFormDescription(session.description || "")
-        setFormActivityMode(session.activity_mode || "线下")
-        setSpaceId(session.space_id || (spaces[0]?.id || ""))
-        setRoomId(session.room_id || "")
-        setSearchKeyword(""); setOwnerRemaining(null)
-        if (session.owner_id && session.owner_name) {
-          ohCardReadingSessionApi.searchCustomers(session.owner_name).then(results => {
-            const found = results.find(r => r.id === session.owner_id)
-            if (found) setOwnerRemaining(found.remaining)
-          }).catch(() => {})
-        }
-      } else {
-        setEditingRecord(null)
-        setFormDate(date)
-        setFormStartTime("09:00"); setFormEndTime("10:00")
-        setFormOwnerId(""); setFormOwnerName("")
-        setFormDescription("")
-        setFormActivityMode("线下")
-        setSearchKeyword(""); setOwnerRemaining(null)
-        const ds = defaultSpaceId || spaces[0]?.id || ""; const dr = ds ? (spaces.find(s => s.id === ds)?.rooms?.[0]?.id || "") : ""
-        setSpaceId(ds); setRoomId(dr)
-      }
-    }
-  }, [open, date, spaces, session, defaultSpaceId])
-
-  useEffect(() => {
-    if (!searchKeyword.trim() && !formOwnerId) return
-    const fetchId = ++remainingFetchRef.current
-    const timer = window.setTimeout(async () => {
-      try {
-        const results = await ohCardReadingSessionApi.searchCustomers(searchKeyword)
-        if (fetchId !== remainingFetchRef.current) return
-        const map: Record<string, number> = {}
-        results.forEach(r => { map[r.id] = r.remaining })
-        setRemainingMap(map)
-      } catch {}
-    }, 200)
-    return () => clearTimeout(timer)
-  }, [searchKeyword, formOwnerId])
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest("[data-dropdown]")) return
-      setSearchKeyword("")
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [])
-
-  const handleSave = async () => {
-    if (!formOwnerId) return
-    setSaving(true)
-    try {
-      const data = {
-        date: formDate, start_time: formStartTime || null, end_time: formEndTime || null,
-        owner_id: formOwnerId, owner_name: formOwnerName,
-        description: formDescription || undefined,
-        activity_mode: formActivityMode,
-        space_id: spaceId || undefined, room_id: roomId || undefined,
-        room_name: (spaces.find(s => s.id === spaceId)?.rooms || []).find(r => r.id === roomId)?.name || "",
-        space_name: spaces.find(s => s.id === spaceId)?.name || "",
-      }
-      let result: OhCardReadingSession
-      if (editingRecord) {
-        result = await ohCardReadingSessionApi.update(editingRecord.id, data)
-      } else {
-        result = await ohCardReadingSessionApi.create(data)
-      }
-      onSaved(result)
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail
-      if (typeof detail === "string") alert(detail)
-    } finally { setSaving(false) }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
-        <DialogHeader className="px-6 pt-5 pb-4 border-b">
-          <DialogTitle className="text-[15px]">{editingRecord ? "编辑OH卡梳理" : "新增OH卡梳理"}</DialogTitle>
-        </DialogHeader>
-        <div className="px-6 py-5 space-y-5" {...enterToNext}>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">日期</span>
-            <Input rounded="[2px]" type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-8 text-[12px]" />
-          </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">时间</span>
-            <div className="flex items-center gap-2">
-              <Input rounded="[2px]" type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="h-8 text-[12px] w-28" />
-              <span className="text-[12px] text-[#8f959e]">至</span>
-              <Input rounded="[2px]" type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-8 text-[12px] w-28" />
-            </div>
-          </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">空间</span>
-            <div className="flex items-center gap-2">
-              <SelectDropdown rounded="[2px]"
-                className="w-[122px]"
-                value={spaceId}
-                options={spaces.map(s => ({value: s.id, label: s.name}))}
-                placeholder="选择空间"
-                onChange={(v) => { setSpaceId(v); setRoomId(spaces.find(s => s.id === v)?.rooms?.[0]?.id || "") }}
-              />
-              <SelectDropdown rounded="[2px]"
-                className="w-[122px]"
-                value={roomId}
-                options={(spaces.find(s => s.id === spaceId)?.rooms || []).map(r => ({value: r.id, label: r.name}))}
-                placeholder={spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0 ? "无房间" : "选择房间"}
-                disabled={!!spaceId && (spaces.find(s => s.id === spaceId)?.rooms || []).length === 0}
-                onChange={(v) => setRoomId(v)}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right">活动方式</span>
-            <SelectDropdown rounded="[2px]"
-              value={formActivityMode}
-              options={[{value: "线下", label: "线下"}, {value: "线上", label: "线上"}]}
-              onChange={setFormActivityMode}
-            />
-          </div>
-          <div className="grid grid-cols-[70px_1fr] items-start gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right mt-2">案主</span>
-            <div data-dropdown className="relative" onMouseDown={(e) => e.stopPropagation()}>
-              <div className="relative">
-                <Input rounded="[2px]"
-                  value={formOwnerId ? formOwnerName : searchKeyword}
-                  onChange={(e) => {
-                    setSearchKeyword(e.target.value)
-                    if (formOwnerId) { setFormOwnerId(""); setFormOwnerName(""); setOwnerRemaining(null) }
-                  }}
-                  placeholder={formOwnerId ? "" : "选择案主"}
-                  className="h-8 text-[12px] pr-20"
-                  autoComplete="off"
-                />
-                {formOwnerId && ownerRemaining !== null && (
-                  <span className={`absolute right-7 top-1/2 -translate-y-1/2 text-[11px] ${isDepleted(ownerRemaining) ? "text-red-500" : "text-[#8f959e]"}`}>
-                    {ownerRemaining === -1 ? "不限次" : `剩余${ownerRemaining}次`}
-                  </span>
-                )}
-                {formOwnerId && (
-                  <button className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8f959e] hover:text-[#2b2f36]"
-                    onClick={() => { setFormOwnerId(""); setFormOwnerName(""); setSearchKeyword(""); setOwnerRemaining(null) }}>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              {searchKeyword.trim().length > 0 && (() => {
-                const kw = searchKeyword.trim().toLowerCase()
-                const filtered = allCustomers.filter(c =>
-                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
-                ).sort((a, b) => {
-                  const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
-                  const sa = isDepleted(ra) ? 1 : 0
-                  const sb = isDepleted(rb) ? 1 : 0
-                  return sa - sb
-                })
-                const visible = filtered.slice(0, MAX_OWNER_VISIBLE)
-                return (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-md border border-[#e8e8e8] shadow-lg z-50 max-h-[200px] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-                  {visible.length === 0 ? (
-                    <div className="px-3 py-2 text-[12px] text-[#8f959e]">无匹配客户</div>
-                  ) : (
-                    visible.map(c => {
-                      const remaining = remainingMap[c.id]
-                      const isDepleted = remaining !== undefined && remaining !== -1 && remaining <= 0
-                      return (
-                        <button key={c.id}
-                          className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
-                          disabled={isDepleted}
-                          onClick={() => {
-                            if (isDepleted) return
-                            setFormOwnerId(c.id)
-                            setFormOwnerName(c.nickname || c.name || "")
-                            setSearchKeyword("")
-                            setOwnerRemaining(remaining !== undefined ? remaining : null)
-                          }}>
-                          <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
-                          <span className={`text-[#8f959e] ${isDepleted ? "text-red-500" : ""}`}>
-                            {remaining !== undefined ? (remaining === -1 ? "" : `余${remaining}`) : ""}
-                          </span>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              )})()}
-            </div>
-          </div>
-          <div className="grid grid-cols-[70px_1fr] items-start gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right mt-1">描述</span>
-            <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
-              className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input text-[12px] resize-none" placeholder="输入课程简介..." />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 px-6 pb-5 pt-2">
-          <Button variant="outline" size="sm" onClick={onClose}>取消</Button>
-          <Button size="sm" onClick={handleSave} disabled={saving || !formOwnerId}>{saving ? "保存中..." : "保存"}</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-})
 
 // ===== EKS Dialog (独立组件) =====
 const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, session, defaultSpaceId, onClose, onSaved }: {
@@ -873,7 +634,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
         setFormHostIds(session.teacher_ids || []); setFormHostNames((session.teacher_ids || []).map(id => hostCustomers.find(c => c.id === id)?.nickname || hostCustomers.find(c => c.id === id)?.name || "").filter(Boolean))
         // 编辑时加载案主剩余次数
         if (descs.length > 0) {
-          energyKnotSessionApi.searchCustomers("").then(results => {
+          energyKnotSessionApi.searchCustomers("", session.date).then(results => {
             const map: Record<string, number> = {}
             results.forEach(r => { map[r.id] = r.remaining })
             setRemainingMap(map)
@@ -901,7 +662,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
     const fetchId = ++remainingFetchRef.current
     const timer = window.setTimeout(async () => {
       try {
-        const results = await energyKnotSessionApi.searchCustomers(searchKeyword)
+        const results = await energyKnotSessionApi.searchCustomers(searchKeyword, formDate)
         if (fetchId !== remainingFetchRef.current) return
         const map: Record<string, number> = {}
         results.forEach(r => { map[r.id] = r.remaining })
@@ -909,7 +670,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
       } catch {}
     }, 200)
     return () => clearTimeout(timer)
-  }, [searchKeyword])
+  }, [searchKeyword, formDate])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -1068,7 +829,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
                 const filtered = allCustomers.filter(c =>
-                  (c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw)
+                  remainingMap[c.id] !== undefined && ((c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
                   const sa = isDepleted(ra) ? 1 : 0
@@ -1917,7 +1678,6 @@ export default function DailyActivitiesPage() {
   const [detailErsSessions, setDetailErsSessions] = useState<EmotionalReleaseSession[]>([])
   const [detailEksSessions, setDetailEksSessions] = useState<EnergyKnotSession[]>([])
   const [detailIcsSessions, setDetailIcsSessions] = useState<InternalCourseSession[]>([])
-  const [detailOcrSessions, setDetailOcrSessions] = useState<OhCardReadingSession[]>([])
   const [detailVisits, setDetailVisits] = useState<any[]>([])
 
   // ===== Salon dialog state (minimal - form state lives in SalonDialog) =====
@@ -1951,13 +1711,6 @@ export default function DailyActivitiesPage() {
   const [icsDeleteId, setIcsDeleteId] = useState<string | null>(null)
   const [icsMaterialsDialogOpen, setIcsMaterialsDialogOpen] = useState(false)
   const [icsMaterialsRecord, setIcsMaterialsRecord] = useState<InternalCourseSession | null>(null)
-
-  // ===== OCR dialog state =====
-  const [ocrDialogOpen, setOcrDialogOpen] = useState(false)
-  const [ocrEditSession, setOcrEditSession] = useState<OhCardReadingSession | null>(null)
-  const [ocrDeleteId, setOcrDeleteId] = useState<string | null>(null)
-  const [ocrMaterialsDialogOpen, setOcrMaterialsDialogOpen] = useState(false)
-  const [ocrMaterialsRecord, setOcrMaterialsRecord] = useState<OhCardReadingSession | null>(null)
 
 
   // ===== Warning dialog =====
@@ -2248,7 +2001,6 @@ export default function DailyActivitiesPage() {
       ...detailErsSessions.map(s => ({ type: "ers" as const, data: s })),
       ...detailEksSessions.map(s => ({ type: "eks" as const, data: s })),
       ...detailIcsSessions.map(s => ({ type: "ics" as const, data: s })),
-      ...detailOcrSessions.map(s => ({ type: "ocr" as const, data: s })),
     ]
     const filtered = selectedSpaceId ? all.filter(r => (r.data as any).space_id === selectedSpaceId) : all
     return filtered.sort((a, b) => {
@@ -2259,7 +2011,7 @@ export default function DailyActivitiesPage() {
       if (!bt) return -1
       return at.localeCompare(bt)
     })
-  }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, detailOcrSessions, selectedSpaceId])
+  }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, selectedSpaceId])
 
   // 当日所有参与者（从到场记录读取，按空间过滤）
   const dayParticipants = useMemo(() => {
@@ -2291,14 +2043,13 @@ export default function DailyActivitiesPage() {
     try {
       const dashboard = await classRecordApi.dashboard(date, selectedSpaceId || undefined)
       if (seq !== loadSeqRef.current) return
-      const { class_records: records, gcs_sessions: gcs, ers_sessions: ers, eks_sessions: eks, ics_sessions: ics, ocr_sessions: ocr } = dashboard
+      const { class_records: records, gcs_sessions: gcs, ers_sessions: ers, eks_sessions: eks, ics_sessions: ics } = dashboard
 
       setDetailRecords(records)
       setDetailGcsSessions(gcs)
       setDetailErsSessions(ers)
       setDetailEksSessions(eks)
       setDetailIcsSessions(ics)
-      setDetailOcrSessions(ocr || [])
       setDetailVisits(dashboard.visits || [])
       setCalendarCounts(dashboard.calendar_counts)
 
@@ -2330,12 +2081,6 @@ export default function DailyActivitiesPage() {
       for (const s of ics) {
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
-      for (const s of (ocr || [])) {
-        if (s.owner_id) ids.add(s.owner_id)
-        if (s.host_id) ids.add(s.host_id)
-        for (const t of (s.teacher_ids || [])) ids.add(t)
-        for (const pid of (s.participant_ids || [])) ids.add(pid)
-      }
 
       const uniqueIds = [...ids]
       if (uniqueIds.length > 0) {
@@ -2363,7 +2108,6 @@ export default function DailyActivitiesPage() {
   const handleErsClose = useCallback(() => { setErsDialogOpen(false) }, [])
   const handleEksClose = useCallback(() => { setEksDialogOpen(false) }, [])
   const handleIcsClose = useCallback(() => { setIcsDialogOpen(false) }, [])
-  const handleOcrClose = useCallback(() => { setOcrDialogOpen(false) }, [])
 
   const handleSalonSaved = useCallback((record: ClassRecord) => {
     setDetailRecords(prev => {
@@ -2405,15 +2149,6 @@ export default function DailyActivitiesPage() {
     })
     setIcsDialogOpen(false)
   }, [])
-  const handleOcrSaved = useCallback((record: OhCardReadingSession) => {
-    setDetailOcrSessions(prev => {
-      const exists = prev.some(r => r.id === record.id)
-      if (!exists) setCalendarCounts(c => ({ ...c, [record.date]: (c[record.date] || 0) + 1 }))
-      return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
-    })
-    setOcrDialogOpen(false)
-  }, [])
-
   const load = () => {
     courseTypeApi.list().then(data => setCourses(data.filter(t => t.category !== "other").map(t => ({ id: t.name, name: t.name })))).catch(() => {})
     spaceApi.list().then((list) => {
@@ -2634,56 +2369,6 @@ export default function DailyActivitiesPage() {
     } catch {}
   }
 
-  // ===== OCR handlers =====
-  const handleOpenOcrCreate = (date?: string) => {
-    setOcrEditSession(null)
-    setOcrDialogOpen(true)
-  }
-
-  const handleOpenOcrEdit = useCallback((session: OhCardReadingSession) => {
-    setOcrEditSession(session)
-    setOcrDialogOpen(true)
-  }, [])
-
-  const handleOcrDelete = async () => {
-    if (!ocrDeleteId) return
-    try {
-      await ohCardReadingSessionApi.delete(ocrDeleteId)
-      setOcrDeleteId(null)
-      loadDateData(detailDate)
-    } catch (e) { handleApiError(e) }
-  }
-
-  const handleOpenOcrMaterials = useCallback((session: OhCardReadingSession) => {
-    setOcrMaterialsRecord(session)
-    setOcrMaterialsDialogOpen(true)
-  }, [])
-
-  const handleUploadOcrMaterial = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !ocrMaterialsRecord) return
-    setUploading(true)
-    try {
-      const material = await uploadApi.uploadMaterial(file)
-      const newMaterials = [...(ocrMaterialsRecord.materials || []), material]
-      await ohCardReadingSessionApi.update(ocrMaterialsRecord.id, { materials: newMaterials } as any)
-      setOcrMaterialsRecord({ ...ocrMaterialsRecord, materials: newMaterials })
-      loadDateData(detailDate)
-    } catch { alert("上传失败，请重试") }
-    finally { setUploading(false); e.target.value = "" }
-  }
-
-  const handleDeleteOcrMaterial = async (filename: string) => {
-    if (!ocrMaterialsRecord) return
-    try {
-      await uploadApi.deleteMaterial(filename)
-      const newMaterials = (ocrMaterialsRecord.materials || []).filter(m => (m.url.split("/").pop() || "") !== filename)
-      await ohCardReadingSessionApi.update(ocrMaterialsRecord.id, { materials: newMaterials } as any)
-      setOcrMaterialsRecord({ ...ocrMaterialsRecord, materials: newMaterials })
-      loadDateData(detailDate)
-    } catch {}
-  }
-
   // ===== Render helpers =====
   const courseMap = useMemo(() => {
     const map: Record<string, string> = {}
@@ -2718,11 +2403,7 @@ export default function DailyActivitiesPage() {
     onEditIcs: handleOpenIcsEdit,
     onDeleteIcs: setIcsDeleteId,
     onMaterialsIcs: handleOpenIcsMaterials,
-    onCreateOcr: handleOpenOcrCreate,
-    onEditOcr: handleOpenOcrEdit,
-    onDeleteOcr: setOcrDeleteId,
-    onMaterialsOcr: handleOpenOcrMaterials,
-  } as CardCallbacks), [teachers, spaces, courseMap, handleOpenCreate, handleOpenEdit, handleOpenMaterials, handleOpenGcsCreate, handleOpenGcsEdit, handleOpenGcsMaterials, handleOpenErsCreate, handleOpenErsEdit, handleOpenEksCreate, handleOpenEksEdit, handleOpenIcsCreate, handleOpenIcsEdit, handleOpenIcsMaterials, handleOpenOcrCreate, handleOpenOcrEdit, handleOpenOcrMaterials])
+  }), [teachers, spaces, courseMap])
 
   // ===== JSX =====
   return (
@@ -2939,6 +2620,7 @@ export default function DailyActivitiesPage() {
               date={detailDate}
               courses={courses}
               customers={allCustomers}
+              invitedCustomerIds={detailVisits.map(visit => visit.customer_id)}
               teachers={teachers}
               spaces={spaces}
               spaceId={selectedSpaceId}
@@ -3131,19 +2813,6 @@ export default function DailyActivitiesPage() {
         onSaved={handleIcsSaved}
       />
 
-      {/* ===== OCR Dialog ===== */}
-      <OcrDialog
-        open={ocrDialogOpen}
-        date={detailDate}
-        spaces={spaces}
-        allCustomers={allCustomers}
-        session={ocrEditSession}
-        defaultSpaceId={selectedSpaceId}
-        onClose={handleOcrClose}
-        onSaved={handleOcrSaved}
-      />
-
-      {/* ===== Salon Delete Dialog ===== */}
       {!!deleteId && (
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
@@ -3223,180 +2892,6 @@ export default function DailyActivitiesPage() {
       </AlertDialog>
       )}
 
-      {/* ===== OCR Delete Dialog ===== */}
-      {!!ocrDeleteId && (
-      <AlertDialog open={!!ocrDeleteId} onOpenChange={(open) => !open && setOcrDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除OH卡梳理</AlertDialogTitle>
-            <AlertDialogDescription>确定要删除这条OH卡梳理记录吗？此操作不可撤销。</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleOcrDelete}>删除</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      )}
-
-      {/* ===== Salon Materials Dialog ===== */}
-      {materialsDialogOpen && (
-      <Dialog open={materialsDialogOpen} onOpenChange={(open) => { if (!open) setMaterialsDialogOpen(false) }}>
-        <DialogContent className="max-w-md p-0 gap-0">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b flex flex-row items-center justify-between">
-            <DialogTitle className="text-[15px]">资料管理</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
-            {(materialsRecord?.materials || []).length === 0 ? (
-              <p className="text-[12px] text-[#8f959e] text-center py-4">暂无资料</p>
-            ) : (
-              <div className="space-y-2">
-                {(materialsRecord?.materials || []).map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-gray-50 rounded px-3 py-2">
-                    <File className="h-4 w-4 text-[#8f959e] shrink-0" />
-                    <span className="text-[12px] text-[#2b2f36] truncate flex-1">{m.name || m.url.split("/").pop() || "文件"}</span>
-                    <a href={m.url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 text-[#8f959e] hover:text-[#3370ff]" /></a>
-                    <button onClick={() => handleDeleteMaterial(m.url.split("/").pop() || "")}><Trash2 className="h-4 w-4 text-destructive" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <label className="flex items-center justify-center gap-2 h-10 rounded-md border border-dashed border-[#e8e8e8] text-[12px] text-[#8f959e] cursor-pointer hover:bg-[#f7f8fa]">
-              <FileUp className="h-3.5 w-3.5" />
-              {uploading ? "上传中..." : "上传文件"}
-              <input type="file" className="hidden" onChange={handleUploadMaterial} disabled={uploading} />
-            </label>
-          </div>
-        </DialogContent>
-      </Dialog>
-      )}
-
-      {/* ===== GCS Materials Dialog ===== */}
-      {gcsMaterialsDialogOpen && (
-      <Dialog open={gcsMaterialsDialogOpen} onOpenChange={(open) => { if (!open) setGcsMaterialsDialogOpen(false) }}>
-        <DialogContent className="max-w-md p-0 gap-0">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b flex flex-row items-center justify-between">
-            <DialogTitle className="text-[15px]">资料管理</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
-            {(gcsMaterialsRecord?.materials || []).length === 0 ? (
-              <p className="text-[12px] text-[#8f959e] text-center py-4">暂无资料</p>
-            ) : (
-              <div className="space-y-2">
-                {(gcsMaterialsRecord?.materials || []).map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-gray-50 rounded px-3 py-2">
-                    <File className="h-4 w-4 text-[#8f959e] shrink-0" />
-                    <span className="text-[12px] text-[#2b2f36] truncate flex-1">{m.name || m.url.split("/").pop() || "文件"}</span>
-                    <a href={m.url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 text-[#8f959e] hover:text-[#3370ff]" /></a>
-                    <button onClick={() => handleDeleteGcsMaterial(m.url.split("/").pop() || "")}><Trash2 className="h-4 w-4 text-destructive" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <label className="flex items-center justify-center gap-2 h-10 rounded-md border border-dashed border-[#e8e8e8] text-[12px] text-[#8f959e] cursor-pointer hover:bg-[#f7f8fa]">
-              <FileUp className="h-3.5 w-3.5" />
-              {uploading ? "上传中..." : "上传文件"}
-              <input type="file" className="hidden" onChange={handleUploadGcsMaterial} disabled={uploading} />
-            </label>
-          </div>
-        </DialogContent>
-      </Dialog>
-      )}
-
-      {/* ===== ICS Materials Dialog ===== */}
-      {icsMaterialsDialogOpen && (
-      <Dialog open={icsMaterialsDialogOpen} onOpenChange={(open) => { if (!open) setIcsMaterialsDialogOpen(false) }}>
-        <DialogContent className="max-w-md p-0 gap-0">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b flex flex-row items-center justify-between">
-            <DialogTitle className="text-[15px]">资料管理</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
-            {(icsMaterialsRecord?.materials || []).length === 0 ? (
-              <p className="text-[12px] text-[#8f959e] text-center py-4">暂无资料</p>
-            ) : (
-              <div className="space-y-2">
-                {(icsMaterialsRecord?.materials || []).map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-gray-50 rounded px-3 py-2">
-                    <File className="h-4 w-4 text-[#8f959e] shrink-0" />
-                    <span className="text-[12px] text-[#2b2f36] truncate flex-1">{m.name || m.url.split("/").pop() || "文件"}</span>
-                    <a href={m.url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 text-[#8f959e] hover:text-[#3370ff]" /></a>
-                    <button onClick={() => handleDeleteIcsMaterial(m.url.split("/").pop() || "")}><Trash2 className="h-4 w-4 text-destructive" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <label className="flex items-center justify-center gap-2 h-10 rounded-md border border-dashed border-[#e8e8e8] text-[12px] text-[#8f959e] cursor-pointer hover:bg-[#f7f8fa]">
-              <FileUp className="h-3.5 w-3.5" />
-              {uploading ? "上传中..." : "上传文件"}
-              <input type="file" className="hidden" onChange={handleUploadIcsMaterial} disabled={uploading} />
-            </label>
-          </div>
-        </DialogContent>
-      </Dialog>
-      )}
-
-      {/* ===== OCR Materials Dialog ===== */}
-      {ocrMaterialsDialogOpen && (
-      <Dialog open={ocrMaterialsDialogOpen} onOpenChange={(open) => { if (!open) setOcrMaterialsDialogOpen(false) }}>
-        <DialogContent className="max-w-md p-0 gap-0">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b flex flex-row items-center justify-between">
-            <DialogTitle className="text-[15px]">资料管理</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
-            {(ocrMaterialsRecord?.materials || []).length === 0 ? (
-              <p className="text-[12px] text-[#8f959e] text-center py-4">暂无资料</p>
-            ) : (
-              <div className="space-y-2">
-                {(ocrMaterialsRecord?.materials || []).map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-gray-50 rounded px-3 py-2">
-                    <File className="h-4 w-4 text-[#8f959e] shrink-0" />
-                    <span className="text-[12px] text-[#2b2f36] truncate flex-1">{m.name || m.url.split("/").pop() || "文件"}</span>
-                    <a href={m.url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 text-[#8f959e] hover:text-[#3370ff]" /></a>
-                    <button onClick={() => handleDeleteOcrMaterial(m.url.split("/").pop() || "")}><Trash2 className="h-4 w-4 text-destructive" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <label className="flex items-center justify-center gap-2 h-10 rounded-md border border-dashed border-[#e8e8e8] text-[12px] text-[#8f959e] cursor-pointer hover:bg-[#f7f8fa]">
-              <FileUp className="h-3.5 w-3.5" />
-              {uploading ? "上传中..." : "上传文件"}
-              <input type="file" className="hidden" onChange={handleUploadOcrMaterial} disabled={uploading} />
-            </label>
-          </div>
-        </DialogContent>
-      </Dialog>
-      )}
-
-      {/* ===== Warning Dialog ===== */}
-      {warningOpen && (
-      <AlertDialog open={warningOpen} onOpenChange={setWarningOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>操作提示</AlertDialogTitle>
-            <AlertDialogDescription>{warningMsg}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setWarningOpen(false)}>知道了</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      )}
-
-      {/* ===== 空间未配置提示 ===== */}
-      <AlertDialog open={noSpacesDialogOpen} onOpenChange={setNoSpacesDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>提示</AlertDialogTitle>
-            <AlertDialogDescription>需要先配置空间，才能配置活动和设置主题。</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setNoSpacesDialogOpen(false); navigate("/courses/spaces") }}>
-              前往配置
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

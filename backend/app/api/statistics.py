@@ -2,7 +2,7 @@
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.api.customer_detail import _build_activities, _build_payment_records
 from app.models.customer import FollowUpStatus
@@ -11,6 +11,7 @@ from app.services import (
     course_service,
     course_type_service,
     customer_service,
+    customer_tag_service,
     emotional_release_service,
     emotional_release_session_service,
     energy_knot_service,
@@ -22,7 +23,6 @@ from app.services import (
     member_identity_service,
     membership_card_service,
     oh_card_reading_service,
-    oh_card_reading_session_service,
     organization_service,
     other_project_service,
     visit_service,
@@ -386,7 +386,7 @@ def get_details(
         "emotional-releases": "情绪释放",
         "energy-knots": "能量结",
         "internal-courses": "内部课程",
-        "oh-card-readings": "OH卡解读",
+        "oh-card-readings": "OH卡诊断",
         "other-projects": "其他项目",
     }
     services = [
@@ -564,7 +564,7 @@ PRODUCT_TYPE_MAP = {
     "membership-cards": "会员卡",
     "group-cases": "觉醒游戏",
     "emotional-releases": "情绪释放",
-    "oh-card-readings": "OH卡梳理",
+    "oh-card-readings": "OH卡诊断",
     "energy-knots": "能量结",
     "internal-courses": "内部课程",
     "other-projects": "其他项目",
@@ -628,7 +628,7 @@ def get_products(
     type_counts: dict[str, int] = {v: 0 for v in PRODUCT_TYPE_MAP.values()}
     total_count = 0
 
-    # 总购买次数（觉醒游戏、情绪释放、OH卡梳理 的 purchase_count 累加）
+    # 总购买次数（觉醒游戏、情绪释放、OH卡诊断 的 purchase_count 累加）
     total_purchase_count = 0
 
     # 按产品类型汇总成交人数（按 customer_id 去重）
@@ -703,12 +703,17 @@ def get_products(
                 total_amount += amount
                 type_counts[label] += 1
                 total_count += 1
-                # 购买次数（觉醒游戏、情绪释放、OH卡梳理、能量结有 purchase_count 字段；其他项目用 total_count，null 记为 1）
-                if type_name in ("group-cases", "emotional-releases", "oh-card-readings", "energy-knots"):
+                # 购买次数（觉醒游戏、情绪释放、能量结有 purchase_count 字段；OH卡诊断用 diagnosis_duration；其他项目用 total_count，null 记为 1）
+                if type_name in ("group-cases", "emotional-releases", "energy-knots"):
                     pc = getattr(r, "purchase_count", 0) or 0
                     total_purchase_count += pc
                     if include_in_daily:
                         daily_purchase_count[deal_date] += pc
+                elif type_name == "oh-card-readings":
+                    dd = getattr(r, "diagnosis_duration", 0) or 0
+                    total_purchase_count += dd
+                    if include_in_daily:
+                        daily_purchase_count[deal_date] += dd
                 elif type_name == "other-projects":
                     pc = getattr(r, "total_count", None) or 1
                     total_purchase_count += pc
@@ -962,7 +967,7 @@ def get_product_details(
             "membership-cards": "会员卡",
             "group-cases": "觉醒游戏",
             "emotional-releases": "情绪释放",
-            "oh-card-readings": "OH卡梳理",
+            "oh-card-readings": "OH卡诊断",
             "energy-knots": "能量结",
             "internal-courses": "内部课程",
             "other-projects": "其他项目",
@@ -1024,12 +1029,15 @@ def get_product_details(
                             closers_info = [{"name": closer_name, "amount": amount}]
                         else:
                             closers_info = []
+                        diagnosis_duration = getattr(r, "diagnosis_duration", None)
                         records.append({
                             "nickname": c.nickname if c else (customer_id or "-"),
                             "type": TYPE_LABELS.get(type_name, type_name),
                             "name": getattr(r, "card_type", None) or getattr(r, "project_name", None) or getattr(r, "course_type", None) or "",
                             "amount": amount,
                             "purchase_count": getattr(r, "purchase_count", None),
+                            "diagnosis_duration": diagnosis_duration,
+                            "notes": getattr(r, "notes", None) or "",
                             "closers": closers_info,
                         })
         return {"data": records}
@@ -1408,7 +1416,6 @@ COURSE_ACTIVITY_TYPES = (
     ("class", "沙龙活动", class_record_service.list_records),
     ("gcs", "觉醒游戏", group_case_session_service.list_sessions),
     ("ers", "情绪释放", emotional_release_session_service.list_sessions),
-    ("ocr", "OH卡梳理", oh_card_reading_session_service.list_sessions),
     ("eks", "能量结", energy_knot_session_service.list_sessions),
     ("ics", "内部课程", internal_course_session_service.list_sessions),
 )
@@ -2050,12 +2057,28 @@ def get_referral_statistics(
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人昵称"),
     member_types: str | None = Query(None, description="会员类型筛选，逗号分隔多选"),
+    tag_ids: str | None = Query(None, description="客户标签 ID，逗号分隔多选"),
+    tag_match: str = Query("any", pattern="^(any|all)$", description="多标签匹配方式"),
+    request: Request = None,
 ):
     """获取引流统计：跟进状态分布、变化趋势和人员明细。"""
     date_from, date_to = _get_date_range(date_from, date_to)
     type_filter = _parse_member_types(member_types)
     status_names = [status.value for status in FollowUpStatus]
     all_customers = customer_service.list_customers()
+    matched_tag_customer_ids: set[str] | None = None
+    if isinstance(tag_ids, str) and tag_ids:
+        requested_tag_ids = [tag_id.strip() for tag_id in tag_ids.split(",") if tag_id.strip()]
+        actor_id = getattr(getattr(request, "state", None), "user_id", "")
+        resolved_tag_match = tag_match if isinstance(tag_match, str) else "any"
+        try:
+            matched_tag_customer_ids = customer_tag_service.customer_ids_for_tags(
+                actor_id,
+                requested_tag_ids,
+                resolved_tag_match,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
     # 引流人选项：只统计选定引流日期范围内有数据的引流人，按人数降序排列
     referrer_counts: dict[str, int] = defaultdict(int)
     for customer in all_customers:
@@ -2079,6 +2102,7 @@ def get_referral_statistics(
         for customer in all_customers
         if (not referrer or (customer.referrer or "").strip() == referrer)
         and (not type_filter or (customer.member_type or "") in type_filter)
+        and (matched_tag_customer_ids is None or customer.id in matched_tag_customer_ids)
     ]
 
     customers_by_date: dict[str, dict[str, int]] = defaultdict(

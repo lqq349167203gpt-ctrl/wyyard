@@ -6,11 +6,12 @@ const { DEV } = require('./utils/config')
 
 // 页面权限别名（与 PC 端 page-permissions.ts 保持一致）
 var PERMISSION_ALIASES = {
+  'daily-report': ['statistics'],
   'class-records': ['class-records-visitors', 'class-records-activities', 'class-records-arrival'],
   'daily-activities': ['class-records-activities'],
-  'payment': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses'],
-  'payment-deductions': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses'],
-  'payment-refunds': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses'],
+  'payment': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses', 'tea-seat-fees', 'offline-courses', 'other-projects'],
+  'payment-deductions': ['membership-cards', 'group-cases', 'emotional-releases', 'energy-knots', 'internal-courses', 'other-projects'],
+  'payment-refunds': ['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings', 'energy-knots', 'internal-courses', 'tea-seat-fees', 'other-projects'],
 }
 
 App({
@@ -38,6 +39,25 @@ App({
       }
       this.globalData._loginReady = Promise.resolve()
     }
+  },
+
+  onShow() {
+    if (!this.globalData.devMode && this.globalData.token) {
+      this.refreshPermissions().catch(() => {})
+    }
+  },
+
+  async refreshPermissions() {
+    const user = this.globalData.currentUser
+    if (!user || !user.role || user.role === '超级管理员') {
+      return this.globalData.permissions || []
+    }
+    const { positionPermissionApi } = require('./utils/api')
+    const result = await positionPermissionApi.get(user.role)
+    const permissions = (result && result.pages) || []
+    this.globalData.permissions = permissions
+    wx.setStorageSync('userPermissions', permissions)
+    return permissions
   },
 
   async _devAutoLogin() {

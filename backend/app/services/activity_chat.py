@@ -15,7 +15,6 @@ from app.services import (
     energy_knot_session_service,
     group_case_session_service,
     internal_course_session_service,
-    oh_card_reading_session_service,
     operation_log_service,
 )
 from app.services.activity_ai_config_service import get_config as get_activity_ai_config
@@ -57,12 +56,6 @@ TYPE_MAP = {
         "model_module": "app.models.internal_course_session",
         "model_name": "InternalCourseSessionCreate",
     },
-    "ocr": {
-        "label": "OH卡",
-        "service": oh_card_reading_session_service,
-        "model_module": "app.models.oh_card_reading_session",
-        "model_name": "OhCardReadingSessionCreate",
-    },
 }
 
 
@@ -97,7 +90,7 @@ def _log_activity(content: str, method: str = "POST"):
 
 
 def _find_all_activities(date: str, space_id: str = ""):
-    """查询所有 6 种活动类型，返回统一格式列表"""
+    """查询所有 5 种活动类型，返回统一格式列表"""
     results = []
     sid = space_id or None
 
@@ -158,18 +151,6 @@ def _find_all_activities(date: str, space_id: str = ""):
             "id": r.id, "name": r.course_name,
             "start_time": r.start_time, "end_time": r.end_time,
             "teacher_ids": r.teacher_ids, "participant_ids": r.participant_ids,
-        })
-
-    # OH卡
-    for r in oh_card_reading_session_service.list_sessions(date=date):
-        if sid and r.space_id and r.space_id != sid:
-            continue
-        results.append({
-            "type": "ocr", "type_label": "OH卡",
-            "id": r.id, "name": r.name or f"OH卡·{r.owner_name}",
-            "start_time": r.start_time, "end_time": r.end_time,
-            "teacher_ids": r.teacher_ids, "participant_ids": r.participant_ids,
-            "owner_name": r.owner_name,
         })
 
     results.sort(key=lambda x: x.get("start_time") or "")
@@ -316,13 +297,13 @@ def create_activity(
     """创建一个新的活动。注意：必须先确认活动类型和老师才能创建，不要自己猜测类型。
 
     Args:
-        activity_type: 一级分类，可选值：class(沙龙), gcs(觉醒游戏), ers(情绪释放), eks(能量结), ics(内部课程), ocr(OH卡)
+        activity_type: 一级分类，可选值：class(沙龙), gcs(觉醒游戏), ers(情绪释放), eks(能量结), ics(内部课程)
         name: 活动名称（如"颂钵"、"读书会"）
         course_type: 具体子类型名称（如"颂钵"、"读书会"、"疗愈师课程"），class 和 ics 类型必须填
         start_time: 开始时间，格式 HH:MM（如"14:00"），必须提供
         end_time: 结束时间，格式 HH:MM（如"16:00"）
         teacher_name: 老师/主持人昵称（如"小明"），必须提供
-        owner_name: 案主昵称（觉醒、情绪释放、OH卡、能量结类型需要）
+        owner_name: 案主昵称（觉醒、情绪释放、能量结类型需要）
         is_public_welfare: 是否公益（沙龙类型可选，默认否）
         activity_date: 活动日期，可传用户原话（如"上周五"）或 YYYY-MM-DD，不填则用当前选中日期
     """
@@ -352,7 +333,7 @@ def create_activity(
     if not (teacher_name or "").strip():
         return json.dumps({"ok": False, "reason": "missing_teacher", "name": name}, ensure_ascii=False)
 
-    if activity_type in ("gcs", "ers", "eks", "ocr") and not (owner_name or "").strip():
+    if activity_type in ("gcs", "ers", "eks") and not (owner_name or "").strip():
         return json.dumps(
             {"ok": False, "reason": "missing_owner", "name": name, "type": TYPE_MAP[activity_type]["label"]},
             ensure_ascii=False,
@@ -459,18 +440,6 @@ def create_activity(
             )
             _log_activity(f"新增内部课程 {name}", method="POST")
             return json.dumps({"ok": True, "action": "create", "type": "内部课程", "name": name, "id": record.id}, ensure_ascii=False)
-
-        elif activity_type == "ocr":
-            record = oh_card_reading_session_service.create_session(
-                __import__("app.models.oh_card_reading_session", fromlist=["OhCardReadingSessionCreate"]).OhCardReadingSessionCreate(
-                    date=date, start_time=start_time or None, end_time=end_time or None,
-                    name=name, owner_id=owner_id, owner_name=owner_name_resolved,
-                    teacher_ids=teacher_ids,
-                    space_id=space_id, space_name=space_name,
-                )
-            )
-            _log_activity(f"新增OH卡 {name}", method="POST")
-            return json.dumps({"ok": True, "action": "create", "type": "OH卡", "name": name, "id": record.id}, ensure_ascii=False)
 
     except Exception as e:
         return json.dumps({"ok": False, "reason": "create_error", "error": str(e)[:200]}, ensure_ascii=False)
@@ -777,6 +746,8 @@ async def activity_chat(message: str, history: list, date: str, space_id: str, o
     for _round in range(5):
         if not response.tool_calls:
             break
+        # 先把 assistant 的 tool_use 响应加入历史，否则 tool 消息前没有对应的 assistant 消息，API 会报 400
+        messages.append(response)
         for tc in response.tool_calls:
             tool_fn = ACTIVITY_CHAT_TOOL_MAP.get(tc["name"])
             if tool_fn:

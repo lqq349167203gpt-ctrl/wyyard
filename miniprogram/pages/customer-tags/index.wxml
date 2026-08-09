@@ -1,0 +1,85 @@
+<view class="page">
+  <view class="loading" wx:if="{{!permissionReady}}">权限同步中...</view>
+
+  <view class="permission-empty" wx:elif="{{!hasPermission}}">
+    <view class="empty-line"></view>
+    <text>当前账号暂无客户标签配置权限</text>
+  </view>
+
+  <block wx:else>
+    <view class="header-card">
+      <view class="header-copy">
+        <text class="header-title">客户标签</text>
+        <text class="header-hint">公共标签团队共享，我的标签仅自己可见</text>
+      </view>
+      <button class="create-button" bindtap="onCreate">新建标签</button>
+    </view>
+
+    <view class="filter-card">
+      <view class="filter-item {{scopeFilter === 'all' ? 'active' : ''}}" data-scope="all" bindtap="onFilterChange">全部</view>
+      <view class="filter-item {{scopeFilter === 'public' ? 'active' : ''}}" data-scope="public" bindtap="onFilterChange">公共标签</view>
+      <view class="filter-item {{scopeFilter === 'private' ? 'active' : ''}}" data-scope="private" bindtap="onFilterChange">我的标签</view>
+    </view>
+
+    <view class="tag-list" wx:if="{{!loading && filteredTags.length}}">
+      <view class="tag-card" wx:for="{{filteredTags}}" wx:key="id">
+        <view class="tag-main">
+          <view class="tag-heading">
+            <text class="tag-name">{{item.name}}</text>
+            <text class="scope-badge">{{item.scope === 'public' ? '团队共享' : '仅自己'}}</text>
+          </view>
+          <text class="tag-description" wx:if="{{item.description}}">{{item.description}}</text>
+          <view class="tag-meta">
+            <text>使用 {{item.usage_count || 0}} 人</text>
+            <text>{{item.created_by_name || '-'}}</text>
+          </view>
+        </view>
+        <view class="tag-actions">
+          <text class="action-edit" bindtap="onEdit" data-tag="{{item}}">编辑</text>
+          <text class="action-archive" bindtap="onArchive" data-id="{{item.id}}" data-name="{{item.name}}">停用</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="loading" wx:if="{{loading}}">加载中...</view>
+    <view class="empty-state" wx:if="{{!loading && !filteredTags.length}}">
+      <view class="empty-line"></view>
+      <text>暂无标签</text>
+    </view>
+  </block>
+
+  <view class="editor-mask" wx:if="{{showEditor}}" bindtap="onCloseEditor"></view>
+  <view class="editor-popup" wx:if="{{showEditor}}">
+    <view class="editor-header">
+      <text class="editor-title">{{editingId ? '编辑标签' : '新建标签'}}</text>
+      <text class="editor-close" bindtap="onCloseEditor">关闭</text>
+    </view>
+    <view class="editor-body">
+      <view class="form-group">
+        <text class="form-label">标签名称</text>
+        <input class="form-input" maxlength="30" placeholder="例如：高意向、亲子需求" value="{{formName}}" bindinput="onNameInput" />
+      </view>
+      <view class="form-group" wx:if="{{!editingId}}">
+        <text class="form-label">可见范围</text>
+        <view class="scope-options">
+          <view class="scope-option {{formScope === 'public' ? 'active' : ''}}" data-scope="public" bindtap="onScopeChange">
+            <text class="scope-option-title">公共标签</text>
+            <text class="scope-option-hint">团队成员均可查看</text>
+          </view>
+          <view class="scope-option {{formScope === 'private' ? 'active' : ''}}" data-scope="private" bindtap="onScopeChange">
+            <text class="scope-option-title">我的标签</text>
+            <text class="scope-option-hint">只有自己可以查看</text>
+          </view>
+        </view>
+      </view>
+      <view class="form-group">
+        <text class="form-label">说明（选填）</text>
+        <textarea class="form-textarea" maxlength="200" placeholder="说明这个标签适合标记哪类客户" value="{{formDescription}}" bindinput="onDescriptionInput"></textarea>
+      </view>
+    </view>
+    <view class="editor-footer">
+      <button class="cancel-button" bindtap="onCloseEditor" disabled="{{saving}}">取消</button>
+      <button class="save-button" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保存</button>
+    </view>
+  </view>
+</view>

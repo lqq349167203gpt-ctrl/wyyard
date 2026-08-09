@@ -1,6 +1,9 @@
 """账号 API 测试"""
-import pytest
 import uuid
+
+import pytest
+
+from app.services import position_permission_service
 
 
 def _unique(suffix=""):
@@ -89,6 +92,54 @@ class TestAccountCRUD:
     def test_delete_account_not_found(self, client):
         resp = client.delete("/api/accounts/nonexistent-id")
         assert resp.status_code == 404
+
+    def test_account_manager_can_load_and_manage_regular_accounts_but_not_superadmins(self, client, make_account):
+        previous_permissions = position_permission_service.get_permissions("管理员")
+        manager, u, manager_password = make_account()
+        created_account_id = ""
+        try:
+            position_permission_service.set_permissions(
+                "管理员",
+                sorted(set(previous_permissions) | {"position-management"}),
+            )
+            login_resp = _login(client, f"user_{u}", manager_password)
+            manager_headers = {"Authorization": f"Bearer {login_resp.json()['token']}"}
+
+            list_resp = client.get("/api/accounts", headers=manager_headers)
+            assert list_resp.status_code == 200
+            assert any(account["id"] == manager["id"] for account in list_resp.json())
+
+            regular_u = _unique()
+            create_resp = client.post("/api/accounts", json={
+                "owner": f"manager_owner_{regular_u}",
+                "role": "管理员",
+                "username": f"manager_user_{regular_u}",
+                "password": _password(regular_u),
+                "enabled": True,
+            }, headers=manager_headers)
+            assert create_resp.status_code == 200
+            created_account_id = create_resp.json()["id"]
+
+            forbidden_resp = client.post("/api/accounts", json={
+                "owner": f"super_owner_{regular_u}",
+                "role": "超级管理员",
+                "username": f"super_user_{regular_u}",
+                "password": _password(regular_u),
+                "enabled": True,
+            }, headers=manager_headers)
+            assert forbidden_resp.status_code == 403
+
+            system_account = next(account for account in list_resp.json() if account["role"] == "超级管理员")
+            update_resp = client.patch(
+                f"/api/accounts/{system_account['id']}",
+                json={"enabled": False},
+                headers=manager_headers,
+            )
+            assert update_resp.status_code == 403
+        finally:
+            position_permission_service.set_permissions("管理员", previous_permissions)
+            if created_account_id:
+                client.delete(f"/api/accounts/{created_account_id}")
 
 
 class TestLogin:

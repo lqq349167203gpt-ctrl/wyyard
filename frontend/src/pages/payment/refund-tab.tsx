@@ -25,8 +25,9 @@ const PROJECT_TYPE_OPTIONS = [
   { value: "membership-cards", label: "会员卡" },
   { value: "group-cases", label: "觉醒游戏" },
   { value: "emotional-releases", label: "情绪释放" },
-  { value: "oh-card-readings", label: "OH卡梳理" },
+  { value: "oh-card-readings", label: "OH卡诊断" },
   { value: "energy-knots", label: "能量结" },
+  { value: "tea-seat-fees", label: "茶位费" },
   { value: "internal-courses", label: "内部课程" },
   { value: "other-projects", label: "其他项目" },
 ]
@@ -35,10 +36,22 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "membership-cards": "会员卡",
   "group-cases": "觉醒游戏",
   "emotional-releases": "情绪释放",
-  "oh-card-readings": "OH卡梳理",
+  "oh-card-readings": "OH卡诊断",
   "energy-knots": "能量结",
+  "tea-seat-fees": "茶位费",
   "internal-courses": "内部课程",
   "other-projects": "其他项目",
+}
+
+type RefundableItem = {
+  id: string
+  name: string
+  paid_amount: number
+  detail?: string
+  card_type?: string
+  project_type: string
+  project_type_label: string
+  selection_key: string
 }
 
 export function RefundTab() {
@@ -76,12 +89,12 @@ export function RefundTab() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [customerId, setCustomerId] = useState("")
   const [customerName, setCustomerName] = useState("")
-  const [projectType, setProjectType] = useState("")
-  const [availableItems, setAvailableItems] = useState<{ id: string; name: string; paid_amount: number; detail?: string; card_type?: string }[]>([])
-  const [selectedItemId, setSelectedItemId] = useState("")
+  const [availableItems, setAvailableItems] = useState<RefundableItem[]>([])
+  const [selectedItemKey, setSelectedItemKey] = useState("")
   const [refundAmount, setRefundAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
+  const availableItemsRequestRef = useRef(0)
 
   // 编辑弹窗
   const [editTarget, setEditTarget] = useState<ProjectRefund | null>(null)
@@ -134,65 +147,59 @@ export function RefundTab() {
     }).catch(() => {})
   }, [permReady])
 
-  // 选中用户后
-  const handleSelectCustomer = useCallback((c: Customer) => {
+  // 选中用户后：并行查询全部类型，合并所有可退费项目
+  const handleSelectCustomer = useCallback(async (c: Customer) => {
+    const requestId = ++availableItemsRequestRef.current
     setCustomerId(c.id)
     setCustomerName(c.nickname)
-    setProjectType("")
-    setSelectedItemId("")
+    setSelectedItemKey("")
     setAvailableItems([])
+    setLoadingItems(true)
+    const groupedItems = await Promise.all(PROJECT_TYPE_OPTIONS.map(async (option) => {
+      try {
+        const items = await projectRefundApi.getAvailableItems(c.id, option.value)
+        return items.map((item) => ({
+          ...item,
+          project_type: option.value,
+          project_type_label: option.label,
+          selection_key: `${option.value}:${item.id}`,
+        }))
+      } catch {
+        return []
+      }
+    }))
+    if (requestId !== availableItemsRequestRef.current) return
+    setAvailableItems(groupedItems.flat())
+    setLoadingItems(false)
   }, [])
 
   const handleClearCustomer = useCallback(() => {
+    availableItemsRequestRef.current += 1
     setCustomerId("")
     setCustomerName("")
-    setProjectType("")
-    setSelectedItemId("")
+    setSelectedItemKey("")
     setAvailableItems([])
+    setLoadingItems(false)
   }, [])
 
-  // 选择项目类型后加载可退费项目
-  const handleProjectTypeChange = useCallback(async (type: string) => {
-    setProjectType(type)
-    setSelectedItemId("")
-    setAvailableItems([])
-    setRefundAmount("")
-    if (!customerId || !type) return
-    setLoadingItems(true)
-    try {
-      const items = await projectRefundApi.getAvailableItems(customerId, type)
-      setAvailableItems(items)
-    } catch {
-      setAvailableItems([])
-    }
-    setLoadingItems(false)
-  }, [customerId])
-
-  const selectedItem = availableItems.find(i => i.id === selectedItemId)
-
-  // 选中项目后自动填充全额
-  const handleSelectItem = useCallback((id: string) => {
-    setSelectedItemId(id)
-    const item = availableItems.find(i => i.id === id)
-    if (item) setRefundAmount(String(item.paid_amount))
-  }, [availableItems])
+  const selectedItem = availableItems.find(i => i.selection_key === selectedItemKey)
 
   const handleRefund = async () => {
-    if (!customerId || !selectedItemId || !projectType) return
+    if (!customerId || !selectedItem) return
     setSubmitting(true)
     try {
       await projectRefundApi.create({
         customer_id: customerId,
-        project_type: projectType,
-        project_id: selectedItemId,
+        project_type: selectedItem.project_type,
+        project_id: selectedItem.id,
         refund_amount: parseFloat(refundAmount) || 0,
         created_by: currentUserName,
       })
       setDialogOpen(false)
+      availableItemsRequestRef.current += 1
       setCustomerId("")
       setCustomerName("")
-      setProjectType("")
-      setSelectedItemId("")
+      setSelectedItemKey("")
       setAvailableItems([])
       setRefundAmount("")
       refreshRefunds()
@@ -359,18 +366,19 @@ export function RefundTab() {
       <Dialog open={dialogOpen} onOpenChange={(open) => {
         setDialogOpen(open)
         if (!open) {
-          setCustomerId(""); setCustomerName(""); setProjectType("")
-          setSelectedItemId(""); setAvailableItems([]); setRefundAmount("")
+          availableItemsRequestRef.current += 1
+          setCustomerId(""); setCustomerName(""); setSelectedItemKey("")
+          setAvailableItems([]); setLoadingItems(false); setRefundAmount("")
         }
       }}>
-        <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
+        <DialogContent className="w-[400px] max-w-[90vw] p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">项目退费</DialogTitle>
+            <DialogTitle className="text-[14px] font-normal">项目退费</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             {/* 用户搜索 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">用户</span>
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">用户</span>
               <CustomerSearchInput
                 customers={customers}
                 value={customerName || ""}
@@ -382,46 +390,36 @@ export function RefundTab() {
               />
             </div>
 
-            {/* 项目类型 */}
-            <div className="grid grid-cols-[70px_1fr] items-center gap-[14px]">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">类型</span>
+            {/* 可退项目 */}
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">可退项目</span>
               {!customerId ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">请先选择用户</div>
+              ) : loadingItems ? (
+                <div className="h-8 flex items-center text-[12px] text-[#8f959e]">正在加载可退项目...</div>
+              ) : availableItems.length === 0 ? (
+                <div className="h-8 flex items-center text-[12px] text-[#8f959e]">该用户暂无可退项目</div>
               ) : (
                 <SelectDropdown
-                  value={projectType}
-                  options={PROJECT_TYPE_OPTIONS}
-                  placeholder="选择项目类型"
-                  onChange={handleProjectTypeChange}
+                  value={selectedItemKey}
+                  options={availableItems.map((item) => ({
+                    value: item.selection_key,
+                    label: `${item.project_type_label} · ${item.name} · ¥${item.paid_amount}`,
+                  }))}
+                  placeholder="请选择可退项目"
+                  onChange={(key) => {
+                    setSelectedItemKey(key)
+                    const item = availableItems.find(i => i.selection_key === key)
+                    if (item) setRefundAmount(String(item.paid_amount))
+                  }}
                 />
               )}
             </div>
 
-            {/* 选择项目 */}
-            {projectType && (
-              <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">项目</span>
-                {loadingItems ? (
-                  <div className="h-8 flex items-center text-[12px] text-[#8f959e]">加载中...</div>
-                ) : availableItems.length === 0 ? (
-                  <div className="h-8 flex items-center text-[12px] text-[#8f959e]">该用户无可退费项目</div>
-                ) : (
-                  <SelectDropdown
-                    value={selectedItemId}
-                    options={availableItems.map((i) => ({
-                      value: i.id,
-                      label: `${i.name} - ¥${i.paid_amount}`,
-                    }))}
-                    placeholder="请选择项目"
-                    onChange={handleSelectItem}
-                  />
-                )}
-              </div>
-            )}
-
             {/* 项目详情 */}
             {selectedItem && (
               <div className="bg-[#f7f8fa] rounded-md p-3 text-[12px] space-y-1">
+                <div className="flex justify-between"><span className="text-[#8f959e]">项目类型</span><span>{selectedItem.project_type_label}</span></div>
                 <div className="flex justify-between"><span className="text-[#8f959e]">项目名称</span><span>{selectedItem.name}</span></div>
                 <div className="flex justify-between"><span className="text-[#8f959e]">已付金额</span><span>¥{selectedItem.paid_amount.toLocaleString()}</span></div>
               </div>
@@ -429,7 +427,7 @@ export function RefundTab() {
 
             {/* 退费金额 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">金额</span>
+              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">金额</span>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -442,7 +440,7 @@ export function RefundTab() {
 
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button size="sm" onClick={handleRefund} disabled={submitting || !customerId || !selectedItemId || !refundAmount}>
+              <Button size="sm" onClick={handleRefund} disabled={submitting || !customerId || !selectedItem || !refundAmount}>
                 {submitting ? "退费中..." : "确认退费"}
               </Button>
             </div>

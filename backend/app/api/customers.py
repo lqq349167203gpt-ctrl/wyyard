@@ -10,6 +10,7 @@ from app.models.base import StrictBaseModel
 from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerUpdate
 from app.services import (
     customer_service,
+    customer_tag_service,
     emotional_release_service,
     energy_knot_service,
     group_case_service,
@@ -19,6 +20,7 @@ from app.services import (
     oh_card_reading_service,
     other_project_service,
     project_refund_service,
+    tea_seat_fee_service,
 )
 from app.services.chat_parser import generate_tags, parse_chat_log
 from app.services.excel_parser import parse_excel
@@ -59,6 +61,9 @@ def _fill_total_payment(customer_id: str) -> float:
     for r in oh_card_reading_service.list_readings():
         if r.customer_id == customer_id:
             total += r.amount
+    for t in tea_seat_fee_service.list_fees():
+        if t.customer_id == customer_id:
+            total += t.amount
     for p in other_project_service.list_projects():
         if p.customer_id == customer_id:
             total += p.fee
@@ -89,9 +94,12 @@ def _build_enriched_items(customers) -> list[dict]:
     # 内部课程
     for c in internal_course_service.list_courses():
         payment_map[c.customer_id] += c.price
-    # OH卡梳理
+    # OH卡诊断
     for r in oh_card_reading_service.list_readings():
         payment_map[r.customer_id] += r.amount
+    # 茶位费
+    for t in tea_seat_fee_service.list_fees():
+        payment_map[t.customer_id] += t.amount
     # 其他项目
     for p in other_project_service.list_projects():
         payment_map[p.customer_id] += p.fee
@@ -163,6 +171,7 @@ def _sort_customer_items(items: list[dict], sort_by: str, sort_order: str | None
 
 @router.get("")
 async def list_customers(
+    request: Request,
     page: int | None = Query(None, ge=1),
     page_size: int | None = Query(None, ge=1, le=100),
     nickname: str | None = Query(None),
@@ -170,6 +179,8 @@ async def list_customers(
     referrer: str | None = Query(None),
     referrer_handler: str | None = Query(None),
     member_types: str | None = Query(None),
+    tag_ids: str | None = Query(None),
+    tag_match: str = Query("any", pattern="^(any|all)$"),
     sort_by: str | None = Query(None),
     sort_order: str | None = Query(None),
 ):
@@ -189,6 +200,21 @@ async def list_customers(
         allowed = [m.strip() for m in member_types.split(",") if m.strip()]
         if allowed:
             items = [c for c in items if c.get("member_type") in allowed]
+    if tag_ids:
+        requested_tag_ids = [tag_id.strip() for tag_id in tag_ids.split(",") if tag_id.strip()]
+        try:
+            matched_customer_ids = customer_tag_service.customer_ids_for_tags(
+                getattr(request.state, "user_id", ""),
+                requested_tag_ids,
+                tag_match,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        items = [item for item in items if item["id"] in matched_customer_ids]
+
+    visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", ""))
+    for item in items:
+        item["customer_tags"] = visible_tags.get(item["id"], [])
 
     # Sort
     if sort_by and sort_by in _SORTABLE_FIELDS:

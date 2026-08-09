@@ -31,7 +31,6 @@ const DEFAULT_ACTIVITY_TYPES = [
   { value: "class", label: "沙龙活动" },
   { value: "gcs", label: "觉醒游戏" },
   { value: "ers", label: "情绪释放" },
-  { value: "ocr", label: "OH卡梳理" },
   { value: "eks", label: "能量结" },
   { value: "ics", label: "内部课程" },
 ]
@@ -396,8 +395,8 @@ export default function CourseStatisticsPage() {
   const dateRangeLabel = `${formatRangeDate(dateFrom)}~${formatRangeDate(dateTo)}`
 
   return (
-    <div className="min-h-full bg-[#f7f8fa] px-2.5 pb-6 pt-2.5">
-      <section className="mb-1.5 rounded-[4px] bg-white px-[22px] py-4">
+    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4">
+      <section className="rounded-xl bg-white px-[22px] py-4">
         <h1 className="mb-3 text-lg font-medium text-[#1f2329]">课程</h1>
 
         <div className="flex flex-col gap-2.5">
@@ -482,7 +481,7 @@ export default function CourseStatisticsPage() {
         </div>
       </section>
 
-      <section className="rounded-[4px] bg-white px-[22px] py-4">
+      <section className="rounded-xl bg-white px-[22px] py-4">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-[13px] font-medium text-[#2b2f36]">课程统计</h2>
@@ -589,8 +588,8 @@ export default function CourseStatisticsPage() {
         )}
       </section>
 
-      <section className="mt-1.5 grid grid-cols-1 gap-1.5 xl:grid-cols-2">
-        <div className="min-w-0 rounded-[4px] bg-white px-[22px] py-4 select-none *:outline-none *:focus:outline-none">
+      <section className="grid grid-cols-1 gap-1.5 xl:grid-cols-2">
+        <div className="min-w-0 rounded-xl bg-white px-[22px] py-4 select-none *:outline-none *:focus:outline-none">
           <div className="mb-[18px]">
             <div className="mb-2 text-[12px] text-[#4e535a]">
               <span className="font-medium">每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}课程变化</span>
@@ -711,7 +710,7 @@ export default function CourseStatisticsPage() {
           )}
         </div>
 
-        <div className="min-w-0 rounded-[4px] bg-white px-[22px] py-4 select-none *:outline-none *:focus:outline-none">
+        <div className="min-w-0 rounded-xl bg-white px-[22px] py-4 select-none *:outline-none *:focus:outline-none">
           <div className="mb-[18px]">
             <div className="mb-2 text-[12px] text-[#4e535a]">
               <span className="font-medium">老师课程与成交数据</span>
@@ -783,7 +782,7 @@ export default function CourseStatisticsPage() {
         </div>
       </section>
 
-      <section className="mt-1.5 overflow-hidden rounded-[4px] bg-white">
+      <section className="overflow-hidden rounded-xl bg-white">
         <div className="flex items-start justify-between gap-4 border-b border-[#f0f0f0] px-[22px] py-4">
           <div>
             <h2 className="text-[13px] font-medium text-[#2b2f36]">课程明细</h2>

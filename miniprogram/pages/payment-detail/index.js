@@ -14,6 +14,22 @@ function formatDuration(type, value) {
   return `${value}${unit}`
 }
 
+function formatDurationDisplay(halfHours) {
+  if (!halfHours) return ''
+  return (halfHours * 0.5) + '小时'
+}
+
+function calcOfflineExpiry(item) {
+  if (!item.effective_date || !item.validity_value) return ''
+  var eff = new Date(item.effective_date.slice(0, 10))
+  eff.setMonth(eff.getMonth() + item.validity_value)
+  eff.setDate(eff.getDate() - 1)
+  var y = eff.getFullYear()
+  var m = String(eff.getMonth() + 1).padStart(2, '0')
+  var d = String(eff.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + d
+}
+
 Page({
   data: {
     type: '',
@@ -61,8 +77,19 @@ Page({
       item._effectiveDate = formatDate(item.effective_date)
       item._expiryDate = formatDate(item.expiry_date)
       item._duration = formatDuration(item.duration_type, item.duration_value)
-      const isHealing = ['group_case', 'emotional_release', 'oh_card_reading', 'energy_knot'].includes(type)
-      if (isHealing) {
+      const isHealing = ['group_case', 'emotional_release', 'energy_knot'].includes(type)
+      const isOhCard = type === 'oh_card_reading'
+      if (isOhCard) {
+        item._durationDisplay = formatDurationDisplay(item.diagnosis_duration)
+        item._remaining = ''
+      } else if (type === 'tea_seat_fee') {
+        item._quantity = item.quantity || 1
+        item._remaining = ''
+      } else if (type === 'offline_course') {
+        item._validity = `${item.validity_value || 1} 个月`
+        item._expiryDate = calcOfflineExpiry(item)
+        item._remaining = ''
+      } else if (isHealing) {
         item._remaining = item.effective_remaining != null ? `${item.effective_remaining}次` : ''
       } else {
         item._remaining = item.remaining_count === null ? '不限次' : (item.remaining_count != null ? `${item.remaining_count}次` : '')

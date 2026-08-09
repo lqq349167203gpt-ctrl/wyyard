@@ -16,7 +16,6 @@ from app.services import (
     group_case_session_service,
     internal_course_session_service,
     membership_card_service,
-    oh_card_reading_session_service,
     project_deduction_service,
     space_service,
     visit_service,
@@ -32,7 +31,6 @@ OTHER_ACTIVITY_SERVICES = {
     "觉醒游戏": ("gcs", group_case_session_service),
     "情绪释放": ("ers", emotional_release_session_service),
     "能量结": ("eks", energy_knot_session_service),
-    "OH卡梳理": ("ocr", oh_card_reading_session_service),
 }
 
 SESSION_SERVICES = {
@@ -40,7 +38,6 @@ SESSION_SERVICES = {
     "ers": emotional_release_session_service,
     "eks": energy_knot_session_service,
     "ics": internal_course_session_service,
-    "ocr": oh_card_reading_session_service,
 }
 
 ACTIVITY_KEY_LABELS = {
@@ -49,7 +46,6 @@ ACTIVITY_KEY_LABELS = {
     "ers": "情绪释放",
     "eks": "能量结",
     "ics": "内部课程",
-    "ocr": "OH卡梳理",
 }
 
 
@@ -144,7 +140,7 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
     teacher_ids = d.get("teacher_ids", [])
     teacher_profiles = _get_teacher_profiles(teacher_ids, customer_map)
     leader_role_label = "老师" if teacher_profiles else ""
-    achiever_activity_types = {"gcs", "ers", "ocr"}
+    achiever_activity_types = {"gcs", "ers"}
     if (
         activity_type in achiever_activity_types
         and d.get("achiever_id")
@@ -828,7 +824,6 @@ def _enrich_activity_time(act: dict):
             "情绪释放": "emotional_release_session_service",
             "能量结": "energy_knot_session_service",
             "内部课程": "internal_course_session_service",
-            "OH卡梳理": "oh_card_reading_session_service",
         }
         svc_name = service_map.get(act_type)
         if svc_name:
@@ -983,7 +978,6 @@ def _build_special_project_usage_records(customer_id: str) -> list[dict]:
         ("group-cases", "觉醒游戏", group_case_session_service),
         ("emotional-releases", "情绪释放", emotional_release_session_service),
         ("energy-knots", "能量结", energy_knot_session_service),
-        ("oh-card-readings", "OH卡梳理", oh_card_reading_session_service),
     ]
     purchased_counts = {
         item.get("type"): item.get("total_purchased", 0)

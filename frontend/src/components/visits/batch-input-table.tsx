@@ -669,7 +669,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     />
                   </td>
                   <td className="px-1.5 py-1.5">
-                    <span className="text-[12px] text-[#2b2f36]">{row.member_type}</span>
+                    <span className="inline-block max-w-[80px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#2b2f36]">{row.member_type}</span>
                   </td>
                   <td className="px-1.5 py-1.5">
                     <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>

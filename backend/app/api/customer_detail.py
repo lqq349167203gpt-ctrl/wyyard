@@ -3,6 +3,7 @@
 汇总单个客户的所有业务数据
 """
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -20,9 +21,11 @@ from app.services import (
     internal_course_service,
     internal_course_session_service,
     membership_card_service,
+    offline_course_record_service,
+    offline_course_service,
     oh_card_reading_service,
-    oh_card_reading_session_service,
     other_project_service,
+    tea_seat_fee_service,
     visit_service,
 )
 
@@ -56,7 +59,8 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
         r.model_dump(mode="json")
         for r in healing_record_service.list_records(customer_id)
     ]
-    payment_records = _build_payment_records(customer_id)
+    payment_records = _build_payment_records(customer_id, date)
+    offline_course_records = _build_offline_course_records(customer_id)
     visit_records = [
         r.model_dump(mode="json")
         for r in visit_service.list_visits(customer_id=customer_id)
@@ -72,6 +76,7 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
         ],
         "healing_records": healing_records,
         "payment_records": payment_records,
+        "offline_course_records": offline_course_records,
         "visit_records": visit_records,
     }
 
@@ -99,6 +104,44 @@ def _count_internal_course_covered(customer_id: str) -> int:
     )
 
 
+def _match_offline_course_attendance(customer_id: str, courses: list) -> dict[str, int]:
+    """按有效期将线下落地课程的上课记录唯一匹配到对应购买记录。"""
+    attendance_counts = {course.id: 0 for course in courses}
+    if not courses:
+        return attendance_counts
+
+    for record in offline_course_record_service.list_records(customer_id):
+        record_date = (record.record_date or "")[:10]
+        if not record_date:
+            continue
+
+        matching_courses = []
+        for course in courses:
+            effective_date = (course.effective_date or "")[:10]
+            expiry_date = _calc_offline_expiry(course.effective_date, course.validity_value)
+            if effective_date and record_date < effective_date:
+                continue
+            if expiry_date and record_date > expiry_date:
+                continue
+            matching_courses.append(course)
+
+        if not matching_courses:
+            continue
+
+        # 有效期重叠时归入最近生效的一笔，确保一条上课记录只统计一次。
+        matched_course = max(
+            matching_courses,
+            key=lambda course: (
+                course.effective_date or "",
+                course.created_at.isoformat() if hasattr(course.created_at, "isoformat") else str(course.created_at),
+                course.id,
+            ),
+        )
+        attendance_counts[matched_course.id] += 1
+
+    return attendance_counts
+
+
 def _build_purchase_summary(customer_id: str) -> list:
     """构建购买汇总: 每个服务类型的总购买次数/金额和剩余次数"""
     summary = []
@@ -118,6 +161,7 @@ def _build_purchase_summary(customer_id: str) -> list:
     today = __import__('datetime').datetime.now().strftime("%Y-%m-%d")
     active = membership_card_service._active_cards(customer_id, today)
     has_unlimited = any(c.remaining_count is None for c in active)
+    current_total = "不限" if has_unlimited else sum((c.total_count or 0) for c in active)
     unlimited_deductions = max(0, raw_activities - activity_deductions - internal_course_deductions) if has_unlimited else 0
     # 有效剩余次数（None=不限次）；无卡则 0
     effective_remaining = membership_card_service.get_effective_remaining(customer_id)
@@ -129,6 +173,20 @@ def _build_purchase_summary(customer_id: str) -> list:
     # 先计算每张卡的 remaining，再汇总为 effective_remaining
     card_info_list = []
     voided_cards_info = []
+    debt_record = membership_card_service.get_debt_record(customer_id)
+    if has_unlimited:
+        current_remaining: int | str = "不限"
+    else:
+        active_remaining = sum(
+            membership_card_service.get_card_effective_remaining(card.id) or 0
+            for card in active
+            if card.remaining_count is not None
+        )
+        current_remaining = (
+            min(active_remaining, effective_remaining)
+            if isinstance(effective_remaining, int)
+            else active_remaining
+        )
     if cards:
         for c in cards:
             if c.voided:
@@ -179,6 +237,10 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "used": used,
                 "remaining": card_remaining,
                 "effective_remaining": effective_remaining,
+                "current_remaining": current_remaining,
+                "current_total": current_total,
+                "debt_count": debt_record["debt_count"],
+                "debt_activities": debt_record["debt_activities"],
                 "manual_deductions": card_manual,
                 "activity_deductions": card_activity,
                 "advance_deductions": advance_deductions,
@@ -199,6 +261,10 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "used": used,
                 "remaining": card_remaining,
                 "effective_remaining": effective_remaining,
+                "current_remaining": current_remaining,
+                "current_total": current_total,
+                "debt_count": debt_record["debt_count"],
+                "debt_activities": debt_record["debt_activities"],
                 "manual_deductions": card_manual,
                 "activity_deductions": card_activity,
                 "advance_deductions": advance_deductions,
@@ -219,6 +285,10 @@ def _build_purchase_summary(customer_id: str) -> list:
             "used": "-",
             "remaining": 0,
             "effective_remaining": effective_remaining,
+            "current_remaining": current_remaining,
+            "current_total": current_total,
+            "debt_count": debt_record["debt_count"],
+            "debt_activities": debt_record["debt_activities"],
             "manual_deductions": manual_deductions,
             "activity_deductions": activity_deductions,
             "advance_deductions": advance_deductions,
@@ -229,57 +299,153 @@ def _build_purchase_summary(customer_id: str) -> list:
             "voided": False,
         })
 
+    def _earliest_expiry(purchases):
+        """返回最早到期日期和该日期对应的次数，仅统计有效且有到期日的购买。"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        valid = [p for p in purchases if p.expiry_date and p.expiry_date >= today
+                 and (not p.effective_date or p.effective_date <= today)]
+        if not valid:
+            return "", 0
+        earliest = min(p.expiry_date for p in valid)
+        cnt = sum(p.purchase_count for p in valid if p.expiry_date == earliest)
+        return earliest, cnt
+
+    def _current_purchase_total(purchases):
+        """仅汇总当前已生效且未过期的购买次数。"""
+        return sum(
+            purchase.purchase_count
+            for purchase in purchases
+            if (not purchase.effective_date or purchase.effective_date <= today)
+            and (not purchase.expiry_date or purchase.expiry_date >= today)
+        )
+
     # 觉醒游戏
     gc_cases = [c for c in group_case_service.list_cases() if c.customer_id == customer_id]
     gc_purchased = sum(c.purchase_count for c in gc_cases)
-    if gc_purchased > 0:
-        gc_remaining = group_case_session_service.get_remaining_count(customer_id)
+    gc_session_deds = group_case_session_service._get_session_deductions_for_customer(customer_id)
+    gc_session_used = sum(d["count"] for d in gc_session_deds)
+    gc_remaining = group_case_session_service.get_remaining_count(customer_id)
+    gc_effective = group_case_session_service.get_usable_remaining_count(customer_id)
+    gc_debt = group_case_session_service.get_debt_record(customer_id)
+    gc_used = gc_session_used if gc_purchased == 0 else gc_purchased - gc_effective
+    gc_earliest, gc_earliest_cnt = _earliest_expiry(gc_cases)
+    if gc_purchased > 0 or gc_session_used > 0:
         summary.append({
             "type": "觉醒游戏",
             "name": "",
             "total_purchased": gc_purchased,
             "total_amount": sum(c.amount for c in gc_cases),
-            "used": gc_purchased - gc_remaining,
+            "used": gc_used,
             "remaining": gc_remaining,
-            "effective_date": "",
-            "expiry_date": "",
+            "effective_remaining": gc_effective,
+            "current_remaining": gc_effective,
+            "current_total": _current_purchase_total(gc_cases),
+            "debt_count": gc_debt["debt_count"],
+            "debt_activities": gc_debt["debt_activities"],
+            "effective_date": gc_cases[0].effective_date if gc_cases else "",
+            "expiry_date": gc_cases[0].expiry_date if gc_cases else "",
+            "earliest_expiry": gc_earliest,
+            "earliest_expiry_count": gc_earliest_cnt,
+            "purchases": [
+                {
+                    "purchase_count": c.purchase_count,
+                    "amount": c.amount,
+                    "deal_date": c.deal_date or "",
+                    "effective_date": c.effective_date or c.deal_date or "",
+                    "expiry_date": c.expiry_date or "",
+                    "remaining": group_case_session_service.get_purchase_remaining(c.id),
+                }
+                for c in gc_cases
+            ],
         })
 
     # 情绪释放
     er_releases = [r for r in emotional_release_service.list_releases() if r.customer_id == customer_id]
     er_purchased = sum(r.purchase_count for r in er_releases)
-    if er_purchased > 0:
-        er_remaining = emotional_release_session_service.get_remaining_count(customer_id)
+    er_session_deds = emotional_release_session_service._get_session_deductions_for_customer(customer_id)
+    er_session_used = sum(d["count"] for d in er_session_deds)
+    er_remaining = emotional_release_session_service.get_remaining_count(customer_id)
+    er_effective = emotional_release_session_service.get_usable_remaining_count(customer_id)
+    er_debt = emotional_release_session_service.get_debt_record(customer_id)
+    er_used = er_session_used if er_purchased == 0 else er_purchased - er_effective
+    er_earliest, er_earliest_cnt = _earliest_expiry(er_releases)
+    if er_purchased > 0 or er_session_used > 0:
         summary.append({
             "type": "情绪释放",
             "name": "",
             "total_purchased": er_purchased,
             "total_amount": sum(r.amount for r in er_releases),
-            "used": er_purchased - er_remaining,
+            "used": er_used,
             "remaining": er_remaining,
-            "effective_date": "",
-            "expiry_date": "",
+            "effective_remaining": er_effective,
+            "current_remaining": er_effective,
+            "current_total": _current_purchase_total(er_releases),
+            "debt_count": er_debt["debt_count"],
+            "debt_activities": er_debt["debt_activities"],
+            "effective_date": er_releases[0].effective_date if er_releases else "",
+            "expiry_date": er_releases[0].expiry_date if er_releases else "",
+            "earliest_expiry": er_earliest,
+            "earliest_expiry_count": er_earliest_cnt,
+            "purchases": [
+                {
+                    "purchase_count": r.purchase_count,
+                    "amount": r.amount,
+                    "deal_date": r.deal_date or "",
+                    "effective_date": r.effective_date or r.deal_date or "",
+                    "expiry_date": r.expiry_date or "",
+                    "remaining": emotional_release_session_service.get_purchase_remaining(r.id),
+                }
+                for r in er_releases
+            ],
         })
 
     # 能量结
     ek_knots = [k for k in energy_knot_service.list_knots() if k.customer_id == customer_id]
     ek_purchased = sum(k.purchase_count for k in ek_knots)
-    if ek_purchased > 0:
-        ek_remaining = energy_knot_session_service.get_remaining_count(customer_id)
+    ek_session_deds = energy_knot_session_service._get_session_deductions_for_customer(customer_id)
+    ek_session_used = sum(d["count"] for d in ek_session_deds)
+    ek_remaining = energy_knot_session_service.get_remaining_count(customer_id)
+    ek_effective = energy_knot_session_service.get_usable_remaining_count(customer_id)
+    ek_debt = energy_knot_session_service.get_debt_record(customer_id)
+    ek_used = ek_session_used if ek_purchased == 0 else ek_purchased - ek_effective
+    ek_earliest, ek_earliest_cnt = _earliest_expiry(ek_knots)
+    if ek_purchased > 0 or ek_session_used > 0:
         summary.append({
             "type": "能量结",
             "name": "",
             "total_purchased": ek_purchased,
             "total_amount": sum(k.amount for k in ek_knots),
-            "used": ek_purchased - ek_remaining,
+            "used": ek_used,
             "remaining": ek_remaining,
-            "effective_date": "",
-            "expiry_date": "",
+            "effective_remaining": ek_effective,
+            "current_remaining": ek_effective,
+            "current_total": _current_purchase_total(ek_knots),
+            "debt_count": ek_debt["debt_count"],
+            "debt_activities": ek_debt["debt_activities"],
+            "effective_date": ek_knots[0].effective_date if ek_knots else "",
+            "expiry_date": ek_knots[0].expiry_date if ek_knots else "",
+            "earliest_expiry": ek_earliest,
+            "earliest_expiry_count": ek_earliest_cnt,
+            "purchases": [
+                {
+                    "purchase_count": k.purchase_count,
+                    "amount": k.amount,
+                    "deal_date": k.deal_date or "",
+                    "effective_date": k.effective_date or k.deal_date or "",
+                    "expiry_date": k.expiry_date or "",
+                    "remaining": energy_knot_session_service.get_purchase_remaining(k.id),
+                }
+                for k in ek_knots
+            ],
         })
 
     # 内部课程
     ic_courses = [c for c in internal_course_service.list_courses() if c.customer_id == customer_id]
     for c in ic_courses:
+        is_current = (
+            (not c.effective_date or c.effective_date <= today)
+            and (not c.expiry_date or c.expiry_date >= today)
+        )
         summary.append({
             "type": "内部课程",
             "name": c.course_type,
@@ -287,40 +453,58 @@ def _build_purchase_summary(customer_id: str) -> list:
             "total_amount": c.price,
             "used": "-",
             "remaining": "-",
+            "current_remaining": "不限" if is_current else 0,
+            "current_total": "不限" if is_current else 0,
             "effective_date": c.effective_date,
             "expiry_date": c.expiry_date or "",
-        })
-
-    # OH卡梳理
-    ocr_readings = [r for r in oh_card_reading_service.list_readings() if r.customer_id == customer_id]
-    ocr_purchased = sum(r.purchase_count for r in ocr_readings)
-    if ocr_purchased > 0:
-        ocr_remaining = oh_card_reading_session_service.get_remaining_count(customer_id)
-        summary.append({
-            "type": "OH卡梳理",
-            "name": "",
-            "total_purchased": ocr_purchased,
-            "total_amount": sum(r.amount for r in ocr_readings),
-            "used": ocr_purchased - ocr_remaining,
-            "remaining": ocr_remaining,
-            "effective_date": "",
-            "expiry_date": "",
         })
 
     # 其他项目
     op_projects = [p for p in other_project_service.list_projects() if p.customer_id == customer_id]
     for p in op_projects:
         project_remaining = other_project_service.get_effective_remaining(p.id)
+        is_current = (
+            (not p.effective_date or p.effective_date <= today)
+            and (not p.expiry_date or p.expiry_date >= today)
+        )
+        project_total = p.total_count if p.total_count is not None else "不限"
         summary.append({
             "type": "其他项目",
             "name": p.project_name,
-            "total_purchased": p.total_count if p.total_count is not None else "不限",
+            "total_purchased": project_total,
             "total_amount": p.fee,
             "used": "-",
             "remaining": project_remaining if project_remaining is not None else "不限",
+            "current_remaining": (project_remaining if project_remaining is not None else "不限") if is_current else 0,
+            "current_total": project_total if is_current else 0,
             "effective_date": p.effective_date,
             "expiry_date": p.expiry_date or "",
             "activity_mode": p.activity_mode or "线下",
+        })
+
+    # 线下落地课程
+    oc_courses = [r for r in offline_course_service.list_courses() if r.customer_id == customer_id]
+    oc_attendance_counts = _match_offline_course_attendance(customer_id, oc_courses)
+    for r in oc_courses:
+        expiry_date = _calc_offline_expiry(r.effective_date, r.validity_value)
+        is_current = (
+            (not r.effective_date or r.effective_date <= today)
+            and (not expiry_date or expiry_date >= today)
+        )
+        summary.append({
+            "type": "线下落地课程",
+            "name": "线下落地课程",
+            "total_purchased": 1,
+            "total_amount": r.amount,
+            "used": "-",
+            "remaining": "-",
+            "effective_remaining": "-",
+            "current_remaining": 1 if is_current else 0,
+            "current_total": 1 if is_current else 0,
+            "attended_count": oc_attendance_counts.get(r.id, 0),
+            "effective_date": r.effective_date or "",
+            "expiry_date": expiry_date,
+            "validity_value": r.validity_value,
         })
 
     return summary
@@ -364,6 +548,20 @@ def _build_activities(
         }
     activities = []
 
+    def deduction_summary(
+        *,
+        attended: bool,
+        membership_count: int = 0,
+        project_label: str = "",
+    ) -> str:
+        if not attended:
+            return "未参与"
+        if project_label:
+            return project_label
+        if membership_count > 0:
+            return f"会员卡扣卡{membership_count}次"
+        return "已参与"
+
     # 课程记录 - 作为参与者或老师（必须实际到店）
     for r in class_record_service.list_records():
         teacher_names = []
@@ -379,6 +577,7 @@ def _build_activities(
         )
         if role:
             attended = r.date in arrived_dates
+            membership_count = r.membership_deduction_count if attended and customer_id in chargeable else 0
             activities.append({
                 "type": "沙龙类型",
                 "date": r.date,
@@ -388,7 +587,12 @@ def _build_activities(
                 "host": host,
                 "session_id": r.id,
                 "is_public_welfare": r.is_public_welfare,
-                "membership_deduction_count": r.membership_deduction_count if attended and customer_id in chargeable else 0,
+                "participated": attended,
+                "membership_deduction_count": membership_count,
+                "deduction_summary": deduction_summary(
+                    attended=attended,
+                    membership_count=membership_count,
+                ),
             })
 
     # 觉醒游戏（必须实际到店）
@@ -408,6 +612,7 @@ def _build_activities(
         if role:
             attended = s.date in arrived_dates
             chargeable = set(s.participant_ids) - {s.owner_id}
+            membership_count = s.membership_deduction_count if attended and customer_id in chargeable else 0
             activities.append({
                 "type": "觉醒游戏",
                 "date": s.date,
@@ -416,7 +621,13 @@ def _build_activities(
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
-                "membership_deduction_count": s.membership_deduction_count if attended and customer_id in chargeable else 0,
+                "participated": attended,
+                "membership_deduction_count": membership_count,
+                "deduction_summary": deduction_summary(
+                    attended=attended,
+                    membership_count=membership_count,
+                    project_label="觉醒游戏扣卡1次" if role == "案主" else "",
+                ),
             })
 
     # 情绪释放（必须实际到店）
@@ -436,6 +647,7 @@ def _build_activities(
         if role:
             attended = s.date in arrived_dates
             chargeable = set(s.participant_ids) - {s.owner_id}
+            membership_count = s.membership_deduction_count if attended and customer_id in chargeable else 0
             activities.append({
                 "type": "情绪释放",
                 "date": s.date,
@@ -444,7 +656,13 @@ def _build_activities(
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
-                "membership_deduction_count": s.membership_deduction_count if attended and customer_id in chargeable else 0,
+                "participated": attended,
+                "membership_deduction_count": membership_count,
+                "deduction_summary": deduction_summary(
+                    attended=attended,
+                    membership_count=membership_count,
+                    project_label="情绪释放扣卡1次" if role == "案主" else "",
+                ),
             })
 
     # 能量结（必须实际到店）
@@ -461,6 +679,8 @@ def _build_activities(
             participant_ids=s.participant_ids,
         )
         if role:
+            attended = s.date in arrived_dates
+            project_count = energy_knot_session_service.get_session_deduction_count(s, customer_id) if role == "案主" else 0
             activities.append({
                 "type": "能量结",
                 "date": s.date,
@@ -469,7 +689,12 @@ def _build_activities(
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
+                "participated": attended,
                 "membership_deduction_count": 0,
+                "deduction_summary": deduction_summary(
+                    attended=attended,
+                    project_label=f"能量结部位{project_count}个" if role == "案主" else "",
+                ),
             })
 
     # 内部课程（必须实际到店）
@@ -483,6 +708,7 @@ def _build_activities(
             participant_ids=s.participant_ids,
         )
         if role:
+            attended = s.date in arrived_dates
             activities.append({
                 "type": "内部课程",
                 "date": s.date,
@@ -492,35 +718,9 @@ def _build_activities(
                 "host": host,
                 "session_id": s.id,
                 "is_public_welfare": False,
+                "participated": attended,
                 "membership_deduction_count": 0,
-            })
-
-    # OH卡梳理
-    for s in oh_card_reading_session_service.list_sessions():
-        ocr_name = f"OH卡梳理【{s.owner_name}】" if s.owner_name else "OH卡梳理"
-        teacher_names = [customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]
-        host = ", ".join(teacher_names) if teacher_names else (s.host_name or "")
-        role = _resolve_activity_role(
-            customer_id,
-            owner_id=s.owner_id,
-            achiever_id=s.achiever_id,
-            host_id=s.host_id,
-            host_role="成就君",
-            teacher_ids=s.teacher_ids,
-            participant_ids=s.participant_ids,
-        )
-        if role:
-            attended = s.date in arrived_dates
-            chargeable = set(s.participant_ids) - {s.owner_id}
-            activities.append({
-                "type": "OH卡梳理",
-                "date": s.date,
-                "name": ocr_name,
-                "role": role,
-                "host": host,
-                "session_id": s.id,
-                "is_public_welfare": False,
-                "membership_deduction_count": s.membership_deduction_count if attended and customer_id in chargeable else 0,
+                "deduction_summary": deduction_summary(attended=attended),
             })
 
     activity_type_codes = {
@@ -529,7 +729,6 @@ def _build_activities(
         "情绪释放": "ers",
         "能量结": "eks",
         "内部课程": "ics",
-        "OH卡梳理": "ocr",
     }
     for activity in activities:
         activity["activity_type"] = activity_type_codes[activity["type"]]
@@ -547,13 +746,15 @@ def _build_activities(
     return activities
 
 
-def _build_payment_records(customer_id: str) -> list:
+def _build_payment_records(customer_id: str, date: str | None = None) -> list:
     """构建收费记录: 返回扁平列表，每条记录包含类型、数量、价格、生效日期、到期日期、成交人"""
     records = []
 
     # 会员活动
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
     for c in cards:
+        if date and c.deal_date != date:
+            continue
         records.append({
             "source_id": c.id,
             "source_created_at": c.created_at.isoformat(),
@@ -561,16 +762,20 @@ def _build_payment_records(customer_id: str) -> list:
             "name": c.card_type,
             "quantity": 1,
             "amount": c.price,
+            "deal_date": c.deal_date or "",
             "effective_date": c.effective_date,
             "expiry_date": c.expiry_date or "",
             "closer_name": ", ".join(cl["name"] for cl in c.closers) if c.closers else (c.closer_name or ""),
             "created_at": c.effective_date,
             "voided": c.voided,
+            "notes": c.notes or "",
         })
 
     # 觉醒游戏
     gc = [c for c in group_case_service.list_cases() if c.customer_id == customer_id]
     for c in gc:
+        if date and c.deal_date != date:
+            continue
         records.append({
             "source_id": c.id,
             "source_created_at": c.created_at.isoformat(),
@@ -578,15 +783,19 @@ def _build_payment_records(customer_id: str) -> list:
             "name": "觉醒游戏",
             "quantity": c.purchase_count,
             "amount": c.amount,
-            "effective_date": c.created_at.strftime("%Y-%m-%d"),
-            "expiry_date": "",
+            "deal_date": c.deal_date or "",
+            "effective_date": c.effective_date or c.created_at.strftime("%Y-%m-%d"),
+            "expiry_date": c.expiry_date or "",
             "closer_name": ", ".join(cl["name"] for cl in c.closers) if c.closers else (c.closer_name or ""),
             "created_at": c.created_at.strftime("%Y-%m-%d"),
+            "notes": c.notes or "",
         })
 
     # 情绪释放
     er = [r for r in emotional_release_service.list_releases() if r.customer_id == customer_id]
     for r in er:
+        if date and r.deal_date != date:
+            continue
         records.append({
             "source_id": r.id,
             "source_created_at": r.created_at.isoformat(),
@@ -594,15 +803,19 @@ def _build_payment_records(customer_id: str) -> list:
             "name": "情绪释放",
             "quantity": r.purchase_count,
             "amount": r.amount,
-            "effective_date": r.created_at.strftime("%Y-%m-%d"),
-            "expiry_date": "",
+            "deal_date": r.deal_date or "",
+            "effective_date": r.effective_date or r.created_at.strftime("%Y-%m-%d"),
+            "expiry_date": r.expiry_date or "",
             "closer_name": ", ".join(cl["name"] for cl in r.closers) if r.closers else (r.closer_name or ""),
             "created_at": r.created_at.strftime("%Y-%m-%d"),
+            "notes": r.notes or "",
         })
 
     # 能量结
     ek = [k for k in energy_knot_service.list_knots() if k.customer_id == customer_id]
     for k in ek:
+        if date and k.deal_date != date:
+            continue
         records.append({
             "source_id": k.id,
             "source_created_at": k.created_at.isoformat(),
@@ -610,15 +823,19 @@ def _build_payment_records(customer_id: str) -> list:
             "name": "能量结",
             "quantity": k.purchase_count,
             "amount": k.amount,
-            "effective_date": k.created_at.strftime("%Y-%m-%d"),
-            "expiry_date": "",
+            "deal_date": k.deal_date or "",
+            "effective_date": k.effective_date or k.created_at.strftime("%Y-%m-%d"),
+            "expiry_date": k.expiry_date or "",
             "closer_name": ", ".join(cl["name"] for cl in k.closers) if k.closers else (k.closer_name or ""),
             "created_at": k.created_at.strftime("%Y-%m-%d"),
+            "notes": k.notes or "",
         })
 
     # 内部课程
     ic = [c for c in internal_course_service.list_courses() if c.customer_id == customer_id]
     for c in ic:
+        if date and c.deal_date != date:
+            continue
         records.append({
             "source_id": c.id,
             "source_created_at": c.created_at.isoformat(),
@@ -626,31 +843,82 @@ def _build_payment_records(customer_id: str) -> list:
             "name": c.course_type,
             "quantity": 1,
             "amount": c.price,
+            "deal_date": c.deal_date or "",
             "effective_date": c.effective_date,
             "expiry_date": c.expiry_date or "",
             "closer_name": ", ".join(cl["name"] for cl in c.closers) if c.closers else (c.closer_name or ""),
             "created_at": c.effective_date,
+            "notes": c.notes or "",
         })
 
-    # OH卡梳理
+    # OH卡诊断
     ocr = [r for r in oh_card_reading_service.list_readings() if r.customer_id == customer_id]
     for r in ocr:
+        if date and r.deal_date != date:
+            continue
+        dd = r.diagnosis_duration or 1
         records.append({
             "source_id": r.id,
             "source_created_at": r.created_at.isoformat(),
-            "type": "OH卡梳理",
-            "name": "OH卡梳理",
-            "quantity": r.purchase_count,
+            "type": "OH卡诊断",
+            "name": "OH卡诊断",
+            "quantity": f"{dd * 0.5}小时",
             "amount": r.amount,
-            "effective_date": r.created_at.strftime("%Y-%m-%d"),
+            "deal_date": r.deal_date or "",
+            "effective_date": getattr(r, "effective_date", None) or "",
+            "expiry_date": getattr(r, "expiry_date", None) or "",
+            "closer_name": r.closer_name or "",
+            "created_at": r.created_at.strftime("%Y-%m-%d"),
+            "notes": r.notes or "",
+            "diagnosis_teacher": getattr(r, "diagnosis_teacher", None) or "",
+        })
+
+    # 线下落地课程
+    oc = [r for r in offline_course_service.list_courses() if r.customer_id == customer_id]
+    for r in oc:
+        if date and r.deal_date != date:
+            continue
+        expiry_date = _calc_offline_expiry(r.effective_date, r.validity_value)
+        records.append({
+            "source_id": r.id,
+            "source_created_at": r.created_at.isoformat(),
+            "type": "线下落地课程",
+            "name": "线下落地课程",
+            "quantity": f"{r.validity_value} 个月",
+            "amount": r.amount,
+            "deal_date": r.deal_date or "",
+            "effective_date": r.effective_date or "",
+            "expiry_date": expiry_date,
+            "closer_name": r.closer_name or "",
+            "created_at": r.created_at.strftime("%Y-%m-%d"),
+            "notes": r.notes or "",
+        })
+
+    # 茶位费
+    tsf = [r for r in tea_seat_fee_service.list_fees() if r.customer_id == customer_id]
+    for r in tsf:
+        if date and r.deal_date != date:
+            continue
+        records.append({
+            "source_id": r.id,
+            "source_created_at": r.created_at.isoformat(),
+            "type": "茶位费",
+            "name": "茶位费",
+            "quantity": f"{r.quantity} 位",
+            "amount": r.amount,
+            "deal_date": r.deal_date or "",
+            "effective_date": "",
             "expiry_date": "",
             "closer_name": r.closer_name or "",
             "created_at": r.created_at.strftime("%Y-%m-%d"),
+            "notes": r.notes or "",
         })
 
     # 其他项目
     op = [p for p in other_project_service.list_projects() if p.customer_id == customer_id]
     for p in op:
+        if date and p.deal_date != date:
+            continue
         created = p.created_at.strftime("%Y-%m-%d") if hasattr(p.created_at, "strftime") else str(p.created_at or "")
         records.append({
             "source_id": p.id,
@@ -659,12 +927,45 @@ def _build_payment_records(customer_id: str) -> list:
             "name": p.project_name,
             "quantity": p.remaining_count if p.remaining_count is not None else "不限",
             "amount": p.fee,
+            "deal_date": p.deal_date or "",
             "effective_date": p.effective_date,
             "expiry_date": p.expiry_date or "",
             "closer_name": ", ".join(cl["name"] for cl in p.closers) if p.closers else (p.closer_name or ""),
             "created_at": created,
+            "notes": p.notes or "",
         })
 
     # 按创建日期倒序
     records.sort(key=lambda r: r["created_at"] or "", reverse=True)
+    return records
+
+
+def _calc_offline_expiry(effective_date: str, validity_value: int) -> str:
+    """计算线下落地课程的到期日期"""
+    if not effective_date or not validity_value:
+        return ""
+    parts = effective_date.split("-")
+    if len(parts) != 3:
+        return ""
+    eff_year, eff_month, eff_day = int(parts[0]), int(parts[1]), int(parts[2])
+    em = eff_month + validity_value
+    ey = eff_year + (em - 1) // 12
+    em = (em - 1) % 12 + 1
+    ed = min(eff_day, 28) if em == 2 else eff_day
+    return f"{ey:04d}-{em:02d}-{ed:02d}"
+
+
+def _build_offline_course_records(customer_id: str) -> list:
+    """构建线下落地课程记录列表（上课记录）"""
+    records = []
+    for r in offline_course_record_service.list_records(customer_id):
+        records.append({
+            "id": r.id,
+            "record_date": r.record_date,
+            "teacher": r.teacher,
+            "content": r.content,
+            "result": r.result,
+            "creator": r.creator,
+            "created_at": r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at),
+        })
     return records

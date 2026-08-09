@@ -2,7 +2,6 @@ const {
   classRecordApi, courseTypeApi, spaceApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
-  ohCardReadingSessionApi,
 } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const {
@@ -35,7 +34,7 @@ Page({
     // 活动方式（沙龙/内部课程）
     activityModes: ['线下', '线上'],
     activityModeIndex: 0,
-    // 案主（觉醒/情绪释放/OH卡/能量结）
+    // 案主（觉醒/情绪释放/能量结）
     ownerId: '',
     ownerName: '',
     // 老师（多选，class/eks/ics）
@@ -78,6 +77,7 @@ Page({
   },
 
   async onLoad(options) {
+    if (!getApp().checkLogin()) return
     if (options.date) this.setData({ date: options.date })
     const savedSpaceId = options.spaceId || ''
     await Promise.all([
@@ -283,7 +283,7 @@ Page({
 
   // 打开案主选择器（单选）
   onOwnerPickerOpen() {
-    const list = this.getFilteredCustomers('').map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
+    const list = this.data.dayVisitors.map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
     this.setData({
       showPicker: true,
       pickerTitle: '案主',
@@ -321,7 +321,7 @@ Page({
     const { pickerMode, activityType } = this.data
     let baseList
     if (pickerMode === 'owner') {
-      baseList = this.getFilteredCustomers('')
+      baseList = this.data.dayVisitors
     } else {
       const position = TEACHER_POSITION[activityType] || ''
       baseList = this.getFilteredCustomers(position)
@@ -402,7 +402,12 @@ Page({
         id: v.customer_id || '',
         nickname: v.customer_nickname || v.nickname || '',
       })).filter(v => v.id)
-      this.setData({ dayVisitors: visitors })
+      const ownerStillInvited = visitors.some(v => v.id === this.data.ownerId)
+      this.setData({
+        dayVisitors: visitors,
+        ownerId: ownerStillInvited ? this.data.ownerId : '',
+        ownerName: ownerStillInvited ? this.data.ownerName : '',
+      })
       this.updateParticipantList()
     } catch (e) {
       console.error('加载到店人员失败:', e)
@@ -446,7 +451,7 @@ Page({
         return
       }
     }
-    if (['gcs', 'ers', 'eks', 'ocr'].includes(activityType)) {
+    if (['gcs', 'ers', 'eks'].includes(activityType)) {
       if (!this.data.ownerId) {
         wx.showToast({ title: '请选择案主', icon: 'none' })
         return
@@ -538,19 +543,6 @@ Page({
             host_id: '',
             host_name: '',
             membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
-            is_published: this.data.isPublished,
-          }))
-          break
-        case 'ocr':
-          await ohCardReadingSessionApi.create(Object.assign({}, baseFields, {
-            owner_id: this.data.ownerId,
-            owner_name: this.data.ownerName,
-            name: this.data.activityName,
-            description: this.data.description,
-            achiever_id: this.data.achieverId,
-            achiever_name: this.data.achieverName,
-            teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
-            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
             is_published: this.data.isPublished,
           }))
           break

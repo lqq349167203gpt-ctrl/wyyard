@@ -56,6 +56,25 @@
   border-radius: 20rpx;
 }
 
+.customer-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.customer-tag {
+  max-width: 220rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4rpx 14rpx;
+  border: 1rpx solid #e8eaed;
+  border-radius: 6rpx;
+  background-color: #f7f8fa;
+  font-size: 22rpx;
+  color: #646a73;
+}
+
 .hero-stats {
   display: flex;
   align-items: center;
@@ -375,6 +394,7 @@
 .act-info {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16rpx;
 }
 
@@ -388,10 +408,15 @@
   color: #8f959e;
 }
 
-/* 剩余次数 */
+.act-detail.deduction {
+  margin-left: auto;
+  color: #5d6673;
+}
+
+/* 卡次统计 */
 .pur-item {
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid #f7f8fa;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
 }
 
 .pur-item:last-child {
@@ -400,9 +425,16 @@
 
 .pur-header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.pur-title {
+  display: flex;
   align-items: center;
+  min-width: 0;
   gap: 12rpx;
-  margin-bottom: 6rpx;
 }
 
 .pur-type {
@@ -414,20 +446,55 @@
 }
 
 .pur-name {
-  font-size: 26rpx;
+  max-width: 180rpx;
+  overflow: hidden;
+  font-size: 24rpx;
+  color: #646a73;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pur-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  font-size: 22rpx;
+  line-height: 34rpx;
+  color: #8f959e;
+}
+
+.pur-summary-value {
+  margin-left: 4rpx;
   color: #1f2329;
+  font-weight: 500;
+}
+
+.pur-summary-divider {
+  margin: 0 8rpx;
+}
+
+.pur-debt-inline {
+  margin-left: 10rpx;
+  color: #c4506a;
 }
 
 .pur-info {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16rpx;
+  margin-top: 14rpx;
 }
 
-.pur-remaining {
-  font-size: 26rpx;
-  color: #1f2329;
-  font-weight: 500;
+.pur-detail-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 24rpx;
+  color: #4e535a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pur-date {
@@ -435,14 +502,137 @@
   color: #8f959e;
 }
 
+.pur-card-list {
+  margin-top: 14rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.pur-card-row {
+  padding-top: 14rpx;
+}
+
+.pur-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.pur-card-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 24rpx;
+  color: #4e535a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pur-card-count {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #646a73;
+}
+
+.pur-card-row .pur-date {
+  display: block;
+  margin-top: 6rpx;
+}
+
+.pur-debt-list {
+  margin-top: 16rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.pur-debt-title {
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 22rpx;
+  color: #c4506a;
+  font-weight: 500;
+}
+
+.pur-debt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150rpx 104rpx;
+  align-items: center;
+  gap: 10rpx;
+  min-height: 42rpx;
+  font-size: 22rpx;
+}
+
+.pur-debt-name {
+  overflow: hidden;
+  color: #646a73;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pur-debt-date {
+  color: #8f959e;
+  text-align: right;
+}
+
+.pur-debt-count {
+  color: #c4506a;
+  text-align: right;
+}
+
 .pur-detail {
   font-size: 22rpx;
   color: #8f959e;
 }
 
-.pur-deductions {
+/* 线下落地课程 */
+.ocr-item {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f7f8fa;
+}
+
+.ocr-item:last-child {
+  border-bottom: none;
+}
+
+.ocr-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 8rpx;
+}
+
+.ocr-date {
+  font-size: 26rpx;
+  color: #1f2329;
+  font-weight: 500;
+}
+
+.ocr-teacher {
   font-size: 22rpx;
   color: #8f959e;
+  background-color: #f0f1f2;
+  padding: 2rpx 10rpx;
+  border-radius: 4rpx;
+}
+
+.ocr-row {
+  display: flex;
+  padding: 6rpx 0;
+}
+
+.ocr-label {
+  font-size: 24rpx;
+  color: #8f959e;
+  width: 130rpx;
+  flex-shrink: 0;
+}
+
+.ocr-value {
+  font-size: 24rpx;
+  color: #4e535a;
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  line-height: 1.6;
 }
 
 /* 交易记录 */
@@ -504,4 +694,37 @@
   padding: 120rpx 0;
   color: #8f959e;
   font-size: 28rpx;
+}
+
+.detail-error {
+  display: flex;
+  min-height: 100vh;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 48rpx;
+  background-color: #f7f8fa;
+}
+
+.detail-error-line {
+  width: 48rpx;
+  height: 2rpx;
+  margin-bottom: 22rpx;
+  background-color: #d8dadd;
+}
+
+.detail-error-text {
+  color: #8f959e;
+  font-size: 26rpx;
+  text-align: center;
+}
+
+.detail-retry {
+  margin-top: 28rpx;
+  padding: 14rpx 28rpx;
+  border-radius: 8rpx;
+  background-color: #eef2f8;
+  color: #3370ff;
+  font-size: 25rpx;
 }

@@ -106,6 +106,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   }
 
   const currentUser = (() => { try { return JSON.parse(localStorage.getItem("currentUser") || "{}") } catch { return {} } })()
+  const isSuperAdmin = currentUser.role === "超级管理员"
 
   const handleDelete = async () => {
     if (!deleteId || deleting) return
@@ -216,6 +217,10 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                   <TableCell className="text-center">
                     {a.is_system ? (
                       <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-50 text-green-600">永久</span>
+                    ) : !isSuperAdmin && a.role === "超级管理员" ? (
+                      <span className={`text-[12px] ${a.enabled ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
+                        {a.enabled ? "启用" : "禁用"}
+                      </span>
                     ) : (
                       <button
                         className={`text-[12px] px-2 py-0.5 rounded-full ${a.enabled ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"} ${togglingId === a.id ? "opacity-50" : ""}`}
@@ -227,19 +232,21 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                     )}
                   </TableCell>
                   <TableCell className="text-right pr-4">
-                    <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(a)}>
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setChangePwdId(a.id); setChangePwdForm({ oldPassword: "", newPassword: "", confirmPassword: "" }); setChangePwdErrors({}) }}>
-                        <KeyRound className="h-3.5 w-3.5" />
-                      </Button>
-                      {!a.is_system && (
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(a.id)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    {(isSuperAdmin || (!a.is_system && a.role !== "超级管理员")) && (
+                      <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(a)}>
+                          <Edit className="h-3.5 w-3.5" />
                         </Button>
-                      )}
-                    </div>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setChangePwdId(a.id); setChangePwdForm({ oldPassword: "", newPassword: "", confirmPassword: "" }); setChangePwdErrors({}) }}>
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                        {!a.is_system && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(a.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -273,7 +280,10 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                 <div className="relative flex-1">
                   <SelectDropdown
                     value={form.role}
-                    options={[{ value: "超级管理员", label: "超级管理员" }, ...positions.map(p => ({ value: p.name, label: p.name }))]}
+                    options={[
+                      ...(isSuperAdmin ? [{ value: "超级管理员", label: "超级管理员" }] : []),
+                      ...positions.map(p => ({ value: p.name, label: p.name })),
+                    ]}
                     placeholder="选择角色"
                     onChange={(v) => setForm({ ...form, role: v })}
                   />

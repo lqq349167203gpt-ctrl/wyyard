@@ -1,0 +1,45 @@
+<view class="page">
+  <view class="no-permission" wx:if="{{!hasPagePermission}}">
+    <text class="no-permission-text">无权限访问此页面</text>
+  </view>
+
+  <block wx:else>
+    <view class="loading" wx:if="{{loading}}">加载中...</view>
+    <view class="form-card" wx:else>
+      <view class="form-item">
+        <text class="form-label">支出时间</text>
+        <view class="datetime-fields">
+          <picker mode="date" value="{{expenseDate}}" bindchange="onDateChange">
+            <view class="picker-value">{{expenseDate}}</view>
+          </picker>
+          <picker mode="time" value="{{expenseTime}}" bindchange="onTimeChange">
+            <view class="picker-value time-value">{{expenseTime}}</view>
+          </picker>
+        </view>
+      </view>
+      <view class="form-item">
+        <text class="form-label">购买内容</text>
+        <input class="form-input" value="{{purchaseContent}}" bindinput="onPurchaseContentInput" placeholder="例如：采购茶具" placeholder-class="placeholder" maxlength="200" />
+      </view>
+      <view class="form-item">
+        <text class="form-label">金额</text>
+        <view class="amount-field">
+          <text class="currency">¥</text>
+          <input class="form-input amount-input" type="digit" value="{{amount}}" bindinput="onAmountInput" placeholder="0.00" placeholder-class="placeholder" />
+        </view>
+      </view>
+      <view class="form-item">
+        <text class="form-label">平台</text>
+        <input class="form-input" value="{{platform}}" bindinput="onPlatformInput" placeholder="例如：淘宝、京东、线下" placeholder-class="placeholder" maxlength="100" />
+      </view>
+      <view class="form-item-content last">
+        <text class="form-label-block">备注</text>
+        <textarea class="form-textarea" value="{{notes}}" bindinput="onNotesInput" placeholder="可填写用途、经办说明等" placeholder-class="placeholder" maxlength="2000" />
+      </view>
+    </view>
+
+    <view class="actions" wx:if="{{!loading}}">
+      <button class="save-button" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    </view>
+  </block>
+</view>

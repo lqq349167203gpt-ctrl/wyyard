@@ -13,14 +13,17 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
     "oh-card-readings",
     "energy-knots",
     "internal-courses",
+    "tea-seat-fees",
+    "offline-courses",
+    "other-projects",
   ],
   "payment-deductions": [
     "membership-cards",
     "group-cases",
     "emotional-releases",
-    "oh-card-readings",
     "energy-knots",
     "internal-courses",
+    "other-projects",
   ],
   "payment-refunds": [
     "membership-cards",
@@ -29,6 +32,8 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
     "oh-card-readings",
     "energy-knots",
     "internal-courses",
+    "tea-seat-fees",
+    "other-projects",
   ],
 }
 

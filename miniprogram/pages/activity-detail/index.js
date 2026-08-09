@@ -2,7 +2,6 @@ const {
   classRecordApi, courseTypeApi, spaceApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
-  ohCardReadingSessionApi,
 } = require('../../utils/api')
 const {
   BADGE_COLORS, ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
@@ -15,7 +14,6 @@ const SOURCE_TO_TYPE = {
   emotional_release: 'ers',
   energy_knot: 'eks',
   internal_course: 'ics',
-  oh_card: 'ocr',
 }
 
 const API_MAP = {
@@ -24,7 +22,6 @@ const API_MAP = {
   ers: emotionalReleaseSessionApi,
   eks: energyKnotSessionApi,
   ics: internalCourseSessionApi,
-  ocr: ohCardReadingSessionApi,
 }
 
 Page({
@@ -81,6 +78,7 @@ Page({
   },
 
   async onLoad() {
+    if (!getApp().checkLogin()) return
     const app = getApp()
     const raw = app.globalData._selectedActivity
     const source = app.globalData._selectedActivitySource
@@ -153,7 +151,7 @@ Page({
         return c ? c.nickname : ''
       }).filter(Boolean)
       initData.teacherDisplay = initData.teacherNames.join('、')
-      // gcs/ers/ocr：如果 achieverName 为空，从 teacherIds 兜底
+      // gcs/ers：如果 achieverName 为空，从 teacherIds 兜底
       if (SINGLE_TEACHER_TYPES.includes(activityType) && !initData.achieverName && initData.teacherNames.length > 0) {
         initData.achieverId = teacherIds[0]
         initData.achieverName = initData.teacherNames[0]
@@ -219,7 +217,12 @@ Page({
         id: v.customer_id || '',
         nickname: v.customer_nickname || v.nickname || '',
       })).filter(v => v.id)
-      this.setData({ dayVisitors: visitors })
+      const ownerStillInvited = visitors.some(v => v.id === this.data.ownerId)
+      this.setData({
+        dayVisitors: visitors,
+        ownerId: ownerStillInvited ? this.data.ownerId : '',
+        ownerName: ownerStillInvited ? this.data.ownerName : '',
+      })
     } catch (e) {
       console.error('加载到店人员失败:', e)
     }
@@ -408,7 +411,7 @@ Page({
   },
 
   onOwnerPickerOpen() {
-    const list = this.getFilteredCustomers('').map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
+    const list = this.data.dayVisitors.map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
     this.setData({
       showPicker: true, pickerTitle: '案主', pickerMode: 'owner',
       pickerKeyword: '', pickerList: list,
@@ -437,7 +440,7 @@ Page({
     const { pickerMode, activityType } = this.data
     let baseList
     if (pickerMode === 'owner') {
-      baseList = this.getFilteredCustomers('')
+      baseList = this.data.dayVisitors
     } else {
       const position = TEACHER_POSITION[activityType] || ''
       baseList = this.getFilteredCustomers(position)
@@ -497,7 +500,7 @@ Page({
       wx.showToast({ title: '请选择课程', icon: 'none' })
       return
     }
-    if (['gcs', 'ers', 'eks', 'ocr'].includes(activityType) && !this.data.ownerId) {
+    if (['gcs', 'ers', 'eks'].includes(activityType) && !this.data.ownerId) {
       wx.showToast({ title: '请选择案主', icon: 'none' })
       return
     }
@@ -539,7 +542,6 @@ Page({
       }
       case 'gcs':
       case 'ers':
-      case 'ocr':
         payload = Object.assign({}, baseFields, {
           owner_id: this.data.ownerId,
           owner_name: this.data.ownerName,

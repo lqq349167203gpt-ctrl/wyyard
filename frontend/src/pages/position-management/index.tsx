@@ -12,6 +12,7 @@ import {
 import { positionApi, positionPermissionApi, memberIdentityApi, accountApi } from "@/lib/api"
 import type { Position, Account } from "@/lib/api"
 import { normalizePagePermissions, removePagePermissions } from "@/lib/page-permissions"
+import { storePagePermissions } from "@/hooks/use-page-permissions"
 import { AccountsContent } from "@/pages/accounts"
 
 const ALL_PAGES = [
@@ -28,14 +29,19 @@ const ALL_PAGES = [
   { key: "healing-records", label: "客户资料" },
   { key: "class-records", label: "邀约" },
   { key: "daily-activities", label: "课表" },
+  { key: "offline-course-records", label: "落地课程" },
+  // 沟通
   { key: "communication-records", label: "沟通记录" },
   { key: "followup-records", label: "回访记录" },
   // 付费
   { key: "payment", label: "付费项目" },
   { key: "payment-deductions", label: "销卡" },
   { key: "payment-refunds", label: "退费" },
+  { key: "expenses", label: "支出" },
+  { key: "debt-records", label: "欠卡记录" },
   // 信息配置
   { key: "member-identities", label: "会员身份" },
+  { key: "customer-tags", label: "客户标签" },
   { key: "healing-identities", label: "疗愈老师" },
   { key: "organizations", label: "组织信息" },
   { key: "spaces", label: "空间配置" },
@@ -54,11 +60,12 @@ const ALL_PAGES = [
 const PERMISSION_GROUPS = [
   { label: "数据", keys: ["business-reminders", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
   { label: "报表", keys: ["daily-report"] },
-  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "communication-records", "followup-records"] },
-  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },
-  { label: "信息配置", keys: ["member-identities", "healing-identities", "organizations", "spaces", "reminders"] },
+  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records"] },
+  { label: "沟通", keys: ["communication-records", "followup-records"] },
+  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds", "expenses", "debt-records"] },
+  { label: "信息配置", keys: ["member-identities", "customer-tags", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
-  { label: "系统配置", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
+  { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
 ]
 
 const CUSTOMER_FILTER_PAGES = [
@@ -194,9 +201,9 @@ export default function PositionManagementPage() {
     const legacyPageKeys: Record<string, string[]> = {
       "class-records": ["class-records-visitors", "class-records-activities", "class-records-arrival"],
       "daily-activities": ["class-records-activities"],
-      payment: ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"],
-      "payment-deductions": ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"],
-      "payment-refunds": ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses"],
+      payment: ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "tea-seat-fees", "offline-courses", "other-projects"],
+      "payment-deductions": ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects"],
+      "payment-refunds": ["membership-cards", "group-cases", "emotional-releases", "oh-card-readings", "energy-knots", "internal-courses", "tea-seat-fees", "other-projects"],
     }
     CUSTOMER_FILTER_PAGES.forEach(pageKey => {
       const directPermissions = pagePermissions[pageKey]
@@ -303,6 +310,10 @@ export default function PositionManagementPage() {
         formCustomerPermissionsPay,
         formPagePermissions
       )
+      try {
+        const currentRole = JSON.parse(localStorage.getItem("currentUser") || "{}").role
+        if (currentRole === selectedPosition.name) storePagePermissions(formPermissions)
+      } catch {}
       setSaveResult({ success: true, message: "权限保存成功" })
       // 保存后立即重新拉取最新数据，确保切角色回来后 UI 状态正确
       await loadData()

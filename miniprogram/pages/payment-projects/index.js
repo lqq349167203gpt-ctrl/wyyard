@@ -12,7 +12,7 @@ const TABS = [
   { value: 'membership_card', label: '会员卡', api: membershipCardApi },
   { value: 'group_case', label: '觉醒游戏', api: groupCaseApi },
   { value: 'emotional_release', label: '情绪释放', api: emotionalReleaseApi },
-  { value: 'oh_card_reading', label: 'OH卡梳理', api: ohCardReadingApi },
+  { value: 'oh_card_reading', label: 'OH卡诊断', api: ohCardReadingApi },
   { value: 'energy_knot', label: '能量结', api: energyKnotApi },
   { value: 'internal_course', label: '内部课程', api: internalCourseApi },
   { value: 'other', label: '其他', api: otherProjectApi },

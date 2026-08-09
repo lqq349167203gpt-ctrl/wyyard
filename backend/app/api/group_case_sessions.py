@@ -56,7 +56,10 @@ def list_sessions(date: Optional[str] = None, page: int | None = Query(None, ge=
 
 @router.post("")
 def create_session(data: GroupCaseSessionCreate, request: Request, conversion: bool = False):
-    session = group_case_session_service.create_session(data, refresh_identities=not conversion)
+    try:
+        session = group_case_session_service.create_session(data, refresh_identities=not conversion)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
     if not conversion:
         activity_assignment_notification_service.notify_new_assignments(
@@ -99,5 +102,5 @@ def delete_session(session_id: str, conversion: bool = False):
 
 
 @router.get("/search-customers")
-def search_customers(q: str = ""):
-    return group_case_session_service.search_customers(q)
+def search_customers(q: str = "", date: str = ""):
+    return group_case_session_service.search_customers(q, date)

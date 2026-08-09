@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -165,7 +165,6 @@ def test_client_aggregates_only_published_activities(monkeypatch):
         "觉醒游戏": ("gcs", "gcs-1"),
         "情绪释放": ("ers", "ers-1"),
         "能量结": ("eks", "eks-1"),
-        "OH卡梳理": ("ocr", "ocr-1"),
     }
     for display_type, (activity_type, activity_id) in expected.items():
         service = client_api.OTHER_ACTIVITY_SERVICES[display_type][1]
@@ -186,6 +185,52 @@ def test_client_aggregates_only_published_activities(monkeypatch):
         assert by_id[activity_id]["data"]["course_type"] == display_type
     assert by_id["ics-1"]["type"] == "ics"
     assert by_id["ics-1"]["data"]["course_type"] == "内部课程子类型"
+
+
+def test_client_activity_list_includes_recent_past_when_no_date_range(monkeypatch):
+    today = date.today()
+    activity_dates = {
+        "future": (today + timedelta(days=1)).isoformat(),
+        "recent-past": (today - timedelta(days=1)).isoformat(),
+        "older-past": (today - timedelta(days=3)).isoformat(),
+    }
+    raw_items = [
+        {
+            "id": activity_id,
+            "type": "class",
+            "date": activity_date,
+            "data": {"date": activity_date},
+        }
+        for activity_id, activity_date in activity_dates.items()
+    ]
+    monkeypatch.setattr(client_api, "_aggregate_published_activities", lambda: raw_items)
+    monkeypatch.setattr(client_api, "_build_customer_map", lambda: {})
+    monkeypatch.setattr(client_api, "_get_space_map", lambda: ({}, {}))
+    monkeypatch.setattr(client_api, "_signup_map", lambda: {})
+    monkeypatch.setattr(client_api, "_activity_signup_count", lambda *_: 0)
+    monkeypatch.setattr(
+        client_api,
+        "_format_activity",
+        lambda item, *_: {
+            "id": item["id"],
+            "date": item["date"],
+            "start_time": "10:00",
+        },
+    )
+
+    result = client_api.list_activities(
+        page=1,
+        page_size=20,
+        start_date=None,
+        end_date=None,
+    )
+
+    assert result["total"] == 3
+    assert [item["id"] for item in result["items"]] == [
+        "future",
+        "recent-past",
+        "older-past",
+    ]
 
 
 def test_client_formats_other_activity_with_configured_images(monkeypatch):

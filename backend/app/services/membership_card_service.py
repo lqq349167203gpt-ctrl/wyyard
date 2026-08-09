@@ -238,7 +238,6 @@ def _count_raw_activities(customer_id: str) -> int:
         class_record_service,
         emotional_release_session_service,
         group_case_session_service,
-        oh_card_reading_session_service,
         visit_service,
     )
     arrived_dates = {v.visit_date for v in visit_service._visits.values()
@@ -257,12 +256,6 @@ def _count_raw_activities(customer_id: str) -> int:
     for s in emotional_release_session_service.list_sessions():
         if not s.is_deleted and s.date in arrived_dates:
             if customer_id in emotional_release_session_service._get_chargeable_ids(s):
-                count += 1
-    for s in oh_card_reading_session_service.list_sessions():
-        if not s.is_deleted and s.date in arrived_dates:
-            chargeable = set(s.participant_ids)
-            chargeable.discard(s.owner_id)
-            if customer_id in chargeable:
                 count += 1
     return count
 
@@ -384,7 +377,6 @@ def _get_activity_date(activity_key: str) -> Optional[str]:
         emotional_release_session_service,
         energy_knot_session_service,
         group_case_session_service,
-        oh_card_reading_session_service,
     )
     activity_key = _base_activity_key(activity_key)
     if ':' not in activity_key:
@@ -403,9 +395,6 @@ def _get_activity_date(activity_key: str) -> Optional[str]:
         elif type_prefix == 'eks':
             s = energy_knot_session_service.get_session(item_id)
             return s.date if s else None
-        elif type_prefix == 'ocr':
-            s = oh_card_reading_session_service.get_session(item_id)
-            return s.date if s else None
     except Exception:
         return None
     return None
@@ -417,7 +406,6 @@ def _get_expected_activity_keys(customer_id: str) -> list[str]:
         class_record_service,
         emotional_release_session_service,
         group_case_session_service,
-        oh_card_reading_session_service,
         visit_service,
     )
 
@@ -457,7 +445,6 @@ def _get_expected_activity_keys(customer_id: str) -> list[str]:
     session_services = (
         ("gcs", group_case_session_service),
         ("ers", emotional_release_session_service),
-        ("ocr", oh_card_reading_session_service),
     )
     for prefix, service in session_services:
         for session in service.list_sessions():
@@ -1091,6 +1078,85 @@ def _refresh_member_type(customer_id: str):
     """委托给 member_identity_service 计算身份"""
     from app.services.member_identity_service import refresh_member_type
     refresh_member_type(customer_id)
+
+
+def _activity_key_label(activity_key: str) -> str:
+    """将活动 key 转为可读标签，优先显示活动名称，无名称则显示类型"""
+    type_map = {"class": "课程", "gcs": "觉醒游戏", "ers": "情绪释放"}
+    prefix = activity_key.split(":")[0] if ":" in activity_key else ""
+    type_name = type_map.get(prefix, prefix)
+    activity_id = activity_key.split(":", 1)[1] if ":" in activity_key else activity_key
+    name = ""
+    try:
+        if prefix == "class":
+            from app.services import class_record_service
+            r = class_record_service.get_record(activity_id)
+            if r:
+                name = r.activity_name or r.course_name or ""
+        elif prefix == "gcs":
+            from app.services import group_case_session_service
+            s = group_case_session_service.get_session(activity_id)
+            if s:
+                name = s.name or ""
+        elif prefix == "ers":
+            from app.services import emotional_release_session_service
+            s = emotional_release_session_service.get_session(activity_id)
+            if s:
+                name = s.name or ""
+    except Exception:
+        pass
+    label = name or type_name
+    date = _get_activity_date(activity_key)
+    if date:
+        return f"{label} {date}"
+    return label
+
+
+def get_debt_record(customer_id: str) -> dict:
+    """返回单个客户的会员卡欠卡汇总，并按活动聚合多次扣卡。"""
+    activity_keys = _debt_activities.get(customer_id, [])
+    grouped: dict[str, int] = {}
+    for activity_key in activity_keys:
+        base_key = _base_activity_key(activity_key)
+        grouped[base_key] = grouped.get(base_key, 0) + 1
+
+    activities = []
+    for activity_key, count in grouped.items():
+        activity_date = _get_activity_date(activity_key) or ""
+        full_label = _activity_key_label(activity_key)
+        label = full_label.removesuffix(f" {activity_date}") if activity_date else full_label
+        activities.append({
+            "label": label,
+            "date": activity_date,
+            "count": count,
+        })
+    debt = sum(item["count"] for item in activities)
+    customer = customer_service.get_customer(customer_id)
+    return {
+        "customer_id": customer_id,
+        "nickname": customer.nickname if customer else "",
+        "member_type": customer.member_type if customer else "",
+        "total_count": get_grand_total(customer_id),
+        "deducted_count": get_manual_deductions(customer_id) + get_activity_deductions(customer_id) + debt,
+        "debt_count": debt,
+        "debt_activities": activities,
+        "activity_labels": [
+            f"{item['label']} {item['date']}×{item['count']}" if item["count"] > 1
+            else f"{item['label']} {item['date']}".strip()
+            for item in activities
+        ],
+    }
+
+
+def list_debt_records() -> list:
+    """列出所有欠卡记录（会员卡），返回 [{customer_id, nickname, member_type, total_count, deducted_count, debt_count, activity_labels}]"""
+    result = []
+    for customer_id, activity_keys in _debt_activities.items():
+        if not activity_keys:
+            continue
+        result.append(get_debt_record(customer_id))
+    result.sort(key=lambda r: r["nickname"])
+    return result
 
 
 def search_customers(keyword: str) -> list:

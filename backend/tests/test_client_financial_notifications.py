@@ -80,6 +80,14 @@ def test_activity_deductions_are_replaced_by_activity_arrangement_notifications(
     assert activity_response.status_code == 200
     activity = activity_response.json()
 
+    visit_response = client.post("/api/visits", json={
+        "visit_date": "2026-07-29",
+        "customer_id": created_customer["id"],
+        "arrived": False,
+    })
+    assert visit_response.status_code == 200
+    visit = visit_response.json()
+
     session_response = client.post("/api/group-case-sessions", json={
         "date": "2026-07-29",
         "name": "未购买觉醒游戏通知",
@@ -89,13 +97,8 @@ def test_activity_deductions_are_replaced_by_activity_arrangement_notifications(
     assert session_response.status_code == 200
     session = session_response.json()
 
-    visit_response = client.post("/api/visits", json={
-        "visit_date": "2026-07-29",
-        "customer_id": created_customer["id"],
-        "arrived": True,
-    })
+    visit_response = client.patch(f"/api/visits/{visit['id']}", json={"arrived": True})
     assert visit_response.status_code == 200
-    visit = visit_response.json()
 
     response = client.get(
         "/api/client/notifications",

@@ -16,6 +16,7 @@ SECTION_MAP = {
     "/api/course-types": "活动配置",
     "/api/spaces": "空间配置",
     "/api/member-identities": "会员身份",
+    "/api/customer-tags": "客户标签",
     "/api/activity-permissions": "课表",
     "/api/membership-cards": "付费项目",
     "/api/group-cases": "课表",
@@ -38,10 +39,11 @@ SECTION_MAP = {
     "/api/position-customer-permissions": "账号管理",
     "/api/system-logs": "系统日志",
     "/api/other-projects": "课表",
-    "/api/oh-card-readings": "课表",
-    "/api/oh-card-reading-sessions": "课表",
+    "/api/oh-card-readings": "付费项目",
+
     "/api/project-deductions": "付费项目",
     "/api/project-refunds": "付费项目",
+    "/api/expenses": "支出",
     "/api/reminders": "提醒配置",
     "/api/business-reminders": "提醒",
     "/api/activity-themes": "课表",
@@ -49,6 +51,8 @@ SECTION_MAP = {
     "/api/activity-history": "邀约",
     "/api/visit-history": "邀约",
     "/api/communication-records": "沟通记录",
+    "/api/offline-courses": "付费项目",
+    "/api/offline-course-records": "落地课程",
     "/api/client/activities": "邀约",
     "/api/client/notifications": "消息通知",
 }
@@ -60,6 +64,7 @@ GETTER_MAP = {
     "/api/courses": ("活动配置", "course_service", "get_course"),
     "/api/spaces": ("空间配置", "space_service", "get_space"),
     "/api/member-identities": ("会员身份", "member_identity_service", "get_identity"),
+    "/api/customer-tags": ("客户标签", "customer_tag_service", "get_tag"),
     "/api/membership-cards": ("付费项目", "membership_card_service", "get_card"),
     "/api/group-cases": ("课表", "group_case_service", "get_case"),
     "/api/group-case-sessions": ("课表", "group_case_session_service", "get_session"),
@@ -80,11 +85,14 @@ GETTER_MAP = {
     # position-customer-permissions 不走通用 getter（按 section+position 取，不是按 id）；
     # 它的快照在下方专用分支里处理
     "/api/other-projects": ("活动安排", "other_project_service", "get_project"),
-    "/api/oh-card-readings": ("活动安排", "oh_card_reading_service", "get_reading"),
-    "/api/oh-card-reading-sessions": ("活动安排", "oh_card_reading_session_service", "get_session"),
+    "/api/oh-card-readings": ("付费项目", "oh_card_reading_service", "get_reading"),
+
     "/api/reminders": ("提醒配置", "reminder_service", "get_reminder"),
     "/api/activity-themes": ("活动安排", "activity_theme_service", "get_theme"),
     "/api/organizations": ("组织信息", "organization_service", "get_organization"),
+    "/api/offline-courses": ("付费项目", "offline_course_service", "get_course"),
+    "/api/offline-course-records": ("落地课程", "offline_course_record_service", "get_record"),
+    "/api/expenses": ("支出", "expense_service", "get_expense"),
 }
 
 PAGE_LABELS: dict[str, str] = {
@@ -98,7 +106,19 @@ PAGE_LABELS: dict[str, str] = {
     "class-records-activities": "邀约",
     "class-records-arrival": "邀约",
     "daily-activities": "课表",
+    "offline-course-records": "落地课程",
+    "communication-records": "沟通记录",
+    "followup-records": "回访记录",
+    "referral-statistics": "引流统计",
+    "member-statistics": "会员情况",
+    "course-statistics": "课程",
+    "product-sales": "产品销售",
+    "statistics": "服务数据",
+    "daily-report": "每日报表",
     "payment": "付费项目",
+    "payment-deductions": "销卡",
+    "payment-refunds": "退费",
+    "debt-records": "欠卡记录",
     "membership-cards": "付费项目",
     "group-cases": "课表",
     "emotional-releases": "课表",
@@ -116,19 +136,25 @@ PAGE_LABELS: dict[str, str] = {
     "accounts": "账号管理",
     "change-password": "密码修改",
     "member-identities": "会员身份",
+    "customer-tags": "客户标签",
     "healing-identities": "疗愈老师",
     "position-management": "账号管理",
     "courses": "活动配置",
     "spaces": "空间配置",
     "other-projects": "课表",
-    "oh-card-readings": "课表",
-    "oh-card-reading-sessions": "课表",
+    "oh-card-readings": "付费项目",
+    "tea-seat-fees": "付费项目",
+
     "reminders": "提醒配置",
     "business-reminders": "提醒",
     "activity-themes": "课表",
     "organizations": "组织信息",
     "activity-history": "邀约",
     "visit-history": "邀约",
+    "offline-courses": "付费项目",
+    "expenses": "支出",
+    "disabled-customers": "停用客户",
+    "chat-history": "沟通记录",
 }
 
 SKIP_PATHS = [
@@ -190,6 +216,7 @@ FIELD_NAMES = {
     "host_id": "主持人", "leader_id": "组长", "deputy_id": "副组长",
     "member_ids": "成员", "teacher_ids": "老师",
     "price": "价格", "amount": "金额", "count": "次数", "total": "总计",
+    "expense_time": "支出时间", "purchase_content": "购买内容", "platform": "平台", "notes": "备注",
     "sort_order": "排序", "is_public_welfare": "公益",
     "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "疗愈师回复",
     "needs": "需求", "visit_date": "到访日期",
@@ -208,6 +235,8 @@ FIELD_NAMES = {
     "work_status": "工作状态", "work_description": "工作描述",
     "basic_info": "创伤经历", "assessment": "当下卡点",
     "tags": "到访目的", "self_tags": "个人标签",
+    "scope": "可见范围", "description": "说明", "enabled": "启用状态", "tag_ids": "客户标签",
+    "customer_tags": "客户标签",
     "wechat": "微信", "core_situation": "核心情况",
     "deal_date": "成交日期", "last_visit_date": "最近到店", "other_info": "其他信息",
     "service_teacher": "服务老师", "is_leader": "组长", "group_leader_feedback": "组长反馈",
@@ -230,6 +259,8 @@ FIELD_NAMES = {
     "provider": "模型供应商", "model": "模型", "api_key": "API密钥", "base_url": "接口地址",
     "system_prompt": "系统提示词", "temperature": "温度", "max_tokens": "最大Token数",
     "project_name": "项目名称", "fee": "费用", "duration_type": "时长类型", "duration_value": "时长值",
+    "record_date": "上课日期", "teacher": "课程老师", "result": "课程结果",
+    "validity_value": "有效期", "validity_unit": "有效期单位",
 }
 
 
@@ -242,7 +273,7 @@ def get_section(path: str) -> str:
 
 
 def get_entity_name(body: dict) -> str:
-    for key in ["nickname", "name", "title", "content", "section", "username", "course_name", "owner_name", "date", "position"]:
+    for key in ["nickname", "name", "title", "purchase_content", "content", "section", "username", "course_name", "owner_name", "date", "position"]:
         if key in body and body[key]:
             return str(body[key])[:20]
     return ""
@@ -717,6 +748,12 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         if nickname:
             entity_name = nickname
 
+    # 落地课程记录：用客户昵称作为实体名
+    if "/api/offline-course-records" in path:
+        nickname = (body or {}).get("customer_nickname") or (before or {}).get("customer_nickname", "")
+        if nickname:
+            entity_name = nickname
+
     # 邀约：从 customer_id 反查昵称（覆盖 member_type/date 等误匹配）
     if "/api/visits" in path and not entity_name:
         customer_id = (body or {}).get("customer_id") or (before or {}).get("customer_id", "")
@@ -827,7 +864,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         if not project_name:
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
-                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
+                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "能量结",
+                "internal-courses": "内部课程", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)
@@ -891,7 +929,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         if not project_name:
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
-                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡梳理", "energy-knots": "能量结",
+                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "能量结",
+                "internal-courses": "内部课程", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)
@@ -1075,7 +1114,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         date_space_prefixes = [
             "/api/group-case-sessions", "/api/emotional-release-sessions",
             "/api/energy-knot-sessions", "/api/internal-course-sessions",
-            "/api/oh-card-reading-sessions", "/api/visits", "/api/class-records",
+            "/api/visits", "/api/class-records",
         ]
         suffix_parts = []
         if any(path.startswith(p) for p in date_space_prefixes):
@@ -1105,7 +1144,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         date_space_prefixes = [
             "/api/group-case-sessions", "/api/emotional-release-sessions",
             "/api/energy-knot-sessions", "/api/internal-course-sessions",
-            "/api/oh-card-reading-sessions", "/api/visits", "/api/class-records",
+            "/api/visits", "/api/class-records",
         ]
         suffix_parts = []
         if any(path.startswith(p) for p in date_space_prefixes) and before:
@@ -1212,6 +1251,11 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         for computed_key in ("total_payment", "visit_count", "activity_count", "welfare_count"):
             body.pop(computed_key, None)
 
+        # 接口可以提供准确的业务快照，解决嵌套资源无法由路径可靠反查的问题。
+        log_context = getattr(request.state, "operation_log_context", None)
+        if isinstance(log_context, dict) and "before_data" in log_context:
+            before_data = log_context["before_data"]
+
         # 过滤敏感字段（密码、API 密钥、手机号等）
         body = _scrub_sensitive(body)
         if before_data:
@@ -1219,8 +1263,22 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
 
         try:
             section = get_section(path)
-            content = build_log_content(method, path, body, before_data)
-            entity_id = get_entity_id(path)
+            content = (
+                log_context.get("content")
+                if isinstance(log_context, dict) and log_context.get("content")
+                else build_log_content(method, path, body, before_data)
+            )
+            entity_id = (
+                log_context.get("entity_id", "")
+                if isinstance(log_context, dict)
+                else get_entity_id(path)
+            )
+
+            after_data = body.get("permissions", body) if body else None
+            if isinstance(log_context, dict) and "after_data" in log_context:
+                after_data = log_context["after_data"]
+            if after_data:
+                after_data = _scrub_sensitive(after_data)
 
             # 特殊处理：position-permissions/full 端点使用 body 中的 position 作为 entity_id
             if "/api/position-permissions/full" in path:
@@ -1238,7 +1296,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                 "entity_id": entity_id,
                 "ip": ip,
                 "before_data": before_data,
-                "after_data": body.get("permissions", body) if body else None,
+                "after_data": after_data,
             })
         except Exception:
             pass

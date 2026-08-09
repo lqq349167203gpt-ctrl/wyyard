@@ -191,8 +191,8 @@ export default function CommunicationRecordsPage() {
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4" style={{ width: "140px" }}>客户</TableHead>
-                <TableHead style={{ width: "110px" }}>身份</TableHead>
-                <TableHead>沟通记录</TableHead>
+                <TableHead style={{ width: "130px", paddingRight: "20px" }}>身份</TableHead>
+                <TableHead className="pl-[20px]">沟通记录</TableHead>
                 <TableHead style={{ width: "80px" }}>创建人</TableHead>
                 <TableHead style={{ width: "110px" }}>创建日期</TableHead>
                 <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
@@ -214,14 +214,14 @@ export default function CommunicationRecordsPage() {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell style={{ paddingRight: "20px" }}>
                     {nicknameToIdentity[record.customer_nickname] ? (
-                      <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{nicknameToIdentity[record.customer_nickname]}</span>
+                      <span className="inline-block max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{nicknameToIdentity[record.customer_nickname]}</span>
                     ) : (
                       <span className="text-[12px] text-[#a8b1bd]">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-[12px] text-[#4e535a] whitespace-normal break-words">{record.content}</TableCell>
+                  <TableCell className="pl-[20px] text-[12px] text-[#4e535a] whitespace-normal break-words">{record.content}</TableCell>
                   <TableCell className="text-[12px] text-[#a8b1bd]">{record.creator || "-"}</TableCell>
                   <TableCell className="text-[12px] text-[#a8b1bd] tabular-nums">{record.created_at ? new Date(record.created_at).toLocaleDateString("zh-CN") : "-"}</TableCell>
                   <TableCell className="text-right pr-4">

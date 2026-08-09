@@ -52,16 +52,16 @@ Page({
 
   async loadUnreadCount() {
     try {
-      const res = await clientApi.getNotifications()
+      const res = await clientApi.getNotifications({ silentAuth: true })
       this.setData({ unreadCount: res.unread_count || 0 })
     } catch (e) {
-      // ignore
+      this._syncGuestState()
     }
   },
 
   async loadRemaining() {
     try {
-      const res = await clientApi.getRemaining()
+      const res = await clientApi.getRemaining({ silentAuth: true })
       const rc = res.remaining
       let remainNum = '0'
       let remainClass = ''
@@ -83,13 +83,13 @@ Page({
       }
       this.setData({ remainNum, remainClass, remainLabel })
     } catch (e) {
-      // ignore
+      this._syncGuestState()
     }
   },
 
   async loadActivityTimeline() {
     try {
-      const res = await clientApi.getActivityRecords()
+      const res = await clientApi.getActivityRecords({ silentAuth: true })
       const now = new Date()
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       const items = (res.items || []).map(a => {
@@ -223,8 +223,21 @@ Page({
         'stats.activity_count': items.length,
       })
     } catch (e) {
-      // ignore
+      this._syncGuestState()
     }
+  },
+
+  _syncGuestState() {
+    if (getApp().isLoggedIn()) return
+    this.setData({
+      isLoggedIn: false,
+      customer: null,
+      unreadCount: 0,
+      activityGroups: [],
+      activityTotalCount: 0,
+      weekCount: 0,
+      'stats.activity_count': 0,
+    })
   },
 
   onGoLogin() {

@@ -6,8 +6,11 @@ from typing import Optional, List
 class OhCardReadingBase(SafeBaseModel):
     customer_id: str
     nickname: str
-    purchase_count: int = 0
-    amount: float = 0.0
+    purchase_count: int = 1  # 固定为1，录入即完成
+    diagnosis_duration: int = 1  # 诊断时长（半小时为单位），默认1=0.5小时
+    amount: float = 298.0  # 默认298
+    notes: str = ""  # 注释
+    diagnosis_teacher: str = ""  # 诊断老师（昵称）
     closer_id: Optional[str] = None
     closer_name: Optional[str] = None
     closers: List[dict] = []

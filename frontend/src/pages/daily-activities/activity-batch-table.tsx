@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
-  energyKnotSessionApi, internalCourseSessionApi, ohCardReadingSessionApi,
+  energyKnotSessionApi, internalCourseSessionApi,
   courseTypeApi, activityOrderApi,
   type CustomerLight, type Space, type MemberIdentity, type CourseType,
 } from "@/lib/api"
@@ -15,7 +15,7 @@ import { ACTIVITY_POSITION_MAP } from "@/lib/positions"
 import { SpaceRoomDropdown } from "@/components/space-room-dropdown"
 import type { CardCallbacks } from "./index"
 
-type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"
+type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics"
 
 const TYPE_BADGES: Record<ActivityType, { label: string; color: string; bg: string }> = {
   class: { label: "沙龙", color: "#8f959e", bg: "#f5f6f7" },
@@ -23,11 +23,10 @@ const TYPE_BADGES: Record<ActivityType, { label: string; color: string; bg: stri
   ers: { label: "情绪", color: "#8f959e", bg: "#f5f6f7" },
   eks: { label: "能量", color: "#8f959e", bg: "#f5f6f7" },
   ics: { label: "内部", color: "#8f959e", bg: "#f5f6f7" },
-  ocr: { label: "OH卡", color: "#8f959e", bg: "#f5f6f7" },
 }
 
 const TYPE_NAMES: Record<ActivityType, string> = {
-  class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "内部课程", ocr: "OH卡梳理",
+  class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "内部课程",
 }
 
 const ICS_COURSE_LABELS: Record<string, string> = {
@@ -69,7 +68,6 @@ const TYPE_OPTIONS = [
   { value: "class", label: "沙龙活动" },
   { value: "gcs", label: "觉醒游戏" },
   { value: "ers", label: "情绪释放" },
-  { value: "ocr", label: "OH卡梳理" },
   { value: "eks", label: "能量结" },
   { value: "ics:疗愈师课程", label: "疗愈师课程" },
   { value: "ics:商业框架陪跑", label: "商业框架陪跑" },
@@ -151,7 +149,7 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
     hostIds = data.teacher_ids || []
     name = courses.find(c => c.id === data.course_id)?.name || data.course_name || ""
     classCourseType = data.course_type || ""
-  } else if (type === "gcs" || type === "ers" || type === "ocr") {
+  } else if (type === "gcs" || type === "ers") {
     ownerId = data.owner_id || ""
     ownerName = data.owner_name || ""
     hostIds = data.teacher_ids || data.host_ids || []
@@ -173,7 +171,7 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
   if (type === "class") {
     const groupIds = (data.groups || []).flatMap((g: any) => [g.leader_id, g.deputy_id, ...(g.member_ids || [])].filter(Boolean))
     participantIds = [...new Set([...groupIds, ...(data.participant_ids || [])])]
-  } else if (type === "gcs" || type === "ocr") {
+  } else if (type === "gcs") {
     participantIds = [...(data.participant_ids || [])].filter(Boolean)
   } else if (type === "ers") {
     participantIds = [...(data.participant_ids || [])].filter(Boolean)
@@ -261,10 +259,11 @@ interface ActivityBatchTableProps {
   date: string
   courses: {id: string, name: string}[]
   customers: CustomerLight[]
+  invitedCustomerIds?: string[]
   teachers: CustomerLight[]
   spaces: Space[]
   spaceId?: string
-  records: { type: "class" | "gcs" | "ers" | "eks" | "ics" | "ocr"; data: any }[]
+  records: { type: "class" | "gcs" | "ers" | "eks" | "ics"; data: any }[]
   onReload: () => void
   callbacks: CardCallbacks
   getMemberName: (id: string) => string
@@ -283,7 +282,7 @@ interface ActivityBatchTableProps {
 }
 
 export function ActivityBatchTable({
-  date, courses, customers, teachers, spaces, spaceId,
+  date, courses, customers, invitedCustomerIds, teachers, spaces, spaceId,
   records, onReload, callbacks, getMemberName, memberIdentities,
   onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed,
   previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview,
@@ -304,6 +303,12 @@ export function ActivityBatchTable({
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
   const [editingDescriptionKey, setEditingDescriptionKey] = useState<number | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState("")
+  const invitedOwnerCustomers = useMemo(() => {
+    // 邀约名单加载完成前保持为空，避免短暂暴露全部客户作为案主候选。
+    if (!invitedCustomerIds) return []
+    const invitedIds = new Set(invitedCustomerIds)
+    return customers.filter(customer => invitedIds.has(customer.id))
+  }, [customers, invitedCustomerIds])
 
   const fitDescriptionPreview = useCallback((element: HTMLTextAreaElement | null) => {
     if (!element) return
@@ -358,7 +363,6 @@ export function ActivityBatchTable({
     else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(id, conversion)
     else if (row.record_type === "eks") await energyKnotSessionApi.delete(id, conversion)
     else if (row.record_type === "ics") await internalCourseSessionApi.delete(id)
-    else if (row.record_type === "ocr") await ohCardReadingSessionApi.delete(id, conversion)
   }, [])
 
   const undo = useCallback(() => {
@@ -514,7 +518,6 @@ export function ActivityBatchTable({
       { value: "class", label: "沙龙活动", children: classChildren },
       { value: "gcs", label: "觉醒游戏" },
       { value: "ers", label: "情绪释放" },
-      { value: "ocr", label: "OH卡梳理" },
       { value: "eks", label: "能量结" },
       { value: "ics:疗愈师课程", label: "疗愈师课程" },
       { value: "ics:商业框架陪跑", label: "商业框架陪跑" },
@@ -537,24 +540,19 @@ export function ActivityBatchTable({
   rowsRef.current = rows
   const timersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
 
-  const REMAINING_APIS: Record<string, (kw: string) => Promise<any[]>> = {
-    eks: (kw) => energyKnotSessionApi.searchCustomers(kw),
-    gcs: (kw) => groupCaseSessionApi.searchCustomers(kw),
-    ers: (kw) => emotionalReleaseSessionApi.searchCustomers(kw),
-    ocr: (kw) => ohCardReadingSessionApi.searchCustomers(kw),
-  }
-
   const fetchRemaining = useCallback(async (type: string, customerId: string) => {
     if (!customerId) return
-    const api = REMAINING_APIS[type]
-    if (!api) return
     try {
-      const results = await api("")
+      let results: any[] = []
+      if (type === "eks") results = await energyKnotSessionApi.searchCustomers("", date)
+      else if (type === "gcs") results = await groupCaseSessionApi.searchCustomers("", date)
+      else if (type === "ers") results = await emotionalReleaseSessionApi.searchCustomers("", date)
+      else return
       const map: Record<string, number> = {}
       for (const r of results) map[r.id] = r.remaining
       setRemainingMap(prev => ({ ...prev, [type]: { ...prev[type], ...map } }))
     } catch {}
-  }, [])
+  }, [date])
 
   // 从 records 加载行数据（优先从 API 获取排序，fallback 到 localStorage）
   const prevRecordsRef = useRef<string | null>(null)
@@ -645,7 +643,7 @@ export function ActivityBatchTable({
           createData.course_description = row.description || ""
           createData.teacher_ids = row.host_ids
           createData.is_public_welfare = row.is_public_welfare
-        } else if (type === "gcs" || type === "ers" || type === "ocr") {
+        } else if (type === "gcs" || type === "ers") {
           createData.name = row.name || ""
           createData.owner_id = row.owner_id || ""
           createData.owner_name = row.owner_name || ""
@@ -675,7 +673,6 @@ export function ActivityBatchTable({
         else if (type === "ers") result = await emotionalReleaseSessionApi.create(createData, conversion)
         else if (type === "eks") result = await energyKnotSessionApi.create(createData, conversion)
         else if (type === "ics") result = await internalCourseSessionApi.create(createData)
-        else if (type === "ocr") result = await ohCardReadingSessionApi.create(createData, conversion)
 
         // 更新行：标记为已创建。先同步 rowsRef，避免 React 批处理期间再次被当成未创建记录。
         const rowsWithCreatedRecord = rowsRef.current.map(r => r.key === row.key ? {
@@ -691,7 +688,7 @@ export function ActivityBatchTable({
         } catch {}
         rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saved" }
         setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
-        if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+        if (["eks", "gcs", "ers"].includes(row.record_type)) {
           // 余额列表数据量较大，不阻塞场次创建和旧类型清理。
           void fetchRemaining(row.record_type, "all")
         }
@@ -755,16 +752,6 @@ export function ActivityBatchTable({
             teacher_ids: row.host_ids,
             participant_ids: row.participant_ids,
           })
-        } else if (type === "ocr") {
-          await ohCardReadingSessionApi.update(id, {
-            ...common,
-            name: row.name,
-            owner_id: row.owner_id || "",
-            owner_name: row.owner_name || "",
-            teacher_ids: row.host_ids,
-            description: row.description,
-            participant_ids: row.participant_ids,
-          })
         }
       }
 
@@ -773,7 +760,7 @@ export function ActivityBatchTable({
       historyPushedRef.current.delete(row.key)
       if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
       // 保存后刷新剩余次数（fetchRemaining 会获取该类型所有客户，调一次即可）
-      if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+      if (["eks", "gcs", "ers"].includes(row.record_type)) {
         if (row.owner_id || prevOwnerRef.current[row.key]) {
           delete prevOwnerRef.current[row.key]
         }
@@ -900,7 +887,6 @@ export function ActivityBatchTable({
     else if (row.record_type === "ers") callbacks.onDeleteErs(row.record_id)
     else if (row.record_type === "eks") callbacks.onDeleteEks(row.record_id)
     else if (row.record_type === "ics") callbacks.onDeleteIcs(row.record_id)
-    else if (row.record_type === "ocr") callbacks.onDeleteOcr(row.record_id)
   }, [callbacks])
 
   // 类型切换 → 先创建新记录，成功后再删除旧记录（防止数据丢失）
@@ -921,7 +907,9 @@ export function ActivityBatchTable({
         ? row.class_course_type
         : ""
     if (type === row.record_type && (!["class", "ics"].includes(type) || parsedCourse === currentCourse)) return
+
     typeChangeKeysRef.current.add(rowKey)
+
     if (timersRef.current[rowKey]) {
       clearTimeout(timersRef.current[rowKey])
       delete timersRef.current[rowKey]
@@ -942,6 +930,12 @@ export function ActivityBatchTable({
       raw: {},
       membership_deduction_count: type === "eks" || type === "ics" ? 0 : 1,
       deduction_count: type === "eks" ? 2 : 1,
+    }
+
+    // 草稿阶段允许案主为空；选中案主时仍由前后端共同校验当天邀约名单。
+    if (["gcs", "ers", "eks"].includes(type) && !invitedOwnerCustomers.some(customer => customer.id === updated.owner_id)) {
+      updated.owner_id = ""
+      updated.owner_name = ""
     }
     const rowsWithUpdatedType = rowsRef.current.map(r => r.key === rowKey ? updated : r)
     rowsRef.current = rowsWithUpdatedType
@@ -968,7 +962,7 @@ export function ActivityBatchTable({
           throw deleteError
         }
         // 旧专项类型的余额也要刷新，否则界面会暂时显示未返还。
-        if (["eks", "gcs", "ers", "ocr"].includes(row.record_type)) {
+        if (["eks", "gcs", "ers"].includes(row.record_type)) {
           void fetchRemaining(row.record_type, "all")
         }
       }
@@ -983,7 +977,23 @@ export function ActivityBatchTable({
     } finally {
       typeChangeKeysRef.current.delete(rowKey)
     }
-  }, [deleteRecordFromBackend, fetchRemaining, saveRow, pushHistory])
+  }, [deleteRecordFromBackend, fetchRemaining, invitedOwnerCustomers, saveRow, pushHistory])
+
+  const selectOwner = useCallback((row: ActivityRow, customer: CustomerLight) => {
+    const ownerId = customer.id
+    const ownerName = customer.nickname || customer.name || ""
+    if (row.record_type === "eks") {
+      delete prevOwnerRef.current[row.key]
+      const currentRow = rowsRef.current.find(r => r.key === row.key)
+      const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
+      const newDesc = serializeEksDescription(ownerId, ownerName, eksDesc.count)
+      lastEditedEksRef.current = { ...(currentRow || row), owner_id: ownerId, owner_name: ownerName, billing_description: newDesc }
+      if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: ownerId, owner_name: ownerName, billing_description: newDesc })
+      updateRowMulti(row.key, { owner_id: ownerId, owner_name: ownerName, billing_description: newDesc })
+    } else {
+      updateRowMulti(row.key, { owner_id: ownerId, owner_name: ownerName })
+    }
+  }, [updateRowMulti])
 
   // 拖拽排序
   const handleDragStart = useCallback((key: number) => { dragKeyRef.current = key }, [])
@@ -1076,15 +1086,19 @@ export function ActivityBatchTable({
 
   // 预加载案主剩余次数（组件挂载后立即加载，确保首次搜索即可显示）
   useEffect(() => {
-    const types = ["eks", "gcs", "ers", "ocr"] as const
+    fetchedRemainingRef.current.clear()
+    setRemainingMap({})
+    const types = ["eks", "gcs", "ers"] as const
     for (const type of types) {
       if (fetchedRemainingRef.current.has(type)) continue
       fetchedRemainingRef.current.add(type)
-      const api = REMAINING_APIS[type]
-      if (!api) continue
       ;(async () => {
         try {
-          const results = await api("")
+          const results = type === "eks"
+            ? await energyKnotSessionApi.searchCustomers("", date)
+            : type === "gcs"
+              ? await groupCaseSessionApi.searchCustomers("", date)
+              : await emotionalReleaseSessionApi.searchCustomers("", date)
           const map: Record<string, number> = {}
           for (const r of results) map[r.id] = r.remaining
           setRemainingMap(prev => ({ ...prev, [type]: { ...prev[type], ...map } }))
@@ -1093,7 +1107,7 @@ export function ActivityBatchTable({
         }
       })()
     }
-  }, [])
+  }, [date])
 
   const handleCreate = async (type: string, classCourseType?: string) => {
     const fresh = createFreshRow(type as ActivityType, spaceId || "", spaces)
@@ -1191,7 +1205,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal w-[80px]">类型</th>
               <th className="px-1 py-2 text-left font-normal w-[140px]">活动名称</th>
               {hasOwnerType && <th className="px-1 py-2 text-left font-normal w-[86px]">案主</th>}
-              {hasEks && <th className="py-2 text-center font-normal w-[40px]">销卡</th>}
+              {hasEks && <th className="py-2 text-center font-normal w-[40px]">部位</th>}
               <th className="px-1 py-2 text-left font-normal w-[57px]">方式</th>
               <th className="px-1 py-2 text-center font-normal w-[62px]">扣卡次数</th>
               <th className="px-1 py-2 text-left font-normal w-[110px]">老师</th>
@@ -1288,7 +1302,7 @@ export function ActivityBatchTable({
 
                   {/* 活动名称 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "name") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {["class", "ics", "gcs", "ers", "ocr", "eks"].includes(row.record_type) ? (
+                    {["class", "ics", "gcs", "ers", "eks"].includes(row.record_type) ? (
                       <Input rounded="[2px]"
                         value={row.name}
                         onChange={(e) => updateRow(row.key, "name", e.target.value)}
@@ -1302,9 +1316,9 @@ export function ActivityBatchTable({
 
                   {/* 案主 */}
                   {hasOwnerType && <td className={`pl-1.5 pr-0 py-0.5 w-[60px] align-top ${isCellChanged(row.key, "owner_name") || isCellChanged(row.key, "owner_id") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {(row.record_type === "gcs" || row.record_type === "ers" || row.record_type === "ocr") ? (
+                    {(row.record_type === "gcs" || row.record_type === "ers") ? (
                       <CustomerSearchInput rounded="2px"
-                        customers={customers}
+                        customers={invitedOwnerCustomers}
                         value={row.owner_name || ""}
                         showClear={false}
                         excludeIds={[...row.host_ids, ...row.participant_ids]}
@@ -1317,10 +1331,10 @@ export function ActivityBatchTable({
                           }
                         }}
                         onSelectItem={(c) => {
-                          updateRowMulti(row.key, { owner_id: c.id, owner_name: c.nickname || c.name || "" })
+                          selectOwner(row, c)
                         }}
                         onBlur={(v) => {
-                          if (v && !customers.some(c => c.nickname === v || c.name === v)) {
+                          if (v && !invitedOwnerCustomers.some(c => c.nickname === v || c.name === v)) {
                             updateRowMulti(row.key, { owner_id: "", owner_name: "" })
                           }
                         }}
@@ -1331,7 +1345,7 @@ export function ActivityBatchTable({
                     ) : row.record_type === "eks" ? (
                       <div className="flex items-center gap-1 min-w-0">
                         <CustomerSearchInput rounded="2px"
-                          customers={customers}
+                          customers={invitedOwnerCustomers}
                           value={row.owner_name || ""}
                           showClear={false}
                           excludeIds={[...row.host_ids, ...row.participant_ids]}
@@ -1347,16 +1361,10 @@ export function ActivityBatchTable({
                             }
                           }}
                           onSelectItem={(c) => {
-                            delete prevOwnerRef.current[row.key]
-                            const currentRow = rowsRef.current.find(r => r.key === row.key)
-                            const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
-                            const newDesc = serializeEksDescription(c.id, c.nickname || c.name || "", eksDesc.count)
-                            lastEditedEksRef.current = { ...(currentRow || row), owner_id: c.id, owner_name: c.nickname || c.name || "", billing_description: newDesc }
-                            if (row.record_id) eksEditsRef.current.set(row.record_id, { owner_id: c.id, owner_name: c.nickname || c.name || "", billing_description: newDesc })
-                            updateRowMulti(row.key, { owner_id: c.id, owner_name: c.nickname || c.name || "", billing_description: newDesc })
+                            selectOwner(row, c)
                           }}
                           onBlur={(v) => {
-                            if (v && !customers.some(c => c.nickname === v || c.name === v)) {
+                            if (v && !invitedOwnerCustomers.some(c => c.nickname === v || c.name === v)) {
                               const currentRow = rowsRef.current.find(r => r.key === row.key)
                               const eksDesc = parseEksDescription(currentRow?.billing_description || row.billing_description)
                               updateRowMulti(row.key, { owner_id: "", owner_name: "", billing_description: serializeEksDescription("", "", eksDesc.count) })

@@ -20,6 +20,7 @@ import DailyActivitiesPage from "@/pages/daily-activities"
 import PaymentPage from "@/pages/payment"
 import PaymentDeductionsPage from "@/pages/payment-deductions"
 import PaymentRefundsPage from "@/pages/payment-refunds"
+import ExpensesPage from "@/pages/expenses"
 import MemberIdentitiesPage from "@/pages/member-identities"
 import HealingRecordsPage from "@/pages/healing-records"
 import CustomerFormPage from "@/pages/healing-records/customer-form"
@@ -41,7 +42,11 @@ import CourseStatisticsPage from "@/pages/course-statistics"
 import ReferralStatisticsPage from "@/pages/referral-statistics"
 import CommunicationRecordsPage from "@/pages/communication-records"
 import FollowupRecordsPage from "@/pages/followup-records"
+import OfflineCourseRecordsPage from "@/pages/offline-course-records"
+import DebtRecordsPage from "@/pages/debt-records"
+import CustomerTagsPage from "@/pages/customer-tags"
 import { hasPagePermission } from "@/lib/page-permissions"
+import { usePagePermissions } from "@/hooks/use-page-permissions"
 
 const PATH_PERMISSIONS: Record<string, string> = {
 
@@ -55,6 +60,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/payment": "payment",
   "/payment-deductions": "payment-deductions",
   "/payment-refunds": "payment-refunds",
+  "/expenses": "expenses",
   "/agents": "agents",
 
 
@@ -62,8 +68,10 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/system-logs": "system-logs",
   "/operation-logs": "operation-logs",
   "/positions/management": "position-management",
-  "/positions/courses": "courses",
+  // 旧“活动配置”地址现已跳转到组织信息，权限也按目标页面校验
+  "/positions/courses": "organizations",
   "/config/member-identities": "member-identities",
+  "/config/customer-tags": "customer-tags",
   "/courses/spaces": "spaces",
   "/organizations": "organizations",
   "/healing-identities": "healing-identities",
@@ -77,6 +85,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/course-statistics": "course-statistics",
   "/communication-records": "communication-records",
   "/followup-records": "followup-records",
+  "/offline-course-records": "offline-course-records",
+  "/debt-records": "debt-records",
   "/daily-report": "daily-report",
   "/positions/teacher": "position-management",
   "/agents/:id/chat": "agents",
@@ -96,13 +106,7 @@ function ProtectedRoute() {
     }
   }, [])
 
-  const permissions = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("userPermissions") || "[]")
-    } catch {
-      return []
-    }
-  }, [])
+  const permissions = usePagePermissions()
 
   const getFirstAllowedPath = useMemo(() => {
     for (const [path, permission] of Object.entries(PATH_PERMISSIONS)) {
@@ -165,6 +169,7 @@ function App() {
               <Route path="/payment" element={<PaymentPage />} />
               <Route path="/payment-deductions" element={<PaymentDeductionsPage />} />
               <Route path="/payment-refunds" element={<PaymentRefundsPage />} />
+              <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/other-projects" element={<Navigate to="/payment" replace />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id/chat" element={<ChatPage />} />
@@ -172,6 +177,7 @@ function App() {
 
 
               <Route path="/config/member-identities" element={<MemberIdentitiesPage />} />
+              <Route path="/config/customer-tags" element={<CustomerTagsPage />} />
               <Route path="/healing-records" element={<HealingRecordsPage />} />
               <Route path="/healing-records/new" element={<CustomerFormPage />} />
               <Route path="/healing-records/:id/edit" element={<CustomerFormPage />} />
@@ -191,6 +197,8 @@ function App() {
               <Route path="/course-statistics" element={<CourseStatisticsPage />} />
               <Route path="/communication-records" element={<CommunicationRecordsPage />} />
               <Route path="/followup-records" element={<FollowupRecordsPage />} />
+              <Route path="/offline-course-records" element={<OfflineCourseRecordsPage />} />
+              <Route path="/debt-records" element={<DebtRecordsPage />} />
               <Route path="/daily-report" element={<DailyReportPage />} />
             </Route>
           </Route>

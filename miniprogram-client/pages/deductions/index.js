@@ -10,7 +10,7 @@ const TYPE_LABELS = {
   'membership-cards': '会员卡',
   'group-cases': '觉醒游戏',
   'emotional-releases': '情绪释放',
-  'oh-card-readings': 'OH卡梳理',
+  'oh-card-readings': 'OH卡诊断',
   'energy-knots': '能量结',
   'internal-courses': '内部课程',
   'other-projects': '其他项目',

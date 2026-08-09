@@ -80,6 +80,29 @@
         </view>
       </view>
 
+      <!-- 客户标签选择 -->
+      <view class="filter-section">
+        <view class="filter-title-row">
+          <view class="filter-section-title">客户标签</view>
+          <text class="filter-section-hint" wx:if="{{selectedTagIds.length > 1}}">匹配任一标签</text>
+        </view>
+        <view class="tags-wrap">
+          <view
+            class="tag-item customer-filter-tag {{item.selected ? 'active' : ''}}"
+            wx:for="{{customerTagList}}"
+            wx:key="id"
+            bindtap="onToggleCustomerTag"
+            data-id="{{item.id}}"
+          >
+            <text class="customer-filter-tag-name">{{item.name}}</text>
+            <text class="customer-filter-tag-scope" wx:if="{{item.scope === 'private'}}">仅自己</text>
+          </view>
+        </view>
+        <view class="filter-section-empty" wx:if="{{!tagLoading && customerTagList.length === 0}}">
+          <text>暂无可用标签</text>
+        </view>
+      </view>
+
       <!-- 引流人选择 -->
       <view class="filter-section">
         <view class="filter-section-title">引流人</view>
@@ -115,9 +138,10 @@
         <text class="group-count">{{item.list.length}} 人</text>
       </view>
       <view class="group-list">
-        <view class="group-item" wx:for="{{item.list}}" wx:for-item="customer" wx:key="id" bindtap="onCustomerTap" data-customer="{{customer}}">
+        <view class="group-item" wx:for="{{item.list}}" wx:for-item="customer" wx:key="id" bindtap="onCustomerTap" data-id="{{customer.id}}">
           <view class="item-left">
             <text class="item-nickname">{{customer.nickname}}</text>
+            <text class="item-customer-tag" wx:if="{{customer.customer_tags && customer.customer_tags.length}}">{{customer.customer_tags[0].name}}</text>
           </view>
           <view class="item-right">
             <text class="item-count" wx:if="{{customer.visit_count}}">到店 {{customer.visit_count}} 次</text>

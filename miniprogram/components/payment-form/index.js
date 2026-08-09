@@ -27,6 +27,15 @@ const PAYMENT_METHODS = [
   { key: '其他', label: '其他' },
 ]
 
+const DIAGNOSIS_DURATIONS = [
+  { value: 1, label: '0.5小时' },
+  { value: 2, label: '1小时' },
+  { value: 3, label: '1.5小时' },
+  { value: 4, label: '2小时' },
+  { value: 5, label: '2.5小时' },
+  { value: 6, label: '3小时' },
+]
+
 function today() {
   const d = new Date()
   const y = d.getFullYear()
@@ -62,6 +71,10 @@ Component({
     durationTypeIndex: -1,
     paymentMethods: PAYMENT_METHODS,
     paymentMethodIndex: -1,
+    diagnosisDurations: DIAGNOSIS_DURATIONS,
+    diagnosisDurationIndex: 0,  // 默认0.5小时
+    diagnosisTeachers: [],
+    diagnosisTeacherIndex: -1,
     submitting: false,
     allCustomers: [],
     organizations: [],
@@ -74,12 +87,40 @@ Component({
         this._populateEditData(editData)
       }
     },
+    'type': function(type) {
+      if (!type || this.data.isEdit) return
+      const isSession = type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'
+      if (!isSession) return
+      if (this.data.durationTypeIndex >= 0) return // 已初始化过
+      const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === 'day')
+      if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx, 'formData.duration_type': 'day' })
+    },
   },
 
   lifetimes: {
     attached() {
       if (!this.data.isEdit) {
-        this.setData({ formData: { deal_date: today(), effective_date: today() } })
+        const type = this.data.type
+        const initData = { deal_date: today() }
+        if (type === 'oh_card_reading') {
+          initData.amount = '298'
+          initData.diagnosis_duration = 1
+        } else if (type === 'tea_seat_fee') {
+          initData.quantity = '1'
+          initData.amount = '68'
+        } else if (type === 'offline_course') {
+          initData.effective_date = today()
+          initData.validity_value = '1'
+        } else {
+          initData.effective_date = today()
+        }
+        // session 类型默认有效期单位设为天
+        if (type === 'group_case' || type === 'emotional_release' || type === 'energy_knot') {
+          initData.duration_type = 'day'
+          const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === 'day')
+          if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx })
+        }
+        this.setData({ formData: initData })
       }
       this._loadCustomers()
       this._loadOrganizations()
@@ -89,8 +130,17 @@ Component({
   methods: {
     _loadCustomers() {
       customerApi.light(200).then(res => {
-        this.setData({ allCustomers: res || [] })
+        const customers = res || []
+        this.setData({ allCustomers: customers })
+        this._filterDiagnosisTeachers(customers)
       }).catch(() => {})
+    },
+
+    _filterDiagnosisTeachers(customers) {
+      const teachers = (customers || this.data.allCustomers)
+        .filter(c => c.positions && c.positions.indexOf('课程老师') !== -1)
+        .sort((a, b) => (a.position_sort_orders?.['课程老师'] ?? 9999) - (b.position_sort_orders?.['课程老师'] ?? 9999))
+      this.setData({ diagnosisTeachers: teachers })
     },
 
     _loadOrganizations() {
@@ -125,6 +175,9 @@ Component({
         card_type: d.card_type ?? '',
         course_type: d.course_type ?? '',
         payment_method: d.payment_method ?? '',
+        notes: d.notes ?? '',
+        diagnosis_duration: d.diagnosis_duration ?? 1,
+        quantity: d.quantity ?? '1',
       }
       const type = this.data.type
       if (type === 'membership_card' && d.card_type) {
@@ -145,9 +198,36 @@ Component({
         const idx = DURATION_TYPES.findIndex(dt => dt.key === fd.duration_type)
         if (idx >= 0) this.setData({ durationTypeIndex: idx })
       }
+      // session 类型: 从 effective_date + expiry_date 反推 duration_value/type
+      const isSession = type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'
+      if (isSession && d.effective_date && d.expiry_date && !fd.duration_type) {
+        const eff = new Date(d.effective_date.slice(0, 10))
+        const exp = new Date(d.expiry_date.slice(0, 10))
+        const diffDays = Math.round((exp.getTime() - eff.getTime()) / (1000 * 60 * 60 * 24))
+        if (diffDays > 0 && diffDays % 30 === 0) {
+          fd.duration_value = String(diffDays / 30)
+          fd.duration_type = 'month'
+          const idx = DURATION_TYPES.findIndex(dt => dt.key === 'month')
+          if (idx >= 0) this.setData({ durationTypeIndex: idx })
+        } else if (diffDays > 0) {
+          fd.duration_value = String(diffDays)
+          fd.duration_type = 'day'
+          const idx = DURATION_TYPES.findIndex(dt => dt.key === 'day')
+          if (idx >= 0) this.setData({ durationTypeIndex: idx })
+        }
+      }
       if (fd.payment_method) {
         const idx = PAYMENT_METHODS.findIndex(method => method.key === fd.payment_method)
         if (idx >= 0) this.setData({ paymentMethodIndex: idx })
+      }
+      if (type === 'oh_card_reading' && fd.diagnosis_duration) {
+        const idx = DIAGNOSIS_DURATIONS.findIndex(dd => dd.value === fd.diagnosis_duration)
+        if (idx >= 0) this.setData({ diagnosisDurationIndex: idx })
+      }
+      if (type === 'oh_card_reading' && fd.diagnosis_teacher) {
+        const teachers = this.data.diagnosisTeachers
+        const tIdx = teachers.findIndex(t => t.nickname === fd.diagnosis_teacher)
+        if (tIdx >= 0) this.setData({ diagnosisTeacherIndex: tIdx })
       }
       // 匹配组织 index
       if (d.organization_id && this.data.organizations.length > 0) {
@@ -331,6 +411,23 @@ Component({
       })
     },
 
+    onDiagnosisDurationChange(e) {
+      const idx = parseInt(e.detail.value)
+      this.setData({
+        diagnosisDurationIndex: idx,
+        'formData.diagnosis_duration': DIAGNOSIS_DURATIONS[idx].value,
+      })
+    },
+
+    onDiagnosisTeacherChange(e) {
+      const idx = parseInt(e.detail.value)
+      const teachers = this.data.diagnosisTeachers
+      this.setData({
+        diagnosisTeacherIndex: idx,
+        'formData.diagnosis_teacher': teachers[idx] ? teachers[idx].nickname : '',
+      })
+    },
+
     _buildPayload() {
       const { formData, selectedCustomer, closers, type, isEdit } = this.data
       const payload = Object.assign({}, formData)
@@ -342,6 +439,37 @@ Component({
         payload.closer_id = closers[0].id || null
         payload.closer_name = closers[0].nickname || ''
         payload.closers = closers.map(c => ({ id: c.id || '', name: c.nickname || '', amount: c.amount || 0 }))
+      }
+      // session 类型: 从 effective_date + duration 计算 expiry_date
+      const isSession = type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'
+      if (isSession && payload.effective_date && payload.duration_value) {
+        const eff = new Date(payload.effective_date)
+        const val = parseInt(payload.duration_value)
+        if (!isNaN(val) && val > 0) {
+          if (payload.duration_type === 'month') {
+            eff.setMonth(eff.getMonth() + val)
+            eff.setDate(eff.getDate() - 1)
+          } else {
+            eff.setDate(eff.getDate() + val)
+          }
+          const y = eff.getFullYear()
+          const m = String(eff.getMonth() + 1).padStart(2, '0')
+          const dd = String(eff.getDate()).padStart(2, '0')
+          payload.expiry_date = `${y}-${m}-${dd}`
+        }
+      }
+      // 线下课程: 从 effective_date + validity_value 计算 expiry_date（固定月）
+      if (type === 'offline_course' && payload.effective_date && payload.validity_value) {
+        const eff = new Date(payload.effective_date)
+        const val = parseInt(payload.validity_value)
+        if (!isNaN(val) && val > 0) {
+          eff.setMonth(eff.getMonth() + val)
+          eff.setDate(eff.getDate() - 1)
+          const y = eff.getFullYear()
+          const m = String(eff.getMonth() + 1).padStart(2, '0')
+          const dd = String(eff.getDate()).padStart(2, '0')
+          payload.expiry_date = `${y}-${m}-${dd}`
+        }
       }
       if (isEdit) {
         if (type === 'membership_card' || type === 'other') {
@@ -356,7 +484,7 @@ Component({
         }
       }
       const floatFields = ['price', 'amount', 'fee']
-      const intFields = ['purchase_count', 'duration_value', 'remaining_count', 'total_count']
+      const intFields = ['purchase_count', 'duration_value', 'remaining_count', 'total_count', 'diagnosis_duration']
       floatFields.forEach(f => {
         if (payload[f] !== '' && payload[f] !== undefined && payload[f] !== null) {
           payload[f] = parseFloat(payload[f])
@@ -379,7 +507,7 @@ Component({
 
     onSubmit() {
       if (this._submitting) return
-      const { selectedCustomer, closers, type, cardTypeIndex, courseTypeIndex, isEdit } = this.data
+      const { selectedCustomer, closers, type, cardTypeIndex, courseTypeIndex, isEdit, formData } = this.data
       if (!selectedCustomer) {
         wx.showToast({ title: '请选择用户', icon: 'none' })
         return
@@ -396,8 +524,13 @@ Component({
         wx.showToast({ title: '请选择课程类型', icon: 'none' })
         return
       }
-      const { formData, closerTotal } = this.data
-      const feeField = type === 'other' ? 'fee' : (type === 'group_case' || type === 'emotional_release' || type === 'oh_card_reading' || type === 'energy_knot') ? 'amount' : 'price'
+      const isSession = type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'
+      if (isSession) {
+        if (!formData.effective_date) { wx.showToast({ title: '请选择生效日期', icon: 'none' }); return }
+        if (!formData.duration_value || !formData.duration_type) { wx.showToast({ title: '请填写有效期', icon: 'none' }); return }
+      }
+      const { closerTotal } = this.data
+      const feeField = type === 'other' ? 'fee' : (type === 'group_case' || type === 'emotional_release' || type === 'oh_card_reading' || type === 'energy_knot' || type === 'tea_seat_fee' || type === 'offline_course') ? 'amount' : 'price'
       const fee = parseFloat(formData[feeField]) || 0
       if (closers.length > 0 && fee > 0 && closerTotal !== fee) {
         wx.showModal({

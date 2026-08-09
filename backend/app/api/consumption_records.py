@@ -46,7 +46,7 @@ def get_daily_payment_totals(date: str = Query(...)):
         if c.deal_date == date:
             totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
 
-    # OH卡梳理
+    # OH卡诊断
     for r in oh_card_reading_service.list_readings():
         if r.deal_date == date:
             totals[r.customer_id] = totals.get(r.customer_id, 0) + r.amount
@@ -63,7 +63,7 @@ TYPE_LABELS = {
     "membership-cards": "会员卡",
     "group-cases": "觉醒游戏",
     "emotional-releases": "情绪释放",
-    "oh-card-readings": "OH卡梳理",
+    "oh-card-readings": "OH卡诊断",
     "energy-knots": "能量结",
 }
 
@@ -157,14 +157,14 @@ def list_payment_records(
             "customer_id": c.customer_id,
         })
 
-    # OH卡梳理
+    # OH卡诊断
     for r in oh_card_reading_service.list_readings():
         created = r.created_at.strftime("%Y-%m-%d") if hasattr(r.created_at, "strftime") else str(r.created_at)
         records.append({
             "date": r.deal_date or "",
             "nickname": "",
-            "type": "OH卡梳理",
-            "name": "OH卡梳理",
+            "type": "OH卡诊断",
+            "name": "OH卡诊断",
             "quantity": r.purchase_count,
             "amount": r.amount,
             "effective_date": created,

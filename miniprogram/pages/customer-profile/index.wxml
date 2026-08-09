@@ -33,6 +33,13 @@
 
   <!-- 联系方式 -->
   <view class="card">
+    <view class="row">
+      <text class="row-label">客户标签</text>
+      <view class="row-value customer-tag-list" wx:if="{{customerTags.length}}">
+        <text class="customer-tag" wx:for="{{customerTags}}" wx:key="id">{{item.name}}</text>
+      </view>
+      <view class="row-value row-empty" wx:else><view class="empty-line"></view></view>
+    </view>
     <view class="row" wx:if="{{customer.name}}">
       <text class="row-label">姓名</text>
       <text class="row-value">{{customer.name}}</text>
@@ -181,36 +188,84 @@
         <view class="act-header">
           <text class="act-date">{{item.date}}</text>
           <text class="act-tag public" wx:if="{{item.is_public_welfare}}">公益</text>
-          <text class="act-tag absent" wx:if="{{item.notArrived}}">未参加</text>
+          <text class="act-tag absent" wx:if="{{item.notArrived}}">未参与</text>
         </view>
         <view class="act-info">
           <text class="act-name">{{item.name || '-'}}</text>
           <text class="act-detail" wx:if="{{item.role}}">{{item.role}}</text>
           <text class="act-detail" wx:if="{{item.host}}">{{item.host}}</text>
+          <text class="act-detail deduction" wx:if="{{item.deduction_summary && !item.notArrived}}">{{item.deduction_summary}}</text>
         </view>
       </view>
     </view>
 
-    <!-- 剩余次数 -->
+    <!-- 卡次统计 -->
     <view class="tab-content" wx:if="{{activeTab === 'purchase'}}">
       <view wx:if="{{purchaseSummary.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="pur-item" wx:for="{{purchaseSummary}}" wx:key="index">
+      <view class="pur-item" wx:for="{{purchaseSummary}}" wx:key="_key">
         <view class="pur-header">
-          <text class="pur-type">{{item.type}}</text>
-          <text class="pur-name">{{item.name || ''}}</text>
+          <view class="pur-title">
+            <text class="pur-type">{{item.type}}</text>
+            <text class="pur-name" wx:if="{{item.name && !item._isOfflineCourse}}">{{item.name}}</text>
+          </view>
+          <view class="pur-summary">
+            <block wx:if="{{item._isOfflineCourse}}">
+              <text>已上课</text><text class="pur-summary-value">{{item._attendedCount}}</text><text>次</text>
+            </block>
+            <block wx:else>
+              <text>当前剩余</text><text class="pur-summary-value">{{item._currentRemainingText}}</text>
+              <text class="pur-summary-divider">/</text>
+              <text>总</text><text class="pur-summary-value">{{item._currentTotalText}}</text>
+              <text class="pur-debt-inline" wx:if="{{item._debtCount > 0}}">· 历史欠卡{{item._debtCount}}次</text>
+            </block>
+          </view>
         </view>
-        <view class="pur-info">
-          <text class="pur-remaining" wx:if="{{item.type === '会员卡'}}">
-            剩余{{item.effective_remaining !== undefined && item.effective_remaining !== null ? item.effective_remaining : item.remaining}}次
-            <text class="pur-deductions">（总{{item.grand_total || 0}}次/销卡{{item.manual_deductions || 0}}次/活动扣卡{{item.activity_deductions || 0}}次）</text>
-          </text>
-          <text class="pur-remaining" wx:elif="{{item.remaining === '不限'}}">不限次</text>
-          <text class="pur-remaining" wx:else>
-            剩余{{item.remaining}}次
-          </text>
+
+        <view class="pur-card-list" wx:if="{{item._cardItems.length > 0}}">
+          <view class="pur-card-row" wx:for="{{item._cardItems}}" wx:for-item="card" wx:key="index">
+            <view class="pur-card-main">
+              <text class="pur-card-name">{{card.name || '会员卡'}}</text>
+              <text class="pur-card-count" wx:if="{{card.voided}}">已退费</text>
+              <text class="pur-card-count" wx:elif="{{card.remaining === '不限'}}">不限次</text>
+              <text class="pur-card-count" wx:else>{{card.remaining}} / {{card.total_purchased}}</text>
+            </view>
+            <text class="pur-date" wx:if="{{card.effective_date}}">{{card.effective_date}}~{{card.expiry_date || '不限'}}</text>
+          </view>
+        </view>
+
+        <view class="pur-info" wx:elif="{{item.name || item.effective_date}}">
+          <text class="pur-detail-name" wx:if="{{item.name && !item._isOfflineCourse}}">{{item.name}}</text>
           <text class="pur-date" wx:if="{{item.effective_date}}">
             {{item.effective_date}}~{{item.expiry_date || '不限'}}
           </text>
+        </view>
+
+        <view class="pur-debt-list" wx:if="{{item._debtCount > 0}}">
+          <text class="pur-debt-title">历史欠卡{{item._debtCount}}次</text>
+          <view class="pur-debt-row" wx:for="{{item._debtActivities}}" wx:for-item="debt" wx:key="index">
+            <text class="pur-debt-name">{{debt.label || '活动'}}</text>
+            <text class="pur-debt-date">{{debt.date || '-'}}</text>
+            <text class="pur-debt-count">欠卡{{debt.count}}次</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 线下落地课程 -->
+    <view class="tab-content" wx:if="{{activeTab === 'offline_course'}}">
+      <view wx:if="{{offlineCourseRecords.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="ocr-item" wx:for="{{offlineCourseRecords}}" wx:key="id">
+        <view class="ocr-header">
+          <text class="ocr-date">{{item.record_date || '-'}}</text>
+          <text class="ocr-teacher" wx:if="{{item.teacher}}">{{item.teacher}}</text>
+        </view>
+        <view class="ocr-row" wx:if="{{item.content}}">
+          <text class="ocr-label">上课内容</text>
+          <text class="ocr-value">{{item.content}}</text>
+        </view>
+        <view class="ocr-row" wx:if="{{item.result}}">
+          <text class="ocr-label">上课结果</text>
+          <text class="ocr-value">{{item.result}}</text>
         </view>
       </view>
     </view>
@@ -238,4 +293,10 @@
 
 <view class="loading" wx:if="{{loading}}">
   <text>加载中...</text>
+</view>
+
+<view class="detail-error" wx:if="{{!loading && !customer}}">
+  <view class="detail-error-line"></view>
+  <text class="detail-error-text">{{loadError || '客户资料加载失败'}}</text>
+  <view class="detail-retry" wx:if="{{customerId}}" bindtap="onRetry">重新加载</view>
 </view>

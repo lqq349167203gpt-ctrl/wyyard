@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { accountApi } from "@/lib/api"
 import { User, Lock, AlertCircle } from "lucide-react"
+import { storePagePermissions } from "@/hooks/use-page-permissions"
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -40,7 +41,7 @@ export default function LoginPage() {
         localStorage.setItem("isLoggedIn", "true")
         localStorage.setItem("authToken", result.token)
         localStorage.setItem("currentUser", JSON.stringify(result.account))
-        localStorage.setItem("userPermissions", JSON.stringify(permissions))
+        storePagePermissions(permissions)
         localStorage.setItem("userCustomerPermissions", JSON.stringify(result.customer_permissions || []))
         localStorage.setItem("userCustomerPermissionsClassRecords", JSON.stringify(result.customer_permissions_class_records || []))
         localStorage.setItem("userCustomerPermissionsPayment", JSON.stringify(result.customer_permissions_payment || []))

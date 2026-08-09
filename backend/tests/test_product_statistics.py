@@ -63,7 +63,8 @@ def test_product_statistics_filters_healing_teacher_and_keeps_teacher_options(mo
         achiever_id="",
     )
 
-    monkeypatch.setattr(statistics.customer_service, "list_customers", lambda: customers)
+    # 产品销售为保留停用人员的历史成交筛选，读取的是包含停用客户的全量数据源。
+    monkeypatch.setattr(statistics.customer_service, "list_all_customers", lambda: customers)
     monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
         ("class", "沙龙活动", lambda **_kwargs: [teacher_1_course, teacher_2_course]),
     ))

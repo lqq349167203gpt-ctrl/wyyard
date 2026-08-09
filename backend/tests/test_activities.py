@@ -1,5 +1,13 @@
 """活动模块 API 测试 — 课程记录、觉醒游戏、情绪释放、能量结、内部课程"""
-import pytest
+
+
+def _invite_owner(client, customer, date):
+    response = client.post("/api/visits", json={
+        "visit_date": date,
+        "customer_id": customer["id"],
+        "arrived": False,
+    })
+    assert response.status_code == 200
 
 
 # ===== 课程记录 (Class Records) =====
@@ -116,6 +124,7 @@ class TestGroupCaseSessions:
         assert resp.status_code == 200
 
     def test_create(self, client, created_customer):
+        _invite_owner(client, created_customer, "2026-05-27")
         resp = client.post("/api/group-case-sessions", json={
             "date": "2026-05-27",
             "owner_id": created_customer["id"],
@@ -126,6 +135,7 @@ class TestGroupCaseSessions:
         assert resp.json()["description"] == "测试场次"
 
     def test_update(self, client, created_customer):
+        _invite_owner(client, created_customer, "2026-05-27")
         resp = client.post("/api/group-case-sessions", json={
             "date": "2026-05-27",
             "owner_id": created_customer["id"],
@@ -136,6 +146,7 @@ class TestGroupCaseSessions:
         assert resp.status_code == 200
 
     def test_delete(self, client, created_customer):
+        _invite_owner(client, created_customer, "2026-05-27")
         resp = client.post("/api/group-case-sessions", json={
             "date": "2026-05-27",
             "owner_id": created_customer["id"],
@@ -172,6 +183,7 @@ class TestEmotionalReleaseSessions:
         assert resp.status_code == 200
 
     def test_create_and_delete(self, client, created_customer):
+        _invite_owner(client, created_customer, "2026-05-27")
         resp = client.post("/api/emotional-release-sessions", json={
             "date": "2026-05-27",
             "owner_id": created_customer["id"],
@@ -209,6 +221,7 @@ class TestEnergyKnotSessions:
         assert resp.status_code == 200
 
     def test_create_and_delete(self, client, created_customer):
+        _invite_owner(client, created_customer, "2026-05-27")
         resp = client.post("/api/energy-knot-sessions", json={
             "date": "2026-05-27",
             "owner_id": created_customer["id"],

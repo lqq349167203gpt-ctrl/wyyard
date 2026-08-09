@@ -1,0 +1,128 @@
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 24rpx 32rpx;
+  background-color: #f7f8fa;
+}
+
+.form-card {
+  padding: 8rpx 32rpx;
+  border-radius: 12rpx;
+  background-color: #ffffff;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  min-height: 96rpx;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.form-label {
+  width: 160rpx;
+  flex-shrink: 0;
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.form-input {
+  min-width: 0;
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2329;
+  text-align: right;
+}
+
+.placeholder {
+  color: #b0b5bb;
+}
+
+.datetime-fields {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  gap: 12rpx;
+}
+
+.picker-value {
+  padding: 12rpx 16rpx;
+  border: 1rpx solid #dee0e3;
+  border-radius: 4rpx;
+  font-size: 26rpx;
+  color: #1f2329;
+  background-color: #ffffff;
+}
+
+.time-value {
+  min-width: 76rpx;
+  text-align: center;
+}
+
+.amount-field {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.currency {
+  margin-right: 8rpx;
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.amount-input {
+  text-align: right;
+}
+
+.form-item-content {
+  padding: 28rpx 0;
+}
+
+.form-label-block {
+  display: block;
+  margin-bottom: 16rpx;
+  font-size: 28rpx;
+  color: #8f959e;
+}
+
+.form-textarea {
+  width: 100%;
+  min-height: 180rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #1f2329;
+}
+
+.actions {
+  padding: 48rpx 28rpx 20rpx;
+}
+
+.save-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  color: #ffffff;
+  background-color: #3370ff;
+}
+
+.save-button::after {
+  border: none;
+}
+
+.save-button[disabled] {
+  color: #ffffff;
+  background-color: #a3c0ff;
+}
+
+.loading,
+.no-permission {
+  padding-top: 220rpx;
+  font-size: 28rpx;
+  color: #8f959e;
+  text-align: center;
+}

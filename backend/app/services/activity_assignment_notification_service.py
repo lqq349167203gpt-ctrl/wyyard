@@ -8,7 +8,7 @@ ACTIVITY_TYPE_NAMES = {
     "ers": "情绪释放",
     "eks": "能量结",
     "ics": "内部课程",
-    "ocr": "OH卡梳理",
+
 }
 
 

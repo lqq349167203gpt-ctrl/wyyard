@@ -84,8 +84,8 @@ def delete_knot(knot_id: str) -> tuple[bool, str]:
         return False, "记录不存在"
     # 检查删除后剩余次数是否会变负
     from app.services import energy_knot_session_service
-    remaining = energy_knot_session_service.get_remaining_count(knot.customer_id)
-    if remaining - knot.purchase_count < 0:
+    purchase_remaining = energy_knot_session_service.get_purchase_remaining(knot_id)
+    if purchase_remaining < knot.purchase_count:
         return False, "该记录中有正在被使用的次数，无法删除"
     knot.is_deleted = True
     knot.deleted_at = datetime.now(timezone.utc)

@@ -5,17 +5,22 @@
   </view>
   <block wx:else>
   <!-- Tab 栏 -->
-  <scroll-view class="tab-bar" scroll-x enable-flex>
-    <view
-      wx:for="{{tabs}}"
-      wx:key="key"
-      class="tab-item {{activeTab === index ? 'active' : ''}}"
-      data-index="{{index}}"
-      bindtap="onTabChange"
-    >
-      <text>{{item.label}}</text>
+  <view class="tab-header">
+    <scroll-view class="tab-bar" scroll-x enable-flex>
+      <view
+        wx:for="{{tabs}}"
+        wx:key="key"
+        class="tab-item {{activeTab === index ? 'active' : ''}}"
+        data-index="{{index}}"
+        bindtap="onTabChange"
+      >
+        <text>{{item.label}}</text>
+      </view>
+    </scroll-view>
+    <view class="export-btn {{exporting ? 'disabled' : ''}}" catchtap="onExportTap">
+      <text>{{exporting ? '导出中' : '导出'}}</text>
     </view>
-  </scroll-view>
+  </view>
 
   <!-- 列表 -->
   <view class="list" wx:if="{{items.length > 0}}">
@@ -23,13 +28,21 @@
       <view class="card-main">
         <view class="card-row1">
           <text class="card-name">{{item.nickname}}</text>
+          <text class="card-status" wx:if="{{item._status}}" style="color: {{item._statusColor}}">{{item._status}}</text>
           <text class="card-price">¥{{item._price}}</text>
         </view>
         <view class="card-row2">
-          <text class="card-detail" wx:if="{{item._detail && !item._purchaseCount}}">{{item._detail}}</text>
+          <text class="card-validity" wx:if="{{item._diagnosisTeacher}}">诊断：{{item._diagnosisTeacher}}</text>
+          <text class="card-detail" wx:if="{{item._detail && !item._purchaseCount && !item._validity && !item._quantity && !item._duration}}">{{item._detail}}</text>
+          <text class="card-validity" wx:if="{{item._validity}}">{{item._validity}}</text>
+          <text class="card-validity" wx:if="{{item._quantity}}">{{item._quantity}}</text>
+          <text class="card-validity" wx:if="{{item._duration}}">{{item._duration}}</text>
           <text class="card-count" wx:if="{{item._purchaseCount !== ''}}">购买: {{item._purchaseCount}}次</text>
           <text class="card-remaining" wx:if="{{item._remaining !== ''}}">剩余: {{item._remaining}}次</text>
           <text class="card-date" wx:if="{{item._effective}}">{{item._effective}} ~ {{item._expiry}}</text>
+        </view>
+        <view class="card-row3" wx:if="{{item.notes}}">
+          <text class="card-notes">备注: {{item.notes}}</text>
         </view>
       </view>
     </view>
@@ -48,5 +61,6 @@
   <!-- 新增按钮 -->
   <view class="fab" bindtap="onAddTap">
     <text class="fab-text">+</text>
-  </view>  </block>
+  </view>
+  </block>
 </view>

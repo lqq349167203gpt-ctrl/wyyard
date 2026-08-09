@@ -1,10 +1,55 @@
-const { customerApi, communicationRecordApi } = require('../../utils/api')
+const { customerApi, customerTagApi, communicationRecordApi } = require('../../utils/api')
+
+function formatCount(value) {
+  if (value === '不限') return '不限次'
+  return `${value === undefined || value === null ? 0 : value}次`
+}
+
+function normalizePurchaseItem(item, key) {
+  const currentRemaining = item.current_remaining !== undefined && item.current_remaining !== null
+    ? item.current_remaining
+    : (item.effective_remaining !== undefined && item.effective_remaining !== null ? item.effective_remaining : item.remaining)
+  const currentTotal = item.current_total !== undefined && item.current_total !== null
+    ? item.current_total
+    : (item.grand_total !== undefined && item.grand_total !== null ? item.grand_total : item.total_purchased)
+
+  return Object.assign({}, item, {
+    _key: key,
+    _isOfflineCourse: item.type === '线下落地课程',
+    _currentRemainingText: formatCount(currentRemaining),
+    _currentTotalText: formatCount(currentTotal),
+    _attendedCount: item.attended_count || 0,
+    _debtCount: item.debt_count || 0,
+    _debtActivities: item.debt_activities || [],
+    _cardItems: [],
+  })
+}
+
+function buildPurchaseSummary(items) {
+  const memberItems = items.filter(item => item.type === '会员卡')
+  const result = []
+
+  if (memberItems.length > 0) {
+    const memberSummary = normalizePurchaseItem(memberItems[0], 'membership-card')
+    memberSummary.name = ''
+    memberSummary._cardItems = memberItems.filter(item => item.name || item.effective_date || item.expiry_date)
+    result.push(memberSummary)
+  }
+
+  items.filter(item => item.type !== '会员卡').forEach((item, index) => {
+    result.push(normalizePurchaseItem(item, `${item.type}-${index}`))
+  })
+
+  return result
+}
 
 Page({
   data: {
     customerId: '',
     customer: null,
+    customerTags: [],
     loading: true,
+    loadError: '',
     healerText: '',
     firstVisit: '',
     totalPayment: 0,
@@ -13,28 +58,44 @@ Page({
     healingRecords: [],
     purchaseSummary: [],
     paymentRecords: [],
+    offlineCourseRecords: [],
     trafficDetailLabel: '流量链接',
     activeTab: 'healing',
     tabs: [
       { key: 'healing', label: '跟进点' },
       { key: 'communication', label: '沟通记录' },
       { key: 'activities', label: '活动记录' },
-      { key: 'purchase', label: '剩余次数' },
+      { key: 'purchase', label: '卡次统计' },
+      { key: 'offline_course', label: '线下落地课程' },
       { key: 'payment', label: '交易记录' },
     ],
   },
 
   onLoad(options) {
+    if (!getApp().checkLogin()) return
     if (options.id) {
       this.setData({ customerId: options.id })
       this.loadData(options.id)
+    } else {
+      this.setData({ loading: false, loadError: '缺少客户信息，请返回后重试' })
+    }
+  },
+
+  onShow() {
+    if (!getApp().checkLogin()) return
+    if (this._needRefresh && this.data.customerId) {
+      this._needRefresh = false
+      this.loadData(this.data.customerId)
     }
   },
 
   async loadData(id) {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
-      const detail = await customerApi.detail(id)
+      const [detail, customerTags] = await Promise.all([
+        customerApi.detail(id),
+        customerTagApi.listForCustomer(id).catch(() => []),
+      ])
       const c = detail.customer
 
       // 疗愈老师
@@ -46,11 +107,11 @@ Page({
       const arrived = visitRecords.filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
       const firstVisit = arrived.length > 0 ? arrived[0].visit_date : ''
       const totalPayment = (detail.payment_records || []).reduce((sum, r) => sum + (r.amount || 0), 0)
-      const arrivedDates = new Set(arrived.map(v => v.visit_date))
-
       // 活动记录
       const activities = (detail.activities || []).map(function(a) {
-        return Object.assign({}, a, { notArrived: !arrivedDates.has(a.date) })
+        return Object.assign({}, a, {
+          notArrived: a.participated === undefined ? !arrived.some(v => v.visit_date === a.date) : !a.participated,
+        })
       })
 
       // 跟进点
@@ -59,11 +120,14 @@ Page({
         return Object.assign({}, v, { growth_record: (hr && hr.growth_record) || v.healing_notes || '' })
       })
 
-      // 剩余次数
-      const purchaseSummary = detail.purchase_summary || []
+      // 卡次统计：与 PC 端使用同一套当前权益、历史欠卡和有效期统计口径
+      const purchaseSummary = buildPurchaseSummary(detail.purchase_summary || [])
 
       // 交易记录
       const paymentRecords = (detail.payment_records || []).sort((a, b) => (b.effective_date || '').localeCompare(a.effective_date || ''))
+
+      // 线下落地课程记录
+      const offlineCourseRecords = detail.offline_course_records || []
 
       // 流量来源对应的详情标签
       const ts = c.traffic_source || ''
@@ -72,7 +136,7 @@ Page({
       else if (ts === '朋友圈') trafficDetailLabel = '所属人'
       else if (['小红书', '抖音', '公众号', '视频号'].includes(ts)) trafficDetailLabel = '内容链接'
 
-      this.setData({ customer: c, healerText, firstVisit, totalPayment, activities, healingRecords, purchaseSummary, paymentRecords, trafficDetailLabel, loading: false })
+      this.setData({ customer: c, customerTags, healerText, firstVisit, totalPayment, activities, healingRecords, purchaseSummary, paymentRecords, offlineCourseRecords, trafficDetailLabel, loading: false })
 
       // 加载沟通记录
       if (c.nickname) {
@@ -92,8 +156,15 @@ Page({
       }
     } catch (e) {
       console.error('加载客户资料失败:', e)
-      this.setData({ loading: false })
+      this.setData({
+        loading: false,
+        loadError: (e && e.message) || '客户资料加载失败',
+      })
     }
+  },
+
+  onRetry() {
+    if (this.data.customerId) this.loadData(this.data.customerId)
   },
 
   onTabChange(e) {

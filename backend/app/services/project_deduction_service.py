@@ -60,7 +60,6 @@ def _fill_current_remaining(deductions: List[ProjectDeduction]):
 
     for key, items in groups.items():
         customer_id, project_type = key.split("|", 1)
-        current_remaining = None
 
         if project_type == "membership-cards":
             for d in items:
@@ -89,12 +88,9 @@ def _fill_current_remaining(deductions: List[ProjectDeduction]):
             }
             svc = svc_map.get(project_type)
             if svc:
-                current_remaining = svc.get_remaining_count(customer_id)
-
-        if current_remaining is not None:
-            for d in items:
-                if d.remaining_after is None:
-                    d.remaining_after = current_remaining
+                for d in items:
+                    if d.remaining_after is None:
+                        d.remaining_after = svc.get_purchase_remaining(d.project_id)
 
 
 def get_deduction_total(customer_id: str, project_type: str) -> int:
@@ -163,51 +159,86 @@ def get_available_items(customer_id: str, project_type: str) -> list:
 
     elif project_type == "group-cases":
         cases = group_case_service.list_cases()
-        remaining = group_case_session_service.get_remaining_count(customer_id)
+        today = datetime.now().strftime("%Y-%m-%d")
         items = [c for c in cases if c.customer_id == customer_id and not c.is_deleted]
-        return [{
-            "id": c.id,
-            "name": f"觉醒游戏（{c.purchase_count}次）",
-            "remaining_count": remaining,
-            "detail": f"总剩余 {remaining} 次",
-            "purchase_count": c.purchase_count,
-        } for c in items]
+        result = []
+        for c in items:
+            if c.expiry_date and c.expiry_date < today:
+                continue
+            if c.effective_date and c.effective_date > today:
+                continue
+            pr = group_case_session_service.get_purchase_remaining(c.id)
+            if pr <= 0:
+                continue
+            result.append({
+                "id": c.id,
+                "name": f"觉醒游戏（{c.purchase_count}次）",
+                "remaining_count": pr,
+                "detail": f"剩余 {pr} 次",
+                "purchase_count": c.purchase_count,
+            })
+        return result
 
     elif project_type == "emotional-releases":
         releases = emotional_release_service.list_releases()
-        remaining = emotional_release_session_service.get_remaining_count(customer_id)
+        today = datetime.now().strftime("%Y-%m-%d")
         items = [r for r in releases if r.customer_id == customer_id and not r.is_deleted]
-        return [{
-            "id": r.id,
-            "name": f"情绪释放（{r.purchase_count}次）",
-            "remaining_count": remaining,
-            "detail": f"总剩余 {remaining} 次",
-            "purchase_count": r.purchase_count,
-        } for r in items]
+        result = []
+        for r in items:
+            if r.expiry_date and r.expiry_date < today:
+                continue
+            if r.effective_date and r.effective_date > today:
+                continue
+            pr = emotional_release_session_service.get_purchase_remaining(r.id)
+            if pr <= 0:
+                continue
+            result.append({
+                "id": r.id,
+                "name": f"情绪释放（{r.purchase_count}次）",
+                "remaining_count": pr,
+                "detail": f"剩余 {pr} 次",
+                "purchase_count": r.purchase_count,
+            })
+        return result
 
     elif project_type == "oh-card-readings":
         readings = oh_card_reading_service.list_readings()
-        remaining = oh_card_reading_session_service.get_remaining_count(customer_id)
         items = [r for r in readings if r.customer_id == customer_id and not r.is_deleted]
-        return [{
-            "id": r.id,
-            "name": f"OH卡梳理（{r.purchase_count}次）",
-            "remaining_count": remaining,
-            "detail": f"总剩余 {remaining} 次",
-            "purchase_count": r.purchase_count,
-        } for r in items]
+        result = []
+        for r in items:
+            pr = oh_card_reading_session_service.get_purchase_remaining(r.id)
+            if pr <= 0:
+                continue
+            result.append({
+                "id": r.id,
+                "name": f"OH卡诊断（{r.purchase_count}次）",
+                "remaining_count": pr,
+                "detail": f"剩余 {pr} 次",
+                "purchase_count": r.purchase_count,
+            })
+        return result
 
     elif project_type == "energy-knots":
         knots = energy_knot_service.list_knots()
-        remaining = energy_knot_session_service.get_remaining_count(customer_id)
+        today = datetime.now().strftime("%Y-%m-%d")
         items = [k for k in knots if k.customer_id == customer_id and not k.is_deleted]
-        return [{
-            "id": k.id,
-            "name": f"能量结（{k.purchase_count}次）",
-            "remaining_count": remaining,
-            "detail": f"总剩余 {remaining} 次",
-            "purchase_count": k.purchase_count,
-        } for k in items]
+        result = []
+        for k in items:
+            if k.expiry_date and k.expiry_date < today:
+                continue
+            if k.effective_date and k.effective_date > today:
+                continue
+            pr = energy_knot_session_service.get_purchase_remaining(k.id)
+            if pr <= 0:
+                continue
+            result.append({
+                "id": k.id,
+                "name": f"能量结（{k.purchase_count}个）",
+                "remaining_count": pr,
+                "detail": f"剩余 {pr} 个",
+                "purchase_count": k.purchase_count,
+            })
+        return result
 
     elif project_type == "other-projects":
         from app.services import other_project_service
@@ -261,7 +292,7 @@ def auto_deduct(
             "membership-cards": "会员卡",
             "group-cases": "觉醒游戏",
             "emotional-releases": "情绪释放",
-            "oh-card-readings": "OH卡梳理",
+            "oh-card-readings": "OH卡诊断",
             "energy-knots": "能量结",
             "other-projects": "其他项目",
         }
@@ -364,7 +395,7 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
                 raise ValueError(f"不支持的项目类型: {data.project_type}")
 
             session_svc, parent_svc = service_map[data.project_type]
-            remaining = session_svc.get_remaining_count(data.customer_id)
+            remaining = session_svc.get_purchase_remaining(data.project_id)
             if remaining < data.count:
                 raise ValueError(f"剩余次数不足（剩余 {remaining} 次）")
 
@@ -379,7 +410,7 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
             type_labels = {
                 "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放",
-                "oh-card-readings": "OH卡梳理",
+                "oh-card-readings": "OH卡诊断",
                 "energy-knots": "能量结",
             }
             project_name = type_labels.get(data.project_type, data.project_type)

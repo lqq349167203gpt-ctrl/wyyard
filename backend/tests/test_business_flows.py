@@ -1,5 +1,4 @@
 """业务流程测试 — 跨模块联动、扣费逻辑、身份刷新、权限验证"""
-import pytest
 import uuid
 
 
@@ -354,6 +353,12 @@ class TestActivityFlows:
 
     def test_group_case_session_full_flow(self, client, created_customer):
         """觉醒游戏场次：创建 → 更新 → 删除"""
+        visit = client.post("/api/visits", json={
+            "visit_date": "2026-06-10",
+            "customer_id": created_customer["id"],
+            "arrived": False,
+        })
+        assert visit.status_code == 200
         resp = client.post("/api/group-case-sessions", json={
             "date": "2026-06-10",
             "owner_id": created_customer["id"],
@@ -373,6 +378,12 @@ class TestActivityFlows:
 
     def test_emotional_release_session_flow(self, client, created_customer):
         """情绪释放场次：创建 → 更新 → 删除"""
+        visit = client.post("/api/visits", json={
+            "visit_date": "2026-06-10",
+            "customer_id": created_customer["id"],
+            "arrived": False,
+        })
+        assert visit.status_code == 200
         resp = client.post("/api/emotional-release-sessions", json={
             "date": "2026-06-10",
             "owner_id": created_customer["id"],
@@ -385,6 +396,12 @@ class TestActivityFlows:
 
     def test_energy_knot_session_flow(self, client, created_customer):
         """能量结场次：创建 → 更新 → 删除"""
+        visit = client.post("/api/visits", json={
+            "visit_date": "2026-06-10",
+            "customer_id": created_customer["id"],
+            "arrived": False,
+        })
+        assert visit.status_code == 200
         resp = client.post("/api/energy-knot-sessions", json={
             "date": "2026-06-10",
             "owner_id": created_customer["id"],

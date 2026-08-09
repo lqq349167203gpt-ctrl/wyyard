@@ -1,15 +1,17 @@
-import uuid
 import threading
+import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
-from app.models.base import StrictBaseModel
-from app.services.storage import load_data, save_data, save_item
-from app.models.position import PositionUpdate
+from typing import Dict, List, Optional
+
 from app.models.account import AccountUpdate
+from app.models.base import StrictBaseModel
+from app.models.position import PositionUpdate
+from app.services.storage import load_data, save_data, save_item
 
 _position_lock = threading.Lock()
 
 FILENAME = "positions.json"
+RESERVED_POSITION_NAMES = {"超级管理员"}
 
 
 class PositionBase(StrictBaseModel):
@@ -64,6 +66,8 @@ def get_position(position_id: str) -> Optional[Position]:
 
 def create_position(data: PositionCreate) -> Position:
     with _position_lock:
+        if data.name.strip() in RESERVED_POSITION_NAMES:
+            raise ValueError(f"身份名称「{data.name.strip()}」为系统保留名称")
         # 名称唯一性校验
         for other in _positions.values():
             if not other.is_deleted and other.name == data.name:
@@ -88,6 +92,8 @@ def update_position(position_id: str, data: PositionUpdate) -> Optional[Position
             new_name = update_data["name"]
             if not new_name or not new_name.strip():
                 raise ValueError("身份名称不能为空")
+            if new_name.strip() in RESERVED_POSITION_NAMES:
+                raise ValueError(f"身份名称「{new_name.strip()}」为系统保留名称")
             for other in _positions.values():
                 if other.id != position_id and not other.is_deleted and other.name == new_name:
                     raise ValueError(f"身份名称「{new_name}」已存在")
@@ -98,10 +104,10 @@ def update_position(position_id: str, data: PositionUpdate) -> Optional[Position
         _save(position_id)
     # 锁外级联：更新权限表 + 账号 role（通过公共 API，不直接操作其他 service 内部状态）
     if old_name and old_name != position.name:
-        from app.services.position_permission_service import rename_position_in_permissions as rename_pp
+        from app.services import account_service
         from app.services.position_customer_permission_service import rename_position_in_permissions as rename_pcp
         from app.services.position_page_permission_service import rename_position_in_page_permissions as rename_ppp
-        from app.services import account_service
+        from app.services.position_permission_service import rename_position_in_permissions as rename_pp
         rename_pp(old_name, position.name)
         rename_pcp(old_name, position.name)
         rename_ppp(old_name, position.name)

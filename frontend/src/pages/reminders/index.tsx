@@ -1,13 +1,9 @@
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Bell, Edit } from "lucide-react"
+import { Plus, Trash2, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -176,91 +172,88 @@ export default function RemindersPage() {
   }
 
   return (
-    <div className="px-6 pt-12 pb-6 space-y-3">
-      <div className="flex items-center justify-between pb-2">
-        <div>
-          <h1 className="text-lg font-semibold">提醒配置</h1>
-          <p className="text-xs text-muted-foreground mt-1.5">共 {items.length} 条提醒规则</p>
-        </div>
-        <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新增提醒
+    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4">
+      {/* 标题栏 */}
+      <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
+        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">提醒配置</span>
+        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">共 {items.length} 条提醒规则</span>
+        <div className="flex-1" />
+        <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleOpenCreate}>
+          <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新增提醒
         </Button>
       </div>
 
-      {loading ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="rounded-full bg-muted p-3 mb-3">
-            <Bell className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="text-sm text-muted-foreground">暂无提醒规则</p>
-          <p className="text-xs text-muted-foreground mt-1">点击上方"新增提醒"按钮添加</p>
-        </div>
-      ) : (
-        <>
-          <Table>
+      {/* 表格卡 */}
+      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden">
+        {loading ? (
+          <div className="py-16 text-center text-[12px] text-[#8f959e]">加载中...</div>
+        ) : items.length === 0 ? (
+          <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无数据</div>
+        ) : (
+          <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">名称</TableHead>
-                <TableHead>账号角色</TableHead>
-                <TableHead>账号</TableHead>
+                <TableHead className="pl-4" style={{ width: "180px" }}>名称</TableHead>
+                <TableHead style={{ width: "120px" }}>账号角色</TableHead>
+                <TableHead style={{ width: "120px" }}>账号</TableHead>
                 <TableHead>条件</TableHead>
-                <TableHead className="text-right pr-4">操作</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedItems.map((item) => (
-                <TableRow key={item.id}>
+                <TableRow key={item.id} className="group hover:bg-[#f7f8fa]">
                   <TableCell className="pl-4">
-                    <span className="text-[13px] text-[#2b2f36] font-medium">{item.name}</span>
+                    <span className="text-[12px] text-[#2b2f36] font-medium">{item.name}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-[#2b2f36]">{item.account_role}</span>
+                    <span className="text-[12px] text-[#2b2f36]">{item.account_role}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-[#2b2f36]">{item.account_id === "全部" ? "全部" : (accountMap[item.account_id] || item.account_id)}</span>
+                    <span className="text-[12px] text-[#2b2f36]">{item.account_id === "全部" ? "全部" : (accountMap[item.account_id] || item.account_id)}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {item.conditions.map((c, i) => (
-                        <span key={i} className="text-[12px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded">
+                        <span key={i} className="text-[11px] text-[#8f959e] bg-[#f0f1f2] px-1.5 py-0.5 rounded">
                           {formatCondition(c)}
                         </span>
                       ))}
                     </div>
                   </TableCell>
                   <TableCell className="text-right pr-4">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(item)}>
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setDeletingItem(item); setDeleteDialogOpen(true) }}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
+                    <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(item)}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setDeletingItem(item); setDeleteDialogOpen(true) }}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          <PaginationBar
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            startIndex={startIndex}
-            endIndex={endIndex}
-            onPageChange={goToPage}
-          />
-        </>
-      )}
+        )}
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          onPageChange={goToPage}
+        />
+      </div>
 
       {/* 新增/编辑弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingItem(null) }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0 gap-0" initialFocus={false}>
-          <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">{editingItem ? "编辑提醒" : "新增提醒"}</DialogTitle>
-          </DialogHeader>
+          <div className="px-5 py-3 border-b border-[#f0f0f0]">
+            <h3 className="text-[12px] font-normal">{editingItem ? "编辑提醒" : "新增提醒"}</h3>
+          </div>
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             {/* 提醒名称 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -448,23 +441,27 @@ export default function RemindersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 删除确认 */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除提醒</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除「{deletingItem?.name}」吗？此操作不可撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-              {deleting ? "删除中..." : "删除"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* 删除确认弹窗 */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { if (!open) setDeleteDialogOpen(false) }}>
+        <DialogContent className="w-[360px] max-w-[90vw] p-0 gap-0">
+          <div className="px-5 py-3 border-b border-[#f0f0f0]">
+            <h3 className="text-[14px] font-normal">删除提醒</h3>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-[12px] text-[#212631]">
+              确定要删除「<span className="font-medium">{deletingItem?.name}</span>」吗？删除后不可恢复。
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">
+            <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => setDeleteDialogOpen(false)}>
+              取消
+            </Button>
+            <Button size="sm" className="h-7 text-[12px] bg-[#f54a45] hover:bg-[#e03e3a]" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "删除中..." : "确定删除"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

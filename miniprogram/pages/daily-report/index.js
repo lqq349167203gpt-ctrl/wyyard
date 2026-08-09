@@ -82,6 +82,14 @@ Page({
     byMethod: [],
     deductionRows: [],
     tabCounts: { customers: 0, activities: 0, finance: 0, deductions: 0 },
+    // 详情弹窗
+    detailOpen: false,
+    detailType: 'visit',
+    detailTitle: '',
+    detailNickname: '',
+    detailLoading: false,
+    detailRows: [],
+    detailHeader: [],
   },
 
   // 静态数据缓存（首次加载拉取，切换日期/空间不重复拉）
@@ -351,7 +359,7 @@ Page({
     const finance = this._buildFinance(payment, date, customerMap)
 
     // 销卡 tab
-    const deductionRows = this._buildDeductions(payment, activities, date, customerMap)
+    const deductionRows = this._buildDeductions(payment, activities, dashboard, date, customerMap)
 
     return {
       visits: customerRows,
@@ -424,10 +432,6 @@ Page({
     ;(dashboard.ics_sessions || []).forEach(r => {
       list.push(build(r, r.course_name || r.course_type || '', '内部课程', false, 'ics'))
     })
-    ;(dashboard.ocr_sessions || []).forEach(r => {
-      list.push(build(r, r.name || (r.achiever_name ? 'OH卡·' + r.achiever_name : 'OH卡'), 'OH卡', false, 'ocr'))
-    })
-
     list.sort((a, b) => (a.timeText || '').localeCompare(b.timeText || ''))
     return list
   },
@@ -474,9 +478,9 @@ Page({
           purchaseCount = item.purchase_count || 0
           break
         case 'oh_card_reading':
-          itemType = 'OH卡梳理'
+          itemType = 'OH卡诊断'
+          itemName = (item.diagnosis_duration ? (item.diagnosis_duration * 0.5) + '小时' : '')
           amount = item.amount || 0
-          purchaseCount = item.purchase_count || 0
           break
         case 'energy_knot':
           itemType = '能量结'
@@ -534,19 +538,36 @@ Page({
     return { rows, total: '¥' + formatMoney(total), byMethod }
   },
 
-  _buildDeductions(payment, activities, date, customerMap) {
-    const cardDeductionMap = {}
-    const manualCardNameMap = {}
-    const manualRemainingMap = {}
+  _buildDeductions(payment, activities, dashboard, date, customerMap) {
+    // 项目类型标签映射
+    const projectLabelMap = {
+      "group-cases": "觉醒游戏",
+      "emotional-releases": "情绪释放",
+      "energy-knots": "能量结",
+    }
+
+    // 1. 人工销卡：按 (customer_id, project_type, project_id) 分组，所有项目类型
+    const manualDeductionMap = {}
     for (const d of payment.deductions || []) {
-      if (d.deduction_date === date && d.project_type === 'membership-cards') {
-        cardDeductionMap[d.customer_id] = (cardDeductionMap[d.customer_id] || 0) + (d.count || 1)
-        if (!(d.customer_id in manualCardNameMap)) {
-          manualCardNameMap[d.customer_id] = d.project_name || ''
-          manualRemainingMap[d.customer_id] = d.remaining_after
+      if (d.deduction_date !== date) continue
+      const key = `${d.customer_id}|${d.project_type}|${d.project_id}`
+      const existing = manualDeductionMap[key]
+      if (existing) {
+        existing.count += (d.count || 1)
+      } else {
+        manualDeductionMap[key] = {
+          customer_id: d.customer_id,
+          nickname: d.nickname,
+          project_type: d.project_type,
+          project_id: d.project_id,
+          project_name: d.project_name,
+          count: d.count || 1,
+          remaining_after: d.remaining_after != null ? d.remaining_after : null,
         }
       }
     }
+
+    // 2. 会员卡活动销卡：activities 所有参与者
     const activityDeductionMap = {}
     for (const a of activities) {
       if (a.isWelfare) continue
@@ -554,43 +575,130 @@ Page({
         activityDeductionMap[id] = (activityDeductionMap[id] || 0) + (a.membershipDeductionCount || 1)
       }
     }
+
+    // 3. 案主活动销卡：session 的 owner 扣对应项目类型
+    const activityProjectDeductionMaps = {}
+    // 觉醒游戏、情绪释放：案主每次扣 1
+    for (const [sessions, projectType] of [[dashboard.gcs_sessions || [], "group-cases"], [dashboard.ers_sessions || [], "emotional-releases"]]) {
+      for (const s of sessions) {
+        if (!s.owner_id) continue
+        const map = activityProjectDeductionMaps[projectType] || (activityProjectDeductionMaps[projectType] = {})
+        map[s.owner_id] = (map[s.owner_id] || 0) + 1
+      }
+    }
+    // 能量结：案主扣部位数（与后端 get_session_deduction_count 逻辑一致）
+    for (const s of (dashboard.eks_sessions || [])) {
+      if (!s.owner_id) continue
+      const map = activityProjectDeductionMaps["energy-knots"] || (activityProjectDeductionMaps["energy-knots"] = {})
+      let count = 1
+      try {
+        const desc = JSON.parse(s.description || "[]")
+        if (Array.isArray(desc)) {
+          const ownerItems = desc.filter(function (item) { return item.id === s.owner_id })
+          if (ownerItems.length > 0) {
+            count = ownerItems.reduce(function (sum, item) { return sum + Math.max(1, parseInt(item.count) || 1) }, 0)
+          }
+        }
+      } catch (e) {}
+      map[s.owner_id] = (map[s.owner_id] || 0) + count
+    }
+
+    // 4. 项目购买数据（用于计算剩余）
+    const projectDataMap = {}
+    for (const item of payment.groups || []) {
+      if (item.is_deleted) continue
+      const m = projectDataMap["group-cases"] || (projectDataMap["group-cases"] = {})
+      m[item.customer_id] = { purchase_count: item.purchase_count || 0, id: item.id }
+    }
+    for (const item of payment.emotions || []) {
+      if (item.is_deleted) continue
+      const m = projectDataMap["emotional-releases"] || (projectDataMap["emotional-releases"] = {})
+      m[item.customer_id] = { purchase_count: item.purchase_count || 0, id: item.id }
+    }
+    for (const item of payment.energies || []) {
+      if (item.is_deleted) continue
+      const m = projectDataMap["energy-knots"] || (projectDataMap["energy-knots"] = {})
+      m[item.customer_id] = { purchase_count: item.purchase_count || 0, id: item.id }
+    }
+
+    // 5. 各项目历史总人工销卡次数（用于计算剩余）
+    const totalDeductionByProject = {}
+    for (const d of payment.deductions || []) {
+      const k = `${d.project_type}|${d.project_id}`
+      totalDeductionByProject[k] = (totalDeductionByProject[k] || 0) + (d.count || 1)
+    }
+
+    const rows = []
+
+    // 人工销卡行
+    for (const [key, entry] of Object.entries(manualDeductionMap)) {
+      const customer = customerMap[entry.customer_id]
+      rows.push({
+        id: `manual_${key}`,
+        customer_id: entry.customer_id,
+        nickname: customer?.nickname || entry.nickname,
+        card_name: entry.project_name,
+        deduction_type: "人工销卡",
+        has_card: true,
+        count: entry.count,
+        remaining_count: entry.remaining_after,
+      })
+    }
+
+    // 会员卡活动销卡行
     const customerCardMap = {}
     const courseCustomerIds = new Set()
     for (const c of payment.cards || []) {
-      if (!c.is_deleted && !c.voided) {
-        customerCardMap[c.customer_id] = customerCardMap[c.customer_id] || c
-      }
+      if (!c.is_deleted && !c.voided) customerCardMap[c.customer_id] = c
     }
     for (const c of payment.courses || []) {
-      if (!c.is_deleted && !c.voided && (!c.expiry_date || c.expiry_date >= date)) {
-        courseCustomerIds.add(c.customer_id)
-      }
+      if (!c.is_deleted && !c.voided && (!c.expiry_date || c.expiry_date >= date)) courseCustomerIds.add(c.customer_id)
     }
-    const ids = new Set([...Object.keys(cardDeductionMap), ...Object.keys(activityDeductionMap)])
-    const rows = []
-    ids.forEach(cid => {
+    for (const [cid, activityCount] of Object.entries(activityDeductionMap)) {
       const customer = customerMap[cid]
       const card = customerCardMap[cid]
-      const manual = cardDeductionMap[cid] || 0
-      const act = activityDeductionMap[cid] || 0
-      if (manual === 0 && act === 0) return
       const hasCard = !!card || courseCustomerIds.has(cid)
-      const remaining = card ? card.remaining_count : null
       rows.push({
+        id: `act_${cid}`,
         customer_id: cid,
-        nickname: customer?.nickname || '',
-        card_type: card?.card_type || (courseCustomerIds.has(cid) ? '疗愈师' : ''),
+        nickname: customer?.nickname || "",
+        card_name: card?.card_type || (courseCustomerIds.has(cid) ? "疗愈师" : "会员卡"),
+        deduction_type: "活动销卡",
         has_card: hasCard,
-        manualText: manual > 0 ? manual + '次' : '',
-        activityText: act > 0 ? act + '次' : '',
-        manualCardName: manualCardNameMap[cid] || '',
-        manualRemainingText: (manualRemainingMap[cid] == null || manualRemainingMap[cid] === -999) ? '不限' : manualRemainingMap[cid] + '次',
-        remainingText: !hasCard ? '未办卡' : (remaining == null || remaining === -999) ? '不限' : remaining + '次',
-        manualMuted: manual === 0,
-        activityMuted: act === 0,
-        cardMuted: !hasCard,
+        count: activityCount,
+        remaining_count: card ? card.remaining_count : null,
       })
-    })
+    }
+
+    // 案主活动销卡行（觉醒游戏/情绪释放/能量结）
+    for (const [projectType, dedupMap] of Object.entries(activityProjectDeductionMaps)) {
+      for (const [cid, activityCount] of Object.entries(dedupMap)) {
+        const customer = customerMap[cid]
+        const projData = projectDataMap[projectType]?.[cid]
+        let remaining = null
+        if (projData) {
+          const totalDeducted = totalDeductionByProject[`${projectType}|${projData.id}`] || 0
+          remaining = projData.purchase_count - totalDeducted
+        }
+        rows.push({
+          id: `proj_${projectType}_${cid}`,
+          customer_id: cid,
+          nickname: customer?.nickname || "",
+          card_name: projectLabelMap[projectType] || projectType,
+          deduction_type: projectLabelMap[projectType] || projectType,
+          has_card: !!projData,
+          count: activityCount,
+          remaining_count: remaining,
+        })
+      }
+    }
+
+    for (const r of rows) {
+      r.remainingText = !r.has_card
+        ? '未办卡'
+        : (r.remaining_count == null || r.remaining_count === -999 ? '不限' : r.remaining_count + '次')
+    }
+
     return rows
   },
 
@@ -610,5 +718,152 @@ Page({
   onActivityToggle(e) {
     const idx = e.currentTarget.dataset.index
     this.setData({ [`activities[${idx}].open`]: !this.data.activities[idx].open })
+  },
+
+  // ---------- 客户详情弹窗 ----------
+
+  onNicknameTap(e) {
+    const { customerId } = e.currentTarget.dataset
+    if (!customerId) return
+    wx.navigateTo({ url: '/pages/customer-profile/index?id=' + customerId })
+  },
+
+  onVisitStatTap(e) {
+    const { customerId, type, nickname } = e.currentTarget.dataset
+    this.openDetail(customerId, type, nickname)
+  },
+
+  async openDetail(customerId, type, nickname) {
+    const titleMap = { visit: '到店记录', invited: '受邀记录', activity_today: '今日参与记录', payment: '成交详情' }
+    const headerMap = {
+      visit: [
+        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
+        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
+      ],
+      invited: [
+        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
+        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
+      ],
+      activity_today: [
+        { text: '日期', cls: 'a-c1' }, { text: '类型', cls: 'a-c2' }, { text: '活动名称', cls: 'a-c3' },
+        { text: '老师', cls: 'a-c4' }, { text: '身份', cls: 'a-c5' },
+      ],
+      payment: [
+        { text: '项目类型', cls: 'p-c1' }, { text: '项目名称', cls: 'p-c2' }, { text: '购买场次', cls: 'p-c3' },
+        { text: '金额', cls: 'p-c4' }, { text: '成交人', cls: 'p-c5' }, { text: '备注', cls: 'p-c6' },
+      ],
+    }
+    // 表头在弹窗打开时就固定渲染，不依赖数据加载
+    this.setData({
+      detailOpen: true, detailType: type,
+      detailTitle: titleMap[type] || '', detailNickname: nickname,
+      detailLoading: true, detailRows: [], detailHeader: headerMap[type] || [],
+    })
+    try {
+      const date = this.data.currentDate
+      let records = []
+      if (type === 'payment') {
+        // 成交详情：当天该客户的成交（deal_date=所选日期，与 PC 财务口径一致）
+        records = this._buildPaymentRecords(customerId, date).map(r => ({
+          rowClass: 'detail-row',
+          cols: [
+            { text: r.c1, cls: 'p-c1' },
+            { text: r.c2, cls: 'p-c2' },
+            { text: r.c3, cls: 'p-c3' },
+            { text: r.c4, cls: 'p-c4' },
+            { text: r.c5, cls: 'p-c5' },
+            { text: r.c6, cls: 'p-c6' },
+          ],
+        }))
+      } else {
+        const detail = await customerApi.detail(customerId, date)
+        if (type === 'invited' || type === 'visit') {
+          records = (detail.visit_records || [])
+            .filter(v => v.visit_date === date)
+            .filter(v => type === 'visit' ? v.arrived : true)
+            .map(v => ({
+              rowClass: 'detail-row',
+              cols: [
+                { text: v.visit_date || '', cls: 'c1', unarrived: !v.arrived },
+                { text: v.referrer_handler || '', cls: 'c2' },
+                { text: v.needs || '', cls: 'c3' },
+                { text: v.feedback || v.experience || '', cls: 'c4' },
+                { text: v.healing_notes || '', cls: 'c5' },
+                { text: v.group_leader_feedback || '', cls: 'c6' },
+              ],
+            }))
+        } else if (type === 'activity_today') {
+          records = (detail.activities || [])
+            .filter(a => a.date === date)
+            .map(a => ({
+              rowClass: 'detail-row',
+              cols: [
+                { text: a.date || '', cls: 'a-c1' },
+                { text: a.type || '', cls: 'a-c2' },
+                { text: a.name || '', cls: 'a-c3' },
+                { text: a.host || '', cls: 'a-c4' },
+                { text: a.role || '', cls: 'a-c5' },
+              ],
+            }))
+        }
+      }
+      this.setData({ detailLoading: false, detailRows: records })
+    } catch (e) {
+      console.error('加载客户详情失败:', e)
+      this.setData({ detailLoading: false, detailRows: [] })
+    }
+  },
+
+  // 当天成交记录：按 deal_date=所选日期 过滤（与 PC 财务口径一致）
+  _buildPaymentRecords(customerId, date) {
+    const payment = this._paymentData || { cards: [], groups: [], emotions: [], ohs: [], energies: [], courses: [], others: [] }
+    const records = []
+    const add = (item, type) => {
+      if (!item || item.customer_id !== customerId) return
+      if (item.deal_date !== date) return
+      if (item.voided) return
+      if (item.is_deleted) return
+      let c1 = ''
+      let c2 = ''
+      let quantity = null
+      let amount = 0
+      switch (type) {
+        case 'membership_card':
+          c1 = '会员卡'; c2 = item.card_type || ''; quantity = 1; amount = item.price || 0; break
+        case 'group_case':
+          c1 = '觉醒游戏'; c2 = '觉醒游戏'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
+        case 'emotional_release':
+          c1 = '情绪释放'; c2 = '情绪释放'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
+        case 'oh_card_reading':
+          c1 = 'OH卡诊断'; c2 = item.diagnosis_duration ? (item.diagnosis_duration * 0.5) + '小时' : 'OH卡诊断'; quantity = ''; amount = item.amount || 0; break
+        case 'energy_knot':
+          c1 = '能量结'; c2 = '能量结'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
+        case 'internal_course':
+          c1 = '内部课程'; c2 = item.course_type || ''; quantity = 1; amount = item.price || 0; break
+        case 'other':
+          c1 = '其他项目'; c2 = item.project_name || item.category || ''; quantity = item.remaining_count != null ? item.remaining_count : '不限'; amount = item.fee || 0; break
+      }
+      const closer = (item.closers || []).map(c => c && c.name).filter(Boolean).join('、') || item.closer_name || ''
+      records.push({
+        c1,
+        c2,
+        c3: quantity == null ? '' : (quantity === '不限' ? '不限' : quantity + '次'),
+        c4: amount > 0 ? '¥' + formatMoney(amount) : '',
+        c5: closer,
+        c6: item.notes || '',
+      })
+    }
+    for (const i of payment.cards || []) add(i, 'membership_card')
+    for (const i of payment.groups || []) add(i, 'group_case')
+    for (const i of payment.emotions || []) add(i, 'emotional_release')
+    for (const i of payment.ohs || []) add(i, 'oh_card_reading')
+    for (const i of payment.energies || []) add(i, 'energy_knot')
+    for (const i of payment.courses || []) add(i, 'internal_course')
+    for (const i of payment.others || []) add(i, 'other')
+    return records
+  },
+
+  onDetailClose() {
+    this.setData({ detailOpen: false })
   },
 })

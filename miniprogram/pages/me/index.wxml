@@ -32,12 +32,20 @@
       <text class="menu-label">付费项目</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onExpensesTap" wx:if="{{canExpenses}}">
+      <text class="menu-label">支出</text>
+      <text class="menu-arrow">›</text>
+    </view>
     <view class="menu-item" bindtap="onCommRecordsTap" wx:if="{{canCommRecords}}">
       <text class="menu-label">沟通记录</text>
       <text class="menu-arrow">›</text>
     </view>
-    <view class="menu-item" bindtap="onDailyReportTap">
+    <view class="menu-item" bindtap="onDailyReportTap" wx:if="{{canDailyReport}}">
       <text class="menu-label">每日报表</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="onCustomerTagsTap" wx:if="{{canCustomerTags}}">
+      <text class="menu-label">客户标签</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>

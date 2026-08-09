@@ -22,6 +22,10 @@ import {
   IconChevronDown,
   IconAffiliate,
   IconSchool,
+  IconBook,
+  IconAlertTriangle,
+  IconReceipt,
+  IconTags,
 } from "@tabler/icons-react"
 import {
   Sidebar,
@@ -35,6 +39,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { hasPagePermission } from "@/lib/page-permissions"
+import { usePagePermissions } from "@/hooks/use-page-permissions"
 
 type SidebarItem = {
   title: string
@@ -61,12 +66,17 @@ const courseItems = [
   { title: "客户资料", icon: IconUser, path: "/healing-records", permission: "healing-records" },
   { title: "邀约", icon: IconCalendarEvent, path: "/courses/class-records", permission: "class-records" },
   { title: "课表", icon: IconCalendar, path: "/courses/daily-activities", permission: "daily-activities" },
+  { title: "落地课程", icon: IconBook, path: "/offline-course-records", permission: "offline-course-records" },
+]
+
+const communicationItems = [
   { title: "沟通记录", icon: IconMessageCircle, path: "/communication-records", permission: "communication-records" },
   { title: "回访记录", icon: IconClipboardText, path: "/followup-records", permission: "followup-records" },
 ]
 
 const configItems = [
   { title: "会员身份", icon: IconShieldCheck, path: "/config/member-identities", permission: "member-identities", clearTab: "tab_member-identities" },
+  { title: "客户标签", icon: IconTags, path: "/config/customer-tags", permission: "customer-tags" },
   { title: "疗愈老师", icon: IconSparkles, path: "/healing-identities", permission: "healing-identities" },
   { title: "组织信息", icon: IconUser, path: "/organizations", permission: "organizations" },
   { title: "空间配置", icon: IconSettings, path: "/courses/spaces", permission: "spaces" },
@@ -86,14 +96,6 @@ const systemItems = [
   { title: "操作日志", icon: IconClipboardText, path: "/operation-logs", permission: "operation-logs" },
 ]
 
-function getPermissions(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem("userPermissions") || "[]")
-  } catch {
-    return []
-  }
-}
-
 function getIsSuperAdmin(): boolean {
   try {
     return JSON.parse(localStorage.getItem("currentUser") || "{}")?.role === "超级管理员"
@@ -107,15 +109,17 @@ function MenuGroup({
   items,
   isOpen,
   onToggle,
+  permissions,
+  isSuperAdmin,
 }: {
   label: string
   items: SidebarItem[]
   isOpen: boolean
   onToggle: () => void
+  permissions: string[]
+  isSuperAdmin: boolean
 }) {
   const location = useLocation()
-  const permissions = useMemo(getPermissions, [])
-  const isSuperAdmin = useMemo(getIsSuperAdmin, [])
 
   const filteredItems = items.filter(item => {
     if (!item.permission || isSuperAdmin) return true
@@ -167,14 +171,16 @@ function FixedGroup({
   label,
   items,
   accessCheck,
+  permissions,
+  isSuperAdmin,
 }: {
   label: string
   items: SidebarItem[]
   accessCheck?: (permissions: string[], isSuperAdmin: boolean) => boolean
+  permissions: string[]
+  isSuperAdmin: boolean
 }) {
   const location = useLocation()
-  const permissions = useMemo(getPermissions, [])
-  const isSuperAdmin = useMemo(getIsSuperAdmin, [])
 
   if (accessCheck && !accessCheck(permissions, isSuperAdmin)) return null
 
@@ -224,6 +230,8 @@ const GROUPS = ["信息配置", "账号管理", "系统配置"]
 
 export function AppSidebar() {
   const location = useLocation()
+  const permissions = usePagePermissions()
+  const isSuperAdmin = useMemo(getIsSuperAdmin, [])
   const activeGroup = getActiveGroup(location.pathname)
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
@@ -263,13 +271,14 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="mt-4 pb-5">
-        <FixedGroup label="数据" items={businessItems} />
-        <FixedGroup label="报表" items={reportItems} />
-        <FixedGroup label="业务" items={courseItems} />
-        <FixedGroup label="付费" items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }]} />
-        <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} />
-        <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} />
-        <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} />
+        <FixedGroup label="数据" items={businessItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <FixedGroup label="报表" items={reportItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <FixedGroup label="业务" items={courseItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <FixedGroup label="沟通" items={communicationItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <FixedGroup label="付费" permissions={permissions} isSuperAdmin={isSuperAdmin} items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }, { title: "支出", path: "/expenses", permission: "expenses", icon: IconReceipt }, { title: "欠卡记录", path: "/debt-records", permission: "debt-records", icon: IconAlertTriangle }]} />
+        <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
       </SidebarContent>
     </Sidebar>
   )

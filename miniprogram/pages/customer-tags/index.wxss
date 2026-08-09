@@ -1,0 +1,302 @@
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+  background-color: #f7f8fa;
+}
+
+.header-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 28rpx 30rpx;
+  border-radius: 12rpx;
+  background-color: #fff;
+}
+
+.header-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.header-title {
+  font-size: 32rpx;
+  color: #1f2329;
+  font-weight: 500;
+}
+
+.header-hint {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  color: #8f959e;
+}
+
+.create-button {
+  flex-shrink: 0;
+  height: 64rpx;
+  margin: 0;
+  padding: 0 24rpx;
+  border-radius: 8rpx;
+  background-color: #3370ff;
+  color: #fff;
+  font-size: 25rpx;
+  line-height: 64rpx;
+}
+
+.filter-card {
+  display: flex;
+  gap: 8rpx;
+  margin-top: 20rpx;
+  padding: 10rpx;
+  border-radius: 10rpx;
+  background-color: #fff;
+}
+
+.filter-item {
+  flex: 1;
+  padding: 15rpx 8rpx;
+  border-radius: 7rpx;
+  color: #79838f;
+  font-size: 25rpx;
+  text-align: center;
+}
+
+.filter-item.active {
+  background-color: #eef2f8;
+  color: #212631;
+}
+
+.tag-list {
+  margin-top: 20rpx;
+}
+
+.tag-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 14rpx;
+  padding: 26rpx 28rpx;
+  border-radius: 12rpx;
+  background-color: #fff;
+}
+
+.tag-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.tag-heading,
+.tag-meta,
+.tag-actions {
+  display: flex;
+  align-items: center;
+}
+
+.tag-heading {
+  gap: 14rpx;
+}
+
+.tag-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2329;
+  font-size: 28rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-badge {
+  flex-shrink: 0;
+  padding: 3rpx 10rpx;
+  border-radius: 5rpx;
+  background-color: #f0f1f2;
+  color: #646a73;
+  font-size: 20rpx;
+}
+
+.tag-description {
+  display: block;
+  overflow: hidden;
+  margin-top: 10rpx;
+  color: #646a73;
+  font-size: 24rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-meta {
+  gap: 20rpx;
+  margin-top: 10rpx;
+  color: #a8adb5;
+  font-size: 21rpx;
+}
+
+.tag-actions {
+  flex-shrink: 0;
+  gap: 20rpx;
+  font-size: 24rpx;
+}
+
+.action-edit {
+  color: #3370ff;
+}
+
+.action-archive {
+  color: #a26a75;
+}
+
+.loading,
+.empty-state,
+.permission-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 360rpx;
+  color: #8f959e;
+  font-size: 25rpx;
+}
+
+.empty-line {
+  width: 48rpx;
+  height: 2rpx;
+  margin-bottom: 22rpx;
+  background-color: #d8dadd;
+}
+
+.editor-mask {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 120;
+  background-color: rgba(0, 0, 0, 0.42);
+}
+
+.editor-popup {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 121;
+  overflow: hidden;
+  border-radius: 20rpx 20rpx 0 0;
+  background-color: #fff;
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f0f1f2;
+}
+
+.editor-title {
+  color: #1f2329;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.editor-close {
+  padding: 8rpx;
+  color: #8f959e;
+  font-size: 26rpx;
+}
+
+.editor-body {
+  padding: 28rpx 32rpx 12rpx;
+}
+
+.form-group {
+  margin-bottom: 26rpx;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #4e535a;
+  font-size: 24rpx;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1rpx solid #e1e4e7;
+  border-radius: 8rpx;
+  color: #1f2329;
+  font-size: 26rpx;
+}
+
+.form-input {
+  height: 72rpx;
+  padding: 0 20rpx;
+}
+
+.form-textarea {
+  height: 150rpx;
+  padding: 18rpx 20rpx;
+}
+
+.scope-options {
+  display: flex;
+  gap: 16rpx;
+}
+
+.scope-option {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 20rpx;
+  border: 1rpx solid #e1e4e7;
+  border-radius: 8rpx;
+}
+
+.scope-option.active {
+  border-color: #9aabc1;
+  background-color: #f4f7fb;
+}
+
+.scope-option-title {
+  color: #212631;
+  font-size: 25rpx;
+}
+
+.scope-option-hint {
+  margin-top: 6rpx;
+  color: #8f959e;
+  font-size: 20rpx;
+}
+
+.editor-footer {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid #f0f1f2;
+}
+
+.cancel-button,
+.save-button {
+  flex: 1;
+  height: 76rpx;
+  margin: 0;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  line-height: 76rpx;
+}
+
+.cancel-button {
+  border: 1rpx solid #e1e4e7;
+  background-color: #fff;
+  color: #4e535a;
+}
+
+.save-button {
+  background-color: #3370ff;
+  color: #fff;
+}

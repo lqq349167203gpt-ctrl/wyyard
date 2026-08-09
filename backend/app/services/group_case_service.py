@@ -83,8 +83,8 @@ def delete_case(case_id: str) -> tuple[bool, str]:
     if not case:
         return False, "记录不存在"
     from app.services import group_case_session_service
-    remaining = group_case_session_service.get_remaining_count(case.customer_id)
-    if remaining - case.purchase_count < 0:
+    purchase_remaining = group_case_session_service.get_purchase_remaining(case_id)
+    if purchase_remaining < case.purchase_count:
         return False, "该记录中有正在被使用的次数，无法删除"
     case.is_deleted = True
     case.deleted_at = datetime.now(timezone.utc)
