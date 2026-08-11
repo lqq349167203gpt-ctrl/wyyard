@@ -4,11 +4,12 @@ import { Plus, Tags, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import ListView from "./components/list-view"
 import DetailView from "./components/detail-view"
-import { customerApi, customerTagApi, memberIdentityApi, statisticsApi, type CustomerLight, type CustomerTag, type DashboardSummary } from "@/lib/api"
+import { customerApi, customerTagApi, memberIdentityApi, spaceApi, statisticsApi, visitApi, type Customer, type CustomerLight, type CustomerTag, type DashboardSummary, type Space } from "@/lib/api"
 import { hasPagePermission } from "@/lib/page-permissions"
 import { usePagePermissions } from "@/hooks/use-page-permissions"
 
@@ -25,6 +26,15 @@ export default function HealingRecordsPage() {
   const [customers, setCustomers] = useState<CustomerLight[]>([])
   const [identityNames, setIdentityNames] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
+  const [spaces, setSpaces] = useState<Space[]>([])
+  const [inviteTarget, setInviteTarget] = useState<Customer | null>(null)
+  const [inviteDate, setInviteDate] = useState("")
+  const [inviteSpaceId, setInviteSpaceId] = useState("")
+  const [inviteTime, setInviteTime] = useState("09:00")
+  const [inviteNeeds, setInviteNeeds] = useState("")
+  const [inviter, setInviter] = useState("")
+  const [inviteSaving, setInviteSaving] = useState(false)
+  const [inviteError, setInviteError] = useState("")
 
   // 搜索状态
   const [searchNickname, setSearchNickname] = useState("")
@@ -51,8 +61,15 @@ export default function HealingRecordsPage() {
     customerApi.light().then(setCustomers).catch(() => {})
     memberIdentityApi.list().then(list => setIdentityNames(list.map(i => i.name).reverse())).catch(() => {})
     customerTagApi.list().then(setAvailableTags).catch(() => setAvailableTags([]))
+    spaceApi.list().then(setSpaces).catch(() => setSpaces([]))
     loadSummary()
   }, [loadSummary])
+
+  useEffect(() => {
+    if (inviteTarget && !inviteSpaceId && spaces.length > 0) {
+      setInviteSpaceId(spaces[0].id)
+    }
+  }, [inviteTarget, inviteSpaceId, spaces])
 
   // 从编辑页返回时自动刷新列表
   useEffect(() => {
@@ -80,6 +97,52 @@ export default function HealingRecordsPage() {
 
   const handleAddNew = () => navigate("/healing-records/new")
   const handleEditCustomer = (id: string) => navigate(`/healing-records/${id}/edit`)
+
+  const handleInviteCustomer = (customer: Customer) => {
+    let currentOwner = ""
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      currentOwner = currentUser.owner || currentUser.username || ""
+    } catch { /* 使用空值兜底 */ }
+    setInviteTarget(customer)
+    setInviteDate(new Date().toLocaleDateString("sv-SE"))
+    setInviteSpaceId(spaces[0]?.id || "")
+    setInviteTime("09:00")
+    setInviteNeeds("")
+    setInviter(currentOwner)
+    setInviteError("")
+  }
+
+  const closeInviteDialog = () => {
+    setInviteTarget(null)
+    setInviteError("")
+  }
+
+  const handleConfirmInvite = async () => {
+    if (!inviteTarget || inviteSaving) return
+    if (!inviteDate || !inviteTime || !inviteSpaceId) {
+      setInviteError(spaces.length === 0 ? "请先在空间配置中新增空间" : "请完整填写邀约日期、空间和时间")
+      return
+    }
+    setInviteSaving(true)
+    setInviteError("")
+    try {
+      await visitApi.create({
+        visit_date: inviteDate,
+        visit_time: inviteTime,
+        customer_id: inviteTarget.id,
+        member_type: inviteTarget.member_type || "",
+        needs: inviteNeeds.trim(),
+        referrer_handler: inviter.trim(),
+        space_id: inviteSpaceId,
+      })
+      closeInviteDialog()
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : "邀约失败，请重试")
+    } finally {
+      setInviteSaving(false)
+    }
+  }
 
   const handleDeleteCustomer = (id: string, nickname: string) => {
     setDeleteTarget({ id, nickname })
@@ -216,6 +279,7 @@ export default function HealingRecordsPage() {
         <ListView
           refreshKey={refreshKey}
           onSelectCustomer={handleSelectCustomer}
+          onInviteCustomer={handleInviteCustomer}
           onDeleteCustomer={handleDeleteCustomer}
           onEditCustomer={handleEditCustomer}
           filterNickname={searchNickname}
@@ -236,6 +300,57 @@ export default function HealingRecordsPage() {
             onClearSelection={() => setDetailOpen(false)}
             hideSearch
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* 快速邀约弹窗 */}
+      <Dialog open={!!inviteTarget} onOpenChange={(open) => { if (!open && !inviteSaving) closeInviteDialog() }}>
+        <DialogContent className="w-[500px] max-w-[90vw] p-0 gap-0" initialFocus={false}>
+          <div className="border-b border-[#f0f0f0] px-5 py-3">
+            <h3 className="text-[14px] font-normal text-[#1f2329]">新增邀约</h3>
+            <p className="mt-1 text-[12px] text-[#8f959e]">{inviteTarget?.nickname || inviteTarget?.name || "客户"}</p>
+          </div>
+          <div className="space-y-3 px-5 py-4">
+            <div className="grid grid-cols-[64px_1fr] items-center gap-3">
+              <label className="text-right text-[12px] text-[#4e535a]">日期</label>
+              <Input type="date" value={inviteDate} onChange={(event) => setInviteDate(event.target.value)} className="h-8 text-[12px]" />
+            </div>
+            <div className="grid grid-cols-[64px_1fr] items-center gap-3">
+              <label className="text-right text-[12px] text-[#4e535a]">空间</label>
+              <SelectDropdown
+                value={inviteSpaceId}
+                options={spaces.map(space => ({ value: space.id, label: space.name }))}
+                onChange={setInviteSpaceId}
+                placeholder={spaces.length ? "请选择空间" : "暂无可用空间"}
+                disabled={spaces.length === 0}
+              />
+            </div>
+            <div className="grid grid-cols-[64px_1fr] items-center gap-3">
+              <label className="text-right text-[12px] text-[#4e535a]">时间</label>
+              <Input type="time" value={inviteTime} onChange={(event) => setInviteTime(event.target.value)} className="h-8 text-[12px]" />
+            </div>
+            <div className="grid grid-cols-[64px_1fr] items-start gap-3">
+              <label className="pt-2 text-right text-[12px] text-[#4e535a]">本次需求</label>
+              <Textarea value={inviteNeeds} onChange={(event) => setInviteNeeds(event.target.value)} rows={4} maxLength={5000} placeholder="请输入本次需求" className="min-h-[88px] resize-none rounded-[4px] text-[12px]" />
+            </div>
+            <div className="grid grid-cols-[64px_1fr] items-center gap-3">
+              <label className="text-right text-[12px] text-[#4e535a]">邀约人</label>
+              <CustomerSearchInput
+                customers={customers}
+                value={inviter}
+                onChange={(value) => setInviter(typeof value === "string" ? value : value[0] || "")}
+                placeholder="请选择邀约人"
+                filterSelected={false}
+              />
+            </div>
+            {inviteError && <p className="pl-[76px] text-[11px] text-[#f54a45]">{inviteError}</p>}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={closeInviteDialog} disabled={inviteSaving}>取消</Button>
+            <Button size="sm" className="h-8 text-xs" onClick={handleConfirmInvite} disabled={inviteSaving || !inviteTarget || !inviteDate || !inviteTime || !inviteSpaceId || !inviter.trim()}>
+              {inviteSaving ? "邀约中..." : "确定"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

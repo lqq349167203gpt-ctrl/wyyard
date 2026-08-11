@@ -63,6 +63,13 @@ def test_manual_deduction_appears_in_client_records(client, created_customer):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200
+    membership_summary = next(
+        item for item in response.json()["purchase_summary"]
+        if item["type"] == "会员卡"
+    )
+    assert membership_summary["current_remaining"] == 4
+    assert membership_summary["current_total"] == 5
+    assert membership_summary["debt_count"] == 0
     manual = next(
         item
         for item in response.json()["items"]
@@ -114,6 +121,18 @@ def test_expired_card_keeps_remaining_for_client_display(client, created_custome
     assert project["status"] == "expired"
     assert project["remaining"] == 5
     assert project["total"] == 5
+    current_response = client.get(
+        "/api/client/remaining",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert current_response.status_code == 200
+    assert current_response.json()["remaining"] == 0
+    membership_summary = next(
+        item for item in client_response.json()["purchase_summary"]
+        if item["type"] == "会员卡"
+    )
+    assert membership_summary["current_remaining"] == 0
+    assert membership_summary["current_total"] == 0
 
     client.delete(f"/api/membership-cards/{card['id']}")
 
@@ -405,6 +424,7 @@ def test_activity_supports_configurable_membership_deduction_count(client, creat
 
 
 def test_activity_without_membership_card_keeps_negative_remaining(client, created_customer):
+    from app.middleware.jwt_auth import create_customer_token
     from app.services import membership_card_service
 
     activity_date = "2026-07-24"
@@ -441,6 +461,23 @@ def test_activity_without_membership_card_keeps_negative_remaining(client, creat
         "date": activity_date,
         "count": 2,
     }]
+
+    token = create_customer_token(created_customer["id"], created_customer["nickname"])
+    deduction_response = client.get(
+        "/api/client/deductions",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert deduction_response.status_code == 200
+    debt_records = [
+        item
+        for item in deduction_response.json()["items"]
+        if item["project_name"] == "无卡多次扣卡测试"
+    ]
+    assert len(debt_records) == 2
+    assert sum(item["count"] for item in debt_records) == 2
+    assert {item["benefit_name"] for item in debt_records} == {"预支扣卡"}
+    assert {item["benefit_type"] for item in debt_records} == {"membership_debt"}
+    assert sorted(item["remaining_after"] for item in debt_records) == [-2, -1]
 
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
     assert membership_card_service.get_effective_remaining(created_customer["id"]) == 0
@@ -976,6 +1013,9 @@ def test_special_project_usage_appears_after_owner_arrival(client, created_custo
         purchase_state = client.get(f"/api/{project_path}/{purchase['id']}")
         assert purchase_state.json()["effective_remaining"] == 2
 
+        records = _build_special_project_usage_records(created_customer["id"])
+        assert all(item["project_name"] != activity_name for item in records)
+
         arrived = client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": True})
         assert arrived.status_code == 200
         purchase_state = client.get(f"/api/{project_path}/{purchase['id']}")
@@ -989,7 +1029,7 @@ def test_special_project_usage_appears_after_owner_arrival(client, created_custo
         assert record["count"] == 1
         assert record["remaining_after"] == 1
         assert record["activity_role"] == "案主"
-        assert record["reason"] == f"课表录入案主使用{type_label}"
+        assert record["reason"] == f"案主已到场，使用{type_label}"
 
         client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
         client.delete(f"/api/{session_path}/{session['id']}")
@@ -1023,9 +1063,70 @@ def test_unpurchased_special_project_usage_keeps_negative_remaining(client, crea
     records = _build_special_project_usage_records(created_customer["id"])
     record = next(item for item in records if item["project_name"] == "未购买专项负数记录")
     assert record["project_type"] == "group-cases"
-    assert record["benefit_name"] == "未购买"
+    assert record["benefit_name"] == "预支扣卡"
     assert record["benefit_type"] == "unpaid_special_project"
     assert record["remaining_after"] == -1
 
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
     client.delete(f"/api/group-case-sessions/{session['id']}")
+
+
+def test_special_project_usage_records_keep_per_activity_balance_and_skip_absence(
+    client,
+    created_customer,
+):
+    from app.api.client import _build_special_project_usage_records
+
+    customer_id = created_customer["id"]
+    purchase_response = client.post("/api/group-cases", json={
+        "customer_id": customer_id,
+        "nickname": created_customer["nickname"],
+        "purchase_count": 2,
+        "amount": 2000,
+    })
+    assert purchase_response.status_code == 200
+    purchase = purchase_response.json()
+
+    sessions = []
+    visits = []
+    for index in range(4):
+        activity_date = f"2026-09-{index + 1:02d}"
+        visit_response = client.post("/api/visits", json={
+            "visit_date": activity_date,
+            "customer_id": customer_id,
+            "arrived": False,
+        })
+        assert visit_response.status_code == 200
+        visits.append(visit_response.json())
+
+        session_response = client.post("/api/group-case-sessions", json={
+            "date": activity_date,
+            "name": f"专项历史余额测试{index + 1}",
+            "owner_id": customer_id,
+            "owner_name": created_customer["nickname"],
+        })
+        assert session_response.status_code == 200
+        sessions.append(session_response.json())
+
+    for visit in visits[:3]:
+        arrived = client.patch(f"/api/visits/{visit['id']}", json={"arrived": True})
+        assert arrived.status_code == 200
+
+    records = _build_special_project_usage_records(customer_id)
+    test_records = {
+        item["deduction_date"]: item
+        for item in records
+        if item["project_name"].startswith("专项历史余额测试")
+    }
+    assert set(test_records) == {"2026-09-01", "2026-09-02", "2026-09-03"}
+    assert test_records["2026-09-01"]["remaining_after"] == 1
+    assert test_records["2026-09-02"]["remaining_after"] == 0
+    assert test_records["2026-09-03"]["remaining_after"] == -1
+    assert test_records["2026-09-03"]["benefit_name"] == "预支扣卡"
+    assert test_records["2026-09-03"]["benefit_type"] == "unpaid_special_project"
+
+    for visit in visits[:3]:
+        client.patch(f"/api/visits/{visit['id']}", json={"arrived": False})
+    for session in sessions:
+        client.delete(f"/api/group-case-sessions/{session['id']}")
+    client.delete(f"/api/group-cases/{purchase['id']}")

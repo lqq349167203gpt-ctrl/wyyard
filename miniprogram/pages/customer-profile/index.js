@@ -55,6 +55,8 @@ Page({
     totalPayment: 0,
     activities: [],
     commRecords: [],
+    commContent: '',
+    commSaving: false,
     healingRecords: [],
     purchaseSummary: [],
     paymentRecords: [],
@@ -90,7 +92,7 @@ Page({
   },
 
   async loadData(id) {
-    this.setData({ loading: true, loadError: '' })
+    this.setData({ loading: true, loadError: '', commRecords: [] })
     try {
       const [detail, customerTags] = await Promise.all([
         customerApi.detail(id),
@@ -140,19 +142,7 @@ Page({
 
       // 加载沟通记录
       if (c.nickname) {
-        communicationRecordApi.list(c.nickname).then(res => {
-          const list = Array.isArray(res) ? res : []
-          list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-          list.forEach(item => {
-            if (item.created_at) {
-              const d = new Date(item.created_at)
-              item._dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-            } else {
-              item._dateStr = ''
-            }
-          })
-          this.setData({ commRecords: list })
-        }).catch(() => {})
+        this.loadCommunicationRecords(c.nickname)
       }
     } catch (e) {
       console.error('加载客户资料失败:', e)
@@ -173,5 +163,70 @@ Page({
 
   onEditTap() {
     wx.navigateTo({ url: `/pages/customer-form/index?id=${this.data.customerId}` })
+  },
+
+  async loadCommunicationRecords(nickname) {
+    try {
+      const res = await communicationRecordApi.list(nickname)
+      const list = Array.isArray(res) ? res : []
+      list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+      list.forEach(item => {
+        if (item.created_at) {
+          const d = new Date(item.created_at)
+          item._dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+        } else {
+          item._dateStr = ''
+        }
+      })
+      this.setData({ commRecords: list })
+    } catch (e) {
+      this.setData({ commRecords: [] })
+    }
+  },
+
+  onCommunicationInput(e) {
+    this.setData({ commContent: e.detail.value })
+  },
+
+  async onAddCommunication() {
+    const nickname = this.data.customer && this.data.customer.nickname
+    if (!nickname) {
+      wx.showToast({ title: '客户昵称为空，无法新增', icon: 'none' })
+      return
+    }
+    const content = this.data.commContent.trim()
+    if (!content || this.data.commSaving) return
+    this.setData({ commSaving: true })
+    try {
+      await communicationRecordApi.create({ customer_nickname: nickname, content })
+      this.setData({ commContent: '' })
+      wx.showToast({ title: '已新增', icon: 'success' })
+      await this.loadCommunicationRecords(nickname)
+    } catch (error) {
+      wx.showToast({ title: (error && error.message) || '新增失败', icon: 'none' })
+    } finally {
+      this.setData({ commSaving: false })
+    }
+  },
+
+  onDeleteCommunication(e) {
+    const id = e.currentTarget.dataset.id
+    const record = this.data.commRecords.find(item => item.id === id)
+    if (!record || !record.can_delete) return
+    wx.showModal({
+      title: '删除沟通记录',
+      content: '确定删除这条由你新增的沟通记录吗？删除后可在操作日志中查看完整内容。',
+      confirmColor: '#f54a45',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await communicationRecordApi.delete(id)
+          wx.showToast({ title: '已删除', icon: 'success' })
+          await this.loadCommunicationRecords(this.data.customer.nickname)
+        } catch (error) {
+          wx.showToast({ title: (error && error.message) || '删除失败', icon: 'none' })
+        }
+      },
+    })
   },
 })

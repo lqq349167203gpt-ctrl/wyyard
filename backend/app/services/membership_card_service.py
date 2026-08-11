@@ -127,6 +127,24 @@ def list_activity_usage_records(customer_id: str) -> list[dict]:
     ]
 
 
+def list_debt_activity_usage_records(customer_id: str) -> list[dict]:
+    """返回没有可用会员权益时形成的活动欠卡流水。"""
+    reconcile_customer_card_usage(customer_id)
+    activity_keys = sorted(
+        _debt_activities.get(customer_id, []),
+        key=lambda key: (_get_activity_date(key) or "9999-12-31", key),
+    )
+    return [
+        {
+            "key": activity_key,
+            "benefit_type": "membership_debt",
+            "benefit_name": "预支扣卡",
+            "remaining_after": -index,
+        }
+        for index, activity_key in enumerate(activity_keys, start=1)
+    ]
+
+
 def _save_debts():
     save_data(DEBTS_FILE, _debts)
     save_data(DEBT_ACTIVITIES_FILE, _debt_activities)

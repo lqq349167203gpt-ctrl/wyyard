@@ -24,6 +24,7 @@ const SortArrow = ({ field, sortField, sortOrder }: { field: SortField; sortFiel
 
 interface Props {
   onSelectCustomer: (id: string) => void
+  onInviteCustomer: (customer: Customer) => void
   onDeleteCustomer: (id: string, nickname: string) => void
   onEditCustomer: (id: string) => void
   filterNickname: string
@@ -36,7 +37,7 @@ interface Props {
   summary?: import("@/lib/api").DashboardSummary | null
 }
 
-export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, refreshKey = 0, summary = null }: Props) {
+export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, refreshKey = 0, summary = null }: Props) {
   const { permissions: cpCustomers, ready: permReady } = useCustomerPermissions("customers")
 
   // Keep latest permission values in refs so the fetch function always reads current state
@@ -134,7 +135,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
           <Table className="w-full min-w-0" style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4" style={{ width: "14%" }}>客户</TableHead>
+                <TableHead className="pl-4" style={{ width: "13%" }}>客户</TableHead>
                 <TableHead style={{ width: "9%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("member_type")}>
                     会员身份<SortArrow field="member_type" sortField={sortField} sortOrder={sortOrder} />
@@ -168,7 +169,7 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                   </span>
                 </TableHead>
                 <TableHead style={{ width: "7%" }}>创建人</TableHead>
-                <TableHead className="text-right pr-4" style={{ width: "8%" }}>操作</TableHead>
+                <TableHead className="text-right pr-4" style={{ width: "9%" }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -238,6 +239,9 @@ export default function ListView({ onSelectCustomer, onDeleteCustomer, onEditCus
                 <TableCell className="text-right pr-4">
                   <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[12px] font-normal text-[#3370ff]" onClick={() => onInviteCustomer(c)}>
+                      邀约
+                    </Button>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEditCustomer(c.id)}>
                       <Edit className="h-3.5 w-3.5" />
                     </Button>

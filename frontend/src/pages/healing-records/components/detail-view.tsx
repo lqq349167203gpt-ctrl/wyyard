@@ -9,7 +9,7 @@ import { uploadApi, customerApi, customerTagApi, healingRecordApi, customerDetai
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Upload, Copy, Inbox } from "lucide-react"
+import { X, Upload, Copy, Inbox, Trash2 } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
 
 interface HealingRec {
@@ -59,6 +59,10 @@ export default function DetailView({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [commRecords, setCommRecords] = useState<CommunicationRecord[]>([])
   const [commPage, setCommPage] = useState(1)
+  const [commContent, setCommContent] = useState("")
+  const [commSaving, setCommSaving] = useState(false)
+  const [commDeleteTarget, setCommDeleteTarget] = useState<CommunicationRecord | null>(null)
+  const [commDeleting, setCommDeleting] = useState(false)
   const [followupsPage, setFollowupsPage] = useState(1)
   const [activityTypeFilter, setActivityTypeFilter] = useState<string>("全部")
   const [activityRoleFilter, setActivityRoleFilter] = useState<string>("全部")
@@ -74,6 +78,7 @@ export default function DetailView({
     setLoading(true)
     setLoadError(null)
     setCopied(false)
+    setCommRecords([])
     setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1); setFollowupsPage(1); setOfflineCoursePage(1)
     try {
       const data = await customerDetailApi.get(cid)
@@ -88,6 +93,8 @@ export default function DetailView({
       const nickname = data.customer?.nickname
       if (nickname) {
         communicationRecordApi.list(nickname).then(setCommRecords).catch(() => setCommRecords([]))
+      } else {
+        setCommRecords([])
       }
     } catch (e) {
       if (seq !== loadSeqRef.current) return
@@ -103,6 +110,47 @@ export default function DetailView({
   const onClear = () => { setDetail(null); setSearchValue(""); onClearSelection() }
 
   const refresh = () => { if (detail) loadDetail(detail.customer.id) }
+
+  const reloadCommunicationRecords = async () => {
+    const nickname = detail?.customer.nickname
+    if (!nickname) {
+      setCommRecords([])
+      return
+    }
+    setCommRecords(await communicationRecordApi.list(nickname))
+  }
+
+  const saveCommunicationRecord = async () => {
+    const nickname = detail?.customer.nickname
+    const content = commContent.trim()
+    if (!nickname || !content || commSaving) return
+    setCommSaving(true)
+    try {
+      await communicationRecordApi.create({ customer_nickname: nickname, content })
+      setCommContent("")
+      setCommPage(1)
+      await reloadCommunicationRecords()
+    } catch (e) {
+      alert("保存失败：" + (e instanceof Error ? e.message : "未知错误"))
+    } finally {
+      setCommSaving(false)
+    }
+  }
+
+  const deleteCommunicationRecord = async () => {
+    if (!commDeleteTarget || commDeleting) return
+    setCommDeleting(true)
+    try {
+      await communicationRecordApi.delete(commDeleteTarget.id)
+      setCommDeleteTarget(null)
+      setCommPage(1)
+      await reloadCommunicationRecords()
+    } catch (e) {
+      alert("删除失败：" + (e instanceof Error ? e.message : "未知错误"))
+    } finally {
+      setCommDeleting(false)
+    }
+  }
 
   const saveRec = async (data: any) => {
     if (saving) return
@@ -478,23 +526,54 @@ export default function DetailView({
             const pageSize = 8
             const totalPages = Math.ceil(sorted.length / pageSize)
             const paginatedRecords = sorted.slice((commPage - 1) * pageSize, commPage * pageSize)
-            return sorted.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
-            ) : (
+            return (
               <div>
+                <div className="flex items-center gap-2 px-1 pb-3">
+                  <Input
+                    value={commContent}
+                    onChange={(event) => setCommContent(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                        event.preventDefault()
+                        void saveCommunicationRecord()
+                      }
+                    }}
+                    maxLength={5000}
+                    placeholder="输入本次沟通内容"
+                    className="h-8 flex-1 rounded-[4px] text-[12px]"
+                  />
+                  <Button size="sm" className="h-8 shrink-0 text-xs" onClick={saveCommunicationRecord} disabled={!c.nickname || !commContent.trim() || commSaving}>
+                    {commSaving ? "新增中..." : "新增"}
+                  </Button>
+                </div>
+                {sorted.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
+                ) : (
+                  <>
                 {paginatedRecords.map((r, idx) => {
                   const createdTime = r.created_at ? new Date(r.created_at) : null
                   const dateStr = createdTime ? `${createdTime.getFullYear()}/${createdTime.getMonth()+1}/${createdTime.getDate()}` : ""
                   const timeStr = createdTime ? ` ${createdTime.getHours().toString().padStart(2,"0")}:${createdTime.getMinutes().toString().padStart(2,"0")}` : ""
                   return (
-                    <div key={r.id} className={`flex gap-3 py-2.5 ${idx > 0 ? "border-t border-[#f3f4f5]" : ""}`}>
+                    <div key={r.id} className={`group flex gap-3 py-2.5 ${idx > 0 ? "border-t border-[#f3f4f5]" : ""}`}>
                       <div className="w-[130px] shrink-0">
-                        <div className="text-[12px] font-bold text-[#212631] tabular-nums">{dateStr}{timeStr}</div>
+                        <div className="text-[12px] font-medium text-[#212631] tabular-nums">{dateStr}{timeStr}</div>
                         <div className="text-[12px] text-[#79838f] mt-px">{r.creator || ""}</div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[12px] leading-[1.6] text-[#3a4150] whitespace-pre-wrap">{r.content}</p>
                       </div>
+                      {r.can_delete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={() => setCommDeleteTarget(r)}
+                          title="删除自己的记录"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   )
                 })}
@@ -502,6 +581,8 @@ export default function DetailView({
                   <div className="px-4 py-2 border-t border-[#f0f0f0]">
                     <PaginationBar currentPage={commPage} totalPages={totalPages} totalItems={sorted.length} startIndex={(commPage-1)*pageSize+1} endIndex={Math.min(commPage*pageSize, sorted.length)} onPageChange={setCommPage} />
                   </div>
+                )}
+                  </>
                 )}
               </div>
             )
@@ -1062,6 +1143,23 @@ export default function DetailView({
 
       {/* 弹窗 */}
       <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec} customers={customerList} saving={saving}/>
+
+      <Dialog open={!!commDeleteTarget} onOpenChange={(open) => { if (!open) setCommDeleteTarget(null) }}>
+        <DialogContent className="w-[380px] max-w-[90vw] p-0 gap-0">
+          <div className="border-b border-[#f0f0f0] px-5 py-3">
+            <h3 className="text-[14px] font-normal">删除沟通记录</h3>
+          </div>
+          <div className="px-5 py-4 text-[12px] leading-6 text-[#2b2f36]">
+            确定删除这条由你新增的沟通记录吗？删除后可在操作日志中查看完整原始内容。
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setCommDeleteTarget(null)}>取消</Button>
+            <Button size="sm" className="h-8 bg-[#f54a45] text-xs hover:bg-[#e03e3a]" onClick={deleteCommunicationRecord} disabled={commDeleting}>
+              {commDeleting ? "删除中..." : "确定删除"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

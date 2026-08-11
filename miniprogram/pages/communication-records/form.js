@@ -4,6 +4,8 @@ Page({
   data: {
     isEdit: false,
     editId: '',
+    canEdit: false,
+    canDelete: false,
     saving: false,
     nickname: '',
     content: '',
@@ -14,6 +16,7 @@ Page({
   },
 
   onLoad(options) {
+    if (!getApp().checkLogin()) return
     const isEdit = !!options.id
     this.setData({ isEdit, editId: options.id || '' })
     if (isEdit) {
@@ -37,6 +40,8 @@ Page({
       this.setData({
         nickname: item.customer_nickname || '',
         content: item.content || '',
+        canEdit: !!item.can_edit,
+        canDelete: !!item.can_delete,
       })
     } catch (err) {
       wx.showToast({ title: '加载失败', icon: 'none' })
@@ -96,6 +101,10 @@ Page({
 
   onSubmit() {
     const { isEdit, editId, nickname, content } = this.data
+    if (isEdit && !this.data.canEdit) {
+      wx.showToast({ title: '只能修改自己新增的记录', icon: 'none' })
+      return
+    }
     if (!nickname.trim()) {
       wx.showToast({ title: '请选择用户昵称', icon: 'none' })
       return
@@ -114,6 +123,7 @@ Page({
 
     action.then(() => {
       wx.showToast({ title: isEdit ? '已更新' : '已创建', icon: 'success' })
+      this.markPreviousPageRefresh()
       setTimeout(() => wx.navigateBack(), 500)
     }).catch(err => {
       wx.showToast({ title: err.message || '提交失败', icon: 'none' })
@@ -123,6 +133,7 @@ Page({
   },
 
   onDelete() {
+    if (!this.data.canDelete) return
     const { editId } = this.data
     wx.showModal({
       title: '确认删除',
@@ -131,6 +142,7 @@ Page({
         if (res.confirm) {
           communicationRecordApi.delete(editId).then(() => {
             wx.showToast({ title: '已删除', icon: 'success' })
+            this.markPreviousPageRefresh()
             setTimeout(() => wx.navigateBack(), 500)
           }).catch(err => {
             wx.showToast({ title: err.message || '删除失败', icon: 'none' })
@@ -142,5 +154,11 @@ Page({
 
   onBack() {
     wx.navigateBack()
+  },
+
+  markPreviousPageRefresh() {
+    const pages = getCurrentPages()
+    const previous = pages[pages.length - 2]
+    if (previous) previous._needRefresh = true
   },
 })

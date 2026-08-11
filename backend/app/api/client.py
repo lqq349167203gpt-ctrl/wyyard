@@ -657,7 +657,10 @@ def cancel_signup(activity_id: str, request: Request):
 # ---- 交易记录 / 活动记录 / 销卡记录 ----
 
 
-def _build_client_purchased_projects(customer_id: str) -> list[dict]:
+def _build_client_purchased_projects(
+    customer_id: str,
+    purchase_summary: list[dict] | None = None,
+) -> list[dict]:
     """返回客户端展示用的已购项目及当前权益信息。"""
     today = date_cls.today().isoformat()
     payment_dates: dict[str, str] = {}
@@ -671,7 +674,8 @@ def _build_client_purchased_projects(customer_id: str) -> list[dict]:
             payment_dates[project_type] = effective_date
 
     projects = []
-    for item in _build_purchase_summary(customer_id):
+    summary_items = purchase_summary if purchase_summary is not None else _build_purchase_summary(customer_id)
+    for item in summary_items:
         project_type = item.get("type", "")
         project_name = item.get("name") or project_type
         if project_type == "会员卡" and not item.get("name"):
@@ -797,12 +801,20 @@ def save_activity_followup(data: ActivityFollowupCreate, request: Request):
 
 @router.get("/remaining")
 def get_remaining(request: Request):
-    """剩余次数 — 与 PC 端客户详情页同一算法：grand_total - 销卡 - 活动扣卡"""
+    """当前会员卡次数 — 与 PC 端按有效期匹配后的卡次统计口径一致。"""
     customer_id = _current_customer_id(request)
     if not customer_id:
         raise HTTPException(status_code=401, detail="请先登录")
-    effective = membership_card_service.get_effective_remaining(customer_id)
-    return {"remaining": effective}
+    membership = next(
+        (item for item in _build_purchase_summary(customer_id) if item.get("type") == "会员卡"),
+        {},
+    )
+    current_remaining = membership.get("current_remaining", 0)
+    return {
+        "remaining": None if current_remaining == "不限" else current_remaining,
+        "current_total": membership.get("current_total", 0),
+        "debt_count": membership.get("debt_count", 0),
+    }
 
 
 def _enrich_activity_time(act: dict):
@@ -900,8 +912,39 @@ def _build_client_deduction_items(customer_id: str) -> list[dict]:
             "activity_role": activity_roles.get(activity_key, ""),
         })
 
+    # 没有可用会员卡/内部课程权益时产生的预支扣卡，也属于真实销卡流水。
+    for item in membership_card_service.list_debt_activity_usage_records(customer_id):
+        key = item.get("key", "")
+        activity = _resolve_activity_usage(key)
+        if not activity or activity["date"] not in arrived_dates:
+            continue
+        activity_key = key.split("#unit=", 1)[0]
+        items.append({
+            "source_id": f"debt:{key}",
+            "source_created_at": f"{activity['date']}T12:00:00+00:00",
+            "source": "activity",
+            "project_type": "membership-cards",
+            "activity_type": activity["activity_type"],
+            "project_name": activity["name"],
+            "benefit_name": item["benefit_name"],
+            "benefit_type": item["benefit_type"],
+            "count": 1,
+            "remaining_after": item["remaining_after"],
+            "deduction_date": activity["date"],
+            "reason": f"参加{activity['type_label']}，无可用权益形成欠卡",
+            "created_by": "",
+            "activity_role": activity_roles.get(activity_key, ""),
+        })
+
     items.extend(_build_special_project_usage_records(customer_id))
-    items.sort(key=lambda x: x.get("deduction_date") or "", reverse=True)
+    items.sort(
+        key=lambda x: (
+            x.get("deduction_date") or "",
+            x.get("source_created_at") or "",
+            x.get("source_id") or "",
+        ),
+        reverse=True,
+    )
     return items
 
 
@@ -913,9 +956,15 @@ def get_deductions(request: Request, response: Response):
     if not customer_id:
         raise HTTPException(status_code=401, detail="请先登录")
 
+    purchase_summary = _build_purchase_summary(customer_id)
     items = _build_client_deduction_items(customer_id)
-    projects = _build_client_purchased_projects(customer_id)
-    return {"projects": projects, "items": items, "total": len(items)}
+    projects = _build_client_purchased_projects(customer_id, purchase_summary)
+    return {
+        "purchase_summary": purchase_summary,
+        "projects": projects,
+        "items": items,
+        "total": len(items),
+    }
 
 
 def _resolve_activity_usage(key: str) -> dict | None:
@@ -973,7 +1022,7 @@ def _resolve_usage_benefit(item: dict) -> tuple[str, str]:
 
 
 def _build_special_project_usage_records(customer_id: str) -> list[dict]:
-    """将专项项目案主的课表使用转换为销卡记录。"""
+    """将专项项目案主已到场后的真实使用转换为销卡记录。"""
     configs = [
         ("group-cases", "觉醒游戏", group_case_session_service),
         ("emotional-releases", "情绪释放", emotional_release_session_service),
@@ -983,31 +1032,71 @@ def _build_special_project_usage_records(customer_id: str) -> list[dict]:
         item.get("type"): item.get("total_purchased", 0)
         for item in _build_purchase_summary(customer_id)
     }
+    manual_deductions = project_deduction_service.list_deductions(customer_id=customer_id)
     records = []
     for project_type, type_label, service in configs:
         total_purchased = purchased_counts.get(type_label, 0)
-        has_purchased = isinstance(total_purchased, (int, float)) and total_purchased > 0
-        current_remaining = service.get_remaining_count(customer_id)
+        running_remaining = (
+            int(total_purchased)
+            if isinstance(total_purchased, (int, float))
+            else 0
+        )
+        timeline = []
+
+        # 手工销卡也会影响后续活动发生时的历史余额，但它本身仍由上层单独展示。
+        for deduction in manual_deductions:
+            if deduction.project_type != project_type:
+                continue
+            timeline.append({
+                "kind": "manual",
+                "date": deduction.deduction_date or "",
+                "created_at": deduction.created_at.isoformat(),
+                "id": deduction.id,
+                "count": deduction.count,
+            })
+
         for session in service.list_sessions():
-            if session.owner_id != customer_id:
+            if (
+                session.owner_id != customer_id
+                or not visit_service.is_customer_arrived(session.date, customer_id)
+            ):
                 continue
             count = (
                 energy_knot_session_service.get_session_deduction_count(session, customer_id)
                 if project_type == "energy-knots"
                 else 1
             )
+            if count <= 0:
+                continue
+            timeline.append({
+                "kind": "activity",
+                "date": session.date or "",
+                "created_at": session.created_at.isoformat(),
+                "id": session.id,
+                "count": count,
+                "session": session,
+            })
+
+        timeline.sort(key=lambda item: (item["date"], item["created_at"], item["id"]))
+        for event in timeline:
+            running_remaining -= event["count"]
+            if event["kind"] != "activity":
+                continue
+
+            session = event["session"]
+            is_debt = running_remaining < 0
             records.append({
                 "source_id": f"special:{project_type}:{session.id}",
-                "source_created_at": f"{session.date}T12:00:00+00:00",
+                "source_created_at": session.created_at.isoformat(),
                 "source": "project_activity",
                 "project_type": project_type,
                 "project_name": getattr(session, "name", "") or type_label,
-                "benefit_name": f"{type_label}次数" if has_purchased else "未购买",
-                "benefit_type": "special_project" if has_purchased else "unpaid_special_project",
-                "count": count,
-                "remaining_after": current_remaining,
+                "benefit_name": "预支扣卡" if is_debt else f"{type_label}次数",
+                "benefit_type": "unpaid_special_project" if is_debt else "special_project",
+                "count": event["count"],
+                "remaining_after": running_remaining,
                 "deduction_date": session.date,
-                "reason": f"课表录入案主使用{type_label}",
+                "reason": f"案主已到场，使用{type_label}",
                 "created_by": "",
                 "activity_role": "案主",
             })

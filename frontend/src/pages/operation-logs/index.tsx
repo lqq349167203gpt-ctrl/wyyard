@@ -137,6 +137,8 @@ const FIELD_CN: Record<string, string> = {
   fee: "费用金额", project_name: "项目名称",
   expense_time: "支出时间", purchase_content: "购买内容", platform: "平台", notes: "备注",
   daily_card_usage: "每日扣费",
+  creator: "创建人", creator_id: "创建账号ID", created_at: "创建时间",
+  customer_nickname: "客户昵称",
 }
 
 const SECTION_OPTIONS = [
@@ -195,6 +197,39 @@ const formatSectionLabel = (section: string) => section === "组织管理" ? "�
 const getMethodLabel = (log: Pick<OperationLog, "method" | "path">) => {
   if (log.method === "DELETE" && log.path.startsWith("/api/customer-tags/")) return "停用"
   return METHOD_LABELS[log.method] || log.method
+}
+
+const compactLogText = (value: unknown, limit = 80) => {
+  const text = String(value || "").replace(/\s+/g, " ").trim()
+  return text.length <= limit ? text : `${text.slice(0, limit)}…`
+}
+
+const getLogDisplayContent = (log: OperationLog) => {
+  if (!log.path.startsWith("/api/communication-records")) return log.content
+
+  const snapshot = log.method === "DELETE"
+    ? log.before_data
+    : (log.after_data || log.before_data)
+  const nickname = compactLogText(snapshot?.customer_nickname)
+  const recordContent = compactLogText(snapshot?.content)
+  const previousContent = compactLogText(log.before_data?.content)
+  const action = log.method === "POST"
+    ? "新增"
+    : log.method === "DELETE"
+      ? "删除"
+      : "修改"
+
+  if (nickname && recordContent) {
+    if (log.method !== "POST" && log.method !== "DELETE" && previousContent) {
+      return `${action}沟通记录：客户：${nickname}｜内容：${previousContent} → ${recordContent}`
+    }
+    return `${action}沟通记录：客户：${nickname}｜内容：${recordContent}`
+  }
+  if (nickname) return `${action}沟通记录：客户：${nickname}｜内容：（内容为空）`
+  if (log.method === "DELETE" && !log.before_data) {
+    return "删除沟通记录（历史记录未保存删除前内容）"
+  }
+  return log.content
 }
 
 export default function OperationLogsPage() {
@@ -443,6 +478,34 @@ export default function OperationLogsPage() {
     )
   }
 
+  const renderSnapshot = (
+    data: Record<string, unknown> | null,
+    title: string,
+  ) => {
+    if (!data) return null
+    const keys = Object.keys(data).filter(key => key !== "can_delete")
+    if (keys.length === 0) return null
+    return (
+      <div>
+        <div className="mb-1.5 text-xs font-medium text-[#8f959e]">{title}</div>
+        <div className="overflow-hidden rounded-[4px] bg-[#f7f8fa] text-xs">
+          <table className="w-full">
+            <tbody>
+              {keys.map((key, index) => (
+                <tr key={key} className={index < keys.length - 1 ? "border-b border-[#f0f0f0]" : ""}>
+                  <td className="w-28 whitespace-nowrap px-3 py-2 text-[#8f959e]">{FIELD_CN[key] || key}</td>
+                  <td className="px-3 py-2 align-top">
+                    <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(data[key], key) || "-"}</pre>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   const resolveIdsInString = (s: string): string => {
     // Replace all 8+ char hex IDs with customer names
     return s.replace(/[0-9a-f]{8,}(?:-[0-9a-f]{4,})*/gi, (match) => getNameById(match))
@@ -604,7 +667,7 @@ export default function OperationLogsPage() {
                           {SOURCE_LABELS[log.source] || log.source}
                         </span>
                       )}
-                      <span className="flex-1 text-[13px] text-[#2b2b2b]">{log.content}</span>
+                      <span className="flex-1 text-[13px] text-[#2b2b2b]">{getLogDisplayContent(log)}</span>
                       {log.operator && (
                         <span className="text-[11px] text-[#8f959e] shrink-0">{log.operator}</span>
                       )}
@@ -677,10 +740,16 @@ export default function OperationLogsPage() {
               </div>
               <div>
                 <span className="text-[#8f959e]">操作内容：</span>
-                <span className="text-[#2b2b2b]">{selectedLog.content}</span>
+                <span className="text-[#2b2b2b]">{getLogDisplayContent(selectedLog)}</span>
               </div>
               {selectedLog.method !== "POST" && selectedLog.method !== "DELETE" && (selectedLog.before_data || selectedLog.after_data)
                 ? renderChanges(selectedLog.before_data || {}, selectedLog.after_data || {}, selectedLog.section, selectedLog.path)
+                : null}
+              {selectedLog.method === "DELETE" && selectedLog.before_data
+                ? renderSnapshot(selectedLog.before_data, "删除前完整信息")
+                : null}
+              {selectedLog.method === "POST" && selectedLog.after_data
+                ? renderSnapshot(selectedLog.after_data, "新增信息")
                 : null}
             </div>
           )}

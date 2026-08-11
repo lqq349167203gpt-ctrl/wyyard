@@ -227,12 +227,16 @@ export default function CommunicationRecordsPage() {
                   <TableCell className="text-right pr-4">
                     <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(record)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(record)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
+                        {record.can_edit && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(record)} title="编辑自己的记录">
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {record.can_delete && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(record)} title="删除自己的记录">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </TableCell>

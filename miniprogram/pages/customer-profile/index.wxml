@@ -169,11 +169,32 @@
 
     <!-- 沟通记录 -->
     <view class="tab-content" wx:if="{{activeTab === 'communication'}}">
+      <view class="comm-compose">
+        <input
+          class="comm-input"
+          value="{{commContent}}"
+          placeholder="输入本次沟通内容"
+          placeholder-class="comm-input-placeholder"
+          maxlength="5000"
+          bindinput="onCommunicationInput"
+          confirm-type="send"
+          bindconfirm="onAddCommunication"
+        />
+        <view
+          class="comm-add-button {{!commContent || commSaving ? 'disabled' : ''}}"
+          bindtap="onAddCommunication"
+          hover-class="comm-add-button-hover"
+          hover-stay-time="80"
+        >{{commSaving ? '...' : '新增'}}</view>
+      </view>
       <view wx:if="{{commRecords.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="comm-item" wx:for="{{commRecords}}" wx:key="id">
         <view class="comm-header">
           <text class="comm-date">{{item._dateStr}}</text>
-          <text class="comm-creator">{{item.creator || ''}}</text>
+          <view class="comm-meta">
+            <text class="comm-creator">{{item.creator || ''}}</text>
+            <text wx:if="{{item.can_delete}}" class="comm-delete" data-id="{{item.id}}" catchtap="onDeleteCommunication">删除</text>
+          </view>
         </view>
         <view class="comm-content">
           <text>{{item.content}}</text>

@@ -90,6 +90,7 @@ GETTER_MAP = {
     "/api/reminders": ("提醒配置", "reminder_service", "get_reminder"),
     "/api/activity-themes": ("活动安排", "activity_theme_service", "get_theme"),
     "/api/organizations": ("组织信息", "organization_service", "get_organization"),
+    "/api/communication-records": ("沟通记录", "communication_record_service", "get_record"),
     "/api/offline-courses": ("付费项目", "offline_course_service", "get_course"),
     "/api/offline-course-records": ("落地课程", "offline_course_record_service", "get_record"),
     "/api/expenses": ("支出", "expense_service", "get_expense"),
@@ -742,11 +743,32 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                 pass
         return "取消报名" if is_cancel else "报名活动"
 
-    # 沟通记录：用客户昵称作为实体名
+    # 沟通记录：摘要同时保留客户与沟通内容，完整原文由接口快照保存。
     if "/api/communication-records" in path:
         nickname = (body or {}).get("customer_nickname") or (before or {}).get("customer_nickname", "")
+        record_content = (body or {}).get("content") or (before or {}).get("content", "")
+        previous_content = (before or {}).get("content", "")
+        compact_content = " ".join(str(record_content).split())
+        compact_previous = " ".join(str(previous_content).split())
+        if len(compact_content) > 80:
+            compact_content = f"{compact_content[:80]}…"
+        if len(compact_previous) > 80:
+            compact_previous = f"{compact_previous[:80]}…"
+        action = {
+            "POST": "新增",
+            "PUT": "修改",
+            "PATCH": "修改",
+            "DELETE": "删除",
+        }.get(method, "操作")
+        if nickname and compact_content:
+            if method in ("PUT", "PATCH") and compact_previous:
+                return f"{action}沟通记录：客户：{nickname}｜内容：{compact_previous} → {compact_content}"
+            return f"{action}沟通记录：客户：{nickname}｜内容：{compact_content}"
         if nickname:
-            entity_name = nickname
+            return f"{action}沟通记录：客户：{nickname}｜内容：（内容为空）"
+        if method == "DELETE":
+            return "删除沟通记录（未获取到删除前内容）"
+        return f"{action}沟通记录"
 
     # 落地课程记录：用客户昵称作为实体名
     if "/api/offline-course-records" in path:
@@ -1257,9 +1279,18 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             before_data = log_context["before_data"]
 
         # 过滤敏感字段（密码、API 密钥、手机号等）
+        raw_before_data = before_data.copy() if isinstance(before_data, dict) else None
         body = _scrub_sensitive(body)
         if before_data:
             before_data = _scrub_sensitive(before_data)
+        # 沟通记录删除需要在操作日志中保留完整原文，便于删除后追溯。
+        if (
+            method == "DELETE"
+            and path.startswith("/api/communication-records/")
+            and raw_before_data
+            and isinstance(before_data, dict)
+        ):
+            before_data["content"] = raw_before_data.get("content", "")
 
         try:
             section = get_section(path)

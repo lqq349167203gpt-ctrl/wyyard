@@ -99,11 +99,15 @@ Page({
 
   onEdit(e) {
     const id = e.currentTarget.dataset.id
+    const record = this.data.records.find(item => item.id === id)
+    if (!record || !record.can_edit) return
     wx.navigateTo({ url: `/pages/communication-records/form?id=${id}` })
   },
 
   onLongPress(e) {
     const id = e.currentTarget.dataset.id
+    const record = this.data.records.find(item => item.id === id)
+    if (!record || !record.can_delete) return
     wx.showActionSheet({
       itemList: ['删除'],
       success: (res) => {

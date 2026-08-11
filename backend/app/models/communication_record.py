@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from .base import SafeBaseModel
 
 
@@ -14,4 +15,5 @@ class CommunicationRecordCreate(CommunicationRecordBase):
 class CommunicationRecord(CommunicationRecordBase):
     id: str
     creator: str = ""  # 创建人
+    creator_id: str = ""  # 创建账号 ID，用于可靠校验删除权限
     created_at: datetime

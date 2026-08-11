@@ -16,6 +16,7 @@
         placeholder-class="form-textarea-placeholder"
         value="{{content}}"
         bindinput="onContentInput"
+        disabled="{{isEdit && !canEdit}}"
         auto-height
         maxlength="-1"
       />
@@ -23,8 +24,8 @@
   </view>
 
   <view class="actions">
-    <button class="btn-delete" wx:if="{{isEdit}}" bindtap="onDelete">删    除</button>
-    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    <button class="btn-delete" wx:if="{{isEdit && canDelete}}" bindtap="onDelete">删    除</button>
+    <button class="btn-primary submit-btn" wx:if="{{!isEdit || canEdit}}" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
 
   <!-- 搜索选择弹窗 -->

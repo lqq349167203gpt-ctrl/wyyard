@@ -4,46 +4,67 @@
   </view>
 
   <block wx:else>
-    <view wx:if="{{projects.length}}" class="project-section">
-      <view class="project-sec">
-        <text class="project-sec-title">生效中 · {{activeProjects.length}}</text>
-        <view class="project-sec-rule"></view>
+    <view wx:if="{{purchaseSummary.length}}" class="entitlement-section">
+      <view class="section-heading">
+        <text class="section-title">卡次统计</text>
+        <view class="section-rule"></view>
       </view>
-      <view class="project-cards">
-        <view wx:for="{{activeProjects}}" wx:key="key" class="project-card">
-          <view class="project-line-one">
-            <text class="project-name">{{item.name}}</text>
-            <text class="project-remaining">{{item.remaining_text}}</text>
-            <text wx:if="{{item.total_text}}" class="project-total">{{item.total_text}}</text>
-          </view>
-          <view class="project-line-two">
-            <text class="project-type">{{item.type}}</text>
-            <text class="project-validity">{{item.validity_text}}</text>
-          </view>
-          <view class="project-progress" style="width: {{item.bar_width}}%;"></view>
-        </view>
-      </view>
-      <view wx:if="{{expiredProjects.length}}" class="project-expired">
-        <view class="project-expired-trigger" bindtap="toggleExpiredProjects">
-          <text class="project-expired-title">已过期 · {{expiredProjects.length}}</text>
-          <text wx:if="{{!expiredExpanded}}" class="project-expired-names">{{expiredProjectNames}}</text>
-          <view class="project-expired-arrow {{expiredExpanded ? 'is-expanded' : ''}}"></view>
-        </view>
-        <view wx:if="{{expiredExpanded}}" class="project-cards project-expired-cards">
-          <view wx:for="{{expiredProjects}}" wx:key="key" class="project-card project-card-expired">
-            <view class="project-line-one">
-              <text class="project-name">{{item.name}}</text>
-              <text class="project-remaining">{{item.remaining_text}}</text>
-              <text wx:if="{{item.total_text}}" class="project-total">{{item.total_text}}</text>
+
+      <view class="entitlement-list">
+        <view class="entitlement-card" wx:for="{{purchaseSummary}}" wx:key="_key">
+          <view class="entitlement-header">
+            <view class="entitlement-title">
+              <text class="entitlement-type">{{item.type}}</text>
+              <text class="entitlement-name" wx:if="{{item.name && !item._isOfflineCourse}}">{{item.name}}</text>
             </view>
-            <view class="project-line-two">
-              <text class="project-type">{{item.type}}</text>
-              <text class="project-validity">{{item.validity_text}}</text>
+            <view class="entitlement-summary">
+              <block wx:if="{{item._isOfflineCourse}}">
+                <text>已上课</text>
+                <text class="entitlement-value">{{item._attendedCount}}</text>
+                <text>次</text>
+              </block>
+              <block wx:else>
+                <text>当前剩余</text>
+                <text class="entitlement-value">{{item._currentRemainingText}}</text>
+                <text class="entitlement-divider">/</text>
+                <text>总</text>
+                <text class="entitlement-value">{{item._currentTotalText}}</text>
+              </block>
             </view>
-            <view class="project-progress" style="width: {{item.bar_width}}%;"></view>
+          </view>
+
+          <text class="entitlement-debt-inline" wx:if="{{item._debtCount > 0}}">历史欠卡 {{item._debtCount}} 次</text>
+
+          <view class="membership-cards" wx:if="{{item._cardItems.length > 0}}">
+            <view class="membership-card-row" wx:for="{{item._cardItems}}" wx:for-item="card" wx:key="_key">
+              <view class="membership-card-main">
+                <text class="membership-card-name">{{card.name || '会员卡'}}</text>
+                <text class="membership-card-count {{card.voided ? 'is-voided' : ''}}">{{card._countText}}</text>
+              </view>
+              <text class="entitlement-validity">{{card._validityText}}</text>
+            </view>
+          </view>
+
+          <view class="entitlement-info" wx:elif="{{item.name || item.effective_date}}">
+            <text class="entitlement-detail-name" wx:if="{{item.name && !item._isOfflineCourse}}">{{item.name}}</text>
+            <text class="entitlement-validity">{{item._validityText}}</text>
+          </view>
+
+          <view class="debt-list" wx:if="{{item._debtCount > 0}}">
+            <view class="debt-row" wx:for="{{item._debtActivities}}" wx:for-item="debt" wx:key="index">
+              <text class="debt-name">{{debt.label || '活动'}}</text>
+              <text class="debt-date">{{debt.date || '-'}}</text>
+              <text class="debt-count">欠卡{{debt.count}}次</text>
+            </view>
           </view>
         </view>
       </view>
+    </view>
+
+    <view class="record-heading section-heading">
+      <text class="section-title">销卡记录</text>
+      <view class="section-rule"></view>
+      <text class="record-count">{{items.length}} 条</text>
     </view>
 
     <view wx:if="{{items.length === 0}}" class="empty-box">
