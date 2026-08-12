@@ -4,8 +4,10 @@ const CARD_TYPES = [
   { key: '次卡', label: '次卡', price: 198, count: 1, duration_type: 'month', duration_value: 12 },
   { key: '体验会员', label: '体验会员', price: 398, count: 4, duration_type: 'month', duration_value: 12 },
   { key: '月卡', label: '月卡', price: 1999, count: null, duration_type: 'month', duration_value: 1 },
+  { key: '12次卡', label: '12次卡', price: 1800, count: 12, duration_type: 'month', duration_value: 12 },
   { key: '3月卡', label: '3月卡', price: 3999, count: null, duration_type: 'month', duration_value: 3 },
   { key: '30次卡', label: '30次卡', price: 3999, count: 30, duration_type: 'month', duration_value: 12 },
+  { key: '45次卡', label: '45次卡', price: 5999, count: 45, duration_type: 'month', duration_value: 12 },
   { key: '半年卡', label: '半年卡', price: 7999, count: null, duration_type: 'month', duration_value: 6 },
   { key: '年卡', label: '年卡', price: 12800, count: null, duration_type: 'month', duration_value: 12 },
 ]

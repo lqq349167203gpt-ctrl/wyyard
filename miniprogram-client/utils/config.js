@@ -1,7 +1,7 @@
 // 全局环境总开关
 //   DEV = true  → 后端连电脑局域网地址，模拟器和同一 Wi-Fi 下的手机均可访问
 //   DEV = false → 后端连生产 https://www.wyteahouse.cn
-const DEV = true
+const DEV = false
 const DEV_HOST = '192.168.31.60'
 
 const BASE_URL = DEV

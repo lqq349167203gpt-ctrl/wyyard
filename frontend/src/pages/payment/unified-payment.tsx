@@ -65,6 +65,7 @@ const MEMBERSHIP_CARD_TYPES: Record<string, { price: number; defaultCount?: numb
   "12次卡": { price: 1800, defaultCount: 12, duration: "1 年" },
   "3月卡": { price: 3999, unlimited: true, duration: "3 个月" },
   "30次卡": { price: 3999, defaultCount: 30, duration: "1 年" },
+  "45次卡": { price: 5999, defaultCount: 45, duration: "1 年" },
   "半年卡": { price: 7999, unlimited: true, duration: "6 个月" },
   "年卡": { price: 12800, unlimited: true, duration: "1 年" },
 }

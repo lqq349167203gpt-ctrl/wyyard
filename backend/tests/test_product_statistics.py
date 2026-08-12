@@ -37,7 +37,7 @@ def test_product_statistics_filters_healing_teacher_and_keeps_teacher_options(mo
         closers=[{"id": "teacher-1", "name": "老师甲", "amount": 100}],
         closer_id=None,
         closer_name=None,
-        card_type="次卡",
+        card_type="45次卡",
     )
     hidden_record = SimpleNamespace(
         customer_id="customer-1",
@@ -93,6 +93,10 @@ def test_product_statistics_filters_healing_teacher_and_keeps_teacher_options(mo
     assert result["total_amount"] == 100
     assert result["total_count"] == 1
     assert result["daily_table"][0]["converted_amount"] == 100
+    assert "45次卡" in result["card_type_names"]
+    assert result["card_type_amounts"]["45次卡"] == 100
+    assert result["card_type_counts"]["45次卡"] == 1
+    assert result["card_type_persons"]["45次卡"] == 1
     assert result["teachers"] == [
         {"id": "teacher-1", "name": "老师甲"},
         {"id": "teacher-2", "name": "老师乙"},

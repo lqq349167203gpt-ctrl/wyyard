@@ -37,6 +37,7 @@ const MEMBERSHIP_CARD_TYPES = {
   '12次卡': { price: 1800, count: 12, unlimited: false, duration: '1年' },
   '3月卡': { price: 3999, count: null, unlimited: true, duration: '3个月' },
   '30次卡': { price: 3999, count: 30, unlimited: false, duration: '1年' },
+  '45次卡': { price: 5999, count: 45, unlimited: false, duration: '1年' },
   '半年卡': { price: 7999, count: null, unlimited: true, duration: '6个月' },
   '年卡': { price: 12800, count: null, unlimited: true, duration: '1年' },
 }
