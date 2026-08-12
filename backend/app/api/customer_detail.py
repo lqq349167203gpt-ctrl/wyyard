@@ -163,8 +163,9 @@ def _build_purchase_summary(customer_id: str) -> list:
     has_unlimited = any(c.remaining_count is None for c in active)
     current_total = "不限" if has_unlimited else sum((c.total_count or 0) for c in active)
     unlimited_deductions = max(0, raw_activities - activity_deductions - internal_course_deductions) if has_unlimited else 0
-    # 有效剩余次数（None=不限次）；无卡则 0
+    # 净权益值用于保留历史欠卡语义；不能直接作为“当前剩余”，否则会把历史欠卡再次从当前有效卡扣除。
     effective_remaining = membership_card_service.get_effective_remaining(customer_id)
+    current_card_remaining = membership_card_service.get_current_card_remaining(customer_id, today)
     # 是否存在未分卡的老扣费记录（card_id=None），决定是否需要聚合分摊
     has_untracked_deductions = membership_card_service.has_untracked_deductions(customer_id)
     # 仅保留次数卡参与分摊（不限次卡不参与分摊）
@@ -174,19 +175,8 @@ def _build_purchase_summary(customer_id: str) -> list:
     card_info_list = []
     voided_cards_info = []
     debt_record = membership_card_service.get_debt_record(customer_id)
-    if has_unlimited:
-        current_remaining: int | str = "不限"
-    else:
-        active_remaining = sum(
-            membership_card_service.get_card_effective_remaining(card.id) or 0
-            for card in active
-            if card.remaining_count is not None
-        )
-        current_remaining = (
-            min(active_remaining, effective_remaining)
-            if isinstance(effective_remaining, int)
-            else active_remaining
-        )
+    # 当前剩余只统计今天有效的各张会员卡单卡余量；历史欠卡在 debt_count 中独立展示。
+    current_remaining: int | str = "不限" if current_card_remaining is None else current_card_remaining
     if cards:
         for c in cards:
             if c.voided:

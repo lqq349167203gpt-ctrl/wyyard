@@ -17,6 +17,44 @@ def _create_count_card(client, customer, count=5):
     return response.json()
 
 
+def test_customer_detail_keeps_each_active_card_remaining_separate(client, created_customer):
+    cards = []
+    for card_type, count, effective_date in (
+        ("体验会员", 4, "2026-01-01"),
+        ("45次卡", 45, "2026-02-01"),
+    ):
+        response = client.post("/api/membership-cards", json={
+            "customer_id": created_customer["id"],
+            "nickname": created_customer["nickname"],
+            "card_type": card_type,
+            "price": 398 if count == 4 else 5999,
+            "effective_date": effective_date,
+            "duration_type": "month",
+            "duration_value": 120,
+            "total_count": count,
+            "remaining_count": count,
+        })
+        assert response.status_code == 200
+        cards.append(response.json())
+
+    response = client.get(f"/api/customer-detail/{created_customer['id']}")
+    assert response.status_code == 200
+    membership_items = [
+        item for item in response.json()["purchase_summary"]
+        if item["type"] == "会员卡" and not item["voided"]
+    ]
+    experience = next(item for item in membership_items if item["name"] == "体验会员")
+    forty_five = next(item for item in membership_items if item["name"] == "45次卡")
+
+    assert experience["remaining"] == 4
+    assert experience["total_purchased"] == 4
+    assert forty_five["remaining"] == 45
+    assert forty_five["total_purchased"] == 45
+
+    for card in cards:
+        client.delete(f"/api/membership-cards/{card['id']}")
+
+
 def test_manual_deduction_requires_reason(client, created_customer):
     card = _create_count_card(client, created_customer)
     payload = {
@@ -453,7 +491,8 @@ def test_activity_without_membership_card_keeps_negative_remaining(client, creat
     )
     assert membership_summary["effective_remaining"] == -2
     assert membership_summary["advance_deductions"] == 2
-    assert membership_summary["current_remaining"] == -2
+    # 当前剩余只表示有效期内会员卡的可用卡次；历史欠卡单独展示，不混入当前余量。
+    assert membership_summary["current_remaining"] == 0
     assert membership_summary["current_total"] == 0
     assert membership_summary["debt_count"] == 2
     assert membership_summary["debt_activities"] == [{
@@ -481,6 +520,66 @@ def test_activity_without_membership_card_keeps_negative_remaining(client, creat
 
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
     assert membership_card_service.get_effective_remaining(created_customer["id"]) == 0
+    client.delete(f"/api/class-records/{activity.json()['id']}")
+
+
+def test_historical_debt_does_not_reduce_current_active_card_remaining(client, created_customer):
+    from app.middleware.jwt_auth import create_customer_token
+
+    activity_date = "2026-07-24"
+    activity = client.post("/api/class-records", json={
+        "date": activity_date,
+        "course_id": "test-historical-debt-current-balance",
+        "course_name": "历史欠卡与当前余量分离测试",
+        "participant_ids": [created_customer["id"]],
+        "membership_deduction_count": 2,
+    })
+    assert activity.status_code == 200
+    visit = client.post("/api/visits", json={
+        "visit_date": activity_date,
+        "customer_id": created_customer["id"],
+        "arrived": True,
+    })
+    assert visit.status_code == 200
+
+    # 后买的卡不覆盖 7 月历史活动，因此历史欠卡仍保留；但当前有效卡 5 次必须完整计入当前剩余。
+    card = client.post("/api/membership-cards", json={
+        "customer_id": created_customer["id"],
+        "nickname": created_customer["nickname"],
+        "card_type": "后购测试卡",
+        "price": 500,
+        "effective_date": "2026-08-01",
+        "duration_type": "month",
+        "duration_value": 120,
+        "total_count": 5,
+        "remaining_count": 5,
+    })
+    assert card.status_code == 200
+
+    detail = client.get(f"/api/customer-detail/{created_customer['id']}")
+    assert detail.status_code == 200
+    membership_summary = next(
+        item for item in detail.json()["purchase_summary"]
+        if item["type"] == "会员卡"
+    )
+    assert membership_summary["current_remaining"] == 5
+    assert membership_summary["current_total"] == 5
+    assert membership_summary["debt_count"] == 2
+
+    token = create_customer_token(created_customer["id"], created_customer["nickname"])
+    current_response = client.get(
+        "/api/client/remaining",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert current_response.status_code == 200
+    assert current_response.json() == {
+        "remaining": 5,
+        "current_total": 5,
+        "debt_count": 2,
+    }
+
+    client.delete(f"/api/membership-cards/{card.json()['id']}")
+    client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
     client.delete(f"/api/class-records/{activity.json()['id']}")
 
 

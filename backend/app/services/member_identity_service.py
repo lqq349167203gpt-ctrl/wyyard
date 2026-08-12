@@ -276,7 +276,7 @@ def _count_activity_days(customer_id: str, all_class_records, all_group_cases,
 
 
 def refresh_member_type(customer_id: str):
-    """根据配置的会员身份规则自动刷新用户的 member_type"""
+    """根据管理员已配置的身份规则刷新 member_type，不从卡类型名称推测或补建规则。"""
     customer = customer_service.get_customer(customer_id)
     if not customer:
         return

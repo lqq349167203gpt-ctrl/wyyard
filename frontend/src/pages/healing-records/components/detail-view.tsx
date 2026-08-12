@@ -236,12 +236,16 @@ export default function DetailView({
   // 次数余量摘要：余量为 0 或已过期的项目不显示；内部课程按不限次展示
   const remainSummary = (detail?.purchase_summary || [])
     .filter(s => {
-      const r = s.effective_remaining !== undefined ? s.effective_remaining : s.remaining
-      // 数字：余量 > 0 才显示
-      if (typeof r === "number") return r > 0
-      // 非数字（null/不限）：需检查卡本身是否在有效期内
+      if (s.voided) return false
       if (s.expiry_date && s.expiry_date < todayStr) return false
       if (s.effective_date && s.effective_date > todayStr) return false
+      // 所有当前有效且有余量的会员卡都逐张展示；不能只显示下一次优先扣除的那张卡。
+      // 会员卡按单卡余量展示，不能把客户全部会员卡的汇总余量重复套到每张卡上。
+      const r = s.type === "会员卡"
+        ? s.remaining
+        : (s.effective_remaining !== undefined ? s.effective_remaining : s.remaining)
+      // 数字：余量 > 0 才显示
+      if (typeof r === "number") return r > 0
       return true
     })
   const trafficLabel = c.traffic_source === "朋友圈" ? "所属人" : c.traffic_source === "好友推荐" ? "好友昵称" : "流量链接"
@@ -366,7 +370,9 @@ export default function DetailView({
             <div className="bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-4 pt-3 pb-[13px] flex-1">
               <h3 className="text-[12.5px] font-bold text-[#212631] mb-0.5">次数余量</h3>
               {remainSummary.map((s, i) => {
-                const eff = s.effective_remaining !== undefined ? s.effective_remaining : s.remaining
+                const eff = s.type === "会员卡"
+                  ? s.remaining
+                  : (s.effective_remaining !== undefined ? s.effective_remaining : s.remaining)
                 const effTotal = s.total_purchased
                 const unlimited = s.remaining === "不限" || s.total_purchased === "不限" || s.type === "内部课程" || s.type === "线下落地课程"
                 return (

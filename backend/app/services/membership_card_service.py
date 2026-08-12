@@ -538,6 +538,24 @@ def get_effective_remaining(customer_id: str) -> Optional[int]:
     return remaining
 
 
+def get_current_card_remaining(customer_id: str, on_date: Optional[str] = None) -> Optional[int]:
+    """当前有效会员卡余量：指定日期有效的各张卡单卡余量之和。
+
+    历史欠卡不参与该值计算；欠卡由 get_debt_record 单独返回。
+    None 表示存在有效的不限次会员卡。
+    """
+    reconcile_customer_card_usage(customer_id)
+    target_date = on_date or datetime.now().strftime("%Y-%m-%d")
+    active = _active_cards(customer_id, target_date)
+    if any(card.remaining_count is None for card in active):
+        return None
+    return sum(
+        get_card_effective_remaining(card.id) or 0
+        for card in active
+        if card.remaining_count is not None
+    )
+
+
 _load()
 
 

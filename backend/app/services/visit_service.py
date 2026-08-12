@@ -446,18 +446,15 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
                 r.member_type = customer.member_type or ""
         r.activity_count = all_activity_counts.get(r.customer_id, 0)
         r.welfare_count = all_welfare_counts.get(r.customer_id, 0)
-        # 会员活动剩余次数：唯一真理由流水派生（总-销卡-活动扣卡），None=不限次
-        effective = membership_card_service.get_effective_remaining(r.customer_id)
-        if effective is None:
-            # 不限次：不限次卡在有效期 OR 内部课程在有效期
-            from app.services import internal_course_service
-            active_cards = all_cards_map.get(r.customer_id, [])
-            if any(c.remaining_count is None for c in active_cards) or internal_course_service.has_active_course(r.customer_id):
-                r.remaining_count = -999
-            else:
-                r.remaining_count = 0
+        # 当前有效卡余量不扣除历史欠卡；会员卡耗尽后，内部课程权益仍按不限次展示。
+        current_remaining = membership_card_service.get_current_card_remaining(r.customer_id)
+        from app.services import internal_course_service
+        if current_remaining is None or (
+            current_remaining <= 0 and internal_course_service.has_active_course(r.customer_id)
+        ):
+            r.remaining_count = -999
         else:
-            r.remaining_count = effective
+            r.remaining_count = current_remaining
         r.activities = all_activities.get((r.customer_id, r.visit_date), [])
 
     if records:
@@ -500,20 +497,15 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
             if not member_type and customer:
                 member_type = customer.member_type or ""
 
-            # remaining_count：唯一真理由流水派生（总-销卡-活动扣卡）
-            remaining_count = 0
-            effective = membership_card_service.get_effective_remaining(r.customer_id)
-            if effective is None:
-                # 不限次：不限次卡在有效期 OR 内部课程在有效期
-                from app.services import internal_course_service
-                all_cards = [c for c in membership_card_service.list_cards() if c.customer_id == r.customer_id and not c.is_deleted]
-                active_cards = [c for c in all_cards if not c.expiry_date or c.expiry_date >= today]
-                if any(c.remaining_count is None for c in active_cards) or internal_course_service.has_active_course(r.customer_id):
-                    remaining_count = -999
-                else:
-                    remaining_count = 0
+            # 当前有效卡余量不扣除历史欠卡；会员卡耗尽后，内部课程权益仍按不限次展示。
+            current_remaining = membership_card_service.get_current_card_remaining(r.customer_id, today)
+            from app.services import internal_course_service
+            if current_remaining is None or (
+                current_remaining <= 0 and internal_course_service.has_active_course(r.customer_id)
+            ):
+                remaining_count = -999
             else:
-                remaining_count = effective
+                remaining_count = current_remaining
 
             result.append({
                 "id": r.id,

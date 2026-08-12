@@ -264,7 +264,7 @@ def query_customer_info(customer_name: str) -> str:
 
     # 剩余次数
     try:
-        remaining = membership_card_service.get_effective_remaining(cid)
+        remaining = membership_card_service.get_current_card_remaining(cid)
         if remaining is not None:
             info["剩余次数"] = str(remaining)
         total = membership_card_service.get_grand_total(cid)

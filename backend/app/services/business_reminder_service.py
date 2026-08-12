@@ -186,9 +186,9 @@ def _precompute_metrics(customer_ids: set) -> Dict[str, Dict[str, Any]]:
     for cid in customer_ids:
         metrics[cid]["activity_counts"] = activity_counts[cid]
 
-    # 3. 会员卡剩余次数 — 使用 get_effective_remaining（唯一真实数据源）
+    # 3. 当前有效会员卡余量；历史欠卡不参与当前余量计算
     for cid in customer_ids:
-        metrics[cid]["remaining_count"] = membership_card_service.get_effective_remaining(cid)
+        metrics[cid]["remaining_count"] = membership_card_service.get_current_card_remaining(cid)
 
     return metrics
 
