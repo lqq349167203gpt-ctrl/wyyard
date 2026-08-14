@@ -133,6 +133,11 @@
   background-color: #ffffff;
 }
 
+.meta-text {
+  font-size: 23rpx;
+  color: #646a73;
+}
+
 .notes-row {
   margin-top: 14rpx;
   padding-top: 14rpx;

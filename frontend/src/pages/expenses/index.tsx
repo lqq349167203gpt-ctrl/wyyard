@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Inbox, Pencil, Plus, ReceiptText, Settings, Trash2, X } from "lucide-react"
 
 import { PaginationBar } from "@/components/pagination-bar"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,8 +31,8 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useServerPagination } from "@/hooks/use-server-pagination"
-import { expenseApi } from "@/lib/api"
-import type { Expense, ExpenseInput, ExpenseType } from "@/lib/api"
+import { customerApi, expenseApi } from "@/lib/api"
+import type { CustomerLight, Expense, ExpenseInput, ExpenseType } from "@/lib/api"
 
 const PAGE_SIZE = 20
 
@@ -50,6 +51,8 @@ function emptyForm(): ExpenseForm {
     expense_time: currentLocalMinute(),
     purchase_content: "",
     amount: "",
+    customer_id: "",
+    customer_nickname: "",
     platform: "",
     notes: "",
   }
@@ -66,7 +69,11 @@ export default function ExpensesPage() {
   const [typeDialogOpen, setTypeDialogOpen] = useState(false)
   const [newTypeCategory, setNewTypeCategory] = useState<"management" | "operation">("management")
   const [newTypeName, setNewTypeName] = useState("")
+  const [newTypeRequiresCustomer, setNewTypeRequiresCustomer] = useState(false)
+  const [newTypeRequiresPlatform, setNewTypeRequiresPlatform] = useState(false)
   const [typeError, setTypeError] = useState("")
+  const [updatingTypeId, setUpdatingTypeId] = useState("")
+  const [customers, setCustomers] = useState<CustomerLight[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Expense | null>(null)
   const [form, setForm] = useState<ExpenseForm>(emptyForm)
@@ -101,6 +108,13 @@ export default function ExpensesPage() {
 
   const loadTypes = () => expenseApi.listTypes().then(setExpenseTypes).catch(() => {})
   useEffect(() => { loadTypes() }, [])
+  useEffect(() => { customerApi.light().then(setCustomers).catch(() => setCustomers([])) }, [])
+
+  const selectedType = expenseTypes.find(
+    item => item.cost_category === form.cost_category && item.name === form.expense_type,
+  )
+  const needsCustomer = selectedType?.requires_customer || Boolean(!selectedType && form.customer_nickname)
+  const needsPlatform = selectedType?.requires_platform || Boolean(!selectedType && form.platform)
 
   const switchCategory = (category: "" | "management" | "operation") => {
     setActiveCategory(category)
@@ -141,6 +155,8 @@ export default function ExpensesPage() {
       expense_type: item.expense_type,
       purchase_content: item.purchase_content,
       amount: String(item.amount),
+      customer_id: item.customer_id || "",
+      customer_nickname: item.customer_nickname || "",
       platform: item.platform,
       notes: item.notes || "",
     })
@@ -155,7 +171,7 @@ export default function ExpensesPage() {
       return
     }
     if (!form.purchase_content.trim()) {
-      setFormError("请输入购买内容")
+      setFormError("请输入支出项")
       return
     }
     if (!form.cost_category || !form.expense_type) {
@@ -166,18 +182,32 @@ export default function ExpensesPage() {
       setFormError("请输入大于 0 的金额")
       return
     }
-    if (!form.platform.trim()) {
-      setFormError("请输入购买平台")
+    if (needsCustomer && !form.customer_id) {
+      setFormError("请选择用户昵称")
+      return
+    }
+    if (needsPlatform && !form.platform.trim()) {
+      setFormError("请输入平台")
       return
     }
 
+    const keepsExistingOptionalFields = editingItem?.cost_category === form.cost_category
+      && editingItem.expense_type === form.expense_type
     const payload: ExpenseInput = {
       expense_time: form.expense_time,
       cost_category: form.cost_category,
       expense_type: form.expense_type,
       purchase_content: form.purchase_content.trim(),
       amount,
-      platform: form.platform.trim(),
+      customer_id: needsCustomer
+        ? form.customer_id
+        : keepsExistingOptionalFields ? editingItem.customer_id : "",
+      customer_nickname: needsCustomer
+        ? form.customer_nickname
+        : keepsExistingOptionalFields ? editingItem.customer_nickname : "",
+      platform: needsPlatform
+        ? form.platform.trim()
+        : keepsExistingOptionalFields ? editingItem.platform : "",
       notes: form.notes.trim(),
     }
 
@@ -218,9 +248,38 @@ export default function ExpensesPage() {
   const createType = async () => {
     if (!newTypeName.trim()) { setTypeError("请输入类型名称"); return }
     try {
-      await expenseApi.createType({ cost_category: newTypeCategory, name: newTypeName.trim() })
-      setNewTypeName(""); setTypeError(""); loadTypes()
+      await expenseApi.createType({
+        cost_category: newTypeCategory,
+        name: newTypeName.trim(),
+        requires_customer: newTypeRequiresCustomer,
+        requires_platform: newTypeRequiresPlatform,
+      })
+      setNewTypeName("")
+      setNewTypeRequiresCustomer(false)
+      setNewTypeRequiresPlatform(false)
+      setTypeError("")
+      loadTypes()
     } catch (error) { setTypeError(error instanceof Error ? error.message : "新增失败") }
+  }
+
+  const updateTypeRequirements = async (
+    item: ExpenseType,
+    field: "requires_customer" | "requires_platform",
+    checked: boolean,
+  ) => {
+    setUpdatingTypeId(item.id)
+    setTypeError("")
+    try {
+      const updated = await expenseApi.updateType(item.id, {
+        requires_customer: field === "requires_customer" ? checked : item.requires_customer,
+        requires_platform: field === "requires_platform" ? checked : item.requires_platform,
+      })
+      setExpenseTypes(current => current.map(type => type.id === updated.id ? updated : type))
+    } catch (error) {
+      setTypeError(error instanceof Error ? error.message : "设置保存失败")
+    } finally {
+      setUpdatingTypeId("")
+    }
   }
 
   return (
@@ -283,9 +342,10 @@ export default function ExpensesPage() {
                 <TableHead className="pl-4" style={{ width: "160px" }}>支出时间</TableHead>
                 <TableHead style={{ width: "100px" }}>成本分类</TableHead>
                 <TableHead style={{ width: "120px" }}>支出类型</TableHead>
-                <TableHead style={{ width: "240px" }}>购买内容</TableHead>
+                <TableHead style={{ width: "180px" }}>支出项</TableHead>
                 <TableHead style={{ width: "120px" }}>金额</TableHead>
-                <TableHead style={{ width: "140px" }}>平台</TableHead>
+                <TableHead style={{ width: "100px" }}>用户昵称</TableHead>
+                <TableHead style={{ width: "110px" }}>平台</TableHead>
                 <TableHead>备注</TableHead>
                 <TableHead style={{ width: "80px" }}>创建人</TableHead>
                 <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
@@ -306,7 +366,10 @@ export default function ExpensesPage() {
                     ¥{item.amount.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-[#4e535a]">{item.platform}</span>
+                    <span className="block truncate text-[13px] text-[#4e535a]" title={item.customer_nickname}>{item.customer_nickname || <span className="text-[#d0d3d6]">-</span>}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="block truncate text-[13px] text-[#4e535a]" title={item.platform}>{item.platform || <span className="text-[#d0d3d6]">-</span>}</span>
                   </TableCell>
                   <TableCell>
                     {item.notes ? (
@@ -351,8 +414,8 @@ export default function ExpensesPage() {
             <DialogTitle className="text-[14px] font-normal">{editingItem ? "编辑支出" : "新增支出"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2"><span className="text-[12px] text-[#4e535a] text-right tracking-widest">成本分类</span><select value={form.cost_category} onChange={event => setForm({ ...form, cost_category: event.target.value as "management" | "operation", expense_type: "" })} className="h-8 rounded-[4px] border border-input bg-white px-2 text-[12px] outline-none focus:border-[#3370ff]"><option value="management">管理成本</option><option value="operation">运营成本</option></select></div>
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2"><span className="text-[12px] text-[#4e535a] text-right tracking-widest">支出类型</span><select value={form.expense_type} onChange={event => setForm({ ...form, expense_type: event.target.value })} className="h-8 rounded-[4px] border border-input bg-white px-2 text-[12px] outline-none focus:border-[#3370ff]"><option value="">请选择</option>{expenseTypes.filter(item => item.cost_category === form.cost_category).map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select></div>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2"><span className="text-right text-[12px] text-[#4e535a]">成本分类</span><select value={form.cost_category} onChange={event => setForm({ ...form, cost_category: event.target.value as "management" | "operation", expense_type: "", customer_id: "", customer_nickname: "", platform: "" })} className="h-8 rounded-[4px] border border-input bg-white px-2 text-[12px] outline-none focus:border-[#3370ff]"><option value="management">管理成本</option><option value="operation">运营成本</option></select></div>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2"><span className="text-right text-[12px] text-[#4e535a]">支出类型</span><select value={form.expense_type} onChange={event => { const nextType = expenseTypes.find(item => item.cost_category === form.cost_category && item.name === event.target.value); setForm({ ...form, expense_type: event.target.value, customer_id: nextType?.requires_customer ? form.customer_id : "", customer_nickname: nextType?.requires_customer ? form.customer_nickname : "", platform: nextType?.requires_platform ? form.platform : "" }) }} className="h-8 rounded-[4px] border border-input bg-white px-2 text-[12px] outline-none focus:border-[#3370ff]"><option value="">请选择</option>{expenseTypes.filter(item => item.cost_category === form.cost_category).map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select></div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] text-right tracking-widest">支出时间</span>
               <Input
@@ -363,11 +426,11 @@ export default function ExpensesPage() {
               />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">购买内容</span>
+              <span className="text-right text-[12px] text-[#4e535a]">支出项</span>
               <Input
                 value={form.purchase_content}
                 onChange={(event) => setForm({ ...form, purchase_content: event.target.value })}
-                placeholder="例如：采购茶具"
+                placeholder="请输入具体支出项"
                 maxLength={200}
                 className="h-8 text-xs"
               />
@@ -387,8 +450,23 @@ export default function ExpensesPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] text-right tracking-widest">平台</span>
+            {needsCustomer && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-right text-[12px] text-[#4e535a]">用户昵称</span>
+              <CustomerSearchInput
+                customers={customers}
+                value={form.customer_nickname}
+                onChange={value => {
+                  const nickname = typeof value === "string" ? value : value[0] || ""
+                  const customer = customers.find(item => item.nickname === nickname)
+                  setForm(current => ({ ...current, customer_id: customer?.id || "", customer_nickname: nickname }))
+                }}
+                onSelectItem={customer => setForm(current => ({ ...current, customer_id: customer.id, customer_nickname: customer.nickname }))}
+                placeholder="输入昵称搜索"
+                filterSelected={false}
+              />
+            </div>}
+            {needsPlatform && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span className="text-right text-[12px] text-[#4e535a]">平台</span>
               <Input
                 value={form.platform}
                 onChange={(event) => setForm({ ...form, platform: event.target.value })}
@@ -396,7 +474,7 @@ export default function ExpensesPage() {
                 maxLength={100}
                 className="h-8 text-xs"
               />
-            </div>
+            </div>}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="pt-2 text-[12px] text-[#4e535a] text-right tracking-widest">备注</span>
               <Textarea
@@ -416,14 +494,73 @@ export default function ExpensesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={typeDialogOpen} onOpenChange={setTypeDialogOpen}><DialogContent className="w-[460px] max-w-[90vw] gap-0 p-0"><DialogHeader className="border-b border-[#f0f0f0] px-6 pb-2 pt-3"><DialogTitle className="text-[14px] font-normal">支出类型设置</DialogTitle></DialogHeader><div className="space-y-4 px-6 py-5"><div className="flex gap-2"><select value={newTypeCategory} onChange={event => setNewTypeCategory(event.target.value as "management" | "operation")} className="h-8 w-[110px] rounded-[4px] border border-input px-2 text-[12px]"><option value="management">管理成本</option><option value="operation">运营成本</option></select><Input value={newTypeName} onChange={event => setNewTypeName(event.target.value)} placeholder="输入支出类型" className="flex-1" /><Button size="sm" className="h-8 text-xs" onClick={createType}><Plus className="mr-1 h-3.5 w-3.5" />新增</Button></div>{typeError && <p className="text-[12px] text-[#c4506a]">{typeError}</p>}<div className="max-h-[320px] overflow-y-auto border-t border-[#f0f0f0] pt-2">{(["management", "operation"] as const).map(category => <div key={category} className="mb-3"><div className="mb-1 text-[12px] text-[#8f959e]">{category === "management" ? "管理成本" : "运营成本"}</div>{expenseTypes.filter(item => item.cost_category === category).length === 0 ? <div className="py-3 text-[12px] text-[#d0d3d6]">暂无类型</div> : expenseTypes.filter(item => item.cost_category === category).map(item => <div key={item.id} className="group flex h-9 items-center justify-between border-b border-[#f0f0f0] text-[13px] text-[#2b2f36]"><span>{item.name}</span><Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100" onClick={async () => { try { await expenseApi.deleteType(item.id); loadTypes() } catch (error) { setTypeError(error instanceof Error ? error.message : "删除失败") } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></div>)}</div>)}</div></div></DialogContent></Dialog>
+      <Dialog open={typeDialogOpen} onOpenChange={setTypeDialogOpen}>
+        <DialogContent className="w-[560px] max-w-[90vw] gap-0 p-0">
+          <DialogHeader className="border-b border-[#f0f0f0] px-6 pb-2 pt-3">
+            <DialogTitle className="text-[14px] font-normal">支出类型设置</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-2">
+              <div className="text-[12px] text-[#4e535a]">新增支出类型</div>
+              <div className="space-y-3 rounded-[4px] border border-[#e8e8e8] bg-[#fafafa] p-3">
+                <div className="grid grid-cols-[72px_1fr] items-center gap-3">
+                  <span className="text-right text-[12px] text-[#8f959e]">成本归属</span>
+                  <div className="flex h-8 items-center gap-7 px-1 text-[12px] text-[#2b2f36]">
+                    {(["management", "operation"] as const).map(category => <label key={category} className="flex cursor-pointer items-center gap-2"><input type="radio" name="expense-cost-category" value={category} checked={newTypeCategory === category} onChange={() => setNewTypeCategory(category)} className="h-3.5 w-3.5 accent-[#3370ff]" /><span>{category === "management" ? "管理成本" : "运营成本"}</span></label>)}
+                  </div>
+                </div>
+                <div className="grid grid-cols-[72px_1fr] items-center gap-3">
+                  <span className="text-right text-[12px] text-[#8f959e]">类型名称</span>
+                  <Input value={newTypeName} onChange={event => setNewTypeName(event.target.value)} placeholder="请输入支出类型名称" className="border-[#c9cdd4] bg-white hover:border-[#b8bdc5] focus-visible:border-[#3370ff]" />
+                </div>
+                <div className="grid grid-cols-[72px_1fr] items-center gap-3">
+                  <span className="text-right text-[12px] text-[#8f959e]">录入字段</span>
+                  <div className="flex h-8 items-center gap-6 px-1 text-[12px] text-[#4e535a]">
+                    <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={newTypeRequiresCustomer} onChange={event => setNewTypeRequiresCustomer(event.target.checked)} className="h-3.5 w-3.5 accent-[#3370ff]" />填写用户昵称</label>
+                    <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={newTypeRequiresPlatform} onChange={event => setNewTypeRequiresPlatform(event.target.checked)} className="h-3.5 w-3.5 accent-[#3370ff]" />填写平台</label>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-[#e8e8e8] pt-3">
+                  <p className="text-[12px] text-[#8f959e]">支出项、支出时间、金额和备注为固定字段</p>
+                  <Button size="sm" className="h-8 px-4 text-xs" onClick={createType}><Plus className="mr-1 h-3.5 w-3.5" />新增</Button>
+                </div>
+              </div>
+            </div>
+            {typeError && <p className="text-[12px] text-[#c4506a]">{typeError}</p>}
+            <div className="max-h-[320px] overflow-y-auto border-t border-[#f0f0f0]">
+              <div className="grid h-8 grid-cols-[88px_minmax(0,1fr)_164px_28px] items-center border-b border-[#f0f0f0] text-[12px] text-[#8f959e]">
+                <span className="px-2">成本归属</span>
+                <span>支出类型</span>
+                <span>录入字段</span>
+                <span />
+              </div>
+              {(["management", "operation"] as const).map(category => {
+                const categoryTypes = expenseTypes.filter(item => item.cost_category === category)
+                return <div key={category} className="grid grid-cols-[88px_minmax(0,1fr)] border-b border-[#f0f0f0] last:border-b-0">
+                  <div className="px-2 pt-3 text-[13px] font-medium text-[#4e535a]">
+                    {category === "management" ? "管理成本" : "运营成本"}
+                  </div>
+                  <div className="min-w-0">
+                    {categoryTypes.length === 0 ? <div className="flex h-10 items-center text-[12px] text-[#d0d3d6]">暂无子类型</div> : categoryTypes.map(item => <div key={item.id} className="group flex min-h-10 items-center border-b border-[#f0f0f0] pr-2 text-[13px] text-[#2b2f36] transition-colors hover:bg-[#f7f8fa] last:border-b-0">
+                      <span className="min-w-0 flex-1 truncate pr-3" title={item.name}>{item.name}</span>
+                      <label className="flex w-[94px] cursor-pointer items-center gap-1.5 text-[12px] text-[#646a73]"><input type="checkbox" checked={item.requires_customer} disabled={updatingTypeId === item.id} onChange={event => updateTypeRequirements(item, "requires_customer", event.target.checked)} className="h-3.5 w-3.5 accent-[#3370ff]" />用户昵称</label>
+                      <label className="flex w-[70px] cursor-pointer items-center gap-1.5 text-[12px] text-[#646a73]"><input type="checkbox" checked={item.requires_platform} disabled={updatingTypeId === item.id} onChange={event => updateTypeRequirements(item, "requires_platform", event.target.checked)} className="h-3.5 w-3.5 accent-[#3370ff]" />平台</label>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 transition-opacity group-hover:opacity-100" onClick={async () => { try { await expenseApi.deleteType(item.id); loadTypes() } catch (error) { setTypeError(error instanceof Error ? error.message : "删除失败") } }} aria-label={`删除${item.name}`}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </div>)}
+                  </div>
+                </div>
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>删除支出记录</AlertDialogTitle>
             <AlertDialogDescription>
-              确定删除“{deleteTarget?.purchase_content}”这条支出记录吗？删除后列表中将不再显示。
+              确定删除支出项“{deleteTarget?.purchase_content}”吗？删除后列表中将不再显示。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

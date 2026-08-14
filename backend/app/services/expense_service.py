@@ -2,7 +2,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from app.models.expense import Expense, ExpenseCreate, ExpenseType, ExpenseTypeCreate, ExpenseUpdate
+from app.models.expense import Expense, ExpenseCreate, ExpenseType, ExpenseTypeCreate, ExpenseTypeUpdate, ExpenseUpdate
 from app.services.storage import load_data, save_item
 
 FILENAME = "expenses.json"
@@ -44,12 +44,41 @@ def get_expense(expense_id: str) -> Expense | None:
     return item
 
 
+def _prepare_expense_data(data: ExpenseCreate | ExpenseUpdate) -> dict:
+    """按支出类型校验可选字段，并以客户主数据中的昵称为准。"""
+    values = data.model_dump()
+    expense_type = next(
+        (
+            item
+            for item in _expense_types.values()
+            if item.cost_category == data.cost_category and item.name == data.expense_type
+        ),
+        None,
+    )
+
+    if data.customer_id:
+        from app.services import customer_service
+
+        customer = customer_service.get_customer(data.customer_id)
+        if not customer:
+            raise ValueError("所选用户不存在")
+        values["customer_nickname"] = customer.nickname or customer.name or ""
+    elif expense_type and expense_type.requires_customer:
+        raise ValueError("请选择用户昵称")
+    else:
+        values["customer_nickname"] = ""
+
+    if expense_type and expense_type.requires_platform and not data.platform.strip():
+        raise ValueError("请输入平台")
+    return values
+
+
 def create_expense(data: ExpenseCreate, created_by: str = "") -> Expense:
     with _expense_lock:
         now = datetime.now(timezone.utc)
         item = Expense(
             id=str(uuid.uuid4()),
-            **data.model_dump(),
+            **_prepare_expense_data(data),
             created_by=created_by,
             created_at=now,
             updated_at=now,
@@ -65,7 +94,7 @@ def update_expense(expense_id: str, data: ExpenseUpdate, updated_by: str = "") -
         if not item:
             raise ValueError("支出记录不存在")
         updated = item.model_copy(update={
-            **data.model_dump(),
+            **_prepare_expense_data(data),
             "updated_by": updated_by,
             "updated_at": datetime.now(timezone.utc),
         })
@@ -97,6 +126,10 @@ def list_expense_types(cost_category: str = "") -> list[ExpenseType]:
     return sorted(items, key=lambda item: (item.cost_category, item.created_at, item.name))
 
 
+def get_expense_type(type_id: str) -> ExpenseType | None:
+    return _expense_types.get(type_id)
+
+
 def create_expense_type(data: ExpenseTypeCreate) -> ExpenseType:
     with _expense_lock:
         normalized_name = data.name.strip()
@@ -109,11 +142,24 @@ def create_expense_type(data: ExpenseTypeCreate) -> ExpenseType:
             id=str(uuid.uuid4()),
             cost_category=data.cost_category,
             name=normalized_name,
+            requires_customer=data.requires_customer,
+            requires_platform=data.requires_platform,
             created_at=datetime.now(timezone.utc),
         )
         _expense_types[item.id] = item
         save_item(TYPE_FILENAME, item.id, item.model_dump(mode="json"))
         return item
+
+
+def update_expense_type(type_id: str, data: ExpenseTypeUpdate) -> ExpenseType:
+    with _expense_lock:
+        item = _expense_types.get(type_id)
+        if not item:
+            raise ValueError("支出类型不存在")
+        updated = item.model_copy(update=data.model_dump())
+        _expense_types[type_id] = updated
+        save_item(TYPE_FILENAME, type_id, updated.model_dump(mode="json"))
+        return updated
 
 
 def delete_expense_type(type_id: str) -> None:

@@ -19,6 +19,23 @@ Page({
     editId: '',
     loading: false,
     saving: false,
+    costCategoryOptions: [
+      { value: 'management', label: '管理成本' },
+      { value: 'operation', label: '运营成本' },
+    ],
+    costCategory: 'management',
+    costCategoryIndex: 0,
+    expenseTypes: [],
+    expenseTypeOptions: [],
+    expenseType: '',
+    expenseTypeIndex: -1,
+    needsCustomer: false,
+    needsPlatform: false,
+    selectedCustomer: null,
+    originalCostCategory: '',
+    originalExpenseType: '',
+    originalCustomer: null,
+    originalPlatform: '',
     expenseDate: '',
     expenseTime: '',
     purchaseContent: '',
@@ -42,19 +59,58 @@ Page({
       expenseTime: now.time,
     })
     wx.setNavigationBarTitle({ title: isEdit ? '编辑支出' : '新增支出' })
-    if (isEdit) this.loadDetail(options.id)
+    this.initialize(options.id || '')
   },
 
   onShow() {
     if (!getApp().checkLogin()) return
   },
 
-  async loadDetail(id) {
+  async initialize(id) {
     this.setData({ loading: true })
+    let expenseTypes = []
+    try {
+      expenseTypes = await expenseApi.listTypes()
+    } catch (error) {
+      console.error('加载支出类型失败:', error)
+    }
+    const expenseTypeOptions = (expenseTypes || []).filter(item => item.cost_category === 'management')
+    this.setData({ expenseTypes: expenseTypes || [], expenseTypeOptions })
+    if (id) await this.loadDetail(id)
+    else this.setData({ loading: false })
+  },
+
+  async loadDetail(id) {
     try {
       const item = await expenseApi.get(id)
       const dateTime = (item.expense_time || '').split('T')
+      const costCategory = item.cost_category === 'operation' ? 'operation' : 'management'
+      let expenseTypeOptions = this.data.expenseTypes.filter(type => type.cost_category === costCategory)
+      let expenseTypeIndex = expenseTypeOptions.findIndex(type => type.name === item.expense_type)
+      if (expenseTypeIndex < 0 && item.expense_type) {
+        expenseTypeOptions = expenseTypeOptions.concat([{
+          id: `legacy-${item.expense_type}`,
+          cost_category: costCategory,
+          name: item.expense_type,
+          requires_customer: Boolean(item.customer_id || item.customer_nickname),
+          requires_platform: Boolean(item.platform),
+        }])
+        expenseTypeIndex = expenseTypeOptions.length - 1
+      }
+      const selectedType = expenseTypeIndex >= 0 ? expenseTypeOptions[expenseTypeIndex] : null
       this.setData({
+        costCategory,
+        costCategoryIndex: costCategory === 'operation' ? 1 : 0,
+        expenseTypeOptions,
+        expenseType: item.expense_type || '',
+        expenseTypeIndex,
+        needsCustomer: Boolean(selectedType && selectedType.requires_customer),
+        needsPlatform: Boolean(selectedType && selectedType.requires_platform),
+        selectedCustomer: item.customer_id ? { id: item.customer_id, nickname: item.customer_nickname || '' } : null,
+        originalCostCategory: costCategory,
+        originalExpenseType: item.expense_type || '',
+        originalCustomer: item.customer_id ? { id: item.customer_id, nickname: item.customer_nickname || '' } : null,
+        originalPlatform: item.platform || '',
         expenseDate: dateTime[0] || this.data.expenseDate,
         expenseTime: dateTime[1] || this.data.expenseTime,
         purchaseContent: item.purchase_content || '',
@@ -76,6 +132,44 @@ Page({
 
   onTimeChange(e) {
     this.setData({ expenseTime: e.detail.value })
+  },
+
+  onCostCategoryChange(e) {
+    const costCategoryIndex = Number(e.detail.value)
+    const costCategory = this.data.costCategoryOptions[costCategoryIndex].value
+    this.setData({
+      costCategory,
+      costCategoryIndex,
+      expenseTypeOptions: this.data.expenseTypes.filter(item => item.cost_category === costCategory),
+      expenseType: '',
+      expenseTypeIndex: -1,
+      needsCustomer: false,
+      needsPlatform: false,
+      selectedCustomer: null,
+      platform: '',
+    })
+  },
+
+  onExpenseTypeChange(e) {
+    const expenseTypeIndex = Number(e.detail.value)
+    const expenseType = this.data.expenseTypeOptions[expenseTypeIndex]
+    if (!expenseType) return
+    this.setData({
+      expenseTypeIndex,
+      expenseType: expenseType.name,
+      needsCustomer: Boolean(expenseType.requires_customer),
+      needsPlatform: Boolean(expenseType.requires_platform),
+      selectedCustomer: expenseType.requires_customer ? this.data.selectedCustomer : null,
+      platform: expenseType.requires_platform ? this.data.platform : '',
+    })
+  },
+
+  onCustomerSelect(e) {
+    this.setData({ selectedCustomer: e.detail.customer })
+  },
+
+  onCustomerClear() {
+    this.setData({ selectedCustomer: null })
   },
 
   onPurchaseContentInput(e) {
@@ -105,23 +199,41 @@ Page({
       return
     }
     if (!purchaseContent) {
-      wx.showToast({ title: '请输入购买内容', icon: 'none' })
+      wx.showToast({ title: '请输入支出项', icon: 'none' })
+      return
+    }
+    if (!this.data.expenseType) {
+      wx.showToast({ title: '请选择支出类型', icon: 'none' })
       return
     }
     if (!Number.isFinite(amount) || amount <= 0) {
       wx.showToast({ title: '请输入正确金额', icon: 'none' })
       return
     }
-    if (!platform) {
+    if (this.data.needsCustomer && !this.data.selectedCustomer) {
+      wx.showToast({ title: '请选择用户昵称', icon: 'none' })
+      return
+    }
+    if (this.data.needsPlatform && !platform) {
       wx.showToast({ title: '请输入平台', icon: 'none' })
       return
     }
 
+    const keepsExistingOptionalFields = this.data.isEdit
+      && this.data.costCategory === this.data.originalCostCategory
+      && this.data.expenseType === this.data.originalExpenseType
+    const selectedCustomer = this.data.needsCustomer
+      ? this.data.selectedCustomer
+      : (keepsExistingOptionalFields ? this.data.originalCustomer : null)
     const payload = {
       expense_time: `${this.data.expenseDate}T${this.data.expenseTime}`,
+      cost_category: this.data.costCategory,
+      expense_type: this.data.expenseType,
       purchase_content: purchaseContent,
       amount,
-      platform,
+      customer_id: selectedCustomer ? selectedCustomer.id : '',
+      customer_nickname: selectedCustomer ? selectedCustomer.nickname : '',
+      platform: this.data.needsPlatform ? platform : (keepsExistingOptionalFields ? this.data.originalPlatform : ''),
       notes: this.data.notes.trim(),
     }
 

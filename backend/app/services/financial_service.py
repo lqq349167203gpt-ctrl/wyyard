@@ -174,6 +174,7 @@ def list_composition_details(date_from: str, date_to: str, kind: str) -> list[di
                 "secondary": item.expense_type or item.purchase_content,
                 "content": item.purchase_content,
                 "amount": round(item.amount, 2),
+                "customer_nickname": item.customer_nickname,
                 "platform": item.platform,
                 "notes": item.notes,
                 "operator": item.created_by,

@@ -98,6 +98,7 @@ GETTER_MAP = {
     "/api/communication-records": ("沟通记录", "communication_record_service", "get_record"),
     "/api/offline-courses": ("付费项目", "offline_course_service", "get_course"),
     "/api/offline-course-records": ("落地课程", "offline_course_record_service", "get_record"),
+    "/api/expenses/types": ("支出项", "expense_service", "get_expense_type"),
     "/api/expenses": ("支出项", "expense_service", "get_expense"),
 }
 
@@ -228,7 +229,8 @@ FIELD_NAMES = {
     "host_id": "主持人", "leader_id": "组长", "deputy_id": "副组长",
     "member_ids": "成员", "teacher_ids": "老师",
     "price": "价格", "amount": "金额", "count": "次数", "total": "总计",
-    "expense_time": "支出时间", "purchase_content": "购买内容", "platform": "平台", "notes": "备注",
+    "expense_time": "支出时间", "purchase_content": "支出项", "platform": "平台", "notes": "备注",
+    "requires_customer": "需要用户昵称", "requires_platform": "需要平台",
     "cost_category": "成本分类", "expense_type": "支出类型", "month": "分成月份",
     "person_name": "人员", "benefit_date": "福利日期",
     "sort_order": "排序", "is_public_welfare": "公益",
@@ -301,6 +303,9 @@ def get_entity_id(path: str) -> str:
     # 批量操作路径不提取 entity_id
     if "/batch/" in path:
         return ""
+    expense_type_match = re.search(r"/api/expenses/types/([^/]+)(?:/|$)", path)
+    if expense_type_match:
+        return expense_type_match.group(1)
     # 找 /api/{resource}/ 后的第一个 UUID（支持嵌套路径如 /api/class-records/{id}/groups）
     match = re.search(r"/api/[^/]+/([^/]+)(?:/|$)", path)
     if match:
@@ -1324,6 +1329,9 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
 
         # 只记录成功的写操作（跳过 4xx/5xx）
         if response.status_code >= 400:
+            return response
+
+        if getattr(request.state, "skip_operation_log", False):
             return response
 
         # 过滤掉前端可能回传的计算字段（不应记录为变更）

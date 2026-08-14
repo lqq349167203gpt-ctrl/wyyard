@@ -220,6 +220,21 @@ def test_customer_tag_operation_logs_show_names_changes_and_miniprogram_source(c
         assert remove_log["source"] == "miniprogram"
         assert remove_log["after_data"]["customer_tags"] == [updated_public_name]
 
+        logs_before_noop = client.get(
+            "/api/operation-logs",
+            params={"entity_id": created_customer["id"], "section": "客户标签"},
+        ).json()
+        noop_response = client.put(
+            f"/api/customer-tags/customers/{created_customer['id']}",
+            json={"tag_ids": [public_tag_id]},
+        )
+        assert noop_response.status_code == 200, noop_response.text
+        logs_after_noop = client.get(
+            "/api/operation-logs",
+            params={"entity_id": created_customer["id"], "section": "客户标签"},
+        ).json()
+        assert len(logs_after_noop) == len(logs_before_noop)
+
         delete_response = client.delete(f"/api/customer-tags/{private_tag_id}")
         assert delete_response.status_code == 200, delete_response.text
         delete_log = client.get(

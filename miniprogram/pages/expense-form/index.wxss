@@ -34,6 +34,31 @@
   text-align: right;
 }
 
+.field-picker {
+  min-width: 0;
+  flex: 1;
+}
+
+.field-picker-value {
+  font-size: 28rpx;
+  color: #1f2329;
+  text-align: right;
+}
+
+.customer-item {
+  align-items: flex-start;
+  padding: 16rpx 0;
+}
+
+.customer-item .form-label {
+  padding-top: 24rpx;
+}
+
+.customer-field {
+  min-width: 0;
+  flex: 1;
+}
+
 .placeholder {
   color: #b0b5bb;
 }

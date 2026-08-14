@@ -229,14 +229,13 @@ function FixedGroup({
 
 function getActiveGroup(pathname: string): string {
   if (businessItems.some(i => i.path === pathname)) return "数据"
-  if (expenseItems.some(i => i.path === pathname)) return "支出"
   if (configItems.some(i => i.path === pathname)) return "信息配置"
   if (accountItems.some(i => i.path === pathname)) return "账号管理"
   if (systemItems.some(i => i.path === pathname)) return "系统配置"
   return ""
 }
 
-const GROUPS = ["数据", "支出", "信息配置", "账号管理", "系统配置"]
+const GROUPS = ["数据", "信息配置", "账号管理", "系统配置"]
 
 export function AppSidebar() {
   const location = useLocation()
@@ -286,7 +285,7 @@ export function AppSidebar() {
         <FixedGroup label="业务" items={courseItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="沟通" items={communicationItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="付费" permissions={permissions} isSuperAdmin={isSuperAdmin} items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }, { title: "欠卡记录", path: "/debt-records", permission: "debt-records", icon: IconAlertTriangle }]} />
-        <MenuGroup label="支出" items={expenseItems} isOpen={openGroups["支出"]} onToggle={() => toggle("支出")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <FixedGroup label="支出" items={expenseItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />

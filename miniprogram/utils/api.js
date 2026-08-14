@@ -515,6 +515,7 @@ const expenseApi = {
     return request(`/api/expenses${qs ? '?' + qs : ''}`)
   },
   get: (id) => request(`/api/expenses/${id}`),
+  listTypes: (costCategory) => request(`/api/expenses/types/list${costCategory ? `?cost_category=${encodeURIComponent(costCategory)}` : ''}`),
   create: (data) => request('/api/expenses', { method: 'POST', data }),
   update: (id, data) => request(`/api/expenses/${id}`, { method: 'PUT', data }),
   delete: (id) => request(`/api/expenses/${id}`, { method: 'DELETE' }),

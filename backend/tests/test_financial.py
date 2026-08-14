@@ -98,13 +98,17 @@ def test_expense_type_configuration(client):
         response = client.post("/api/expenses/types", json={
             "cost_category": "operation",
             "name": "平台投放",
+            "requires_customer": False,
+            "requires_platform": True,
         })
         assert response.status_code == 200
         type_id = response.json()["id"]
 
         list_response = client.get("/api/expenses/types/list", params={"cost_category": "operation"})
         assert list_response.status_code == 200
-        assert any(item["id"] == type_id for item in list_response.json())
+        configured_type = next(item for item in list_response.json() if item["id"] == type_id)
+        assert configured_type["requires_customer"] is False
+        assert configured_type["requires_platform"] is True
     finally:
         if type_id:
             client.delete(f"/api/expenses/types/{type_id}")

@@ -195,7 +195,9 @@ def set_customer_tags(customer_id: str, data: CustomerTagAssignmentUpdate, reque
     if removed_names:
         changes.append(f"移除标签“{'、'.join(removed_names)}”")
     if not changes:
-        changes.append("标签无变更")
+        # 保存客户资料时前端会一并提交标签；标签未变化不属于有效业务操作。
+        request.state.skip_operation_log = True
+        return after_tags
     _set_operation_log_context(
         request,
         entity_id=customer_id,

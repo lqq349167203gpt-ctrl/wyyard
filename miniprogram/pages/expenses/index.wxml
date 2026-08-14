@@ -30,7 +30,11 @@
         </view>
         <view class="card-meta">
           <text class="time">{{item._time}}</text>
-          <text class="platform">{{item.platform}}</text>
+          <text class="platform">{{item._costCategory}} · {{item.expense_type || '未设置类型'}}</text>
+        </view>
+        <view class="card-meta" wx:if="{{item.customer_nickname || item.platform}}">
+          <text class="meta-text" wx:if="{{item.customer_nickname}}">用户：{{item.customer_nickname}}</text>
+          <text class="meta-text" wx:if="{{item.platform}}">平台：{{item.platform}}</text>
         </view>
         <view class="notes-row" wx:if="{{item.notes}}">
           <text class="notes">{{item.notes}}</text>

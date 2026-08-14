@@ -68,6 +68,7 @@ export default function CustomerFormPage() {
   const [tagsLoading, setTagsLoading] = useState(true)
   const [tagLoadError, setTagLoadError] = useState("")
   const initializedRef = useRef(false)
+  const initialTagIdsRef = useRef<string[]>([])
 
   // 加载客户列表（供搜索输入用）
   useEffect(() => {
@@ -127,7 +128,9 @@ export default function CustomerFormPage() {
       .then(([tags, selectedTags]) => {
         if (cancelled) return
         setAvailableTags(tags)
-        setSelectedTagIds(selectedTags.map(tag => tag.id))
+        const selectedIds = selectedTags.map(tag => tag.id)
+        setSelectedTagIds(selectedIds)
+        initialTagIdsRef.current = selectedIds
         setTagsLoaded(true)
         setTagLoadError("")
       })
@@ -179,7 +182,10 @@ export default function CustomerFormPage() {
       }
       if (entityId) {
         await customerApi.update(entityId, payload as Partial<CustomerCreate>)
-        if (tagsLoaded) await customerTagApi.setForCustomer(entityId, selectedTagIds)
+        const initialTagIds = initialTagIdsRef.current
+        const tagsChanged = selectedTagIds.length !== initialTagIds.length
+          || selectedTagIds.some(tagId => !initialTagIds.includes(tagId))
+        if (tagsLoaded && tagsChanged) await customerTagApi.setForCustomer(entityId, selectedTagIds)
       } else {
         const result = await customerApi.create(payload as Partial<CustomerCreate>)
         if (tagsLoaded && selectedTagIds.length > 0) {

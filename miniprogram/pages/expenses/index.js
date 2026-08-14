@@ -5,6 +5,7 @@ function formatExpense(item) {
   return Object.assign({}, item, {
     _time: (item.expense_time || '').replace('T', ' '),
     _amount: amount.toFixed(2),
+    _costCategory: item.cost_category === 'management' ? '管理成本' : item.cost_category === 'operation' ? '运营成本' : '待分类',
   })
 }
 
@@ -136,7 +137,7 @@ Page({
   confirmDelete(item) {
     wx.showModal({
       title: '删除支出记录',
-      content: `确定删除“${item.purchase_content}”吗？`,
+      content: `确定删除支出项“${item.purchase_content}”吗？`,
       confirmColor: '#c4506a',
       success: async (result) => {
         if (!result.confirm) return

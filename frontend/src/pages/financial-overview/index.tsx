@@ -109,7 +109,8 @@ function CompositionTable({ kind, rows, loading, onSelect }: { kind: FinancialCo
       <TableHead className="pl-4" style={{ width: "120px" }}>日期</TableHead>
       <TableHead style={{ width: "160px" }}>{kind === "expense" ? "成本类别" : "客户"}</TableHead>
       <TableHead style={{ width: "180px" }}>{kind === "expense" ? "支出类型" : kind === "refund" ? "退款项目" : "类型"}</TableHead>
-      {kind === "expense" && <TableHead>购买内容</TableHead>}
+      {kind === "expense" && <TableHead>支出项</TableHead>}
+      {kind === "expense" && <TableHead style={{ width: "100px" }}>用户昵称</TableHead>}
       {kind === "expense" && <TableHead style={{ width: "100px" }}>平台</TableHead>}
       {kind === "refund" && <TableHead className="text-right" style={{ width: "120px" }}>原成交额</TableHead>}
       <TableHead className="text-right" style={{ width: "130px" }}>{kind === "refund" ? "退款金额" : "金额"}</TableHead>
@@ -121,6 +122,7 @@ function CompositionTable({ kind, rows, loading, onSelect }: { kind: FinancialCo
       <TableCell><span className="block truncate text-[13px] font-medium text-[#212631]" title={row.primary}>{row.primary}</span></TableCell>
       <TableCell><span className="block truncate text-[12px] text-[#4e535a]" title={row.secondary}>{row.secondary || <EmptyValue />}</span></TableCell>
       {kind === "expense" && <TableCell><span className="block truncate text-[12px] text-[#4e535a]" title={row.content}>{row.content || <EmptyValue />}</span></TableCell>}
+      {kind === "expense" && <TableCell className="text-[12px] text-[#8f959e]">{row.customer_nickname || <EmptyValue />}</TableCell>}
       {kind === "expense" && <TableCell className="text-[12px] text-[#8f959e]">{row.platform || <EmptyValue />}</TableCell>}
       {kind === "refund" && <TableCell className="text-right text-[12px] tabular-nums text-[#646a73]">{money(row.paid_amount ?? 0)}</TableCell>}
       <TableCell className="text-right text-[12px] tabular-nums text-[#2b2f36]">{money(row.amount)}</TableCell>
@@ -322,7 +324,7 @@ export default function FinancialOverviewPage() {
           <span className="text-right text-[#8f959e]">日期</span><span className="text-[#2b2f36] tabular-nums">{selectedComposition.date}</span>
           <span className="text-right text-[#8f959e]">{selectedComposition.kind === "expense" ? "成本类别" : "客户"}</span><span className="text-[#2b2f36]">{selectedComposition.primary}</span>
           <span className="text-right text-[#8f959e]">{selectedComposition.kind === "expense" ? "支出类型" : selectedComposition.kind === "refund" ? "退款项目" : "类型"}</span><span className="text-[#2b2f36]">{selectedComposition.secondary || <EmptyValue />}</span>
-          {selectedComposition.kind === "expense" && <><span className="text-right text-[#8f959e]">购买内容</span><span className="text-[#2b2f36]">{selectedComposition.content || <EmptyValue />}</span><span className="text-right text-[#8f959e]">平台</span><span className="text-[#2b2f36]">{selectedComposition.platform || <EmptyValue />}</span></>}
+          {selectedComposition.kind === "expense" && <><span className="text-right text-[#8f959e]">支出项</span><span className="text-[#2b2f36]">{selectedComposition.content || <EmptyValue />}</span><span className="text-right text-[#8f959e]">用户昵称</span><span className="text-[#2b2f36]">{selectedComposition.customer_nickname || <EmptyValue />}</span><span className="text-right text-[#8f959e]">平台</span><span className="text-[#2b2f36]">{selectedComposition.platform || <EmptyValue />}</span></>}
           {selectedComposition.kind === "refund" && <><span className="text-right text-[#8f959e]">原成交额</span><span className="text-[#2b2f36] tabular-nums">{money(selectedComposition.paid_amount ?? 0)}</span></>}
           <span className="text-right text-[#8f959e]">{selectedComposition.kind === "refund" ? "退款金额" : "金额"}</span><span className="font-medium tabular-nums text-[#2b2f36]">{money(selectedComposition.amount)}</span>
           <span className="text-right text-[#8f959e]">备注</span><span className="whitespace-pre-wrap text-[#2b2f36]">{selectedComposition.notes || <EmptyValue />}</span>

@@ -7,6 +7,18 @@
     <view class="loading" wx:if="{{loading}}">加载中...</view>
     <view class="form-card" wx:else>
       <view class="form-item">
+        <text class="form-label">成本分类</text>
+        <picker class="field-picker" range="{{costCategoryOptions}}" range-key="label" value="{{costCategoryIndex}}" bindchange="onCostCategoryChange">
+          <view class="field-picker-value">{{costCategoryOptions[costCategoryIndex].label}}</view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <text class="form-label">支出类型</text>
+        <picker class="field-picker" range="{{expenseTypeOptions}}" range-key="name" value="{{expenseTypeIndex < 0 ? 0 : expenseTypeIndex}}" bindchange="onExpenseTypeChange">
+          <view class="field-picker-value {{expenseType ? '' : 'placeholder'}}">{{expenseType || '请选择'}}</view>
+        </picker>
+      </view>
+      <view class="form-item">
         <text class="form-label">支出时间</text>
         <view class="datetime-fields">
           <picker mode="date" value="{{expenseDate}}" bindchange="onDateChange">
@@ -18,8 +30,8 @@
         </view>
       </view>
       <view class="form-item">
-        <text class="form-label">购买内容</text>
-        <input class="form-input" value="{{purchaseContent}}" bindinput="onPurchaseContentInput" placeholder="例如：采购茶具" placeholder-class="placeholder" maxlength="200" />
+        <text class="form-label">支出项</text>
+        <input class="form-input" value="{{purchaseContent}}" bindinput="onPurchaseContentInput" placeholder="请输入具体支出项" placeholder-class="placeholder" maxlength="200" />
       </view>
       <view class="form-item">
         <text class="form-label">金额</text>
@@ -28,7 +40,13 @@
           <input class="form-input amount-input" type="digit" value="{{amount}}" bindinput="onAmountInput" placeholder="0.00" placeholder-class="placeholder" />
         </view>
       </view>
-      <view class="form-item">
+      <view class="form-item customer-item" wx:if="{{needsCustomer}}">
+        <text class="form-label">用户昵称</text>
+        <view class="customer-field">
+          <customer-picker value="{{selectedCustomer}}" bind:select="onCustomerSelect" bind:clear="onCustomerClear" />
+        </view>
+      </view>
+      <view class="form-item" wx:if="{{needsPlatform}}">
         <text class="form-label">平台</text>
         <input class="form-input" value="{{platform}}" bindinput="onPlatformInput" placeholder="例如：淘宝、京东、线下" placeholder-class="placeholder" maxlength="100" />
       </view>

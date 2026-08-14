@@ -78,3 +78,75 @@ def test_expense_rejects_invalid_amount(client):
         "notes": "",
     })
     assert response.status_code == 422
+
+
+def test_expense_type_controls_customer_and_platform_fields(client, created_customer):
+    type_id = ""
+    expense_id = ""
+    try:
+        type_response = client.post("/api/expenses/types", json={
+            "cost_category": "operation",
+            "name": "人员分成测试",
+            "requires_customer": True,
+            "requires_platform": False,
+        })
+        assert type_response.status_code == 200, type_response.text
+        expense_type = type_response.json()
+        type_id = expense_type["id"]
+        assert expense_type["requires_customer"] is True
+        assert expense_type["requires_platform"] is False
+
+        missing_customer = client.post("/api/expenses", json={
+            "cost_category": "operation",
+            "expense_type": "人员分成测试",
+            "expense_time": "2026-08-14T09:00",
+            "purchase_content": "八月人员分成",
+            "amount": 500,
+            "platform": "",
+            "notes": "测试",
+        })
+        assert missing_customer.status_code == 400
+        assert missing_customer.json()["detail"] == "请选择用户昵称"
+
+        create_response = client.post("/api/expenses", json={
+            "cost_category": "operation",
+            "expense_type": "人员分成测试",
+            "expense_time": "2026-08-14T09:00",
+            "purchase_content": "八月人员分成",
+            "amount": 500,
+            "customer_id": created_customer["id"],
+            "customer_nickname": "不应信任的昵称",
+            "platform": "",
+            "notes": "测试",
+        })
+        assert create_response.status_code == 200, create_response.text
+        created = create_response.json()
+        expense_id = created["id"]
+        assert created["customer_nickname"] == created_customer["nickname"]
+        assert created["platform"] == ""
+
+        update_type_response = client.put(f"/api/expenses/types/{type_id}", json={
+            "requires_customer": True,
+            "requires_platform": True,
+        })
+        assert update_type_response.status_code == 200, update_type_response.text
+        assert update_type_response.json()["requires_platform"] is True
+
+        missing_platform = client.put(f"/api/expenses/{expense_id}", json={
+            "cost_category": "operation",
+            "expense_type": "人员分成测试",
+            "expense_time": "2026-08-14T09:00",
+            "purchase_content": "八月人员分成",
+            "amount": 500,
+            "customer_id": created_customer["id"],
+            "customer_nickname": created_customer["nickname"],
+            "platform": "",
+            "notes": "测试",
+        })
+        assert missing_platform.status_code == 400
+        assert missing_platform.json()["detail"] == "请输入平台"
+    finally:
+        if expense_id:
+            client.delete(f"/api/expenses/{expense_id}")
+        if type_id:
+            client.delete(f"/api/expenses/types/{type_id}")

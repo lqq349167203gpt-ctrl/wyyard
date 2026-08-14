@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "新增支出",
-  "usingComponents": {}
+  "usingComponents": {
+    "customer-picker": "/components/customer-picker/index"
+  }
 }

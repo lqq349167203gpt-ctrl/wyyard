@@ -1612,6 +1612,8 @@ export interface Expense {
   expense_type: string
   purchase_content: string
   amount: number
+  customer_id: string
+  customer_nickname: string
   platform: string
   notes: string
   created_by: string
@@ -1626,6 +1628,8 @@ export interface ExpenseInput {
   expense_time: string
   purchase_content: string
   amount: number
+  customer_id: string
+  customer_nickname: string
   platform: string
   notes: string
 }
@@ -1645,8 +1649,10 @@ export const expenseApi = {
   delete: (id: string) =>
     request<{ message: string }>(`/api/expenses/${id}`, { method: "DELETE" }),
   listTypes: (costCategory = "") => request<ExpenseType[]>(`/api/expenses/types/list${costCategory ? `?cost_category=${costCategory}` : ""}`),
-  createType: (data: { cost_category: "management" | "operation"; name: string }) =>
+  createType: (data: { cost_category: "management" | "operation"; name: string; requires_customer: boolean; requires_platform: boolean }) =>
     request<ExpenseType>("/api/expenses/types", { method: "POST", body: JSON.stringify(data) }),
+  updateType: (id: string, data: { requires_customer: boolean; requires_platform: boolean }) =>
+    request<ExpenseType>(`/api/expenses/types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteType: (id: string) => request<{ message: string }>(`/api/expenses/types/${id}`, { method: "DELETE" }),
 }
 
@@ -1654,6 +1660,8 @@ export interface ExpenseType {
   id: string
   cost_category: "management" | "operation"
   name: string
+  requires_customer: boolean
+  requires_platform: boolean
   created_at: string
 }
 
@@ -1687,6 +1695,7 @@ export interface FinancialCompositionDetail {
   primary: string
   secondary: string
   content: string
+  customer_nickname: string
   amount: number
   paid_amount?: number
   platform: string

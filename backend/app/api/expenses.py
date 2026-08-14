@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.models.expense import ExpenseCreate, ExpenseTypeCreate, ExpenseUpdate
+from app.models.expense import ExpenseCreate, ExpenseTypeCreate, ExpenseTypeUpdate, ExpenseUpdate
 from app.services import expense_service
 from app.utils.pagination import paginate
 
@@ -52,6 +52,14 @@ def delete_expense_type(type_id: str):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@router.put("/types/{type_id}")
+def update_expense_type(type_id: str, data: ExpenseTypeUpdate):
+    try:
+        return expense_service.update_expense_type(type_id, data).model_dump(mode="json")
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
 @router.get("/{expense_id}")
 def get_expense(expense_id: str):
     item = expense_service.get_expense(expense_id)
@@ -62,7 +70,10 @@ def get_expense(expense_id: str):
 
 @router.post("")
 def create_expense(data: ExpenseCreate, request: Request):
-    return expense_service.create_expense(data, _operator(request)).model_dump(mode="json")
+    try:
+        return expense_service.create_expense(data, _operator(request)).model_dump(mode="json")
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.put("/{expense_id}")
@@ -70,7 +81,8 @@ def update_expense(expense_id: str, data: ExpenseUpdate, request: Request):
     try:
         return expense_service.update_expense(expense_id, data, _operator(request)).model_dump(mode="json")
     except ValueError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
+        status_code = 404 if str(error) == "支出记录不存在" else 400
+        raise HTTPException(status_code=status_code, detail=str(error)) from error
 
 
 @router.delete("/{expense_id}")
