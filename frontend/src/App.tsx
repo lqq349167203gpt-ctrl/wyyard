@@ -21,6 +21,9 @@ import PaymentPage from "@/pages/payment"
 import PaymentDeductionsPage from "@/pages/payment-deductions"
 import PaymentRefundsPage from "@/pages/payment-refunds"
 import ExpensesPage from "@/pages/expenses"
+import FinancialOverviewPage from "@/pages/financial-overview"
+import CommissionRecordsPage from "@/pages/commission-records"
+import StaffBenefitsPage from "@/pages/staff-benefits"
 import MemberIdentitiesPage from "@/pages/member-identities"
 import HealingRecordsPage from "@/pages/healing-records"
 import CustomerFormPage from "@/pages/healing-records/customer-form"
@@ -61,6 +64,9 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/payment-deductions": "payment-deductions",
   "/payment-refunds": "payment-refunds",
   "/expenses": "expenses",
+  "/financial-overview": "financial-overview",
+  "/commission-records": "commission-records",
+  "/staff-benefits": "staff-benefits",
   "/agents": "agents",
 
 
@@ -170,6 +176,9 @@ function App() {
               <Route path="/payment-deductions" element={<PaymentDeductionsPage />} />
               <Route path="/payment-refunds" element={<PaymentRefundsPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
+              <Route path="/financial-overview" element={<FinancialOverviewPage />} />
+              <Route path="/commission-records" element={<CommissionRecordsPage />} />
+              <Route path="/staff-benefits" element={<StaffBenefitsPage />} />
               <Route path="/other-projects" element={<Navigate to="/payment" replace />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id/chat" element={<ChatPage />} />

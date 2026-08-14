@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react"
-import { Inbox, Pencil, ReceiptText, Trash2, X } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Inbox, Pencil, Plus, ReceiptText, Settings, Trash2, X } from "lucide-react"
 
 import { PaginationBar } from "@/components/pagination-bar"
 import {
@@ -31,7 +31,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { expenseApi } from "@/lib/api"
-import type { Expense, ExpenseInput } from "@/lib/api"
+import type { Expense, ExpenseInput, ExpenseType } from "@/lib/api"
 
 const PAGE_SIZE = 20
 
@@ -45,6 +45,8 @@ function currentLocalMinute() {
 
 function emptyForm(): ExpenseForm {
   return {
+    cost_category: "management",
+    expense_type: "",
     expense_time: currentLocalMinute(),
     purchase_content: "",
     amount: "",
@@ -58,6 +60,13 @@ function formatExpenseTime(value: string) {
 }
 
 export default function ExpensesPage() {
+  const [activeCategory, setActiveCategory] = useState<"" | "management" | "operation">("")
+  const activeCategoryRef = useRef<"" | "management" | "operation">("")
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([])
+  const [typeDialogOpen, setTypeDialogOpen] = useState(false)
+  const [newTypeCategory, setNewTypeCategory] = useState<"management" | "operation">("management")
+  const [newTypeName, setNewTypeName] = useState("")
+  const [typeError, setTypeError] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Expense | null>(null)
   const [form, setForm] = useState<ExpenseForm>(emptyForm)
@@ -74,6 +83,7 @@ export default function ExpensesPage() {
     return expenseApi.listPaginated(page, pageSize, {
       date_from: filters.dateFrom || undefined,
       date_to: filters.dateTo || undefined,
+      cost_category: activeCategoryRef.current || undefined,
     })
   }, [])
 
@@ -88,6 +98,15 @@ export default function ExpensesPage() {
     loading,
     refresh,
   } = useServerPagination<Expense>(fetchExpenses, { pageSize: PAGE_SIZE })
+
+  const loadTypes = () => expenseApi.listTypes().then(setExpenseTypes).catch(() => {})
+  useEffect(() => { loadTypes() }, [])
+
+  const switchCategory = (category: "" | "management" | "operation") => {
+    setActiveCategory(category)
+    activeCategoryRef.current = category
+    goToPage(1)
+  }
 
   const handleDateFilter = (field: "from" | "to", value: string) => {
     if (field === "from") {
@@ -118,6 +137,8 @@ export default function ExpensesPage() {
     setEditingItem(item)
     setForm({
       expense_time: item.expense_time,
+      cost_category: item.cost_category === "operation" ? "operation" : "management",
+      expense_type: item.expense_type,
       purchase_content: item.purchase_content,
       amount: String(item.amount),
       platform: item.platform,
@@ -137,6 +158,10 @@ export default function ExpensesPage() {
       setFormError("请输入购买内容")
       return
     }
+    if (!form.cost_category || !form.expense_type) {
+      setFormError("请选择成本分类和支出类型")
+      return
+    }
     if (!Number.isFinite(amount) || amount <= 0) {
       setFormError("请输入大于 0 的金额")
       return
@@ -148,6 +173,8 @@ export default function ExpensesPage() {
 
     const payload: ExpenseInput = {
       expense_time: form.expense_time,
+      cost_category: form.cost_category,
+      expense_type: form.expense_type,
       purchase_content: form.purchase_content.trim(),
       amount,
       platform: form.platform.trim(),
@@ -188,17 +215,29 @@ export default function ExpensesPage() {
     }
   }
 
+  const createType = async () => {
+    if (!newTypeName.trim()) { setTypeError("请输入类型名称"); return }
+    try {
+      await expenseApi.createType({ cost_category: newTypeCategory, name: newTypeName.trim() })
+      setNewTypeName(""); setTypeError(""); loadTypes()
+    } catch (error) { setTypeError(error instanceof Error ? error.message : "新增失败") }
+  }
+
   return (
-    <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+    <div className="dv-root flex h-full flex-col gap-3 bg-[#f4f5f6] p-4">
       <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
-      <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
-        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">支出</span>
-        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部支出记录</span>
+
+      <div className="flex h-[52px] flex-wrap items-center gap-2 rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
+        <span className="whitespace-nowrap text-[15px] font-medium text-[#212631]">支出项</span>
+        <span className="ml-2.5 whitespace-nowrap text-[11.5px] text-[#a8b1bd]">分别归集管理成本与运营成本</span>
       </div>
 
-      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
+        <div className="flex h-[52px] shrink-0 items-center gap-6 border-b border-[#f0f0f0] px-5">
+          {[["", "全部"], ["management", "管理成本"], ["operation", "运营成本"]].map(([value, label]) => <button key={label} onClick={() => switchCategory(value as "" | "management" | "operation")} className={`relative px-1 text-[14px] transition-colors ${activeCategory === value ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}>{label}{activeCategory === value && <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}</button>)}
+        </div>
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
-          <div className="flex h-8 items-center overflow-hidden rounded-[4px] border border-[#dee0e3] bg-white">
+          <div className="flex h-8 items-center overflow-hidden rounded-[7px] border border-[#e1e4e7] bg-white">
             <input
               type="date"
               value={dateFrom}
@@ -215,15 +254,14 @@ export default function ExpensesPage() {
               className={`h-full border-none bg-transparent px-2 text-[12px] outline-none ${dateTo ? "text-[#2b2f36]" : "date-empty text-[#8f959e]"}`}
             />
           </div>
-          {(dateFrom || dateTo) && (
-            <button
-              onClick={clearDateFilter}
-              className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
-            >
-              <X className="h-3.5 w-3.5" />清空
-            </button>
-          )}
+          <button
+            onClick={clearDateFilter}
+            className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+          >
+            <X className="h-3.5 w-3.5" />清空
+          </button>
           <div className="flex-1" />
+          <button className="flex h-8 items-center gap-1 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]" onClick={() => setTypeDialogOpen(true)}><Settings className="h-3.5 w-3.5" />支出类型设置</button>
           <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={openCreate}>
             <ReceiptText className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" />新增支出
           </Button>
@@ -243,6 +281,8 @@ export default function ExpensesPage() {
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4" style={{ width: "160px" }}>支出时间</TableHead>
+                <TableHead style={{ width: "100px" }}>成本分类</TableHead>
+                <TableHead style={{ width: "120px" }}>支出类型</TableHead>
                 <TableHead style={{ width: "240px" }}>购买内容</TableHead>
                 <TableHead style={{ width: "120px" }}>金额</TableHead>
                 <TableHead style={{ width: "140px" }}>平台</TableHead>
@@ -257,6 +297,8 @@ export default function ExpensesPage() {
                   <TableCell className="pl-4 text-[12px] text-[#2b2f36] tabular-nums">
                     {formatExpenseTime(item.expense_time)}
                   </TableCell>
+                  <TableCell>{item.cost_category === "management" ? "管理成本" : item.cost_category === "operation" ? "运营成本" : <span className="text-[#d0d3d6]">待分类</span>}</TableCell>
+                  <TableCell>{item.expense_type || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                   <TableCell>
                     <span className="block truncate text-[12px] text-[#2b2f36]" title={item.purchase_content}>{item.purchase_content}</span>
                   </TableCell>
@@ -264,7 +306,7 @@ export default function ExpensesPage() {
                     ¥{item.amount.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell>
-                    <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{item.platform}</span>
+                    <span className="text-[13px] text-[#4e535a]">{item.platform}</span>
                   </TableCell>
                   <TableCell>
                     {item.notes ? (
@@ -309,6 +351,8 @@ export default function ExpensesPage() {
             <DialogTitle className="text-[14px] font-normal">{editingItem ? "编辑支出" : "新增支出"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2"><span className="text-[12px] text-[#4e535a] text-right tracking-widest">成本分类</span><select value={form.cost_category} onChange={event => setForm({ ...form, cost_category: event.target.value as "management" | "operation", expense_type: "" })} className="h-8 rounded-[4px] border border-input bg-white px-2 text-[12px] outline-none focus:border-[#3370ff]"><option value="management">管理成本</option><option value="operation">运营成本</option></select></div>
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2"><span className="text-[12px] text-[#4e535a] text-right tracking-widest">支出类型</span><select value={form.expense_type} onChange={event => setForm({ ...form, expense_type: event.target.value })} className="h-8 rounded-[4px] border border-input bg-white px-2 text-[12px] outline-none focus:border-[#3370ff]"><option value="">请选择</option>{expenseTypes.filter(item => item.cost_category === form.cost_category).map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select></div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] text-right tracking-widest">支出时间</span>
               <Input
@@ -371,6 +415,8 @@ export default function ExpensesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={typeDialogOpen} onOpenChange={setTypeDialogOpen}><DialogContent className="w-[460px] max-w-[90vw] gap-0 p-0"><DialogHeader className="border-b border-[#f0f0f0] px-6 pb-2 pt-3"><DialogTitle className="text-[14px] font-normal">支出类型设置</DialogTitle></DialogHeader><div className="space-y-4 px-6 py-5"><div className="flex gap-2"><select value={newTypeCategory} onChange={event => setNewTypeCategory(event.target.value as "management" | "operation")} className="h-8 w-[110px] rounded-[4px] border border-input px-2 text-[12px]"><option value="management">管理成本</option><option value="operation">运营成本</option></select><Input value={newTypeName} onChange={event => setNewTypeName(event.target.value)} placeholder="输入支出类型" className="flex-1" /><Button size="sm" className="h-8 text-xs" onClick={createType}><Plus className="mr-1 h-3.5 w-3.5" />新增</Button></div>{typeError && <p className="text-[12px] text-[#c4506a]">{typeError}</p>}<div className="max-h-[320px] overflow-y-auto border-t border-[#f0f0f0] pt-2">{(["management", "operation"] as const).map(category => <div key={category} className="mb-3"><div className="mb-1 text-[12px] text-[#8f959e]">{category === "management" ? "管理成本" : "运营成本"}</div>{expenseTypes.filter(item => item.cost_category === category).length === 0 ? <div className="py-3 text-[12px] text-[#d0d3d6]">暂无类型</div> : expenseTypes.filter(item => item.cost_category === category).map(item => <div key={item.id} className="group flex h-9 items-center justify-between border-b border-[#f0f0f0] text-[13px] text-[#2b2f36]"><span>{item.name}</span><Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100" onClick={async () => { try { await expenseApi.deleteType(item.id); loadTypes() } catch (error) { setTypeError(error instanceof Error ? error.message : "删除失败") } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></div>)}</div>)}</div></div></DialogContent></Dialog>
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

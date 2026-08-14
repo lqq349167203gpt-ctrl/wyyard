@@ -2,6 +2,8 @@ def test_expense_crud_and_pagination(client):
     expense_id = ""
     try:
         create_response = client.post("/api/expenses", json={
+            "cost_category": "management",
+            "expense_type": "物资采购",
             "expense_time": "2026-08-09T14:30",
             "purchase_content": "采购茶具",
             "amount": 368.5,
@@ -40,6 +42,8 @@ def test_expense_crud_and_pagination(client):
         assert all(item["id"] != expense_id for item in unmatched_response.json()["items"])
 
         update_response = client.put(f"/api/expenses/{expense_id}", json={
+            "cost_category": "operation",
+            "expense_type": "平台服务",
             "expense_time": "2026-08-09T15:00",
             "purchase_content": "采购茶具和托盘",
             "amount": 428.5,
@@ -65,6 +69,8 @@ def test_expense_crud_and_pagination(client):
 
 def test_expense_rejects_invalid_amount(client):
     response = client.post("/api/expenses", json={
+        "cost_category": "management",
+        "expense_type": "无效类型",
         "expense_time": "2026-08-09T14:30",
         "purchase_content": "无效支出",
         "amount": 0,

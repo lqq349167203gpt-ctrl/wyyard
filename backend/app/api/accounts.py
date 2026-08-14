@@ -70,7 +70,7 @@ async def create_account(
 ALL_PAGE_KEYS = [
     # 数据
     "business-reminders", "referral-statistics",
-    "member-statistics", "course-statistics", "product-sales", "statistics",
+    "member-statistics", "course-statistics", "product-sales", "statistics", "financial-overview",
     # 报表
     "daily-report",
     # 业务
@@ -78,7 +78,7 @@ ALL_PAGE_KEYS = [
     "class-records-arrival", "class-records", "daily-activities",
     "communication-records", "followup-records", "offline-course-records",
     # 付费
-    "payment-deductions", "payment-refunds", "expenses", "debt-records",
+    "payment-deductions", "payment-refunds", "expenses", "debt-records", "commission-records", "staff-benefits",
     "payment", "membership-cards", "group-cases",
     "emotional-releases", "oh-card-readings",
     "energy-knots", "internal-courses", "tea-seat-fees", "offline-courses", "other-projects",

@@ -33,6 +33,7 @@ from app.api.emotional_releases import router as emotional_releases_router
 from app.api.energy_knot_sessions import router as energy_knot_sessions_router
 from app.api.energy_knots import router as energy_knots_router
 from app.api.expenses import router as expenses_router
+from app.api.financial import router as financial_router
 from app.api.followup_records import router as followup_records_router
 from app.api.group_case_sessions import router as group_case_sessions_router
 from app.api.group_cases import router as group_cases_router
@@ -140,6 +141,7 @@ app.include_router(project_deductions_router)
 app.include_router(project_refunds_router)
 app.include_router(payment_exports_router)
 app.include_router(expenses_router)
+app.include_router(financial_router)
 app.include_router(system_helper_router)
 app.include_router(system_helper_config_router)
 app.include_router(chat_history_router)

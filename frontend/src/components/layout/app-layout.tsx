@@ -39,6 +39,10 @@ const PAGE_TITLES: Record<string, string> = {
   "/communication-records": "无忧 - 沟通记录",
   "/followup-records": "无忧 - 回访记录",
   "/chat-history": "无忧 - 沟通记录",
+  "/financial-overview": "无忧 - 财务数据",
+  "/expenses": "无忧 - 支出项",
+  "/staff-benefits": "无忧 - 人员福利",
+  "/commission-records": "无忧 - 分成",
 }
 
 export function AppLayout() {

@@ -2,30 +2,38 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from app.models.expense import Expense, ExpenseCreate, ExpenseUpdate
+from app.models.expense import Expense, ExpenseCreate, ExpenseType, ExpenseTypeCreate, ExpenseUpdate
 from app.services.storage import load_data, save_item
 
 FILENAME = "expenses.json"
+TYPE_FILENAME = "expense_types.json"
 
 _expenses: dict[str, Expense] = {}
 _expense_lock = threading.Lock()
+_expense_types: dict[str, ExpenseType] = {}
 
 
 def _load() -> None:
-    global _expenses
+    global _expenses, _expense_types
     data = load_data(FILENAME)
     _expenses = {item_id: Expense(**item) for item_id, item in data.items()}
+    _expense_types = {
+        item_id: ExpenseType(**item)
+        for item_id, item in load_data(TYPE_FILENAME).items()
+    }
 
 
 _load()
 
 
-def list_expenses(date_from: str = "", date_to: str = "") -> list[Expense]:
+def list_expenses(date_from: str = "", date_to: str = "", cost_category: str = "") -> list[Expense]:
     items = [item for item in _expenses.values() if not item.is_deleted]
     if date_from:
         items = [item for item in items if (item.expense_time or "")[:10] >= date_from]
     if date_to:
         items = [item for item in items if (item.expense_time or "")[:10] <= date_to]
+    if cost_category:
+        items = [item for item in items if item.cost_category == cost_category]
     return sorted(items, key=lambda item: (item.expense_time, item.created_at), reverse=True)
 
 
@@ -80,3 +88,42 @@ def delete_expense(expense_id: str, updated_by: str = "") -> None:
         })
         _expenses[expense_id] = deleted
         save_item(FILENAME, expense_id, deleted.model_dump(mode="json"))
+
+
+def list_expense_types(cost_category: str = "") -> list[ExpenseType]:
+    items = list(_expense_types.values())
+    if cost_category:
+        items = [item for item in items if item.cost_category == cost_category]
+    return sorted(items, key=lambda item: (item.cost_category, item.created_at, item.name))
+
+
+def create_expense_type(data: ExpenseTypeCreate) -> ExpenseType:
+    with _expense_lock:
+        normalized_name = data.name.strip()
+        if any(
+            item.cost_category == data.cost_category and item.name == normalized_name
+            for item in _expense_types.values()
+        ):
+            raise ValueError("该支出类型已存在")
+        item = ExpenseType(
+            id=str(uuid.uuid4()),
+            cost_category=data.cost_category,
+            name=normalized_name,
+            created_at=datetime.now(timezone.utc),
+        )
+        _expense_types[item.id] = item
+        save_item(TYPE_FILENAME, item.id, item.model_dump(mode="json"))
+        return item
+
+
+def delete_expense_type(type_id: str) -> None:
+    from app.services.storage import delete_item
+
+    with _expense_lock:
+        item = _expense_types.get(type_id)
+        if not item:
+            raise ValueError("支出类型不存在")
+        if any(expense.expense_type == item.name for expense in _expenses.values() if not expense.is_deleted):
+            raise ValueError("该类型已有支出记录，不能删除")
+        del _expense_types[type_id]
+        delete_item(TYPE_FILENAME, type_id)

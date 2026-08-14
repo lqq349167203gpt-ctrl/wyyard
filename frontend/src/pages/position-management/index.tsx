@@ -23,6 +23,7 @@ const ALL_PAGES = [
   { key: "course-statistics", label: "课程" },
   { key: "product-sales", label: "产品销售" },
   { key: "statistics", label: "服务数据" },
+  { key: "financial-overview", label: "财务数据" },
   // 报表
   { key: "daily-report", label: "每日报表" },
   // 业务
@@ -37,7 +38,9 @@ const ALL_PAGES = [
   { key: "payment", label: "付费项目" },
   { key: "payment-deductions", label: "销卡" },
   { key: "payment-refunds", label: "退费" },
-  { key: "expenses", label: "支出" },
+  { key: "expenses", label: "支出项" },
+  { key: "commission-records", label: "分成" },
+  { key: "staff-benefits", label: "人员福利" },
   { key: "debt-records", label: "欠卡记录" },
   // 信息配置
   { key: "member-identities", label: "会员身份" },
@@ -59,10 +62,11 @@ const ALL_PAGES = [
 
 const PERMISSION_GROUPS = [
   { label: "数据", keys: ["business-reminders", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
-  { label: "报表", keys: ["daily-report"] },
+  { label: "报表", keys: ["financial-overview", "daily-report"] },
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },
-  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds", "expenses", "debt-records"] },
+  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds", "debt-records"] },
+  { label: "支出", keys: ["expenses", "commission-records", "staff-benefits"] },
   { label: "信息配置", keys: ["member-identities", "customer-tags", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
   { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },

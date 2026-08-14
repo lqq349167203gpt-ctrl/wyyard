@@ -35,7 +35,7 @@ const PAGE_LABELS: Record<string, string> = {
   "payment": "付费项目",
   "payment-deductions": "销卡",
   "payment-refunds": "退费",
-  "expenses": "支出",
+  "expenses": "支出项",
   "debt-records": "欠卡记录",
   "membership-cards": "会员卡",
   "group-cases": "觉醒游戏",
@@ -142,7 +142,7 @@ const FIELD_CN: Record<string, string> = {
 }
 
 const SECTION_OPTIONS = [
-  "客户资料", "邀约", "课表", "付费项目", "支出", "活动配置", "会员身份", "客户标签",
+  "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
   "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
@@ -156,7 +156,9 @@ const ALL_PAGES = [
   { key: "class-records-arrival", label: "到场确认" },
   { key: "daily-activities", label: "活动安排" },
   { key: "payment", label: "付费项目" },
-  { key: "expenses", label: "支出" },
+  { key: "expenses", label: "支出项" },
+  { key: "commission-records", label: "分成" },
+  { key: "staff-benefits", label: "人员福利" },
   { key: "membership-cards", label: "会员卡" },
   { key: "group-cases", label: "觉醒游戏" },
   { key: "emotional-releases", label: "情绪释放" },

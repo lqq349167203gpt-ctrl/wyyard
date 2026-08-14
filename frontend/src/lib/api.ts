@@ -1585,6 +1585,8 @@ export const projectRefundApi = {
 export interface Expense {
   id: string
   expense_time: string
+  cost_category: "" | "management" | "operation"
+  expense_type: string
   purchase_content: string
   amount: number
   platform: string
@@ -1596,6 +1598,8 @@ export interface Expense {
 }
 
 export interface ExpenseInput {
+  cost_category: "management" | "operation"
+  expense_type: string
   expense_time: string
   purchase_content: string
   amount: number
@@ -1604,10 +1608,11 @@ export interface ExpenseInput {
 }
 
 export const expenseApi = {
-  listPaginated: (page: number, pageSize: number, params?: { date_from?: string; date_to?: string }) => {
+  listPaginated: (page: number, pageSize: number, params?: { date_from?: string; date_to?: string; cost_category?: string }) => {
     const searchParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (params?.date_from) searchParams.set("date_from", params.date_from)
     if (params?.date_to) searchParams.set("date_to", params.date_to)
+    if (params?.cost_category) searchParams.set("cost_category", params.cost_category)
     return request<PaginatedResponse<Expense>>(`/api/expenses?${searchParams.toString()}`)
   },
   create: (data: ExpenseInput) =>
@@ -1616,6 +1621,130 @@ export const expenseApi = {
     request<Expense>(`/api/expenses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<{ message: string }>(`/api/expenses/${id}`, { method: "DELETE" }),
+  listTypes: (costCategory = "") => request<ExpenseType[]>(`/api/expenses/types/list${costCategory ? `?cost_category=${costCategory}` : ""}`),
+  createType: (data: { cost_category: "management" | "operation"; name: string }) =>
+    request<ExpenseType>("/api/expenses/types", { method: "POST", body: JSON.stringify(data) }),
+  deleteType: (id: string) => request<{ message: string }>(`/api/expenses/types/${id}`, { method: "DELETE" }),
+}
+
+export interface ExpenseType {
+  id: string
+  cost_category: "management" | "operation"
+  name: string
+  created_at: string
+}
+
+export interface FinancialBreakdown {
+  name: string
+  revenue: number
+  revenue_share: number
+  deal_count: number
+  customer_count: number
+  closers: string[]
+}
+
+export interface FinancialOrderDetail {
+  id: string
+  deal_date: string
+  nickname: string
+  type: string
+  name: string
+  quantity: string
+  amount: number
+  closers: { name: string; amount: number }[]
+  notes: string
+}
+
+export type FinancialCompositionKind = "expense" | "commission" | "benefit" | "refund"
+
+export interface FinancialCompositionDetail {
+  id: string
+  kind: FinancialCompositionKind
+  date: string
+  primary: string
+  secondary: string
+  content: string
+  amount: number
+  paid_amount?: number
+  platform: string
+  notes: string
+  operator: string
+}
+
+export interface FinancialOverview {
+  date_from: string
+  date_to: string
+  total_revenue: number
+  management_cost: number
+  operation_cost: number
+  total_expense: number
+  commission_total: number
+  staff_benefit_total: number
+  refund_total: number
+  operating_profit: number
+  net_profit: number | null
+  group_class_revenue: number
+  custom_course_revenue: number
+  group_class_breakdown: FinancialBreakdown[]
+  custom_course_breakdown: FinancialBreakdown[]
+}
+
+export interface CommissionRecord {
+  id: string
+  month: string
+  person_id: string
+  person_name: string
+  amount: number
+  notes: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface StaffBenefitRecord {
+  id: string
+  benefit_date: string
+  content: string
+  amount: number
+  notes: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export const financialApi = {
+  overview: (dateFrom: string, dateTo: string) => {
+    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo })
+    return request<FinancialOverview>(`/api/financial/overview?${params.toString()}`)
+  },
+  revenueDetails: (dateFrom: string, dateTo: string, category: "group" | "custom", name: string) => {
+    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, category, name })
+    return request<{ data: FinancialOrderDetail[] }>(`/api/financial/revenue-details?${params.toString()}`)
+  },
+  compositionDetails: (dateFrom: string, dateTo: string, kind: FinancialCompositionKind) => {
+    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, kind })
+    return request<{ data: FinancialCompositionDetail[] }>(`/api/financial/composition-details?${params.toString()}`)
+  },
+  listCommissions: (page: number, pageSize: number, month = "") =>
+    request<PaginatedResponse<CommissionRecord>>(`/api/financial/commissions?page=${page}&page_size=${pageSize}${month ? `&month=${month}` : ""}`),
+  createCommission: (data: Omit<CommissionRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
+    request<CommissionRecord>("/api/financial/commissions", { method: "POST", body: JSON.stringify(data) }),
+  updateCommission: (id: string, data: Omit<CommissionRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
+    request<CommissionRecord>(`/api/financial/commissions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteCommission: (id: string) => request<{ message: string }>(`/api/financial/commissions/${id}`, { method: "DELETE" }),
+  listBenefits: (page: number, pageSize: number, dateFrom = "", dateTo = "") => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (dateFrom) params.set("date_from", dateFrom)
+    if (dateTo) params.set("date_to", dateTo)
+    return request<PaginatedResponse<StaffBenefitRecord>>(`/api/financial/staff-benefits?${params}`)
+  },
+  createBenefit: (data: Omit<StaffBenefitRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
+    request<StaffBenefitRecord>("/api/financial/staff-benefits", { method: "POST", body: JSON.stringify(data) }),
+  updateBenefit: (id: string, data: Omit<StaffBenefitRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
+    request<StaffBenefitRecord>(`/api/financial/staff-benefits/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteBenefit: (id: string) => request<{ message: string }>(`/api/financial/staff-benefits/${id}`, { method: "DELETE" }),
 }
 
 // Space

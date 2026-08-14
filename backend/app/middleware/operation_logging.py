@@ -9,6 +9,8 @@ from app.models.operation_log import OperationLogCreate
 from app.services.operation_log_service import create_log
 
 SECTION_MAP = {
+    "/api/financial/commissions": "分成",
+    "/api/financial/staff-benefits": "人员福利",
     "/api/customers": "客户资料",
     "/api/visits": "邀约",
     "/api/healing-records": "客户资料",
@@ -43,7 +45,7 @@ SECTION_MAP = {
 
     "/api/project-deductions": "付费项目",
     "/api/project-refunds": "付费项目",
-    "/api/expenses": "支出",
+    "/api/expenses": "支出项",
     "/api/reminders": "提醒配置",
     "/api/business-reminders": "提醒",
     "/api/activity-themes": "课表",
@@ -59,6 +61,8 @@ SECTION_MAP = {
 
 # 路径前缀 → (section, service_module, get_function_name)
 GETTER_MAP = {
+    "/api/financial/commissions": ("分成", "financial_record_service", "get_commission"),
+    "/api/financial/staff-benefits": ("人员福利", "financial_record_service", "get_benefit"),
     "/api/customers": ("客户资料", "customer_service", "get_customer"),
     "/api/healing-records": ("客户资料", "healing_record_service", "get_record"),
     "/api/courses": ("活动配置", "course_service", "get_course"),
@@ -93,7 +97,7 @@ GETTER_MAP = {
     "/api/communication-records": ("沟通记录", "communication_record_service", "get_record"),
     "/api/offline-courses": ("付费项目", "offline_course_service", "get_course"),
     "/api/offline-course-records": ("落地课程", "offline_course_record_service", "get_record"),
-    "/api/expenses": ("支出", "expense_service", "get_expense"),
+    "/api/expenses": ("支出项", "expense_service", "get_expense"),
 }
 
 PAGE_LABELS: dict[str, str] = {
@@ -153,7 +157,10 @@ PAGE_LABELS: dict[str, str] = {
     "activity-history": "邀约",
     "visit-history": "邀约",
     "offline-courses": "付费项目",
-    "expenses": "支出",
+    "expenses": "支出项",
+    "financial-overview": "财务数据",
+    "commission-records": "分成",
+    "staff-benefits": "人员福利",
     "disabled-customers": "停用客户",
     "chat-history": "沟通记录",
 }
@@ -218,6 +225,8 @@ FIELD_NAMES = {
     "member_ids": "成员", "teacher_ids": "老师",
     "price": "价格", "amount": "金额", "count": "次数", "total": "总计",
     "expense_time": "支出时间", "purchase_content": "购买内容", "platform": "平台", "notes": "备注",
+    "cost_category": "成本分类", "expense_type": "支出类型", "month": "分成月份",
+    "person_name": "人员", "benefit_date": "福利日期",
     "sort_order": "排序", "is_public_welfare": "公益",
     "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "疗愈师回复",
     "needs": "需求", "visit_date": "到访日期",
