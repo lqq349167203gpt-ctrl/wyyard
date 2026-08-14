@@ -1,11 +1,26 @@
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, type CSSProperties } from "react"
 import { LogOut } from "lucide-react"
-import { Outlet, useLocation, useNavigate } from "react-router-dom"
+import { IconCreditCard, IconReceipt } from "@tabler/icons-react"
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 
 import { useUsageTracking } from "@/hooks/use-usage-tracking"
 import { storePagePermissions, usePagePermissions } from "@/hooks/use-page-permissions"
 import { clearAuthState, positionPermissionApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
 import { SystemSwitcher } from "./system-switcher"
 import { hasPagePermission } from "@/lib/page-permissions"
 
@@ -45,37 +60,76 @@ export function TeaGuestLayout() {
     navigate("/login")
   }
 
+  const menuItems = [
+    { title: "消费记录", path: "/tea-guest/consumption-records", icon: IconCreditCard, visible: canViewConsumption },
+    { title: "支出", path: "/tea-guest/expenses", icon: IconReceipt, visible: canViewExpenses },
+  ].filter(item => item.visible)
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#f4f5f6]">
-      <header className="flex h-[46px] shrink-0 items-center justify-between border-b border-[#e8e9eb] bg-white px-5">
-        <SystemSwitcher currentSystem="tea-guest" />
-        <div className="flex items-center gap-2">
-          {ownerName && <span className="text-[12px] text-[#8f959e]">{ownerName}</span>}
-          <Button variant="ghost" size="sm" className="h-8 text-[12px] font-normal text-[#8f959e]" onClick={handleLogout}>
-            <LogOut className="mr-1.5 h-3.5 w-3.5" />退出登录
-          </Button>
-        </div>
-      </header>
-      <div className="flex min-h-0 flex-1">
-        <aside className="w-[140px] shrink-0 border-r border-[#e8e9eb] bg-white px-3 py-4">
-          <div className="mb-2 px-2 text-[12px] text-[#8f959e]">茶客业务</div>
-          <nav className="space-y-1">
-            {canViewConsumption && (
-              <button type="button" onClick={() => navigate("/tea-guest/consumption-records")} className={`flex h-9 w-full items-center rounded-[4px] px-3 text-[13px] transition-colors ${location.pathname === "/tea-guest/consumption-records" ? "bg-[#f5f6f7] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}>
-                消费记录
-              </button>
-            )}
-            {canViewExpenses && (
-              <button type="button" onClick={() => navigate("/tea-guest/expenses")} className={`flex h-9 w-full items-center rounded-[4px] px-3 text-[13px] transition-colors ${location.pathname === "/tea-guest/expenses" ? "bg-[#f5f6f7] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}>
-                支出
-              </button>
-            )}
-          </nav>
-        </aside>
-        <main className="min-w-0 flex-1 overflow-y-auto">
+    <SidebarProvider style={{ "--sidebar-width": "11rem" } as CSSProperties}>
+      <Sidebar
+        style={{
+          "--sidebar": "#ffffff",
+          "--sidebar-foreground": "#212631",
+          "--sidebar-accent": "#eaf1ff",
+          "--sidebar-accent-foreground": "#212631",
+          "--sidebar-border": "#eef0f1",
+          "--sidebar-ring": "#3370ff",
+        } as CSSProperties}
+      >
+        <SidebarHeader className="px-5 pt-5 pb-2">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#3370ff] text-[12px] font-medium text-white">
+              茶
+            </div>
+            <span className="text-[13px] font-medium tracking-tight text-[#212631]">茶客业务</span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent className="mt-4 pb-5">
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className="mt-2.5 mb-0 flex h-[26px] select-none items-center px-5 text-[12px] font-normal uppercase text-[#a8b1bd]">
+              业务
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-[2px]">
+                {menuItems.map(item => {
+                  const isActive = location.pathname === item.path
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        render={<Link to={item.path} />}
+                        isActive={isActive}
+                        className={`relative mx-2 h-[34px] w-[calc(100%_-_16px)] gap-2.5 rounded-[8px] px-3 text-[13px] font-normal transition-colors ${isActive ? "bg-[#eaf1ff] text-[#212631] before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-[#3370ff] hover:bg-[#eaf1ff] hover:text-[#212631] data-active:bg-[#eaf1ff] data-active:text-[#212631] data-active:hover:bg-[#eaf1ff] data-active:hover:text-[#212631]" : "text-[#212631] hover:bg-[#f0f5ff]"}`}
+                      >
+                        <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-[#245bdb]" : "text-[#79838f]"}`} />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+
+      <SidebarInset className="min-w-0">
+        <header className="flex h-[38px] items-center justify-between border-b-2 border-[#f0f1f2] bg-white px-5">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <SystemSwitcher currentSystem="tea-guest" />
+          </div>
+          <div className="flex items-center gap-2">
+            {ownerName && <span className="text-xs text-[#8f959e]">{ownerName}</span>}
+            <Button variant="ghost" size="sm" className="h-8 text-xs font-normal text-[#8f959e]" onClick={handleLogout}>
+              <LogOut className="mr-1.5 h-3.5 w-3.5" />退出登录
+            </Button>
+          </div>
+        </header>
+        <main className="min-w-0 flex-1 overflow-y-auto bg-white">
           <Outlet />
         </main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
