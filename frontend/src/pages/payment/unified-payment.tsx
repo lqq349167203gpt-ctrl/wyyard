@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useState, useRef, useCallback, useImperativeHandle, useMemo } from "react"
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, CreditCard, X, Wallet, Heart, Layers, Zap, GraduationCap, Package, Coffee, BookOpen } from "lucide-react"
@@ -190,47 +190,6 @@ function getApi(type: ProjectTypeKey) {
   return PROJECT_TYPES[type].api as any
 }
 
-function getExportDetail(item: UnifiedItem) {
-  switch (item.type) {
-    case "membership_card":
-      return item.card_type || ""
-    case "internal_course":
-      return item.course_type || ""
-    case "oh_card_reading":
-      return item.diagnosis_teacher ? `诊断老师：${item.diagnosis_teacher}` : "OH卡诊断"
-    case "other":
-      return [item.category, item.project_name].filter(Boolean).join(" / ")
-    default:
-      return PROJECT_TYPES[item.type].label
-  }
-}
-
-function getExportQuantity(item: UnifiedItem) {
-  switch (item.type) {
-    case "membership_card":
-      return item.total_count == null ? "不限" : `${item.total_count}次`
-    case "group_case":
-    case "emotional_release":
-      return `${item.purchase_count || 0}次`
-    case "energy_knot":
-      return `${item.purchase_count || 0}个`
-    case "oh_card_reading":
-      return `${(item.diagnosis_duration || 1) * 0.5}小时`
-    case "tea_seat_fee":
-      return `${item.quantity || 1}位`
-    case "offline_course":
-      return `${item.validity_value || 1}个月`
-    case "other":
-      return item.total_count == null ? "不限" : `${item.total_count}次`
-    default:
-      return ""
-  }
-}
-
-export interface UnifiedPaymentHandle {
-  exportAllPayments: () => Promise<number>
-}
-
 interface UnifiedPaymentContentProps {
   embedded?: boolean
   filterTypes?: ProjectTypeKey[]
@@ -238,7 +197,7 @@ interface UnifiedPaymentContentProps {
 
 /* ========== 组件 ========== */
 
-export const UnifiedPaymentContent = forwardRef<UnifiedPaymentHandle, UnifiedPaymentContentProps>(function UnifiedPaymentContent({ embedded, filterTypes }, ref) {
+export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentContentProps) {
   const enterToNext = useEnterToNext()
   const navigate = useNavigate()
 
@@ -334,7 +293,7 @@ export const UnifiedPaymentContent = forwardRef<UnifiedPaymentHandle, UnifiedPay
   const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customersReady, setCustomersReady] = useState(false)
-  const { organizations, hasAnyOrganization, loading: organizationsLoading } = useOrganizations()
+  const { organizations, hasAnyOrganization } = useOrganizations()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
   const [noAssignmentDialogOpen, setNoAssignmentDialogOpen] = useState(false)
 
@@ -444,116 +403,6 @@ export const UnifiedPaymentContent = forwardRef<UnifiedPaymentHandle, UnifiedPay
     appliedCloserNameRef.current = ""
     refresh()
   }
-
-  const handleExportAllPayments = useCallback(async () => {
-    if (!customersReadyRef.current || organizationsLoading) {
-      throw new Error("数据仍在加载，请稍后再试")
-    }
-
-    const params: { customer_ids?: string } = {}
-    if (!isSuperAdminRef.current) {
-      const allowedCustomers = customersRef.current
-      if (allowedCustomers.length === 0) {
-        throw new Error("当前账号没有可导出的客户数据")
-      }
-      params.customer_ids = allowedCustomers.map(customer => customer.id).join(",")
-    }
-    const apiParams = Object.keys(params).length > 0 ? params : undefined
-
-    const fetchAllForType = async (type: ProjectTypeKey) => {
-      const records: UnifiedItem[] = []
-      let page = 1
-      let totalPages = 1
-      do {
-        const response = await getApi(type).listPaginated(page, 100, apiParams)
-        records.push(...response.items.map((item: any) => toUnified(item, type)))
-        totalPages = response.total_pages || 1
-        page += 1
-      } while (page <= totalPages)
-      return records
-    }
-
-    const types = Object.keys(PROJECT_TYPES) as ProjectTypeKey[]
-    const records = (await Promise.all(types.map(fetchAllForType))).flat()
-    records.sort((a, b) => {
-      const dateOrder = (b.deal_date || b._raw?.created_at || "").localeCompare(a.deal_date || a._raw?.created_at || "")
-      if (dateOrder !== 0) return dateOrder
-      return (b._raw?.created_at || "").localeCompare(a._raw?.created_at || "")
-    })
-
-    if (records.length === 0) {
-      throw new Error("暂无可导出的付费记录")
-    }
-
-    const organizationNames = new Map(organizations.map(organization => [organization.id, organization.name]))
-    const workbook = new ExcelJS.Workbook()
-    workbook.creator = "无忧茶苑"
-    workbook.created = new Date()
-    const worksheet = workbook.addWorksheet("全部付费记录")
-    worksheet.columns = [
-      { header: "成交日期", key: "deal_date", width: 13 },
-      { header: "付费类型", key: "type", width: 16 },
-      { header: "用户昵称", key: "nickname", width: 16 },
-      { header: "项目内容", key: "detail", width: 30 },
-      { header: "数量/期限", key: "quantity", width: 14 },
-      { header: "金额", key: "amount", width: 14 },
-      { header: "生效日期", key: "effective_date", width: 13 },
-      { header: "到期日期", key: "expiry_date", width: 13 },
-      { header: "成交人", key: "closers", width: 24 },
-      { header: "支付方式", key: "payment_method", width: 14 },
-      { header: "所属组织", key: "organization", width: 18 },
-      { header: "备注", key: "notes", width: 30 },
-      { header: "创建人", key: "created_by", width: 14 },
-      { header: "录入时间", key: "created_at", width: 20 },
-    ]
-
-    records.forEach(item => {
-      worksheet.addRow({
-        deal_date: item.deal_date || "",
-        type: PROJECT_TYPES[item.type].label,
-        nickname: item.nickname,
-        detail: getExportDetail(item),
-        quantity: getExportQuantity(item),
-        amount: item.price,
-        effective_date: item.effective_date || "",
-        expiry_date: item.expiry_date || "",
-        closers: item.closers?.length
-          ? item.closers.map(closer => `${closer.name} ¥${closer.amount.toLocaleString()}`).join("、")
-          : (item.closer_name || ""),
-        payment_method: item.payment_method || "",
-        organization: item.organization_id ? (organizationNames.get(item.organization_id) || "") : "",
-        notes: item.notes || "",
-        created_by: item.created_by || "",
-        created_at: (item._raw?.created_at || "").replace("T", " ").slice(0, 19),
-      })
-    })
-
-    worksheet.views = [{ state: "frozen", ySplit: 1 }]
-    worksheet.autoFilter = { from: "A1", to: "N1" }
-    worksheet.getRow(1).height = 24
-    worksheet.getRow(1).eachCell(cell => {
-      cell.font = { bold: true, color: { argb: "FF2B2F36" } }
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7F8FA" } }
-      cell.alignment = { vertical: "middle" }
-    })
-    worksheet.getColumn("amount").numFmt = '¥#,##0.00'
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return
-      row.alignment = { vertical: "middle" }
-    })
-
-    const buffer = await workbook.xlsx.writeBuffer()
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement("a")
-    anchor.href = url
-    anchor.download = `付费项目_${new Date().toLocaleDateString("sv-SE")}.xlsx`
-    anchor.click()
-    URL.revokeObjectURL(url)
-    return records.length
-  }, [organizations, organizationsLoading])
-
-  useImperativeHandle(ref, () => ({ exportAllPayments: handleExportAllPayments }), [handleExportAllPayments])
 
   // 会员卡类型选择
   const handleSelectCardType = (type: string) => {
@@ -2242,4 +2091,4 @@ export const UnifiedPaymentContent = forwardRef<UnifiedPaymentHandle, UnifiedPay
       </AlertDialog>
     </>
   )
-})
+}

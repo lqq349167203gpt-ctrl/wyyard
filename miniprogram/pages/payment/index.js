@@ -2,6 +2,31 @@ const { paymentApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
 
 const TABS = PAYMENT_PROJECT_TYPES
 
+const now = new Date()
+const TODAY = [
+  now.getFullYear(),
+  String(now.getMonth() + 1).padStart(2, '0'),
+  String(now.getDate()).padStart(2, '0'),
+].join('-')
+const CURRENT_MONTH = TODAY.slice(0, 7)
+const CURRENT_YEAR = TODAY.slice(0, 4)
+
+const EXPORT_RANGE_OPTIONS = [
+  { value: 'day', label: '按天' },
+  { value: 'month', label: '按月' },
+  { value: 'year', label: '按年' },
+  { value: 'custom', label: '自定义' },
+]
+
+function getMonthEnd(month) {
+  const parts = month.split('-')
+  const year = Number(parts[0])
+  const monthNumber = Number(parts[1])
+  if (!year || !monthNumber) return ''
+  const lastDay = new Date(year, monthNumber, 0).getDate()
+  return month + '-' + String(lastDay).padStart(2, '0')
+}
+
 function formatDate(d) {
   if (!d) return ''
   return d.slice(0, 10)
@@ -76,6 +101,15 @@ Page({
     items: [],
     loading: false,
     exporting: false,
+    exportDialogVisible: false,
+    exportRangeOptions: EXPORT_RANGE_OPTIONS,
+    exportRangeType: 'month',
+    exportDate: TODAY,
+    exportMonth: CURRENT_MONTH,
+    exportYear: CURRENT_YEAR,
+    exportDateFrom: CURRENT_MONTH + '-01',
+    exportDateTo: TODAY,
+    exportRangeSummary: CURRENT_MONTH + '-01 至 ' + getMonthEnd(CURRENT_MONTH),
   },
 
   onLoad() {
@@ -169,30 +203,115 @@ Page({
   },
 
   onExportTap() {
+    this.updateExportSummary()
+    this.setData({ exportDialogVisible: true })
+  },
+
+  onExportDialogClose() {
     if (this.data.exporting) return
+    this.setData({ exportDialogVisible: false })
+  },
+
+  stopPropagation() {},
+
+  onExportRangeChange(e) {
+    this.setData({ exportRangeType: e.currentTarget.dataset.type }, () => this.updateExportSummary())
+  },
+
+  onExportDateChange(e) {
+    this.setData({ exportDate: e.detail.value }, () => this.updateExportSummary())
+  },
+
+  onExportMonthChange(e) {
+    this.setData({ exportMonth: e.detail.value }, () => this.updateExportSummary())
+  },
+
+  onExportYearChange(e) {
+    this.setData({ exportYear: e.detail.value }, () => this.updateExportSummary())
+  },
+
+  onExportDateFromChange(e) {
+    this.setData({ exportDateFrom: e.detail.value }, () => this.updateExportSummary())
+  },
+
+  onExportDateToChange(e) {
+    this.setData({ exportDateTo: e.detail.value }, () => this.updateExportSummary())
+  },
+
+  updateExportSummary() {
+    const data = this.data
+    let summary = data.exportDate
+    if (data.exportRangeType === 'month') {
+      summary = data.exportMonth + '-01 至 ' + getMonthEnd(data.exportMonth)
+    } else if (data.exportRangeType === 'year') {
+      summary = data.exportYear + '-01-01 至 ' + data.exportYear + '-12-31'
+    } else if (data.exportRangeType === 'custom') {
+      summary = data.exportDateFrom + ' 至 ' + data.exportDateTo
+    }
+    this.setData({ exportRangeSummary: summary })
+  },
+
+  getExportParams() {
+    const data = this.data
+    if (data.exportRangeType === 'custom') {
+      return {
+        range_type: 'custom',
+        date_from: data.exportDateFrom,
+        date_to: data.exportDateTo,
+      }
+    }
+    const periodMap = {
+      day: data.exportDate,
+      month: data.exportMonth,
+      year: data.exportYear,
+    }
+    return {
+      range_type: data.exportRangeType,
+      period: periodMap[data.exportRangeType],
+    }
+  },
+
+  getExportFilename() {
+    const data = this.data
+    if (data.exportRangeType === 'day') return '付费项目_' + data.exportDate + '.xlsx'
+    if (data.exportRangeType === 'month') return '付费项目_' + data.exportMonth + '.xlsx'
+    if (data.exportRangeType === 'year') return '付费项目_' + data.exportYear + '年.xlsx'
+    return '付费项目_' + data.exportDateFrom + '至' + data.exportDateTo + '.xlsx'
+  },
+
+  onExportConfirm() {
+    if (this.data.exporting) return
+    if (this.data.exportRangeType === 'custom' && this.data.exportDateFrom > this.data.exportDateTo) {
+      wx.showToast({ title: '开始日期不能晚于结束日期', icon: 'none' })
+      return
+    }
     this.setData({ exporting: true })
     wx.showLoading({ title: '正在导出...' })
+    const params = this.getExportParams()
     wx.downloadFile({
-      url: paymentApi.export(),
+      url: paymentApi.export(params),
       header: { Authorization: 'Bearer ' + (wx.getStorageSync('auth_token') || '') },
       success: (res) => {
         if (res.statusCode !== 200) {
           wx.hideLoading()
           this.setData({ exporting: false })
-          wx.showToast({ title: '导出失败', icon: 'none' })
+          wx.getFileSystemManager().readFile({
+            filePath: res.tempFilePath,
+            encoding: 'utf8',
+            success: (file) => {
+              let message = '导出失败'
+              try { message = JSON.parse(file.data).detail || message } catch (e) {}
+              wx.showToast({ title: message, icon: 'none' })
+            },
+            fail: () => wx.showToast({ title: '导出失败', icon: 'none' }),
+          })
           return
         }
-        const today = new Date()
-        const dateText = [
-          today.getFullYear(),
-          String(today.getMonth() + 1).padStart(2, '0'),
-          String(today.getDate()).padStart(2, '0'),
-        ].join('-')
-        const filePath = `${wx.env.USER_DATA_PATH}/付费项目_${dateText}.xlsx`
+        const filePath = `${wx.env.USER_DATA_PATH}/${this.getExportFilename()}`
         const fileSystem = wx.getFileSystemManager()
         const openFile = (path) => {
           wx.hideLoading()
-          this.setData({ exporting: false })
+          this.setData({ exporting: false, exportDialogVisible: false })
           wx.openDocument({
             filePath: path,
             fileType: 'xlsx',

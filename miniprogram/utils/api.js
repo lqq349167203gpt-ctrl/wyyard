@@ -435,7 +435,13 @@ const paymentApi = {
     },
   }),
 
-  export: () => `${BASE_URL}/api/payment-exports/export`,
+  export: (params = {}) => {
+    const qs = Object.entries(params)
+      .filter(([_, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    return `${BASE_URL}/api/payment-exports/export${qs ? '?' + qs : ''}`
+  },
 
   // 项目类型 → API 映射
   getByType(type) {

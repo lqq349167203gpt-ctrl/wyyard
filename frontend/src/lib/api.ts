@@ -1605,6 +1605,47 @@ export const projectRefundApi = {
     ),
 }
 
+export type PaymentExportRangeType = "day" | "month" | "year" | "custom"
+
+export interface PaymentExportParams {
+  range_type: PaymentExportRangeType
+  period?: string
+  date_from?: string
+  date_to?: string
+}
+
+export const paymentExportApi = {
+  download: async (params: PaymentExportParams) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) query.set(key, value)
+    })
+    const res = await fetch(`${API_BASE}/api/payment-exports/export?${query.toString()}`, {
+      headers: getAuthHeaders(),
+    })
+    applyNewToken(res)
+    if (res.status === 401) {
+      handle401()
+      throw new Error("登录已过期")
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      const detail = data.detail
+      const message = Array.isArray(detail)
+        ? detail.map((item: { msg?: string }) => item.msg || "参数错误").join("；")
+        : (detail || "导出失败，请稍后再试")
+      throw new Error(message)
+    }
+    const disposition = res.headers.get("Content-Disposition") || ""
+    const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    let filename = `付费项目_${new Date().toLocaleDateString("sv-SE")}.xlsx`
+    if (encodedFilename) {
+      try { filename = decodeURIComponent(encodedFilename) } catch {}
+    }
+    return { blob: await res.blob(), filename }
+  },
+}
+
 export interface Expense {
   id: string
   expense_time: string

@@ -62,5 +62,75 @@
   <view class="fab" bindtap="onAddTap">
     <text class="fab-text">+</text>
   </view>
+
+  <view class="export-mask" wx:if="{{exportDialogVisible}}" catchtap="onExportDialogClose">
+    <view class="export-panel" catchtap="stopPropagation">
+      <view class="export-panel-header">
+        <text class="export-panel-title">导出付费记录</text>
+        <text class="export-panel-desc">导出全部付费类型，并按成交日期从近到远排列</text>
+      </view>
+
+      <view class="export-panel-body">
+        <view class="export-field">
+          <text class="export-field-label">导出方式</text>
+          <view class="export-range-options">
+            <view
+              wx:for="{{exportRangeOptions}}"
+              wx:key="value"
+              class="export-range-option {{exportRangeType === item.value ? 'active' : ''}}"
+              data-type="{{item.value}}"
+              bindtap="onExportRangeChange"
+            >
+              <text>{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="export-field">
+          <text class="export-field-label" wx:if="{{exportRangeType === 'day'}}">选择日期</text>
+          <text class="export-field-label" wx:if="{{exportRangeType === 'month'}}">选择月份</text>
+          <text class="export-field-label" wx:if="{{exportRangeType === 'year'}}">选择年份</text>
+          <text class="export-field-label" wx:if="{{exportRangeType === 'custom'}}">时间范围</text>
+
+          <picker wx:if="{{exportRangeType === 'day'}}" mode="date" fields="day" value="{{exportDate}}" bindchange="onExportDateChange">
+            <view class="export-picker">
+              <text>{{exportDate}}</text>
+              <view class="export-picker-arrow"></view>
+            </view>
+          </picker>
+          <picker wx:if="{{exportRangeType === 'month'}}" mode="date" fields="month" value="{{exportMonth}}" bindchange="onExportMonthChange">
+            <view class="export-picker">
+              <text>{{exportMonth}}</text>
+              <view class="export-picker-arrow"></view>
+            </view>
+          </picker>
+          <picker wx:if="{{exportRangeType === 'year'}}" mode="date" fields="year" value="{{exportYear}}" bindchange="onExportYearChange">
+            <view class="export-picker">
+              <text>{{exportYear}}年</text>
+              <view class="export-picker-arrow"></view>
+            </view>
+          </picker>
+          <view class="export-custom-range" wx:if="{{exportRangeType === 'custom'}}">
+            <picker class="export-custom-picker" mode="date" fields="day" value="{{exportDateFrom}}" bindchange="onExportDateFromChange">
+              <view class="export-picker export-picker-half"><text>{{exportDateFrom}}</text></view>
+            </picker>
+            <text class="export-range-separator">~</text>
+            <picker class="export-custom-picker" mode="date" fields="day" value="{{exportDateTo}}" bindchange="onExportDateToChange">
+              <view class="export-picker export-picker-half"><text>{{exportDateTo}}</text></view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="export-summary">
+          <text>将导出全部付费类型 · {{exportRangeSummary}}</text>
+        </view>
+      </view>
+
+      <view class="export-panel-footer">
+        <view class="export-action secondary {{exporting ? 'disabled' : ''}}" bindtap="onExportDialogClose"><text>取消</text></view>
+        <view class="export-action primary {{exporting ? 'disabled' : ''}}" bindtap="onExportConfirm"><text>{{exporting ? '导出中...' : '导出'}}</text></view>
+      </view>
+    </view>
+  </view>
   </block>
 </view>

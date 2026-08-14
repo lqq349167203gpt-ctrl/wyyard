@@ -146,7 +146,11 @@ def _format_created_at(value) -> str:
     return str(value).replace("T", " ")[:19]
 
 
-def _build_rows(user_role: str) -> list[dict]:
+def _build_rows(
+    user_role: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> list[dict]:
     allowed_customer_ids = _allowed_customer_ids(user_role)
     organization_names = {
         organization.id: organization.name
@@ -160,6 +164,11 @@ def _build_rows(user_role: str) -> list[dict]:
                 continue
             created_at = item.get("created_at") or ""
             deal_date = item.get("deal_date") or ""
+            normalized_deal_date = str(deal_date)[:10]
+            if date_from and (not normalized_deal_date or normalized_deal_date < date_from):
+                continue
+            if date_to and (not normalized_deal_date or normalized_deal_date > date_to):
+                continue
             effective_date = item.get("effective_date") or ""
             expiry_date = (
                 _offline_expiry(item)
@@ -191,8 +200,12 @@ def _build_rows(user_role: str) -> list[dict]:
     return rows
 
 
-def build_payment_export(user_role: str) -> tuple[io.BytesIO, int]:
-    rows = _build_rows(user_role)
+def build_payment_export(
+    user_role: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> tuple[io.BytesIO, int]:
+    rows = _build_rows(user_role, date_from, date_to)
     workbook = Workbook()
     worksheet = workbook.active
     worksheet.title = "全部付费记录"
