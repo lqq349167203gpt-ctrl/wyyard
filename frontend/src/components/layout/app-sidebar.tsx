@@ -19,7 +19,7 @@ import {
   IconMessageCircle,
   IconFileText,
   IconClipboardText,
-  IconChevronDown,
+  IconChevronRight,
   IconAffiliate,
   IconSchool,
   IconBook,
@@ -143,7 +143,7 @@ function MenuGroup({
         onClick={onToggle}
       >
         <span>{label}</span>
-        <IconChevronDown style={{ width: 14, height: 14 }} className={`text-[#a8b1bd] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <IconChevronRight style={{ width: 14, height: 14 }} className={`text-[#a8b1bd] transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`} />
       </SidebarGroupLabel>
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"

@@ -27,6 +27,7 @@ interface SelectDropdownSingleProps {
   textColor?: string
   portalContainer?: HTMLElement | null
   dropdownWidth?: number
+  menuMaxHeight?: number
 }
 
 interface SelectDropdownMultiProps {
@@ -47,6 +48,7 @@ interface SelectDropdownMultiProps {
   textColor?: string
   portalContainer?: HTMLElement | null
   dropdownWidth?: number
+  menuMaxHeight?: number
 }
 
 type SelectDropdownProps = SelectDropdownSingleProps | SelectDropdownMultiProps
@@ -71,6 +73,7 @@ export function SelectDropdown({
   textColor,
   portalContainer,
   dropdownWidth,
+  menuMaxHeight = 200,
 }: SelectDropdownProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -91,7 +94,7 @@ export function SelectDropdown({
     const el = rootRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    const h = 200
+    const h = menuMaxHeight
     const below = window.innerHeight - r.bottom
     const above = r.top
 
@@ -109,7 +112,7 @@ export function SelectDropdown({
       s.maxHeight = Math.min(h, above - 8)
     }
     setPos(s)
-  }, [dropdownWidth])
+  }, [dropdownWidth, menuMaxHeight])
 
   const calcSubMenuPos = useCallback((optEl: HTMLElement, opt: Option) => {
     const menuEl = menuRef.current
