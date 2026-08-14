@@ -62,6 +62,8 @@ from app.api.statistics import router as statistics_router
 from app.api.system_helper import router as system_helper_router
 from app.api.system_helper_config import router as system_helper_config_router
 from app.api.system_logs import router as system_logs_router
+from app.api.tea_guest_consumptions import router as tea_guest_consumptions_router
+from app.api.tea_guest_expenses import router as tea_guest_expenses_router
 from app.api.tea_seat_fees import router as tea_seat_fees_router
 from app.api.uploads import router as uploads_router
 from app.api.visit_ai_config import router as visit_ai_config_router
@@ -143,6 +145,8 @@ app.include_router(project_deductions_router)
 app.include_router(project_refunds_router)
 app.include_router(payment_exports_router)
 app.include_router(expenses_router)
+app.include_router(tea_guest_consumptions_router)
+app.include_router(tea_guest_expenses_router)
 app.include_router(financial_router)
 app.include_router(system_helper_router)
 app.include_router(system_helper_config_router)

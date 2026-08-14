@@ -10,6 +10,8 @@ from app.services.operation_log_service import create_log
 from app.utils.request_context import get_client_ip
 
 SECTION_MAP = {
+    "/api/tea-guest/consumption-records": "茶客业务 · 消费记录",
+    "/api/tea-guest/expenses": "茶客业务 · 支出",
     "/api/financial/commissions": "分成",
     "/api/financial/staff-benefits": "人员福利",
     "/api/customers": "客户资料",
@@ -62,6 +64,9 @@ SECTION_MAP = {
 
 # 路径前缀 → (section, service_module, get_function_name)
 GETTER_MAP = {
+    "/api/tea-guest/consumption-records": ("茶客业务 · 消费记录", "tea_guest_consumption_service", "get_record"),
+    "/api/tea-guest/expenses/types": ("茶客业务 · 支出", "tea_guest_expense_service", "get_expense_type"),
+    "/api/tea-guest/expenses": ("茶客业务 · 支出", "tea_guest_expense_service", "get_expense"),
     "/api/financial/commissions": ("分成", "financial_record_service", "get_commission"),
     "/api/financial/staff-benefits": ("人员福利", "financial_record_service", "get_benefit"),
     "/api/customers": ("客户资料", "customer_service", "get_customer"),
@@ -103,6 +108,8 @@ GETTER_MAP = {
 }
 
 PAGE_LABELS: dict[str, str] = {
+    "tea-guest-consumption-records": "茶客业务 · 消费记录",
+    "tea-guest-expenses": "茶客业务 · 支出",
     "dashboard": "工作台",
     "customers": "客户资料",
     "healing-records": "客户资料",
@@ -230,6 +237,7 @@ FIELD_NAMES = {
     "member_ids": "成员", "teacher_ids": "老师",
     "price": "价格", "amount": "金额", "count": "次数", "total": "总计",
     "expense_time": "支出时间", "purchase_content": "支出项", "platform": "平台", "notes": "备注",
+    "consumption_time": "消费时间", "guest_count": "茶客数量", "unit_price": "单价", "total_amount": "总金额",
     "requires_customer": "需要用户昵称", "requires_platform": "需要平台",
     "cost_category": "成本分类", "expense_type": "支出类型", "month": "分成月份",
     "person_name": "人员", "benefit_date": "福利日期",
@@ -293,7 +301,7 @@ def get_section(path: str) -> str:
 
 
 def get_entity_name(body: dict) -> str:
-    for key in ["nickname", "name", "title", "purchase_content", "content", "section", "username", "course_name", "owner_name", "date", "position"]:
+    for key in ["nickname", "name", "title", "purchase_content", "content", "section", "username", "course_name", "owner_name", "consumption_time", "date", "position"]:
         if key in body and body[key]:
             return str(body[key])[:20]
     return ""
@@ -303,6 +311,15 @@ def get_entity_id(path: str) -> str:
     # 批量操作路径不提取 entity_id
     if "/batch/" in path:
         return ""
+    tea_guest_match = re.search(r"/api/tea-guest/consumption-records/([^/]+)(?:/|$)", path)
+    if tea_guest_match:
+        return tea_guest_match.group(1)
+    tea_guest_expense_type_match = re.search(r"/api/tea-guest/expenses/types/([^/]+)(?:/|$)", path)
+    if tea_guest_expense_type_match:
+        return tea_guest_expense_type_match.group(1)
+    tea_guest_expense_match = re.search(r"/api/tea-guest/expenses/([^/]+)(?:/|$)", path)
+    if tea_guest_expense_match:
+        return tea_guest_expense_match.group(1)
     expense_type_match = re.search(r"/api/expenses/types/([^/]+)(?:/|$)", path)
     if expense_type_match:
         return expense_type_match.group(1)

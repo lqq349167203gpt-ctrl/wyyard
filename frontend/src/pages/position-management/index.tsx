@@ -57,6 +57,9 @@ const ALL_PAGES = [
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
   { key: "login-records", label: "使用统计" },
+  // 茶客业务
+  { key: "tea-guest-consumption-records", label: "消费记录" },
+  { key: "tea-guest-expenses", label: "支出" },
 ]
 
 const PERMISSION_GROUPS = [
@@ -69,6 +72,7 @@ const PERMISSION_GROUPS = [
   { label: "信息配置", keys: ["member-identities", "customer-tags", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
   { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs", "login-records"] },
+  { label: "茶客业务", keys: ["tea-guest-consumption-records", "tea-guest-expenses"] },
 ]
 
 const CUSTOMER_FILTER_PAGES = [

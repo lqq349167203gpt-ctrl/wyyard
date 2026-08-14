@@ -1706,6 +1706,119 @@ export interface ExpenseType {
   created_at: string
 }
 
+export type TeaGuestPaymentMethod = "美团" | "支付宝" | "微信" | "抖音"
+
+export interface TeaGuestConsumptionRecord {
+  id: string
+  consumption_time: string
+  guest_count: number
+  unit_price: number
+  total_amount: number
+  payment_method: TeaGuestPaymentMethod
+  notes: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TeaGuestConsumptionInput {
+  consumption_time: string
+  guest_count: number
+  unit_price: number
+  payment_method: TeaGuestPaymentMethod
+  notes: string
+}
+
+export const teaGuestConsumptionApi = {
+  listPaginated: (
+    page: number,
+    pageSize: number,
+    params?: { date_from?: string; date_to?: string; payment_method?: string },
+  ) => {
+    const searchParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params?.date_from) searchParams.set("date_from", params.date_from)
+    if (params?.date_to) searchParams.set("date_to", params.date_to)
+    if (params?.payment_method) searchParams.set("payment_method", params.payment_method)
+    return request<PaginatedResponse<TeaGuestConsumptionRecord>>(
+      `/api/tea-guest/consumption-records?${searchParams.toString()}`,
+    )
+  },
+  create: (data: TeaGuestConsumptionInput) =>
+    request<TeaGuestConsumptionRecord>("/api/tea-guest/consumption-records", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: TeaGuestConsumptionInput) =>
+    request<TeaGuestConsumptionRecord>(`/api/tea-guest/consumption-records/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/api/tea-guest/consumption-records/${id}`, { method: "DELETE" }),
+}
+
+export interface TeaGuestExpense {
+  id: string
+  cost_category: "management" | "operation"
+  expense_type: string
+  expense_time: string
+  purchase_content: string
+  amount: number
+  platform: string
+  notes: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TeaGuestExpenseInput {
+  cost_category: "management" | "operation"
+  expense_type: string
+  expense_time: string
+  purchase_content: string
+  amount: number
+  platform: string
+  notes: string
+}
+
+export interface TeaGuestExpenseType {
+  id: string
+  cost_category: "management" | "operation"
+  name: string
+  requires_platform: boolean
+  created_at: string
+}
+
+export const teaGuestExpenseApi = {
+  listPaginated: (
+    page: number,
+    pageSize: number,
+    params?: { date_from?: string; date_to?: string; cost_category?: string },
+  ) => {
+    const searchParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params?.date_from) searchParams.set("date_from", params.date_from)
+    if (params?.date_to) searchParams.set("date_to", params.date_to)
+    if (params?.cost_category) searchParams.set("cost_category", params.cost_category)
+    return request<PaginatedResponse<TeaGuestExpense>>(`/api/tea-guest/expenses?${searchParams.toString()}`)
+  },
+  create: (data: TeaGuestExpenseInput) =>
+    request<TeaGuestExpense>("/api/tea-guest/expenses", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: TeaGuestExpenseInput) =>
+    request<TeaGuestExpense>(`/api/tea-guest/expenses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/api/tea-guest/expenses/${id}`, { method: "DELETE" }),
+  listTypes: (costCategory = "") =>
+    request<TeaGuestExpenseType[]>(`/api/tea-guest/expenses/types/list${costCategory ? `?cost_category=${costCategory}` : ""}`),
+  createType: (data: { cost_category: "management" | "operation"; name: string; requires_platform: boolean }) =>
+    request<TeaGuestExpenseType>("/api/tea-guest/expenses/types", { method: "POST", body: JSON.stringify(data) }),
+  updateType: (id: string, data: { requires_platform: boolean }) =>
+    request<TeaGuestExpenseType>(`/api/tea-guest/expenses/types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteType: (id: string) =>
+    request<{ message: string }>(`/api/tea-guest/expenses/types/${id}`, { method: "DELETE" }),
+}
+
 export interface FinancialBreakdown {
   name: string
   revenue: number

@@ -90,6 +90,8 @@ ALL_PAGE_KEYS = [
     "position-management", "change-password", "disabled-customers",
     # 系统配置
     "agents", "chat-history", "system-logs", "operation-logs", "login-records",
+    # 茶客业务
+    "tea-guest-consumption-records", "tea-guest-expenses",
 ]
 
 

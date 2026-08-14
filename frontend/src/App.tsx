@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom"
 import { useMemo } from "react"
 import { AppLayout } from "@/components/layout/app-layout"
+import { TeaGuestLayout } from "@/components/layout/tea-guest-layout"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import LoginPage from "@/pages/login"
 
@@ -47,6 +48,8 @@ import FollowupRecordsPage from "@/pages/followup-records"
 import OfflineCourseRecordsPage from "@/pages/offline-course-records"
 import DebtRecordsPage from "@/pages/debt-records"
 import CustomerTagsPage from "@/pages/customer-tags"
+import TeaGuestConsumptionRecordsPage from "@/pages/tea-guest-consumption-records"
+import TeaGuestExpensesPage from "@/pages/tea-guest-expenses"
 import { hasPagePermission } from "@/lib/page-permissions"
 import { usePagePermissions } from "@/hooks/use-page-permissions"
 
@@ -96,6 +99,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/agents/:id/chat": "agents",
   "/change-password": "change-password",
   "/disabled-customers": "disabled-customers",
+  "/tea-guest/consumption-records": "tea-guest-consumption-records",
+  "/tea-guest/expenses": "tea-guest-expenses",
 }
 
 function ProtectedRoute() {
@@ -206,6 +211,10 @@ function App() {
               <Route path="/offline-course-records" element={<OfflineCourseRecordsPage />} />
               <Route path="/debt-records" element={<DebtRecordsPage />} />
               <Route path="/daily-report" element={<DailyReportPage />} />
+            </Route>
+            <Route element={<TeaGuestLayout />}>
+              <Route path="/tea-guest/consumption-records" element={<TeaGuestConsumptionRecordsPage />} />
+              <Route path="/tea-guest/expenses" element={<TeaGuestExpensesPage />} />
             </Route>
           </Route>
         </Routes>

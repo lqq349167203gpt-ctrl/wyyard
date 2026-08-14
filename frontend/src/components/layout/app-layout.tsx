@@ -1,13 +1,15 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom"
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useState, type CSSProperties } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { Button } from "@/components/ui/button"
-import { clearAuthState, loginRecordApi, positionPermissionApi } from "@/lib/api"
+import { clearAuthState, positionPermissionApi } from "@/lib/api"
 import { storePagePermissions } from "@/hooks/use-page-permissions"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SystemHelperChat, type ChatMessage } from "@/components/system-helper-chat"
 import { LogOut } from "lucide-react"
+import { useUsageTracking } from "@/hooks/use-usage-tracking"
+import { SystemSwitcher } from "./system-switcher"
 
 const PAGE_TITLES: Record<string, string> = {
 
@@ -44,14 +46,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/expenses": "无忧 - 支出项",
 }
 
-const HEARTBEAT_INTERVAL_MS = 30_000
-const IDLE_TIMEOUT_MS = 5 * 60_000
-
-const createUsageSessionId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
 export function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -67,74 +61,7 @@ export function AppLayout() {
     } catch { return [] }
   })
   const [helperSending, setHelperSending] = useState(false)
-  const usageSessionIdRef = useRef("")
-  const usageActiveRef = useRef(false)
-  const lastActivityRef = useRef(Date.now())
-  const currentPathRef = useRef(location.pathname)
-
-  const sendUsageHeartbeat = useCallback((active: boolean, keepalive = false) => {
-    if (!localStorage.getItem("authToken")) return Promise.resolve()
-    if (active && !usageSessionIdRef.current) {
-      usageSessionIdRef.current = createUsageSessionId()
-    }
-    if (!usageSessionIdRef.current) return Promise.resolve()
-    const request = loginRecordApi.heartbeat({
-      client_session_id: usageSessionIdRef.current,
-      page_path: currentPathRef.current,
-      active,
-    }, keepalive).catch(() => undefined)
-    usageActiveRef.current = active
-    if (!active) usageSessionIdRef.current = ""
-    return request
-  }, [])
-
-  useEffect(() => {
-    currentPathRef.current = location.pathname
-    if (usageActiveRef.current) sendUsageHeartbeat(true)
-  }, [location.pathname, sendUsageHeartbeat])
-
-  useEffect(() => {
-    const isEligible = () => (
-      document.visibilityState === "visible"
-      && document.hasFocus()
-      && Date.now() - lastActivityRef.current < IDLE_TIMEOUT_MS
-    )
-    const syncUsageState = () => {
-      if (isEligible()) {
-        sendUsageHeartbeat(true)
-      } else if (usageActiveRef.current) {
-        sendUsageHeartbeat(false)
-      }
-    }
-    const markActivity = () => {
-      lastActivityRef.current = Date.now()
-      if (!usageActiveRef.current && document.visibilityState === "visible" && document.hasFocus()) {
-        sendUsageHeartbeat(true)
-      }
-    }
-    const stopForUnload = () => {
-      if (usageActiveRef.current) sendUsageHeartbeat(false, true)
-    }
-
-    const activityEvents: Array<keyof WindowEventMap> = ["mousedown", "keydown", "scroll", "touchstart", "mousemove"]
-    activityEvents.forEach(event => window.addEventListener(event, markActivity, { passive: true }))
-    window.addEventListener("focus", syncUsageState)
-    window.addEventListener("blur", syncUsageState)
-    window.addEventListener("beforeunload", stopForUnload)
-    document.addEventListener("visibilitychange", syncUsageState)
-    syncUsageState()
-    const timer = window.setInterval(syncUsageState, HEARTBEAT_INTERVAL_MS)
-
-    return () => {
-      window.clearInterval(timer)
-      activityEvents.forEach(event => window.removeEventListener(event, markActivity))
-      window.removeEventListener("focus", syncUsageState)
-      window.removeEventListener("blur", syncUsageState)
-      window.removeEventListener("beforeunload", stopForUnload)
-      document.removeEventListener("visibilitychange", syncUsageState)
-      if (usageActiveRef.current) sendUsageHeartbeat(false, true)
-    }
-  }, [sendUsageHeartbeat])
+  const { stopUsageTracking } = useUsageTracking(location.pathname)
 
   useEffect(() => {
     localStorage.setItem(`systemHelperMessages_${userId}`, JSON.stringify(helperMessages))
@@ -162,7 +89,7 @@ export function AppLayout() {
   }, [syncPagePermissions])
 
   const handleLogout = async () => {
-    if (usageActiveRef.current) await sendUsageHeartbeat(false)
+    await stopUsageTracking()
     clearAuthState()
     navigate("/login")
   }
@@ -172,7 +99,10 @@ export function AppLayout() {
       <AppSidebar />
       <SidebarInset className="min-w-0">
         <header className="flex h-[38px] items-center justify-between bg-white px-5 border-b-2 border-[#f0f1f2]">
-          <SidebarTrigger />
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <SystemSwitcher currentSystem="main" />
+          </div>
           <div className="flex items-center gap-2">
             {ownerName && (
               <span className="text-xs text-[#8f959e]">{ownerName}</span>
