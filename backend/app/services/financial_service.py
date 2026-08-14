@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from app.services import expense_service, financial_record_service, project_refund_service
+from app.services import expense_service, project_refund_service
 from app.services.payment_export_service import PROJECT_SOURCES, _amount
 
 
@@ -105,20 +105,6 @@ def get_overview(date_from: str, date_to: str) -> dict:
     expenses = expense_service.list_expenses(date_from, date_to)
     management_cost = round(sum(item.amount for item in expenses if item.cost_category == "management"), 2)
     operation_cost = round(sum(item.amount for item in expenses if item.cost_category == "operation"), 2)
-    month_from = date_from[:7]
-    month_to = date_to[:7]
-    commission_total = round(
-        sum(
-            item.amount
-            for item in financial_record_service.list_commissions()
-            if month_from <= item.month <= month_to
-        ),
-        2,
-    )
-    staff_benefit_total = round(
-        sum(item.amount for item in financial_record_service.list_benefits(date_from, date_to)),
-        2,
-    )
     refund_total = round(
         sum(
             item.refund_amount
@@ -129,10 +115,6 @@ def get_overview(date_from: str, date_to: str) -> dict:
     )
     total_revenue = round(group_revenue + custom_revenue, 2)
     total_expense = round(management_cost + operation_cost, 2)
-    operating_profit = round(
-        total_revenue - total_expense - commission_total - staff_benefit_total - refund_total,
-        2,
-    )
     return {
         "date_from": date_from,
         "date_to": date_to,
@@ -140,11 +122,7 @@ def get_overview(date_from: str, date_to: str) -> dict:
         "management_cost": management_cost,
         "operation_cost": operation_cost,
         "total_expense": total_expense,
-        "commission_total": commission_total,
-        "staff_benefit_total": staff_benefit_total,
         "refund_total": refund_total,
-        "operating_profit": operating_profit,
-        "net_profit": None,
         "group_class_revenue": group_revenue,
         "custom_course_revenue": custom_revenue,
         "group_class_breakdown": group_breakdown,
@@ -201,41 +179,6 @@ def list_composition_details(date_from: str, date_to: str, kind: str) -> list[di
                 "operator": item.created_by,
             }
             for item in expense_service.list_expenses(date_from, date_to)
-        ]
-    if kind == "commission":
-        month_from = date_from[:7]
-        month_to = date_to[:7]
-        return [
-            {
-                "id": item.id,
-                "kind": kind,
-                "date": item.month,
-                "primary": item.person_name,
-                "secondary": "人员分成",
-                "content": "",
-                "amount": round(item.amount, 2),
-                "platform": "",
-                "notes": item.notes,
-                "operator": item.created_by,
-            }
-            for item in financial_record_service.list_commissions()
-            if month_from <= item.month <= month_to
-        ]
-    if kind == "benefit":
-        return [
-            {
-                "id": item.id,
-                "kind": kind,
-                "date": item.benefit_date,
-                "primary": item.content,
-                "secondary": "人员福利",
-                "content": item.content,
-                "amount": round(item.amount, 2),
-                "platform": "",
-                "notes": item.notes,
-                "operator": item.created_by,
-            }
-            for item in financial_record_service.list_benefits(date_from, date_to)
         ]
     return [
         {

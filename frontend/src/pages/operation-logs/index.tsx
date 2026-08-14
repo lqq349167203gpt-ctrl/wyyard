@@ -51,6 +51,7 @@ const PAGE_LABELS: Record<string, string> = {
   "business-reminders": "业务提醒",
   "system-logs": "系统日志",
   "operation-logs": "操作日志",
+  "login-records": "使用统计",
   "member-identities": "会员身份",
   "customer-tags": "客户标签",
   "healing-identities": "疗愈老师",
@@ -81,7 +82,7 @@ const METHOD_COLORS: Record<string, string> = {
 
 const SOURCE_LABELS: Record<string, string> = {
   pc: "PC端",
-  miniprogram: "员工小程序",
+  miniprogram: "管理端小程序",
   "miniprogram-client": "客户端小程序",
   system: "系统",
 }
@@ -94,6 +95,7 @@ const SOURCE_COLORS: Record<string, string> = {
 }
 
 const FIELD_CN: Record<string, string> = {
+  id: "记录编号", project_id: "项目编号", project_type: "项目类型",
   nickname: "昵称", name: "名称", title: "标题", username: "用户名", owner: "归属人",
   phone: "电话", email: "邮箱", wechat: "微信", gender: "性别", age: "年龄", birthday: "生日",
   member_type: "会员类型", member_identity: "会员身份", healing_identity: "疗愈老师", activity_types: "活动类型",
@@ -105,7 +107,7 @@ const FIELD_CN: Record<string, string> = {
   owner_name: "案主", owner_id: "案主", host_name: "主持人", host_names: "主持人", host_id: "主持人", host_ids: "主持人",
   participant_ids: "参与者", achiever_name: "成就君", achiever_id: "成就君",
   leader_id: "组长", deputy_id: "副组长", member_ids: "成员",
-  closer_name: "成交人", closer_id: "成交人",
+  closer_name: "成交人", closer_id: "成交人", closers: "成交人",
   price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
   sort_order: "排序", is_public_welfare: "公益", category: "分类",
   arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "疗愈师回复",
@@ -118,7 +120,7 @@ const FIELD_CN: Record<string, string> = {
   groups: "分组", materials: "资料", images: "图片", rooms: "房间",
   location: "地点", address: "地址",
   start_date: "开始日期", end_date: "结束日期",
-  remaining_count: "剩余次数", card_type: "卡类型", purchase_count: "购买场次",
+  remaining_count: "剩余次数", total_count: "总次数", card_type: "卡类型", purchase_count: "购买场次",
   customer_id: "客户", customer_name: "用户",
   space_id: "空间", room_id: "房间", space_name: "空间名", room_name: "房间名",
   organization_id: "组织",
@@ -126,20 +128,79 @@ const FIELD_CN: Record<string, string> = {
   core_situation: "核心情况", need_tags: "需求标签",
   follow_up_node: "跟进节点", follow_up_action: "跟进动作", follow_up_status: "跟进状态",
   tracking_plan: "跟进计划",
-  pages: "页面权限", member_types: "用户信息权限",
+  pages: "页面权限", page_permissions: "页面权限", member_types: "用户信息权限",
   operator: "匹配方式", conditions: "匹配条件",
   customers: "客户信息可见身份", class_records: "人员安排可见身份", payment: "付费项目可见身份",
   referrer_handler: "引流处理人", traffic_source_detail: "流量来源详情",
   total_payment: "累计付费",
   activity_mode: "活动模式", course_id: "课程",
-  effective_date: "生效日期", themes: "主题",
+  effective_date: "生效日期", deal_date: "成交日期", themes: "主题",
   duration_type: "时长类型", duration_value: "时长", expiry_date: "到期日期",
-  fee: "费用金额", project_name: "项目名称",
+  fee: "费用金额", refund_amount: "退费金额", project_name: "项目名称", payment_method: "支付方式",
   expense_time: "支出时间", purchase_content: "购买内容", platform: "平台", notes: "备注",
+  cost_category: "成本分类", expense_type: "支出类型", month: "月份",
+  person_name: "人员", benefit_date: "福利日期",
   daily_card_usage: "每日扣费",
-  creator: "创建人", creator_id: "创建账号ID", created_at: "创建时间",
-  customer_nickname: "客户昵称",
+  creator: "创建人", creator_id: "创建账号编号", created_by: "创建人", created_at: "创建时间",
+  updated_at: "更新时间", is_deleted: "是否删除", deleted_at: "删除时间",
+  voided: "是否退费", voided_at: "退费时间",
+  customer_nickname: "客户昵称", tag_ids: "客户标签",
+  last_visit_date: "最近到店", other_info: "其他信息", service_teacher: "服务老师",
+  is_leader: "是否组长", group_leader_feedback: "组长反馈",
+  room_ids: "房间顺序", position_sort_orders: "排序顺序", is_system: "是否系统角色",
+  healing_notes: "疗愈笔记", activity_count: "活动次数", welfare_count: "公益次数", activities: "活动记录",
+  provider: "模型供应商", model: "模型", api_key: "接口密钥", base_url: "接口地址",
+  system_prompt: "系统提示词", temperature: "温度", max_tokens: "最大输出长度",
+  record_date: "上课日期", teacher: "课程老师", result: "课程结果",
+  validity_value: "有效期", validity_unit: "有效期单位",
 }
+
+const VALUE_CN: Record<string, string> = {
+  "membership-cards": "会员卡",
+  "group-cases": "觉醒游戏",
+  "emotional-releases": "情绪释放",
+  "oh-card-readings": "OH卡梳理",
+  "energy-knots": "能量结",
+  "internal-courses": "内部课程",
+  "other-projects": "其他项目",
+  month: "按月",
+  day: "按天",
+  year: "按年",
+  permanent: "永久",
+  alipay: "支付宝",
+  wechat: "微信支付",
+  cash: "现金",
+  bank: "银行转账",
+  active: "生效中",
+  inactive: "未生效",
+  pending: "待处理",
+  completed: "已完成",
+  cancelled: "已取消",
+  disabled: "已停用",
+  male: "男",
+  female: "女",
+}
+
+const MONEY_FIELDS = new Set(["price", "amount", "fee", "refund_amount", "total_payment"])
+const COUNT_FIELDS = new Set(["count", "total_count", "remaining_count", "purchase_count", "class_count"])
+const DATE_TIME_FIELDS = new Set(["created_at", "updated_at", "deleted_at", "voided_at", "arrival_time"])
+
+const API_PATH_LABELS: Array<[string, string]> = [
+  ["/api/project-refunds", "退费记录"],
+  ["/api/membership-cards", "会员卡"],
+  ["/api/group-cases", "觉醒游戏"],
+  ["/api/emotional-releases", "情绪释放"],
+  ["/api/oh-card-readings", "OH卡梳理"],
+  ["/api/energy-knots", "能量结"],
+  ["/api/internal-courses", "内部课程"],
+  ["/api/other-projects", "其他项目"],
+  ["/api/expenses", "支出项"],
+  ["/api/communication-records", "沟通记录"],
+  ["/api/customer-tags", "客户标签"],
+  ["/api/customers", "客户资料"],
+  ["/api/visits", "邀约"],
+  ["/api/class-records", "课表"],
+]
 
 const SECTION_OPTIONS = [
   "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
@@ -169,6 +230,7 @@ const ALL_PAGES = [
   { key: "business-reminders", label: "业务提醒" },
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
+  { key: "login-records", label: "使用统计" },
   { key: "member-identities", label: "会员身份" },
   { key: "customer-tags", label: "客户标签" },
   { key: "healing-identities", label: "疗愈老师" },
@@ -185,7 +247,7 @@ const PERMISSION_GROUPS = [
   { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects", "expenses"] },
   { label: "信息配置", keys: ["courses", "organizations", "member-identities", "customer-tags", "healing-identities", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management"] },
-  { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs"] },
+  { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs", "login-records"] },
 ]
 
 const CUSTOMER_FILTER_PAGES = [
@@ -195,6 +257,10 @@ const CUSTOMER_FILTER_PAGES = [
 ]
 
 const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
+
+const getOperationLocation = (path: string, section: string) => (
+  API_PATH_LABELS.find(([prefix]) => path.startsWith(prefix))?.[1] || formatSectionLabel(section)
+)
 
 const getMethodLabel = (log: Pick<OperationLog, "method" | "path">) => {
   if (log.method === "DELETE" && log.path.startsWith("/api/customer-tags/")) return "停用"
@@ -206,7 +272,47 @@ const compactLogText = (value: unknown, limit = 80) => {
   return text.length <= limit ? text : `${text.slice(0, limit)}…`
 }
 
+const formatLogAmount = (value: unknown) => {
+  const amount = Number(value)
+  return Number.isFinite(amount) ? `¥${amount.toLocaleString()}` : ""
+}
+
+const getFinancialLogDisplayContent = (log: OperationLog) => {
+  const isCommission = log.path.startsWith("/api/financial/commissions")
+  const isBenefit = log.path.startsWith("/api/financial/staff-benefits")
+  if (!isCommission && !isBenefit) return ""
+
+  const snapshot = log.method === "DELETE" ? log.before_data : (log.after_data || log.before_data)
+  if (!snapshot) {
+    if (log.method === "DELETE") {
+      return `删除${isCommission ? "分成" : "人员福利"}记录（历史日志未保存删除前信息）`
+    }
+    return log.content
+      .replace("新增分成 commissions", "新增分成")
+      .replace("修改分成 commissions", "修改分成")
+      .replace("新增人员福利 staff-benefits", "新增人员福利")
+      .replace("修改人员福利 staff-benefits", "修改人员福利")
+  }
+
+  const action = log.method === "POST" ? "新增" : log.method === "DELETE" ? "删除" : "修改"
+  const parts = isCommission
+    ? [
+        snapshot.month ? `月份：${snapshot.month}` : "",
+        snapshot.person_name ? `人员：${snapshot.person_name}` : "",
+      ]
+    : [
+        snapshot.benefit_date ? `日期：${snapshot.benefit_date}` : "",
+        snapshot.content ? `福利内容：${snapshot.content}` : "",
+      ]
+  const amount = formatLogAmount(snapshot.amount)
+  if (amount) parts.push(`金额：${amount}`)
+  if (snapshot.notes) parts.push(`备注：${compactLogText(snapshot.notes)}`)
+  return `${action}${isCommission ? "分成" : "人员福利"}：${parts.filter(Boolean).join("｜")}`
+}
+
 const getLogDisplayContent = (log: OperationLog) => {
+  const financialContent = getFinancialLogDisplayContent(log)
+  if (financialContent) return financialContent
   if (!log.path.startsWith("/api/communication-records")) return log.content
 
   const snapshot = log.method === "DELETE"
@@ -427,6 +533,11 @@ export default function OperationLogsPage() {
     return SECTION_ENTITY[section] || null
   }
 
+  const getFieldLabel = (key: string, section?: string, path?: string) => {
+    if (key === "name") return getEntityLabel(section, path) || FIELD_CN.name
+    return FIELD_CN[key] || "其他信息"
+  }
+
   const renderChanges = (before: Record<string, unknown> | null, after: Record<string, unknown> | null, section?: string, path?: string) => {
     if (!after || !before) return null
 
@@ -463,7 +574,7 @@ export default function OperationLogsPage() {
               {changedKeys.map((key, i) => {
                 return (
                   <tr key={key} className={i < changedKeys.length - 1 ? "border-b border-[#f0f0f0]" : ""}>
-                    <td className="px-3 py-2 text-[#8f959e] whitespace-nowrap">{(key === "name" ? getEntityLabel(section, path) : null) || FIELD_CN[key] || key}</td>
+                    <td className="px-3 py-2 text-[#8f959e] whitespace-nowrap">{getFieldLabel(key, section, path)}</td>
                     <td className="px-3 py-2 align-top">
                       <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(before[key], key) || "-"}</pre>
                     </td>
@@ -485,7 +596,19 @@ export default function OperationLogsPage() {
     title: string,
   ) => {
     if (!data) return null
-    const keys = Object.keys(data).filter(key => key !== "can_delete")
+    const idNamePairs: Record<string, string> = {
+      owner_id: "owner_name", host_id: "host_name", closer_id: "closer_name",
+      space_id: "space_name", room_id: "room_name",
+    }
+    const hasCloserAllocation = Array.isArray(data.closers)
+      ? data.closers.length > 0
+      : Boolean(data.closers)
+    const keys = Object.keys(data).filter(key => {
+      if (key === "can_delete") return false
+      if (hasCloserAllocation && (key === "closer_id" || key === "closer_name")) return false
+      const nameKey = idNamePairs[key]
+      return !(nameKey && data[nameKey] !== undefined)
+    })
     if (keys.length === 0) return null
     return (
       <div>
@@ -495,7 +618,7 @@ export default function OperationLogsPage() {
             <tbody>
               {keys.map((key, index) => (
                 <tr key={key} className={index < keys.length - 1 ? "border-b border-[#f0f0f0]" : ""}>
-                  <td className="w-28 whitespace-nowrap px-3 py-2 text-[#8f959e]">{FIELD_CN[key] || key}</td>
+                  <td className="w-28 whitespace-nowrap px-3 py-2 text-[#8f959e]">{getFieldLabel(key)}</td>
                   <td className="px-3 py-2 align-top">
                     <pre className="whitespace-pre-wrap break-all font-sans text-[#2b2b2b]">{formatCellValue(data[key], key) || "-"}</pre>
                   </td>
@@ -521,17 +644,42 @@ export default function OperationLogsPage() {
       if (key === "rooms") {
         return val.map((r: any) => r.name || r.id || "").filter(Boolean).join("、") || "（空）"
       }
+      if (key === "closers") {
+        return val.map((item) => {
+          if (!item || typeof item !== "object") return String(item)
+          const closer = item as Record<string, unknown>
+          const name = String(closer.name || getNameById(String(closer.id || "")) || "未填写")
+          const amount = Number(closer.amount)
+          return Number.isFinite(amount) ? `${name}（¥${amount.toLocaleString()}）` : name
+        }).join("、")
+      }
       return val.map(v => {
-        if (typeof v === "object" && v !== null) return resolveIdsInString(JSON.stringify(v))
+        if (typeof v === "object" && v !== null) {
+          return Object.entries(v as Record<string, unknown>)
+            .map(([childKey, childValue]) => `${getFieldLabel(childKey)}：${formatCellValue(childValue, childKey) || "-"}`)
+            .join("；")
+        }
         const s = String(v)
         if (s.length >= 8 && /^[0-9a-f-]+$/i.test(s)) return getNameById(s)
         // 页面权限字段：翻译为中文
         if (key === "pages" && PAGE_LABELS[s]) return PAGE_LABELS[s]
-        return s
+        return VALUE_CN[s] || s
       }).join("、")
     }
-    if (typeof val === "object") return resolveIdsInString(JSON.stringify(val, null, 2))
+    if (typeof val === "object") {
+      if (key === "closers") return formatCellValue([val], key)
+      return Object.entries(val as Record<string, unknown>)
+        .map(([childKey, childValue]) => `${getFieldLabel(childKey)}：${formatCellValue(childValue, childKey) || "-"}`)
+        .join("；")
+    }
     const s = String(val)
+    if (key === "closers") {
+      try {
+        return formatCellValue(JSON.parse(s), key)
+      } catch {
+        return s
+      }
+    }
     if (key === "operator") {
       if (s === "all") return "全部满足"
       if (s === "any") return "满足任意一项"
@@ -540,8 +688,31 @@ export default function OperationLogsPage() {
       if (s === "public") return "团队共享"
       if (s === "private") return "仅自己可见"
     }
+    if (key && MONEY_FIELDS.has(key)) {
+      const amount = Number(s)
+      if (Number.isFinite(amount)) return `¥${amount.toLocaleString()}`
+    }
+    if (key && COUNT_FIELDS.has(key)) {
+      const count = Number(s)
+      if (Number.isFinite(count)) return `${count.toLocaleString()}次`
+    }
+    if (key && DATE_TIME_FIELDS.has(key) && s.includes("T")) {
+      const date = new Date(s)
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleString("zh-CN", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })
+      }
+    }
+    if (VALUE_CN[s]) return VALUE_CN[s]
     if (s.length >= 8 && /^[0-9a-f-]+$/i.test(s)) return getNameById(s)
-    return s
+    return resolveIdsInString(s)
   }
 
   return (
@@ -590,7 +761,7 @@ export default function OperationLogsPage() {
             options={[
               {value: "", label: "全部"},
               {value: "pc", label: "PC端"},
-              {value: "miniprogram", label: "员工小程序"},
+              {value: "miniprogram", label: "管理端小程序"},
               {value: "miniprogram-client", label: "客户端小程序"},
               {value: "system", label: "系统"},
             ]}
@@ -724,11 +895,11 @@ export default function OperationLogsPage() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-[#8f959e]">请求路径：</span>
-                  <span className="text-[#2b2b2b] break-all">{selectedLog.path}</span>
+                  <span className="text-[#8f959e]">操作位置：</span>
+                  <span className="text-[#2b2b2b]">{getOperationLocation(selectedLog.path, selectedLog.section)}</span>
                 </div>
                 <div>
-                  <span className="text-[#8f959e]">实体 ID：</span>
+                  <span className="text-[#8f959e]">记录编号：</span>
                   <span className="text-[#2b2b2b]">{selectedLog.entity_id || "-"}</span>
                 </div>
                 <div>

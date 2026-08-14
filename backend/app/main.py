@@ -40,6 +40,7 @@ from app.api.group_cases import router as group_cases_router
 from app.api.healing_records import router as healing_records_router
 from app.api.internal_course_sessions import router as internal_course_sessions_router
 from app.api.internal_courses import router as internal_courses_router
+from app.api.login_records import router as login_records_router
 from app.api.member_identities import router as member_identities_router
 from app.api.membership_cards import router as membership_cards_router
 from app.api.miniapp_ai_config import router as miniapp_ai_config_router
@@ -126,6 +127,7 @@ app.include_router(healing_records_router)
 app.include_router(customer_detail_router)
 app.include_router(system_logs_router)
 app.include_router(operation_logs_router)
+app.include_router(login_records_router)
 app.include_router(accounts_router)
 app.include_router(position_permissions_router)
 app.include_router(positions_router)

@@ -27,8 +27,7 @@ import {
   IconReceipt,
   IconTags,
   IconChartPie,
-  IconCoins,
-  IconGift,
+  IconLogin,
 } from "@tabler/icons-react"
 import {
   Sidebar,
@@ -68,8 +67,6 @@ const reportItems = [
 
 const expenseItems = [
   { title: "支出项", path: "/expenses", permission: "expenses", icon: IconReceipt },
-  { title: "分成", path: "/commission-records", permission: "commission-records", icon: IconCoins },
-  { title: "人员福利", path: "/staff-benefits", permission: "staff-benefits", icon: IconGift },
 ]
 
 const courseItems = [
@@ -104,6 +101,7 @@ const systemItems = [
   { title: "沟通记录", icon: IconMessageCircle, path: "/chat-history", permission: "chat-history" },
   { title: "系统日志", icon: IconFileText, path: "/system-logs", permission: "system-logs" },
   { title: "操作日志", icon: IconClipboardText, path: "/operation-logs", permission: "operation-logs" },
+  { title: "使用统计", icon: IconLogin, path: "/login-records", permission: "login-records" },
 ]
 
 function getIsSuperAdmin(): boolean {

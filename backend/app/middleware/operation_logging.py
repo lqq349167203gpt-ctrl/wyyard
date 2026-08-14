@@ -7,6 +7,7 @@ from starlette.responses import Response
 
 from app.models.operation_log import OperationLogCreate
 from app.services.operation_log_service import create_log
+from app.utils.request_context import get_client_ip
 
 SECTION_MAP = {
     "/api/financial/commissions": "分成",
@@ -138,6 +139,7 @@ PAGE_LABELS: dict[str, str] = {
     "business": "数据记录",
     "system-logs": "系统日志",
     "operation-logs": "操作日志",
+    "login-records": "使用统计",
     "accounts": "账号管理",
     "change-password": "密码修改",
     "member-identities": "会员身份",
@@ -174,6 +176,7 @@ SKIP_PATHS = [
     "/api/customers/batch",  # 只读批量查询，不需要记录操作日志
     "/api/uploads",  # 文件上传是二进制 multipart，不能 decode("utf-8")
     "/api/operation-logs",  # 操作日志自身是只读 API，不记录自身操作
+    "/api/login-records",  # 登录与页面访问由独立审计服务记录
     "/api/system-logs",  # 系统日志自身是只读 API，不记录自身操作
     "/api/system-helper",  # 茶苑助手对话不记录操作日志
     "/api/voice",  # 语音助手对话不记录操作日志（已有独立日志逻辑）
@@ -212,6 +215,7 @@ def _scrub_sensitive(data: dict) -> dict:
 
 
 FIELD_NAMES = {
+    "id": "记录编号", "project_id": "项目编号", "project_type": "项目类型",
     "nickname": "昵称", "name": "名称", "title": "标题", "username": "用户名", "owner": "归属人",
     "phone": "手机", "email": "邮箱", "gender": "性别", "birthday": "生日",
     "member_type": "会员类型", "activity_types": "活动类型", "member_identity": "会员身份", "healing_identity": "疗愈老师",
@@ -255,7 +259,7 @@ FIELD_NAMES = {
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
     "operator": "匹配方式", "conditions": "匹配条件",
     "customers": "客户信息可见身份", "class_records": "人员安排可见身份", "payment": "付费项目可见身份",
-    "purchase_count": "购买次数", "closer_name": "成交人", "closer_id": "成交人", "category": "分类",
+    "purchase_count": "购买次数", "closer_name": "成交人", "closer_id": "成交人", "closers": "成交人", "category": "分类",
     "referrer_handler": "引流处理人", "traffic_source_detail": "流量来源详情",
     "total_payment": "累计付费",
     "activity_mode": "活动模式", "class_count": "课时数", "course_id": "课程",
@@ -268,9 +272,13 @@ FIELD_NAMES = {
     "activities": "活动记录",
     "provider": "模型供应商", "model": "模型", "api_key": "API密钥", "base_url": "接口地址",
     "system_prompt": "系统提示词", "temperature": "温度", "max_tokens": "最大Token数",
-    "project_name": "项目名称", "fee": "费用", "duration_type": "时长类型", "duration_value": "时长值",
+    "project_name": "项目名称",
+    "fee": "费用", "refund_amount": "退费金额", "payment_method": "支付方式",
+    "duration_type": "时长类型", "duration_value": "时长值",
     "record_date": "上课日期", "teacher": "课程老师", "result": "课程结果",
     "validity_value": "有效期", "validity_unit": "有效期单位",
+    "created_by": "创建人", "created_at": "创建时间", "updated_at": "更新时间",
+    "is_deleted": "是否删除", "deleted_at": "删除时间", "voided": "是否退费", "voided_at": "退费时间",
 }
 
 
@@ -728,10 +736,50 @@ def _build_create_summary(body: dict) -> str:
     return "，".join(parts)
 
 
+def _format_financial_amount(value) -> str:
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return ""
+    text = f"{amount:,.2f}".rstrip("0").rstrip(".")
+    return f"¥{text}"
+
+
+def _build_financial_record_content(method: str, record_type: str, body: dict, before: dict) -> str:
+    """生成分成与人员福利的完整中文摘要，删除时以删除前快照为准。"""
+    action = {"POST": "新增", "PUT": "修改", "PATCH": "修改", "DELETE": "删除"}.get(method, "操作")
+    source = before if method == "DELETE" else {**(before or {}), **(body or {})}
+    parts = []
+    if record_type == "commission":
+        fields = (("月份", "month"), ("人员", "person_name"))
+        section = "分成"
+    else:
+        fields = (("日期", "benefit_date"), ("福利内容", "content"))
+        section = "人员福利"
+    for label, key in fields:
+        value = source.get(key)
+        if value not in (None, ""):
+            parts.append(f"{label}：{value}")
+    amount = _format_financial_amount(source.get("amount"))
+    if amount:
+        parts.append(f"金额：{amount}")
+    notes = str(source.get("notes") or "").strip()
+    if notes:
+        parts.append(f"备注：{notes}")
+    details = "｜".join(parts)
+    return f"{action}{section}：{details}" if details else f"{action}{section}记录"
+
+
 def build_log_content(method: str, path: str, body: dict, before: dict = None) -> str:
     entity_name = get_entity_name(body) if body else ""
     if not entity_name and before:
         entity_name = get_entity_name(before)
+
+    if path.startswith("/api/financial/commissions"):
+        return _build_financial_record_content(method, "commission", body or {}, before or {})
+
+    if path.startswith("/api/financial/staff-benefits"):
+        return _build_financial_record_content(method, "benefit", body or {}, before or {})
 
     # 客户端报名/取消报名：从路径提取活动 ID，反查活动名称
     if "/api/client/activities/" in path and "signup" in path:
@@ -1241,7 +1289,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         except json.JSONDecodeError:
             body = {}
 
-        ip = request.client.host if request.client else ""
+        ip = get_client_ip(request)
 
         before_data = None
         if method in ("PUT", "PATCH", "DELETE"):

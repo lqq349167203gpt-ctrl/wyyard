@@ -23,6 +23,10 @@ App({
     devMode: DEV,
     _selectedActivity: null,
     _loginReady: null, // Promise，登录完成后 resolve
+    _usageTimer: null,
+    _usageSessionId: '',
+    _usagePagePath: '',
+    _usageActive: false,
   },
 
   onLaunch() {
@@ -45,6 +49,66 @@ App({
     if (!this.globalData.devMode && this.globalData.token) {
       this.refreshPermissions().catch(() => {})
     }
+    if (this.globalData.token) this.startUsageTracking()
+  },
+
+  onHide() {
+    this.stopUsageTracking()
+  },
+
+  _currentPagePath() {
+    const pages = getCurrentPages()
+    const current = pages && pages.length ? pages[pages.length - 1] : null
+    return current && current.route ? '/' + current.route : ''
+  },
+
+  _newUsageSessionId() {
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12)
+  },
+
+  _sendUsageHeartbeat(active) {
+    if (!this.globalData.token || !this.globalData._usageSessionId) return Promise.resolve()
+    const { usageTrackingApi } = require('./utils/api')
+    const currentPagePath = this._currentPagePath()
+    if (currentPagePath) this.globalData._usagePagePath = currentPagePath
+    const pagePath = this.globalData._usagePagePath
+    return usageTrackingApi.heartbeat(this.globalData._usageSessionId, pagePath, active).catch(() => {})
+  },
+
+  startUsageTracking() {
+    if (!this.globalData.token) return
+    const pagePath = this._currentPagePath()
+    if (!pagePath || pagePath === '/pages/login/index') return
+    if (!this.globalData._usageSessionId) this.globalData._usageSessionId = this._newUsageSessionId()
+    this.globalData._usagePagePath = pagePath
+    this.globalData._usageActive = true
+    this._sendUsageHeartbeat(true)
+    if (!this.globalData._usageTimer) {
+      this.globalData._usageTimer = setInterval(() => this._sendUsageHeartbeat(true), 30000)
+    }
+  },
+
+  trackUsagePage(pagePath) {
+    if (!pagePath || pagePath === '/pages/login/index') return
+    if (!this.globalData._usageActive) {
+      this.globalData._usagePagePath = pagePath
+      this.startUsageTracking()
+      return
+    }
+    if (pagePath === this.globalData._usagePagePath) return
+    this.globalData._usagePagePath = pagePath
+    setTimeout(() => this._sendUsageHeartbeat(true), 0)
+  },
+
+  stopUsageTracking() {
+    if (this.globalData._usageTimer) {
+      clearInterval(this.globalData._usageTimer)
+      this.globalData._usageTimer = null
+    }
+    if (this.globalData._usageActive) this._sendUsageHeartbeat(false)
+    this.globalData._usageActive = false
+    this.globalData._usageSessionId = ''
+    this.globalData._usagePagePath = ''
   },
 
   async refreshPermissions() {
@@ -81,6 +145,7 @@ App({
       wx.setStorageSync('currentUser', data.account)
       wx.setStorageSync('userPermissions', data.permissions)
       console.log('[dev-login] token 已存入 storage')
+      this.startUsageTracking()
     } catch (err) {
       console.error('[dev-login] 登录失败:', err)
       this.globalData._loginReady = null
@@ -115,6 +180,7 @@ App({
   },
 
   logout() {
+    this.stopUsageTracking()
     wx.removeStorageSync('auth_token')
     wx.removeStorageSync('currentUser')
     wx.removeStorageSync('userPermissions')

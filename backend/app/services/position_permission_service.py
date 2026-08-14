@@ -1,8 +1,14 @@
 from typing import Dict, List
+
 from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "position_permissions.json"
 _permissions: Dict[str, List[str]] = {}
+REMOVED_PAGE_KEYS = {"commission-records", "staff-benefits"}
+
+
+def _active_pages(pages: List[str]) -> List[str]:
+    return [page for page in pages if page not in REMOVED_PAGE_KEYS]
 
 
 def _load():
@@ -23,16 +29,16 @@ _load()
 
 
 def get_permissions(position: str) -> List[str]:
-    return _permissions.get(position, [])
+    return _active_pages(_permissions.get(position, []))
 
 
 def set_permissions(position: str, pages: List[str]):
-    _permissions[position] = pages
+    _permissions[position] = _active_pages(pages)
     _save(position)
 
 
 def get_all() -> Dict[str, List[str]]:
-    return _permissions
+    return {position: _active_pages(pages) for position, pages in _permissions.items()}
 
 
 def rename_position_in_permissions(old_name: str, new_name: str):

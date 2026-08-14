@@ -48,6 +48,7 @@ DEFAULT_SYSTEM_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 助手�
 - **AI 配置** (`/agents`)：配置 AI 代理和模型
 - **业务提醒** (`/business-reminders`)：管理业务提醒
 - **操作日志** (`/operation-logs`)：查看系统操作记录
+- **使用统计** (`/login-records`)：查看人员登录、页面访问、操作轨迹与活跃时长
 - **系统日志** (`/system-logs`)：查看系统运行日志
 
 ## 回复格式要求

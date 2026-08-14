@@ -126,6 +126,7 @@ Page({
       app.globalData.token = data.token
       app.globalData.currentUser = data.account
       app.globalData.permissions = data.permissions || []
+      if (app.startUsageTracking) app.startUsageTracking()
     }
   },
 })

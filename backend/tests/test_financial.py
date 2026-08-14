@@ -25,6 +25,13 @@ def test_financial_records_and_overview(client):
         commission_id = commission_response.json()["id"]
         assert commission_response.json()["created_by"] == "不闹"
 
+        filtered_commissions = client.get("/api/financial/commissions", params={"month": "2026-08"})
+        assert filtered_commissions.status_code == 200
+        assert any(item["id"] == commission_id for item in filtered_commissions.json()["items"])
+        other_month_commissions = client.get("/api/financial/commissions", params={"month": "2026-07"})
+        assert other_month_commissions.status_code == 200
+        assert all(item["id"] != commission_id for item in other_month_commissions.json()["items"])
+
         benefit_response = client.post("/api/financial/staff-benefits", json={
             "benefit_date": "2026-08-10",
             "content": "节日福利",
@@ -53,12 +60,12 @@ def test_financial_records_and_overview(client):
         assert overview_response.status_code == 200
         overview = overview_response.json()
         assert overview["management_cost"] == 100
-        assert overview["commission_total"] == 1200
-        assert overview["staff_benefit_total"] == 300
-        assert overview["net_profit"] is None
+        assert overview["operation_cost"] == 0
+        assert overview["total_expense"] == 100
+        assert "commission_total" not in overview
+        assert "staff_benefit_total" not in overview
         assert overview["date_from"] == "2026-08-01"
         assert overview["date_to"] == "2026-08-31"
-        assert overview["operating_profit"] == overview["total_revenue"] - 1600 - overview["refund_total"]
 
         expense_details = client.get("/api/financial/composition-details", params={
             "date_from": "2026-08-01",
@@ -70,21 +77,12 @@ def test_financial_records_and_overview(client):
         assert expense_row["primary"] == "管理成本"
         assert expense_row["secondary"] == "办公采购"
 
-        commission_details = client.get("/api/financial/composition-details", params={
+        removed_composition = client.get("/api/financial/composition-details", params={
             "date_from": "2026-08-01",
             "date_to": "2026-08-31",
             "kind": "commission",
         })
-        assert commission_details.status_code == 200
-        assert any(item["id"] == commission_id and item["primary"] == "测试员工" for item in commission_details.json()["data"])
-
-        benefit_details = client.get("/api/financial/composition-details", params={
-            "date_from": "2026-08-01",
-            "date_to": "2026-08-31",
-            "kind": "benefit",
-        })
-        assert benefit_details.status_code == 200
-        assert any(item["id"] == benefit_id and item["primary"] == "节日福利" for item in benefit_details.json()["data"])
+        assert removed_composition.status_code == 422
     finally:
         if commission_id:
             client.delete(f"/api/financial/commissions/{commission_id}")
@@ -121,6 +119,44 @@ def test_financial_overview_rejects_reversed_date_range(client):
     assert response.json()["detail"] == "开始日期不能晚于结束日期"
 
 
+def test_financial_record_operation_logs_keep_chinese_details_after_delete(client):
+    commission_response = client.post("/api/financial/commissions", json={
+        "month": "2026-08",
+        "person_id": "person-log-test",
+        "person_name": "日志测试员工",
+        "amount": 123,
+        "notes": "分成日志备注",
+    })
+    assert commission_response.status_code == 200
+    commission_id = commission_response.json()["id"]
+
+    benefit_response = client.post("/api/financial/staff-benefits", json={
+        "benefit_date": "2026-08-14",
+        "content": "日志测试福利",
+        "amount": 12,
+        "notes": "福利日志备注",
+    })
+    assert benefit_response.status_code == 200
+    benefit_id = benefit_response.json()["id"]
+
+    commission_create_logs = client.get("/api/operation-logs", params={"entity_id": commission_id, "method": "POST"}).json()
+    assert commission_create_logs[0]["content"] == "新增分成：月份：2026-08｜人员：日志测试员工｜金额：¥123｜备注：分成日志备注"
+
+    benefit_create_logs = client.get("/api/operation-logs", params={"entity_id": benefit_id, "method": "POST"}).json()
+    assert benefit_create_logs[0]["content"] == "新增人员福利：日期：2026-08-14｜福利内容：日志测试福利｜金额：¥12｜备注：福利日志备注"
+
+    assert client.delete(f"/api/financial/commissions/{commission_id}").status_code == 200
+    assert client.delete(f"/api/financial/staff-benefits/{benefit_id}").status_code == 200
+
+    commission_delete_logs = client.get("/api/operation-logs", params={"entity_id": commission_id, "method": "DELETE"}).json()
+    assert commission_delete_logs[0]["content"] == "删除分成：月份：2026-08｜人员：日志测试员工｜金额：¥123｜备注：分成日志备注"
+    assert commission_delete_logs[0]["before_data"]["person_name"] == "日志测试员工"
+
+    benefit_delete_logs = client.get("/api/operation-logs", params={"entity_id": benefit_id, "method": "DELETE"}).json()
+    assert benefit_delete_logs[0]["content"] == "删除人员福利：日期：2026-08-14｜福利内容：日志测试福利｜金额：¥12｜备注：福利日志备注"
+    assert benefit_delete_logs[0]["before_data"]["content"] == "日志测试福利"
+
+
 def test_financial_revenue_breakdown_counts_unique_customers_and_lists_orders(client, monkeypatch):
     records = [
         _FinancialTestRecord(
@@ -150,8 +186,6 @@ def test_financial_revenue_breakdown_counts_unique_customers_and_lists_orders(cl
     ]
     monkeypatch.setattr(financial_service, "PROJECT_SOURCES", (("membership_card", "会员卡", lambda: records),))
     monkeypatch.setattr(financial_service.expense_service, "list_expenses", lambda *_: [])
-    monkeypatch.setattr(financial_service.financial_record_service, "list_commissions", lambda: [])
-    monkeypatch.setattr(financial_service.financial_record_service, "list_benefits", lambda *_: [])
     monkeypatch.setattr(financial_service.project_refund_service, "list_refunds", lambda: [])
 
     overview = financial_service.get_overview("2026-08-01", "2026-08-31")

@@ -39,8 +39,6 @@ const ALL_PAGES = [
   { key: "payment-deductions", label: "销卡" },
   { key: "payment-refunds", label: "退费" },
   { key: "expenses", label: "支出项" },
-  { key: "commission-records", label: "分成" },
-  { key: "staff-benefits", label: "人员福利" },
   { key: "debt-records", label: "欠卡记录" },
   // 信息配置
   { key: "member-identities", label: "会员身份" },
@@ -58,6 +56,7 @@ const ALL_PAGES = [
   { key: "chat-history", label: "沟通记录" },
   { key: "system-logs", label: "系统日志" },
   { key: "operation-logs", label: "操作日志" },
+  { key: "login-records", label: "使用统计" },
 ]
 
 const PERMISSION_GROUPS = [
@@ -66,10 +65,10 @@ const PERMISSION_GROUPS = [
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },
   { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds", "debt-records"] },
-  { label: "支出", keys: ["expenses", "commission-records", "staff-benefits"] },
+  { label: "支出", keys: ["expenses"] },
   { label: "信息配置", keys: ["member-identities", "customer-tags", "healing-identities", "organizations", "spaces", "reminders"] },
   { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
-  { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs"] },
+  { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs", "login-records"] },
 ]
 
 const CUSTOMER_FILTER_PAGES = [

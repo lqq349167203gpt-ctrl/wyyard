@@ -12,6 +12,7 @@ Page({
   async onShow() {
     if (!getApp().checkLogin()) return
     const app = getApp()
+    if (app.trackUsagePage) app.trackUsagePage('/pages/me/index')
     try {
       await app.refreshPermissions()
     } catch (e) {

@@ -16,6 +16,7 @@ function login() {
               app.globalData.token = data.token
               app.globalData.currentUser = data.account
               app.globalData.permissions = data.permissions || []
+              if (app.startUsageTracking) app.startUsageTracking()
             }
             resolve(Object.assign({ bound: true }, data))
           }
@@ -38,6 +39,7 @@ function bindAccount(token, username, password) {
       app.globalData.token = data.token
       app.globalData.currentUser = data.account
       app.globalData.permissions = data.permissions || []
+      if (app.startUsageTracking) app.startUsageTracking()
     }
     return data
   })
@@ -49,6 +51,7 @@ function logout() {
   wx.removeStorageSync('userPermissions')
   const app = getApp()
   if (app) {
+    if (app.stopUsageTracking) app.stopUsageTracking()
     app.globalData.token = ''
     app.globalData.currentUser = null
     app.globalData.permissions = []

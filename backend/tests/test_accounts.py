@@ -1,5 +1,6 @@
 """账号 API 测试"""
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -162,6 +163,62 @@ class TestLogin:
         resp = _login(client, f"nobody_{_unique()}", "nopass123")
         assert resp.status_code == 200
         assert resp.json()["success"] is False
+
+    def test_same_browser_login_replaces_previous_session(self, client, make_account):
+        from app.middleware.jwt_auth import decode_token
+
+        _, u, password = make_account()
+        headers = {"X-Device-ID": f"pc-test-{u}", "X-Client-Type": "pc"}
+        first = client.post(
+            "/api/accounts/login",
+            json={"username": f"user_{u}", "password": password},
+            headers=headers,
+        )
+        second = client.post(
+            "/api/accounts/login",
+            json={"username": f"user_{u}", "password": password},
+            headers=headers,
+        )
+        first_jti = decode_token(first.json()["token"])["jti"]
+        second_jti = decode_token(second.json()["token"])["jti"]
+        auth_headers = {"Authorization": f"Bearer {second.json()['token']}"}
+        sessions = client.get("/api/accounts/sessions", headers=auth_headers)
+
+        assert sessions.status_code == 200
+        assert [item["id"] for item in sessions.json()] == [second_jti]
+        assert first_jti != second_jti
+        replaced = client.get(
+            "/api/accounts/sessions",
+            headers={"Authorization": f"Bearer {first.json()['token']}"},
+        )
+        assert replaced.status_code == 401
+
+    def test_session_list_prunes_expired_and_merges_legacy_duplicates(self, make_account):
+        from app.config.settings import settings
+        from app.services import session_service
+        from app.services.storage import load_item, save_item
+
+        account, u, _ = make_account()
+        old_id = f"expired-{u}"
+        old_time = datetime.now(timezone.utc) - timedelta(hours=settings.jwt_expire_hours + 1)
+        save_item("sessions.json", old_id, {
+            "id": old_id,
+            "account_id": account["id"],
+            "device_info": "Mac OS legacy",
+            "ip": "203.0.113.8",
+            "login_time": old_time.isoformat(),
+            "last_active": old_time.isoformat(),
+        })
+        first_legacy_id = f"legacy-first-{u}"
+        latest_legacy_id = f"legacy-latest-{u}"
+        session_service.create_session(first_legacy_id, account["id"], "Mac OS", "203.0.113.9")
+        session_service.create_session(latest_legacy_id, account["id"], "Mac OS", "203.0.113.9")
+
+        sessions = session_service.list_account_sessions(account["id"], current_session_id=latest_legacy_id)
+
+        assert [item["id"] for item in sessions] == [latest_legacy_id]
+        assert load_item("sessions.json", old_id) is None
+        assert load_item("sessions.json", first_legacy_id) is None
 
 
 class TestPasswordChange:

@@ -176,7 +176,43 @@ def _parse_client_type(scope) -> str:
         if key == b"x-client-type":
             return value.decode("utf-8", errors="ignore")
     return ""
+
+
+def _parse_header(scope, header_name: bytes) -> str:
+    for key, value in scope.get("headers", []):
+        if key == header_name:
+            return value.decode("utf-8", errors="ignore")
     return ""
+
+
+def _client_ip(scope) -> str:
+    forwarded_for = _parse_header(scope, b"x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    real_ip = _parse_header(scope, b"x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    client = scope.get("client")
+    return client[0] if client else ""
+
+
+def _record_page_view(scope, account, source: str):
+    if _parse_header(scope, b"x-page-view") != "1":
+        return
+    page_path = _parse_header(scope, b"x-page-path")
+    if not page_path:
+        return
+    try:
+        from app.services import login_record_service
+        login_record_service.record_page_view(
+            account,
+            source=source,
+            ip=_client_ip(scope),
+            page_path=page_path,
+            device_info=_parse_header(scope, b"user-agent"),
+        )
+    except Exception:
+        logger.exception("记录页面访问失败: account=%s path=%s", account.id, page_path)
 
 
 class AuthMiddleware:
@@ -285,6 +321,8 @@ class AuthMiddleware:
                         response = _unauthorized("kicked", path, account_id, jti)
                         await response(scope, receive, send)
                         return
+                    if session is not None:
+                        session_service.touch_session(jti)
                 # 设置 request.state（通过 scope["state"]）
                 state = scope.setdefault("state", {})
                 state["user_id"] = account.id
@@ -293,6 +331,7 @@ class AuthMiddleware:
                 state["user_role"] = account.role
                 state["token_jti"] = token_jti
                 state["source"] = _parse_client_type(scope) or "pc"
+                _record_page_view(scope, account, state["source"])
 
                 # 路径级授权：管理员路径的写操作拦截非管理员
                 method = scope.get("method", "")

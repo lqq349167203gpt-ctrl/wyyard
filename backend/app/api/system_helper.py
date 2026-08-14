@@ -65,8 +65,6 @@ PERMISSION_PAGE_MAP = {
     "payment-deductions": ("销卡", "/payment-deductions"),
     "payment-refunds": ("退费", "/payment-refunds"),
     "expenses": ("支出项", "/expenses"),
-    "commission-records": ("分成", "/commission-records"),
-    "staff-benefits": ("人员福利", "/staff-benefits"),
     "financial-overview": ("财务数据", "/financial-overview"),
     "debt-records": ("欠卡记录", "/debt-records"),
     "membership-cards": ("会员卡", "/payment"),
@@ -92,6 +90,7 @@ PERMISSION_PAGE_MAP = {
     "chat-history": ("沟通记录", "/chat-history"),
     "system-logs": ("系统日志", "/system-logs"),
     "operation-logs": ("操作日志", "/operation-logs"),
+    "login-records": ("使用统计", "/login-records"),
 }
 
 

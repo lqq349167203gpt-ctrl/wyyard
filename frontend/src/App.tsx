@@ -22,14 +22,13 @@ import PaymentDeductionsPage from "@/pages/payment-deductions"
 import PaymentRefundsPage from "@/pages/payment-refunds"
 import ExpensesPage from "@/pages/expenses"
 import FinancialOverviewPage from "@/pages/financial-overview"
-import CommissionRecordsPage from "@/pages/commission-records"
-import StaffBenefitsPage from "@/pages/staff-benefits"
 import MemberIdentitiesPage from "@/pages/member-identities"
 import HealingRecordsPage from "@/pages/healing-records"
 import CustomerFormPage from "@/pages/healing-records/customer-form"
 
 import OperationLogsPage from "@/pages/operation-logs"
 import SystemLogsPage from "@/pages/system-logs"
+import LoginRecordsPage from "@/pages/login-records"
 import HealingIdentitiesPage from "@/pages/healing-identities"
 import ArrivalFeedbackPage from "@/pages/arrival-feedback"
 import ChangePasswordPage from "@/pages/change-password"
@@ -65,14 +64,13 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/payment-refunds": "payment-refunds",
   "/expenses": "expenses",
   "/financial-overview": "financial-overview",
-  "/commission-records": "commission-records",
-  "/staff-benefits": "staff-benefits",
   "/agents": "agents",
 
 
 
   "/system-logs": "system-logs",
   "/operation-logs": "operation-logs",
+  "/login-records": "login-records",
   "/positions/management": "position-management",
   // 旧“活动配置”地址现已跳转到组织信息，权限也按目标页面校验
   "/positions/courses": "organizations",
@@ -177,8 +175,6 @@ function App() {
               <Route path="/payment-refunds" element={<PaymentRefundsPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/financial-overview" element={<FinancialOverviewPage />} />
-              <Route path="/commission-records" element={<CommissionRecordsPage />} />
-              <Route path="/staff-benefits" element={<StaffBenefitsPage />} />
               <Route path="/other-projects" element={<Navigate to="/payment" replace />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id/chat" element={<ChatPage />} />
@@ -196,6 +192,7 @@ function App() {
               <Route path="/disabled-customers" element={<DisabledCustomersPage />} />
               <Route path="/healing-identities" element={<HealingIdentitiesPage />} />
               <Route path="/operation-logs" element={<OperationLogsPage />} />
+              <Route path="/login-records" element={<LoginRecordsPage />} />
               <Route path="/config/reminders" element={<RemindersPage />} />
               <Route path="/business-reminders" element={<BusinessRemindersPage />} />
               <Route path="/referral-statistics" element={<ReferralStatisticsPage />} />

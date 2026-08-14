@@ -20,6 +20,8 @@ DB_URL = settings.database_url
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
+_ensure_table_lock = threading.Lock()
+_ensured_tables: set[str] = set()
 
 # 每张表一把锁，防止 save_data 的 DELETE+INSERT 竞态
 _table_locks: Dict[str, threading.Lock] = {}
@@ -66,15 +68,23 @@ def _table_name(filename: str) -> str:
 
 
 def _ensure_table(table: str):
-    conn = _get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                f'CREATE TABLE IF NOT EXISTS "{table}" (id TEXT PRIMARY KEY, data TEXT NOT NULL)'
-            )
-        conn.commit()
-    finally:
-        _put_conn(conn)
+    if table in _ensured_tables:
+        return
+    with _ensure_table_lock:
+        if table in _ensured_tables:
+            return
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                # advisory lock 同时覆盖多进程首次建表，避免 PostgreSQL 系统类型索引竞态。
+                cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"wyyard:create-table:{table}",))
+                cur.execute(
+                    f'CREATE TABLE IF NOT EXISTS "{table}" (id TEXT PRIMARY KEY, data TEXT NOT NULL)'
+                )
+            conn.commit()
+            _ensured_tables.add(table)
+        finally:
+            _put_conn(conn)
 
 
 def load_data(filename: str) -> Dict[str, Any]:

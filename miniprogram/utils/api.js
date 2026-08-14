@@ -4,6 +4,16 @@ const { BASE_URL } = require('./config')
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
+let _lastTrackedPagePath = ''
+const DEVICE_ID_KEY = 'wyyard_device_id'
+
+function _getDeviceId() {
+  let deviceId = wx.getStorageSync(DEVICE_ID_KEY)
+  if (deviceId) return deviceId
+  deviceId = `mini-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  wx.setStorageSync(DEVICE_ID_KEY, deviceId)
+  return deviceId
+}
 
 // base64 字符表（JWT 使用 base64url，解码前需先替换 -/_ 并补齐 padding）
 const _B64_TABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -122,6 +132,25 @@ function _extractErrorMessage(data) {
   return String(error)
 }
 
+function _pageTrackingHeaders() {
+  try {
+    const pages = getCurrentPages()
+    const current = pages && pages.length ? pages[pages.length - 1] : null
+    const pagePath = current && current.route ? '/' + current.route : ''
+    if (!pagePath) return {}
+    const headers = { 'X-Page-Path': pagePath }
+    if (pagePath !== _lastTrackedPagePath) {
+      headers['X-Page-View'] = '1'
+      _lastTrackedPagePath = pagePath
+      const app = getApp()
+      if (app && app.trackUsagePage) app.trackUsagePage(pagePath)
+    }
+    return headers
+  } catch (e) {
+    return {}
+  }
+}
+
 async function request(path, options = {}) {
   const app = getApp()
   // devMode 下：先尽力确保有有效 JWT（skipAuth 的请求跳过，如登录类请求）。
@@ -143,7 +172,12 @@ async function request(path, options = {}) {
       data: options.data,
       timeout: options.timeout || 60000,
       header: Object.assign(
-        { 'Content-Type': 'application/json', 'X-Client-Type': 'miniprogram' },
+        {
+          'Content-Type': 'application/json',
+          'X-Client-Type': 'miniprogram',
+          'X-Device-ID': _getDeviceId(),
+        },
+        _pageTrackingHeaders(),
         token ? { 'Authorization': 'Bearer ' + token } : {}
       ),
       success: (res) => {
@@ -301,6 +335,19 @@ const customerTagApi = {
 // 角色页面权限 API（用于同步 PC 端角色权限配置）
 const positionPermissionApi = {
   get: (position) => request(`/api/position-permissions/${encodeURIComponent(position)}`, { silent: true }),
+}
+
+// 账号活跃时长心跳（仅管理端小程序）
+const usageTrackingApi = {
+  heartbeat: (clientSessionId, pagePath, active) => request('/api/login-records/heartbeat', {
+    method: 'POST',
+    data: {
+      client_session_id: clientSessionId,
+      page_path: pagePath || '',
+      active: active !== false,
+    },
+    silent: true,
+  }),
 }
 
 // 空间 API
@@ -480,6 +527,7 @@ module.exports = {
   customerApi,
   customerTagApi,
   positionPermissionApi,
+  usageTrackingApi,
   spaceApi,
   organizationApi,
   memberIdentityApi,

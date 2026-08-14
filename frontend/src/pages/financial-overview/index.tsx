@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { CircleHelp, Inbox } from "lucide-react"
+import { Inbox } from "lucide-react"
 import { financialApi } from "@/lib/api"
 import type { FinancialBreakdown, FinancialCompositionDetail, FinancialCompositionKind, FinancialOrderDetail, FinancialOverview } from "@/lib/api"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -7,9 +7,6 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { EmptyValue } from "@/components/empty-value"
 import { usePagination } from "@/hooks/use-pagination"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-
-const OPERATING_PROFIT_FORMULA = "营业利润 = 营收 - 管理成本 - 运营成本 - 分成总额 - 人员福利 - 退款"
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -40,33 +37,16 @@ function money(value: number) {
 function MetricCard({
   label,
   value,
-  help,
-  pending = false,
-  emphasis = false,
 }: {
   label: string
   value: number | null
-  help?: string
-  pending?: boolean
-  emphasis?: boolean
 }) {
   return (
     <div className="min-w-0 px-5 py-5">
-      <div className="flex items-center gap-1 text-[12px] text-[#8f959e]">
-        <span>{label}</span>
-        {help && (
-          <Tooltip>
-            <TooltipTrigger render={<button type="button" aria-label={`查看${label}计算公式`} className="inline-flex h-4 w-4 items-center justify-center text-[#8f959e] hover:text-[#646a73]" />}>
-              <CircleHelp className="h-3.5 w-3.5" />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[360px] text-[12px]">{help}</TooltipContent>
-          </Tooltip>
-        )}
-      </div>
-      <div className={`mt-2 text-lg font-medium tabular-nums ${pending ? "text-[#c0c4cc]" : emphasis ? "text-[#3370ff]" : "text-[#1f2329]"}`}>
+      <div className="text-[12px] text-[#8f959e]">{label}</div>
+      <div className="mt-2 text-lg font-medium tabular-nums text-[#1f2329]">
         {value === null ? <EmptyValue /> : money(value)}
       </div>
-      {pending && <div className="mt-1 text-[12px] text-[#c0c4cc]">口径待确认</div>}
     </div>
   )
 }
@@ -117,8 +97,6 @@ function RevenueTable({ rows, onSelect }: { rows: FinancialBreakdown[]; onSelect
 
 const COMPOSITION_META: Record<FinancialCompositionKind, { label: string; empty: string }> = {
   expense: { label: "支出构成", empty: "暂无支出记录" },
-  commission: { label: "分成构成", empty: "暂无分成记录" },
-  benefit: { label: "人员福利构成", empty: "暂无人员福利记录" },
   refund: { label: "退款构成", empty: "暂无退款记录" },
 }
 
@@ -128,8 +106,8 @@ function CompositionTable({ kind, rows, loading, onSelect }: { kind: FinancialCo
     <div className="h-[562px] overflow-hidden">
     {loading ? <div className="flex h-full items-center justify-center text-[12px] text-[#8f959e]">加载中...</div> : rows.length === 0 ? <div className="flex h-full flex-col items-center justify-center gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">{COMPOSITION_META[kind].empty}</span></div> : <Table style={{ tableLayout: "fixed" }}>
     <TableHeader><TableRow className="hover:bg-transparent">
-      <TableHead className="pl-4" style={{ width: "120px" }}>{kind === "commission" ? "分成月份" : "日期"}</TableHead>
-      <TableHead style={{ width: "160px" }}>{kind === "expense" ? "成本类别" : kind === "commission" ? "人员" : kind === "benefit" ? "福利内容" : "客户"}</TableHead>
+      <TableHead className="pl-4" style={{ width: "120px" }}>日期</TableHead>
+      <TableHead style={{ width: "160px" }}>{kind === "expense" ? "成本类别" : "客户"}</TableHead>
       <TableHead style={{ width: "180px" }}>{kind === "expense" ? "支出类型" : kind === "refund" ? "退款项目" : "类型"}</TableHead>
       {kind === "expense" && <TableHead>购买内容</TableHead>}
       {kind === "expense" && <TableHead style={{ width: "100px" }}>平台</TableHead>}
@@ -260,35 +238,22 @@ export default function FinancialOverviewPage() {
         </div>
         <div className="grid divide-x divide-[#f0f0f0] sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="总营收" value={data.total_revenue} />
-          <MetricCard label="总支出" value={data.total_expense} />
-          <MetricCard label="营业利润" value={data.operating_profit} help={OPERATING_PROFIT_FORMULA} emphasis />
-          <MetricCard label="净利润" value={data.net_profit} pending />
-        </div>
-        <div className="border-t border-[#f0f0f0] bg-[#f7f8fa] px-5 py-4">
-          <div className="mb-3 text-[12px] text-[#8f959e]">成本与扣减</div>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 md:grid-cols-3 xl:grid-cols-5">
-            {[["管理成本", data.management_cost], ["运营成本", data.operation_cost], ["分成", data.commission_total], ["人员福利", data.staff_benefit_total], ["退款", data.refund_total]].map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <div className="text-[12px] text-[#8f959e]">{label}</div>
-                <div className="mt-1.5 truncate text-[13px] font-medium tabular-nums text-[#2b2f36]">{money(Number(value))}</div>
-              </div>
-            ))}
-          </div>
+          <MetricCard label="总支出 · 管理成本" value={data.management_cost} />
+          <MetricCard label="总支出 · 运营成本" value={data.operation_cost} />
+          <MetricCard label="退费总额" value={data.refund_total} />
         </div>
       </section>
 
       <section className="overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
         <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-3 border-b border-[#f0f0f0] px-5 py-3">
           <div><h2 className="text-[14px] font-medium text-[#1f2329]">财务构成</h2><p className="mt-1 text-[12px] text-[#8f959e]">按当前统计范围查看各项财务明细</p></div>
-          <div className="text-right"><div className="text-[12px] text-[#8f959e]">{activeComposition === "revenue" ? "营收合计" : activeComposition === "expense" ? "支出合计" : activeComposition === "commission" ? "分成合计" : activeComposition === "benefit" ? "人员福利合计" : "退款合计"}</div><div className="mt-1 text-[13px] font-medium tabular-nums text-[#2b2f36]">{money(activeComposition === "revenue" ? data.total_revenue : activeComposition === "expense" ? data.total_expense : activeComposition === "commission" ? data.commission_total : activeComposition === "benefit" ? data.staff_benefit_total : data.refund_total)}</div></div>
+          <div className="text-right"><div className="text-[12px] text-[#8f959e]">{activeComposition === "revenue" ? "营收合计" : activeComposition === "expense" ? "支出合计" : "退款合计"}</div><div className="mt-1 text-[13px] font-medium tabular-nums text-[#2b2f36]">{money(activeComposition === "revenue" ? data.total_revenue : activeComposition === "expense" ? data.total_expense : data.refund_total)}</div></div>
         </div>
         <div className="flex min-h-[46px] items-end border-b border-[#e8e8e8] px-5">
           <div className="flex items-center gap-7">
             {[
               { key: "revenue" as const, label: "营收构成" },
               { key: "expense" as const, label: "支出构成" },
-              { key: "commission" as const, label: "分成构成" },
-              { key: "benefit" as const, label: "人员福利构成" },
               { key: "refund" as const, label: "退款构成" },
             ].map((item) => <button key={item.key} type="button" onClick={() => switchComposition(item.key)} className={`relative px-1 pb-3 text-[14px] transition-colors ${activeComposition === item.key ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}>{item.label}{activeComposition === item.key && <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}</button>)}
           </div>
@@ -354,8 +319,8 @@ export default function FinancialOverviewPage() {
           <span className="text-[14px] font-medium text-[#1f2329]">{selectedComposition ? COMPOSITION_META[selectedComposition.kind].label.replace("构成", "详情") : "明细详情"}</span>
         </div>
         {selectedComposition && <div className="grid grid-cols-[88px_1fr] gap-x-4 gap-y-4 px-5 py-5 text-[12px]">
-          <span className="text-right text-[#8f959e]">{selectedComposition.kind === "commission" ? "分成月份" : "日期"}</span><span className="text-[#2b2f36] tabular-nums">{selectedComposition.date}</span>
-          <span className="text-right text-[#8f959e]">{selectedComposition.kind === "expense" ? "成本类别" : selectedComposition.kind === "commission" ? "人员" : selectedComposition.kind === "benefit" ? "福利内容" : "客户"}</span><span className="text-[#2b2f36]">{selectedComposition.primary}</span>
+          <span className="text-right text-[#8f959e]">日期</span><span className="text-[#2b2f36] tabular-nums">{selectedComposition.date}</span>
+          <span className="text-right text-[#8f959e]">{selectedComposition.kind === "expense" ? "成本类别" : "客户"}</span><span className="text-[#2b2f36]">{selectedComposition.primary}</span>
           <span className="text-right text-[#8f959e]">{selectedComposition.kind === "expense" ? "支出类型" : selectedComposition.kind === "refund" ? "退款项目" : "类型"}</span><span className="text-[#2b2f36]">{selectedComposition.secondary || <EmptyValue />}</span>
           {selectedComposition.kind === "expense" && <><span className="text-right text-[#8f959e]">购买内容</span><span className="text-[#2b2f36]">{selectedComposition.content || <EmptyValue />}</span><span className="text-right text-[#8f959e]">平台</span><span className="text-[#2b2f36]">{selectedComposition.platform || <EmptyValue />}</span></>}
           {selectedComposition.kind === "refund" && <><span className="text-right text-[#8f959e]">原成交额</span><span className="text-[#2b2f36] tabular-nums">{money(selectedComposition.paid_amount ?? 0)}</span></>}

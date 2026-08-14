@@ -6,10 +6,12 @@ from app.models.base import StrictBaseModel
 from app.services import (
     account_service,
     customer_service,
+    login_record_service,
     position_customer_permission_service,
     position_permission_service,
     wechat_service,
 )
+from app.utils.request_context import get_client_ip, get_client_source
 
 router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 
@@ -50,7 +52,7 @@ def _build_login_response(account) -> dict:
     }
 
 
-def _make_jwt_token(account) -> str:
+def _make_jwt_token(account, request: Request) -> str:
     """为账号生成 JWT token（与 accounts/login 一致，全局中间件只认 JWT）"""
     import uuid
 
@@ -65,12 +67,26 @@ def _make_jwt_token(account) -> str:
     # 解码获取 jti，写入 session 表（改密码时可批量失效）
     from app.middleware.jwt_auth import decode_token
     payload = decode_token(token)
-    session_service.create_session(session_id=payload.get("jti", str(uuid.uuid4())), account_id=account.id)
+    ip = get_client_ip(request)
+    user_agent = request.headers.get("user-agent", "")
+    session_service.create_session(
+        session_id=payload.get("jti", str(uuid.uuid4())),
+        account_id=account.id,
+        device_info=user_agent,
+        ip=ip,
+        device_id=request.headers.get("x-device-id", ""),
+    )
+    login_record_service.record_login(
+        account,
+        source=get_client_source(request, "miniprogram"),
+        ip=ip,
+        device_info=user_agent,
+    )
     return token
 
 
 @router.post("/login")
-async def wechat_login(data: WechatLoginRequest):
+async def wechat_login(data: WechatLoginRequest, request: Request):
     """微信登录：用 code 换 openid，查找已绑定的账号"""
     try:
         wx_result = wechat_service.jscode2session(data.code)
@@ -87,7 +103,7 @@ async def wechat_login(data: WechatLoginRequest):
         account = account_service.get_account(existing.account_id)
         if account and account.enabled:
             resp = _build_login_response(account)
-            resp["token"] = _make_jwt_token(account)
+            resp["token"] = _make_jwt_token(account, request)
             resp["bound"] = True
             return resp
 
@@ -101,7 +117,7 @@ async def wechat_login(data: WechatLoginRequest):
 
 
 @router.post("/bind")
-async def wechat_bind(data: WechatBindRequest):
+async def wechat_bind(data: WechatBindRequest, request: Request):
     """绑定微信账号：验证用户名密码，将 openid 关联到账号"""
     # 验证 token 存在且未过期（直查数据库，多实例下立即可见）
     session = wechat_service.get_session(data.token)
@@ -122,7 +138,7 @@ async def wechat_bind(data: WechatBindRequest):
     wechat_service.save_session(session)
 
     resp = _build_login_response(account)
-    resp["token"] = _make_jwt_token(account)
+    resp["token"] = _make_jwt_token(account, request)
     resp["bound"] = True
     return resp
 
@@ -149,7 +165,7 @@ async def dev_login(data: DevLoginRequest, request: Request):
         raise HTTPException(status_code=403, detail="账号已禁用")
     # 与正式登录共用同一套 JWT + session 登记逻辑，
     # 否则中间件会将未登记的 jti 判定为无效会话。
-    token = _make_jwt_token(account)
+    token = _make_jwt_token(account, request)
     resp = _build_login_response(account)
     resp["token"] = token
     resp["bound"] = True
@@ -162,7 +178,7 @@ class PhoneLoginRequest(StrictBaseModel):
 
 
 @router.post("/phone-login")
-async def phone_login(data: PhoneLoginRequest):
+async def phone_login(data: PhoneLoginRequest, request: Request):
     """手机号自动登录（员工）：解密手机号 → 查客户 → 查账号"""
     try:
         phone = wechat_service.get_phone_number(data.code)
@@ -186,7 +202,7 @@ async def phone_login(data: PhoneLoginRequest):
     wechat_service.create_session("", account.id)
 
     resp = _build_login_response(account)
-    resp["token"] = _make_jwt_token(account)
+    resp["token"] = _make_jwt_token(account, request)
     resp["bound"] = True
     return resp
 

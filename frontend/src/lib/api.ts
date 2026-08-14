@@ -1,4 +1,17 @@
 const API_BASE = ""
+let lastTrackedPagePath = ""
+const DEVICE_ID_KEY = "wyyardDeviceId"
+
+function getDeviceId(): string {
+  const stored = localStorage.getItem(DEVICE_ID_KEY)
+  if (stored) return stored
+  const randomPart = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const deviceId = `pc-${randomPart}`
+  localStorage.setItem(DEVICE_ID_KEY, deviceId)
+  return deviceId
+}
 
 export function clearAuthState() {
   localStorage.removeItem("authToken")
@@ -37,6 +50,16 @@ export interface PaginatedResponse<T> {
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "X-Client-Type": "pc",
+    "X-Device-ID": getDeviceId(),
+  }
+  const pagePath = window.location.pathname
+  if (pagePath && pagePath !== "/login") {
+    headers["X-Page-Path"] = pagePath
+    if (pagePath !== lastTrackedPagePath) {
+      headers["X-Page-View"] = "1"
+      lastTrackedPagePath = pagePath
+    }
   }
   const token = localStorage.getItem("authToken")
   if (token) headers["Authorization"] = `Bearer ${token}`
@@ -1655,7 +1678,7 @@ export interface FinancialOrderDetail {
   notes: string
 }
 
-export type FinancialCompositionKind = "expense" | "commission" | "benefit" | "refund"
+export type FinancialCompositionKind = "expense" | "refund"
 
 export interface FinancialCompositionDetail {
   id: string
@@ -1678,40 +1701,11 @@ export interface FinancialOverview {
   management_cost: number
   operation_cost: number
   total_expense: number
-  commission_total: number
-  staff_benefit_total: number
   refund_total: number
-  operating_profit: number
-  net_profit: number | null
   group_class_revenue: number
   custom_course_revenue: number
   group_class_breakdown: FinancialBreakdown[]
   custom_course_breakdown: FinancialBreakdown[]
-}
-
-export interface CommissionRecord {
-  id: string
-  month: string
-  person_id: string
-  person_name: string
-  amount: number
-  notes: string
-  created_by: string
-  updated_by: string
-  created_at: string
-  updated_at: string
-}
-
-export interface StaffBenefitRecord {
-  id: string
-  benefit_date: string
-  content: string
-  amount: number
-  notes: string
-  created_by: string
-  updated_by: string
-  created_at: string
-  updated_at: string
 }
 
 export const financialApi = {
@@ -1727,24 +1721,6 @@ export const financialApi = {
     const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, kind })
     return request<{ data: FinancialCompositionDetail[] }>(`/api/financial/composition-details?${params.toString()}`)
   },
-  listCommissions: (page: number, pageSize: number, month = "") =>
-    request<PaginatedResponse<CommissionRecord>>(`/api/financial/commissions?page=${page}&page_size=${pageSize}${month ? `&month=${month}` : ""}`),
-  createCommission: (data: Omit<CommissionRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
-    request<CommissionRecord>("/api/financial/commissions", { method: "POST", body: JSON.stringify(data) }),
-  updateCommission: (id: string, data: Omit<CommissionRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
-    request<CommissionRecord>(`/api/financial/commissions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteCommission: (id: string) => request<{ message: string }>(`/api/financial/commissions/${id}`, { method: "DELETE" }),
-  listBenefits: (page: number, pageSize: number, dateFrom = "", dateTo = "") => {
-    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (dateFrom) params.set("date_from", dateFrom)
-    if (dateTo) params.set("date_to", dateTo)
-    return request<PaginatedResponse<StaffBenefitRecord>>(`/api/financial/staff-benefits?${params}`)
-  },
-  createBenefit: (data: Omit<StaffBenefitRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
-    request<StaffBenefitRecord>("/api/financial/staff-benefits", { method: "POST", body: JSON.stringify(data) }),
-  updateBenefit: (id: string, data: Omit<StaffBenefitRecord, "id" | "created_by" | "updated_by" | "created_at" | "updated_at">) =>
-    request<StaffBenefitRecord>(`/api/financial/staff-benefits/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteBenefit: (id: string) => request<{ message: string }>(`/api/financial/staff-benefits/${id}`, { method: "DELETE" }),
 }
 
 // Space
@@ -2079,6 +2055,73 @@ export interface OperationLog {
   created_at: string
 }
 
+export interface LoginAccountSummary {
+  account_id: string
+  username: string
+  owner: string
+  role: string
+  today_count: number
+  month_count: number
+  latest_login_at: string | null
+  latest_ip: string
+  latest_source: string
+  today_usage_seconds: number
+  month_usage_seconds: number
+  last_active_at: string | null
+}
+
+export type AccountActivityType = "login" | "page_view" | "operation" | "usage"
+
+export interface AccountActivityRecord {
+  id: string
+  event_type: AccountActivityType
+  account_id: string
+  username: string
+  owner: string
+  role: string
+  source: string
+  ip: string
+  device_info: string
+  page_path: string
+  page_name: string
+  content: string
+  method: string
+  created_at: string
+  ended_at: string | null
+  duration_seconds: number
+}
+
+export interface LoginRecordQuery {
+  account_id?: string
+  event_type?: AccountActivityType
+  source?: "pc" | "miniprogram"
+  date_from?: string
+  date_to?: string
+  keyword?: string
+}
+
+export const loginRecordApi = {
+  summary: () => request<LoginAccountSummary[]>("/api/login-records/summary"),
+  heartbeat: (data: { client_session_id: string; page_path: string; active: boolean }, keepalive = false) =>
+    request<{ success: boolean; last_heartbeat_at: string }>("/api/login-records/heartbeat", {
+      method: "POST",
+      body: JSON.stringify(data),
+      keepalive,
+    }),
+  listPaginated: (params: LoginRecordQuery = {}, page = 1, pageSize = 20) => {
+    const qs = new URLSearchParams()
+    if (params.account_id) qs.set("account_id", params.account_id)
+    if (params.event_type) qs.set("event_type", params.event_type)
+    if (params.source) qs.set("source", params.source)
+    if (params.date_from) qs.set("date_from", params.date_from)
+    if (params.date_to) qs.set("date_to", params.date_to)
+    if (params.keyword) qs.set("keyword", params.keyword)
+    qs.set("page", String(page))
+    qs.set("page_size", String(pageSize))
+    return request<PaginatedResponse<AccountActivityRecord>>(`/api/login-records?${qs.toString()}`)
+  },
+}
+
 export const operationLogApi = {
   list: (params?: OperationLogQuery) => {
     const qs = new URLSearchParams()
@@ -2156,7 +2199,7 @@ export const accountApi = {
   login: (username: string, password: string) => request<{ success: boolean; message?: string; token?: string; account?: Account; permissions?: string[]; customer_permissions?: string[]; customer_permissions_class_records?: string[]; customer_permissions_payment?: string[] }>("/api/accounts/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   changePassword: (id: string, oldPassword: string, newPassword: string) => request<{ message: string }>(`/api/accounts/${id}/change-password`, { method: "POST", body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }) }),
   resetPassword: (id: string, newPassword: string) => request<{ message: string }>(`/api/accounts/${id}/reset-password`, { method: "POST", body: JSON.stringify({ new_password: newPassword }) }),
-  listSessions: () => request<{ id: string; account_id: string; device_info: string; ip: string; login_time: string; last_active: string }[]>("/api/accounts/sessions"),
+  listSessions: () => request<{ id: string; account_id: string; device_info: string; device_id?: string; ip: string; login_time: string; last_active: string }[]>("/api/accounts/sessions"),
   deleteSession: (sessionId: string) => request<{ message: string }>(`/api/accounts/sessions/${sessionId}`, { method: "DELETE" }),
   listRoles: () => request<Role[]>("/api/accounts/roles"),
   createRole: (data: RoleCreate) => request<Role>("/api/accounts/roles", { method: "POST", body: JSON.stringify(data) }),

@@ -11,6 +11,7 @@ interface Session {
   id: string
   account_id: string
   device_info: string
+  device_id?: string
   ip: string
   login_time: string
   last_active: string
@@ -18,12 +19,29 @@ interface Session {
 
 function parseDeviceInfo(ua: string): string {
   if (!ua) return "未知设备"
-  if (ua.includes("Windows")) return "Windows"
-  if (ua.includes("Mac OS")) return "macOS"
-  if (ua.includes("Linux")) return "Linux"
-  if (ua.includes("Android")) return "Android"
-  if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS"
-  return "未知设备"
+  const system = ua.includes("Windows")
+    ? "Windows"
+    : ua.includes("Android")
+      ? "Android"
+      : ua.includes("iPhone") || ua.includes("iPad")
+        ? "iOS"
+        : ua.includes("Mac OS")
+          ? "macOS"
+          : ua.includes("Linux")
+            ? "Linux"
+            : "未知设备"
+  const browser = ua.includes("MicroMessenger")
+    ? "微信"
+    : ua.includes("Edg/")
+      ? "Edge"
+      : ua.includes("Chrome/")
+        ? "Chrome"
+        : ua.includes("Firefox/")
+          ? "Firefox"
+          : ua.includes("Safari/")
+            ? "Safari"
+            : ""
+  return browser ? `${system} · ${browser}` : system
 }
 
 function formatTime(iso: string): string {
@@ -121,21 +139,21 @@ export default function ChangePasswordPage() {
   return (
     <div className="px-6 pt-12 pb-6">
       <div className="pb-6">
-        <h1 className="text-lg font-semibold">密码修改</h1>
+        <h1 className="text-lg font-medium">密码修改</h1>
         <p className="text-xs text-muted-foreground mt-1.5">修改当前登录账号的密码</p>
       </div>
 
-      <div className="bg-white rounded-lg p-6 max-w-[480px]">
+      <div className="bg-white rounded-[4px] p-6 max-w-[480px]">
         <div className="space-y-6">
           <div className="flex items-start gap-3">
-            <span className="text-[12px] text-[#4e535a] font-light tracking-widest w-16 shrink-0 pt-2">当前账号</span>
+            <span className="text-[12px] text-[#4e535a] tracking-widest w-16 shrink-0 pt-2">当前账号</span>
             <div className="flex-1">
               <div className="h-8 flex items-center text-[13px] text-[#2b2f36]">{currentUser.username}</div>
             </div>
           </div>
 
           <div className="flex items-start gap-3">
-            <span className="text-[12px] text-[#4e535a] font-light tracking-widest w-16 shrink-0 pt-2">原密码</span>
+            <span className="text-[12px] text-[#4e535a] tracking-widest w-16 shrink-0 pt-2">原密码</span>
             <div className="flex-1">
               <Input
                 type="password"
@@ -149,7 +167,7 @@ export default function ChangePasswordPage() {
           </div>
 
           <div className="flex items-start gap-3">
-            <span className="text-[12px] text-[#4e535a] font-light tracking-widest w-16 shrink-0 pt-2">新密码</span>
+            <span className="text-[12px] text-[#4e535a] tracking-widest w-16 shrink-0 pt-2">新密码</span>
             <div className="flex-1">
               <Input
                 type="password"
@@ -163,7 +181,7 @@ export default function ChangePasswordPage() {
           </div>
 
           <div className="flex items-start gap-3">
-            <span className="text-[12px] text-[#4e535a] font-light tracking-widest w-16 shrink-0 pt-2">确认密码</span>
+            <span className="text-[12px] text-[#4e535a] tracking-widest w-16 shrink-0 pt-2">确认密码</span>
             <div className="flex-1">
               <Input
                 type="password"
@@ -213,14 +231,14 @@ export default function ChangePasswordPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 在线设备 */}
-      <div className="bg-white rounded-lg p-6 max-w-[480px] mt-6">
+      {/* 已登录设备 */}
+      <div className="bg-white rounded-[4px] p-6 max-w-[480px] mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[13px] font-medium text-[#2b2f36]">在线设备</h2>
+          <h2 className="text-[13px] font-medium text-[#2b2f36]">已登录设备</h2>
           <span className="text-[12px] text-[#8f959e]">{sessions.length} 个设备</span>
         </div>
         {sessions.length === 0 ? (
-          <p className="text-[12px] text-[#8f959e]">暂无在线设备</p>
+          <p className="text-[12px] text-[#8f959e]">暂无已登录设备</p>
         ) : (
           <div className="space-y-3">
             {sessions.map((s) => {
@@ -235,7 +253,7 @@ export default function ChangePasswordPage() {
                       )}
                     </div>
                     <div className="text-[11px] text-[#8f959e] mt-0.5">
-                      {s.ip || "未知 IP"} · 登录于 {formatTime(s.login_time)}
+                      {s.ip || "未知 IP"} · 最近使用 {formatTime(s.last_active || s.login_time)}
                     </div>
                   </div>
                   {!isCurrent && (
@@ -245,7 +263,7 @@ export default function ChangePasswordPage() {
                       className="text-[12px] text-[#8f959e] hover:text-[#f53f3f] h-7 px-2"
                       onClick={() => handleDeleteSession(s.id)}
                     >
-                      退出
+                      退出登录
                     </Button>
                   )}
                 </div>

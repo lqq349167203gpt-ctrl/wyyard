@@ -7,10 +7,12 @@ from app.models.account import AccountCreate, AccountUpdate, RoleCreate, RoleUpd
 from app.models.base import StrictBaseModel
 from app.services import (
     account_service,
+    login_record_service,
     position_customer_permission_service,
     position_permission_service,
     session_service,
 )
+from app.utils.request_context import get_client_ip, get_client_source
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 require_account_manager = require_page_permission("position-management")
@@ -78,7 +80,7 @@ ALL_PAGE_KEYS = [
     "class-records-arrival", "class-records", "daily-activities",
     "communication-records", "followup-records", "offline-course-records",
     # 付费
-    "payment-deductions", "payment-refunds", "expenses", "debt-records", "commission-records", "staff-benefits",
+    "payment-deductions", "payment-refunds", "expenses", "debt-records",
     "payment", "membership-cards", "group-cases",
     "emotional-releases", "oh-card-readings",
     "energy-knots", "internal-courses", "tea-seat-fees", "offline-courses", "other-projects",
@@ -87,7 +89,7 @@ ALL_PAGE_KEYS = [
     # 账号管理
     "position-management", "change-password", "disabled-customers",
     # 系统配置
-    "agents", "chat-history", "system-logs", "operation-logs",
+    "agents", "chat-history", "system-logs", "operation-logs", "login-records",
 ]
 
 
@@ -114,8 +116,20 @@ async def login(data: LoginRequest, request: StarletteRequest):
     payload = decode_token(token)
     jti = payload.get("jti", "")
     ua = request.headers.get("user-agent", "")
-    ip = request.client.host if request.client else ""
-    session_service.create_session(jti, result.id, ua, ip)
+    ip = get_client_ip(request)
+    session_service.create_session(
+        jti,
+        result.id,
+        ua,
+        ip,
+        device_id=request.headers.get("x-device-id", ""),
+    )
+    login_record_service.record_login(
+        result,
+        source=get_client_source(request),
+        ip=ip,
+        device_info=ua,
+    )
 
     if result.role == "超级管理员":
         from app.services import member_identity_service
@@ -241,7 +255,10 @@ async def list_my_sessions(request: StarletteRequest):
     user_id = getattr(request.state, "user_id", "")
     if not user_id:
         raise HTTPException(status_code=401, detail="未登录")
-    sessions = session_service.list_account_sessions(user_id)
+    sessions = session_service.list_account_sessions(
+        user_id,
+        current_session_id=getattr(request.state, "token_jti", ""),
+    )
     return sessions
 
 
