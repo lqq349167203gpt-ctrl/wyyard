@@ -76,12 +76,17 @@ def test_summary_counts_today_and_month(client):
     account = account_service.get_by_username("pytest_admin")
     assert account is not None
     login_record_service.record_login(account, source="pc", ip="127.0.0.1")
+    login_record_service.record_login(account, source="miniprogram", ip="127.0.0.1")
 
     response = client.get("/api/login-records/summary")
     assert response.status_code == 200
     item = next(row for row in response.json() if row["account_id"] == account.id)
-    assert item["today_count"] >= 1
+    assert item["today_count"] >= 2
     assert item["month_count"] >= item["today_count"]
+    assert item["today_count"] == item["pc_today_count"] + item["miniprogram_today_count"]
+    assert item["month_count"] == item["pc_month_count"] + item["miniprogram_month_count"]
+    assert item["pc_today_count"] >= 1
+    assert item["miniprogram_today_count"] >= 1
     assert datetime.fromisoformat(item["latest_login_at"]).tzinfo == timezone.utc
 
 
@@ -158,6 +163,10 @@ def test_usage_summary_merges_overlapping_devices(client):
     row = next(item for item in summary if item["account_id"] == account.id)
     assert row["today_usage_seconds"] == 30 * 60
     assert row["month_usage_seconds"] == 30 * 60
+    assert row["pc_today_usage_seconds"] == 20 * 60
+    assert row["pc_month_usage_seconds"] == 20 * 60
+    assert row["miniprogram_today_usage_seconds"] == 20 * 60
+    assert row["miniprogram_month_usage_seconds"] == 20 * 60
 
     detail = client.get(
         "/api/login-records",
@@ -165,6 +174,50 @@ def test_usage_summary_merges_overlapping_devices(client):
     ).json()
     assert detail["total"] == 2
     assert {item["source"] for item in detail["items"]} == {"pc", "miniprogram"}
+
+
+def test_summary_falls_back_to_real_activity_when_tracking_is_missing(client):
+    from app.models.account import AccountCreate
+    from app.models.operation_log import OperationLogCreate
+    from app.services import account_service, login_record_service, operation_log_service
+
+    suffix = uuid.uuid4().hex[:8]
+    account = account_service.create_account(AccountCreate(
+        owner=f"操作兜底_{suffix}",
+        role="超级管理员",
+        username=f"activity_fallback_{suffix}",
+        password="Fallback123456",
+        enabled=True,
+    ))
+    now = datetime.now(timezone.utc)
+    pc_log = operation_log_service.create_log(
+        OperationLogCreate(section="课表", content="修改课程参与者"),
+        extra={"operator": account.owner, "source": "pc", "ip": "203.0.113.31"},
+    )
+    mini_log = operation_log_service.create_log(
+        OperationLogCreate(section="客户资料", content="修改客户标签"),
+        extra={"operator": account.owner, "source": "miniprogram", "ip": "203.0.113.32"},
+    )
+    pc_log.created_at = now - timedelta(minutes=3)
+    mini_log.created_at = now - timedelta(minutes=1)
+
+    summary = client.get("/api/login-records/summary").json()
+    row = next(item for item in summary if item["account_id"] == account.id)
+    assert row["pc_today_count"] == 1
+    assert row["miniprogram_today_count"] == 1
+    assert 175 <= row["pc_today_usage_seconds"] <= 185
+    assert 55 <= row["miniprogram_today_usage_seconds"] <= 65
+    assert 175 <= row["today_usage_seconds"] <= 185
+    assert datetime.fromisoformat(row["pc_latest_active_at"]).tzinfo == timezone.utc
+    assert row["pc_latest_active_ip"] == "203.0.113.31"
+    assert datetime.fromisoformat(row["miniprogram_latest_active_at"]).tzinfo == timezone.utc
+    assert row["miniprogram_latest_active_ip"] == "203.0.113.32"
+
+    # 同一天补回真实登录后，不再把业务操作额外算作一次登录。
+    login_record_service.record_login(account, source="pc", ip="203.0.113.31")
+    summary = client.get("/api/login-records/summary").json()
+    row = next(item for item in summary if item["account_id"] == account.id)
+    assert row["pc_today_count"] == 1
 
 
 def test_default_activity_attaches_page_duration_without_duplicate_usage_rows(client):

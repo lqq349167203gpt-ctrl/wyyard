@@ -20,10 +20,11 @@ import {
 } from "@/lib/api"
 
 const PAGE_SIZE = 20
+type SummarySource = "pc" | "miniprogram"
 
 const SOURCE_LABELS: Record<string, string> = {
   pc: "PC端",
-  miniprogram: "管理员小程序",
+  miniprogram: "管理端小程序",
 }
 
 const EVENT_LABELS: Record<AccountActivityType, string> = {
@@ -64,9 +65,31 @@ const formatDuration = (seconds: number) => {
   return `${minutes}分钟`
 }
 
+function getTerminalSummary(item: LoginAccountSummary, source: SummarySource) {
+  if (source === "pc") {
+    return {
+      todayUsageSeconds: item.pc_today_usage_seconds,
+      monthUsageSeconds: item.pc_month_usage_seconds,
+      todayLoginCount: item.pc_today_count,
+      monthLoginCount: item.pc_month_count,
+      latestActiveAt: item.pc_latest_active_at,
+      latestActiveIp: item.pc_latest_active_ip,
+    }
+  }
+  return {
+    todayUsageSeconds: item.miniprogram_today_usage_seconds,
+    monthUsageSeconds: item.miniprogram_month_usage_seconds,
+    todayLoginCount: item.miniprogram_today_count,
+    monthLoginCount: item.miniprogram_month_count,
+    latestActiveAt: item.miniprogram_latest_active_at,
+    latestActiveIp: item.miniprogram_latest_active_ip,
+  }
+}
+
 export default function LoginRecordsPage() {
   const [summary, setSummary] = useState<LoginAccountSummary[]>([])
   const [summaryLoading, setSummaryLoading] = useState(true)
+  const [summarySource, setSummarySource] = useState<SummarySource>("pc")
   const [accountId, setAccountId] = useState("")
   const [eventType, setEventType] = useState("")
   const [source, setSource] = useState("")
@@ -135,45 +158,89 @@ export default function LoginRecordsPage() {
       </div>
 
       <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[14px] font-medium text-[#2b2f36]">使用统计</h2>
-          <span className="text-[12px] text-[#8f959e]">按北京时间统计，5 分钟无操作后暂停计时</span>
+        <div>
+          <h2 className="text-[14px] font-medium text-[#2b2f36]">账号使用概览</h2>
+          <p className="mt-1 text-[12px] text-[#8f959e]">
+            正常登录和心跳优先；缺失时以实际访问、操作补足，5 分钟无操作后暂停计时
+          </p>
+        </div>
+        <div className="flex min-h-[39px] items-center border-b border-[#e8e8e8]">
+          <div className="flex items-center gap-6">
+            {(["pc", "miniprogram"] as SummarySource[]).map((terminal) => (
+              <button
+                key={terminal}
+                type="button"
+                className={`relative px-1 pb-2 text-[14px] transition-colors ${
+                  summarySource === terminal
+                    ? "text-[#3370ff]"
+                    : "text-[#2b2f36] hover:text-[#4e535a]"
+                }`}
+                onClick={() => setSummarySource(terminal)}
+              >
+                {SOURCE_LABELS[terminal]}
+                {summarySource === terminal && (
+                  <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="overflow-hidden border border-[#e8e8e8] rounded-[4px]">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">使用人</TableHead>
-                <TableHead className="text-right">今日时长</TableHead>
-                <TableHead className="text-right">本月时长</TableHead>
-                <TableHead className="text-right">今日登录</TableHead>
-                <TableHead className="text-right">本月登录</TableHead>
-                <TableHead>最近登录时间</TableHead>
-                <TableHead>最近登录 IP</TableHead>
-                <TableHead className="pr-4">最近登录端</TableHead>
+                <TableHead className="w-[150px] pl-4">使用人</TableHead>
+                <TableHead className="w-[130px] text-right">今日时长</TableHead>
+                <TableHead className="w-[110px] text-right">今日登录</TableHead>
+                <TableHead className="w-[130px] text-right">本月时长</TableHead>
+                <TableHead className="w-[110px] text-right">本月登录</TableHead>
+                <TableHead className="w-[200px]">最近活跃</TableHead>
+                <TableHead className="pr-4">IP</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!summaryLoading && summary.length === 0 ? (
+              {summaryLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-16 text-center text-[13px] text-[#8f959e]">暂无账号</TableCell>
+                  <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">加载中...</TableCell>
                 </TableRow>
-              ) : summary.map((item) => (
-                <TableRow
-                  key={item.account_id}
-                  className={`cursor-pointer ${accountId === item.account_id ? "bg-[#f7f8fa]" : ""}`}
-                  onClick={() => updateFilter("accountId", accountId === item.account_id ? "" : item.account_id)}
-                >
-                  <TableCell className="pl-4 font-medium text-[#1f2329]">{item.owner || <EmptyValue />}</TableCell>
-                  <TableCell className="text-right font-medium text-[#1f2329] tabular-nums">{item.today_usage_seconds > 0 ? formatDuration(item.today_usage_seconds) : <EmptyValue />}</TableCell>
-                  <TableCell className="text-right font-medium text-[#1f2329] tabular-nums">{item.month_usage_seconds > 0 ? formatDuration(item.month_usage_seconds) : <EmptyValue />}</TableCell>
-                  <TableCell className="text-right text-[#646a73] tabular-nums">{item.today_count}</TableCell>
-                  <TableCell className="text-right text-[#646a73] tabular-nums">{item.month_count}</TableCell>
-                  <TableCell className="text-[12px] text-[#8f959e]">{item.latest_login_at ? formatDateTime(item.latest_login_at) : <EmptyValue />}</TableCell>
-                  <TableCell className="font-mono text-[12px]">{item.latest_ip || <EmptyValue />}</TableCell>
-                  <TableCell className="pr-4">{item.latest_source ? (SOURCE_LABELS[item.latest_source] || item.latest_source) : <EmptyValue />}</TableCell>
+              ) : summary.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">暂无账号</TableCell>
                 </TableRow>
-              ))}
+              ) : summary.map((item) => {
+                const terminalSummary = getTerminalSummary(item, summarySource)
+                return (
+                  <TableRow
+                    key={item.account_id}
+                    className={`cursor-pointer ${accountId === item.account_id ? "bg-[#f7f8fa]" : ""}`}
+                    onClick={() => updateFilter("accountId", accountId === item.account_id ? "" : item.account_id)}
+                  >
+                    <TableCell className="pl-4 font-medium text-[#1f2329]">{item.owner || <EmptyValue />}</TableCell>
+                    <TableCell className="text-right font-medium text-[#1f2329] tabular-nums">
+                      {terminalSummary.todayUsageSeconds > 0
+                        ? formatDuration(terminalSummary.todayUsageSeconds)
+                        : <EmptyValue />}
+                    </TableCell>
+                    <TableCell className="text-right text-[#646a73] tabular-nums">
+                      {terminalSummary.todayLoginCount} 次
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-[#1f2329] tabular-nums">
+                      {terminalSummary.monthUsageSeconds > 0
+                        ? formatDuration(terminalSummary.monthUsageSeconds)
+                        : <EmptyValue />}
+                    </TableCell>
+                    <TableCell className="text-right text-[#646a73] tabular-nums">
+                      {terminalSummary.monthLoginCount} 次
+                    </TableCell>
+                    <TableCell className="text-[12px] text-[#8f959e]">
+                      {terminalSummary.latestActiveAt ? formatDateTime(terminalSummary.latestActiveAt) : <EmptyValue />}
+                    </TableCell>
+                    <TableCell className="pr-4 font-mono text-[12px]">
+                      {terminalSummary.latestActiveIp || <EmptyValue />}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>
@@ -216,7 +283,7 @@ export default function LoginRecordsPage() {
               options={[
                 { value: "", label: "全部" },
                 { value: "pc", label: "PC端" },
-                { value: "miniprogram", label: "管理员小程序" },
+                { value: "miniprogram", label: "管理端小程序" },
               ]}
               onChange={(value) => updateFilter("source", value)}
               className="w-36"

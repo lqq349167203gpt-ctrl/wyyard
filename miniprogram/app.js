@@ -24,6 +24,7 @@ App({
     _selectedActivity: null,
     _loginReady: null, // Promise，登录完成后 resolve
     _usageTimer: null,
+    _usageStartTimer: null,
     _usageSessionId: '',
     _usagePagePath: '',
     _usageActive: false,
@@ -46,10 +47,12 @@ App({
   },
 
   onShow() {
-    if (!this.globalData.devMode && this.globalData.token) {
-      this.refreshPermissions().catch(() => {})
-    }
-    if (this.globalData.token) this.startUsageTracking()
+    Promise.resolve(this.globalData._loginReady).catch(() => {}).then(() => {
+      if (!this.globalData.devMode && this.globalData.token) {
+        this.refreshPermissions().catch(() => {})
+      }
+      if (this.globalData.token) this.scheduleUsageTracking()
+    })
   },
 
   onHide() {
@@ -70,29 +73,43 @@ App({
     if (!this.globalData.token || !this.globalData._usageSessionId) return Promise.resolve()
     const { usageTrackingApi } = require('./utils/api')
     const currentPagePath = this._currentPagePath()
-    if (currentPagePath) this.globalData._usagePagePath = currentPagePath
+    if (currentPagePath && currentPagePath !== '/pages/login/index') {
+      this.globalData._usagePagePath = currentPagePath
+    }
     const pagePath = this.globalData._usagePagePath
     return usageTrackingApi.heartbeat(this.globalData._usageSessionId, pagePath, active).catch(() => {})
   },
 
-  startUsageTracking() {
-    if (!this.globalData.token) return
-    const pagePath = this._currentPagePath()
-    if (!pagePath || pagePath === '/pages/login/index') return
+  scheduleUsageTracking(attempt) {
+    const retryCount = Number(attempt) || 0
+    if (this.globalData._usageStartTimer) clearTimeout(this.globalData._usageStartTimer)
+    this.globalData._usageStartTimer = setTimeout(() => {
+      this.globalData._usageStartTimer = null
+      if (!this.globalData.token || this.globalData._usageActive) return
+      const started = this.startUsageTracking()
+      if (!started && retryCount < 10) this.scheduleUsageTracking(retryCount + 1)
+    }, retryCount === 0 ? 0 : 200)
+  },
+
+  startUsageTracking(pagePath) {
+    if (!this.globalData.token) return false
+    const activePagePath = pagePath || this._currentPagePath()
+    if (!activePagePath || activePagePath === '/pages/login/index') return false
     if (!this.globalData._usageSessionId) this.globalData._usageSessionId = this._newUsageSessionId()
-    this.globalData._usagePagePath = pagePath
+    this.globalData._usagePagePath = activePagePath
     this.globalData._usageActive = true
     this._sendUsageHeartbeat(true)
     if (!this.globalData._usageTimer) {
       this.globalData._usageTimer = setInterval(() => this._sendUsageHeartbeat(true), 30000)
     }
+    return true
   },
 
   trackUsagePage(pagePath) {
     if (!pagePath || pagePath === '/pages/login/index') return
     if (!this.globalData._usageActive) {
       this.globalData._usagePagePath = pagePath
-      this.startUsageTracking()
+      this.startUsageTracking(pagePath)
       return
     }
     if (pagePath === this.globalData._usagePagePath) return
@@ -101,6 +118,10 @@ App({
   },
 
   stopUsageTracking() {
+    if (this.globalData._usageStartTimer) {
+      clearTimeout(this.globalData._usageStartTimer)
+      this.globalData._usageStartTimer = null
+    }
     if (this.globalData._usageTimer) {
       clearInterval(this.globalData._usageTimer)
       this.globalData._usageTimer = null
@@ -145,7 +166,7 @@ App({
       wx.setStorageSync('currentUser', data.account)
       wx.setStorageSync('userPermissions', data.permissions)
       console.log('[dev-login] token 已存入 storage')
-      this.startUsageTracking()
+      this.scheduleUsageTracking()
     } catch (err) {
       console.error('[dev-login] 登录失败:', err)
       this.globalData._loginReady = null

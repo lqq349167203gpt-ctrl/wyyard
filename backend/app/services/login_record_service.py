@@ -12,6 +12,7 @@ FILENAME = "login_records.json"
 USAGE_FILENAME = "usage_sessions.json"
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 HEARTBEAT_GRACE_SECONDS = 90
+ACTIVITY_FALLBACK_SECONDS = 5 * 60
 _page_view_lock = threading.Lock()
 _recent_page_views: dict[tuple[str, str, str], datetime] = {}
 
@@ -207,6 +208,18 @@ def _merged_duration(
     return round(sum((end - start).total_seconds() for start, end in merged))
 
 
+def _fallback_activity_intervals(
+    activity_times: list[datetime],
+    now: datetime,
+) -> list[tuple[datetime, datetime]]:
+    """将页面访问和业务操作转换为兜底活跃区间，5 分钟无新活动后停止计时。"""
+    return [
+        (activity_at, min(activity_at + timedelta(seconds=ACTIVITY_FALLBACK_SECONDS), now))
+        for activity_at in activity_times
+        if activity_at < now
+    ]
+
+
 def record_login(account: Any, source: str, ip: str, device_info: str = "") -> LoginRecord:
     return _save(LoginRecord(
         id=str(uuid.uuid4()),
@@ -264,10 +277,12 @@ def _local_bounds(date_from: str | None, date_to: str | None) -> tuple[datetime 
 
 
 def get_account_summary() -> list[dict[str, Any]]:
-    from app.services import account_service
+    from app.services import account_service, operation_log_service
 
     now_local = datetime.now(CHINA_TZ)
-    login_records = [item for item in _records() if item.event_type == "login"]
+    records = _records()
+    login_records = [item for item in records if item.event_type == "login"]
+    page_view_records = [item for item in records if item.event_type == "page_view"]
     usage_sessions = _usage_sessions()
     today_start = datetime.combine(now_local.date(), time.min, tzinfo=CHINA_TZ).astimezone(timezone.utc)
     tomorrow_start = today_start + timedelta(days=1)
@@ -279,8 +294,28 @@ def get_account_summary() -> list[dict[str, Any]]:
     month_start = month_start_local.astimezone(timezone.utc)
     next_month = next_month_local.astimezone(timezone.utc)
     now_utc = datetime.now(timezone.utc)
+    accounts = account_service.list_accounts()
+    account_by_name = {
+        name: account
+        for account in accounts
+        for name in (account.owner, account.username)
+        if name
+    }
+    activity_events_by_source: dict[tuple[str, str], list[tuple[datetime, str]]] = {}
+    for record in page_view_records:
+        if record.source in {"pc", "miniprogram"}:
+            activity_events_by_source.setdefault((record.account_id, record.source), []).append(
+                (record.created_at, record.ip)
+            )
+    for log in operation_log_service.list_logs():
+        account = account_by_name.get(log.operator)
+        if account and log.source in {"pc", "miniprogram"}:
+            activity_events_by_source.setdefault((account.id, log.source), []).append(
+                (log.created_at, log.ip)
+            )
+
     result = []
-    for account in account_service.list_accounts():
+    for account in accounts:
         account_logins = [item for item in login_records if item.account_id == account.id]
         today_logins = [item for item in account_logins if item.created_at.astimezone(CHINA_TZ).date() == now_local.date()]
         month_logins = [
@@ -295,19 +330,91 @@ def get_account_summary() -> list[dict[str, Any]]:
             for session in account_usage
             for start_at, end_at, _, _ in _effective_intervals(session, now_utc)
         ]
-        last_active = max((session.last_heartbeat_at for session in account_usage), default=None)
+        source_metrics: dict[str, dict[str, Any]] = {}
+        for source in ("pc", "miniprogram"):
+            source_logins = [item for item in account_logins if item.source == source]
+            source_today_logins = [item for item in today_logins if item.source == source]
+            source_month_logins = [item for item in month_logins if item.source == source]
+            source_activity_events = activity_events_by_source.get((account.id, source), [])
+            source_activity_times = [activity_at for activity_at, _ in source_activity_events]
+            login_days = {item.created_at.astimezone(CHINA_TZ).date() for item in source_logins}
+            fallback_days = {
+                activity_at.astimezone(CHINA_TZ).date()
+                for activity_at in source_activity_times
+            } - login_days
+            fallback_intervals = _fallback_activity_intervals(source_activity_times, now_utc)
+            source_usage_intervals = [
+                (start_at, end_at)
+                for session in account_usage
+                if session.source == source
+                for start_at, end_at, _, _ in _effective_intervals(session, now_utc)
+            ] + fallback_intervals
+            usage_intervals.extend(fallback_intervals)
+            latest_active = max(
+                [(item.created_at, item.ip) for item in source_logins]
+                + source_activity_events
+                + [
+                    (session.last_heartbeat_at, session.ip)
+                    for session in account_usage
+                    if session.source == source
+                ],
+                key=lambda event: event[0],
+                default=None,
+            )
+            source_metrics[source] = {
+                "today_count": len(source_today_logins) + int(now_local.date() in fallback_days),
+                "month_count": len(source_month_logins) + sum(
+                    (day.year, day.month) == (now_local.year, now_local.month)
+                    for day in fallback_days
+                ),
+                "today_usage_seconds": _merged_duration(
+                    source_usage_intervals,
+                    today_start,
+                    tomorrow_start,
+                ),
+                "month_usage_seconds": _merged_duration(
+                    source_usage_intervals,
+                    month_start,
+                    next_month,
+                ),
+                "latest_active_at": latest_active[0] if latest_active else None,
+                "latest_active_ip": latest_active[1] if latest_active else "",
+            }
+        account_activity_times = [
+            activity_at
+            for source in ("pc", "miniprogram")
+            for activity_at, _ in activity_events_by_source.get((account.id, source), [])
+        ]
+        last_active = max(
+            [session.last_heartbeat_at for session in account_usage] + account_activity_times,
+            default=None,
+        )
+        today_count = sum(metrics["today_count"] for metrics in source_metrics.values())
+        month_count = sum(metrics["month_count"] for metrics in source_metrics.values())
         result.append({
             "account_id": account.id,
             "username": account.username,
             "owner": account.owner,
             "role": account.role,
-            "today_count": len(today_logins),
-            "month_count": len(month_logins),
+            "today_count": today_count,
+            "month_count": month_count,
             "latest_login_at": latest.created_at if latest else None,
             "latest_ip": latest.ip if latest else "",
             "latest_source": latest.source if latest else "",
             "today_usage_seconds": _merged_duration(usage_intervals, today_start, tomorrow_start),
             "month_usage_seconds": _merged_duration(usage_intervals, month_start, next_month),
+            "pc_today_count": source_metrics["pc"]["today_count"],
+            "pc_month_count": source_metrics["pc"]["month_count"],
+            "pc_today_usage_seconds": source_metrics["pc"]["today_usage_seconds"],
+            "pc_month_usage_seconds": source_metrics["pc"]["month_usage_seconds"],
+            "pc_latest_active_at": source_metrics["pc"]["latest_active_at"],
+            "pc_latest_active_ip": source_metrics["pc"]["latest_active_ip"],
+            "miniprogram_today_count": source_metrics["miniprogram"]["today_count"],
+            "miniprogram_month_count": source_metrics["miniprogram"]["month_count"],
+            "miniprogram_today_usage_seconds": source_metrics["miniprogram"]["today_usage_seconds"],
+            "miniprogram_month_usage_seconds": source_metrics["miniprogram"]["month_usage_seconds"],
+            "miniprogram_latest_active_at": source_metrics["miniprogram"]["latest_active_at"],
+            "miniprogram_latest_active_ip": source_metrics["miniprogram"]["latest_active_ip"],
             "last_active_at": last_active,
         })
     return sorted(result, key=lambda item: (item["month_count"], item["today_count"], item["owner"]), reverse=True)

@@ -2076,6 +2076,18 @@ export interface LoginAccountSummary {
   latest_source: string
   today_usage_seconds: number
   month_usage_seconds: number
+  pc_today_count: number
+  pc_month_count: number
+  pc_today_usage_seconds: number
+  pc_month_usage_seconds: number
+  pc_latest_active_at: string | null
+  pc_latest_active_ip: string
+  miniprogram_today_count: number
+  miniprogram_month_count: number
+  miniprogram_today_usage_seconds: number
+  miniprogram_month_usage_seconds: number
+  miniprogram_latest_active_at: string | null
+  miniprogram_latest_active_ip: string
   last_active_at: string | null
 }
 
