@@ -29,7 +29,7 @@ Component({
 
   methods: {
     onCardTap() {
-      if (this.data.editMode) return
+      if (this.data.editMode || this.data.visit.cancelled) return
       this.triggerEvent('tap', { visit: this.data.visit })
     },
 
@@ -58,6 +58,7 @@ Component({
     },
 
     onArrivalTap(e) {
+      if (this.data.visit.cancelled) return
       const now = new Date()
       const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
       this.setData({ showArrivalDialog: true, arrivalTime: time })
@@ -78,6 +79,10 @@ Component({
 
     onCancelArrival(e) {
       this.triggerEvent('arrival', { visit: this.data.visit, arrivalTime: '' })
+    },
+
+    onCancelVisitTap() {
+      this.triggerEvent('cancelvisit', { visit: this.data.visit })
     },
   },
 })

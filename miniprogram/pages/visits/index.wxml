@@ -68,6 +68,7 @@
       bind:delete="onDeleteTap"
       bind:profile="onProfileTap"
       bind:arrival="onArrivalTap"
+      bind:cancelvisit="onCancelVisitTap"
       bind:moveup="onMoveUp"
       bind:movedown="onMoveDown"
     />

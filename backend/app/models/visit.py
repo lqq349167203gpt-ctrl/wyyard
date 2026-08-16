@@ -25,6 +25,7 @@ class VisitRecordBase(SafeBaseModel):
     is_leader: bool = False  # 是否组长
     arrived: bool = False  # 是否到店
     arrival_time: str = ""  # 实际到场时间 HH:MM
+    cancelled: bool = False  # 是否已取消邀约；取消后记录保留但锁定
     experience: str = ""  # 客户反馈
     feedback: str = ""  # 疗愈师回复
     healing_notes: str = ""  # 跟进记录

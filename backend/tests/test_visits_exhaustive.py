@@ -53,6 +53,7 @@ class TestVisitCreate:
         """默认未到店"""
         resp = self._make(client, created_customer)
         assert resp.json()["arrived"] is False
+        assert resp.json()["cancelled"] is False
 
     def test_needs_field(self, client, created_customer):
         """本次需求"""
@@ -153,6 +154,87 @@ class TestVisitUpdate:
         assert resp.status_code == 200
         assert resp.json()["arrived"] is True
 
+    def test_cancel_unarrived_visit_and_persist(self, client, created_customer):
+        """未到店邀约可取消，完整列表和轻量列表都持久返回取消状态"""
+        vid = self._create(client, created_customer)
+
+        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True})
+        assert resp.status_code == 200
+        assert resp.json()["cancelled"] is True
+        assert resp.json()["arrived"] is False
+        assert resp.json()["arrival_time"] == ""
+
+        detail = client.get(f"/api/visits/{vid}")
+        assert detail.status_code == 200
+        assert detail.json()["cancelled"] is True
+
+        light = client.get("/api/visits/light", params={"date": "2026-08-02"})
+        assert light.status_code == 200
+        item = next(row for row in light.json() if row["id"] == vid)
+        assert item["cancelled"] is True
+
+    def test_cancelled_visit_is_locked_until_restored(self, client, created_customer):
+        """已取消记录不可修改或勾选到店，恢复后才可继续编辑"""
+        vid = self._create(client, created_customer)
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True}).status_code == 200
+
+        edit = client.patch(f"/api/visits/{vid}", json={"needs": "不应保存"})
+        assert edit.status_code == 400
+        assert "已锁定" in edit.json()["detail"]
+
+        arrival = client.patch(
+            f"/api/visits/{vid}",
+            json={"arrived": True, "arrival_time": "14:00"},
+        )
+        assert arrival.status_code == 400
+        assert client.get(f"/api/visits/{vid}").json()["arrived"] is False
+
+        restored = client.patch(f"/api/visits/{vid}", json={"cancelled": False})
+        assert restored.status_code == 200
+        assert restored.json()["cancelled"] is False
+
+        edited = client.patch(f"/api/visits/{vid}", json={"needs": "恢复后可编辑"})
+        assert edited.status_code == 200
+        assert edited.json()["needs"] == "恢复后可编辑"
+
+    def test_arrived_visit_cannot_be_cancelled(self, client, created_customer):
+        """已到店记录不显示取消入口，后端也拒绝取消"""
+        vid = self._create(client, created_customer)
+        assert client.patch(
+            f"/api/visits/{vid}",
+            json={"arrived": True, "arrival_time": "14:00"},
+        ).status_code == 200
+
+        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True})
+        assert resp.status_code == 400
+        assert "已到店" in resp.json()["detail"]
+
+    def test_cancelled_visit_is_excluded_from_expected_count(self, client, created_customer):
+        """取消后不再计入预计到场人数"""
+        vid = self._create(client, created_customer)
+        before = client.get(
+            "/api/visits/counts",
+            params={
+                "customer_ids": created_customer["id"],
+                "start_date": "2026-08-02",
+                "end_date": "2026-08-02",
+            },
+        )
+        assert before.status_code == 200
+        assert before.json()["2026-08-02"] == 1
+
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True}).status_code == 200
+        after = client.get(
+            "/api/visits/counts",
+            params={
+                "customer_ids": created_customer["id"],
+                "start_date": "2026-08-02",
+                "end_date": "2026-08-02",
+            },
+        )
+        assert after.status_code == 200
+        assert after.json().get("2026-08-02", 0) == 0
+
     def test_update_visit_date(self, client, created_customer):
         vid = self._create(client, created_customer)
         resp = client.patch(f"/api/visits/{vid}", json={"visit_date": "2026-08-10"})
@@ -183,6 +265,30 @@ class TestVisitUpdate:
         assert data["experience"] == "新体验"
         assert data["feedback"] == "新反馈"
         assert data["healing_notes"] == "新记录"
+
+
+class TestVisitReorderOperationLog:
+    """邀约排序日志不应被误记为新增邀约。"""
+
+    def test_reorder_log_has_readable_content_without_raw_ids(self, client):
+        ids = [_u(), _u(), _u()]
+        response = client.post(
+            "/api/visits/reorder",
+            json={"ids": ids},
+            headers={"X-Client-Type": "miniprogram"},
+        )
+        assert response.status_code == 200
+
+        logs = client.get(
+            "/api/operation-logs",
+            params={"section": "邀约", "source": "miniprogram"},
+        ).json()
+        log = next(item for item in logs if item["path"] == "/api/visits/reorder")
+
+        assert log["content"] == "调整邀约排序（3条记录）"
+        assert log["entity_id"] == ""
+        assert log["after_data"] is None
+        assert all(record_id not in str(log) for record_id in ids)
 
 
 class TestVisitDelete:

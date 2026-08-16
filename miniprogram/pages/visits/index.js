@@ -339,6 +339,7 @@ Page({
   onVisitTap(e) {
     if (this.data.editMode) return
     const visit = e.currentTarget.dataset.visit
+    if (visit.cancelled) return
     wx.navigateTo({ url: `/pages/visit-edit/index?id=${visit.id}` })
   },
 
@@ -351,6 +352,7 @@ Page({
 
   onArrivalTap(e) {
     const { visit, arrivalTime } = e.detail
+    if (visit.cancelled) return
     const arrived = !!arrivalTime
 
     visitApi.update(visit.id, {
@@ -358,6 +360,18 @@ Page({
       arrival_time: arrivalTime || null,
     }).then(() => {
       wx.showToast({ title: arrived ? '已确认到店' : '已取消到店' })
+      this.loadData()
+    }).catch(() => {
+      wx.showToast({ title: '操作失败', icon: 'none' })
+    })
+  },
+
+  onCancelVisitTap(e) {
+    const visit = e.detail.visit
+    const cancelled = !visit.cancelled
+
+    visitApi.update(visit.id, { cancelled }).then(() => {
+      wx.showToast({ title: cancelled ? '已取消邀约' : '已恢复邀约' })
       this.loadData()
     }).catch(() => {
       wx.showToast({ title: '操作失败', icon: 'none' })

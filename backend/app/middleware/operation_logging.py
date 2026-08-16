@@ -797,6 +797,12 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     if not entity_name and before:
         entity_name = get_entity_name(before)
 
+    # 邀约排序使用 POST 只是接口实现细节，不是新增邀约。
+    # 记录数量便于审计，但不把无业务含义的记录 ID 列表写进日志。
+    if path.rstrip("/") == "/api/visits/reorder":
+        ids = body.get("ids", []) if isinstance(body, dict) else []
+        return f"调整邀约排序（{len(ids)}条记录）" if ids else "调整邀约排序"
+
     if path.startswith("/api/financial/commissions"):
         return _build_financial_record_content(method, "commission", body or {}, before or {})
 
@@ -1390,6 +1396,8 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             after_data = body.get("permissions", body) if body else None
             if isinstance(log_context, dict) and "after_data" in log_context:
                 after_data = log_context["after_data"]
+            if path.rstrip("/") == "/api/visits/reorder":
+                after_data = None
             if after_data:
                 after_data = _scrub_sensitive(after_data)
 

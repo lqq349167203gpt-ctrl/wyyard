@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
-import { Plus, Trash2, FileText, GripVertical, Edit } from "lucide-react"
+import { Plus, Trash2, FileText, GripVertical, Edit, CalendarX2, CalendarSync } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,6 +9,7 @@ import {
 import { visitApi, membershipCardApi, consumptionRecordsApi, type CustomerLight, type MembershipCard } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 interface Row {
   key: number
@@ -22,6 +23,7 @@ interface Row {
   needs: string
   referrer_handler: string
   arrived: boolean
+  cancelled: boolean
   feedback: string
   healing_notes: string
   group_leader_feedback: string
@@ -31,7 +33,7 @@ interface Row {
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_id: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, feedback: "", healing_notes: "", group_leader_feedback: "", activities: "" }
+  return { key: nextKey++, visit_id: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", group_leader_feedback: "", activities: "" }
 }
 
 export interface VisitChangedCell {
@@ -362,6 +364,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           needs: v.needs || "",
           referrer_handler: v.referrer_handler || "",
           arrived: v.arrived,
+          cancelled: v.cancelled,
           feedback: v.feedback || "",
           healing_notes: v.healing_notes || "",
           group_leader_feedback: v.group_leader_feedback || "",
@@ -381,6 +384,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   const saveRow = useCallback(async (row: Row) => {
     const existingId = savedVisitIds.current[row.key]
+
+    if (row.cancelled) return
 
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
 
@@ -465,6 +470,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   const updateRow = useCallback((key: number, field: keyof Row, value: any) => {
     const row = rowsRef.current.find(r => r.key === key)
+    if (!row || row.cancelled) return
     const name = row?.nickname || "未命名"
     const label = FIELD_LABELS[field as string] || field
     let desc = `编辑了「${name}」的${label}`
@@ -478,6 +484,46 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     }
     scheduleSave(key)
   }, [rowStatus, scheduleSave, pushEditHistory])
+
+  const cancelVisit = useCallback(async (row: Row) => {
+    const visitId = savedVisitIds.current[row.key]
+    if (!visitId || row.arrived || row.cancelled) return
+    if (timersRef.current[row.key]) {
+      clearTimeout(timersRef.current[row.key])
+      delete timersRef.current[row.key]
+    }
+    setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
+    try {
+      await visitApi.update(visitId, { cancelled: true })
+      setRows(prev => prev.map(item => item.key === row.key
+        ? { ...item, arrived: false, cancelled: true }
+        : item))
+      setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+      pushHistory("取消了邀约", [row.key], `取消了「${row.nickname || "未命名"}」的邀约`, undefined, [{ rowKey: row.key, fields: ["cancelled"] }])
+      onSaved()
+    } catch (error) {
+      setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+      window.alert(error instanceof Error ? error.message : "取消邀约失败")
+    }
+  }, [onSaved, pushHistory])
+
+  const restoreVisit = useCallback(async (row: Row) => {
+    const visitId = savedVisitIds.current[row.key]
+    if (!visitId || !row.cancelled) return
+    setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
+    try {
+      await visitApi.update(visitId, { cancelled: false })
+      setRows(prev => prev.map(item => item.key === row.key
+        ? { ...item, cancelled: false }
+        : item))
+      setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+      pushHistory("恢复了邀约", [row.key], `恢复了「${row.nickname || "未命名"}」的邀约`, undefined, [{ rowKey: row.key, fields: ["cancelled"] }])
+      onSaved()
+    } catch (error) {
+      setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
+      window.alert(error instanceof Error ? error.message : "恢复邀约失败")
+    }
+  }, [onSaved, pushHistory])
 
   const removeRow = useCallback(async (key: number) => {
     const row = rowsRef.current.find(r => r.key === key)
@@ -575,7 +621,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         </div>
       )}
       <div className="overflow-x-auto scrollbar-visible">
-        <div className="min-w-[1688px]">
+        <div className="min-w-[1736px]">
           <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
           <thead>
             <tr className="bg-[#f7f8fa] text-[#8f959e]">
@@ -594,7 +640,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">跟进点</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">组长反馈</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[68px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="px-1.5 py-2 text-center font-normal w-[116px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
           </thead>
           <tbody className="[&_tr:first-child>td]:pt-[12px] [&_tr:last-child>td]:pb-[6px]">
@@ -606,13 +652,13 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               return (
                 <tr
                   key={row.key}
-                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""} ${isChanged ? "bg-[#fff8e6]" : ""}`}
+                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""} ${isChanged ? "bg-[#fff8e6]" : ""} ${row.cancelled ? "[&>td:not(:last-child)]:opacity-55 bg-[#fafbfc]" : ""}`}
                   onDragOver={(e) => handleDragOver(e, row.key)}
                   onDrop={() => handleDrop(row.key)}
                 >
                   <td
-                    className="px-0.5 py-1.5 cursor-grab active:cursor-grabbing text-center"
-                    draggable
+                    className={`px-0.5 py-1.5 text-center ${row.cancelled ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"}`}
+                    draggable={!row.cancelled}
                     onDragStart={() => handleDragStart(row.key)}
                     onDragEnd={handleDragEnd}
                   >
@@ -622,8 +668,9 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <input
                       type="checkbox"
                       checked={row.arrived}
+                      disabled={row.cancelled}
                       onChange={(e) => updateRow(row.key, "arrived", e.target.checked)}
-                      className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                      className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer disabled:cursor-not-allowed"
                     />
                   </td>
                   <td className={`pl-2 pr-[10px] py-1.5 w-[64px] ${isCellChanged(row.key, "is_leader") ? "bg-[#f5eeff] rounded" : ""}`}>
@@ -632,6 +679,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       value={row.is_leader ? "1" : "0"}
                       options={[{ value: "0", label: "-" }, { value: "1", label: "组长" }]}
                       onChange={(v) => updateRow(row.key, "is_leader", v === "1")}
+                      disabled={row.cancelled}
                       placeholder="-"
                       hideChevron
                       className="[&_button]:border-[0.5px] [&_button]:text-[12px]"
@@ -642,6 +690,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <input
                       type="time"
                       value={row.visit_time}
+                      disabled={row.cancelled}
                       onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
                       className={`h-7 text-[12px] w-[56px] time-no-icon rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
                     />
@@ -650,6 +699,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <CustomerSearchInput rounded="2px"
                       customers={customers as any[]}
                       value={row.nickname}
+                      disabled={row.cancelled}
                       showClear={false}
                       excludeIds={rows.filter(r => r.key !== row.key && r.customer_id).map(r => r.customer_id)}
                       onChange={(v) => {
@@ -677,6 +727,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <textarea
                       value={row.needs}
+                      disabled={row.cancelled}
                       onChange={(e) => updateRow(row.key, "needs", e.target.value)}
                       className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
                       rows={1}
@@ -686,6 +737,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <CustomerSearchInput rounded="2px"
                       customers={customers as any[]}
                       value={row.referrer_handler}
+                      disabled={row.cancelled}
                       showClear={false}
                       onChange={(v) => updateRow(row.key, "referrer_handler", typeof v === "string" ? v : v[0] || "")}
                       onSelectItem={(c) => updateRow(row.key, "referrer_handler", c.nickname)}
@@ -716,6 +768,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <textarea
                       value={row.feedback}
+                      disabled={row.cancelled}
                       onChange={(e) => updateRow(row.key, "feedback", e.target.value)}
                       className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
                       rows={1}
@@ -724,6 +777,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <textarea
                       value={row.healing_notes}
+                      disabled={row.cancelled}
                       onChange={(e) => updateRow(row.key, "healing_notes", e.target.value)}
                       className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
                       rows={1}
@@ -732,6 +786,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "group_leader_feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <textarea
                       value={row.group_leader_feedback}
+                      disabled={row.cancelled}
                       onChange={(e) => updateRow(row.key, "group_leader_feedback", e.target.value)}
                       className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
                       rows={1}
@@ -741,28 +796,77 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <span className="text-[12px] text-[#8f959e]">{leaderRow?.nickname || ""}</span>
                   </td>
                   <td className={`px-1.5 py-1.5 text-center sticky right-0 z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)] bg-white`}>
-                    {row.customer_id && (
-                      <>
-                        <button
-                          onClick={() => onCustomerClick?.(row.customer_id)}
-                          className="text-[#8f959e] hover:text-[#3370ff] mr-1"
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => onCustomerEdit?.(row.customer_id)}
-                          className="text-[#8f959e] hover:text-[#3370ff] mr-1"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => setDeleteKey(row.key)}
-                      className="text-[#8f959e] hover:text-[#e02020]"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      {(row.cancelled || (!row.arrived && Boolean(row.visit_id))) && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <button
+                                  onClick={() => row.cancelled ? restoreVisit(row) : cancelVisit(row)}
+                                  className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#3370ff]"
+                                  aria-label={row.cancelled ? "恢复" : "取消"}
+                                >
+                                  {row.cancelled
+                                    ? <CalendarSync className="h-3.5 w-3.5" />
+                                    : <CalendarX2 className="h-3.5 w-3.5" />}
+                                </button>
+                              }
+                            />
+                            <TooltipContent>{row.cancelled ? "恢复" : "取消"}</TooltipContent>
+                          </Tooltip>
+                          <span className="h-3 w-px shrink-0 bg-[#d0d3d6]" aria-hidden="true" />
+                        </>
+                      )}
+                      {row.customer_id && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <button
+                                  onClick={() => onCustomerClick?.(row.customer_id)}
+                                  className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#3370ff]"
+                                  aria-label="详情"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                </button>
+                              }
+                            />
+                            <TooltipContent>详情</TooltipContent>
+                          </Tooltip>
+                          {!row.cancelled && (
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <button
+                                    onClick={() => onCustomerEdit?.(row.customer_id)}
+                                    className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#3370ff]"
+                                    aria-label="编辑"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </button>
+                                }
+                              />
+                              <TooltipContent>编辑</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              onClick={() => setDeleteKey(row.key)}
+                              className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#e02020]"
+                              aria-label="删除"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          }
+                        />
+                        <TooltipContent>删除</TooltipContent>
+                      </Tooltip>
+                    </div>
                   </td>
                 </tr>
               )

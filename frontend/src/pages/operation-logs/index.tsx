@@ -263,9 +263,19 @@ const getOperationLocation = (path: string, section: string) => (
   API_PATH_LABELS.find(([prefix]) => path.startsWith(prefix))?.[1] || formatSectionLabel(section)
 )
 
+const isVisitReorderLog = (log: Pick<OperationLog, "path">) => (
+  log.path.replace(/\/+$/, "") === "/api/visits/reorder"
+)
+
 const getMethodLabel = (log: Pick<OperationLog, "method" | "path">) => {
+  if (isVisitReorderLog(log)) return "排序"
   if (log.method === "DELETE" && log.path.startsWith("/api/customer-tags/")) return "停用"
   return METHOD_LABELS[log.method] || log.method
+}
+
+const getMethodColor = (log: Pick<OperationLog, "method" | "path">) => {
+  if (isVisitReorderLog(log)) return METHOD_COLORS.PATCH
+  return METHOD_COLORS[log.method] || "bg-gray-50 text-gray-600"
 }
 
 const compactLogText = (value: unknown, limit = 80) => {
@@ -312,6 +322,12 @@ const getFinancialLogDisplayContent = (log: OperationLog) => {
 }
 
 const getLogDisplayContent = (log: OperationLog) => {
+  if (isVisitReorderLog(log)) {
+    const ids = log.after_data?.ids
+    return Array.isArray(ids) && ids.length > 0
+      ? `调整邀约排序（${ids.length}条记录）`
+      : "调整邀约排序"
+  }
   const financialContent = getFinancialLogDisplayContent(log)
   if (financialContent) return financialContent
   if (!log.path.startsWith("/api/communication-records")) return log.content
@@ -828,7 +844,7 @@ export default function OperationLogsPage() {
                     >
                       <span
                         className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${
-                          METHOD_COLORS[log.method] || "bg-gray-50 text-gray-600"
+                          getMethodColor(log)
                         }`}
                       >
                         {getMethodLabel(log)}
@@ -922,7 +938,7 @@ export default function OperationLogsPage() {
               {selectedLog.method === "DELETE" && selectedLog.before_data
                 ? renderSnapshot(selectedLog.before_data, "删除前完整信息")
                 : null}
-              {selectedLog.method === "POST" && selectedLog.after_data
+              {selectedLog.method === "POST" && selectedLog.after_data && !isVisitReorderLog(selectedLog)
                 ? renderSnapshot(selectedLog.after_data, "新增信息")
                 : null}
             </div>

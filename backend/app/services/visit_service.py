@@ -41,8 +41,12 @@ def count_customer_visits(customer_id: str) -> int:
 
 
 def count_customer_invitations(customer_id: str) -> int:
-    """统计某个客户的受邀次数（所有邀约记录，不含已删除）"""
-    return sum(1 for v in _visits.values() if v.customer_id == customer_id and not v.is_deleted)
+    """统计某个客户的有效受邀次数（不含已删除、已取消）"""
+    return sum(
+        1
+        for v in _visits.values()
+        if v.customer_id == customer_id and not v.is_deleted and not v.cancelled
+    )
 
 
 def get_last_visit_date(customer_id: str) -> str:
@@ -61,11 +65,11 @@ def get_arrived_customer_ids(date_from: str, date_to: str) -> set[str]:
 
 
 def get_invited_customer_ids(date: str) -> set[str]:
-    """获取指定日期邀约名单中的客户 ID（包含未到场）。"""
+    """获取指定日期有效邀约名单中的客户 ID（包含未到场，不含已取消）。"""
     return {
         v.customer_id
         for v in _visits.values()
-        if not v.is_deleted and v.visit_date == date
+        if not v.is_deleted and not v.cancelled and v.visit_date == date
     }
 
 
@@ -109,7 +113,7 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
 
     # 构建 leader 集合
     leader_set = {v.customer_id for v in _visits.values()
-                  if v.visit_date == date and v.is_leader and not v.is_deleted}
+                  if v.visit_date == date and v.is_leader and not v.is_deleted and not v.cancelled}
 
     result: dict[str, list[ActivityInfo]] = defaultdict(list)
 
@@ -335,7 +339,7 @@ def get_date_counts(customer_ids: list[str] | None = None, start_date: str | Non
     allowed = set(customer_ids) if customer_ids else None
     counts: dict[str, int] = {}
     for v in _visits.values():
-        if v.is_deleted:
+        if v.is_deleted or v.cancelled:
             continue
         if start_date and v.visit_date < start_date:
             continue
@@ -431,7 +435,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
     all_arrived_counts: dict[str, int] = {}
     all_invitation_counts: dict[str, int] = {}
     for v in _visits.values():
-        if not v.is_deleted:
+        if not v.is_deleted and not v.cancelled:
             all_invitation_counts[v.customer_id] = all_invitation_counts.get(v.customer_id, 0) + 1
             if v.arrived:
                 all_arrived_counts[v.customer_id] = all_arrived_counts.get(v.customer_id, 0) + 1
@@ -515,6 +519,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "visit_date": r.visit_date,
                 "arrived": r.arrived,
                 "arrival_time": r.arrival_time or "",
+                "cancelled": r.cancelled,
                 "is_leader": r.is_leader,
                 "space_id": r.space_id or "",
                 "member_type": member_type,
@@ -530,6 +535,8 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
 
 
 def create_visit(data: VisitRecordCreate) -> VisitRecord:
+    if data.cancelled:
+        raise ValueError("新建邀约不能直接设为已取消")
     # 验证客户必须存在于系统中
     if data.customer_id:
         from app.services import customer_service
@@ -583,7 +590,26 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
         record = _visits.get(visit_id)
         if not record:
             return None
+
+        if "cancelled" in data and not isinstance(data["cancelled"], bool):
+            raise ValueError("取消状态必须为布尔值")
+
+        requested_cancelled = data.get("cancelled")
+        if record.cancelled:
+            if set(data) != {"cancelled"} or requested_cancelled is not False:
+                raise ValueError("已取消的邀约已锁定，请先恢复邀约")
+        elif requested_cancelled is True:
+            if record.arrived:
+                raise ValueError("已到店的邀约不能取消")
+            if set(data) != {"cancelled"}:
+                raise ValueError("取消邀约时不能同时修改其他内容")
+
+        if data.get("arrived") is True and (record.cancelled or requested_cancelled is True):
+            raise ValueError("已取消的邀约不能确认到店")
+
         old_arrived = record.arrived
+        if requested_cancelled is True:
+            data = {"cancelled": True, "arrived": False, "arrival_time": ""}
         for key, value in data.items():
             if hasattr(record, key) and key not in ("id", "created_at", "created_by"):
                 setattr(record, key, value)

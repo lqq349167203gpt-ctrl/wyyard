@@ -261,7 +261,10 @@ async def update_visit(visit_id: str, data: dict):
     old_record = visit_service.get_visit(visit_id)
     old_arrived = old_record.arrived if old_record else False
 
-    record = visit_service.update_visit(visit_id, data)
+    try:
+        record = visit_service.update_visit(visit_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
 

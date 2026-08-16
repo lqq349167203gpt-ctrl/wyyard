@@ -12,7 +12,7 @@
     <view class="card-info">
       <view class="row-top">
         <view class="name-area">
-          <text class="nickname">{{visit.nickname}}</text>
+          <text class="nickname {{visit.cancelled ? 'cancelled' : ''}}">{{visit.nickname}}</text>
           <text class="leader-tag" wx:if="{{visit.is_leader}}">组长</text>
           <text class="member-tag" wx:if="{{leaderName}}">{{leaderName}}组员</text>
         </view>
@@ -23,12 +23,17 @@
         <text class="remaining">{{remainingText}}</text>
       </view>
     </view>
-    <view class="card-arrow" wx:if="{{!editMode}}">›</view>
+    <view class="card-arrow" wx:if="{{!editMode && !visit.cancelled}}">›</view>
   </view>
 
   <view class="card-actions" wx:if="{{!editMode}}">
-    <view class="arrival-badge {{visit.arrived ? 'arrived' : ''}}" catchtap="{{visit.arrived ? 'onCancelArrival' : 'onArrivalTap'}}">
-      <text>{{visit.arrived ? '已到店' : '未到店'}}</text>
+    <view class="visit-status-actions">
+      <view class="arrival-badge {{visit.arrived ? 'arrived' : ''}}" wx:if="{{!visit.cancelled}}" catchtap="{{visit.arrived ? 'onCancelArrival' : 'onArrivalTap'}}">
+        <text>{{visit.arrived ? '已到店' : '未到店'}}</text>
+      </view>
+      <view class="cancel-visit-btn" wx:if="{{!visit.arrived}}" catchtap="onCancelVisitTap">
+        <text>{{visit.cancelled ? '恢复' : '取消'}}</text>
+      </view>
     </view>
     <view class="action-btn" catchtap="onProfileTap">
       <text>资料</text>

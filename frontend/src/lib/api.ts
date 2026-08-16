@@ -565,6 +565,7 @@ export interface VisitRecord {
   is_leader: boolean
   arrived: boolean
   arrival_time?: string
+  cancelled: boolean
   visit_count: number
   arrived_count: number
   invitation_count: number
@@ -593,6 +594,7 @@ export interface VisitRecordCreate {
   is_leader?: boolean
   arrived?: boolean
   arrival_time?: string
+  cancelled?: boolean
   feedback?: string
   group_leader_feedback?: string
   healing_notes?: string

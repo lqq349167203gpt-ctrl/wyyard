@@ -68,6 +68,10 @@
   color: #1f2329;
 }
 
+.nickname.cancelled {
+  color: #b0b5bd;
+}
+
 .leader-tag {
   font-size: 22rpx;
   color: #3370ff;
@@ -105,7 +109,6 @@
   border: 1rpx solid #d0d3d6;
   border-radius: 8rpx;
   padding: 6rpx 20rpx;
-  margin-right: auto;
 }
 
 .arrival-badge.arrived {
@@ -126,6 +129,19 @@
   justify-content: flex-end;
   padding: 14rpx 32rpx;
   border-top: 1rpx solid #f0f1f2;
+}
+
+.visit-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-right: auto;
+}
+
+.cancel-visit-btn {
+  font-size: 24rpx;
+  color: #8f959e;
+  padding: 6rpx 0;
 }
 
 .action-btn {

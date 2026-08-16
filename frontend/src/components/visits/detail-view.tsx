@@ -401,7 +401,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   // 通知父组件已加载的到访数据
   useEffect(() => {
     if (onDataLoaded && visits.length >= 0 && customerListReady) {
-      onDataLoaded(visits)
+      onDataLoaded(visits.filter(visit => !visit.cancelled))
     }
   }, [visits, onDataLoaded, customerListReady])
 
@@ -553,7 +553,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     // 直接从 API 读取最新数据，不依赖状态，确保导出内容是最新的
     const freshVisits = await visitApi.list(selectedDate, undefined, spaceId).catch(() => filteredVisits)
     const visibleIdSet = new Set(customerList.map(c => c.id))
-    const latestVisits = freshVisits.filter(v => visibleIdSet.has(v.customer_id))
+    const latestVisits = freshVisits.filter(v => visibleIdSet.has(v.customer_id) && !v.cancelled)
 
     const customerMap = new Map(customerList.map(c => [c.id, c]))
     // 构建角色映射
@@ -684,7 +684,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         <div className="px-4 py-3 flex items-center justify-between overflow-visible">
           <div className="flex items-center shrink-0">
             <span className="text-xs font-medium text-[#2b2f36]">预计到场</span>
-            <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.length} 人</span>
+            <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.filter(visit => !visit.cancelled).length} 人</span>
             {savingCount > 0 ? (
               <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
             ) : tableSavedCount > 0 ? (
