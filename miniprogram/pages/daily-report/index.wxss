@@ -740,6 +740,11 @@
   margin-left: 4rpx;
 }
 
+.detail-row .cancelled {
+  color: #c4506a;
+  margin-left: 4rpx;
+}
+
 .detail-row .a-c1 { width: 100rpx; flex-shrink: 0; }
 .detail-row .a-c2 { width: 110rpx; flex-shrink: 0; }
 .detail-row .a-c3 { flex: 1; min-width: 0; }
@@ -752,3 +757,39 @@
 .detail-row .p-c4 { width: 130rpx; flex-shrink: 0; text-align: right; }
 .detail-row .p-c5 { width: 110rpx; flex-shrink: 0; text-align: right; }
 .detail-row .p-c6 { width: 200rpx; flex-shrink: 0; }
+
+/* 展开/缩略按钮 */
+.detail-row .row-toggle {
+  flex-shrink: 0;
+  width: 34rpx;
+  margin-left: 8rpx;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-row .row-toggle-arrow {
+  color: #8f959e;
+  font-size: 30rpx;
+}
+
+.detail-row .row-toggle-spacer {
+  flex-shrink: 0;
+  width: 34rpx;
+  margin-left: 8rpx;
+}
+
+/* 缩略态：单行省略号 */
+.detail-row.collapsed .c3,
+.detail-row.collapsed .c4,
+.detail-row.collapsed .c5,
+.detail-row.collapsed .c6,
+.detail-row.collapsed .a-c3,
+.detail-row.collapsed .a-c4,
+.detail-row.collapsed .p-c2,
+.detail-row.collapsed .p-c6 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

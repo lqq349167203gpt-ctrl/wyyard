@@ -18,6 +18,14 @@ function getWeekday(d: string): string {
   return ["日", "一", "二", "三", "四", "五", "六"][new Date(d).getDay()]
 }
 
+function rowTextClass(expanded: boolean): string {
+  return expanded ? "whitespace-pre-wrap break-words" : "truncate"
+}
+
+function EmptyDash() {
+  return <span className="text-[#c9cdd4]">-</span>
+}
+
 export default function DailyReportPage() {
   const [detailDate, setDetailDate] = useState(() => {
     const saved = localStorage.getItem("shared-selected-date")
@@ -70,20 +78,46 @@ export default function DailyReportPage() {
 
   // 详情弹窗
   const [detailOpen, setDetailOpen] = useState(false)
-  const [detailType, setDetailType] = useState<"visit" | "invited" | "activity_all" | "activity_today" | "payment">("visit")
+  const [detailType, setDetailType] = useState<"visit" | "invited" | "cancelled" | "activity_all" | "activity_today" | "payment">("visit")
   const [detailNickname, setDetailNickname] = useState("")
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailExpanded, setDetailExpanded] = useState<Set<string>>(new Set())
+  const [detailOverflow, setDetailOverflow] = useState<Set<string>>(new Set())
+
+  const toggleDetailRow = (key: string) => {
+    setDetailExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // 测量各文本列是否溢出（单行缩略后被截断），用于按需显示展开按钮
+  useEffect(() => {
+    if (!detailOpen || detailLoading) return
+    const timer = setTimeout(() => {
+      const keys = new Set<string>()
+      document.querySelectorAll<HTMLElement>("[data-ov-key]").forEach(el => {
+        if (el.scrollWidth > el.clientWidth) keys.add(el.dataset.ovKey || "")
+      })
+      setDetailOverflow(keys)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [detailData, detailExpanded, detailOpen, detailLoading])
 
   // 客户详情弹窗
   const [customerDetailOpen, setCustomerDetailOpen] = useState(false)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
 
-  const openDetail = async (type: "visit" | "invited" | "activity_all" | "activity_today" | "payment", customerId: string, nickname: string) => {
+  const openDetail = async (type: "visit" | "invited" | "cancelled" | "activity_all" | "activity_today" | "payment", customerId: string, nickname: string) => {
     setDetailType(type)
     setDetailNickname(nickname)
     setDetailOpen(true)
     setDetailLoading(true)
+    setDetailExpanded(new Set())
+    setDetailOverflow(new Set())
     try {
       const data = await customerDetailApi.get(customerId, type === "activity_today" || type === "payment" ? detailDate : undefined)
       setDetailData(data)
@@ -107,9 +141,9 @@ export default function DailyReportPage() {
     </style>`
     let html = `<html><head><meta charset="utf-8">${style}</head><body>`
     // 第一部分：当日客户
-    html += `<table><colgroup><col width="60"><col width="50"><col width="80"><col width="60"><col width="50"><col width="50"><col width="50"><col width="50"><col width="60"><col width="120"><col width="120"><col width="100"><col width="100"><col width="70"><col width="50"><col width="40"></colgroup>`
-    html += `<tr class="section"><td colspan="16">当日客户（${sortedVisits.length}人）</td></tr>`
-    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th><th>当日需求</th><th>客户信息</th><th>跟进点</th><th>组长反馈</th><th>今日成交</th><th>邀约</th><th>到场</th></tr>`
+    html += `<table><colgroup><col width="60"><col width="50"><col width="80"><col width="60"><col width="50"><col width="50"><col width="50"><col width="50"><col width="50"><col width="60"><col width="120"><col width="120"><col width="100"><col width="100"><col width="70"><col width="50"><col width="40"></colgroup>`
+    html += `<tr class="section"><td colspan="17">当日客户（${sortedVisits.length}人）</td></tr>`
+    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th><th>当日需求</th><th>客户信息</th><th>跟进点</th><th>组长反馈</th><th>今日成交</th><th>邀约</th><th>到场</th></tr>`
     for (const v of sortedVisits) {
       html += `<tr>
         <td>${esc(v.referrer || "-")}</td>
@@ -117,6 +151,7 @@ export default function DailyReportPage() {
         <td>${esc(v.nickname)}</td>
         <td>${esc(v.member_type || "-")}</td>
         <td>${v.invitation_count}次</td>
+        <td>${v.cancelled_count}次</td>
         <td>${v.arrived_count}次</td>
         <td>${v.activity_count}场</td>
         <td>${todayActivityCountMap[v.customer_id] || 0}场</td>
@@ -222,6 +257,7 @@ export default function DailyReportPage() {
         case "member_type": va = a.member_type || ""; vb = b.member_type || ""; break
         case "visit_count": va = a.visit_count; vb = b.visit_count; break
         case "invitation_count": va = a.invitation_count; vb = b.invitation_count; break
+        case "cancelled_count": va = a.cancelled_count; vb = b.cancelled_count; break
         case "arrived_count": va = a.arrived_count; vb = b.arrived_count; break
         case "activity_count": va = a.activity_count; vb = b.activity_count; break
         case "today_activity": va = todayActivityCountMap[a.customer_id] || 0; vb = todayActivityCountMap[b.customer_id] || 0; break
@@ -654,6 +690,7 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-left font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">客户昵称</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[54px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("member_type")}><span className="inline-flex items-center gap-0">身份<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "member_type" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "member_type" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[40px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("invitation_count")}><span className="inline-flex items-center gap-0">受邀<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "invitation_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "invitation_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
+                  <th className="px-[5px] py-2 text-center font-normal w-[40px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("cancelled_count")}><span className="inline-flex items-center gap-0">取消<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "cancelled_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "cancelled_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[48px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("arrived_count")}><span className="inline-flex items-center gap-0">到店<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "arrived_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "arrived_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[50px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("activity_count")}><span className="inline-flex items-center gap-0">总参与<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "activity_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "activity_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[48px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("today_activity")}><span className="inline-flex items-center gap-0">今日<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "today_activity" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "today_activity" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
@@ -675,6 +712,7 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-black truncate border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => { setSelectedCustomerId(v.customer_id); setCustomerDetailOpen(true) }}>{v.nickname}</td>
                     <td className="px-[5px] py-2 text-[#8b9198] truncate border-b-[0.5px] border-[#e8eaed]">{v.member_type || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("invited", v.customer_id, v.nickname)}>{v.invitation_count}次</td>
+                    <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("cancelled", v.customer_id, v.nickname)}>{v.cancelled_count}次</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("visit", v.customer_id, v.nickname)}>{v.arrived_count}次</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_all", v.customer_id, v.nickname)}>{v.activity_count}场</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_today", v.customer_id, v.nickname)}>{todayActivityCountMap[v.customer_id] || 0}场</td>
@@ -846,7 +884,7 @@ export default function DailyReportPage() {
         <DialogContent className="max-w-[912px] max-h-[70vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="text-[14px]">
-              {detailNickname} — {detailType === "visit" ? "到店记录" : detailType === "invited" ? "受邀记录" : detailType === "activity_all" ? "总参与记录" : detailType === "payment" ? "成交详情" : "今日参与记录"}
+              {detailNickname} — {detailType === "visit" ? "到店记录" : detailType === "invited" ? "受邀记录" : detailType === "cancelled" ? "取消记录" : detailType === "activity_all" ? "总参与记录" : detailType === "payment" ? "成交详情" : "今日参与记录"}
             </DialogTitle>
           </DialogHeader>
           {detailLoading ? (
@@ -866,17 +904,23 @@ export default function DailyReportPage() {
                   <span className="flex-1">客户信息</span>
                   <span className="w-24 shrink-0">跟进点</span>
                   <span className="w-24 shrink-0">组长反馈</span>
+                  <span className="w-11 shrink-0" />
                 </div>
-                {records.map(v => (
-                  <div key={v.id} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
-                    <span className="w-32 shrink-0">{v.visit_date}</span>
-                    <span className="w-20 shrink-0 truncate">{v.referrer_handler || "-"}</span>
-                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.needs || "-"}</span>
-                    <span className="flex-1 whitespace-pre-wrap">{v.feedback || v.experience || "-"}</span>
-                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.healing_notes || "-"}</span>
-                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.group_leader_feedback || "-"}</span>
-                  </div>
-                ))}
+                {records.map(v => {
+                  const expanded = detailExpanded.has(v.id)
+                  const showToggle = expanded || detailOverflow.has(v.id)
+                  return (
+                    <div key={v.id} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
+                      <span className="w-32 shrink-0">{v.visit_date}</span>
+                      <span data-ov-key={v.id} className="w-20 shrink-0 truncate">{v.referrer_handler || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.needs || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || v.experience || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.healing_notes || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.group_leader_feedback || <EmptyDash />}</span>
+                      {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(v.id)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
+                    </div>
+                  )
+                })}
               </>
             )
           })() : detailType === "invited" ? (() => {
@@ -892,17 +936,55 @@ export default function DailyReportPage() {
                   <span className="flex-1">客户信息</span>
                   <span className="w-24 shrink-0">跟进点</span>
                   <span className="w-24 shrink-0">组长反馈</span>
+                  <span className="w-11 shrink-0" />
                 </div>
-                {records.map(v => (
-                  <div key={v.id} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
-                    <span className="w-40 shrink-0">{v.visit_date}{!v.arrived && <span className="ml-1 text-[#a0a4ab]">（未参与）</span>}</span>
-                    <span className="w-20 shrink-0 truncate">{v.referrer_handler || "-"}</span>
-                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.needs || "-"}</span>
-                    <span className="flex-1 whitespace-pre-wrap">{v.feedback || v.experience || "-"}</span>
-                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.healing_notes || "-"}</span>
-                    <span className="w-24 shrink-0 whitespace-pre-wrap">{v.group_leader_feedback || "-"}</span>
-                  </div>
-                ))}
+                {records.map(v => {
+                  const expanded = detailExpanded.has(v.id)
+                  const showToggle = expanded || detailOverflow.has(v.id)
+                  return (
+                    <div key={v.id} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
+                      <span className="w-40 shrink-0">{v.visit_date}{v.cancelled ? <span className="ml-1 text-[#c4506a]">（已取消）</span> : !v.arrived ? <span className="ml-1 text-[#a0a4ab]">（未参与）</span> : null}</span>
+                      <span data-ov-key={v.id} className="w-20 shrink-0 truncate">{v.referrer_handler || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.needs || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || v.experience || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.healing_notes || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.group_leader_feedback || <EmptyDash />}</span>
+                      {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(v.id)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
+                    </div>
+                  )
+                })}
+              </>
+            )
+          })() : detailType === "cancelled" ? (() => {
+            const records = (detailData.visit_records || []).filter(v => v.cancelled).sort((a, b) => (b.visit_date || "").localeCompare(a.visit_date || ""))
+            return records.length === 0 ? (
+              <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无取消记录</div>
+            ) : (
+              <>
+                <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
+                  <span className="w-40 shrink-0">日期</span>
+                  <span className="w-20 shrink-0">邀约人</span>
+                  <span className="w-24 shrink-0">需求</span>
+                  <span className="flex-1">客户信息</span>
+                  <span className="w-24 shrink-0">跟进点</span>
+                  <span className="w-24 shrink-0">组长反馈</span>
+                  <span className="w-11 shrink-0" />
+                </div>
+                {records.map(v => {
+                  const expanded = detailExpanded.has(v.id)
+                  const showToggle = expanded || detailOverflow.has(v.id)
+                  return (
+                    <div key={v.id} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
+                      <span className="w-40 shrink-0">{v.visit_date}</span>
+                      <span data-ov-key={v.id} className="w-20 shrink-0 truncate">{v.referrer_handler || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.needs || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || v.experience || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.healing_notes || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.group_leader_feedback || <EmptyDash />}</span>
+                      {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(v.id)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
+                    </div>
+                  )
+                })}
               </>
             )
           })() : detailType === "payment" ? (() => {
@@ -920,19 +1002,26 @@ export default function DailyReportPage() {
                   <span className="w-[92px] shrink-0">金额</span>
                   <span className="w-[102px] shrink-0">成交人</span>
                   <span className="flex-1 pl-2">备注</span>
+                  <span className="w-11 shrink-0" />
                 </div>
-                {records.map((r, i) => (
-                  <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
-                    <span className="w-[82px] shrink-0">{r.type || "-"}</span>
-                    <span className="w-[142px] shrink-0 truncate">{(r.name && r.name !== r.type) ? r.name : <span className="text-[#c9cdd4]">-</span>}</span>
-                    <span className="w-[102px] shrink-0">{r.effective_date || <span className="text-[#c9cdd4]">-</span>}</span>
-                    <span className="w-[102px] shrink-0">{r.expiry_date || <span className="text-[#c9cdd4]">-</span>}</span>
-                    <span className="w-[92px] shrink-0">{r.quantity != null ? (typeof r.quantity === "string" ? r.quantity : `${r.quantity}次`) : <span className="text-[#c9cdd4]">-</span>}</span>
-                    <span className="w-[92px] shrink-0">¥{r.amount.toLocaleString()}</span>
-                    <span className="w-[102px] shrink-0 truncate">{r.closer_name || "-"}</span>
-                    <span className="flex-1 truncate pl-2">{r.notes || <span className="text-[#c9cdd4]">-</span>}</span>
-                  </div>
-                ))}
+                {records.map((r, i) => {
+                  const key = `payment-${i}`
+                  const expanded = detailExpanded.has(key)
+                  const showToggle = expanded || detailOverflow.has(key)
+                  return (
+                    <div key={key} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
+                      <span className="w-[82px] shrink-0">{r.type || <EmptyDash />}</span>
+                      <span data-ov-key={key} className={`w-[142px] shrink-0 ${rowTextClass(expanded)}`}>{(r.name && r.name !== r.type) ? r.name : <span className="text-[#c9cdd4]">-</span>}</span>
+                      <span className="w-[102px] shrink-0">{r.effective_date || <span className="text-[#c9cdd4]">-</span>}</span>
+                      <span className="w-[102px] shrink-0">{r.expiry_date || <span className="text-[#c9cdd4]">-</span>}</span>
+                      <span className="w-[92px] shrink-0">{r.quantity != null ? (typeof r.quantity === "string" ? r.quantity : `${r.quantity}次`) : <span className="text-[#c9cdd4]">-</span>}</span>
+                      <span className="w-[92px] shrink-0">¥{r.amount.toLocaleString()}</span>
+                      <span data-ov-key={key} className="w-[102px] shrink-0 truncate">{r.closer_name || <EmptyDash />}</span>
+                      <span data-ov-key={key} className={`flex-1 min-w-0 pl-2 ${rowTextClass(expanded)}`}>{r.notes || <span className="text-[#c9cdd4]">-</span>}</span>
+                      {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(key)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
+                    </div>
+                  )
+                })}
               </>
             )
           })() : (() => {
@@ -949,16 +1038,23 @@ export default function DailyReportPage() {
                   <span className="flex-1">活动名称</span>
                   <span className="w-20 shrink-0">老师</span>
                   <span className="w-12 shrink-0 text-right">身份</span>
+                  <span className="w-11 shrink-0" />
                 </div>
-                {records.map((a, i) => (
-                  <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
-                    <span className="w-20 shrink-0">{a.date}</span>
-                    <span className="w-16 shrink-0">{a.type || "-"}</span>
-                    <span className="flex-1 truncate">{a.name || "-"}</span>
-                    <span className="w-20 shrink-0 truncate">{a.host || "-"}</span>
-                    <span className="w-12 shrink-0 text-right">{a.role || "-"}</span>
-                  </div>
-                ))}
+                {records.map((a, i) => {
+                  const key = `act-${i}`
+                  const expanded = detailExpanded.has(key)
+                  const showToggle = expanded || detailOverflow.has(key)
+                  return (
+                    <div key={key} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a] border-b border-[#f0f0f0]">
+                      <span className="w-20 shrink-0">{a.date}</span>
+                      <span className="w-16 shrink-0">{a.type || <EmptyDash />}</span>
+                      <span data-ov-key={key} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{a.name || <EmptyDash />}</span>
+                      <span data-ov-key={key} className={`w-20 shrink-0 ${rowTextClass(expanded)}`}>{a.host || <EmptyDash />}</span>
+                      <span className="w-12 shrink-0 text-right">{a.role || <EmptyDash />}</span>
+                      {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(key)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
+                    </div>
+                  )
+                })}
               </>
             )
           })()}

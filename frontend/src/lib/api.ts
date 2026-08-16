@@ -569,6 +569,7 @@ export interface VisitRecord {
   visit_count: number
   arrived_count: number
   invitation_count: number
+  cancelled_count: number
   activity_count: number
   welfare_count: number
   remaining_count: number | null  // -999=不限次, null=不限次, 0=无卡/已用完, >0=剩余次数
@@ -2665,6 +2666,7 @@ export interface StatisticsDetail {
   date: string
   status: string
   arrived?: boolean
+  cancelled?: boolean
   type?: string
   name?: string
   quantity?: number | string
@@ -2672,6 +2674,7 @@ export interface StatisticsDetail {
   member_type?: string
   referrer_handler?: string
   invited_count?: number
+  cancelled_count?: number
   visit_count?: number
   activity_count?: number
   total_consumption?: number
@@ -2690,7 +2693,7 @@ export interface StatisticsProducts {
   chart_amount: Record<string, string | number>[]
   chart_count: Record<string, string | number>[]
   chart_persons: Record<string, string | number>[]
-  daily_table: { date: string; invited: number; arrived: number; converted_persons: number; converted_amount: number; converted_count: number; purchase_count: number }[]
+  daily_table: { date: string; invited: number; cancelled: number; arrived: number; converted_persons: number; converted_amount: number; converted_count: number; purchase_count: number }[]
   card_type_names: string[]
   card_type_amounts: Record<string, number>
   card_type_counts: Record<string, number>
@@ -2733,6 +2736,7 @@ export interface MemberStatistics {
     referral_date: string
     first_visit_date: string
     invited_count: number
+    cancelled_count: number
     visit_count: number
     visit_interval: string
     activity_count: number
@@ -2828,6 +2832,7 @@ export interface ReferralStatistics {
     follow_up_status: CustomerFollowUpStatus
     first_visit_date: string
     invited_count: number
+    cancelled_count: number
     visit_count: number
     visit_interval: string
     activity_count: number

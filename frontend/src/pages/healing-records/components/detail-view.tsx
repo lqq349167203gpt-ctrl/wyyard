@@ -479,15 +479,26 @@ export default function DetailView({
             const pageSize = 8
             const totalPages = Math.ceil(records.length / pageSize)
             const paginatedRecords = records.slice((healingPage - 1) * pageSize, healingPage * pageSize)
+            const arrivedCount = records.filter(v => v.arrived).length
+            const cancelledCount = records.filter(v => v.cancelled).length
+            const absentCount = records.length - arrivedCount - cancelledCount
             return records.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
             ) : (
               <div>
+                <div className="mb-[9px] flex items-center gap-4 rounded-[10px] border border-[#eef0f1] bg-[#fafbfc] px-3.5 py-2.5 text-[12px]">
+                  <span className="font-semibold text-[#212631]">汇总</span>
+                  <span className="text-[#79838f]">已到店 <b className="font-semibold text-[#157a3c] tabular-nums">{arrivedCount}</b> 次</span>
+                  <span className="text-[#79838f]">未到店 <b className="font-semibold text-[#79838f] tabular-nums">{absentCount}</b> 次</span>
+                  <span className="text-[#79838f]">已取消 <b className="font-semibold text-[#c4506a] tabular-nums">{cancelledCount}</b> 次</span>
+                </div>
                 {paginatedRecords.map((v) => (
                   <div key={v.id} className="bg-[#fafbfc] border border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px] last:mb-0">
                     <div className="flex items-center gap-[9px] mb-[7px]">
                       <span className="text-[12.5px] font-bold text-[#212631] tabular-nums">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{v.arrival_time && ` ${v.arrival_time}`}</span>
-                      {v.arrived ? (
+                      {v.cancelled ? (
+                        <span className="text-[10.5px] font-semibold text-[#c4506a] bg-[#fdeeee] px-2 py-px rounded-full">已取消</span>
+                      ) : v.arrived ? (
                         <span className="text-[10.5px] font-semibold text-[#157a3c] bg-[#dcf5e4] px-2 py-px rounded-full">已到店</span>
                       ) : (
                         <span className="text-[10.5px] font-semibold text-[#79838f] bg-[#f1f0ed] px-2 py-px rounded-full">未到店</span>

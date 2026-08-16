@@ -143,10 +143,24 @@
     <!-- 跟进点 -->
     <view class="tab-content" wx:if="{{activeTab === 'healing'}}">
       <view wx:if="{{healingRecords.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="heal-summary" wx:if="{{healingRecords.length > 0}}">
+        <view class="heal-summary-item">
+          <text class="heal-summary-label">已到店</text>
+          <text class="heal-summary-num">{{arrivedCount}}</text>
+        </view>
+        <view class="heal-summary-item">
+          <text class="heal-summary-label">未到店</text>
+          <text class="heal-summary-num">{{absentCount}}</text>
+        </view>
+        <view class="heal-summary-item">
+          <text class="heal-summary-label">已取消</text>
+          <text class="heal-summary-num cancelled">{{cancelledCount}}</text>
+        </view>
+      </view>
       <view class="heal-item" wx:for="{{healingRecords}}" wx:key="id">
         <view class="heal-header">
           <text class="heal-date">{{item.visit_date}}</text>
-          <text class="visit-status {{item.arrived ? 'arrived' : ''}}">{{item.arrived ? '已到店' : '未到店'}}</text>
+          <text class="visit-status {{item.cancelled ? 'cancelled' : (item.arrived ? 'arrived' : '')}}">{{item.cancelled ? '已取消' : (item.arrived ? '已到店' : '未到店')}}</text>
         </view>
         <view class="heal-row" wx:if="{{item.needs}}">
           <text class="heal-label">当日需求</text>

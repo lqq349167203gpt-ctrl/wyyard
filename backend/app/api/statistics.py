@@ -150,7 +150,7 @@ def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to:
     """获取客户统计：受邀次数、到店次数、参与活动次数、消费总额（与详情页一致）"""
     c = customer_service.get_customer(customer_id)
     if not c:
-        return {"invited_count": 0, "visit_count": 0, "activity_count": 0, "total_consumption": 0.0, "visit_interval": "-", "first_visit_date": "-"}
+        return {"invited_count": 0, "cancelled_count": 0, "visit_count": 0, "activity_count": 0, "total_consumption": 0.0, "visit_interval": "-", "first_visit_date": "-"}
 
     # 所有邀约记录
     all_visits = visit_service.list_visits(customer_id=customer_id)
@@ -158,7 +158,8 @@ def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to:
         range_visits = [v for v in all_visits if v.visit_date and date_from <= v.visit_date <= date_to]
     else:
         range_visits = list(all_visits)
-    invited_count = len(range_visits)
+    invited_count = len([v for v in range_visits if not v.cancelled])
+    cancelled_count = len([v for v in range_visits if v.cancelled])
 
     # 到店次数：按日期范围过滤
     arrived_visits = [v for v in range_visits if v.arrived]
@@ -195,6 +196,7 @@ def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to:
 
     return {
         "invited_count": invited_count,
+        "cancelled_count": cancelled_count,
         "visit_count": visit_count,
         "activity_count": activity_count,
         "total_consumption": round(total_consumption, 2),
@@ -447,6 +449,7 @@ def get_details(
                 "date": visit_date,
                 "status": "converted" if is_converted else "invited",
                 "arrived": v.arrived,
+                "cancelled": v.cancelled,
                 "member_type": member_type,
                 "referrer_handler": visit_referrer,
             })
@@ -522,6 +525,7 @@ def get_details(
     for r in all_records:
         stats = stats_map.get(r.get("customer_id", ""), {})
         r["invited_count"] = stats.get("invited_count", 0)
+        r["cancelled_count"] = stats.get("cancelled_count", 0)
         r["visit_count"] = stats.get("visit_count", 0)
         r["activity_count"] = stats.get("activity_count", 0)
         r["total_consumption"] = stats.get("total_consumption", 0)
@@ -763,15 +767,19 @@ def get_products(
                         other_project_persons[pn].add(customer_id)
                         daily_other_project_persons[deal_date][pn].add(customer_id)
 
-    # 邀约/到访数据
+    # 邀约/到访/取消数据
     daily_invited: dict[str, int] = defaultdict(int)
     daily_arrived: dict[str, int] = defaultdict(int)
+    daily_cancelled: dict[str, int] = defaultdict(int)
     for v in visit_service.list_visits():
         visit_date = v.visit_date
         if visit_date and date_from <= visit_date <= date_to:
-            daily_invited[visit_date] += 1
-            if v.arrived:
-                daily_arrived[visit_date] += 1
+            if v.cancelled:
+                daily_cancelled[visit_date] += 1
+            else:
+                daily_invited[visit_date] += 1
+                if v.arrived:
+                    daily_arrived[visit_date] += 1
 
     # 每日列表
     daily_table = []
@@ -782,6 +790,7 @@ def get_products(
         daily_table.append({
             "date": ds,
             "invited": daily_invited.get(ds, 0),
+            "cancelled": daily_cancelled.get(ds, 0),
             "arrived": daily_arrived.get(ds, 0),
             "converted_persons": len(daily_converted_persons.get(ds, set())),
             "converted_amount": round(daily_converted_amount.get(ds, 0), 2),
@@ -929,7 +938,22 @@ def get_product_details(
                     "referrer_handler": v.referrer_handler or "-",
                     "needs": v.needs or "-",
                     "arrived": v.arrived,
+                    "cancelled": v.cancelled,
                     "activity_count": activity_count,
+                })
+        return {"data": records}
+
+    if type == "cancelled":
+        records = []
+        for v in visit_service.list_visits():
+            if v.visit_date == date and v.cancelled:
+                c = customer_service.get_customer(v.customer_id) if v.customer_id else None
+                records.append({
+                    "nickname": c.nickname if c else (v.customer_id or "-"),
+                    "referrer_handler": v.referrer_handler or "-",
+                    "needs": v.needs or "-",
+                    "arrived": v.arrived,
+                    "cancelled": v.cancelled,
                 })
         return {"data": records}
 
@@ -1391,6 +1415,7 @@ def get_member_statistics(
             "referral_date": (c.referral_date or "").strip(),
             "first_visit_date": stats.get("first_visit_date", "-"),
             "invited_count": stats.get("invited_count", 0),
+            "cancelled_count": stats.get("cancelled_count", 0),
             "visit_count": stats.get("visit_count", 0),
             "visit_interval": stats.get("visit_interval", "-"),
             "activity_count": stats.get("activity_count", 0),
@@ -2157,6 +2182,7 @@ def get_referral_statistics(
             "follow_up_status": status,
             "first_visit_date": stats.get("first_visit_date", "-"),
             "invited_count": stats.get("invited_count", 0),
+            "cancelled_count": stats.get("cancelled_count", 0),
             "visit_count": stats.get("visit_count", 0),
             "visit_interval": stats.get("visit_interval", "-"),
             "activity_count": stats.get("activity_count", 0),

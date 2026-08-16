@@ -275,7 +275,41 @@
   background-color: #f0f5ff;
 }
 
+.visit-status.cancelled {
+  color: #c4506a;
+  background-color: #fdeeee;
+}
+
 /* 跟进点 */
+.heal-summary {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0 20rpx;
+  border-bottom: 1rpx solid #eef0f1;
+}
+
+.heal-summary-item {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8rpx;
+}
+
+.heal-summary-label {
+  font-size: 24rpx;
+  color: #b0b5bb;
+}
+
+.heal-summary-num {
+  font-size: 24rpx;
+  color: #1f2329;
+}
+
+.heal-summary-num.cancelled {
+  color: #c4506a;
+}
+
 .heal-item {
   padding: 20rpx 0;
   border-bottom: 1rpx solid #f7f8fa;

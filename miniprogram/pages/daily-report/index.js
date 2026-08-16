@@ -58,6 +58,40 @@ function formatMoney(n) {
   return out
 }
 
+// 估算文本显示宽度：CJK 记 1，其他字符记 0.55（按 22rpx 字号折算）
+function textWidth(str) {
+  if (!str) return 0
+  let w = 0
+  for (let i = 0; i < str.length; i++) {
+    w += str.charCodeAt(i) > 255 ? 1 : 0.55
+  }
+  return w
+}
+
+// 各列容量（单位：CJK 字宽），仅用于判断是否会被省略号截断
+const COL_CAPACITY = {
+  c3: 4.5, c4: 4, c5: 5, c6: 5,
+  'a-c3': 5, 'a-c4': 6,
+  'p-c2': 4, 'p-c6': 9,
+}
+const OVERFLOW_COLS = ['c3', 'c4', 'c5', 'c6', 'a-c3', 'a-c4', 'p-c2', 'p-c6']
+
+function flattenText(str) {
+  return (str || '').replace(/\n+/g, ' ')
+}
+
+// 计算是否溢出，同时给每列生成缩略态单行文本 flat（把换行折叠成空格）
+function rowOverflow(cols) {
+  let overflow = false
+  for (const c of cols) {
+    c.flat = flattenText(c.text)
+    if (OVERFLOW_COLS.indexOf(c.cls) >= 0 && textWidth(c.flat) > (COL_CAPACITY[c.cls] || 5)) {
+      overflow = true
+    }
+  }
+  return overflow
+}
+
 Page({
   data: {
     hasPagePermission: true,
@@ -339,6 +373,7 @@ Page({
         amountText: (v.daily_amount || 0) > 0 ? '¥' + formatMoney(v.daily_amount) : '-',
         hasAmount: (v.daily_amount || 0) > 0,
         invitedCount: v.invitation_count || 0,
+        cancelledCount: v.cancelled_count || 0,
         arrivedCount: v.arrived_count || 0,
         todayActCount: todayActMap[v.customer_id] || 0,
         remainingText: !hasCard ? '未办卡' : (remaining == null || remaining === -999 ? '不限' : remaining + '次'),
@@ -734,13 +769,17 @@ Page({
   },
 
   async openDetail(customerId, type, nickname) {
-    const titleMap = { visit: '到店记录', invited: '受邀记录', activity_today: '今日参与记录', payment: '成交详情' }
+    const titleMap = { visit: '到店记录', invited: '受邀记录', cancelled: '取消记录', activity_today: '今日参与记录', payment: '成交详情' }
     const headerMap = {
       visit: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
         { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
       ],
       invited: [
+        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
+        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
+      ],
+      cancelled: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
         { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
       ],
@@ -764,47 +803,46 @@ Page({
       let records = []
       if (type === 'payment') {
         // 成交详情：当天该客户的成交（deal_date=所选日期，与 PC 财务口径一致）
-        records = this._buildPaymentRecords(customerId, date).map(r => ({
-          rowClass: 'detail-row',
-          cols: [
+        records = this._buildPaymentRecords(customerId, date).map(r => {
+          const cols = [
             { text: r.c1, cls: 'p-c1' },
             { text: r.c2, cls: 'p-c2' },
             { text: r.c3, cls: 'p-c3' },
             { text: r.c4, cls: 'p-c4' },
             { text: r.c5, cls: 'p-c5' },
             { text: r.c6, cls: 'p-c6' },
-          ],
-        }))
+          ]
+          return { rowClass: 'detail-row', expanded: false, overflow: rowOverflow(cols), cols }
+        })
       } else {
         const detail = await customerApi.detail(customerId, date)
-        if (type === 'invited' || type === 'visit') {
+        if (type === 'invited' || type === 'visit' || type === 'cancelled') {
           records = (detail.visit_records || [])
-            .filter(v => v.visit_date === date)
-            .filter(v => type === 'visit' ? v.arrived : true)
-            .map(v => ({
-              rowClass: 'detail-row',
-              cols: [
-                { text: v.visit_date || '', cls: 'c1', unarrived: !v.arrived },
+            .filter(v => type === 'cancelled' ? v.cancelled : type === 'visit' ? v.arrived : true)
+            .map(v => {
+              const cols = [
+                { text: v.visit_date || '', cls: 'c1', cancelled: type === 'invited' && !!v.cancelled, unarrived: type === 'invited' && !v.arrived && !v.cancelled },
                 { text: v.referrer_handler || '', cls: 'c2' },
                 { text: v.needs || '', cls: 'c3' },
                 { text: v.feedback || v.experience || '', cls: 'c4' },
                 { text: v.healing_notes || '', cls: 'c5' },
                 { text: v.group_leader_feedback || '', cls: 'c6' },
-              ],
-            }))
+              ]
+              return { rowClass: 'detail-row', expanded: false, overflow: rowOverflow(cols), cols }
+            })
         } else if (type === 'activity_today') {
           records = (detail.activities || [])
             .filter(a => a.date === date)
-            .map(a => ({
-              rowClass: 'detail-row',
-              cols: [
+            .map(a => {
+              const cols = [
                 { text: a.date || '', cls: 'a-c1' },
                 { text: a.type || '', cls: 'a-c2' },
                 { text: a.name || '', cls: 'a-c3' },
                 { text: a.host || '', cls: 'a-c4' },
                 { text: a.role || '', cls: 'a-c5' },
-              ],
-            }))
+              ]
+              return { rowClass: 'detail-row', expanded: false, overflow: rowOverflow(cols), cols }
+            })
         }
       }
       this.setData({ detailLoading: false, detailRows: records })
@@ -865,5 +903,10 @@ Page({
 
   onDetailClose() {
     this.setData({ detailOpen: false })
+  },
+
+  onDetailRowToggle(e) {
+    const idx = e.currentTarget.dataset.index
+    this.setData({ [`detailRows[${idx}].expanded`]: !this.data.detailRows[idx].expanded })
   },
 })

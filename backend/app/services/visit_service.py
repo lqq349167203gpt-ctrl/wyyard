@@ -431,11 +431,16 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         if not c.is_deleted:
             all_cards_map.setdefault(c.customer_id, []).append(c)
 
-    # 批量构建每个客户的到店次数和受邀次数
+    # 批量构建每个客户的到店次数、受邀次数和取消次数
     all_arrived_counts: dict[str, int] = {}
     all_invitation_counts: dict[str, int] = {}
+    all_cancelled_counts: dict[str, int] = {}
     for v in _visits.values():
-        if not v.is_deleted and not v.cancelled:
+        if v.is_deleted:
+            continue
+        if v.cancelled:
+            all_cancelled_counts[v.customer_id] = all_cancelled_counts.get(v.customer_id, 0) + 1
+        else:
             all_invitation_counts[v.customer_id] = all_invitation_counts.get(v.customer_id, 0) + 1
             if v.arrived:
                 all_arrived_counts[v.customer_id] = all_arrived_counts.get(v.customer_id, 0) + 1
@@ -444,6 +449,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         r.visit_count = count_customer_visits(r.customer_id)
         r.arrived_count = all_arrived_counts.get(r.customer_id, 0)
         r.invitation_count = all_invitation_counts.get(r.customer_id, 0)
+        r.cancelled_count = all_cancelled_counts.get(r.customer_id, 0)
         if not r.member_type:
             customer = get_customer(r.customer_id)
             if customer:

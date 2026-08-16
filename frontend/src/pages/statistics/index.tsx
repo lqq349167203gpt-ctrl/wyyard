@@ -204,7 +204,7 @@ export default function StatisticsPage() {
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDetails, { pageSize: 10 })
 
   // 数字列点击弹窗
-  const [popupType, setPopupType] = useState<"invited" | "visits" | "activities" | "payments" | "day_activities" | null>(null)
+  const [popupType, setPopupType] = useState<"invited" | "cancelled" | "visits" | "activities" | "payments" | "day_activities" | null>(null)
   const [popupData, setPopupData] = useState<{ customer?: { nickname?: string }; visit_records?: any[]; activities?: any[]; payment_records?: any[] } | null>(null)
   const [popupLoading, setPopupLoading] = useState(false)
   const [popupCustomerId, setPopupCustomerId] = useState<string | null>(null)
@@ -318,7 +318,7 @@ export default function StatisticsPage() {
   }, [activeTab])
 
   // 点击数字列加载客户详情
-  const handleStatClick = async (type: "invited" | "visits" | "activities" | "payments" | "day_activities", customerId: string, date?: string) => {
+  const handleStatClick = async (type: "invited" | "cancelled" | "visits" | "activities" | "payments" | "day_activities", customerId: string, date?: string) => {
     setPopupType(type)
     setPopupCustomerId(customerId)
     setPopupDate(date || null)
@@ -912,6 +912,7 @@ export default function StatisticsPage() {
                     ] : [
                       ["member_type", "身份", "w-20"],
                       ["invited_count", "受邀次数", "w-20"],
+                      ["cancelled_count", "取消次数", "w-20"],
                       ["visit_count", "到店次数", "w-20"],
                       ["visit_interval", "平均到店间隔", "w-[90px]"],
                       ["activity_count", "参与活动", "w-20"],
@@ -958,6 +959,10 @@ export default function StatisticsPage() {
                             onClick={() => item.customer_id && item.invited_count != null && item.invited_count > 0 && handleStatClick("invited", item.customer_id)}
                           >{item.invited_count != null && item.invited_count > 0 ? `${item.invited_count}次` : <EmptyValue />}</td>
                           <td
+                            className={`w-20 truncate px-3 tabular-nums ${item.cancelled_count != null && item.cancelled_count > 0 ? "cursor-pointer hover:text-[#2e7d32]" : ""}`}
+                            onClick={() => item.customer_id && item.cancelled_count != null && item.cancelled_count > 0 && handleStatClick("cancelled", item.customer_id)}
+                          >{item.cancelled_count != null && item.cancelled_count > 0 ? `${item.cancelled_count}次` : <EmptyValue />}</td>
+                          <td
                             className={`w-20 truncate px-3 tabular-nums ${item.visit_count != null && item.visit_count > 0 ? "cursor-pointer hover:text-[#2e7d32]" : ""}`}
                             onClick={() => item.customer_id && item.visit_count != null && item.visit_count > 0 && handleStatClick("visits", item.customer_id)}
                           >{item.visit_count != null && item.visit_count > 0 ? `${item.visit_count}次` : <EmptyValue />}</td>
@@ -972,9 +977,9 @@ export default function StatisticsPage() {
                           >{item.total_consumption != null ? `¥${item.total_consumption}` : <EmptyValue />}</td>
                           <td className="w-20 px-3">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${
-                              item.arrived ? "bg-[#e8f5e9] text-[#2e7d32]" : "bg-[#f0f1f2] text-[#8f959e]"
+                              item.cancelled ? "bg-[#fdecef] text-[#c4506a]" : item.arrived ? "bg-[#e8f5e9] text-[#2e7d32]" : "bg-[#f0f1f2] text-[#8f959e]"
                             }`}>
-                              {item.arrived ? "已到店" : "未到店"}
+                              {item.cancelled ? "已取消" : item.arrived ? "已到店" : "未到店"}
                             </span>
                           </td>
                           <td className="w-20 px-3">
@@ -1034,7 +1039,35 @@ export default function StatisticsPage() {
                   </div>
                   {popupData.visit_records.filter(v => statDimension === "total" || (v.visit_date && dateRange.from <= v.visit_date && v.visit_date <= dateRange.to)).sort((a, b) => b.visit_date.localeCompare(a.visit_date)).map((v, i) => (
                     <div key={i} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
-                      <span className="w-32 shrink-0 whitespace-nowrap">{v.visit_date}{!v.arrived && <span className="ml-0.5 text-[#8f959e]">（未到店）</span>}</span>
+                      <span className="w-32 shrink-0 whitespace-nowrap">{v.visit_date}{v.cancelled ? <span className="ml-0.5 text-[#c4506a]">（已取消）</span> : !v.arrived ? <span className="ml-0.5 text-[#a0a4ab]">（未参与）</span> : null}</span>
+                      <span className="w-20 shrink-0 text-[#8f959e]">{v.referrer_handler || "-"}</span>
+                      <span className="flex-1 min-w-0">{v.needs || "-"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          {popupType === "cancelled" && (
+            <>
+              <div className="px-4 py-3 border-b border-[#f0f0f0]">
+                <span className="text-[14px] font-medium text-[#1f2329]">取消记录</span>
+                {popupData?.customer?.nickname && <span className="text-[14px] text-[#8f959e]"> - {popupData.customer.nickname}</span>}
+              </div>
+              {popupLoading ? (
+                <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">加载中...</div>
+              ) : !popupData?.visit_records?.filter(v => v.cancelled && (statDimension === "total" || (v.visit_date && dateRange.from <= v.visit_date && v.visit_date <= dateRange.to))).length ? (
+                <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无取消记录</div>
+              ) : (
+                <div>
+                  <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
+                    <span className="w-32 shrink-0">日期</span>
+                    <span className="w-20 shrink-0">邀约人</span>
+                    <span className="flex-1 min-w-0">需求</span>
+                  </div>
+                  {popupData.visit_records.filter(v => v.cancelled && (statDimension === "total" || (v.visit_date && dateRange.from <= v.visit_date && v.visit_date <= dateRange.to))).sort((a, b) => b.visit_date.localeCompare(a.visit_date)).map((v, i) => (
+                    <div key={i} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
+                      <span className="w-32 shrink-0 whitespace-nowrap">{v.visit_date}<span className="ml-0.5 text-[#c4506a]">（已取消）</span></span>
                       <span className="w-20 shrink-0 text-[#8f959e]">{v.referrer_handler || "-"}</span>
                       <span className="flex-1 min-w-0">{v.needs || "-"}</span>
                     </div>

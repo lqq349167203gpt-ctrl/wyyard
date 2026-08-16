@@ -104,7 +104,7 @@ export default function ReferralStatisticsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null)
-  const [detailType, setDetailType] = useState<"invited" | "arrived" | "activity" | "payment" | null>(null)
+  const [detailType, setDetailType] = useState<"invited" | "cancelled" | "arrived" | "activity" | "payment" | null>(null)
   const [detailRecords, setDetailRecords] = useState<Array<Record<string, unknown>>>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>(
@@ -212,6 +212,15 @@ export default function ReferralStatisticsPage() {
             referrer: record.referrer_handler || "-",
             needs: record.needs || "-",
             arrived: record.arrived,
+            cancelled: record.cancelled,
+          })))
+        } else if (detailType === "cancelled") {
+          setDetailRecords(result.visit_records.filter(record => record.cancelled).map(record => ({
+            date: record.visit_date,
+            referrer: record.referrer_handler || "-",
+            needs: record.needs || "-",
+            arrived: record.arrived,
+            cancelled: record.cancelled,
           })))
         } else if (detailType === "arrived") {
           setDetailRecords(result.visit_records.filter(record => record.arrived).map(record => ({
@@ -315,6 +324,10 @@ export default function ReferralStatisticsPage() {
     setSelectedTrendPeriod("")
     goToPage(1)
   }, [dateRange, granularity, selectedReferrer, selectedTagIds, selectedTypes, tagMatch])
+
+  useEffect(() => {
+    goToPage(1)
+  }, [sortField, sortOrder])
 
   const handleSort = (field: keyof Member) => {
     if (sortField === field) {
@@ -836,6 +849,7 @@ export default function ReferralStatisticsPage() {
                     <TableHead className="h-9 overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]">引流人</TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("first_visit_date")}>首次到店<SortArrow field="first_visit_date" /></TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("invited_count")}>受邀次数<SortArrow field="invited_count" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("cancelled_count")}>取消次数<SortArrow field="cancelled_count" /></TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("visit_count")}>到店次数<SortArrow field="visit_count" /></TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("visit_interval")}>平均到店间隔<SortArrow field="visit_interval" /></TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("activity_count")}>参与活动<SortArrow field="activity_count" /></TableHead>
@@ -873,6 +887,19 @@ export default function ReferralStatisticsPage() {
                             }}
                           >
                             {member.invited_count}次
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell className="h-11 overflow-hidden px-3 py-0 text-[12px] tabular-nums">
+                        {member.cancelled_count === 0 ? <EmptyValue /> : (
+                          <button
+                            className="block max-w-full truncate text-left text-[#4e535a] hover:underline"
+                            onClick={() => {
+                              setDetailCustomerId(member.id)
+                              setDetailType("cancelled")
+                            }}
+                          >
+                            {member.cancelled_count}次
                           </button>
                         )}
                       </TableCell>
@@ -965,6 +992,7 @@ export default function ReferralStatisticsPage() {
           <div className="border-b border-[#f0f0f0] px-4 py-3">
             <span className="text-[14px] font-medium text-[#1f2329]">
               {detailType === "invited" && "受邀记录"}
+              {detailType === "cancelled" && "取消记录"}
               {detailType === "arrived" && "到店记录"}
               {detailType === "activity" && "参与活动"}
               {detailType === "payment" && "消费记录"}
@@ -976,7 +1004,7 @@ export default function ReferralStatisticsPage() {
             <div className="px-4 py-8 text-center text-[12px] text-[#8f959e]">暂无数据</div>
           ) : (
             <div>
-              {(detailType === "invited" || detailType === "arrived") && (
+              {(detailType === "invited" || detailType === "cancelled" || detailType === "arrived") && (
                 <>
                   <div className="flex items-center border-b border-[#f0f0f0] px-4 py-1.5 text-[11px] text-[#8f959e]">
                     <span className="w-28 shrink-0">日期</span>
@@ -987,7 +1015,7 @@ export default function ReferralStatisticsPage() {
                     <div key={index} className="flex items-center px-4 py-2 text-[12px] text-[#4e535a] hover:bg-[#f7f8fa]">
                       <span className="w-28 shrink-0">
                         {String(record.date)}
-                        {detailType === "invited" && !record.arrived ? <span className="text-[#b0b5bd]">（未到店）</span> : ""}
+                        {(detailType === "invited" || detailType === "cancelled") && (record.cancelled ? <span className="ml-1 text-[#c4506a]">（已取消）</span> : !record.arrived ? <span className="ml-1 text-[#a0a4ab]">（未参与）</span> : null)}
                       </span>
                       <span className="w-20 shrink-0 text-[#8f959e]">{String(record.referrer)}</span>
                       <span className="min-w-0 flex-1 truncate">{String(record.needs)}</span>

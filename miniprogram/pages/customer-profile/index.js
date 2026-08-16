@@ -58,6 +58,9 @@ Page({
     commContent: '',
     commSaving: false,
     healingRecords: [],
+    arrivedCount: 0,
+    cancelledCount: 0,
+    absentCount: 0,
     purchaseSummary: [],
     paymentRecords: [],
     offlineCourseRecords: [],
@@ -121,6 +124,9 @@ Page({
         const hr = (detail.healing_records || []).find(r => r.date === v.visit_date)
         return Object.assign({}, v, { growth_record: (hr && hr.growth_record) || v.healing_notes || '' })
       })
+      const arrivedCount = visitRecords.filter(v => v.arrived).length
+      const cancelledCount = visitRecords.filter(v => v.cancelled).length
+      const absentCount = visitRecords.length - arrivedCount - cancelledCount
 
       // 卡次统计：与 PC 端使用同一套当前权益、历史欠卡和有效期统计口径
       const purchaseSummary = buildPurchaseSummary(detail.purchase_summary || [])
@@ -138,7 +144,7 @@ Page({
       else if (ts === '朋友圈') trafficDetailLabel = '所属人'
       else if (['小红书', '抖音', '公众号', '视频号'].includes(ts)) trafficDetailLabel = '内容链接'
 
-      this.setData({ customer: c, customerTags, healerText, firstVisit, totalPayment, activities, healingRecords, purchaseSummary, paymentRecords, offlineCourseRecords, trafficDetailLabel, loading: false })
+      this.setData({ customer: c, customerTags, healerText, firstVisit, totalPayment, activities, healingRecords, arrivedCount, cancelledCount, absentCount, purchaseSummary, paymentRecords, offlineCourseRecords, trafficDetailLabel, loading: false })
 
       // 加载沟通记录
       if (c.nickname) {

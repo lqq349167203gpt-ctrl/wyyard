@@ -78,6 +78,7 @@
         </view>
         <view class="c-l2">
           <view class="stat" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="invited" data-nickname="{{item.nickname}}"><text class="l">受邀</text><text class="b">{{item.invitedCount}}</text></view>
+          <view class="stat" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="cancelled" data-nickname="{{item.nickname}}"><text class="l">取消</text><text class="b">{{item.cancelledCount}}</text></view>
           <view class="stat" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="visit" data-nickname="{{item.nickname}}"><text class="l">到店</text><text class="b">{{item.arrivedCount}}</text></view>
           <view class="stat" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="activity_today" data-nickname="{{item.nickname}}"><text class="l">今日活动</text><text class="b">{{item.todayActCount}}</text></view>
           <view class="stat"><text class="l">剩余</text><text class="b">{{item.remainingText}}</text></view>
@@ -124,8 +125,8 @@
           <text>老人 {{item.oldCount}} / 新人 {{item.newCount}}</text>
         </view>
         <view class="act-detail">
-          <view class="d-row"><text class="d-label">老人</text><text class="d-val">{{item.oldText || '-'}}</text></view>
-          <view class="d-row"><text class="d-label">新人</text><text class="d-val">{{item.newText || '-'}}</text></view>
+          <view class="d-row"><text class="d-label">老人</text><text class="d-val">{{item.oldText || ''}}<text class="dash" wx:if="{{!item.oldText}}">-</text></text></view>
+          <view class="d-row"><text class="d-label">新人</text><text class="d-val">{{item.newText || ''}}<text class="dash" wx:if="{{!item.newText}}">-</text></text></view>
         </view>
       </view>
       <view class="empty-state" wx:if="{{activities.length === 0}}">
@@ -215,12 +216,17 @@
       <scroll-view scroll-y class="detail-scroll">
         <view class="detail-row thead">
           <text wx:for="{{detailHeader}}" wx:key="index" class="{{item.cls}}">{{item.text}}</text>
+          <text class="row-toggle-spacer"></text>
         </view>
         <view class="detail-empty" wx:if="{{detailLoading}}">加载中...</view>
         <view class="detail-empty" wx:if="{{!detailLoading && detailRows.length === 0}}">暂无记录</view>
         <block wx:if="{{!detailLoading && detailRows.length > 0}}">
-          <view wx:for="{{detailRows}}" wx:key="index" class="{{item.rowClass}}">
-            <text wx:for="{{item.cols}}" wx:for-item="col" wx:key="index" class="{{col.cls}}">{{col.text}}<text class="unarrived" wx:if="{{col.unarrived}}">（未参与）</text><text class="dash" wx:if="{{!col.text}}">-</text></text>
+          <view wx:for="{{detailRows}}" wx:key="index" class="{{item.rowClass}} {{item.expanded ? 'expanded' : 'collapsed'}}" catchtap="onDetailRowToggle" data-index="{{index}}">
+            <text wx:for="{{item.cols}}" wx:for-item="col" wx:key="index" class="{{col.cls}}">{{item.expanded ? col.text : col.flat}}<text class="cancelled" wx:if="{{col.cancelled}}">（已取消）</text><text class="unarrived" wx:elif="{{col.unarrived}}">（未参与）</text><text class="dash" wx:if="{{!col.text}}">-</text></text>
+            <view class="row-toggle" wx:if="{{item.overflow || item.expanded}}">
+              <text class="row-toggle-arrow">{{item.expanded ? '▴' : '▾'}}</text>
+            </view>
+            <view class="row-toggle-spacer" wx:else></view>
           </view>
         </block>
       </scroll-view>

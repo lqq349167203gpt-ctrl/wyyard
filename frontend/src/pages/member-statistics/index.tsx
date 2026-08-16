@@ -29,6 +29,7 @@ interface MemberStatistics {
     referral_date: string
     first_visit_date: string
     invited_count: number
+    cancelled_count: number
     visit_count: number
     visit_interval: string
     activity_count: number
@@ -47,7 +48,7 @@ export default function MemberStatisticsPage() {
   const [dataType, setDataType] = useState<"total" | "new">("total")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null)
-  const [detailType, setDetailType] = useState<"invited" | "arrived" | "activity" | "payment" | null>(null)
+  const [detailType, setDetailType] = useState<"invited" | "cancelled" | "arrived" | "activity" | "payment" | null>(null)
   const [detailRecords, setDetailRecords] = useState<Array<Record<string, unknown>>>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [sortField, setSortField] = useState<string | null>(null)
@@ -146,6 +147,8 @@ export default function MemberStatisticsPage() {
         else if (sortField === "visit_interval") { va = a.visit_interval || ""; vb = b.visit_interval || "" }
         else if (sortField === "activity_count") { va = a.activity_count; vb = b.activity_count }
         else if (sortField === "total_consumption") { va = a.total_consumption; vb = b.total_consumption }
+        else if (sortField === "invited_count") { va = a.invited_count; vb = b.invited_count }
+        else if (sortField === "cancelled_count") { va = a.cancelled_count; vb = b.cancelled_count }
         if (va < vb) return sortOrder === "asc" ? -1 : 1
         if (va > vb) return sortOrder === "asc" ? 1 : -1
         return 0
@@ -160,6 +163,10 @@ export default function MemberStatisticsPage() {
     setSelectedTrendPeriod("")
     goToPage(1)
   }, [dateRange, granularity, selectedReferrer, selectedTypes])
+
+  useEffect(() => {
+    goToPage(1)
+  }, [sortField, sortOrder])
 
   // 图表数据：根据所选类型和数据类型计算
   const chartData = useMemo(() => {
@@ -224,6 +231,15 @@ export default function MemberStatisticsPage() {
             referrer: v.referrer_handler || "-",
             needs: v.needs || "-",
             arrived: v.arrived,
+            cancelled: v.cancelled,
+          })))
+        } else if (detailType === "cancelled") {
+          setDetailRecords(res.visit_records.filter(v => v.cancelled).map(v => ({
+            date: v.visit_date,
+            referrer: v.referrer_handler || "-",
+            needs: v.needs || "-",
+            arrived: v.arrived,
+            cancelled: v.cancelled,
           })))
         } else if (detailType === "arrived") {
           setDetailRecords(res.visit_records.filter(v => v.arrived).map(v => ({
@@ -535,7 +551,12 @@ export default function MemberStatisticsPage() {
                       <th className="w-[100px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("first_visit_date")}>
                         首次到店<SortArrow field="first_visit_date" />
                       </th>
-                      <th className="w-[80px] px-3 font-normal">受邀次数</th>
+                      <th className="w-[80px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("invited_count")}>
+                        受邀次数<SortArrow field="invited_count" />
+                      </th>
+                      <th className="w-[80px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("cancelled_count")}>
+                        取消次数<SortArrow field="cancelled_count" />
+                      </th>
                       <th className="w-[80px] cursor-pointer select-none px-3 font-normal" onClick={() => handleSort("visit_count")}>
                         到店次数<SortArrow field="visit_count" />
                       </th>
@@ -571,6 +592,16 @@ export default function MemberStatisticsPage() {
                               className="text-left text-[#4e535a] hover:underline"
                             >
                               {member.invited_count}次
+                            </button>
+                          )}
+                        </td>
+                        <td className="truncate px-3 tabular-nums">
+                          {member.cancelled_count === 0 ? <EmptyValue /> : (
+                            <button
+                              onClick={() => { setDetailCustomerId(member.id); setDetailType("cancelled") }}
+                              className="text-left text-[#4e535a] hover:underline"
+                            >
+                              {member.cancelled_count}次
                             </button>
                           )}
                         </td>
@@ -637,6 +668,7 @@ export default function MemberStatisticsPage() {
           <div className="px-4 py-3 border-b border-[#f0f0f0]">
             <span className="text-[14px] font-medium text-[#1f2329]">
               {detailType === "invited" && "受邀记录"}
+              {detailType === "cancelled" && "取消记录"}
               {detailType === "arrived" && "到店记录"}
               {detailType === "activity" && "参与活动"}
               {detailType === "payment" && "消费记录"}
@@ -648,7 +680,7 @@ export default function MemberStatisticsPage() {
             <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无数据</div>
           ) : (
             <div>
-              {(detailType === "invited" || detailType === "arrived") && (
+              {(detailType === "invited" || detailType === "cancelled" || detailType === "arrived") && (
                 <>
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-28 shrink-0">日期</span>
@@ -658,7 +690,7 @@ export default function MemberStatisticsPage() {
                   {detailRecords.map((r, i) => (
                     <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
                       <span className="w-28 shrink-0">
-                        {String(r.date)}{detailType === "invited" && !r.arrived ? <span className="text-[#b0b5bd]">（未到店）</span> : ""}
+                        {String(r.date)}{(detailType === "invited" || detailType === "cancelled") && (r.cancelled ? <span className="ml-1 text-[#c4506a]">（已取消）</span> : !r.arrived ? <span className="ml-1 text-[#a0a4ab]">（未参与）</span> : null)}
                       </span>
                       <span className="w-20 shrink-0 text-[#8f959e]">{String(r.referrer)}</span>
                       <span className="flex-1 min-w-0 truncate">{String(r.needs)}</span>

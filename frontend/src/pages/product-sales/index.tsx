@@ -170,12 +170,12 @@ export default function ProductSalesPage() {
   const { paginatedItems: paginatedDaily, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(sortedDailyTable, { pageSize: 10 })
 
   // 弹窗
-  const [popupType, setPopupType] = useState<"invited" | "arrived" | "persons" | "amount" | "count" | "purchase" | null>(null)
+  const [popupType, setPopupType] = useState<"invited" | "cancelled" | "arrived" | "persons" | "amount" | "count" | "purchase" | null>(null)
   const [popupDate, setPopupDate] = useState<string | null>(null)
   const [popupData, setPopupData] = useState<Record<string, unknown>[]>([])
   const [popupLoading, setPopupLoading] = useState(false)
 
-  const handleCellClick = async (type: "invited" | "arrived" | "persons" | "amount" | "count" | "purchase", date: string) => {
+  const handleCellClick = async (type: "invited" | "cancelled" | "arrived" | "persons" | "amount" | "count" | "purchase", date: string) => {
     setPopupType(type)
     setPopupDate(date)
     setPopupLoading(true)
@@ -663,6 +663,7 @@ export default function ProductSalesPage() {
                     {[
                       { key: "date", label: "日期", w: "w-28" },
                       { key: "invited", label: "邀约人数", w: "w-24" },
+                      { key: "cancelled", label: "取消人数", w: "w-24" },
                       { key: "arrived", label: "实际到访", w: "w-24" },
                       { key: "converted_persons", label: "成交人数", w: "w-24" },
                       { key: "converted_count", label: "成交单数", w: "w-24" },
@@ -687,6 +688,7 @@ export default function ProductSalesPage() {
                       <td className="truncate px-3 tabular-nums">{startIndex + index}</td>
                       <td className="truncate px-3 tabular-nums">{row.date}</td>
                       <td className={`truncate px-3 tabular-nums ${row.invited ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.invited && handleCellClick("invited", row.date)}>{row.invited || <EmptyValue />}</td>
+                      <td className={`truncate px-3 tabular-nums ${row.cancelled ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.cancelled && handleCellClick("cancelled", row.date)}>{row.cancelled || <EmptyValue />}</td>
                       <td className={`truncate px-3 tabular-nums ${row.arrived ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.arrived && handleCellClick("arrived", row.date)}>{row.arrived || <EmptyValue />}</td>
                       <td className={`truncate px-3 tabular-nums ${row.converted_persons ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_persons && handleCellClick("persons", row.date)}>{row.converted_persons || <EmptyValue />}</td>
                       <td className={`truncate px-3 tabular-nums ${row.converted_count ? "cursor-pointer hover:text-[#2e7d32]" : ""}`} onClick={() => row.converted_count && handleCellClick("count", row.date)}>{row.converted_count || <EmptyValue />}</td>
@@ -714,7 +716,7 @@ export default function ProductSalesPage() {
         <DialogContent className={`${popupType === "persons" ? "max-w-[780px]" : popupType === "amount" || popupType === "count" || popupType === "purchase" ? "max-w-[780px]" : "max-w-[580px]"} max-h-[60vh] overflow-y-auto p-0 gap-0`} initialFocus={false}>
           <div className="px-4 py-3 border-b border-[#f0f0f0]">
             <span className="text-[14px] font-medium text-[#1f2329]">
-              {popupType ? { invited: "邀约到访", arrived: "实际到访", persons: "成交人数", amount: "成交金额", count: "成交单数", purchase: productType === "OH卡诊断" ? "总时长" : productType === "能量结" ? "总部位数" : productType === "觉醒游戏" || productType === "情绪释放" ? "总场次数" : "售出产品数" }[popupType] : ""}
+              {popupType ? { invited: "邀约到访", cancelled: "取消到访", arrived: "实际到访", persons: "成交人数", amount: "成交金额", count: "成交单数", purchase: productType === "OH卡诊断" ? "总时长" : productType === "能量结" ? "总部位数" : productType === "觉醒游戏" || productType === "情绪释放" ? "总场次数" : "售出产品数" }[popupType] : ""}
             </span>
             {popupDate && <span className="text-[12px] text-[#8f959e] ml-2">{popupDate}</span>}
           </div>
@@ -731,16 +733,35 @@ export default function ProductSalesPage() {
                     <span className="w-20 shrink-0">邀约人</span>
                     <span className="flex-1 min-w-0">需求</span>
                     <span className="w-16 shrink-0">参与活动</span>
+                    <span className="w-16 shrink-0">状态</span>
                   </div>
                   {popupData.map((r, i) => (
                     <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
-                      <span className="w-32 shrink-0 truncate">
-                        {r.nickname as string}
-                        {!r.arrived && <span className="text-[#b0b5bd]">（未参与）</span>}
-                      </span>
+                      <span className="w-32 shrink-0 truncate">{r.nickname as string}</span>
                       <span className="w-20 shrink-0 text-[#8f959e]">{r.referrer_handler as string}</span>
                       <span className="flex-1 min-w-0 truncate">{r.needs as string}</span>
                       <span className="w-16 shrink-0">{(r.activity_count as number) > 0 ? `${r.activity_count}场` : "-"}</span>
+                      <span className="w-16 shrink-0">
+                        {r.cancelled ? <span className="text-[#c4506a]">已取消</span> : r.arrived ? <span className="text-[#2e7d32]">已到店</span> : <span className="text-[#8f959e]">未参与</span>}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {popupType === "cancelled" && (
+                <>
+                  <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
+                    <span className="w-32 shrink-0">昵称</span>
+                    <span className="w-20 shrink-0">邀约人</span>
+                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="w-16 shrink-0">状态</span>
+                  </div>
+                  {popupData.map((r, i) => (
+                    <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
+                      <span className="w-32 shrink-0 truncate">{r.nickname as string}</span>
+                      <span className="w-20 shrink-0 text-[#8f959e]">{r.referrer_handler as string}</span>
+                      <span className="flex-1 min-w-0 truncate">{r.needs as string}</span>
+                      <span className="w-16 shrink-0"><span className="text-[#c4506a]">已取消</span></span>
                     </div>
                   ))}
                 </>
