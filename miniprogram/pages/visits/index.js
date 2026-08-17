@@ -373,12 +373,11 @@ Page({
     visitApi.update(visit.id, { cancelled }).then(() => {
       wx.showToast({ title: cancelled ? '已取消邀约' : '已恢复邀约' })
       // 就地更新当前项，避免 loadData() 触发整页刷新导致滚动位置丢失
-      const visits = this.data.visits.slice()
-      const idx = visits.findIndex(v => v.id === visit.id)
-      if (idx >= 0) {
-        visits[idx] = { ...visits[idx], cancelled }
-        this.setData({ visits })
-      }
+      const visits = this.data.visits.map(v => v.id === visit.id ? { ...v, cancelled } : v)
+      // 已取消的行移到末尾，未取消保持相对顺序
+      const reordered = [...visits.filter(v => !v.cancelled), ...visits.filter(v => v.cancelled)]
+      const leaderMap = this.buildLeaderMap(reordered)
+      this.setData({ visits: reordered, leaderMap })
       // 同步日历圆点计数（已取消的邀约不计入）
       const counts = { ...(this._calendarCounts || {}) }
       const date = visit.visit_date || this.data.currentDate

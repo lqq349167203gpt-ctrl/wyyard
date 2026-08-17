@@ -478,7 +478,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
             pass
         print(f"[list_visits] sample: {sample_nick}, is_leader={sample.is_leader}, activities={[(a.name, a.role) for a in sample.activities]}", flush=True)
 
-    return sorted(records, key=lambda r: (r.sort_order, -r.created_at.timestamp()))
+    return sorted(records, key=lambda r: (r.cancelled, r.sort_order, -r.created_at.timestamp()))
 
 
 def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None) -> List[dict]:
@@ -499,7 +499,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
 
     result = []
     today = datetime.now().strftime("%Y-%m-%d")
-    for r in sorted(records, key=lambda r: (r.sort_order, -r.created_at.timestamp())):
+    for r in sorted(records, key=lambda r: (r.cancelled, r.sort_order, -r.created_at.timestamp())):
         try:
             # 从客户表获取 member_type 和 nickname
             customer = get_customer(r.customer_id)

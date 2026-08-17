@@ -495,9 +495,13 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       await visitApi.update(visitId, { cancelled: true })
-      setRows(prev => prev.map(item => item.key === row.key
-        ? { ...item, arrived: false, cancelled: true }
-        : item))
+      setRows(prev => {
+        const updated = prev.map(item => item.key === row.key
+          ? { ...item, arrived: false, cancelled: true }
+          : item)
+        // 已取消的行移到末尾，未取消保持相对顺序
+        return [...updated.filter(r => !r.cancelled), ...updated.filter(r => r.cancelled)]
+      })
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
       pushHistory("取消了邀约", [row.key], `取消了「${row.nickname || "未命名"}」的邀约`, undefined, [{ rowKey: row.key, fields: ["cancelled"] }])
       onSaved()
@@ -513,9 +517,13 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       await visitApi.update(visitId, { cancelled: false })
-      setRows(prev => prev.map(item => item.key === row.key
-        ? { ...item, cancelled: false }
-        : item))
+      setRows(prev => {
+        const updated = prev.map(item => item.key === row.key
+          ? { ...item, cancelled: false }
+          : item)
+        // 恢复后回到未取消区域，已取消的仍排在末尾
+        return [...updated.filter(r => !r.cancelled), ...updated.filter(r => r.cancelled)]
+      })
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
       pushHistory("恢复了邀约", [row.key], `恢复了「${row.nickname || "未命名"}」的邀约`, undefined, [{ rowKey: row.key, fields: ["cancelled"] }])
       onSaved()
