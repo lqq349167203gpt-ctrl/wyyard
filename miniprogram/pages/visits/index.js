@@ -372,7 +372,18 @@ Page({
 
     visitApi.update(visit.id, { cancelled }).then(() => {
       wx.showToast({ title: cancelled ? '已取消邀约' : '已恢复邀约' })
-      this.loadData()
+      // 就地更新当前项，避免 loadData() 触发整页刷新导致滚动位置丢失
+      const visits = this.data.visits.slice()
+      const idx = visits.findIndex(v => v.id === visit.id)
+      if (idx >= 0) {
+        visits[idx] = { ...visits[idx], cancelled }
+        this.setData({ visits })
+      }
+      // 同步日历圆点计数（已取消的邀约不计入）
+      const counts = { ...(this._calendarCounts || {}) }
+      const date = visit.visit_date || this.data.currentDate
+      counts[date] = Math.max(0, (counts[date] || 0) + (cancelled ? -1 : 1))
+      this._calendarCounts = counts
     }).catch(() => {
       wx.showToast({ title: '操作失败', icon: 'none' })
     })

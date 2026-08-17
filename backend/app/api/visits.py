@@ -154,7 +154,7 @@ async def export_visits(date: str = None, space_id: str = None):
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
     records = visit_service.list_visits(date, space_id=space_id)
-    items = [_fill_member_type(r) for r in records]
+    items = [_fill_member_type(r) for r in records if not r.cancelled]
 
     # 构建组长映射（复用 PC 端逻辑）
     role_map = {}
