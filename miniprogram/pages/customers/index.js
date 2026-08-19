@@ -130,10 +130,9 @@ Page({
   async onShow() {
     if (!getApp().checkLogin()) return
     if (this.data.initialized) await this.loadCustomerTags()
+    // 仅在有数据变更标记时重载列表，避免从详情页返回时无谓刷新导致闪屏
     if (this._needRefresh) {
       this._needRefresh = false
-      this.loadData(true)
-    } else if (this.data.initialized && !this.data.loading) {
       this.loadData(true)
     }
   },

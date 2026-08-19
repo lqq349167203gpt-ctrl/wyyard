@@ -1,184 +1,159 @@
 <view class="container" wx:if="{{!loading && customer}}">
 
-  <!-- 头像区 -->
+  <!-- Hero -->
   <view class="hero">
-    <view class="edit-link" bindtap="onEditTap">
-      <text>编辑</text>
-    </view>
-    <view class="hero-info">
+    <view class="hero-top">
       <text class="hero-name">{{customer.nickname || '-'}}</text>
-      <view class="hero-tags">
-        <text class="hero-type" wx:if="{{customer.member_type}}">{{customer.member_type}}</text>
-        <text class="hero-type" wx:if="{{customer.follow_up_status}}">{{customer.follow_up_status}}</text>
-      </view>
+      <text class="pill {{daysPillClass}}" wx:if="{{daysPillText}}">{{daysPillText}}</text>
+      <view class="hero-edit" bindtap="onEditTap">编辑</view>
+    </view>
+    <view class="hero-tags" wx:if="{{customer.member_type || customer.follow_up_status || customerTags.length}}">
+      <text class="pill pill-gray" wx:if="{{customer.member_type}}">{{customer.member_type}}</text>
+      <text class="pill pill-blue" wx:if="{{customer.follow_up_status}}">{{customer.follow_up_status}}</text>
+      <text class="pill pill-gray" wx:for="{{customerTags}}" wx:key="id">{{item.name}}</text>
     </view>
     <view class="hero-stats">
-      <view class="stat">
-        <text class="stat-num">{{customer.visit_count || 0}}</text>
-        <text class="stat-label">到店</text>
+      <view class="hstat">
+        <text class="hstat-num">{{customer.visit_count || 0}}<text class="unit"> 次</text></text>
+        <text class="hstat-label">到店</text>
       </view>
-      <view class="stat-divider"></view>
-      <view class="stat">
-        <text class="stat-num">¥{{totalPayment}}</text>
-        <text class="stat-label">消费</text>
+      <view class="hstat">
+        <text class="hstat-num">{{totalPaymentText}}</text>
+        <text class="hstat-label">消费</text>
       </view>
-      <view class="stat-divider"></view>
-      <view class="stat">
-        <text class="stat-num" wx:if="{{firstVisit}}">{{firstVisit}}</text>
-        <view class="stat-empty" wx:else><view class="empty-line"></view></view>
-        <text class="stat-label">首次到访</text>
+      <view class="hstat">
+        <text class="hstat-num date" wx:if="{{firstVisit}}">{{firstVisit}}</text>
+        <text class="hstat-num date empty" wx:else>—</text>
+        <text class="hstat-label">首次到访</text>
       </view>
     </view>
   </view>
 
-  <!-- 联系方式 -->
-  <view class="card">
-    <view class="row">
-      <text class="row-label">客户标签</text>
-      <view class="row-value customer-tag-list" wx:if="{{customerTags.length}}">
-        <text class="customer-tag" wx:for="{{customerTags}}" wx:key="id">{{item.name}}</text>
-      </view>
-      <view class="row-value row-empty" wx:else><view class="empty-line"></view></view>
+  <!-- 基本信息 -->
+  <view class="sec">
+    <view class="sec-title">基本信息</view>
+    <view class="kv">
+      <text class="k">姓名</text>
+      <text class="v">{{customer.name}}</text>
     </view>
-    <view class="row" wx:if="{{customer.name}}">
-      <text class="row-label">姓名</text>
-      <text class="row-value">{{customer.name}}</text>
+    <view class="kv">
+      <text class="k">性别</text>
+      <text class="v">{{genderAgeText}}</text>
     </view>
-    <view class="row" wx:if="{{customer.gender}}">
-      <text class="row-label">性别</text>
-      <text class="row-value">{{customer.gender}}</text>
+    <view class="kv">
+      <text class="k">电话</text>
+      <text class="v">{{customer.phone}}</text>
     </view>
-    <view class="row">
-      <text class="row-label">年龄</text>
-      <text class="row-value" wx:if="{{customer.age}}">{{customer.age}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
+    <view class="kv">
+      <text class="k">微信</text>
+      <text class="v">{{customer.wechat}}</text>
     </view>
-    <view class="row">
-      <text class="row-label">电话</text>
-      <text class="row-value" wx:if="{{customer.phone}}">{{customer.phone}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
-    </view>
-    <view class="row">
-      <text class="row-label">微信</text>
-      <text class="row-value" wx:if="{{customer.wechat}}">{{customer.wechat}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
-    </view>
-    <view class="row">
-      <text class="row-label">工作</text>
-      <text class="row-value" wx:if="{{customer.work_status || customer.work_description}}">{{customer.work_status || ''}}{{customer.work_status && customer.work_description ? ' · ' : ''}}{{customer.work_description}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
+    <view class="kv">
+      <text class="k">工作</text>
+      <text class="v">{{workText}}</text>
     </view>
   </view>
 
   <!-- 来源归属 -->
-  <view class="card">
-    <view class="row">
-      <text class="row-label">引流人</text>
-      <text class="row-value" wx:if="{{customer.referrer}}">{{customer.referrer}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
+  <view class="sec">
+    <view class="sec-title">来源归属</view>
+    <view class="kv">
+      <text class="k">引流人</text>
+      <text class="v">{{customer.referrer}}</text>
     </view>
-    <view class="row">
-      <text class="row-label">引流日期</text>
-      <text class="row-value" wx:if="{{customer.referral_date}}">{{customer.referral_date}}</text>
-      <view class="row-value row-empty" wx:else><view class="empty-line"></view></view>
+    <view class="kv">
+      <text class="k">引流日期</text>
+      <text class="v">{{customer.referral_date}}</text>
     </view>
-    <view class="row">
-      <text class="row-label">承接人</text>
-      <text class="row-value" wx:if="{{customer.referrer_handler}}">{{customer.referrer_handler}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
+    <view class="kv">
+      <text class="k">承接人</text>
+      <text class="v">{{customer.referrer_handler}}</text>
     </view>
-    <view class="row">
-      <text class="row-label">流量来源</text>
-      <text class="row-value" wx:if="{{customer.traffic_source}}">{{customer.traffic_source}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
+    <view class="kv">
+      <text class="k">流量来源</text>
+      <text class="v">{{customer.traffic_source}}</text>
     </view>
-    <view class="row">
-      <text class="row-label">{{trafficDetailLabel}}</text>
-      <text class="row-value break" wx:if="{{customer.traffic_source_detail}}">{{customer.traffic_source_detail}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
+    <view class="kv">
+      <text class="k">{{trafficDetailLabel}}</text>
+      <text class="v">{{customer.traffic_source_detail}}</text>
     </view>
-    <view class="row">
-      <text class="row-label">疗愈老师</text>
-      <text class="row-value" wx:if="{{healerText}}">{{healerText}}</text>
-      <text class="row-value empty-val" wx:else>-</text>
+    <view class="kv">
+      <text class="k">疗愈老师</text>
+      <text class="v">{{healerText}}</text>
     </view>
   </view>
 
   <!-- 背景信息 -->
-  <view class="card">
-    <view class="block">
-      <text class="block-label">到访目的</text>
-      <text class="block-value" wx:if="{{customer.tags}}">{{customer.tags}}</text>
-      <text class="block-value empty-val" wx:else>-</text>
+  <view class="sec">
+    <view class="sec-title">背景信息</view>
+    <view class="blk">
+      <text class="k">到访目的</text>
+      <text class="v">{{customer.tags}}</text>
     </view>
-    <view class="block">
-      <text class="block-label">创伤经历</text>
-      <text class="block-value" wx:if="{{customer.basic_info}}">{{customer.basic_info}}</text>
-      <text class="block-value empty-val" wx:else>-</text>
+    <view class="blk">
+      <text class="k">创伤经历</text>
+      <text class="v">{{customer.basic_info}}</text>
     </view>
-    <view class="block">
-      <text class="block-label">当下卡点</text>
-      <text class="block-value" wx:if="{{customer.assessment}}">{{customer.assessment}}</text>
-      <text class="block-value empty-val" wx:else>-</text>
+    <view class="blk">
+      <text class="k">当下卡点</text>
+      <text class="v">{{customer.assessment}}</text>
     </view>
-    <view class="block">
-      <text class="block-label">其他信息</text>
-      <text class="block-value" wx:if="{{customer.other_info}}">{{customer.other_info}}</text>
-      <text class="block-value empty-val" wx:else>-</text>
+    <view class="blk">
+      <text class="k">其他信息</text>
+      <text class="v">{{customer.other_info}}</text>
     </view>
   </view>
 
   <!-- 记录区 -->
   <view class="record-section">
-    <!-- Tab 栏 -->
-    <view class="tab-bar">
-      <view
-        wx:for="{{tabs}}" wx:key="key" wx:for-item="tab"
-        class="tab-item {{activeTab === tab.key ? 'active' : ''}}"
-        bindtap="onTabChange"
-        data-key="{{tab.key}}"
-      >{{tab.label}}</view>
+    <!-- 分段控件 -->
+    <view class="seg-wrap">
+      <view class="seg">
+        <view
+          wx:for="{{tabs}}" wx:key="key" wx:for-item="tab"
+          class="seg-item {{activeTab === tab.key ? 'active' : ''}}"
+          bindtap="onTabChange"
+          data-key="{{tab.key}}"
+        >
+          <text>{{tab.label}}</text>
+          <text class="n" wx:if="{{tab.count > 0}}">{{tab.count}}</text>
+        </view>
+      </view>
+      <view class="seg-gap"></view>
     </view>
 
     <!-- 跟进点 -->
-    <view class="tab-content" wx:if="{{activeTab === 'healing'}}">
+    <view wx:if="{{activeTab === 'healing'}}">
       <view wx:if="{{healingRecords.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="heal-summary" wx:if="{{healingRecords.length > 0}}">
-        <view class="heal-summary-item">
-          <text class="heal-summary-label">已到店</text>
-          <text class="heal-summary-num">{{arrivedCount}}</text>
-        </view>
-        <view class="heal-summary-item">
-          <text class="heal-summary-label">未到店</text>
-          <text class="heal-summary-num">{{absentCount}}</text>
-        </view>
-        <view class="heal-summary-item">
-          <text class="heal-summary-label">已取消</text>
-          <text class="heal-summary-num cancelled">{{cancelledCount}}</text>
-        </view>
+      <view class="rec-summary" wx:if="{{healingRecords.length > 0}}">
+        <text><text class="dot dot-blue"></text>已到店 {{arrivedCount}}</text>
+        <text><text class="dot dot-gray"></text>未到店 {{absentCount}}</text>
+        <text><text class="dot dot-warn"></text>已取消 {{cancelledCount}}</text>
       </view>
-      <view class="heal-item" wx:for="{{healingRecords}}" wx:key="id">
-        <view class="heal-header">
-          <text class="heal-date">{{item.visit_date}}</text>
-          <text class="visit-status {{item.cancelled ? 'cancelled' : (item.arrived ? 'arrived' : '')}}">{{item.cancelled ? '已取消' : (item.arrived ? '已到店' : '未到店')}}</text>
-        </view>
-        <view class="heal-row" wx:if="{{item.needs}}">
-          <text class="heal-label">当日需求</text>
-          <text class="heal-value">{{item.needs}}</text>
-        </view>
-        <view class="heal-row" wx:if="{{item.growth_record}}">
-          <text class="heal-label">跟进点</text>
-          <text class="heal-value">{{item.growth_record}}</text>
-        </view>
-        <view class="heal-row" wx:if="{{item.feedback || item.experience}}">
-          <text class="heal-label">客户信息</text>
-          <text class="heal-value">{{item.feedback || item.experience}}</text>
+      <view class="rec-list" wx:if="{{healingRecords.length > 0}}">
+        <view class="rec" wx:for="{{healingRecords}}" wx:key="id">
+          <view class="rec-head">
+            <text class="rec-sub-date">{{item.visit_date}}</text>
+            <text class="pill {{item.cancelled ? 'pill-warn' : (item.arrived ? 'pill-blue' : 'pill-gray')}}">{{item.cancelled ? '已取消' : (item.arrived ? '已到店' : '未到店')}}</text>
+          </view>
+          <view class="rec-kv" wx:if="{{item.needs}}">
+            <text class="k">当日需求</text>
+            <text class="v">{{item.needs}}</text>
+          </view>
+          <view class="rec-kv" wx:if="{{item.growth_record}}">
+            <text class="k">跟进点</text>
+            <text class="v">{{item.growth_record}}</text>
+          </view>
+          <view class="rec-kv" wx:if="{{item.feedback || item.experience}}">
+            <text class="k">客户信息</text>
+            <text class="v">{{item.feedback || item.experience}}</text>
+          </view>
         </view>
       </view>
     </view>
 
     <!-- 沟通记录 -->
-    <view class="tab-content" wx:if="{{activeTab === 'communication'}}">
+    <view wx:if="{{activeTab === 'communication'}}">
       <view class="comm-compose">
         <input
           class="comm-input"
@@ -198,124 +173,118 @@
         >{{commSaving ? '...' : '新增'}}</view>
       </view>
       <view wx:if="{{commRecords.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="comm-item" wx:for="{{commRecords}}" wx:key="id">
-        <view class="comm-header">
-          <text class="comm-date">{{item._dateStr}}</text>
-          <view class="comm-meta">
-            <text class="comm-creator">{{item.creator || ''}}</text>
-            <text wx:if="{{item.can_delete}}" class="comm-delete" data-id="{{item.id}}" catchtap="onDeleteCommunication">删除</text>
+      <view class="rec-list" wx:if="{{commRecords.length > 0}}">
+        <view class="rec" wx:for="{{commRecords}}" wx:key="id">
+          <view class="rec-head">
+            <text class="rec-date">{{item._dateStr}}</text>
+            <view class="comm-meta">
+              <text class="comm-creator">{{item.creator || ''}}</text>
+              <text wx:if="{{item.can_delete}}" class="comm-delete" data-id="{{item.id}}" catchtap="onDeleteCommunication">删除</text>
+            </view>
           </view>
-        </view>
-        <view class="comm-content">
-          <text>{{item.content}}</text>
+          <view class="rec-body">{{item.content}}</view>
         </view>
       </view>
     </view>
 
     <!-- 活动记录 -->
-    <view class="tab-content" wx:if="{{activeTab === 'activities'}}">
+    <view wx:if="{{activeTab === 'activities'}}">
       <view wx:if="{{activities.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="act-item" wx:for="{{activities}}" wx:key="index">
-        <view class="act-header">
-          <text class="act-date">{{item.date}}</text>
-          <text class="act-tag public" wx:if="{{item.is_public_welfare}}">公益</text>
-          <text class="act-tag absent" wx:if="{{item.notArrived}}">未参与</text>
-        </view>
-        <view class="act-info">
-          <text class="act-name">{{item.name || '-'}}</text>
-          <text class="act-detail" wx:if="{{item.role}}">{{item.role}}</text>
-          <text class="act-detail" wx:if="{{item.host}}">{{item.host}}</text>
-          <text class="act-detail deduction" wx:if="{{item.deduction_summary && !item.notArrived}}">{{item.deduction_summary}}</text>
+      <view class="rec-list" wx:if="{{activities.length > 0}}">
+        <view class="rec" wx:for="{{activities}}" wx:key="index">
+          <view class="rec-head">
+            <text class="rec-sub-date">{{item.date}}</text>
+            <text class="pill pill-warn" wx:if="{{item.notArrived}}">未参与</text>
+            <text class="pill pill-blue" wx:elif="{{item.is_public_welfare}}">公益</text>
+          </view>
+          <view class="rec-name rec-name-gap">{{item.name || '-'}}</view>
+          <view class="rec-sub" wx:if="{{item.role || item.host || (item.deduction_summary && !item.notArrived)}}">
+            <text wx:if="{{item.role}}">{{item.role}}</text>
+            <text class="sep" wx:if="{{item.role && item.host}}">·</text>
+            <text wx:if="{{item.host}}">{{item.host}}</text>
+            <text class="sep" wx:if="{{(item.role || item.host) && item.deduction_summary && !item.notArrived}}">·</text>
+            <text wx:if="{{item.deduction_summary && !item.notArrived}}">{{item.deduction_summary}}</text>
+          </view>
         </view>
       </view>
     </view>
 
     <!-- 卡次统计 -->
-    <view class="tab-content" wx:if="{{activeTab === 'purchase'}}">
+    <view wx:if="{{activeTab === 'purchase'}}">
       <view wx:if="{{purchaseSummary.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="pur-item" wx:for="{{purchaseSummary}}" wx:key="_key">
-        <view class="pur-header">
-          <view class="pur-title">
-            <text class="pur-type">{{item.type}}</text>
-            <text class="pur-name" wx:if="{{item.name && !item._isOfflineCourse}}">{{item.name}}</text>
-          </view>
-          <view class="pur-summary">
-            <block wx:if="{{item._isOfflineCourse}}">
-              <text>已上课</text><text class="pur-summary-value">{{item._attendedCount}}</text><text>次</text>
-            </block>
-            <block wx:else>
-              <text>当前剩余</text><text class="pur-summary-value">{{item._currentRemainingText}}</text>
-              <text class="pur-summary-divider">/</text>
-              <text>总</text><text class="pur-summary-value">{{item._currentTotalText}}</text>
-              <text class="pur-debt-inline" wx:if="{{item._debtCount > 0}}">· 历史欠卡{{item._debtCount}}次</text>
-            </block>
-          </view>
-        </view>
-
-        <view class="pur-card-list" wx:if="{{item._cardItems.length > 0}}">
-          <view class="pur-card-row" wx:for="{{item._cardItems}}" wx:for-item="card" wx:key="index">
-            <view class="pur-card-main">
-              <text class="pur-card-name">{{card.name || '会员卡'}}</text>
-              <text class="pur-card-count" wx:if="{{card.voided}}">已退费</text>
-              <text class="pur-card-count" wx:elif="{{card.remaining === '不限'}}">不限次</text>
-              <text class="pur-card-count" wx:else>{{card.remaining}} / {{card.total_purchased}}</text>
+      <block wx:else>
+        <view class="sec-label">卡次统计</view>
+        <view class="rec-list">
+          <view class="rec" wx:for="{{purchaseSummary}}" wx:key="_key">
+            <view class="rec-head">
+              <text class="rec-name">{{item._displayName}}</text>
+              <view class="rec-amt">
+                <block wx:if="{{item._specialText}}">
+                  <text class="{{item._specialCls}}">{{item._specialText}}</text>
+                </block>
+                <block wx:else>
+                  <text class="remain">{{item._remainingNum}}</text>
+                  <text class="rec-amt-meta"> / {{item._totalText}}</text>
+                </block>
+              </view>
             </view>
-            <text class="pur-date" wx:if="{{card.effective_date}}">{{card.effective_date}}~{{card.expiry_date || '不限'}}</text>
+            <view class="rec-sub" wx:if="{{item._dateRange || (item._showDebt && item._debtCount > 0)}}">
+              <text wx:if="{{item._dateRange}}">{{item._dateRange}}</text>
+              <text class="sep" wx:if="{{item._dateRange && item._showDebt && item._debtCount > 0}}">·</text>
+              <text class="rec-debt" wx:if="{{item._showDebt && item._debtCount > 0}}">历史欠卡{{item._debtCount}}次</text>
+            </view>
+            <view class="rec-debt-list" wx:if="{{item._showDebt && item._debtActivities.length > 0}}">
+              <view class="rec-debt-row" wx:for="{{item._debtActivities}}" wx:for-item="debt" wx:key="index">
+                <text class="rec-debt-name">{{debt.label || '活动'}}</text>
+                <text class="rec-debt-date">{{debt.date || '-'}}</text>
+                <text class="rec-debt-count">欠卡{{debt.count}}次</text>
+              </view>
+            </view>
           </view>
         </view>
-
-        <view class="pur-info" wx:elif="{{item.name || item.effective_date}}">
-          <text class="pur-detail-name" wx:if="{{item.name && !item._isOfflineCourse}}">{{item.name}}</text>
-          <text class="pur-date" wx:if="{{item.effective_date}}">
-            {{item.effective_date}}~{{item.expiry_date || '不限'}}
-          </text>
-        </view>
-
-        <view class="pur-debt-list" wx:if="{{item._debtCount > 0}}">
-          <text class="pur-debt-title">历史欠卡{{item._debtCount}}次</text>
-          <view class="pur-debt-row" wx:for="{{item._debtActivities}}" wx:for-item="debt" wx:key="index">
-            <text class="pur-debt-name">{{debt.label || '活动'}}</text>
-            <text class="pur-debt-date">{{debt.date || '-'}}</text>
-            <text class="pur-debt-count">欠卡{{debt.count}}次</text>
-          </view>
-        </view>
-      </view>
+      </block>
     </view>
 
     <!-- 线下落地课程 -->
-    <view class="tab-content" wx:if="{{activeTab === 'offline_course'}}">
+    <view wx:if="{{activeTab === 'offline_course'}}">
       <view wx:if="{{offlineCourseRecords.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="ocr-item" wx:for="{{offlineCourseRecords}}" wx:key="id">
-        <view class="ocr-header">
-          <text class="ocr-date">{{item.record_date || '-'}}</text>
-          <text class="ocr-teacher" wx:if="{{item.teacher}}">{{item.teacher}}</text>
-        </view>
-        <view class="ocr-row" wx:if="{{item.content}}">
-          <text class="ocr-label">上课内容</text>
-          <text class="ocr-value">{{item.content}}</text>
-        </view>
-        <view class="ocr-row" wx:if="{{item.result}}">
-          <text class="ocr-label">上课结果</text>
-          <text class="ocr-value">{{item.result}}</text>
+      <view class="rec-list" wx:if="{{offlineCourseRecords.length > 0}}">
+        <view class="rec" wx:for="{{offlineCourseRecords}}" wx:key="id">
+          <view class="rec-head">
+            <text class="rec-date">{{item.record_date || '-'}}</text>
+            <text class="pill pill-gray" wx:if="{{item.teacher}}">{{item.teacher}}</text>
+          </view>
+          <view class="rec-kv" wx:if="{{item.content}}">
+            <text class="k">上课内容</text>
+            <text class="v">{{item.content}}</text>
+          </view>
+          <view class="rec-kv" wx:if="{{item.result}}">
+            <text class="k">上课结果</text>
+            <text class="v">{{item.result}}</text>
+          </view>
         </view>
       </view>
     </view>
 
     <!-- 交易记录 -->
-    <view class="tab-content" wx:if="{{activeTab === 'payment'}}">
+    <view wx:if="{{activeTab === 'payment'}}">
       <view wx:if="{{paymentRecords.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="pay-item" wx:for="{{paymentRecords}}" wx:key="index">
-        <view class="pay-header">
-          <text class="pay-type">{{item.type}}</text>
-          <text class="pay-amount">¥{{item.amount}}</text>
-        </view>
-        <view class="pay-info">
-          <text class="pay-name">{{item.name || ''}}</text>
-          <text class="pay-meta" wx:if="{{item.quantity}}">x{{item.quantity}}</text>
-          <text class="pay-meta" wx:if="{{item.closer_name}}">{{item.closer_name}}</text>
-        </view>
-        <view class="pay-dates" wx:if="{{item.effective_date || item.expiry_date}}">
-          <text>{{item.effective_date || '-'}} ~ {{item.expiry_date || '不限'}}</text>
+      <view class="rec-list" wx:if="{{paymentRecords.length > 0}}">
+        <view class="rec" wx:for="{{paymentRecords}}" wx:key="index">
+          <view class="rec-head">
+            <text class="rec-name">{{item.type}}</text>
+            <text class="rec-amt pay-amount">¥{{item.amount}}</text>
+          </view>
+          <view class="rec-sub" wx:if="{{item.name || item.quantity || item.closer_name}}">
+            <text wx:if="{{item.name}}">{{item.name}}</text>
+            <text class="sep" wx:if="{{item.name && item.quantity}}">·</text>
+            <text wx:if="{{item.quantity}}">x{{item.quantity}}</text>
+            <text class="sep" wx:if="{{(item.name || item.quantity) && item.closer_name}}">·</text>
+            <text wx:if="{{item.closer_name}}">{{item.closer_name}}</text>
+          </view>
+          <view class="rec-sub" wx:if="{{item.effective_date || item.expiry_date}}">
+            <text>{{item.effective_date || '-'}} ~ {{item.expiry_date || '不限'}}</text>
+          </view>
         </view>
       </view>
     </view>

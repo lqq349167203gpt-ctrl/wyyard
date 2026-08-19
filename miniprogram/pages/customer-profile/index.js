@@ -1,43 +1,85 @@
 const { customerApi, customerTagApi, communicationRecordApi } = require('../../utils/api')
 
-function formatCount(value) {
-  if (value === '不限') return '不限次'
-  return `${value === undefined || value === null ? 0 : value}次`
+function formatMoney(value) {
+  return '¥' + String(Math.round(value || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// 计算「N天未到店」预警签：≤7天灰 / 8-30天蓝 / >30天红，未到店灰
+function computeDaysPill(lastVisitDate) {
+  let daysAgo = -1
+  if (lastVisitDate) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const vd = new Date(lastVisitDate)
+    vd.setHours(0, 0, 0, 0)
+    if (!isNaN(vd.getTime())) {
+      daysAgo = Math.floor((today - vd) / 86400000)
+    }
+  }
+  if (daysAgo < 0) return { cls: 'pill-gray', text: '未到店' }
+  if (daysAgo <= 7) return { cls: 'pill-gray', text: daysAgo + '天前' }
+  if (daysAgo <= 30) return { cls: 'pill-blue', text: daysAgo + '天前' }
+  return { cls: 'pill-warn', text: daysAgo + '天未到店' }
 }
 
 function normalizePurchaseItem(item, key) {
-  const currentRemaining = item.current_remaining !== undefined && item.current_remaining !== null
-    ? item.current_remaining
-    : (item.effective_remaining !== undefined && item.effective_remaining !== null ? item.effective_remaining : item.remaining)
-  const currentTotal = item.current_total !== undefined && item.current_total !== null
-    ? item.current_total
-    : (item.grand_total !== undefined && item.grand_total !== null ? item.grand_total : item.total_purchased)
+  const isOfflineCourse = item.type === '线下落地课程'
+  const remaining = item.remaining
+  const total = item.total_purchased
+  const voided = !!item.voided
+
+  let _remainingNum = ''
+  let _totalText = ''
+  let _specialText = ''
+  let _specialCls = ''
+
+  if (isOfflineCourse) {
+    _specialText = `已上课 ${item.attended_count || 0} 次`
+    _specialCls = 'remain-used'
+  } else if (voided || remaining === '已退费') {
+    _specialText = '已退费'
+    _specialCls = 'remain-used'
+  } else if (remaining === '不限' || remaining === undefined || remaining === null) {
+    _specialText = '不限次'
+    _specialCls = 'remain'
+  } else if (typeof remaining === 'number' && remaining <= 0) {
+    _specialText = '已用完'
+    _specialCls = 'remain-used'
+  } else {
+    _remainingNum = remaining
+    _totalText = (total === '不限' || total === undefined || total === null) ? '不限' : (total + ' 次')
+  }
+
+  const dateRange = [item.effective_date, item.expiry_date].filter(Boolean).join(' ~ ')
 
   return Object.assign({}, item, {
     _key: key,
-    _isOfflineCourse: item.type === '线下落地课程',
-    _currentRemainingText: formatCount(currentRemaining),
-    _currentTotalText: formatCount(currentTotal),
-    _attendedCount: item.attended_count || 0,
+    _isOfflineCourse: isOfflineCourse,
+    _displayName: item.name || item.type,
+    _remainingNum,
+    _totalText,
+    _specialText,
+    _specialCls,
+    _dateRange: dateRange,
     _debtCount: item.debt_count || 0,
     _debtActivities: item.debt_activities || [],
-    _cardItems: [],
   })
 }
 
+// 扁平化卡次条目：每张会员卡/每个项目各占一行，历史欠卡只挂在首张会员卡上
 function buildPurchaseSummary(items) {
-  const memberItems = items.filter(item => item.type === '会员卡')
   const result = []
+  let debtShown = false
 
-  if (memberItems.length > 0) {
-    const memberSummary = normalizePurchaseItem(memberItems[0], 'membership-card')
-    memberSummary.name = ''
-    memberSummary._cardItems = memberItems.filter(item => item.name || item.effective_date || item.expiry_date)
-    result.push(memberSummary)
-  }
-
-  items.filter(item => item.type !== '会员卡').forEach((item, index) => {
-    result.push(normalizePurchaseItem(item, `${item.type}-${index}`))
+  items.forEach((item, index) => {
+    const normalized = normalizePurchaseItem(item, `${item.type}-${index}`)
+    if (item.type === '会员卡' && (item.debt_count || 0) > 0) {
+      if (!debtShown) {
+        normalized._showDebt = true
+        debtShown = true
+      }
+    }
+    result.push(normalized)
   })
 
   return result
@@ -53,6 +95,11 @@ Page({
     healerText: '',
     firstVisit: '',
     totalPayment: 0,
+    totalPaymentText: '¥0',
+    daysPillClass: '',
+    daysPillText: '',
+    genderAgeText: '',
+    workText: '',
     activities: [],
     commRecords: [],
     commContent: '',
@@ -67,12 +114,12 @@ Page({
     trafficDetailLabel: '流量链接',
     activeTab: 'healing',
     tabs: [
-      { key: 'healing', label: '跟进点' },
-      { key: 'communication', label: '沟通记录' },
-      { key: 'activities', label: '活动记录' },
-      { key: 'purchase', label: '卡次统计' },
-      { key: 'offline_course', label: '线下落地课程' },
-      { key: 'payment', label: '交易记录' },
+      { key: 'healing', label: '跟进点', count: 0 },
+      { key: 'communication', label: '沟通', count: 0 },
+      { key: 'activities', label: '活动', count: 0 },
+      { key: 'purchase', label: '卡次', count: 0 },
+      { key: 'offline_course', label: '课程', count: 0 },
+      { key: 'payment', label: '交易', count: 0 },
     ],
   },
 
@@ -111,6 +158,17 @@ Page({
       const visitRecords = detail.visit_records || []
       const arrived = visitRecords.filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
       const firstVisit = arrived.length > 0 ? arrived[0].visit_date : ''
+      const lastVisitDate = arrived.length > 0 ? arrived[arrived.length - 1].visit_date : ''
+
+      // 预警签（详情接口不含 last_visit_date，从已到店记录推导最近到店日期）
+      const daysPill = computeDaysPill(lastVisitDate)
+
+      // 基本信息合并字段
+      const gender = c.gender || ''
+      const age = c.age ? (c.age + ' 岁') : ''
+      const genderAgeText = gender && age ? (gender + ' · ' + age) : (gender || age)
+      const workText = [c.work_status, c.work_description].filter(Boolean).join(' · ')
+
       const totalPayment = (detail.payment_records || []).reduce((sum, r) => sum + (r.amount || 0), 0)
       // 活动记录
       const activities = (detail.activities || []).map(function(a) {
@@ -128,7 +186,7 @@ Page({
       const cancelledCount = visitRecords.filter(v => v.cancelled).length
       const absentCount = visitRecords.length - arrivedCount - cancelledCount
 
-      // 卡次统计：与 PC 端使用同一套当前权益、历史欠卡和有效期统计口径
+      // 卡次统计：扁平化，每张卡/项目一行
       const purchaseSummary = buildPurchaseSummary(detail.purchase_summary || [])
 
       // 交易记录
@@ -144,7 +202,29 @@ Page({
       else if (ts === '朋友圈') trafficDetailLabel = '所属人'
       else if (['小红书', '抖音', '公众号', '视频号'].includes(ts)) trafficDetailLabel = '内容链接'
 
-      this.setData({ customer: c, customerTags, healerText, firstVisit, totalPayment, activities, healingRecords, arrivedCount, cancelledCount, absentCount, purchaseSummary, paymentRecords, offlineCourseRecords, trafficDetailLabel, loading: false })
+      this.setData({
+        customer: c,
+        customerTags,
+        healerText,
+        firstVisit,
+        totalPayment,
+        totalPaymentText: formatMoney(totalPayment),
+        daysPillClass: daysPill.cls,
+        daysPillText: daysPill.text,
+        genderAgeText,
+        workText,
+        activities,
+        healingRecords,
+        arrivedCount,
+        cancelledCount,
+        absentCount,
+        purchaseSummary,
+        paymentRecords,
+        offlineCourseRecords,
+        trafficDetailLabel,
+        loading: false,
+      })
+      this.updateTabCounts()
 
       // 加载沟通记录
       if (c.nickname) {
@@ -157,6 +237,20 @@ Page({
         loadError: (e && e.message) || '客户资料加载失败',
       })
     }
+  },
+
+  updateTabCounts() {
+    const { healingRecords, commRecords, activities, purchaseSummary, offlineCourseRecords, paymentRecords } = this.data
+    this.setData({
+      tabs: [
+        { key: 'healing', label: '跟进点', count: healingRecords.length },
+        { key: 'communication', label: '沟通', count: commRecords.length },
+        { key: 'activities', label: '活动', count: activities.length },
+        { key: 'purchase', label: '卡次', count: purchaseSummary.length },
+        { key: 'offline_course', label: '课程', count: offlineCourseRecords.length },
+        { key: 'payment', label: '交易', count: paymentRecords.length },
+      ],
+    })
   },
 
   onRetry() {
@@ -185,8 +279,10 @@ Page({
         }
       })
       this.setData({ commRecords: list })
+      this.updateTabCounts()
     } catch (e) {
       this.setData({ commRecords: [] })
+      this.updateTabCounts()
     }
   },
 

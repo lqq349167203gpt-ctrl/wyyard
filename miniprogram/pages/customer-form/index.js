@@ -12,9 +12,11 @@ function getTodayDate() {
 }
 
 function markPreviousPageForRefresh() {
+  // 客户编辑会影响详情页与列表页（栈内所有下层页面），逐层打刷新标记
   const pages = getCurrentPages()
-  const previousPage = pages.length > 1 ? pages[pages.length - 2] : null
-  if (previousPage) previousPage._needRefresh = true
+  for (let i = 0; i < pages.length - 1; i++) {
+    pages[i]._needRefresh = true
+  }
 }
 
 Page({
