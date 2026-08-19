@@ -204,7 +204,7 @@ export default function ClassRecordsPage() {
             onExternalDateChange={(d) => startTransition(() => setDetailDate(d))}
             hideDateBar
             onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
-            onCustomerEdit={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
+            onCustomerEdit={(id) => navigate(`/healing-records/${id}/edit?back=${encodeURIComponent("/courses/class-records")}`)}
             onActivityClick={(id) => {
               const customer = allCustomers.find(c => c.id === id)
               setActivityNickname(customer?.nickname || customer?.name || "")

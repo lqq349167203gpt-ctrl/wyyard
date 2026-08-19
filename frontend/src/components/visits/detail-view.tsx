@@ -680,7 +680,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       )}
 
       {/* 到场人员列表 */}
-      <div className="bg-white rounded-lg overflow-x-auto">
+      <div className="bg-white rounded-lg overflow-x-clip">
         <div className="px-4 py-3 flex items-center justify-between overflow-visible">
           <div className="flex items-center shrink-0">
             <span className="text-xs font-medium text-[#2b2f36]">预计到场</span>

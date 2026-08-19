@@ -10,7 +10,6 @@ Page({
     needs: '',
     feedback: '',
     healingNotes: '',
-    groupLeaderFeedback: '',
     referrerHandler: '',
     referrerHandlerId: '',
     spaces: [],
@@ -110,7 +109,7 @@ Page({
 
   onOpenEditor(e) {
     const { field, label } = e.currentTarget.dataset
-    wx.navigateTo({ url: `/pages/text-editor/index?field=${field}&label=${label}` })
+    wx.navigateTo({ url: `/pages/text-editor/index?field=${encodeURIComponent(field)}&label=${encodeURIComponent(label)}` })
   },
 
   onFeedbackInput(e) {
@@ -119,10 +118,6 @@ Page({
 
   onHealingNotesInput(e) {
     this.setData({ healingNotes: e.detail.value })
-  },
-
-  onGroupLeaderFeedbackInput(e) {
-    this.setData({ groupLeaderFeedback: e.detail.value })
   },
 
   // 搜索选择弹窗
@@ -192,7 +187,6 @@ Page({
         needs: this.data.needs,
         feedback: this.data.feedback,
         healing_notes: this.data.healingNotes,
-        group_leader_feedback: this.data.groupLeaderFeedback,
         referrer_handler: this.data.referrerHandler,
         referrer_handler_id: this.data.referrerHandlerId || '',
         space_id: space?.id || '',

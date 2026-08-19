@@ -576,7 +576,6 @@ export interface VisitRecord {
   activities: ActivityInfo[]
   experience: string
   feedback: string
-  group_leader_feedback: string
   healing_notes: string
   daily_amount: number
   created_at: string
@@ -597,7 +596,6 @@ export interface VisitRecordCreate {
   arrival_time?: string
   cancelled?: boolean
   feedback?: string
-  group_leader_feedback?: string
   healing_notes?: string
 }
 
@@ -630,7 +628,7 @@ export const visitApi = {
   },
   get: (id: string) => request<VisitRecord>(`/api/visits/${id}`),
   create: (data: VisitRecordCreate) => request<VisitRecord>("/api/visits", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<VisitRecordCreate> & { experience?: string; feedback?: string; group_leader_feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<VisitRecordCreate> & { experience?: string; feedback?: string }) => request<VisitRecord>(`/api/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/visits/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/visits/search-customers?q=${encodeURIComponent(keyword)}`),
   counts: (params?: { customerIds?: string; startDate?: string; endDate?: string; memberTypes?: string; spaceId?: string }) => {

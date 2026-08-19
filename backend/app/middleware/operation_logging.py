@@ -186,7 +186,7 @@ SKIP_PATHS = [
     "/api/operation-logs",  # 操作日志自身是只读 API，不记录自身操作
     "/api/login-records",  # 登录与页面访问由独立审计服务记录
     "/api/system-logs",  # 系统日志自身是只读 API，不记录自身操作
-    "/api/system-helper",  # 茶苑助手对话不记录操作日志
+    "/api/system-helper",  # 茶院助手对话不记录操作日志
     "/api/voice",  # 语音助手对话不记录操作日志（已有独立日志逻辑）
     "/api/wechat",  # 微信登录不记录操作日志
     "/api/visit-history",  # 撤销/重做历史快照，非业务操作
@@ -263,7 +263,7 @@ FIELD_NAMES = {
     "customer_tags": "客户标签",
     "wechat": "微信", "core_situation": "核心情况",
     "deal_date": "成交日期", "last_visit_date": "最近到店", "other_info": "其他信息",
-    "service_teacher": "服务老师", "is_leader": "组长", "group_leader_feedback": "组长反馈",
+    "service_teacher": "服务老师", "is_leader": "组长",
     "need_tags": "需求标签", "follow_up_node": "跟进节点", "follow_up_status": "跟进状态",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",

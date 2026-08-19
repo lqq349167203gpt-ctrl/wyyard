@@ -291,8 +291,6 @@ def query_customer_info(customer_name: str) -> str:
                     parts.append(f"跟进点：{v.healing_notes}")
                 if v.feedback:
                     parts.append(f"客户收获：{v.feedback}")
-                if v.group_leader_feedback:
-                    parts.append(f"组长反馈：{v.group_leader_feedback}")
                 # 填充活动参与信息
                 if not v.activities:
                     try:

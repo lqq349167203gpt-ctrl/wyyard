@@ -166,10 +166,6 @@
           <text class="heal-label">当日需求</text>
           <text class="heal-value">{{item.needs}}</text>
         </view>
-        <view class="heal-row" wx:if="{{item.group_leader_feedback}}">
-          <text class="heal-label">组长反馈</text>
-          <text class="heal-value">{{item.group_leader_feedback}}</text>
-        </view>
         <view class="heal-row" wx:if="{{item.growth_record}}">
           <text class="heal-label">跟进点</text>
           <text class="heal-value">{{item.growth_record}}</text>

@@ -70,11 +70,11 @@ function textWidth(str) {
 
 // 各列容量（单位：CJK 字宽），仅用于判断是否会被省略号截断
 const COL_CAPACITY = {
-  c3: 4.5, c4: 4, c5: 5, c6: 5,
+  c3: 4.5, c4: 4, c5: 5,
   'a-c3': 5, 'a-c4': 6,
   'p-c2': 4, 'p-c6': 9,
 }
-const OVERFLOW_COLS = ['c3', 'c4', 'c5', 'c6', 'a-c3', 'a-c4', 'p-c2', 'p-c6']
+const OVERFLOW_COLS = ['c3', 'c4', 'c5', 'a-c3', 'a-c4', 'p-c2', 'p-c6']
 
 function flattenText(str) {
   return (str || '').replace(/\n+/g, ' ')
@@ -380,7 +380,6 @@ Page({
         needText: v.needs || '',
         infoText: v.feedback || v.experience || '',
         followText: (c && c.follow_up_node) || '',
-        leaderText: v.group_leader_feedback || '',
         refText: v.referrer || '',
         refHandlerText: v.referrer_handler || '',
         visitTimeText: v.arrival_time || v.visit_time || '',
@@ -773,15 +772,15 @@ Page({
     const headerMap = {
       visit: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
-        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
+        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
       ],
       invited: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
-        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
+        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
       ],
       cancelled: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
-        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '组长反馈', cls: 'c6' },
+        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
       ],
       activity_today: [
         { text: '日期', cls: 'a-c1' }, { text: '类型', cls: 'a-c2' }, { text: '活动名称', cls: 'a-c3' },
@@ -826,7 +825,6 @@ Page({
                 { text: v.needs || '', cls: 'c3' },
                 { text: v.feedback || v.experience || '', cls: 'c4' },
                 { text: v.healing_notes || '', cls: 'c5' },
-                { text: v.group_leader_feedback || '', cls: 'c6' },
               ]
               return { rowClass: 'detail-row', expanded: false, overflow: rowOverflow(cols), cols }
             })

@@ -13,7 +13,7 @@ export default function ArrivalFeedbackPage() {
   const [experience, setExperience] = useState("")
 
   useEffect(() => {
-    document.title = "无忧茶苑 - 反馈记录"
+    document.title = "无忧茶院 - 反馈记录"
   }, [])
 
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function ArrivalFeedbackPage() {
       </div>
 
       <div className="text-center py-5 text-[11px] text-[#b0b5bb]">
-        无忧茶苑数据平台
+        无忧茶院数据平台
       </div>
     </div>
   )

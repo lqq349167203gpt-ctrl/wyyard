@@ -733,7 +733,6 @@
 .detail-row .c3 { width: 100rpx; flex-shrink: 0; white-space: pre-wrap; word-break: break-all; }
 .detail-row .c4 { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-all; }
 .detail-row .c5 { width: 110rpx; flex-shrink: 0; white-space: pre-wrap; word-break: break-all; }
-.detail-row .c6 { width: 110rpx; flex-shrink: 0; white-space: pre-wrap; word-break: break-all; }
 
 .detail-row .unarrived {
   color: #a0a4ab;
@@ -784,7 +783,6 @@
 .detail-row.collapsed .c3,
 .detail-row.collapsed .c4,
 .detail-row.collapsed .c5,
-.detail-row.collapsed .c6,
 .detail-row.collapsed .a-c3,
 .detail-row.collapsed .a-c4,
 .detail-row.collapsed .p-c2,

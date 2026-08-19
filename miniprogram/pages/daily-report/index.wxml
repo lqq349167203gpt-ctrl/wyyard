@@ -91,7 +91,6 @@
         <view class="c-detail">
           <view class="d-row"><text class="d-label">客户信息</text><text class="d-val">{{item.infoText || ''}}<text class="dash" wx:if="{{!item.infoText}}">-</text></text></view>
           <view class="d-row"><text class="d-label">跟进点</text><text class="d-val">{{item.followText || ''}}<text class="dash" wx:if="{{!item.followText}}">-</text></text></view>
-          <view class="d-row"><text class="d-label">组长反馈</text><text class="d-val">{{item.leaderText || ''}}<text class="dash" wx:if="{{!item.leaderText}}">-</text></text></view>
           <view class="d-divider"></view>
           <view class="d-row"><text class="d-label">引流</text><text class="d-val">{{item.refText || '自然到店'}}</text></view>
           <view class="d-row"><text class="d-label">邀约</text><text class="d-val">{{item.refHandlerText || ''}}<text class="dash" wx:if="{{!item.refHandlerText}}">-</text></text></view>

@@ -30,7 +30,7 @@ Component({
   methods: {
     onCardTap() {
       if (this.data.editMode || this.data.visit.cancelled) return
-      this.triggerEvent('tap', { visit: this.data.visit })
+      this.triggerEvent('cardtap', { visit: this.data.visit })
     },
 
     onCardLongPress() {

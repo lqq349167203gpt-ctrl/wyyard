@@ -72,7 +72,7 @@ export default function LoginPage() {
           <div className="w-5 h-5 rounded-md bg-[#4370F7] flex items-center justify-center">
             <span className="text-[10px] font-semibold text-white leading-none font-sans">W</span>
           </div>
-          <span className="text-sm font-medium text-[#1f2329]">无忧茶苑数据平台</span>
+          <span className="text-sm font-medium text-[#1f2329]">无忧茶院数据平台</span>
         </div>
 
         <div className="flex-1 flex items-center justify-center">

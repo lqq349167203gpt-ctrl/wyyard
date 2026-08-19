@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +50,8 @@ function buildPayload(form: Record<string, any>, changedFields?: Record<string, 
 export default function CustomerFormPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id?: string }>()
+  const [searchParams] = useSearchParams()
+  const backPath = searchParams.get("back") || "/healing-records"
   const isEdit = !!id
   const enterToNext = useEnterToNext()
 
@@ -112,10 +114,10 @@ export default function CustomerFormPage() {
       })
     }).catch(() => {
       alert("加载客户信息失败")
-      navigate("/healing-records")
+      navigate(backPath)
     }).finally(() => setLoading(false))
 
-  }, [id, navigate])
+  }, [id, navigate, backPath])
 
   // 新建和编辑页面都加载可选标签；编辑时额外加载客户已有标签。
   useEffect(() => {
@@ -195,7 +197,7 @@ export default function CustomerFormPage() {
         navigate(`/healing-records/${result.id}/edit`, { replace: true })
       }
       localStorage.removeItem(draftKey)
-      navigate("/healing-records")
+      navigate(backPath)
     } catch (e) {
       const msg = e instanceof Error ? e.message : "保存失败"
       if (msg.includes("昵称")) setFieldErrors({ nickname: msg })
@@ -205,7 +207,7 @@ export default function CustomerFormPage() {
     } finally {
       setSaving(false)
     }
-  }, [form, entityId, navigate, selectedTagIds, tagsLoaded, customers, draftKey])
+  }, [form, entityId, navigate, backPath, selectedTagIds, tagsLoaded, customers, draftKey])
 
   // 引流人/承接人验证（blur 时检查）
   const validateReferrer = (value: string, field: "referrer" | "referrer_handler") => {
@@ -234,7 +236,7 @@ export default function CustomerFormPage() {
       {/* 顶栏 */}
       <div className="shrink-0 bg-white border-b border-[#f0f0f0]">
         <div className="px-6 h-12 flex items-center gap-3">
-          <button onClick={() => navigate("/healing-records")} className="flex items-center gap-1 text-[13px] text-[#4e535a] hover:text-[#1f2329] transition-colors">
+          <button onClick={() => navigate(backPath)} className="flex items-center gap-1 text-[13px] text-[#4e535a] hover:text-[#1f2329] transition-colors">
             <ArrowLeft className="h-4 w-4" />
             返回
           </button>
@@ -416,7 +418,7 @@ export default function CustomerFormPage() {
         <div className="flex flex-col items-center gap-2">
           {fieldErrors._general && <p className="text-[12px] text-[#f54a45]">{fieldErrors._general}</p>}
           <div className="flex items-center gap-[18px]">
-            <Button variant="outline" size="sm" className="h-[34px] text-xs w-[140px]" onClick={() => navigate("/healing-records")}>
+            <Button variant="outline" size="sm" className="h-[34px] text-xs w-[140px]" onClick={() => navigate(backPath)}>
               返回
             </Button>
             <Button size="sm" className="h-[34px] text-xs w-[140px]" onClick={handleSave} disabled={saving || (isEdit && tagsLoading)}>

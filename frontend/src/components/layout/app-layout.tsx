@@ -68,7 +68,7 @@ export function AppLayout() {
   }, [helperMessages, userId])
 
   useEffect(() => {
-    const title = PAGE_TITLES[location.pathname] || "无忧茶苑"
+    const title = PAGE_TITLES[location.pathname] || "无忧茶院"
     document.title = title
   }, [location.pathname])
 

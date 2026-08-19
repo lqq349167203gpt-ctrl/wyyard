@@ -338,8 +338,8 @@ Page({
 
   onVisitTap(e) {
     if (this.data.editMode) return
-    const visit = e.currentTarget.dataset.visit
-    if (visit.cancelled) return
+    const visit = e.detail.visit || e.currentTarget.dataset.visit
+    if (!visit || visit.cancelled) return
     wx.navigateTo({ url: `/pages/visit-edit/index?id=${visit.id}` })
   },
 

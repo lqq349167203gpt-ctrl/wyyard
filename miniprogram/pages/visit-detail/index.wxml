@@ -58,11 +58,6 @@
     <text class="section-content">{{visit.healing_notes}}</text>
   </view>
 
-  <view class="section" wx:if="{{visit.group_leader_feedback}}">
-    <text class="section-title">组长反馈</text>
-    <text class="section-content">{{visit.group_leader_feedback}}</text>
-  </view>
-
   <!-- 编辑按钮 -->
   <view class="bottom-bar">
     <button class="edit-btn" bindtap="onEditTap">编辑记录</button>

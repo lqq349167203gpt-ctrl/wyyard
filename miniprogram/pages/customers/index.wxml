@@ -1,3 +1,4 @@
+<page-meta page-style="{{showFilterPanel ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
   <!-- 无权限 -->
   <view class="no-permission" wx:if="{{!hasPagePermission}}">
@@ -131,30 +132,37 @@
   </view>
 
   <!-- 分组客户列表 -->
-  <view class="customer-groups" wx:if="{{!loading && groupedCustomers.length > 0}}">
+  <view class="customer-groups" wx:if="{{groupedCustomers.length > 0}}">
     <view class="group" wx:for="{{groupedCustomers}}" wx:key="type">
-      <view class="group-header">
-        <text class="group-title">{{item.type}}</text>
-        <text class="group-count">{{item.list.length}} 人</text>
+      <view class="c-group-head">
+        <text class="c-group-title">{{item.type}}</text>
+        <text class="c-group-count">{{item.list.length}} 人</text>
       </view>
-      <view class="group-list">
-        <view class="group-item" wx:for="{{item.list}}" wx:for-item="customer" wx:key="id" bindtap="onCustomerTap" data-id="{{customer.id}}">
-          <view class="item-left">
-            <text class="item-nickname">{{customer.nickname}}</text>
-            <text class="item-customer-tag" wx:if="{{customer.customer_tags && customer.customer_tags.length}}">{{customer.customer_tags[0].name}}</text>
+      <block wx:for="{{item.list}}" wx:for-item="customer" wx:key="id">
+        <view class="c-card {{customer.isStale ? 'stale' : 'normal'}}" bindtap="onCustomerTap" data-id="{{customer.id}}">
+          <view class="c-line1">
+            <text class="c-name">{{customer.nickname}}</text>
+            <text class="c-tag" wx:if="{{customer.customer_tags && customer.customer_tags.length}}">{{customer.customer_tags[0].name}}</text>
+            <text class="c-days-pill {{customer.daysPillClass}}">{{customer.daysPillText}}</text>
           </view>
-          <view class="item-right">
-            <text class="item-count" wx:if="{{customer.visit_count}}">到店 {{customer.visit_count}} 次</text>
-            <text class="item-days" wx:if="{{customer.daysAgo >= 0}}">（{{customer.daysAgo}}天前）</text>
-            <text class="item-arrow">›</text>
+          <view class="c-line2">
+            <text>到店 {{customer.visit_count}} 次</text>
+            <block wx:if="{{customer.referrer}}">
+              <text class="c-sep">·</text>
+              <text>引流 {{customer.referrer}}</text>
+            </block>
+            <block wx:if="{{customer.cardRemainingText}}">
+              <text class="c-sep">·</text>
+              <text>{{customer.cardRemainingText}}</text>
+            </block>
           </view>
         </view>
-      </view>
+      </block>
     </view>
   </view>
 
-  <!-- 加载中 -->
-  <view class="loading" wx:if="{{loading}}">
+  <!-- 加载中（仅首次加载、列表为空时显示） -->
+  <view class="loading" wx:if="{{loading && groupedCustomers.length === 0}}">
     <text>加载中...</text>
   </view>
 
@@ -168,7 +176,10 @@
   </view>
 
   <!-- 加载更多 -->
-  <view class="load-more" wx:if="{{!loading && !hasMore && groupedCustomers.length > 0}}">
+  <view class="load-more" wx:if="{{loadingMore}}">
+    <text>加载中...</text>
+  </view>
+  <view class="load-more" wx:if="{{!loadingMore && !loading && !hasMore && groupedCustomers.length > 0}}">
     <text>已加载全部</text>
   </view>
 

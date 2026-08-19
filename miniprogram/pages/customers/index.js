@@ -6,6 +6,7 @@ Page({
     customers: [],
     groupedCustomers: [],
     loading: false,
+    loadingMore: false,
     initialized: false,
     keyword: '',
     // 筛选相关
@@ -144,15 +145,23 @@ Page({
   },
 
   onReachBottom() {
-    if (this.data.hasMore && !this.data.loading) {
+    if (this.data.hasMore && !this.data.loading && !this.data.loadingMore) {
       this.loadData(false)
     }
   },
 
+  onUnload() {
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+  },
+
   async loadData(reset) {
-    if (this.data.loading) return
+    if (this.data.loading || this.data.loadingMore) return
     const page = reset ? 1 : this.data.page + 1
-    this.setData({ loading: true })
+    if (reset) {
+      this.setData({ loading: true })
+    } else {
+      this.setData({ loadingMore: true })
+    }
 
     try {
       const token = wx.getStorageSync('auth_token')
@@ -161,8 +170,12 @@ Page({
         page,
         page_size: this.data.pageSize,
         nickname: this.data.keyword || undefined,
+        member_types: this.data.selectedMemberTypes.length > 0 ? this.data.selectedMemberTypes.join(',') : undefined,
+        referrers: this.data.selectedReferrers.length > 0 ? this.data.selectedReferrers.join(',') : undefined,
         tag_ids: this.data.selectedTagIds.length > 0 ? this.data.selectedTagIds.join(',') : undefined,
         tag_match: this.data.selectedTagIds.length > 0 ? 'any' : undefined,
+        last_visit_days_min: this.data.daysFilterMin > 0 ? this.data.daysFilterMin : undefined,
+        last_visit_days_max: this.data.daysFilterMax < 60 ? this.data.daysFilterMax : undefined,
       })
       console.log('[loadData] 请求成功, items数量:', res?.items?.length ?? res?.length ?? 'N/A')
 
@@ -181,6 +194,28 @@ Page({
         } else {
           c.daysAgo = -1
         }
+        const days = c.daysAgo
+        if (days < 0) {
+          c.daysPillClass = 'pill-none'
+          c.daysPillText = '未到店'
+        } else if (days <= 7) {
+          c.daysPillClass = 'pill-recent'
+          c.daysPillText = days + '天前'
+        } else if (days <= 30) {
+          c.daysPillClass = 'pill-mid'
+          c.daysPillText = days + '天前'
+        } else {
+          c.daysPillClass = 'pill-over'
+          c.daysPillText = days + '天未到店'
+        }
+        c.isStale = days > 30
+        if (c.card_remaining === 'unlimited') {
+          c.cardRemainingText = '不限次'
+        } else if (typeof c.card_remaining === 'number') {
+          c.cardRemainingText = '剩 ' + c.card_remaining + ' 次'
+        } else {
+          c.cardRemainingText = ''
+        }
       })
 
       this.setData({ customers, page, total, hasMore: customers.length < total, initialized: true })
@@ -188,36 +223,13 @@ Page({
       this.applyFilters()
     } catch (e) {
       console.error('[loadData] 加载客户失败:', e.message, e)
-      this.setData({ loading: false, initialized: true })
+      this.setData({ loading: false, loadingMore: false, initialized: true })
       wx.showToast({ title: '加载失败', icon: 'none' })
     }
   },
 
   applyFilters() {
-    let filtered = this.data.customers || []
-
-    // 按身份筛选（多选）
-    const { selectedMemberTypes } = this.data
-    if (selectedMemberTypes && selectedMemberTypes.length > 0) {
-      filtered = filtered.filter(c => selectedMemberTypes.includes(c.member_type || ''))
-    }
-
-    // 按引流人筛选（多选）
-    const { selectedReferrers } = this.data
-    if (selectedReferrers && selectedReferrers.length > 0) {
-      filtered = filtered.filter(c => selectedReferrers.includes(c.referrer || ''))
-    }
-
-    // 按到店间隔区间筛选
-    const { daysFilterMin, daysFilterMax } = this.data
-    if (daysFilterMin > 0 || daysFilterMax < 60) {
-      filtered = filtered.filter(c => {
-        if (c.daysAgo < 0) return false
-        if (c.daysAgo < daysFilterMin) return false
-        if (daysFilterMax < 60 && c.daysAgo > daysFilterMax) return false
-        return true
-      })
-    }
+    const filtered = this.data.customers || []
 
     // 按会员身份分组（反向排列）
     const identities = this.data.memberTypes.filter(t => t).reverse()
@@ -239,14 +251,19 @@ Page({
       groupedCustomers.push({ type: '其他', list: groupMap['其他'] })
     }
 
-    this.setData({ groupedCustomers, loading: false })
+    this.setData({ groupedCustomers, loading: false, loadingMore: false })
   },
 
   onSearchInput(e) {
     this.setData({ keyword: e.detail.value })
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    this._searchTimer = setTimeout(() => {
+      this.loadData(true)
+    }, 300)
   },
 
   onSearchConfirm() {
+    if (this._searchTimer) clearTimeout(this._searchTimer)
     this.loadData(true)
   },
 
@@ -362,7 +379,7 @@ Page({
     this._rangeType = null
   },
 
-  // 重置筛选
+  // 重置筛选（清空所有条件，但保持面板打开，等用户点确定后再生效）
   onResetFilter() {
     this._filterSnapshot = null
     this.setData({
@@ -373,13 +390,11 @@ Page({
       rangeMax: 60,
       daysFilterMin: 0,
       daysFilterMax: 60,
-      showFilterPanel: false,
       filterCount: 0,
     })
     this.updateMemberTypeList()
     this.updateReferrerList()
     this.updateCustomerTagList()
-    this.loadData(true)
   },
 
   // 确认筛选

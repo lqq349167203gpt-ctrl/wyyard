@@ -199,7 +199,7 @@ export default function TeaGuestConsumptionRecordsPage() {
       <section className="flex h-[56px] shrink-0 items-center justify-between rounded-[4px] bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
         <div>
           <h1 className="text-[18px] font-medium text-[#212631]">消费记录</h1>
-          <p className="mt-0.5 text-[12px] text-[#8f959e]">茶客业务独立记录，不计入无忧茶苑现有业务数据</p>
+          <p className="mt-0.5 text-[12px] text-[#8f959e]">茶客业务独立记录，不计入无忧茶院现有业务数据</p>
         </div>
         <Button size="sm" className="h-8 bg-[#3370ff] px-3 text-[12px] hover:bg-[#2865e8]" onClick={openCreate}>
           <Plus className="mr-1 h-3.5 w-3.5" />新增记录

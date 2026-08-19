@@ -507,8 +507,6 @@ export default function DetailView({
                     <div className="grid grid-cols-[84px_1fr] gap-y-1 gap-x-3">
                       <span className="text-[12px] text-[#a8b1bd] pt-px">当日需求</span>
                       <p className="text-[12px] leading-[1.55] text-[#3a4150] whitespace-pre-wrap">{v.needs || <DvEmpty />}</p>
-                      <span className="text-[12px] text-[#a8b1bd] pt-px">组长反馈</span>
-                      <p className="text-[12px] leading-[1.55] text-[#3a4150] whitespace-pre-wrap">{v.group_leader_feedback || <DvEmpty />}</p>
                       {(() => {
                         const hr = detail?.healing_records.find(r => r.date === v.visit_date)
                         const record = hr?.growth_record || v.healing_notes

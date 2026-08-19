@@ -16,7 +16,6 @@ Page({
     needs: '',
     feedback: '',
     healingNotes: '',
-    groupLeaderFeedback: '',
     arrived: false,
     arrivalTime: '',
     // 搜索选择弹窗
@@ -80,7 +79,6 @@ Page({
         needs: visit.needs || '',
         feedback: visit.feedback || '',
         healingNotes: visit.healing_notes || '',
-        groupLeaderFeedback: visit.group_leader_feedback || '',
         arrived: visit.arrived || false,
         arrivalTime: visit.arrival_time || '',
       })
@@ -115,13 +113,12 @@ Page({
 
   onOpenEditor(e) {
     const { field, label } = e.currentTarget.dataset
-    wx.navigateTo({ url: `/pages/text-editor/index?field=${field}&label=${label}` })
+    wx.navigateTo({ url: `/pages/text-editor/index?field=${encodeURIComponent(field)}&label=${encodeURIComponent(label)}` })
   },
 
   onNeedsInput(e) { this.setData({ needs: e.detail.value }) },
   onFeedbackInput(e) { this.setData({ feedback: e.detail.value }) },
   onHealingNotesInput(e) { this.setData({ healingNotes: e.detail.value }) },
-  onGroupLeaderFeedbackInput(e) { this.setData({ groupLeaderFeedback: e.detail.value }) },
 
   onArrivedChange(e) {
     const arrived = e.detail.value
@@ -204,7 +201,6 @@ Page({
         needs: this.data.needs,
         feedback: this.data.feedback,
         healing_notes: this.data.healingNotes,
-        group_leader_feedback: this.data.groupLeaderFeedback,
         arrived: this.data.arrived,
         arrival_time: this.data.arrivalTime || null,
       })

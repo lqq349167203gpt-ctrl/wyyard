@@ -62,7 +62,7 @@
       edit-mode="{{editMode}}"
       can-move-up="{{index > 0}}"
       can-move-down="{{index < visits.length - 1}}"
-      bindtap="onVisitTap"
+      bind:cardtap="onVisitTap"
       data-visit="{{item}}"
 
       bind:delete="onDeleteTap"

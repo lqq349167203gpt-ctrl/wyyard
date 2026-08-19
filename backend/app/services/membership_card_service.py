@@ -556,6 +556,56 @@ def get_current_card_remaining(customer_id: str, on_date: Optional[str] = None) 
     )
 
 
+def list_current_card_remaining(customer_ids: set) -> dict:
+    """批量计算客户当前有效会员卡剩余次数（轻量，不逐客户 reconcile，供列表页使用）。
+
+    返回 {customer_id: remaining}，remaining 取值：
+      "unlimited" 表示有效期内存在不限次卡；int 表示剩余次数（>=0）。
+      未返回的客户表示当前没有有效会员卡（含没办卡 / 卡已过期 / 已退费作废）。
+    语义对齐 get_current_card_remaining（单卡余量之和），但不包含历史欠卡。
+    """
+    from app.services import project_deduction_service
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # 销卡流水次数索引 {card_id: count}
+    manual_map: dict = {}
+    for d in project_deduction_service._deductions.values():
+        if d.project_type == "membership-cards" and not d.is_deleted and d.project_id:
+            manual_map[d.project_id] = manual_map.get(d.project_id, 0) + (d.count or 0)
+
+    # 活动扣卡次数索引 {card_id: count}
+    activity_map: dict = {}
+    for records in _deductions.values():
+        for item in records:
+            if isinstance(item, dict) and item.get("card_id"):
+                activity_map[item["card_id"]] = activity_map.get(item["card_id"], 0) + 1
+
+    result: dict = {}
+    for card in list_cards():
+        if card.customer_id not in customer_ids:
+            continue
+        # 有效卡：已生效、未过期、未作废
+        if (
+            card.voided
+            or (card.effective_date and card.effective_date > today)
+            or (card.expiry_date and card.expiry_date < today)
+        ):
+            continue
+        if card.remaining_count is None:
+            # 有效期内有不限次卡，直接标记不限次
+            result[card.customer_id] = "unlimited"
+            continue
+        prev = result.get(card.customer_id)
+        if prev == "unlimited":
+            continue
+        used = manual_map.get(card.id, 0) + activity_map.get(card.id, 0)
+        rem = max(0, (card.total_count or 0) - used)
+        result[card.customer_id] = (prev or 0) + rem
+
+    return result
+
+
 _load()
 
 

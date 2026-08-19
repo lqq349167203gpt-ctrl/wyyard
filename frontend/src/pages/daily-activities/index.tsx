@@ -2407,8 +2407,8 @@ export default function DailyActivitiesPage() {
 
   // ===== JSX =====
   return (
-    <div className="flex flex-col min-h-0" style={{ height: 'calc(100vh - 48px)', paddingRight: historyPanelOpen ? 320 : 0 }}>
-      <div className="flex flex-col min-h-0 flex-1 gap-2 px-6 pt-4 pb-6 overflow-x-auto">
+    <div className="flex flex-col min-h-0 min-w-0" style={{ height: 'calc(100vh - 48px)', paddingRight: historyPanelOpen ? 320 : 0 }}>
+      <div className="flex flex-col min-h-0 min-w-0 flex-1 gap-2 px-6 pt-4 pb-6 overflow-x-clip">
         {/* 月份导航 + 空间 */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0 relative">
@@ -2609,7 +2609,7 @@ export default function DailyActivitiesPage() {
         </div>
 
         {/* Activity cards */}
-        <div className="flex-1 overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex-1 overflow-y-auto min-w-0" onMouseDown={(e) => e.stopPropagation()}>
           {detailLoading ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Loader2 className="h-8 w-8 text-muted-foreground mb-2 animate-spin" />

@@ -199,11 +199,11 @@ export default function AgentsPage() {
         </Dialog>
       </div>
 
-      {/* 茶苑助手 AI 配置 */}
+      {/* 茶院助手 AI 配置 */}
       <Card className="shadow-none">
         <CardHeader className="px-5 pt-4 pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold">茶苑助手 AI 配置</CardTitle>
+            <CardTitle className="text-sm font-semibold">茶院助手 AI 配置</CardTitle>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
               setHelperConfigExpanded(true)
               if (!helperConfig) {
@@ -214,7 +214,7 @@ export default function AgentsPage() {
               <Settings className="mr-1 h-3 w-3" /> 配置
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">配置 header 茶苑助手对话功能使用的模型和参数</p>
+          <p className="text-xs text-muted-foreground">配置 header 茶院助手对话功能使用的模型和参数</p>
         </CardHeader>
         <CardContent className="px-5 pb-4 pt-0">
           <div className="flex items-center gap-2 text-sm">
@@ -225,11 +225,11 @@ export default function AgentsPage() {
         </CardContent>
       </Card>
 
-      {/* 茶苑助手 AI 配置弹窗 */}
+      {/* 茶院助手 AI 配置弹窗 */}
       <Dialog open={helperConfigExpanded} onOpenChange={setHelperConfigExpanded}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">茶苑助手 AI 配置</DialogTitle>
+            <DialogTitle className="text-base">茶院助手 AI 配置</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5" {...enterToNext}>
             {helperLoading ? (

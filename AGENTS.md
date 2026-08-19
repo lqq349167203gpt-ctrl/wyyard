@@ -139,7 +139,68 @@ wyyard/
 <claude-mem-context>
 # Memory Context
 
-# [wyyard] recent context, 2026-07-28 8:44pm GMT+8
+# [wyyard] recent context, 2026-08-16 10:55pm GMT+8
 
-No previous sessions found.
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 50 obs (8,921t read) | 1,161,699t work | 99% savings
+
+### Aug 12, 2026
+263 12:27p 🔵 Member identity config applied but dev service serves stale in-memory value
+265 12:59p 🔴 PC端客户详情卡次统计修复：逐张展示所有有效会员卡
+266 " 🔄 删除单卡标记冗余代码：移除 is_current 字段与 get_current_card_id
+267 " 🔵 API 实测确认两卡并存与欠卡分离语义
+268 " ⚖️ Git 提交范围界定：仅项目代码，排除设计预览文件
+### Aug 13, 2026
+288 3:38p 🔴 会员卡余量与多卡展示逻辑修正
+289 " 🔵 生产部署架构：全部流量经 HTTPS 443 的 www.wyteahouse.cn
+290 4:42p 🟣 New financial overview module (财务数据) added to wyyard
+291 " 🟣 Expense records now support cost categories and configurable expense types
+292 " ✅ New financial pages synced into account permissions and operation logging
+293 " 🔵 Backend pytest needs escalated sandbox to reach local PostgreSQL test schema
+294 5:14p 🟣 New financial management module completed in wyyard admin backend
+295 " 🔄 Admin sidebar navigation restructured: financial data moved to reports, new expense group
+296 5:38p ✅ 人员分成 renamed to 分成 across full stack and reordered above 人员福利
+297 " 🔵 Backend pytest blocked: local PostgreSQL not running at localhost:5432
+301 5:57p ✅ wyyard 系统数据整体恢复到 7 月 18 日快照
+302 " 🔄 支出项/分成/人员福利三个页面统一为退费/欠卡记录视觉体系
+303 " 🔵 wyyard 前端工程规范：UI 设计 skill 与验证流程
+304 6:15p 🔵 wyyard backup/restore workflow established before destructive restore
+305 7:33p 🔴 财务构成弹窗空白修复：营收错误被吞 + 四类列表未绑定行详情
+306 " 🟣 财务构成列表统一固定 10 行高度分页
+307 " 🟣 财务构成行详情弹窗按类型差异化展示字段
+### Aug 14, 2026
+308 9:59a 🔵 DeepSeek dsh CLI v0.1.0-rc.6 is a Cordis-based agent framework with React web UI
+309 10:01a 🔵 The dsh web command maps to @deepseek-ai/dsh-web-app, a React client with ripgrep and turndown deps
+310 10:03a 🟣 DeepSeek dsh CLI installed and its web UI is now serving on http://127.0.0.1:3080
+311 " 🔵 dsh web reports serving on 127.0.0.1:3080 but the port refuses connections
+312 " 🔵 dsh web reports serving on 127.0.0.1:3080 but the port refuses connections
+313 10:04a 🔵 Untitled
+314 " 🔵 dsh web server confirmed reachable; earlier connection refusal was transient startup delay
+315 7:51p 🟣 DSH Web (deepseek-ai) installed and served on port 3080
+316 " 🔵 DSH Web became inaccessible because npx runs the server as a foreground session-bound process
+317 " ⚖️ DSH Web restarted as a nohup background daemon to survive session end
+318 9:52p 🟣 新增茶客业务独立消费记录模块
+319 " 🟣 新增系统切换器在独立业务线与主系统间切换
+320 " 🟣 茶客业务接入角色权限体系
+321 " 🟣 使用时长统计逻辑重构为可复用 hook
+322 " 🔴 修复测试文件 E402 导入位置错误
+323 " 🔵 诊断登录失败：检查 5173/8000 端口服务状态
+324 10:10p ✅ 系统切换入口降级为低存在感文字，并按权限隐藏
+325 " 🔴 茶客消费记录支付方式筛选框不再显示英文 all
+326 " ⚖️ 提交前按 wyyard-verify 流水线验证，git push 需用户确认
+327 10:29p 🔄 茶客业务布局统一样式：侧边栏与顶栏改用共享 Sidebar 组件
+328 " 🟣 新增茶客业务消费与支出模块并推送
+### Aug 16, 2026
+329 10:53p 🔵 PC 端网站无数据：定位为后端 8000 端口未监听，正在核对 PostgreSQL 数据是否仍存在
+330 " 🟣 新增「茶客业务」独立业务线：消费记录与支出模块，含独立权限与切换入口
+331 " 🟣 新增「使用统计」：登录记录 + IP + 页面操作 + 使用时长，区分 PC 端与管理端小程序
+332 " 🔴 操作日志汉化：删除/新增详情中的英文键名改为中文可读内容
+333 " 🟣 新增财务数据报表：营收/支出/退费/分成/人员福利核算与构成分析
+334 " ✅ 支出模块增强：自定义支出类型、成本归属二选一、可配置可选字段
+335 " ⚖️ 多分店架构需求被识别但暂缓：数据仍按当前空间维度，未拉高到系统级
+
+Access 1162k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

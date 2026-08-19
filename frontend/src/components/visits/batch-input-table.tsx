@@ -10,6 +10,8 @@ import { visitApi, membershipCardApi, consumptionRecordsApi, type CustomerLight,
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
 
 interface Row {
   key: number
@@ -26,14 +28,13 @@ interface Row {
   cancelled: boolean
   feedback: string
   healing_notes: string
-  group_leader_feedback: string
   activities: string
 }
 
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_id: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", group_leader_feedback: "", activities: "" }
+  return { key: nextKey++, visit_id: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", activities: "" }
 }
 
 export interface VisitChangedCell {
@@ -97,6 +98,14 @@ function formatRemaining(count: number | null): string {
   return `${count} 次`
 }
 
+type LongTextField = "needs" | "feedback" | "healing_notes"
+
+const LONG_TEXT_LABELS: Record<LongTextField, string> = {
+  needs: "本次需求",
+  feedback: "客户信息",
+  healing_notes: "跟进点",
+}
+
 export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onCustomerEdit, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
@@ -105,6 +114,9 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({})
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [editor, setEditor] = useState<{ key: number; field: LongTextField; label: string; nickname: string } | null>(null)
+  const [editorValue, setEditorValue] = useState("")
   const cardsRef = useRef<MembershipCard[]>([])
 
   // 撤回/重做历史栈
@@ -367,7 +379,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           cancelled: v.cancelled,
           feedback: v.feedback || "",
           healing_notes: v.healing_notes || "",
-          group_leader_feedback: v.group_leader_feedback || "",
           activities: (v.activities || []).map(a => `${a.name}${a.role ? `(${a.role})` : ""}`).join("、"),
         })
         ids[key] = v.id
@@ -401,7 +412,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           arrival_time: row.arrived ? row.visit_time : "",
           feedback: row.feedback,
           healing_notes: row.healing_notes,
-          group_leader_feedback: row.group_leader_feedback,
         })
         // 更新剩余次数
         if (result?.remaining_count !== undefined) {
@@ -426,7 +436,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           arrival_time: row.arrived ? row.visit_time : "",
           feedback: row.feedback,
           healing_notes: row.healing_notes,
-          group_leader_feedback: row.group_leader_feedback,
           space_id: spaceId || undefined,
         }
         const result = await visitApi.create(payload)
@@ -465,7 +474,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     visit_time: "到店时间", nickname: "昵称", member_type: "会员类型",
     is_leader: "组长", needs: "需求", referrer_handler: "引流处理",
     arrived: "到店状态", feedback: "反馈", healing_notes: "疗愈记录",
-    group_leader_feedback: "组长反馈",
   }
 
   const updateRow = useCallback((key: number, field: keyof Row, value: any) => {
@@ -484,6 +492,17 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     }
     scheduleSave(key)
   }, [rowStatus, scheduleSave, pushEditHistory])
+
+  const openEditor = (row: Row, field: LongTextField) => {
+    setEditor({ key: row.key, field, label: LONG_TEXT_LABELS[field], nickname: row.nickname || "未命名" })
+    setEditorValue(row[field])
+  }
+
+  const saveEditor = () => {
+    if (!editor) return
+    updateRow(editor.key, editor.field, editorValue)
+    setEditor(null)
+  }
 
   const cancelVisit = useCallback(async (row: Row) => {
     const visitId = savedVisitIds.current[row.key]
@@ -628,8 +647,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={onClosePreview}>返回编辑</Button>
         </div>
       )}
-      <div className="overflow-x-auto scrollbar-visible">
-        <div className="min-w-[1736px]">
+      <div ref={scrollRef} className="overflow-x-auto scrollbar-hide">
+        <div className="min-w-[1474px]">
           <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
           <thead>
             <tr className="bg-[#f7f8fa] text-[#8f959e]">
@@ -646,7 +665,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="px-1.5 py-2 text-left font-normal w-[60px]">今日成交</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">客户信息</th>
               <th className="px-1.5 py-2 text-left font-normal w-[220px]">跟进点</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[220px]">组长反馈</th>
               <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
               <th className="px-1.5 py-2 text-center font-normal w-[116px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
             </tr>
@@ -733,13 +751,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <textarea
-                      value={row.needs}
+                    <button
+                      type="button"
                       disabled={row.cancelled}
-                      onChange={(e) => updateRow(row.key, "needs", e.target.value)}
-                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
-                      rows={1}
-                    />
+                      onClick={() => openEditor(row, "needs")}
+                      className={`w-full h-7 flex items-center gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.needs ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
+                    >
+                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{row.needs}</span>
+                      <Edit className="h-3 w-3 shrink-0 text-[#c9cdd4]" />
+                    </button>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "referrer_handler") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <CustomerSearchInput rounded="2px"
@@ -774,31 +794,26 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     </span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <textarea
-                      value={row.feedback}
+                    <button
+                      type="button"
                       disabled={row.cancelled}
-                      onChange={(e) => updateRow(row.key, "feedback", e.target.value)}
-                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
-                      rows={1}
-                    />
+                      onClick={() => openEditor(row, "feedback")}
+                      className={`w-full h-7 flex items-center gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.feedback ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
+                    >
+                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{row.feedback}</span>
+                      <Edit className="h-3 w-3 shrink-0 text-[#c9cdd4]" />
+                    </button>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <textarea
-                      value={row.healing_notes}
+                    <button
+                      type="button"
                       disabled={row.cancelled}
-                      onChange={(e) => updateRow(row.key, "healing_notes", e.target.value)}
-                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
-                      rows={1}
-                    />
-                  </td>
-                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "group_leader_feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <textarea
-                      value={row.group_leader_feedback}
-                      disabled={row.cancelled}
-                      onChange={(e) => updateRow(row.key, "group_leader_feedback", e.target.value)}
-                      className="w-full h-7 text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] px-2 py-1 resize-none leading-5"
-                      rows={1}
-                    />
+                      onClick={() => openEditor(row, "healing_notes")}
+                      className={`w-full h-7 flex items-center gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.healing_notes ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
+                    >
+                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{row.healing_notes}</span>
+                      <Edit className="h-3 w-3 shrink-0 text-[#c9cdd4]" />
+                    </button>
                   </td>
                   <td className="px-1.5 py-1.5">
                     <span className="text-[12px] text-[#8f959e]">{leaderRow?.nickname || ""}</span>
@@ -884,6 +899,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         </div>
       </div>
 
+      <HorizontalScrollbar scrollRef={scrollRef} />
+
       <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
         <button
           onClick={addRow}
@@ -906,6 +923,26 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editor !== null} onOpenChange={(open) => { if (!open) setEditor(null) }}>
+        <DialogContent className="max-w-md p-0 gap-0" initialFocus={false}>
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-[15px]">{editor ? `${editor.nickname} — ${editor.label}` : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5">
+            <textarea
+              value={editorValue}
+              onChange={(e) => setEditorValue(e.target.value)}
+              className="w-full min-h-[200px] px-3 py-2 rounded-md border border-input text-[12px] resize-none"
+              placeholder={editor ? `输入${editor.label}...` : ""}
+            />
+          </div>
+          <div className="flex justify-end gap-2 px-6 pb-5 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setEditor(null)}>取消</Button>
+            <Button size="sm" onClick={saveEditor}>保存</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

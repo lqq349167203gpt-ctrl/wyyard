@@ -3,6 +3,7 @@ import { GripVertical, Trash2, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
 import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
@@ -293,6 +294,7 @@ export function ActivityBatchTable({
   rowStatusRef.current = rowStatus
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const eksCountEditRef = useRef<Record<string, string>>({})
   const [membershipDeductionDrafts, setMembershipDeductionDrafts] = useState<Record<number, string>>({})
   const lastEditedEksRef = useRef<ActivityRow | null>(null)
@@ -1194,7 +1196,7 @@ export function ActivityBatchTable({
           }
         `}</style>
       )}
-      <div className="overflow-x-auto scrollbar-visible">
+      <div ref={scrollRef} className="overflow-x-auto scrollbar-hide">
         <div className={hasOwnerType ? "min-w-[1471px]" : "min-w-[1315px]"}>
           <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
           <thead>
@@ -1592,6 +1594,8 @@ export function ActivityBatchTable({
         </table>
         </div>
       </div>
+
+      <HorizontalScrollbar scrollRef={scrollRef} />
 
       {!isPreview && (
         <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">

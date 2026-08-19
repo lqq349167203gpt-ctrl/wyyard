@@ -311,7 +311,7 @@ export default function ChatHistoryPage() {
                       <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} min-w-0 max-w-[75%]`}>
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-[11px] text-[#b0b5bb]">
-                            {isUser ? "用户" : (msg.mode === "visit" ? "邀约助手" : msg.mode === "activity" ? "课表助手" : msg.mode === "customer" ? "客户助手" : "茶苑助手")}
+                            {isUser ? "用户" : (msg.mode === "visit" ? "邀约助手" : msg.mode === "activity" ? "课表助手" : msg.mode === "customer" ? "客户助手" : "茶院助手")}
                           </span>
                           {msg.mode && (
                             <span className={`text-[9px] px-1 py-0.5 rounded ${MODE_COLORS[msg.mode]?.bg || ""} ${MODE_COLORS[msg.mode]?.text || ""}`}>

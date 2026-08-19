@@ -93,12 +93,12 @@ export default function OrganizationsPage() {
 
   const activeOrg = organizations.find(o => o.id === activeOrgId) || null
 
-  const FIXED_ORG_NAME = "无忧茶苑"
+  const FIXED_ORG_NAME = "无忧茶院"
   const FIXED_ORG_ALIASES = new Set(["无忧茶苑", "无忧茶院"])
   const isFixedOrganization = (name: string) => FIXED_ORG_ALIASES.has(name.trim())
 
   const sortedOrganizations = [...organizations].sort((a, b) => {
-    // 无忧茶苑始终置顶
+    // 无忧茶院始终置顶
     if (isFixedOrganization(a.name)) return -1
     if (isFixedOrganization(b.name)) return 1
     return (a.sort_order ?? 9999) - (b.sort_order ?? 9999)

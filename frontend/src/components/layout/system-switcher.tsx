@@ -59,7 +59,7 @@ export function SystemSwitcher({ currentSystem }: SystemSwitcherProps) {
     navigate(lastPath && !lastPath.startsWith("/tea-guest/") ? lastPath : "/")
   }
 
-  const currentLabel = currentSystem === "main" ? "无忧茶苑管理系统" : "茶客业务"
+  const currentLabel = currentSystem === "main" ? "无忧茶院管理系统" : "茶客业务"
 
   if (currentSystem === "main" && !canOpenTeaGuest) return null
 
@@ -83,7 +83,7 @@ export function SystemSwitcher({ currentSystem }: SystemSwitcherProps) {
             className="flex h-9 w-full items-center justify-between rounded-[4px] px-3 text-left text-[13px] text-[#2b2f36] hover:bg-[#f5f6f7]"
             role="menuitem"
           >
-            <span>无忧茶苑管理系统</span>
+            <span>无忧茶院管理系统</span>
             {currentSystem === "main" && <Check className="h-3.5 w-3.5 text-[#3370ff]" />}
           </button>
           {canOpenTeaGuest && (

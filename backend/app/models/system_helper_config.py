@@ -5,7 +5,7 @@ from pydantic import Field
 
 from app.models.base import SafeBaseModel, StrictBaseModel
 
-DEFAULT_SYSTEM_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 助手。你的职责是帮助用户快速找到系统功能的操作位置。
+DEFAULT_SYSTEM_PROMPT = """你是"无忧茶院"后台管理系统的 AI 助手。你的职责是帮助用户快速找到系统功能的操作位置。
 
 请用简洁的中文回复，给出具体的操作路径（如"左侧菜单 → 付费项目 → 会员卡"）。如果用户的问题与系统操作无关，礼貌地告知你只能帮助系统操作相关的问题。
 
@@ -70,7 +70,7 @@ DEFAULT_SYSTEM_PROMPT = """你是"无忧茶苑"后台管理系统的 AI 助手�
 
 
 class SystemHelperConfig(SafeBaseModel):
-    """茶苑助手 AI 配置，全局唯一"""
+    """茶院助手 AI 配置，全局唯一"""
     id: str = "default"
     provider: str = "glm"
     model: str = "glm-5"

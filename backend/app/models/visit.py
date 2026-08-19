@@ -29,13 +29,12 @@ class VisitRecordBase(SafeBaseModel):
     experience: str = ""  # 客户反馈
     feedback: str = ""  # 疗愈师回复
     healing_notes: str = ""  # 跟进记录
-    group_leader_feedback: str = ""  # 组长反馈
     sort_order: int = 0  # 排序权重，越小越靠前
 
     @field_validator(
         "visit_time", "member_type", "needs", "referrer_handler",
         "space_id", "arrival_time",
-        "experience", "feedback", "healing_notes", "group_leader_feedback",
+        "experience", "feedback", "healing_notes",
         mode="before",
     )
     @classmethod

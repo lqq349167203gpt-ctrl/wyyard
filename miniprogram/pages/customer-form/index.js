@@ -236,7 +236,7 @@ Page({
 
   onOpenEditor(e) {
     const { field, label } = e.currentTarget.dataset
-    wx.navigateTo({ url: `/pages/text-editor/index?field=${field}&label=${label}` })
+    wx.navigateTo({ url: `/pages/text-editor/index?field=${encodeURIComponent(field)}&label=${encodeURIComponent(label)}` })
   },
 
   onGenderChange(e) {

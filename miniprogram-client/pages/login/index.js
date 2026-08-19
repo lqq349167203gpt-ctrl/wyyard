@@ -21,7 +21,7 @@ Page({
     if (!this.data.agreed) {
       wx.showModal({
         title: '服务协议与隐私政策',
-        content: '登录即表示同意《无忧茶苑服务协议》与《隐私协议》',
+        content: '登录即表示同意《无忧茶院服务协议》与《隐私协议》',
         confirmText: '同意',
         cancelText: '取消',
         success: (res) => {

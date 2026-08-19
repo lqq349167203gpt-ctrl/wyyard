@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import Field
@@ -118,6 +119,7 @@ def _build_enriched_items(customers) -> list[dict]:
         "basic_info", "assessment", "other_info", "tracking_plan",
         "created_at", "created_by", "space_id", "position_sort_orders",
     )
+    remaining_map = membership_card_service.list_current_card_remaining({c.id for c in customers})
     items = []
     for c in customers:
         data = {k: getattr(c, k, None) for k in _SLIM_FIELDS}
@@ -125,6 +127,7 @@ def _build_enriched_items(customers) -> list[dict]:
         data["activity_count"] = _count_customer_activities(c.id)
         data["total_payment"] = max(payment_map.get(c.id, 0), 0)
         data["last_visit_date"] = get_last_visit_date(c.id)
+        data["card_remaining"] = remaining_map.get(c.id)
         items.append(data)
     return items
 
@@ -181,6 +184,9 @@ async def list_customers(
     member_types: str | None = Query(None),
     tag_ids: str | None = Query(None),
     tag_match: str = Query("any", pattern="^(any|all)$"),
+    referrers: str | None = Query(None),
+    last_visit_days_min: int | None = Query(None, ge=0),
+    last_visit_days_max: int | None = Query(None, ge=0),
     sort_by: str | None = Query(None),
     sort_order: str | None = Query(None),
 ):
@@ -200,6 +206,10 @@ async def list_customers(
         allowed = [m.strip() for m in member_types.split(",") if m.strip()]
         if allowed:
             items = [c for c in items if c.get("member_type") in allowed]
+    if referrers:
+        allowed_refs = [r.strip() for r in referrers.split(",") if r.strip()]
+        if allowed_refs:
+            items = [c for c in items if (c.get("referrer") or "").strip() in allowed_refs]
     if tag_ids:
         requested_tag_ids = [tag_id.strip() for tag_id in tag_ids.split(",") if tag_id.strip()]
         try:
@@ -211,6 +221,23 @@ async def list_customers(
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         items = [item for item in items if item["id"] in matched_customer_ids]
+    if last_visit_days_min is not None or last_visit_days_max is not None:
+        today = date.today()
+        filtered = []
+        for c in items:
+            d = (c.get("last_visit_date") or "").strip()
+            if not d:
+                continue
+            try:
+                days_ago = (today - date.fromisoformat(d)).days
+            except ValueError:
+                continue
+            if last_visit_days_min is not None and days_ago < last_visit_days_min:
+                continue
+            if last_visit_days_max is not None and days_ago > last_visit_days_max:
+                continue
+            filtered.append(c)
+        items = filtered
 
     visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", ""))
     for item in items:

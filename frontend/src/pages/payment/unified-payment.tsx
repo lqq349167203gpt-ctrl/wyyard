@@ -1069,8 +1069,8 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       if (!org) errors.push(`组织"${orgName}"不存在`)
       else orgId = org.id
     } else if (type !== "other") {
-      // 非其他项目默认无忧茶苑
-      const defaultOrg = orgMap.get("无忧茶苑")
+      // 非其他项目默认无忧茶院
+      const defaultOrg = orgMap.get("无忧茶院")
       if (defaultOrg) orgId = defaultOrg.id
     }
 

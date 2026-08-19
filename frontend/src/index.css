@@ -209,7 +209,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   scrollbar-color: #c1c1c1 #f0f0f0;
 }
 .scrollbar-visible::-webkit-scrollbar {
-  height: 8px;
+  height: 10px;
 }
 .scrollbar-visible::-webkit-scrollbar-track {
   background: #f0f0f0;

@@ -276,7 +276,7 @@ export function AppSidebar() {
           <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#3370ff] text-[12px] font-medium text-white">
             W
           </div>
-          <span className="text-[13px] font-medium tracking-tight text-[#212631]">无忧茶苑</span>
+          <span className="text-[13px] font-medium tracking-tight text-[#212631]">无忧茶院</span>
         </div>
       </SidebarHeader>
       <SidebarContent className="mt-4 pb-5">
