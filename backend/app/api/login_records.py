@@ -58,6 +58,16 @@ def list_records(
     page_size: int = Query(20, ge=1, le=100),
     _role: str = Depends(require_login_records),
 ):
+    if event_type == "operation":
+        return login_record_service.list_operation_activity_paginated(
+            account_id=account_id,
+            source=source,
+            date_from=date_from.isoformat() if date_from else None,
+            date_to=date_to.isoformat() if date_to else None,
+            keyword=keyword,
+            page=page,
+            page_size=page_size,
+        )
     items = login_record_service.list_activity(
         account_id=account_id,
         event_type=event_type,

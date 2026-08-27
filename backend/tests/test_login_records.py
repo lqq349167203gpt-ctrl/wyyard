@@ -277,3 +277,39 @@ def test_default_activity_attaches_page_duration_without_duplicate_usage_rows(cl
     )
     assert usage_response.status_code == 200
     assert usage_response.json()["items"][0]["duration_seconds"] == 120
+
+
+def test_operation_activity_is_filtered_before_pagination(client):
+    from app.models.operation_log import OperationLogCreate
+    from app.services import account_service, operation_log_service
+
+    account = account_service.get_by_username("pytest_admin")
+    assert account is not None
+    marker = f"分页专项_{uuid.uuid4().hex[:8]}"
+    created_ids = []
+    for index in range(23):
+        log = operation_log_service.create_log(
+            OperationLogCreate(section="使用统计", content=f"{marker}_{index:02d}"),
+            extra={"operator": account.owner, "source": "pc", "ip": "203.0.113.60"},
+        )
+        created_ids.append(log.id)
+
+    response = client.get(
+        "/api/login-records",
+        params={
+            "account_id": account.id,
+            "event_type": "operation",
+            "keyword": marker,
+            "page": 2,
+            "page_size": 20,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 23
+    assert data["page"] == 2
+    assert data["total_pages"] == 2
+    assert len(data["items"]) == 3
+    assert all(item["event_type"] == "operation" for item in data["items"])
+    assert {item["id"].removeprefix("operation-") for item in data["items"]}.issubset(set(created_ids))

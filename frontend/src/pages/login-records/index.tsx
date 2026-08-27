@@ -125,6 +125,7 @@ export default function LoginRecordsPage() {
     startIndex,
     endIndex,
     loading,
+    error,
   } = useServerPagination<AccountActivityRecord>(fetchRecords, { pageSize: PAGE_SIZE })
 
   const updateFilter = (field: keyof typeof filtersRef.current, value: string) => {
@@ -324,7 +325,12 @@ export default function LoginRecordsPage() {
           </button>
         </div>
 
-        <div className="overflow-hidden border border-[#e8e8e8] rounded-[4px]">
+        {error && (
+          <div className="rounded-[4px] border border-[#f0f0f0] bg-white px-3 py-2 text-[12px] text-[#c4506a]">
+            数据更新失败，请稍后重试
+          </div>
+        )}
+        <div className="relative overflow-hidden border border-[#e8e8e8] rounded-[4px]">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -338,7 +344,11 @@ export default function LoginRecordsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!loading && records.length === 0 ? (
+              {loading && records.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">加载中...</TableCell>
+                </TableRow>
+              ) : !loading && records.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">暂无访问、使用或操作记录</TableCell>
                 </TableRow>
@@ -364,6 +374,11 @@ export default function LoginRecordsPage() {
               ))}
             </TableBody>
           </Table>
+          {loading && records.length > 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-[42px] bottom-0 flex items-center justify-center bg-white/80 text-[12px] text-[#8f959e]">
+              正在更新...
+            </div>
+          )}
         </div>
 
         <PaginationBar
@@ -372,7 +387,7 @@ export default function LoginRecordsPage() {
           totalItems={totalItems}
           startIndex={startIndex}
           endIndex={endIndex}
-          onPageChange={goToPage}
+          onPageChange={(page) => { if (!loading) goToPage(page) }}
         />
       </section>
     </div>

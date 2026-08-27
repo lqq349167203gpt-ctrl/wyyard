@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from app.models.login_record import LoginRecord
 from app.models.usage_session import UsageInterval, UsageSession
 from app.services.storage import load_data, load_item, save_item
+from app.utils.pagination import paginate
 
 FILENAME = "login_records.json"
 USAGE_FILENAME = "usage_sessions.json"
@@ -279,6 +280,135 @@ def _local_bounds(date_from: str | None, date_to: str | None) -> tuple[datetime 
     return start, end
 
 
+def _usage_interval_indexes(
+    relevant_accounts: set[tuple[str, str]] | None = None,
+    now: datetime | None = None,
+) -> tuple[
+    dict[tuple[str, str, str], list[tuple[datetime, datetime]]],
+    dict[tuple[str, str, str], list[tuple[datetime, datetime]]],
+]:
+    """按账号、终端及页面建立活跃区间索引，避免每条操作重复扫描全部会话。"""
+    path_index: dict[tuple[str, str, str], list[tuple[datetime, datetime]]] = {}
+    name_index: dict[tuple[str, str, str], list[tuple[datetime, datetime]]] = {}
+    current_time = now or datetime.now(timezone.utc)
+    for session in _usage_sessions():
+        account_source = (session.account_id, session.source)
+        if relevant_accounts is not None and account_source not in relevant_accounts:
+            continue
+        for interval_start, interval_end, page_path, page_name in _effective_intervals(session, current_time):
+            if page_path:
+                path_index.setdefault((*account_source, page_path), []).append((interval_start, interval_end))
+            if page_name:
+                name_index.setdefault((*account_source, page_name), []).append((interval_start, interval_end))
+    return path_index, name_index
+
+
+def _activity_page_duration(
+    indexes: tuple[
+        dict[tuple[str, str, str], list[tuple[datetime, datetime]]],
+        dict[tuple[str, str, str], list[tuple[datetime, datetime]]],
+    ],
+    account_id: str,
+    source: str,
+    activity_at: datetime,
+    page_path: str,
+    page_name: str,
+) -> int:
+    """返回操作对应页面区间时长；页面事件可比首个心跳早最多 10 秒。"""
+    path_index, name_index = indexes
+    groups = (
+        path_index.get((account_id, source, page_path), []) if page_path else [],
+        name_index.get((account_id, source, page_name), []) if page_name else [],
+    )
+    for intervals in groups:
+        candidates: list[tuple[float, datetime, datetime]] = []
+        for interval_start, interval_end in intervals:
+            if interval_start <= activity_at <= interval_end:
+                distance = 0.0
+            elif activity_at < interval_start and (interval_start - activity_at).total_seconds() <= 10:
+                distance = (interval_start - activity_at).total_seconds()
+            else:
+                continue
+            candidates.append((distance, interval_start, interval_end))
+        if candidates:
+            _, interval_start, interval_end = min(candidates, key=lambda item: item[0])
+            return max(0, round((interval_end - interval_start).total_seconds()))
+    return 0
+
+
+def list_operation_activity_paginated(
+    account_id: str | None = None,
+    source: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    keyword: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict[str, Any]:
+    """先筛选、分页业务操作，再仅为当前页计算使用时长。"""
+    from app.services import account_service, operation_log_service
+
+    accounts = account_service.list_accounts()
+    account_by_name = {
+        name: account
+        for account in accounts
+        for name in (account.owner, account.username)
+        if name
+    }
+    start, end = _local_bounds(date_from, date_to)
+    normalized_keyword = keyword.lower() if keyword else ""
+    filtered: list[tuple[Any, Any]] = []
+    for log in operation_log_service.list_logs(source=source):
+        account = account_by_name.get(log.operator)
+        if account_id and (not account or account.id != account_id):
+            continue
+        if start and log.created_at < start:
+            continue
+        if end and log.created_at > end:
+            continue
+        if normalized_keyword and normalized_keyword not in f"{log.operator} {log.section} {log.content}".lower():
+            continue
+        filtered.append((log, account))
+
+    result = paginate(filtered, page, page_size)
+    current_rows = result["items"]
+    relevant_accounts = {
+        (account.id, log.source)
+        for log, account in current_rows
+        if account
+    }
+    indexes = _usage_interval_indexes(relevant_accounts)
+    result["items"] = [
+        {
+            "id": f"operation-{log.id}",
+            "event_type": "operation",
+            "account_id": account.id if account else "",
+            "username": account.username if account else "",
+            "owner": log.operator,
+            "role": log.operator_role,
+            "source": log.source,
+            "ip": log.ip,
+            "device_info": "",
+            "page_path": log.path,
+            "page_name": log.section,
+            "content": log.content,
+            "method": log.method,
+            "created_at": log.created_at.isoformat(),
+            "duration_seconds": _activity_page_duration(
+                indexes,
+                account.id if account else "",
+                log.source,
+                log.created_at,
+                log.path,
+                log.section,
+            ),
+            "ended_at": None,
+        }
+        for log, account in current_rows
+    ]
+    return result
+
+
 def get_account_summary() -> list[dict[str, Any]]:
     from app.services import account_service, operation_log_service
 
@@ -442,48 +572,7 @@ def list_activity(
     }
     start, end = _local_bounds(date_from, date_to)
     now_utc = datetime.now(timezone.utc)
-    usage_intervals = [
-        {
-            "account_id": session.account_id,
-            "source": session.source,
-            "start_at": interval_start,
-            "end_at": interval_end,
-            "page_path": page_path,
-            "page_name": page_name,
-        }
-        for session in _usage_sessions()
-        for interval_start, interval_end, page_path, page_name in _effective_intervals(session, now_utc)
-    ]
-
-    def activity_page_duration(
-        activity_account_id: str,
-        activity_source: str,
-        activity_at: datetime,
-        page_path: str,
-        page_name: str,
-    ) -> int:
-        """返回操作发生时所在页面的活跃区间时长；允许页面访问记录比首个心跳早 10 秒。"""
-        candidates: list[tuple[int, float, datetime, datetime]] = []
-        for interval in usage_intervals:
-            if interval["account_id"] != activity_account_id or interval["source"] != activity_source:
-                continue
-            path_matches = bool(page_path and interval["page_path"] == page_path)
-            name_matches = bool(page_name and interval["page_name"] == page_name)
-            if not path_matches and not name_matches:
-                continue
-            interval_start = interval["start_at"]
-            interval_end = interval["end_at"]
-            if interval_start <= activity_at <= interval_end:
-                distance = 0.0
-            elif activity_at < interval_start and (interval_start - activity_at).total_seconds() <= 10:
-                distance = (interval_start - activity_at).total_seconds()
-            else:
-                continue
-            candidates.append((0 if path_matches else 1, distance, interval_start, interval_end))
-        if not candidates:
-            return 0
-        _, _, interval_start, interval_end = min(candidates, key=lambda item: (item[0], item[1]))
-        return max(0, round((interval_end - interval_start).total_seconds()))
+    usage_indexes = _usage_interval_indexes(now=now_utc)
 
     items: list[dict[str, Any]] = []
     if event_type in (None, "", "login", "page_view"):
@@ -506,7 +595,8 @@ def list_activity(
                 "content": content,
                 "method": "",
                 "duration_seconds": (
-                    activity_page_duration(
+                    _activity_page_duration(
+                        usage_indexes,
                         record.account_id,
                         record.source,
                         record.created_at,
@@ -580,7 +670,8 @@ def list_activity(
                 "content": log.content,
                 "method": log.method,
                 "created_at": log.created_at.isoformat(),
-                "duration_seconds": activity_page_duration(
+                "duration_seconds": _activity_page_duration(
+                    usage_indexes,
                     account.id if account else "",
                     log.source,
                     log.created_at,
