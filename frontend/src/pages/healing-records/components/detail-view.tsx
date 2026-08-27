@@ -1,15 +1,16 @@
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { uploadApi, customerApi, customerTagApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type CustomerTag, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord, type PurchaseSummaryItem } from "@/lib/api"
+import { uploadApi, customerApi, customerTagApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type CustomerTag, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord, type PurchaseSummaryItem, type VisitNoteSummary } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Upload, Copy, Inbox, Trash2 } from "lucide-react"
+import { X, Upload, Copy, Edit, Inbox, Trash2 } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
 
 interface HealingRec {
@@ -30,6 +31,29 @@ const DvEmpty = ({ className = "" }: { className?: string }) => (
   <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className}`} />
 )
 
+function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
+  const seenAuthors = new Set<string>()
+  const uniqueNotes = notes.filter((note) => {
+    const key = note.created_by_id || note.created_by || note.id
+    if (seenAuthors.has(key)) return false
+    seenAuthors.add(key)
+    return true
+  })
+  if (uniqueNotes.length === 0) return <DvEmpty />
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      {uniqueNotes.map((note) => (
+        <div key={note.id} className="flex min-w-0 items-baseline gap-2 leading-[1.6]">
+          <span className="max-w-[88px] shrink-0 truncate text-[12px] text-[#3370ff]" title={note.created_by || "历史记录"}>
+            {note.created_by || "历史记录"}
+          </span>
+          <span className="min-w-0 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{note.content}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 
 export default function DetailView({
   selectedCustomerId,
@@ -42,6 +66,8 @@ export default function DetailView({
   hideSearch?: boolean
   defaultTab?: "activities" | "healing" | "payment" | "purchase"
 }) {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [customerList, setCustomerList] = useState<CustomerLight[]>([])
   const [searchValue, setSearchValue] = useState("")
   const [detail, setDetail] = useState<CustomerDetail | null>(null)
@@ -68,6 +94,15 @@ export default function DetailView({
   const [activityRoleFilter, setActivityRoleFilter] = useState<string>("全部")
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
   const loadSeqRef = useRef(0)
+  const canEditVisits = useMemo(() => {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      const permissions = JSON.parse(localStorage.getItem("userPermissions") || "[]")
+      return currentUser?.role === "超级管理员" || permissions.includes("class-records")
+    } catch {
+      return false
+    }
+  }, [])
 
   useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
   // 客户到店日期集合（用于标记未参加活动）
@@ -110,6 +145,13 @@ export default function DetailView({
   const onClear = () => { setDetail(null); setSearchValue(""); onClearSelection() }
 
   const refresh = () => { if (detail) loadDetail(detail.customer.id) }
+
+  const openVisitEditor = (visitDate: string) => {
+    localStorage.setItem("shared-selected-date", visitDate)
+    localStorage.setItem("visit_selected_date", visitDate)
+    onClearSelection()
+    navigate("/courses/class-records")
+  }
 
   const reloadCommunicationRecords = async () => {
     const nickname = detail?.customer.nickname
@@ -268,11 +310,11 @@ export default function DetailView({
         <aside className="w-[300px] shrink-0 min-h-0 overflow-y-auto dv-scroll flex flex-col gap-2.5 pr-[3px]">
           {/* 身份块 */}
           <div className="bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-4 pt-[17px] pb-[13px] shrink-0">
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3">
               <div className="w-[46px] h-[46px] rounded-full bg-[#eef0f2] text-[#79838f] text-[18px] font-bold flex items-center justify-center shrink-0">
                 {(c.nickname || c.name || "客").charAt(0)}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-[17px] font-extrabold leading-[1.3] text-[#212631] truncate">{c.nickname || <span className="text-[#d0d3d6]">-</span>}</div>
                 <div className="mt-0.5 text-[12px] text-[#79838f] truncate">
                   {(() => {
@@ -286,23 +328,44 @@ export default function DetailView({
                   })()}
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const backPath = `${location.pathname}${location.search}`
+                  navigate(`/healing-records/${c.id}/edit?back=${encodeURIComponent(backPath)}`)
+                }}
+                className="inline-flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2 text-[12px] font-normal text-[#646a73] hover:bg-[#f5f6f7]"
+                aria-label="编辑客户资料"
+              >
+                <Edit className="h-3 w-3" />
+                编辑
+              </button>
             </div>
-            <div className="flex flex-wrap gap-[5px] mt-2.5">
-              {c.member_type && (
-                <span className="px-[9px] py-[2px] rounded-full text-[11px] font-semibold bg-[#ffe8d9] text-[#c25a1b]">{c.member_type}</span>
-              )}
-              {c.follow_up_status && (
-                <span className="rounded-[4px] bg-[#f2f3f5] px-[9px] py-[2px] text-[11px] font-normal text-[#4e535a]">
-                  {c.follow_up_status}
+            <div className="mt-3 border-t border-[#f0f0f0] pt-1">
+              <div className="flex items-center gap-2.5 border-b border-[#f3f4f5] py-[7px]">
+                <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">会员身份</span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={c.member_type || undefined}>
+                  {c.member_type || <DvEmpty />}
                 </span>
-              )}
-              {c.service_teacher ? (
-                <span className="px-[9px] py-[2px] rounded-full text-[11px] font-semibold bg-[#e0ebff] text-[#2f5cc4]">服务老师 · {c.service_teacher}</span>
-              ) : (
-                <span className="px-[9px] py-[2px] rounded-full text-[11px] font-semibold bg-[#f1f0ed] text-[#a8b1bd]">服务老师 -</span>
-              )}
+                <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">系统判定</span>
+              </div>
+              <div className="flex items-center gap-2.5 border-b border-[#f3f4f5] py-[7px]">
+                <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">服务老师</span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={c.service_teacher || undefined}>
+                  {c.service_teacher || <DvEmpty />}
+                </span>
+                <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">人工分配</span>
+              </div>
+              <div className="flex items-center gap-2.5 pb-1 pt-[7px]">
+                <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">跟进阶段</span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={c.follow_up_status || undefined}>
+                  {c.follow_up_status || <DvEmpty />}
+                </span>
+                <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">人工设置</span>
+              </div>
             </div>
-            <div className="mt-2.5 border-t border-[#f0f0f0] pt-2.5">
+            <div className="border-t border-[#f0f0f0] pt-2">
+              <div className="mb-1.5 text-[12px] text-[#a8b1bd]">客户标签</div>
               <div className="flex min-w-0 flex-wrap gap-1.5">
                 {customerTags.length > 0 ? customerTags.map(tag => (
                   <span key={tag.id} className="inline-flex max-w-[108px] items-center rounded-full border border-[#e1e4e7] bg-[#fafbfc] px-2 py-0.5 text-[10.5px] font-normal text-[#646a73]">
@@ -492,40 +555,49 @@ export default function DetailView({
                   <span className="text-[#79838f]">未到店 <b className="font-semibold text-[#79838f] tabular-nums">{absentCount}</b> 次</span>
                   <span className="text-[#79838f]">已取消 <b className="font-semibold text-[#c4506a] tabular-nums">{cancelledCount}</b> 次</span>
                 </div>
-                {paginatedRecords.map((v) => (
-                  <div key={v.id} className="bg-[#fafbfc] border border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px] last:mb-0">
-                    <div className="flex items-center gap-[9px] mb-[7px]">
-                      <span className="text-[12.5px] font-bold text-[#212631] tabular-nums">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{v.arrival_time && ` ${v.arrival_time}`}</span>
+                {paginatedRecords.map((v) => {
+                  const followUpNotes = (v.visit_notes || []).filter(note => note.category === "follow_up")
+                  const customerInfoNotes = (v.visit_notes || []).filter(note => note.category === "customer_info")
+                  return (
+                  <div key={v.id} className="mb-[9px] rounded-[4px] border-[0.5px] border-[#eef0f1] bg-[#fafbfc] px-3.5 py-2.5 last:mb-0">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="text-[13px] font-medium text-[#212631] tabular-nums">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{(v.arrival_time || v.visit_time) && ` ${v.arrival_time || v.visit_time}`}</span>
                       {v.cancelled ? (
-                        <span className="text-[10.5px] font-semibold text-[#c4506a] bg-[#fdeeee] px-2 py-px rounded-full">已取消</span>
+                        <span className="rounded-[4px] bg-[#fdeeee] px-2 py-px text-[11px] text-[#c4506a]">已取消</span>
                       ) : v.arrived ? (
-                        <span className="text-[10.5px] font-semibold text-[#157a3c] bg-[#dcf5e4] px-2 py-px rounded-full">已到店</span>
+                        <span className="rounded-[4px] bg-[#dcf5e4] px-2 py-px text-[11px] text-[#157a3c]">已到店</span>
                       ) : (
-                        <span className="text-[10.5px] font-semibold text-[#79838f] bg-[#f1f0ed] px-2 py-px rounded-full">未到店</span>
+                        <span className="rounded-[4px] bg-[#f1f0ed] px-2 py-px text-[11px] text-[#79838f]">未到店</span>
+                      )}
+                      {v.referrer_handler && (
+                        <span
+                          className="max-w-[160px] truncate text-[12px] font-normal text-[#8f959e]"
+                          title={`邀约人：${v.referrer_handler}`}
+                        >
+                          邀约人：{v.referrer_handler}
+                        </span>
+                      )}
+                      {canEditVisits && (
+                        <button
+                          type="button"
+                          className="ml-auto text-[11px] text-[#3370ff] hover:underline"
+                          onClick={() => openVisitEditor(v.visit_date)}
+                        >
+                          去编辑
+                        </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-[84px_1fr] gap-y-1 gap-x-3">
-                      <span className="text-[12px] text-[#a8b1bd] pt-px">当日需求</span>
-                      <p className="text-[12px] leading-[1.55] text-[#3a4150] whitespace-pre-wrap">{v.needs || <DvEmpty />}</p>
-                      {(() => {
-                        const hr = detail?.healing_records.find(r => r.date === v.visit_date)
-                        const record = hr?.growth_record || v.healing_notes
-                        return (
-                          <>
-                            <span className="text-[12px] text-[#a8b1bd] pt-px">跟进点</span>
-                            <p className="text-[12px] leading-[1.55] whitespace-pre-wrap">
-                              {record
-                                ? <span className="inline text-[#212631] bg-[linear-gradient(transparent_62%,rgba(201,242,75,.55)_62%)]">{record}</span>
-                                : <DvEmpty />}
-                            </p>
-                          </>
-                        )
-                      })()}
+                    <div className="grid grid-cols-[64px_1fr] gap-x-3 gap-y-1.5">
+                      <span className="text-[12px] text-[#a8b1bd] pt-px">来访需求</span>
+                      <p className="whitespace-pre-wrap text-[12px] leading-[1.6] text-[#3a4150]">{v.needs || <DvEmpty />}</p>
                       <span className="text-[12px] text-[#a8b1bd] pt-px">客户信息</span>
-                      <p className="text-[12px] leading-[1.55] text-[#3a4150] whitespace-pre-wrap">{v.feedback || v.experience || <DvEmpty />}</p>
+                      <VisitNoteRows notes={customerInfoNotes} />
+                      <span className="pt-px text-[12px] text-[#a8b1bd]">跟进点</span>
+                      <VisitNoteRows notes={followUpNotes} />
                     </div>
                   </div>
-                ))}
+                  )
+                })}
                 {totalPages > 1 && (
                   <div className="px-4 py-2 border-t border-[#f0f0f0]">
                     <PaginationBar currentPage={healingPage} totalPages={totalPages} totalItems={records.length} startIndex={(healingPage-1)*pageSize+1} endIndex={Math.min(healingPage*pageSize, records.length)} onPageChange={setHealingPage} />

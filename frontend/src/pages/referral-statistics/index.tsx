@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { CircleAlert } from "lucide-react"
 import {
   Area,
   Bar,
@@ -18,6 +19,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { EmptyValue } from "@/components/empty-value"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tooltip as HintTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Table,
   TableBody,
@@ -49,20 +51,30 @@ function generateColors(count: number, hueStart = 0): string[] {
   })
 }
 
-const STATUS_COLORS = generateColors(5, 0)
+const STATUS_COLORS = generateColors(6, 0)
 
 const STATUS_META: Array<{
   name: CustomerFollowUpStatus
   color: string
 }> = [
   { name: "新添加", color: STATUS_COLORS[0] },
-  { name: "沟通中", color: STATUS_COLORS[1] },
-  { name: "已到店", color: STATUS_COLORS[2] },
-  { name: "已成交", color: STATUS_COLORS[3] },
-  { name: "沉默/流失", color: STATUS_COLORS[4] },
+  { name: "前期沟通中", color: STATUS_COLORS[1] },
+  { name: "已邀约未到店", color: STATUS_COLORS[2] },
+  { name: "已到店", color: STATUS_COLORS[3] },
+  { name: "已成交", color: STATUS_COLORS[4] },
+  { name: "沉默/流失", color: STATUS_COLORS[5] },
+  { name: "未配置", color: "#b7bdc6" },
 ]
 
 type Member = ReferralStatistics["members"][number]
+type BarDataType = "follow_up_status" | "referrer" | "traffic_source" | "referrer_handler"
+
+const BAR_DATA_TYPE_OPTIONS: Array<{ value: BarDataType; label: string }> = [
+  { value: "follow_up_status", label: "跟进阶段" },
+  { value: "referrer", label: "引流人" },
+  { value: "traffic_source", label: "流量来源" },
+  { value: "referrer_handler", label: "承接人" },
+]
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -85,15 +97,19 @@ export default function ReferralStatisticsPage() {
   const [loading, setLoading] = useState(false)
   const [timeView, setTimeView] = useState<"year" | "month">("month")
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day")
-  const [dataType, setDataType] = useState<"total" | "new">("total")
   const [selectedReferrer, setSelectedReferrer] = useState("")
+  const [selectedTrafficSource, setSelectedTrafficSource] = useState("")
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [selectedTagCardId, setSelectedTagCardId] = useState("")
   const [tagMatch, setTagMatch] = useState<"any" | "all">("any")
   const [selectedTrendPeriod, setSelectedTrendPeriod] = useState("")
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
+  const [selectedFollowUpStatus, setSelectedFollowUpStatus] = useState<CustomerFollowUpStatus | "">("")
+  const [barDataType, setBarDataType] = useState<BarDataType>("follow_up_status")
   const [persistedTypeNames, setPersistedTypeNames] = useState<string[]>([])
   const [persistedReferrerNames, setPersistedReferrerNames] = useState<string[]>([])
+  const [persistedTrafficSourceNames, setPersistedTrafficSourceNames] = useState<string[]>([])
   const [startYear, setStartYear] = useState(now.getFullYear())
   const [startMonth, setStartMonth] = useState(now.getMonth() + 1)
   const [startDay, setStartDay] = useState(1)
@@ -121,10 +137,18 @@ export default function ReferralStatisticsPage() {
     from: `${startYear}-${String(startMonth).padStart(2, "0")}-${String(startDay).padStart(2, "0")}`,
     to: `${endYear}-${String(endMonth).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`,
   }), [startYear, startMonth, startDay, endYear, endMonth, endDay])
+  const dateRangeLabel = useMemo(
+    () => `${dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~${dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}`,
+    [dateRange],
+  )
 
   // 会员类型筛选项（后端返回全量列表，不随筛选塌缩）
   const typeNames = useMemo(() => data?.member_type_names ?? persistedTypeNames, [data?.member_type_names, persistedTypeNames])
   const referrerNames = useMemo(() => data?.referrer_names ?? persistedReferrerNames, [data?.referrer_names, persistedReferrerNames])
+  const trafficSourceNames = useMemo(
+    () => data?.traffic_source_names ?? persistedTrafficSourceNames,
+    [data?.traffic_source_names, persistedTrafficSourceNames],
+  )
 
   // 数据加载后初始化选中所有类型
   const typesInitializedRef = useRef(false)
@@ -180,18 +204,21 @@ export default function ReferralStatisticsPage() {
         granularity,
         referrer: selectedReferrer || undefined,
         member_types: selectedTypes.size > 0 ? Array.from(selectedTypes).join(",") : undefined,
-        tag_ids: selectedTagIds.length > 0 ? selectedTagIds.join(",") : undefined,
-        tag_match: tagMatch,
+        follow_up_status: selectedFollowUpStatus || undefined,
+        traffic_source: selectedTrafficSource || undefined,
+        tag_ids: selectedTagCardId || (selectedTagIds.length > 0 ? selectedTagIds.join(",") : undefined),
+        tag_match: selectedTagCardId ? "any" : tagMatch,
       })
       setData(result)
       if (result.member_type_names) setPersistedTypeNames(result.member_type_names)
       if (result.referrer_names) setPersistedReferrerNames(result.referrer_names)
+      if (result.traffic_source_names) setPersistedTrafficSourceNames(result.traffic_source_names)
     } catch {
       if (showLoading) setData(null)
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [dateRange, granularity, selectedReferrer, selectedTagIds, selectedTypes, tagMatch, hasNoSelection])
+  }, [dateRange, granularity, selectedFollowUpStatus, selectedReferrer, selectedTagCardId, selectedTagIds, selectedTrafficSource, selectedTypes, tagMatch, hasNoSelection])
 
   useEffect(() => {
     fetchData()
@@ -253,12 +280,11 @@ export default function ReferralStatisticsPage() {
   }, [detailCustomerId, detailType])
 
   const chartData = useMemo(() => {
-    const source = dataType === "new" ? data?.chart_new : data?.chart_total
-    return (source || []).map(item => ({
+    return (data?.chart_total || []).map(item => ({
       ...item,
       label: formatChartLabel(String(item.date), granularity),
     }))
-  }, [data?.chart_new, data?.chart_total, dataType, granularity])
+  }, [data?.chart_total, granularity])
 
   // 前端过滤会员类型（后端 member_types=None 时返回全量，需前端再过滤）
   const filteredMembers = useMemo(() => {
@@ -275,23 +301,50 @@ export default function ReferralStatisticsPage() {
     [filteredMembers, granularity, selectedTrendPeriod],
   )
 
+  const displayedStatusMeta = useMemo(
+    () => selectedFollowUpStatus
+      ? STATUS_META.filter(status => status.name === selectedFollowUpStatus)
+      : STATUS_META,
+    [selectedFollowUpStatus],
+  )
+
   const distributionData = useMemo(() => {
     const counts: Record<string, number> = {}
     filteredMembers.forEach(m => {
-      counts[m.follow_up_status] = (counts[m.follow_up_status] || 0) + 1
+      const name = String(m[barDataType] || "").trim() || "未配置"
+      counts[name] = (counts[name] || 0) + 1
     })
-    return STATUS_META.map(status => ({
-      name: status.name,
-      value: counts[status.name] ?? 0,
-      color: status.color,
-    }))
-  }, [filteredMembers])
+    if (barDataType === "follow_up_status") {
+      return displayedStatusMeta.map(status => ({
+        name: status.name,
+        value: counts[status.name] ?? 0,
+        color: status.color,
+      }))
+    }
+    const entries = Object.entries(counts).sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "zh-CN"))
+    const colors = generateColors(entries.length, 190)
+    return entries.map(([name, value], index) => ({ name, value, color: colors[index] }))
+  }, [barDataType, displayedStatusMeta, filteredMembers])
 
-  const filteredTotalPeople = useMemo(() => filteredMembers.length, [filteredMembers])
+  const barDataTypeLabel = BAR_DATA_TYPE_OPTIONS.find(option => option.value === barDataType)?.label ?? "跟进阶段"
+
+  const selectedTagSummary = useMemo(() => selectedTagIds.flatMap(tagId => {
+    const tag = customerTags.find(item => item.id === tagId)
+    return tag ? [{
+      id: tag.id,
+      name: tag.scope === "private" ? `${tag.name} · 我的` : tag.name,
+      count: data?.tag_totals?.[tag.id] ?? 0,
+    }] : []
+  }), [customerTags, data?.tag_totals, selectedTagIds])
+
+  const trafficSourceTotal = useMemo(
+    () => Object.values(data?.summary_traffic_source_totals ?? {}).reduce((sum, count) => sum + count, 0),
+    [data?.summary_traffic_source_totals],
+  )
 
   const lineYAxisWidth = useMemo(
-    () => calcYAxisWidth(chartData, STATUS_META.map(status => status.name)),
-    [chartData],
+    () => calcYAxisWidth(chartData, displayedStatusMeta.map(status => status.name)),
+    [chartData, displayedStatusMeta],
   )
   const barYAxisWidth = useMemo(
     () => calcYAxisWidth(distributionData, ["value"]),
@@ -323,7 +376,7 @@ export default function ReferralStatisticsPage() {
   useEffect(() => {
     setSelectedTrendPeriod("")
     goToPage(1)
-  }, [dateRange, granularity, selectedReferrer, selectedTagIds, selectedTypes, tagMatch])
+  }, [dateRange, granularity, selectedFollowUpStatus, selectedReferrer, selectedTagCardId, selectedTagIds, selectedTrafficSource, selectedTypes, tagMatch])
 
   useEffect(() => {
     goToPage(1)
@@ -355,8 +408,8 @@ export default function ReferralStatisticsPage() {
       ...current,
       status_totals: {
         ...current.status_totals,
-        [previousStatus]: Math.max(0, current.status_totals[previousStatus] - 1),
-        [nextStatus]: current.status_totals[nextStatus] + 1,
+        [previousStatus]: Math.max(0, (current.status_totals[previousStatus] ?? 0) - 1),
+        [nextStatus]: (current.status_totals[nextStatus] ?? 0) + 1,
       },
       members: current.members.map(item => (
         item.id === member.id ? { ...item, follow_up_status: nextStatus } : item
@@ -371,14 +424,14 @@ export default function ReferralStatisticsPage() {
         ...current,
         status_totals: {
           ...current.status_totals,
-          [nextStatus]: Math.max(0, current.status_totals[nextStatus] - 1),
-          [previousStatus]: current.status_totals[previousStatus] + 1,
+          [nextStatus]: Math.max(0, (current.status_totals[nextStatus] ?? 0) - 1),
+          [previousStatus]: (current.status_totals[previousStatus] ?? 0) + 1,
         },
         members: current.members.map(item => (
           item.id === member.id ? { ...item, follow_up_status: previousStatus } : item
         )),
       } : current)
-      setStatusError(error instanceof Error ? error.message : "跟进状态保存失败，请重试")
+      setStatusError(error instanceof Error ? error.message : "跟进阶段保存失败，请重试")
     } finally {
       setSavingStatusCustomerId(null)
     }
@@ -458,6 +511,20 @@ export default function ReferralStatisticsPage() {
             </div>
             <div className="ml-1 flex items-center gap-2">
               <span className="text-[12px] text-[#8f959e]">时间单位</span>
+              <HintTooltip>
+                <TooltipTrigger
+                  render={(
+                    <button
+                      type="button"
+                      aria-label="查看时间单位说明"
+                      className="inline-flex h-4 w-4 items-center justify-center text-[#b7bdc6] transition-colors hover:text-[#8f959e]"
+                    >
+                      <CircleAlert className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                />
+                <TooltipContent>时间单位的选择仅影响折线图的横坐标的时间分布</TooltipContent>
+              </HintTooltip>
               <div className="flex items-center rounded-[4px] bg-[#f0f1f3] p-0.5">
                 {timeView === "month" && (
                   <button
@@ -480,27 +547,6 @@ export default function ReferralStatisticsPage() {
                   月
                 </button>
               </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
-              <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
-              数据类型
-            </span>
-            <div className="flex items-center rounded-[4px] bg-[#f0f1f3] p-0.5">
-              <button
-                onClick={() => setDataType("total")}
-                className={`h-[26px] rounded-[2px] px-3 text-[11px] ${dataType === "total" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
-              >
-                总数
-              </button>
-              <button
-                onClick={() => setDataType("new")}
-                className={`h-[26px] rounded-[2px] px-3 text-[11px] ${dataType === "new" ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
-              >
-                新增
-              </button>
             </div>
           </div>
 
@@ -552,6 +598,32 @@ export default function ReferralStatisticsPage() {
             </div>
           </div>
 
+          <div className="flex items-start gap-3">
+            <span className="mt-1 inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
+              <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
+              流量来源
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedTrafficSource("")}
+                className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedTrafficSource === "" ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+              >
+                全部
+              </button>
+              {trafficSourceNames.map(source => (
+                <button
+                  type="button"
+                  key={source}
+                  onClick={() => setSelectedTrafficSource(source)}
+                  className={`inline-flex h-[26px] items-center rounded-[2px] border px-3 text-[11px] ${selectedTrafficSource === source ? "border-[#b3d4ff] bg-[#fafcff] text-[#3370ff]" : "border-[#e8eaed] bg-white text-[#646a73] hover:border-[#c0c4cc]"}`}
+                >
+                  {source}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center gap-3">
             <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
               <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
@@ -565,8 +637,12 @@ export default function ReferralStatisticsPage() {
                 label: tag.scope === "private" ? `${tag.name} · 我的` : tag.name,
               }))}
               placeholder="全部标签"
-              onChange={setSelectedTagIds}
-              className="w-[180px]"
+              singleLineMulti
+              onChange={value => {
+                setSelectedTagIds(value)
+                setSelectedTagCardId("")
+              }}
+              className="w-[300px]"
               buttonClassName="border-[#dee0e3] bg-white px-2.5"
               rounded="4px"
               clearable
@@ -589,33 +665,122 @@ export default function ReferralStatisticsPage() {
       </div>
 
       <section className="mb-1.5 rounded-[4px] bg-white px-[22px] py-4">
-        <div className="mb-3 text-[12px] font-medium text-[#4e535a]">
-          跟进人数<span className="font-normal text-[#8f959e]">（当前统计）</span>
+        <div className="mb-3 flex items-center gap-2 text-[12px]">
+          <div className="font-medium text-[#4e535a]">
+            跟进阶段<span className="font-normal text-[#8f959e]">（{dateRangeLabel}）</span>
+          </div>
+          <HintTooltip>
+            <TooltipTrigger
+              render={(
+                <button
+                  type="button"
+                  aria-label="查看跟进阶段说明"
+                  className="inline-flex h-4 w-4 items-center justify-center text-[#b7bdc6] transition-colors hover:text-[#8f959e]"
+                >
+                  <CircleAlert className="h-3.5 w-3.5" />
+                </button>
+              )}
+            />
+            <TooltipContent>跟进阶段的标签由客服手动配置</TooltipContent>
+          </HintTooltip>
         </div>
-        <div className="grid grid-cols-6 gap-2">
-          <div className="rounded-[2px] border border-[#e8eaed] bg-white px-3 py-2">
+        <div className="grid grid-cols-7 gap-2">
+          <button
+            type="button"
+            aria-pressed={selectedFollowUpStatus === ""}
+            onClick={() => setSelectedFollowUpStatus("")}
+            className={`rounded-[2px] border px-3 py-2 text-left transition-colors ${selectedFollowUpStatus === "" ? "border-[#b3d4ff] bg-[#fafcff]" : "border-[#e8eaed] bg-white hover:border-[#c0c4cc]"}`}
+          >
             <div className="mb-1 flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-[2px] bg-[#1f2329]" />
               <span className="text-[12px] text-[#4e535a]">总人数</span>
             </div>
             <span className="text-lg font-medium tabular-nums text-[#1f2329]">
-              {loading ? "..." : filteredTotalPeople}
+              {loading ? "..." : data?.summary_total_people ?? 0}
               <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
             </span>
-          </div>
+          </button>
           {STATUS_META.map(status => (
-            <div key={status.name} className="rounded-[2px] border border-[#e8eaed] bg-white px-3 py-2">
+            <button
+              type="button"
+              key={status.name}
+              aria-pressed={selectedFollowUpStatus === status.name}
+              onClick={() => setSelectedFollowUpStatus(status.name)}
+              className={`rounded-[2px] border px-3 py-2 text-left transition-colors ${selectedFollowUpStatus === status.name ? "border-[#b3d4ff] bg-[#fafcff]" : status.name === "未配置" ? "border-[#e1e4e7] bg-[#f7f8fa] hover:border-[#c8ccd0]" : "border-[#e8eaed] bg-white hover:border-[#c0c4cc]"}`}
+            >
               <div className="mb-1 flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-[2px]" style={{ backgroundColor: status.color }} />
                 <span className="truncate text-[12px] text-[#4e535a]">{status.name}</span>
               </div>
               <span className="text-lg font-medium tabular-nums text-[#1f2329]">
-                {loading ? "..." : distributionData.find(d => d.name === status.name)?.value ?? 0}
+                {loading ? "..." : data?.summary_status_totals?.[status.name] ?? 0}
                 <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
               </span>
-            </div>
+            </button>
           ))}
         </div>
+      </section>
+
+      <section className="mb-1.5 rounded-[4px] bg-white px-[22px] py-4">
+        <div className="mb-3 text-[12px] font-medium text-[#4e535a]">
+          流量来源<span className="font-normal text-[#8f959e]">（{dateRangeLabel}）</span>
+        </div>
+        <div className="grid grid-cols-7 gap-2">
+          <button
+            type="button"
+            aria-pressed={selectedTrafficSource === ""}
+            onClick={() => setSelectedTrafficSource("")}
+            className={`rounded-[2px] border px-3 py-2 text-left transition-colors ${selectedTrafficSource === "" ? "border-[#b3d4ff] bg-[#fafcff]" : "border-[#e8eaed] bg-white hover:border-[#c0c4cc]"}`}
+          >
+            <div className="mb-1 truncate text-[12px] text-[#4e535a]">全部来源</div>
+            <span className="text-lg font-medium tabular-nums text-[#1f2329]">
+              {loading ? "..." : trafficSourceTotal}
+              <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
+            </span>
+          </button>
+          {trafficSourceNames.map(source => (
+            <button
+              type="button"
+              key={source}
+              aria-pressed={selectedTrafficSource === source}
+              onClick={() => setSelectedTrafficSource(current => current === source ? "" : source)}
+              className={`rounded-[2px] border px-3 py-2 text-left transition-colors ${selectedTrafficSource === source ? "border-[#b3d4ff] bg-[#fafcff]" : source === "未配置" ? "border-[#e1e4e7] bg-[#f7f8fa] hover:border-[#c8ccd0]" : "border-[#e8eaed] bg-white hover:border-[#c0c4cc]"}`}
+            >
+              <div className="mb-1 truncate text-[12px] text-[#4e535a]" title={source}>{source}</div>
+              <span className="text-lg font-medium tabular-nums text-[#1f2329]">
+                {loading ? "..." : data?.summary_traffic_source_totals?.[source] ?? 0}
+                <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-1.5 rounded-[4px] bg-white px-[22px] py-4">
+        <div className="mb-3 text-[12px] font-medium text-[#4e535a]">
+          客户标签<span className="font-normal text-[#8f959e]">（{dateRangeLabel}）</span>
+        </div>
+        {selectedTagSummary.length === 0 ? (
+          <div className="py-3 text-[12px] text-[#b7bdc6]">未选择</div>
+        ) : (
+          <div className="grid grid-cols-7 gap-2">
+            {selectedTagSummary.map(tag => (
+              <button
+                type="button"
+                key={tag.id}
+                aria-pressed={selectedTagCardId === tag.id}
+                onClick={() => setSelectedTagCardId(current => current === tag.id ? "" : tag.id)}
+                className={`rounded-[2px] border px-3 py-2 text-left transition-colors ${selectedTagCardId === tag.id ? "border-[#b3d4ff] bg-[#fafcff]" : "border-[#e8eaed] bg-white hover:border-[#c0c4cc]"}`}
+              >
+                <div className="mb-1 truncate text-[12px] text-[#4e535a]" title={tag.name}>{tag.name}</div>
+                <span className="text-lg font-medium tabular-nums text-[#1f2329]">
+                  {loading ? "..." : tag.count}
+                  <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mb-1.5 flex gap-1.5">
@@ -626,14 +791,14 @@ export default function ReferralStatisticsPage() {
           <div className="mb-[18px]">
             <div className="mb-2 text-[12px] text-[#4e535a]">
               <span className="font-medium">
-                每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}跟进状态人数变化
+                每{granularity === "day" ? "日" : granularity === "week" ? "周" : "月"}跟进阶段人数变化
               </span>
               <span className="text-[#8f959e]">
-                （{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）
+                （{dateRangeLabel}）
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              {STATUS_META.map(status => (
+              {displayedStatusMeta.map(status => (
                 <label
                   key={status.name}
                   className="flex cursor-pointer select-none items-center gap-1"
@@ -681,7 +846,7 @@ export default function ReferralStatisticsPage() {
                 }}
               >
                 <defs>
-                  {STATUS_META.map((status, index) => (
+                  {displayedStatusMeta.map((status, index) => (
                     <linearGradient key={status.name} id={`referral-status-gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={status.color} stopOpacity={0.4} />
                       <stop offset="100%" stopColor={status.color} stopOpacity={0.02} />
@@ -732,7 +897,7 @@ export default function ReferralStatisticsPage() {
                     )
                   }}
                 />
-                {STATUS_META.map((status, index) => (
+                {displayedStatusMeta.map((status, index) => (
                   visibleLines[status.name] && (
                     <Area
                       key={`area-${status.name}`}
@@ -744,7 +909,7 @@ export default function ReferralStatisticsPage() {
                     />
                   )
                 ))}
-                {STATUS_META.map(status => (
+                {displayedStatusMeta.map(status => (
                   visibleLines[status.name] && (
                     <Line
                       key={status.name}
@@ -766,12 +931,24 @@ export default function ReferralStatisticsPage() {
           className="min-w-0 flex-1 select-none rounded-[4px] bg-white px-[22px] py-4 *:outline-none *:focus:outline-none"
           onMouseDown={event => event.preventDefault()}
         >
-          <div className="mb-[18px]">
-            <div className="mb-2 text-[12px] text-[#4e535a]">
-              <span className="font-medium">当前跟进状态分布</span>
+          <div className="mb-[18px] flex items-center justify-between gap-3">
+            <div className="min-w-0 text-[12px] text-[#4e535a]">
+              <span className="font-medium">当前{barDataTypeLabel}分布</span>
               <span className="text-[#8f959e]">
-                （{dateRange.from.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}~{dateRange.to.replace(/(\d+)-(\d+)-(\d+)/, "$1年$2月$3日")}）
+                （{dateRangeLabel}）
               </span>
+            </div>
+            <div className="flex shrink-0 items-center rounded-[4px] bg-[#f0f1f3] p-0.5">
+              {BAR_DATA_TYPE_OPTIONS.map(option => (
+                <button
+                  type="button"
+                  key={option.value}
+                  onClick={() => setBarDataType(option.value)}
+                  className={`h-[24px] rounded-[2px] px-2.5 text-[11px] ${barDataType === option.value ? "bg-white text-[#1f2329]" : "text-[#646a73] hover:text-[#4e535a]"}`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
           {loading ? (
@@ -779,8 +956,10 @@ export default function ReferralStatisticsPage() {
           ) : distributionData.every(item => item.value === 0) ? (
             <div className="flex h-[160px] items-center justify-center text-[12px] text-[#8f959e]">暂无数据</div>
           ) : (
-            <ResponsiveContainer width="100%" height={160} tabIndex={-1}>
-              <BarChart data={distributionData} margin={{ top: 10, right: 5, left: 0, bottom: 2 }}>
+            <div className="overflow-x-auto [scrollbar-width:thin]">
+              <div style={{ minWidth: Math.max(480, distributionData.length * 52) }}>
+                <ResponsiveContainer width="100%" height={160} tabIndex={-1}>
+                  <BarChart data={distributionData} margin={{ top: 10, right: 5, left: 0, bottom: 2 }}>
                 <CartesianGrid strokeDasharray="4 4" stroke="#e8eaed" vertical={false} />
                 <XAxis
                   dataKey="name"
@@ -806,8 +985,10 @@ export default function ReferralStatisticsPage() {
                 <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={20} activeBar={false}>
                   {distributionData.map(item => <Cell key={item.name} fill={item.color} />)}
                 </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           )}
         </div>
       </section>
@@ -854,7 +1035,7 @@ export default function ReferralStatisticsPage() {
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("visit_interval")}>平均到店间隔<SortArrow field="visit_interval" /></TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("activity_count")}>参与活动<SortArrow field="activity_count" /></TableHead>
                     <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("total_consumption")}>消费总额<SortArrow field="total_consumption" /></TableHead>
-                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 pr-4 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("follow_up_status")}>跟进状态<SortArrow field="follow_up_status" /></TableHead>
+                    <TableHead className="h-9 cursor-pointer select-none overflow-hidden px-3 pr-4 text-[11px] font-normal text-[#8f959e]" onClick={() => handleSort("follow_up_status")}>跟进阶段<SortArrow field="follow_up_status" /></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1009,7 +1190,7 @@ export default function ReferralStatisticsPage() {
                   <div className="flex items-center border-b border-[#f0f0f0] px-4 py-1.5 text-[11px] text-[#8f959e]">
                     <span className="w-28 shrink-0">日期</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="min-w-0 flex-1">需求</span>
+                    <span className="min-w-0 flex-1">来访需求</span>
                   </div>
                   {detailRecords.map((record, index) => (
                     <div key={index} className="flex items-center px-4 py-2 text-[12px] text-[#4e535a] hover:bg-[#f7f8fa]">

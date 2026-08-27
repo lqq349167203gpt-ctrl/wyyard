@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react"
-import { GripVertical, Trash2, Plus } from "lucide-react"
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react"
+import { GripVertical, Trash2, Plus, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -14,40 +14,14 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { ACTIVITY_POSITION_MAP } from "@/lib/positions"
 import { SpaceRoomDropdown } from "@/components/space-room-dropdown"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { CardCallbacks } from "./index"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics"
 
-const TYPE_BADGES: Record<ActivityType, { label: string; color: string; bg: string }> = {
-  class: { label: "沙龙", color: "#8f959e", bg: "#f5f6f7" },
-  gcs: { label: "觉醒", color: "#8f959e", bg: "#f5f6f7" },
-  ers: { label: "情绪", color: "#8f959e", bg: "#f5f6f7" },
-  eks: { label: "能量", color: "#8f959e", bg: "#f5f6f7" },
-  ics: { label: "内部", color: "#8f959e", bg: "#f5f6f7" },
-}
-
 const TYPE_NAMES: Record<ActivityType, string> = {
   class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "内部课程",
-}
-
-const ICS_COURSE_LABELS: Record<string, string> = {
-  "疗愈师课程": "疗愈师", "疗愈师课程：自爱力构建": "疗愈师",
-  "商业框架陪跑": "陪跑", "商业框架陪跑：自觉力提升": "陪跑",
-  "落地赋能班": "赋能班", "落地赋能班：自洽力整合": "赋能班",
-}
-
-function getTypeBadge(type: ActivityType, courseName?: string, classCourseType?: string): { label: string; color: string; bg: string } {
-  if (type === "class" && classCourseType) {
-    return { ...TYPE_BADGES.class, label: classCourseType.length > 3 ? classCourseType.slice(0, 3) : classCourseType }
-  }
-  if (type === "ics" && courseName) {
-    const label = ICS_COURSE_LABELS[courseName]
-    if (label) return { ...TYPE_BADGES.ics, label }
-    if (courseName.startsWith("疗愈师")) return { ...TYPE_BADGES.ics, label: "疗愈师" }
-    if (courseName.startsWith("商业框架") || courseName.startsWith("陪跑")) return { ...TYPE_BADGES.ics, label: "陪跑" }
-    if (courseName.startsWith("落地赋能") || courseName.startsWith("赋能")) return { ...TYPE_BADGES.ics, label: "赋能班" }
-  }
-  return TYPE_BADGES[type]
 }
 
 function parseEksDescription(desc: string): { id: string; name: string; count: number } {
@@ -64,16 +38,6 @@ function parseEksDescription(desc: string): { id: string; name: string; count: n
 function serializeEksDescription(id: string, name: string, count: number): string {
   return JSON.stringify([{ id: id || "", name: name || "", count }])
 }
-
-const TYPE_OPTIONS = [
-  { value: "class", label: "沙龙活动" },
-  { value: "gcs", label: "觉醒游戏" },
-  { value: "ers", label: "情绪释放" },
-  { value: "eks", label: "能量结" },
-  { value: "ics:疗愈师课程", label: "疗愈师课程" },
-  { value: "ics:商业框架陪跑", label: "商业框架陪跑" },
-  { value: "ics:落地赋能班", label: "落地赋能班" },
-]
 
 const ICS_COURSE_MAP: Record<string, string> = {
   "疗愈师课程": "ics:疗愈师课程", "疗愈师课程：自爱力构建": "ics:疗愈师课程",
@@ -110,6 +74,8 @@ const ACTIVITY_MODE_OPTIONS = [
 interface ActivityRow {
   key: number
   record_id: string
+  created_by_id: string
+  created_by: string
   record_type: ActivityType
   ics_course_key: string  // ics 子类型，如 "ics:商业框架陪跑"
   class_course_type: string  // class 子类型，如 "读书会"
@@ -134,6 +100,26 @@ interface ActivityRow {
   pendingCreate: boolean
   raw: any
 }
+
+const ACTIVITY_CREATOR_ONLY_FIELDS = new Set<keyof ActivityRow>([
+  "record_type",
+  "ics_course_key",
+  "class_course_type",
+  "name",
+  "course_id",
+  "owner_id",
+  "owner_name",
+  "host_ids",
+  "host_names",
+  "activity_mode",
+  "start_time",
+  "end_time",
+  "is_public_welfare",
+  "membership_deduction_count",
+  "deduction_count",
+  "description",
+  "billing_description",
+])
 
 let nextKey = 1
 
@@ -190,6 +176,8 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
 
   return {
     key, record_id: data.id, record_type: type,
+    created_by_id: data.created_by_id || "",
+    created_by: data.created_by || "",
     ics_course_key: type === "ics" ? resolveIcsCourseKey(name) : "",
     class_course_type: type === "class" ? classCourseType : "",
     start_time: data.start_time || "", end_time: data.end_time || "",
@@ -218,6 +206,7 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
   const rid = sid ? (spaces.find(s => s.id === sid)?.rooms?.[0]?.id || "") : ""
   return {
     key, record_id: "", record_type: type,
+    created_by_id: "", created_by: "",
     ics_course_key: "", class_course_type: "",
     start_time: "", end_time: "",
     name: "", course_id: "",
@@ -238,6 +227,7 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
 }
 
 type RowStatus = "idle" | "saving" | "saved" | "error"
+type ViewSegment = "all" | "mine"
 
 export interface ChangedCell {
   rowKey: number
@@ -280,6 +270,9 @@ interface ActivityBatchTableProps {
   previewChangedCells?: ChangedCell[]
   locked?: boolean
   onClosePreview?: () => void
+  toolbarLeading?: React.ReactNode
+  toolbarTrailing?: React.ReactNode
+  toolbarSupplement?: React.ReactNode
 }
 
 export function ActivityBatchTable({
@@ -287,6 +280,7 @@ export function ActivityBatchTable({
   records, onReload, callbacks, getMemberName, memberIdentities,
   onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed,
   previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview,
+  toolbarLeading, toolbarTrailing, toolbarSupplement,
 }: ActivityBatchTableProps) {
   const [rows, setRows] = useState<ActivityRow[]>([])
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
@@ -294,7 +288,9 @@ export function ActivityBatchTable({
   rowStatusRef.current = rowStatus
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
+  const headerScrollRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const pendingScrollToBottomRef = useRef(false)
   const eksCountEditRef = useRef<Record<string, string>>({})
   const [membershipDeductionDrafts, setMembershipDeductionDrafts] = useState<Record<number, string>>({})
   const lastEditedEksRef = useRef<ActivityRow | null>(null)
@@ -305,6 +301,34 @@ export function ActivityBatchTable({
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
   const [editingDescriptionKey, setEditingDescriptionKey] = useState<number | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState("")
+  const currentUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}") }
+    catch { return {} }
+  }, [])
+  const currentActorId = String(currentUser.id || "")
+  const currentActorName = String(currentUser.owner || currentUser.username || "")
+  const editPermissions = useEditPermissions()
+  const canEditAllActivities = currentUser.role === "超级管理员" || editPermissions.activities === "all"
+  const [viewSegment, setViewSegment] = useState<ViewSegment>(() => {
+    try { return localStorage.getItem("activity_view_segment") === "mine" ? "mine" : "all" }
+    catch { return "all" }
+  })
+  const isOwnRow = useCallback((row: ActivityRow) => {
+    if (row.pendingCreate || !row.record_id) return true
+    if (row.created_by_id) return Boolean(currentActorId && row.created_by_id === currentActorId)
+    return Boolean(row.created_by && currentActorName && row.created_by === currentActorName)
+  }, [currentActorId, currentActorName])
+  const canEditRow = useCallback((row: ActivityRow) => (
+    canEditAllActivities || isOwnRow(row)
+  ), [canEditAllActivities, isOwnRow])
+  const canEditField = useCallback((row: ActivityRow, field: keyof ActivityRow) => (
+    canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field)
+  ), [canEditRow])
+  const canEditChanges = useCallback((row: ActivityRow, changes: Partial<ActivityRow>) => (
+    canEditRow(row) || Object.keys(changes).every(field => (
+      !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow)
+    ))
+  ), [canEditRow])
   const invitedOwnerCustomers = useMemo(() => {
     // 邀约名单加载完成前保持为空，避免短暂暴露全部客户作为案主候选。
     if (!invitedCustomerIds) return []
@@ -360,12 +384,13 @@ export function ActivityBatchTable({
   const deleteRecordFromBackend = useCallback(async (row: ActivityRow, conversion = false) => {
     const id = row.record_id
     if (!id) return
-    if (row.record_type === "class") await classRecordApi.delete(id)
+    if (!canEditRow(row)) throw new Error("只能删除自己创建的课表内容")
+    if (row.record_type === "class") await classRecordApi.delete(id, conversion)
     else if (row.record_type === "gcs") await groupCaseSessionApi.delete(id, conversion)
     else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(id, conversion)
     else if (row.record_type === "eks") await energyKnotSessionApi.delete(id, conversion)
-    else if (row.record_type === "ics") await internalCourseSessionApi.delete(id)
-  }, [])
+    else if (row.record_type === "ics") await internalCourseSessionApi.delete(id, conversion)
+  }, [canEditRow])
 
   const undo = useCallback(() => {
     if (undoStack.length === 0) return
@@ -622,15 +647,17 @@ export function ActivityBatchTable({
       const common = {
         start_time: row.start_time || null,
         end_time: row.end_time || null,
-        activity_mode: row.activity_mode,
         is_published: row.is_published,
-        membership_deduction_count: type === "eks" || type === "ics" || row.is_public_welfare
-          ? 0
-          : row.membership_deduction_count,
         space_id: row.space_id || undefined,
         room_id: row.room_id || undefined,
         space_name: space?.name || undefined,
         room_name: room?.name || undefined,
+        ...(canEditRow(row) ? {
+          activity_mode: row.activity_mode,
+          membership_deduction_count: type === "eks" || type === "ics" || row.is_public_welfare
+            ? 0
+            : row.membership_deduction_count,
+        } : {}),
       }
 
       if (row.pendingCreate) {
@@ -670,15 +697,20 @@ export function ActivityBatchTable({
         }
 
         let result: any
-        if (type === "class") result = await classRecordApi.create(createData)
+        if (type === "class") result = await classRecordApi.create(createData, conversion)
         else if (type === "gcs") result = await groupCaseSessionApi.create(createData, conversion)
         else if (type === "ers") result = await emotionalReleaseSessionApi.create(createData, conversion)
         else if (type === "eks") result = await energyKnotSessionApi.create(createData, conversion)
-        else if (type === "ics") result = await internalCourseSessionApi.create(createData)
+        else if (type === "ics") result = await internalCourseSessionApi.create(createData, conversion)
 
         // 更新行：标记为已创建。先同步 rowsRef，避免 React 批处理期间再次被当成未创建记录。
         const rowsWithCreatedRecord = rowsRef.current.map(r => r.key === row.key ? {
-          ...r, record_id: result?.id || "", pendingCreate: false, raw: result || {},
+          ...r,
+          record_id: result?.id || "",
+          created_by_id: result?.created_by_id || currentActorId,
+          created_by: result?.created_by || currentActorName,
+          pendingCreate: false,
+          raw: result || {},
         } : r)
         rowsRef.current = rowsWithCreatedRecord
         setRows(rowsWithCreatedRecord)
@@ -702,58 +734,68 @@ export function ActivityBatchTable({
           const course = courses.find(c => c.id === row.course_id)
           await classRecordApi.update(id, {
             ...common,
-            course_id: row.course_id,
-            course_name: course?.name || row.name,
-            course_type: row.class_course_type || "",
-            course_description: row.description,
-            teacher_ids: row.host_ids,
+            ...(canEditRow(row) ? {
+              course_id: row.course_id,
+              course_name: course?.name || row.name,
+              course_type: row.class_course_type || "",
+              course_description: row.description,
+              teacher_ids: row.host_ids,
+            } : {}),
             is_public_welfare: row.is_public_welfare,
             participant_ids: row.participant_ids,
-          })
+          }, conversion)
         } else if (type === "gcs") {
           await groupCaseSessionApi.update(id, {
             ...common,
-            name: row.name,
-            owner_id: row.owner_id || "",
-            owner_name: row.owner_name || "",
-            teacher_ids: row.host_ids,
+            ...(canEditRow(row) ? {
+              name: row.name,
+              owner_id: row.owner_id || "",
+              owner_name: row.owner_name || "",
+              teacher_ids: row.host_ids,
+              description: row.description,
+            } : {}),
             participant_ids: row.participant_ids,
-            description: row.description,
           })
         } else if (type === "ers") {
           await emotionalReleaseSessionApi.update(id, {
             ...common,
-            name: row.name,
-            owner_id: row.owner_id || "",
-            owner_name: row.owner_name || "",
-            teacher_ids: row.host_ids,
-            description: row.description,
+            ...(canEditRow(row) ? {
+              name: row.name,
+              owner_id: row.owner_id || "",
+              owner_name: row.owner_name || "",
+              teacher_ids: row.host_ids,
+              description: row.description,
+            } : {}),
             participant_ids: row.participant_ids,
           })
         } else if (type === "eks") {
           await energyKnotSessionApi.update(id, {
             ...common,
-            owner_id: row.owner_id || "",
-            owner_name: row.owner_name || "",
-            name: row.name || "",
-            teacher_ids: row.host_ids,
-            description: serializeEksDescription(
-              row.owner_id,
-              row.owner_name,
-              Math.max(1, Number(row.deduction_count) || 1),
-            ),
-            course_description: row.description,
+            ...(canEditRow(row) ? {
+              owner_id: row.owner_id || "",
+              owner_name: row.owner_name || "",
+              name: row.name || "",
+              teacher_ids: row.host_ids,
+              description: serializeEksDescription(
+                row.owner_id,
+                row.owner_name,
+                Math.max(1, Number(row.deduction_count) || 1),
+              ),
+              course_description: row.description,
+            } : {}),
             participant_ids: row.participant_ids,
           })
         } else if (type === "ics") {
           await internalCourseSessionApi.update(id, {
             ...common,
-            course_type: row.ics_course_key?.replace("ics:", "") || "",
-            course_name: row.name,
-            course_description: row.description,
-            teacher_ids: row.host_ids,
+            ...(canEditRow(row) ? {
+              course_type: row.ics_course_key?.replace("ics:", "") || "",
+              course_name: row.name,
+              course_description: row.description,
+              teacher_ids: row.host_ids,
+            } : {}),
             participant_ids: row.participant_ids,
-          })
+          }, conversion)
         }
       }
 
@@ -780,7 +822,7 @@ export function ActivityBatchTable({
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       throw e
     }
-  }, [courses, spaceId, spaces, date, fetchRemaining])
+  }, [courses, spaceId, spaces, date, fetchRemaining, canEditRow, currentActorId, currentActorName])
 
   // saveRow 包装：加 15 秒超时，防止 API 挂起时 status 永远停在 "saving"
   const saveRow = useCallback(async (row: ActivityRow, conversion = false): Promise<any> => {
@@ -823,6 +865,8 @@ export function ActivityBatchTable({
   }
 
   const updateRow = useCallback((key: number, field: keyof ActivityRow, value: any) => {
+    const editableRow = rowsRef.current.find(r => r.key === key)
+    if (!editableRow || !canEditField(editableRow, field)) return
     // 首次编辑时记录历史
     if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
       if (!historyPushedRef.current.has(key)) {
@@ -864,10 +908,12 @@ export function ActivityBatchTable({
     }
     setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
     scheduleSave(key)
-  }, [rowStatus, scheduleSave, pushHistory])
+  }, [rowStatus, scheduleSave, pushHistory, canEditField])
 
   // 批量修改行字段（用于一次修改多个关联字段的场景，如 eks 案主+描述）
   const updateRowMulti = useCallback((key: number, changes: Partial<ActivityRow>, desc?: string) => {
+    const editableRow = rowsRef.current.find(r => r.key === key)
+    if (!editableRow || !canEditChanges(editableRow, changes)) return
     if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
       if (!historyPushedRef.current.has(key)) {
         const row = rowsRef.current.find(r => r.key === key)
@@ -879,24 +925,25 @@ export function ActivityBatchTable({
     }
     setRows(prev => prev.map(r => r.key === key ? { ...r, ...changes } : r))
     scheduleSave(key)
-  }, [rowStatus, scheduleSave, pushHistory])
+  }, [rowStatus, scheduleSave, pushHistory, canEditChanges])
 
   // 删除按钮
   const handleDelete = useCallback((row: ActivityRow) => {
+    if (!canEditRow(row)) return
     // 不在确认前移除行，等父组件确认后由 loadDateData 同步
     if (row.record_type === "class") callbacks.onDeleteClass(row.record_id)
     else if (row.record_type === "gcs") callbacks.onDeleteGcs(row.record_id)
     else if (row.record_type === "ers") callbacks.onDeleteErs(row.record_id)
     else if (row.record_type === "eks") callbacks.onDeleteEks(row.record_id)
     else if (row.record_type === "ics") callbacks.onDeleteIcs(row.record_id)
-  }, [callbacks])
+  }, [callbacks, canEditRow])
 
   // 类型切换 → 先创建新记录，成功后再删除旧记录（防止数据丢失）
   const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {
     // 同一行的类型转换必须串行执行，避免连续切换时留下中间类型的孤立场次。
     if (typeChangeKeysRef.current.has(rowKey) || rowStatusRef.current[rowKey] === "saving") return
     const row = rowsRef.current.find(r => r.key === rowKey)
-    if (!row) return
+    if (!row || !canEditRow(row)) return
     // 解析复合值，如 "ics:疗愈师课程"
     const [parsedType, parsedCourse] = newType.includes(":") ? newType.split(":") : [newType, ""]
     const oldName = row.name || "未命名活动"
@@ -920,17 +967,23 @@ export function ActivityBatchTable({
     const preRows = rowsRef.current.map(r => ({ ...r }))
 
     // 保留已有数据，只更新活动名称和类型相关字段
+    const updatesExistingSubtype = ["class", "ics"].includes(type)
+      && type === row.record_type
+      && Boolean(row.record_id)
+      && !row.pendingCreate
     const updated: ActivityRow = {
       ...row,
       record_type: type,
       ics_course_key: type === "ics" ? newType : "",
       class_course_type: type === "class" ? parsedCourse : "",
-      record_id: "",
-      pendingCreate: true,
+      record_id: updatesExistingSubtype ? row.record_id : "",
+      pendingCreate: !updatesExistingSubtype,
       name: parsedCourse || TYPE_NAMES[type] || "",
       course_id: "",
-      raw: {},
-      membership_deduction_count: type === "eks" || type === "ics" ? 0 : 1,
+      raw: updatesExistingSubtype ? row.raw : {},
+      membership_deduction_count: updatesExistingSubtype
+        ? row.membership_deduction_count
+        : (type === "eks" || type === "ics" ? 0 : 1),
       deduction_count: type === "eks" ? 2 : 1,
     }
 
@@ -948,10 +1001,10 @@ export function ActivityBatchTable({
     // 先保存新记录，再删除旧记录；任一步失败都回滚新记录并恢复旧行。
     try {
       const result = await saveRow(updated, true)
-      const savedId = result?.id || ""
+      const savedId = updatesExistingSubtype ? updated.record_id : (result?.id || "")
       if (!savedId) throw new Error("新活动创建失败")
       // 新记录创建成功，删除旧记录
-      if (row.record_id && !row.pendingCreate) {
+      if (!updatesExistingSubtype && row.record_id && !row.pendingCreate) {
         try {
           await deleteRecordFromBackend(row, true)
         } catch (deleteError) {
@@ -979,7 +1032,7 @@ export function ActivityBatchTable({
     } finally {
       typeChangeKeysRef.current.delete(rowKey)
     }
-  }, [deleteRecordFromBackend, fetchRemaining, invitedOwnerCustomers, saveRow, pushHistory])
+  }, [deleteRecordFromBackend, fetchRemaining, invitedOwnerCustomers, saveRow, pushHistory, canEditRow])
 
   const selectOwner = useCallback((row: ActivityRow, customer: CustomerLight) => {
     const ownerId = customer.id
@@ -998,7 +1051,9 @@ export function ActivityBatchTable({
   }, [updateRowMulti])
 
   // 拖拽排序
-  const handleDragStart = useCallback((key: number) => { dragKeyRef.current = key }, [])
+  const handleDragStart = useCallback((key: number) => {
+    if (rowsRef.current.some(row => row.key === key)) dragKeyRef.current = key
+  }, [])
   const handleDragOver = useCallback((e: React.DragEvent, key: number) => {
     e.preventDefault()
     if (dragKeyRef.current !== key) setDragOverKey(key)
@@ -1012,7 +1067,7 @@ export function ActivityBatchTable({
         const data = JSON.parse(e.dataTransfer.getData("text/plain"))
         if (data.customer_id) {
           const targetRow = rowsRef.current.find(r => r.key === targetKey)
-          if (!targetRow) { setDragOverKey(null); return }
+          if (!targetRow || !canEditField(targetRow, "participant_ids")) { setDragOverKey(null); return }
           const alreadyInRow = targetRow.owner_id === data.customer_id || targetRow.host_ids.includes(data.customer_id) || targetRow.participant_ids.includes(data.customer_id)
           if (!alreadyInRow) {
             const newParticipantIds = [...targetRow.participant_ids, data.customer_id]
@@ -1025,7 +1080,23 @@ export function ActivityBatchTable({
     }
     // 内部排序
     if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
-    pushHistory("调整了排序")
+    const sourceRow = rowsRef.current.find(r => r.key === sourceKey)
+    if (!sourceRow) {
+      setDragOverKey(null)
+      return
+    }
+    const visibleRows = viewSegment === "mine"
+      ? rowsRef.current.filter(isOwnRow)
+      : rowsRef.current
+    const sourceIndex = visibleRows.findIndex(row => row.key === sourceKey)
+    const targetIndex = visibleRows.findIndex(row => row.key === targetKey)
+    if (sourceIndex === -1 || targetIndex === -1) { setDragOverKey(null); return }
+    const subject = sourceRow.name || TYPE_NAMES[sourceRow.record_type] || "未命名课程"
+    pushHistory(
+      "调整了排序",
+      undefined,
+      `将「${subject}」从第 ${sourceIndex + 1} 位移动到第 ${targetIndex + 1} 位`,
+    )
     setRows(prev => {
       const srcIdx = prev.findIndex(r => r.key === sourceKey)
       const tgtIdx = prev.findIndex(r => r.key === targetKey)
@@ -1037,12 +1108,16 @@ export function ActivityBatchTable({
       const order = next.map(r => `${r.record_type}-${r.record_id}`)
       try { localStorage.setItem(orderKey, JSON.stringify(order)) } catch {}
       // 持久化到后端
-      activityOrderApi.save(date, spaceId || "", order).catch(() => {})
+      activityOrderApi.save(date, spaceId || "", order, {
+        movedName: subject,
+        fromPosition: sourceIndex + 1,
+        toPosition: targetIndex + 1,
+      }).catch(() => {})
       return next
     })
     dragKeyRef.current = null
     setDragOverKey(null)
-  }, [date, spaceId, updateRow, saveRow, pushHistory])
+  }, [date, spaceId, updateRow, saveRow, pushHistory, canEditField, viewSegment, isOwnRow])
 
   // 获取 host 显示名称
   const getHostDisplay = useCallback((row: ActivityRow): string[] => {
@@ -1052,10 +1127,6 @@ export function ActivityBatchTable({
       return c?.nickname || c?.name || ""
     }).filter(Boolean)
   }, [teachers, customers])
-
-  const getParticipantNames = useCallback((ids: string[]): string[] => {
-    return ids.map(id => getMemberName(id))
-  }, [getMemberName])
 
   // 会员身份类型映射：身份名称 → "老人" | "新人"
   const identityTypeMap = useMemo(() => {
@@ -1132,18 +1203,48 @@ export function ActivityBatchTable({
     const preRows = rowsRef.current.map(r => ({ ...r }))
     const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "membership_deduction_count", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "is_published", "space_id"]
     pushHistory("新增了活动", [fresh.key], `新增了「${newName}」`, preRows, [{ rowKey: fresh.key, fields: allFields }])
+    pendingScrollToBottomRef.current = true
     setRows(prev => [...prev, fresh])
     setRowStatus(prev => ({ ...prev, [fresh.key]: "idle" }))
     try { await saveRow(fresh) } catch { /* saveRow handles its own errors */ }
   }
 
+  useLayoutEffect(() => {
+    if (!pendingScrollToBottomRef.current) return
+    pendingScrollToBottomRef.current = false
+    const scrollContainer = scrollRef.current
+    if (!scrollContainer) return
+    scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: "smooth" })
+  }, [rows.length])
+
   const hasEks = rows.some(r => r.record_type === "eks")
   const hasOwnerType = rows.some(r => r.record_type !== "class" && r.record_type !== "ics")
+  const tableMinWidth = hasOwnerType ? 1413 : 1257
+  const fixedColumnWidth = 867 + (hasOwnerType ? 86 : 0) + (hasEks ? 40 : 0)
+  const participantColumnWidth = (tableMinWidth - fixedColumnWidth) / 2
+  const columnWidths = [
+    24, 46, 122, 80, 126,
+    ...(hasOwnerType ? [86] : []),
+    ...(hasEks ? [40] : []),
+    57, 62, 80, 160, participantColumnWidth, participantColumnWidth, 42, 68,
+  ]
+
+  const handleTableScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const header = headerScrollRef.current
+    if (header && header.scrollLeft !== event.currentTarget.scrollLeft) {
+      header.scrollLeft = event.currentTarget.scrollLeft
+    }
+  }, [])
 
   // 预览模式：使用预览行数据
   const isPreview = !!previewRows
   const isLocked = locked || isPreview
-  const displayRows = previewRows || rows
+  const allDisplayRows = previewRows || rows
+  const mineDisplayRows = useMemo(
+    () => allDisplayRows.filter(isOwnRow),
+    [allDisplayRows, isOwnRow],
+  )
+  const displayRows = viewSegment === "mine" ? mineDisplayRows : allDisplayRows
   const changedKeySet = new Set(previewChangedKeys || [])
   // 单元格级别的变更标记：rowKey -> Set<fieldName>
   const changedCellMap = useMemo(() => {
@@ -1158,6 +1259,10 @@ export function ActivityBatchTable({
   const isCellChanged = useCallback((rowKey: number, field: string) => {
     return changedCellMap.get(rowKey)?.has(field) ?? false
   }, [changedCellMap])
+
+  useEffect(() => {
+    try { localStorage.setItem("activity_view_segment", viewSegment) } catch {}
+  }, [viewSegment])
 
   const closeDescriptionDialog = () => {
     setEditingDescriptionKey(null)
@@ -1174,7 +1279,7 @@ export function ActivityBatchTable({
   }
 
   return (
-    <div className={`bg-white rounded-[2px] relative ${isLocked ? "activity-table-locked" : ""}`}>
+    <div className={`relative flex min-h-0 flex-1 flex-col rounded-[2px] bg-white ${isLocked ? "activity-table-locked" : ""}`}>
       {isPreview && (
         <div className="px-3 py-2 bg-[#f5eeff] border-b border-[#e0d0f5]">
           <span className="text-[12px] text-[#7c3aed]">正在预览历史版本</span>
@@ -1196,38 +1301,91 @@ export function ActivityBatchTable({
           }
         `}</style>
       )}
-      <div ref={scrollRef} className="overflow-x-auto scrollbar-hide">
-        <div className={hasOwnerType ? "min-w-[1471px]" : "min-w-[1315px]"}>
-          <table className="text-[12px] w-full border-separate border-spacing-y-[6px]" style={{ tableLayout: "fixed" }}>
+      <div className="flex h-10 shrink-0 items-center gap-3 border-b border-[#f0f0f0] px-3.5">
+        {toolbarLeading && (
+          <>
+            <div className="flex shrink-0 items-center gap-2">{toolbarLeading}</div>
+            <span className="h-3.5 w-px shrink-0 bg-[#e8eaed]" aria-hidden="true" />
+          </>
+        )}
+        <div className="flex items-center gap-1.5" aria-label="课表记录范围">
+          <button
+            type="button"
+            onClick={() => setViewSegment("all")}
+            className={`h-7 rounded-full px-3 text-[12px] transition-colors ${viewSegment === "all" ? "bg-[#1f2329] text-white" : "border-[0.5px] border-[#e1e4e7] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}
+          >
+            全部 {allDisplayRows.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewSegment("mine")}
+            className={`h-7 rounded-full px-3 text-[12px] transition-colors ${viewSegment === "mine" ? "bg-[#1f2329] text-white" : "border-[0.5px] border-[#e1e4e7] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}
+          >
+            我录入的 {mineDisplayRows.length}
+          </button>
+        </div>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button type="button" className="hidden shrink-0 items-center gap-1 text-[12px] text-[#8f959e] min-[1100px]:inline-flex">
+                仅创建人可编辑
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            }
+          />
+          <TooltipContent>公益、时间、类型、名称、老师、方式、扣卡、案主、部位、简介及删除仅创建人可操作</TooltipContent>
+        </Tooltip>
+        <div className="ml-auto flex shrink-0 items-center gap-1">{toolbarTrailing}</div>
+      </div>
+      {toolbarSupplement}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div ref={headerScrollRef} className="shrink-0 overflow-hidden">
+          <div style={{ minWidth: tableMinWidth }}>
+            <table className="w-full border-separate border-spacing-y-[6px] text-[12px]" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                {columnWidths.map((width, index) => <col key={index} style={{ width }} />)}
+              </colgroup>
           <thead>
             <tr className="bg-[#f7f8fa] text-[#8f959e]">
-              <th className="w-[24px]"></th>
-              <th className="px-1.5 py-2 text-center font-normal w-[46px]">公益</th>
-              <th className="px-1 py-2 text-left font-normal w-[122px]">时间</th>
-              <th className="px-1 py-2 text-left font-normal w-[80px]">类型</th>
-              <th className="px-1 py-2 text-left font-normal w-[140px]">活动名称</th>
-              {hasOwnerType && <th className="px-1 py-2 text-left font-normal w-[86px]">案主</th>}
-              {hasEks && <th className="py-2 text-center font-normal w-[40px]">部位</th>}
-              <th className="px-1 py-2 text-left font-normal w-[57px]">方式</th>
-              <th className="px-1 py-2 text-center font-normal w-[62px]">扣卡次数</th>
-              <th className="px-1 py-2 text-left font-normal w-[110px]">老师</th>
-              <th className="px-1 py-2 text-left font-normal w-[200px]">简介</th>
-              <th className="px-1 py-2 text-left font-normal flex-1">老人</th>
-              <th className="px-1 py-2 text-left font-normal flex-1">新人</th>
-              <th className="w-[42px] sticky right-[42px] z-10 bg-[#f7f8fa] px-1 py-2 text-center font-normal relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">发布</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[42px] sticky right-0 bg-[#f7f8fa] z-10">操作</th>
+              <th></th>
+              <th className="px-1.5 py-2 text-center font-normal">公益</th>
+              <th className="px-1 py-2 text-left font-normal">时间</th>
+              <th className="px-1 py-2 text-left font-normal">类型</th>
+              <th className="px-1 py-2 text-left font-normal">活动名称</th>
+              {hasOwnerType && <th className="px-1 py-2 text-left font-normal">案主</th>}
+              {hasEks && <th className="py-2 text-center font-normal">部位</th>}
+              <th className="px-1 py-2 text-left font-normal">方式</th>
+              <th className="px-1 py-2 text-center font-normal">扣卡次数</th>
+              <th className="px-1 py-2 text-left font-normal">老师</th>
+              <th className="px-1 py-2 text-left font-normal">简介</th>
+              <th className="px-1 py-2 text-left font-normal">老人</th>
+              <th className="px-1 py-2 text-left font-normal">新人</th>
+              <th className="sticky right-[68px] z-10 w-[42px] bg-[#f7f8fa] px-1 py-2 text-center font-normal">发布</th>
+              <th className="sticky right-0 z-10 w-[68px] bg-[#f7f8fa] px-1 py-2 text-center font-normal">操作</th>
             </tr>
           </thead>
+            </table>
+          </div>
+        </div>
+        <div ref={scrollRef} onScroll={handleTableScroll} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-hide">
+          <div style={{ minWidth: tableMinWidth }}>
+            <table className="w-full border-separate border-spacing-y-[6px] text-[12px]" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                {columnWidths.map((width, index) => <col key={index} style={{ width }} />)}
+              </colgroup>
           <tbody>
             {displayRows.map((row) => {
               const isChanged = changedKeySet.has(row.key)
               const rowChangedFields = changedCellMap.get(row.key)
               const hasCellChanges = !!rowChangedFields && rowChangedFields.size > 0
-              const badge = getTypeBadge(row.record_type, row.record_type === "ics" ? (row.ics_course_key?.replace("ics:", "") || row.name || "") : row.name, row.class_course_type)
-              const participantNames = getParticipantNames(row.participant_ids)
               const { oldMembers, newMembers } = splitParticipants(row.participant_ids)
-              const currentSpace = spaces.find(s => s.id === row.space_id)
-              const roomOptions = (currentSpace?.rooms || []).map(r => ({ value: r.id, label: r.name }))
+              const rowReadOnly = !canEditRow(row)
+              const typeLabel = row.record_type === "class"
+                ? (row.class_course_type || "沙龙")
+                : row.record_type === "ics"
+                  ? (row.ics_course_key.replace("ics:", "") || "内部课程")
+                  : TYPE_NAMES[row.record_type]
+              const hostDisplayText = getHostDisplay(row).join("、")
               return (
                 <tr
                   key={row.key}
@@ -1249,62 +1407,84 @@ export function ActivityBatchTable({
                   <td className={`px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "is_public_welfare") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <div className="flex items-center justify-center h-7">
                     {row.record_type === "class" ? (
-                      <input
-                        type="checkbox"
-                        checked={row.is_public_welfare}
-                        onChange={(e) => {
-                          const checked = e.target.checked
-                          updateRowMulti(
-                            row.key,
-                            {
-                              is_public_welfare: checked,
-                              membership_deduction_count: checked ? 0 : 1,
-                            },
-                            `编辑了「${row.name || ""}」的公益状态与扣卡次数`,
-                          )
-                        }}
-                        className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#e8eaed] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Crect%20x%3D%223.5%22%20y%3D%223.5%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23a0a5ab%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
-                      />
+                      rowReadOnly ? (
+                        <span className={row.is_public_welfare ? "text-[#2b2f36]" : "text-[#c9cdd4]"}>
+                          {row.is_public_welfare ? "公益" : "-"}
+                        </span>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={row.is_public_welfare}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            updateRowMulti(
+                              row.key,
+                              {
+                                is_public_welfare: checked,
+                                membership_deduction_count: checked ? 0 : 1,
+                              },
+                              `编辑了「${row.name || ""}」的公益状态与扣卡次数`,
+                            )
+                          }}
+                          className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#e8eaed] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Crect%20x%3D%223.5%22%20y%3D%223.5%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23a0a5ab%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
+                        />
+                      )
                     ) : null}
                     </div>
                   </td>
 
                   {/* 时间 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "start_time") || isCellChanged(row.key, "end_time") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <div className="flex items-center h-7 rounded-[2px] border-[0.5px] border-[#e8eaed] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
-                      <input
-                        type="time"
-                        value={row.start_time}
-                        onChange={(e) => updateRow(row.key, "start_time", e.target.value)}
-                        className={`h-full flex-1 min-w-0 bg-transparent px-1.5 outline-none border-none ${!row.start_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
-                      />
-                      <span className="text-[10px] text-[#c9cdd4] shrink-0 px-0.5">-</span>
-                      <input
-                        type="time"
-                        value={row.end_time}
-                        onChange={(e) => updateRow(row.key, "end_time", e.target.value)}
-                        className={`h-full flex-1 min-w-0 bg-transparent px-1.5 outline-none border-none ${!row.end_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
-                      />
-                    </div>
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center text-[12px] tabular-nums ${row.start_time || row.end_time ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}>
+                        {row.start_time || "-"}{row.end_time ? ` - ${row.end_time}` : ""}
+                      </span>
+                    ) : (
+                      <div className="flex items-center h-7 rounded-[2px] border-[0.5px] border-[#e8eaed] focus-within:border-[#3370ff] overflow-hidden time-no-icon">
+                        <input
+                          type="time"
+                          value={row.start_time}
+                          onChange={(e) => updateRow(row.key, "start_time", e.target.value)}
+                          className={`h-full flex-1 min-w-0 bg-transparent px-1.5 outline-none border-none ${!row.start_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                        />
+                        <span className="text-[10px] text-[#c9cdd4] shrink-0 px-0.5">-</span>
+                        <input
+                          type="time"
+                          value={row.end_time}
+                          onChange={(e) => updateRow(row.key, "end_time", e.target.value)}
+                          className={`h-full flex-1 min-w-0 bg-transparent px-1.5 outline-none border-none ${!row.end_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                        />
+                      </div>
+                    )}
                   </td>
 
                   {/* 类型 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "record_type") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <SelectDropdown rounded="[2px]"
-                      size="sm"
-                      value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
-                      options={typeOptions}
-                      onChange={(v) => handleTypeChange(row.key, v)}
-                      disabled={isLocked || rowStatus[row.key] === "saving"}
-                      className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
-                      hideChevron
-                      dropdownWidth={110}
-                    />
+                    {rowReadOnly ? (
+                      <span className="inline-flex h-7 w-full items-center truncate text-[12px] text-[#2b2f36]" title={typeLabel}>
+                        {typeLabel}
+                      </span>
+                    ) : (
+                      <SelectDropdown rounded="[2px]"
+                        size="sm"
+                        value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
+                        options={typeOptions}
+                        onChange={(v) => handleTypeChange(row.key, v)}
+                        disabled={isLocked || rowStatus[row.key] === "saving"}
+                        className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
+                        hideChevron
+                        dropdownWidth={110}
+                      />
+                    )}
                   </td>
 
                   {/* 活动名称 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "name") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {["class", "ics", "gcs", "ers", "eks"].includes(row.record_type) ? (
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.name ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.name}>
+                        {row.name || "-"}
+                      </span>
+                    ) : ["class", "ics", "gcs", "ers", "eks"].includes(row.record_type) ? (
                       <Input rounded="[2px]"
                         value={row.name}
                         onChange={(e) => updateRow(row.key, "name", e.target.value)}
@@ -1318,7 +1498,11 @@ export function ActivityBatchTable({
 
                   {/* 案主 */}
                   {hasOwnerType && <td className={`pl-1.5 pr-0 py-0.5 w-[60px] align-top ${isCellChanged(row.key, "owner_name") || isCellChanged(row.key, "owner_id") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {(row.record_type === "gcs" || row.record_type === "ers") ? (
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.owner_name ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.owner_name}>
+                        {row.owner_name || "-"}
+                      </span>
+                    ) : (row.record_type === "gcs" || row.record_type === "ers") ? (
                       <CustomerSearchInput rounded="2px"
                         customers={invitedOwnerCustomers}
                         value={row.owner_name || ""}
@@ -1382,7 +1566,11 @@ export function ActivityBatchTable({
 
                   {/* 销卡 */}
                   {hasEks && <td className={`px-0 py-0.5 text-center align-top ${isCellChanged(row.key, "deduction_count") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {row.record_type === "eks" ? (() => {
+                    {row.record_type === "eks" ? (rowReadOnly ? (
+                      <span className="inline-flex h-7 items-center text-[12px] text-[#2b2f36] tabular-nums">
+                        {row.deduction_count || "-"}
+                      </span>
+                    ) : (() => {
                       const remaining = row.owner_id ? remainingMap.eks?.[row.owner_id] : undefined
                       return (
                         <input
@@ -1424,25 +1612,35 @@ export function ActivityBatchTable({
                           className="w-[34px] h-7 text-center rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent outline-none focus:border-[#3370ff] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       )
-                    })() : null}
+                    })()) : null}
                   </td>}
 
                   {/* 活动方式 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "activity_mode") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <SelectDropdown rounded="[2px]"
-                      size="sm"
-                      value={row.activity_mode || "线下"}
-                      options={ACTIVITY_MODE_OPTIONS}
-                      onChange={(v) => updateRow(row.key, "activity_mode", v)}
-                      className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
-                      hideChevron
-                    />
+                    {rowReadOnly ? (
+                      <span className="inline-flex h-7 items-center text-[12px] text-[#2b2f36]">
+                        {row.activity_mode || "-"}
+                      </span>
+                    ) : (
+                      <SelectDropdown rounded="[2px]"
+                        size="sm"
+                        value={row.activity_mode || "线下"}
+                        options={ACTIVITY_MODE_OPTIONS}
+                        onChange={(v) => updateRow(row.key, "activity_mode", v)}
+                        className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
+                        hideChevron
+                      />
+                    )}
                   </td>
 
                   {/* 扣卡次数 */}
                   <td className={`px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "membership_deduction_count") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {row.record_type === "eks" || row.record_type === "ics" ? (
                       <span className="inline-flex h-7 items-center text-[#c9cdd4]">-</span>
+                    ) : rowReadOnly ? (
+                      <span className="inline-flex h-7 items-center text-[12px] text-[#2b2f36] tabular-nums">
+                        {row.is_public_welfare ? 0 : row.membership_deduction_count}
+                      </span>
                     ) : (
                       <input
                         type="number"
@@ -1488,41 +1686,59 @@ export function ActivityBatchTable({
 
                   {/* 老师 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "host_names") || isCellChanged(row.key, "host_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <CustomerSearchInput rounded="2px"
-                      multi
-                      customers={customers}
-                      value={getHostDisplay(row)}
-                      excludeIds={[row.owner_id, ...row.participant_ids].filter(Boolean)}
-                      onChange={(v) => {
-                        const names = Array.isArray(v) ? v : v ? [v] : []
-                        const ids = names.map(n => {
-                          const c = customers.find(c => c.nickname === n || c.name === n)
-                          return c?.id || ""
-                        }).filter(Boolean)
-                        updateRow(row.key, "host_ids", ids)
-                        setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_names: names } : r))
-                      }}
-                      positionFilter={TEACHER_POSITION_MAP[row.record_type]}
-                      filterSelected
-                      className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
-                    />
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${hostDisplayText ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={hostDisplayText}>
+                        {hostDisplayText || "-"}
+                      </span>
+                    ) : (
+                      <CustomerSearchInput rounded="2px"
+                        multi
+                        compactMulti
+                        dropdownWidth={320}
+                        customers={customers}
+                        value={getHostDisplay(row)}
+                        excludeIds={[row.owner_id, ...row.participant_ids].filter(Boolean)}
+                        onChange={(v) => {
+                          const names = Array.isArray(v) ? v : v ? [v] : []
+                          const ids = names.map(n => {
+                            const c = customers.find(c => c.nickname === n || c.name === n)
+                            return c?.id || ""
+                          }).filter(Boolean)
+                          updateRow(row.key, "host_ids", ids)
+                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, host_names: names } : r))
+                        }}
+                        positionFilter={TEACHER_POSITION_MAP[row.record_type]}
+                        filterSelected
+                        placeholder="选择老师"
+                        className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
+                      />
+                    )}
                   </td>
 
                   {/* 活动简介 */}
-                  <td className={`px-1 py-0.5 align-middle ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDescriptionDraft(row.description)
-                        setEditingDescriptionKey(row.key)
-                      }}
-                      title={row.description}
-                      className="flex h-7 w-full items-center overflow-hidden rounded-[2px] border-[0.5px] border-input bg-transparent px-2 text-left text-[12px] text-[#2b2f36] outline-none hover:border-[#c9cdd4] focus:border-[#3370ff]"
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {row.description.replace(/\s+/g, " ").trim()}
+                  <td
+                    className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}
+                    style={{ verticalAlign: "top" }}
+                  >
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.description ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.description}>
+                        {row.description.replace(/\s+/g, " ").trim() || "-"}
                       </span>
-                    </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDescriptionDraft(row.description)
+                          setEditingDescriptionKey(row.key)
+                        }}
+                        title={row.description}
+                        className="flex h-7 w-full items-center overflow-hidden rounded-[2px] border-[0.5px] border-input bg-transparent px-2 text-left text-[12px] text-[#2b2f36] outline-none hover:border-[#c9cdd4] focus:border-[#3370ff]"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {row.description.replace(/\s+/g, " ").trim()}
+                        </span>
+                      </button>
+                    )}
                   </td>
 
                   {/* 老人 */}
@@ -1566,7 +1782,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 发布到客户端 */}
-                  <td className={`sticky right-[42px] z-10 px-1 py-0.5 text-center align-top relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)] ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
+                  <td className={`sticky right-[68px] z-10 px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
                     <div className="flex h-7 items-center justify-center">
                       <input
                         type="checkbox"
@@ -1579,13 +1795,26 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 操作 */}
-                  <td className="px-1 py-0.5 text-center sticky right-0 z-10 bg-white">
-                    <button
-                      onClick={() => handleDelete(row)}
-                      className="h-7 w-full flex items-center justify-center text-[#8f959e] hover:text-[#e02020]"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                  <td className="sticky right-0 z-10 w-[68px] bg-white px-1 py-0.5 text-center">
+                    {rowReadOnly ? (
+                      <span
+                        className="inline-flex h-7 max-w-[60px] items-center truncate text-[12px] text-[#8f959e]"
+                        title="公益、时间、类型、名称、老师、方式、扣卡、案主、部位、简介及删除仅创建人可操作"
+                      >
+                        {row.created_by || "未记录"}
+                      </span>
+                    ) : (
+                      <div className="flex h-7 items-center justify-center gap-1">
+                        <span className="text-[11px] text-[#8f959e]">自己</span>
+                        <button
+                          onClick={() => handleDelete(row)}
+                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[#8f959e] hover:text-[#e02020]"
+                          aria-label="删除"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               )
@@ -1593,6 +1822,7 @@ export function ActivityBatchTable({
           </tbody>
         </table>
         </div>
+      </div>
       </div>
 
       <HorizontalScrollbar scrollRef={scrollRef} />

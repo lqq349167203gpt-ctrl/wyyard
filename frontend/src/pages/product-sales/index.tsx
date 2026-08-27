@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { CircleAlert } from "lucide-react"
 import { ComposedChart, Line, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tooltip as HintTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { statisticsApi, type StatisticsProducts } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
@@ -293,6 +295,20 @@ export default function ProductSalesPage() {
               </div>
               <div className="ml-1 flex items-center gap-2">
                 <span className="text-[12px] text-[#8f959e]">时间单位</span>
+                <HintTooltip>
+                  <TooltipTrigger
+                    render={(
+                      <button
+                        type="button"
+                        aria-label="查看时间单位说明"
+                        className="inline-flex h-4 w-4 items-center justify-center text-[#b7bdc6] transition-colors hover:text-[#8f959e]"
+                      >
+                        <CircleAlert className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  />
+                  <TooltipContent>时间单位的选择仅影响折线图的横坐标的时间分布</TooltipContent>
+                </HintTooltip>
                 <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
                   {timeView === "month" && (
                     <button
@@ -731,7 +747,7 @@ export default function ProductSalesPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-32 shrink-0">昵称</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="flex-1 min-w-0">来访需求</span>
                     <span className="w-16 shrink-0">参与活动</span>
                     <span className="w-16 shrink-0">状态</span>
                   </div>
@@ -753,7 +769,7 @@ export default function ProductSalesPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-32 shrink-0">昵称</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="flex-1 min-w-0">来访需求</span>
                     <span className="w-16 shrink-0">状态</span>
                   </div>
                   {popupData.map((r, i) => (
@@ -771,7 +787,7 @@ export default function ProductSalesPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-24 shrink-0">昵称</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="flex-1 min-w-0">来访需求</span>
                     <span className="w-16 shrink-0">参与活动</span>
                   </div>
                   {popupData.map((r, i) => (

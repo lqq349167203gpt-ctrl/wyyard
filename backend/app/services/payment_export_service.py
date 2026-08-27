@@ -7,7 +7,6 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from app.services import (
-    customer_service,
     emotional_release_service,
     energy_knot_service,
     group_case_service,
@@ -17,7 +16,6 @@ from app.services import (
     oh_card_reading_service,
     organization_service,
     other_project_service,
-    position_customer_permission_service,
     tea_seat_fee_service,
 )
 
@@ -51,21 +49,6 @@ HEADERS = [
 ]
 
 COLUMN_WIDTHS = [13, 16, 16, 30, 14, 14, 13, 13, 24, 14, 18, 30, 14, 20]
-
-
-def _allowed_customer_ids(user_role: str) -> set[str] | None:
-    if user_role == "超级管理员":
-        return None
-    allowed_member_types = set(
-        position_customer_permission_service.get_customer_permissions("payment", user_role)
-    )
-    if not allowed_member_types:
-        return set()
-    return {
-        customer.id
-        for customer in customer_service.list_customers()
-        if customer.member_type in allowed_member_types
-    }
 
 
 def _offline_expiry(item: dict) -> str:
@@ -151,7 +134,6 @@ def _build_rows(
     date_from: str | None = None,
     date_to: str | None = None,
 ) -> list[dict]:
-    allowed_customer_ids = _allowed_customer_ids(user_role)
     organization_names = {
         organization.id: organization.name
         for organization in organization_service.list_organizations()
@@ -160,8 +142,6 @@ def _build_rows(
     for project_type, type_label, list_records in PROJECT_SOURCES:
         for record in list_records():
             item = record.model_dump(mode="json")
-            if allowed_customer_ids is not None and item.get("customer_id") not in allowed_customer_ids:
-                continue
             created_at = item.get("created_at") or ""
             deal_date = item.get("deal_date") or ""
             normalized_deal_date = str(deal_date)[:10]

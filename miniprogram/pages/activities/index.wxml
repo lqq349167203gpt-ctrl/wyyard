@@ -50,7 +50,7 @@
     <view class="group" wx:for="{{timeGroups}}" wx:key="label" wx:for-item="group">
       <view class="group-label">{{group.label}}</view>
       <view
-        class="card"
+        class="card {{item.canEdit ? '' : 'read-only'}}"
         wx:for="{{group.items}}"
         wx:key="key"
         wx:for-item="item"
@@ -67,9 +67,13 @@
             <text class="name">{{item.displayName}}</text>
             <text class="type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
           </view>
-          <view class="card-line2">{{item.metaText || ''}}</view>
+          <view class="card-line2">
+            <text wx:if="{{item.metaText}}">{{item.metaText}}</text>
+            <text class="creator-text">创建人 · {{item.createdBy || '未记录'}}</text>
+          </view>
         </view>
         <view class="card-right">
+          <text class="readonly-status" wx:if="{{!item.canEdit}}">部分只读</text>
           <text class="ppl" wx:if="{{item.participants > 0}}">{{item.participants}} 人</text>
           <text class="status" wx:if="{{item.isPublished}}">已发布</text>
         </view>

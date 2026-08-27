@@ -1,4 +1,4 @@
-const { visitApi, spaceApi, customerApi } = require('../../utils/api')
+const { visitApi, visitNoteApi, spaceApi, customerApi } = require('../../utils/api')
 const { formatDate, formatTime } = require('../../utils/util')
 
 Page({
@@ -28,6 +28,7 @@ Page({
   },
 
   onLoad(options) {
+    if (!getApp().checkLogin()) return
     if (options.date) this.setData({ date: options.date })
     if (options.spaceId) this.setData({ _spaceId: options.spaceId })
     this.loadSpaces()
@@ -35,6 +36,7 @@ Page({
   },
 
   onShow() {
+    if (!getApp().checkLogin()) return
     // 从新建客户页返回时，重新加载客户列表并自动选中新建的客户
     if (this.data._expectNewCustomer) {
       const oldIds = new Set(this.data.allCustomers.map(c => c.id))
@@ -180,13 +182,11 @@ Page({
     this.setData({ saving: true })
     try {
       const space = this.data.spaces[this.data.spaceIndex]
-      await visitApi.create({
+      const visit = await visitApi.create({
         visit_date: this.data.date,
         visit_time: this.data.time,
         customer_id: this.data.customerId,
         needs: this.data.needs,
-        feedback: this.data.feedback,
-        healing_notes: this.data.healingNotes,
         referrer_handler: this.data.referrerHandler,
         referrer_handler_id: this.data.referrerHandlerId || '',
         space_id: space?.id || '',
@@ -194,7 +194,26 @@ Page({
         arrived: this.data.arrived,
         arrival_time: this.data.arrivalTime || null,
       })
-      wx.showToast({ title: '已添加' })
+      const noteRequests = []
+      if ((this.data.feedback || '').trim()) {
+        noteRequests.push(visitNoteApi.create({
+          visit_id: visit.id,
+          category: 'customer_info',
+          content: this.data.feedback.trim(),
+        }))
+      }
+      if ((this.data.healingNotes || '').trim()) {
+        noteRequests.push(visitNoteApi.create({
+          visit_id: visit.id,
+          category: 'follow_up',
+          content: this.data.healingNotes.trim(),
+        }))
+      }
+      const noteResults = await Promise.all(noteRequests.map((request) => request.then(() => true).catch(() => false)))
+      wx.showToast({
+        title: noteResults.includes(false) ? '邀约已添加，部分记录未保存' : '已添加',
+        icon: noteResults.includes(false) ? 'none' : 'success',
+      })
       wx.navigateBack()
     } catch (e) {
       this.setData({ saving: false })

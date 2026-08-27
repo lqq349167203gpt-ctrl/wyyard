@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { FileText } from "lucide-react"
+import { CircleAlert } from "lucide-react"
 import { ComposedChart, Line, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tooltip as HintTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { statisticsApi, memberIdentityApi, customerDetailApi, type StatisticsData, type StatisticsDetail, type MemberIdentity } from "@/lib/api"
 import { usePagination } from "@/hooks/use-pagination"
@@ -552,6 +553,20 @@ export default function StatisticsPage() {
               </div>
               <div className="ml-1 flex items-center gap-2">
                 <span className="text-[12px] text-[#8f959e]">时间单位</span>
+                <HintTooltip>
+                  <TooltipTrigger
+                    render={(
+                      <button
+                        type="button"
+                        aria-label="查看时间单位说明"
+                        className="inline-flex h-4 w-4 items-center justify-center text-[#b7bdc6] transition-colors hover:text-[#8f959e]"
+                      >
+                        <CircleAlert className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  />
+                  <TooltipContent>时间单位的选择仅影响折线图的横坐标的时间分布</TooltipContent>
+                </HintTooltip>
                 <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
                   {timeView === "month" && (
                     <button
@@ -931,14 +946,24 @@ export default function StatisticsPage() {
                         </span>
                       </th>
                     ))}
-                    <th className="w-16 px-3 font-normal">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedItems.map((item, index) => (
-                    <tr key={index} className="group h-11 border-b border-[#f0f0f0] text-[12px] text-[#4e535a] last:border-b-0 hover:bg-[#f7f8fa]">
+                    <tr key={index} className="h-11 border-b border-[#f0f0f0] text-[12px] text-[#4e535a] last:border-b-0 hover:bg-[#f7f8fa]">
                       <td className="w-12 truncate px-3 tabular-nums">{index + 1}</td>
-                      <td className="w-20 truncate px-3">{item.nickname || item.customer_id || <EmptyValue />}</td>
+                      <td className="w-20 truncate px-3">
+                        {item.customer_id ? (
+                          <button
+                            type="button"
+                            onClick={() => { setSelectedCustomerId(item.customer_id!); setDetailOpen(true) }}
+                            className="block max-w-full truncate text-left text-[#2b2f36] hover:underline"
+                            title={item.nickname || item.customer_id}
+                          >
+                            {item.nickname || item.customer_id}
+                          </button>
+                        ) : <EmptyValue />}
+                      </td>
                       <td className="w-20 truncate px-3">{item.member_type || <EmptyValue />}</td>
                       {activeTab === "converted_amount" ? (
                         <>
@@ -992,16 +1017,6 @@ export default function StatisticsPage() {
                           <td className="w-24 truncate px-3 tabular-nums">{item.date || <EmptyValue />}</td>
                         </>
                       )}
-                      <td className="w-16 px-3">
-                        {item.customer_id && (
-                          <button
-                            onClick={() => { setSelectedCustomerId(item.customer_id!); setDetailOpen(true) }}
-                            className="text-[#8f959e] opacity-0 transition-opacity hover:text-[#4e535a] group-hover:opacity-100"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1035,7 +1050,7 @@ export default function StatisticsPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-32 shrink-0">日期</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="flex-1 min-w-0">来访需求</span>
                   </div>
                   {popupData.visit_records.filter(v => statDimension === "total" || (v.visit_date && dateRange.from <= v.visit_date && v.visit_date <= dateRange.to)).sort((a, b) => b.visit_date.localeCompare(a.visit_date)).map((v, i) => (
                     <div key={i} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
@@ -1063,7 +1078,7 @@ export default function StatisticsPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-32 shrink-0">日期</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="flex-1 min-w-0">来访需求</span>
                   </div>
                   {popupData.visit_records.filter(v => v.cancelled && (statDimension === "total" || (v.visit_date && dateRange.from <= v.visit_date && v.visit_date <= dateRange.to))).sort((a, b) => b.visit_date.localeCompare(a.visit_date)).map((v, i) => (
                     <div key={i} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">
@@ -1091,7 +1106,7 @@ export default function StatisticsPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-32 shrink-0">日期</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="flex-1 min-w-0">来访需求</span>
                   </div>
                   {popupData.visit_records.filter(v => v.arrived && (statDimension === "total" || (v.visit_date && dateRange.from <= v.visit_date && v.visit_date <= dateRange.to))).sort((a, b) => b.visit_date.localeCompare(a.visit_date)).map((v, i) => (
                     <div key={i} className="flex items-start px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">

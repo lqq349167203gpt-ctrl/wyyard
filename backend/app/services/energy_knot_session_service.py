@@ -57,46 +57,18 @@ def _get_chargeable_ids(session) -> set:
 
 
 def _deduct_for_session(session):
-    """为新创建的活动扣费"""
-    from app.services import membership_card_service
-    chargeable = membership_card_service.filter_arrived_customer_ids(
-        session.date,
-        _get_chargeable_ids(session),
-    )
-    activity_key = f"eks:{session.id}"
-    deduction_count = membership_card_service.get_activity_deduction_count(session)
-    with membership_card_service._deduct_lock:
-        for cid in chargeable:
-            membership_card_service._do_sync_activity_count(cid, activity_key, deduction_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+    """能量结不扣会员卡，无需写入会员卡扣卡与欠卡数据。"""
+    return None
 
 
 def _restore_for_session(session):
-    """为删除的活动退费"""
-    from app.services import membership_card_service
-    chargeable = _get_chargeable_ids(session)
-    activity_key = f"eks:{session.id}"
-    with membership_card_service._deduct_lock:
-        for cid in chargeable:
-            membership_card_service._do_sync_activity_count(cid, activity_key, 0)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+    """能量结不扣会员卡，删除时无需恢复会员卡数据。"""
+    return None
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
-    """同步参与人员和单场扣卡次数。"""
-    from app.services import membership_card_service
-    old_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, old_chargeable)
-    new_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, new_chargeable)
-    activity_key = f"eks:{session.id}"
-    deduction_count = membership_card_service.get_activity_deduction_count(session)
-    with membership_card_service._deduct_lock:
-        for cid in old_chargeable | new_chargeable:
-            target_count = deduction_count if cid in new_chargeable else 0
-            membership_card_service._do_sync_activity_count(cid, activity_key, target_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+    """能量结不扣会员卡，参与人员变化无需同步会员卡数据。"""
+    return None
 
 
 def _get_all_member_ids(session) -> set:
@@ -158,7 +130,7 @@ def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
+        if hasattr(session, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
             setattr(session, key, value)
 
     if session.owner_id:

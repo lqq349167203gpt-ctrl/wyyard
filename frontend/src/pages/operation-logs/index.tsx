@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
-import { operationLogApi, accountApi, customerApi, organizationApi, positionPermissionApi, positionCustomerPermissionApi, memberIdentityApi } from "@/lib/api"
+import { operationLogApi, accountApi, customerApi, organizationApi } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import type { OperationLog, AccountLight, Customer, Organization } from "@/lib/api"
 import {
@@ -16,6 +16,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 const PAGE_SIZE = 20
 
 const PAGE_LABELS: Record<string, string> = {
+  "custom-analysis": "自定义筛选",
   "healing-records": "客户信息",
   "activity-records": "活动记录",
   "traffic-records": "引流记录",
@@ -52,6 +53,7 @@ const PAGE_LABELS: Record<string, string> = {
   "system-logs": "系统日志",
   "operation-logs": "操作日志",
   "login-records": "使用统计",
+  "analysis-logs": "分析日志",
   "member-identities": "会员身份",
   "customer-tags": "客户标签",
   "healing-identities": "疗愈老师",
@@ -98,7 +100,7 @@ const FIELD_CN: Record<string, string> = {
   id: "记录编号", project_id: "项目编号", project_type: "项目类型",
   nickname: "昵称", name: "名称", title: "标题", username: "用户名", owner: "归属人",
   phone: "电话", email: "邮箱", wechat: "微信", gender: "性别", age: "年龄", birthday: "生日",
-  member_type: "会员类型", member_identity: "会员身份", healing_identity: "疗愈老师", activity_types: "活动类型",
+  member_type: "会员身份", member_identity: "会员身份", healing_identity: "疗愈老师", activity_types: "活动类型",
   note: "备注", description: "描述", content: "内容", section: "板块",
   status: "状态", type: "类型", date: "日期", start_time: "开始时间", end_time: "结束时间",
   enabled: "启用状态",
@@ -110,8 +112,8 @@ const FIELD_CN: Record<string, string> = {
   closer_name: "成交人", closer_id: "成交人", closers: "成交人",
   price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
   sort_order: "排序", is_public_welfare: "公益", category: "分类",
-  arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "疗愈师回复",
-  needs: "需求",
+  arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "客户信息",
+  needs: "来访需求",
   visit_date: "到访日期", visit_time: "预计时间", visit_count: "到店次数",
   referrer: "引流人", referral_date: "引流日期", traffic_source: "流量来源", paid_content: "付费内容",
   basic_info: "基础信息", assessment: "客户评估", tags: "标签", self_tags: "个人标签",
@@ -126,9 +128,10 @@ const FIELD_CN: Record<string, string> = {
   organization_id: "组织",
   password: "密码", old_password: "旧密码", new_password: "新密码",
   core_situation: "核心情况", need_tags: "需求标签",
-  follow_up_node: "跟进节点", follow_up_action: "跟进动作", follow_up_status: "跟进状态",
+  follow_up_node: "跟进节点", follow_up_action: "跟进动作", follow_up_status: "跟进阶段",
   tracking_plan: "跟进计划",
-  pages: "页面权限", page_permissions: "页面权限", member_types: "用户信息权限",
+  pages: "页面权限", page_permissions: "页面权限", member_types: "历史用户信息权限",
+  edit_permissions: "信息编辑范围", visits: "邀约",
   operator: "匹配方式", conditions: "匹配条件",
   customers: "客户信息可见身份", class_records: "人员安排可见身份", payment: "付费项目可见身份",
   referrer_handler: "引流处理人", traffic_source_detail: "流量来源详情",
@@ -142,14 +145,15 @@ const FIELD_CN: Record<string, string> = {
   cost_category: "成本分类", expense_type: "支出类型", month: "月份",
   person_name: "人员", benefit_date: "福利日期",
   daily_card_usage: "每日扣费",
-  creator: "创建人", creator_id: "创建账号编号", created_by: "创建人", created_at: "创建时间",
+  creator: "创建人", creator_id: "创建账号编号", created_by: "创建人", created_by_id: "创建账号编号", created_at: "创建时间",
   updated_at: "更新时间", is_deleted: "是否删除", deleted_at: "删除时间",
   voided: "是否退费", voided_at: "退费时间",
   customer_nickname: "客户昵称", tag_ids: "客户标签",
   last_visit_date: "最近到店", other_info: "其他信息", service_teacher: "服务老师",
   is_leader: "是否组长",
   room_ids: "房间顺序", position_sort_orders: "排序顺序", is_system: "是否系统角色",
-  healing_notes: "疗愈笔记", activity_count: "活动次数", welfare_count: "公益次数", activities: "活动记录",
+  healing_notes: "跟进点", activity_count: "活动次数", welfare_count: "公益次数", activities: "活动记录",
+  visit_id: "邀约记录", category_label: "记录类型",
   provider: "模型供应商", model: "模型", api_key: "接口密钥", base_url: "接口地址",
   system_prompt: "系统提示词", temperature: "温度", max_tokens: "最大输出长度",
   record_date: "上课日期", teacher: "课程老师", result: "课程结果",
@@ -167,6 +171,8 @@ const VALUE_CN: Record<string, string> = {
   month: "按月",
   day: "按天",
   year: "按年",
+  own: "仅本人录入",
+  all: "全部记录",
   permanent: "永久",
   alipay: "支付宝",
   wechat: "微信支付",
@@ -187,6 +193,7 @@ const COUNT_FIELDS = new Set(["count", "total_count", "remaining_count", "purcha
 const DATE_TIME_FIELDS = new Set(["created_at", "updated_at", "deleted_at", "voided_at", "arrival_time"])
 
 const API_PATH_LABELS: Array<[string, string]> = [
+  ["/api/activity-orders", "课表"],
   ["/api/project-refunds", "退费记录"],
   ["/api/membership-cards", "会员卡"],
   ["/api/group-cases", "觉醒游戏"],
@@ -200,6 +207,7 @@ const API_PATH_LABELS: Array<[string, string]> = [
   ["/api/customer-tags", "客户标签"],
   ["/api/customers", "客户资料"],
   ["/api/visits", "邀约"],
+  ["/api/visit-notes", "邀约"],
   ["/api/class-records", "课表"],
 ]
 
@@ -209,72 +217,24 @@ const SECTION_OPTIONS = [
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
 
-const ALL_PAGES = [
-  { key: "healing-records", label: "客户信息" },
-  { key: "activity-records", label: "活动记录" },
-  { key: "traffic-records", label: "引流记录" },
-  { key: "class-records-visitors", label: "到场人员" },
-  { key: "class-records-activities", label: "当日活动" },
-  { key: "class-records-arrival", label: "到场确认" },
-  { key: "daily-activities", label: "活动安排" },
-  { key: "payment", label: "付费项目" },
-  { key: "expenses", label: "支出项" },
-  { key: "commission-records", label: "分成" },
-  { key: "staff-benefits", label: "人员福利" },
-  { key: "membership-cards", label: "会员卡" },
-  { key: "group-cases", label: "觉醒游戏" },
-  { key: "emotional-releases", label: "情绪释放" },
-  { key: "energy-knots", label: "能量结" },
-  { key: "internal-courses", label: "内部课程" },
-  { key: "other-projects", label: "其他项目" },
-  { key: "agents", label: "AI 配置" },
-  { key: "business-reminders", label: "业务提醒" },
-  { key: "system-logs", label: "系统日志" },
-  { key: "operation-logs", label: "操作日志" },
-  { key: "login-records", label: "使用统计" },
-  { key: "member-identities", label: "会员身份" },
-  { key: "customer-tags", label: "客户标签" },
-  { key: "healing-identities", label: "疗愈老师" },
-  { key: "position-management", label: "账号管理" },
-  { key: "courses", label: "活动配置" },
-  { key: "organizations", label: "组织信息" },
-  { key: "spaces", label: "疗愈空间" },
-  { key: "reminders", label: "提醒配置" },
-]
-
-const PERMISSION_GROUPS = [
-  { label: "业务数据", keys: ["healing-records", "activity-records", "traffic-records"] },
-  { label: "人员安排", keys: ["class-records-visitors", "class-records-activities", "class-records-arrival", "daily-activities"] },
-  { label: "付费项目", keys: ["payment", "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses", "other-projects", "expenses"] },
-  { label: "信息配置", keys: ["courses", "organizations", "member-identities", "customer-tags", "healing-identities", "spaces", "reminders"] },
-  { label: "账号管理", keys: ["position-management"] },
-  { label: "系统配置", keys: ["agents", "business-reminders", "system-logs", "operation-logs", "login-records"] },
-]
-
-const CUSTOMER_FILTER_PAGES = [
-  "healing-records",
-  "class-records-visitors", "class-records-activities", "class-records-arrival",
-  "membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses",
-]
-
 const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
 
 const getOperationLocation = (path: string, section: string) => (
   API_PATH_LABELS.find(([prefix]) => path.startsWith(prefix))?.[1] || formatSectionLabel(section)
 )
 
-const isVisitReorderLog = (log: Pick<OperationLog, "path">) => (
-  log.path.replace(/\/+$/, "") === "/api/visits/reorder"
+const isReorderLog = (log: Pick<OperationLog, "path">) => (
+  ["/api/visits/reorder", "/api/activity-orders"].includes(log.path.replace(/\/+$/, ""))
 )
 
 const getMethodLabel = (log: Pick<OperationLog, "method" | "path">) => {
-  if (isVisitReorderLog(log)) return "排序"
+  if (isReorderLog(log)) return "排序"
   if (log.method === "DELETE" && log.path.startsWith("/api/customer-tags/")) return "停用"
   return METHOD_LABELS[log.method] || log.method
 }
 
 const getMethodColor = (log: Pick<OperationLog, "method" | "path">) => {
-  if (isVisitReorderLog(log)) return METHOD_COLORS.PATCH
+  if (isReorderLog(log)) return METHOD_COLORS.PATCH
   return METHOD_COLORS[log.method] || "bg-gray-50 text-gray-600"
 }
 
@@ -321,15 +281,60 @@ const getFinancialLogDisplayContent = (log: OperationLog) => {
   return `${action}${isCommission ? "分成" : "人员福利"}：${parts.filter(Boolean).join("｜")}`
 }
 
+const EDIT_SCOPE_LABELS: Record<string, string> = {
+  own: "仅本人录入",
+  all: "全部记录",
+}
+
+const getPermissionLogDisplayContent = (log: OperationLog) => {
+  if (!log.path.startsWith("/api/position-permissions/full")) return ""
+  const before = log.before_data || {}
+  const after = log.after_data || {}
+  const position = String(after.position || before.position || "角色")
+  const changes: string[] = []
+
+  const oldPages = new Set(Array.isArray(before.pages) ? before.pages : [])
+  const newPages = new Set(Array.isArray(after.pages) ? after.pages : [])
+  const addedPages = [...newPages].filter(page => !oldPages.has(page))
+  const removedPages = [...oldPages].filter(page => !newPages.has(page))
+  if (addedPages.length > 0) {
+    changes.push(`新增页面权限：${addedPages.map(page => PAGE_LABELS[page] || page).join("、")}`)
+  }
+  if (removedPages.length > 0) {
+    changes.push(`移除页面权限：${removedPages.map(page => PAGE_LABELS[page] || page).join("、")}`)
+  }
+
+  const oldEdit = before.edit_permissions && typeof before.edit_permissions === "object"
+    ? before.edit_permissions as Record<string, unknown>
+    : {}
+  const newEdit = after.edit_permissions && typeof after.edit_permissions === "object"
+    ? after.edit_permissions as Record<string, unknown>
+    : {}
+  ;([
+    { key: "visits", label: "邀约编辑范围" },
+    { key: "activities", label: "课表编辑范围" },
+  ] as const).forEach(({ key, label }) => {
+    const oldScope = String(oldEdit[key] || "own")
+    const newScope = String(newEdit[key] || "own")
+    if (oldScope !== newScope) {
+      changes.push(`${label}：${EDIT_SCOPE_LABELS[oldScope] || oldScope} → ${EDIT_SCOPE_LABELS[newScope] || newScope}`)
+    }
+  })
+
+  return changes.length > 0 ? `${position}：${changes.join("；")}` : `${position}：权限无变更`
+}
+
 const getLogDisplayContent = (log: OperationLog) => {
-  if (isVisitReorderLog(log)) {
-    const ids = log.after_data?.ids
-    return Array.isArray(ids) && ids.length > 0
-      ? `调整邀约排序（${ids.length}条记录）`
+  if (isReorderLog(log)) {
+    if (log.content) return log.content
+    return log.path.replace(/\/+$/, "") === "/api/activity-orders"
+      ? "调整课表排序"
       : "调整邀约排序"
   }
   const financialContent = getFinancialLogDisplayContent(log)
   if (financialContent) return financialContent
+  const permissionContent = getPermissionLogDisplayContent(log)
+  if (permissionContent) return permissionContent
   if (!log.path.startsWith("/api/communication-records")) return log.content
 
   const snapshot = log.method === "DELETE"
@@ -371,16 +376,6 @@ export default function OperationLogsPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, sourceFilter, dateFrom, dateTo, keywordFilter })
-
-  // 权限编辑弹窗状态
-  const [permDialogOpen, setPermDialogOpen] = useState(false)
-  const [permPositionName, setPermPositionName] = useState("")
-  const [formPermissions, setFormPermissions] = useState<string[]>([])
-  const [formCustomerPermissions, setFormCustomerPermissions] = useState<string[]>([])
-  const [formCustomerPermissionsCR, setFormCustomerPermissionsCR] = useState<string[]>([])
-  const [formCustomerPermissionsPay, setFormCustomerPermissionsPay] = useState<string[]>([])
-  const [memberIdentityNames, setMemberIdentityNames] = useState<string[]>([])
-  const [permLoading, setPermLoading] = useState(false)
 
   const fetchLogs = useCallback(async (page: number, pageSize: number) => {
     const f = filtersRef.current
@@ -437,65 +432,6 @@ export default function OperationLogsPage() {
     setKeywordFilter("")
     filtersRef.current = { operatorFilter: "", methodFilter: "", sectionFilter: "", sourceFilter: "", dateFrom: "", dateTo: "", keywordFilter: "" }
     goToPage(1)
-  }
-
-  // 权限编辑弹窗
-  const openPermissionDialog = async (positionName: string) => {
-    setPermLoading(true)
-    setPermDialogOpen(true)
-    setPermPositionName(positionName)
-    try {
-      const [allPerms, cPerm, cPermCR, cPermPay, identities] = await Promise.all([
-        positionPermissionApi.getAll(),
-        positionCustomerPermissionApi.getAll("customers"),
-        positionCustomerPermissionApi.getAll("class_records"),
-        positionCustomerPermissionApi.getAll("payment"),
-        memberIdentityApi.list(),
-      ])
-      setFormPermissions(allPerms[positionName] || [])
-      setFormCustomerPermissions(cPerm[positionName] || [])
-      setFormCustomerPermissionsCR(cPermCR[positionName] || [])
-      setFormCustomerPermissionsPay(cPermPay[positionName] || [])
-      setMemberIdentityNames(identities.map(i => i.name))
-    } catch {} finally {
-      setPermLoading(false)
-    }
-  }
-
-  const getSectionForPage = (pageKey: string): string | null => {
-    if (pageKey === "healing-records") return "customers"
-    if (["class-records-visitors", "class-records-activities", "class-records-arrival"].includes(pageKey)) return "class_records"
-    if (["membership-cards", "group-cases", "emotional-releases", "energy-knots", "internal-courses"].includes(pageKey)) return "payment"
-    return null
-  }
-
-  const autoFillCustomerPerms = (section: string) => {
-    if (section === "customers" && formCustomerPermissions.length === 0) setFormCustomerPermissions([...memberIdentityNames])
-    else if (section === "class_records" && formCustomerPermissionsCR.length === 0) setFormCustomerPermissionsCR([...memberIdentityNames])
-    else if (section === "payment" && formCustomerPermissionsPay.length === 0) setFormCustomerPermissionsPay([...memberIdentityNames])
-  }
-
-  const handleTogglePermission = (pageKey: string) => {
-    setFormPermissions(prev => {
-      const next = prev.includes(pageKey) ? prev.filter(k => k !== pageKey) : [...prev, pageKey]
-      const section = getSectionForPage(pageKey)
-      if (section && next.includes(pageKey)) autoFillCustomerPerms(section)
-      return next
-    })
-  }
-
-  const handleSavePermissions = async () => {
-    try {
-      await Promise.all([
-        positionPermissionApi.set(permPositionName, formPermissions),
-        positionCustomerPermissionApi.setBatch(permPositionName, {
-          customers: formCustomerPermissions,
-          class_records: formCustomerPermissionsCR,
-          payment: formCustomerPermissionsPay,
-        }),
-      ])
-      setPermDialogOpen(false)
-    } catch {}
   }
 
   const formatDate = (dateStr: string) => {
@@ -685,6 +621,13 @@ export default function OperationLogsPage() {
     }
     if (typeof val === "object") {
       if (key === "closers") return formatCellValue([val], key)
+      if (key === "edit_permissions") {
+        const permissions = val as Record<string, unknown>
+        return [
+          `邀约：${EDIT_SCOPE_LABELS[String(permissions.visits || "own")] || String(permissions.visits || "own")}`,
+          `课表：${EDIT_SCOPE_LABELS[String(permissions.activities || "own")] || String(permissions.activities || "own")}`,
+        ].join("；")
+      }
       return Object.entries(val as Record<string, unknown>)
         .map(([childKey, childValue]) => `${getFieldLabel(childKey)}：${formatCellValue(childValue, childKey) || "-"}`)
         .join("；")
@@ -938,7 +881,7 @@ export default function OperationLogsPage() {
               {selectedLog.method === "DELETE" && selectedLog.before_data
                 ? renderSnapshot(selectedLog.before_data, "删除前完整信息")
                 : null}
-              {selectedLog.method === "POST" && selectedLog.after_data && !isVisitReorderLog(selectedLog)
+              {selectedLog.method === "POST" && selectedLog.after_data && !isReorderLog(selectedLog)
                 ? renderSnapshot(selectedLog.after_data, "新增信息")
                 : null}
             </div>
@@ -946,117 +889,6 @@ export default function OperationLogsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 权限编辑弹窗 */}
-      <Dialog open={permDialogOpen} onOpenChange={setPermDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[80vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>编辑角色权限：{permPositionName}</DialogTitle>
-          </DialogHeader>
-          {permLoading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">加载中...</div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <label className="text-xs text-muted-foreground font-medium">页面权限</label>
-                {PERMISSION_GROUPS.map((group) => (
-                  <div key={group.label} className="border border-[#e8e8e8] rounded-lg overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#f7f8fa] border-b border-[#e8e8e8]">
-                      <span className="text-[12px] font-medium text-[#2b2f36]">{group.label}</span>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={group.keys.every(k => formPermissions.includes(k))}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormPermissions(prev => [...new Set([...prev, ...group.keys])])
-                              if (group.keys.some(k => CUSTOMER_FILTER_PAGES.includes(k))) {
-                                const sec = getSectionForPage(group.keys.find(k => CUSTOMER_FILTER_PAGES.includes(k))!)
-                                if (sec) autoFillCustomerPerms(sec)
-                              }
-                            } else {
-                              setFormPermissions(prev => prev.filter(k => !group.keys.includes(k)))
-                            }
-                          }}
-                          className="rounded"
-                        />
-                        <span className="text-[11px] text-[#8f959e]">全选</span>
-                      </label>
-                    </div>
-                    <div className="px-4 py-2.5 grid grid-cols-2 gap-1">
-                      {group.keys.map((key) => {
-                        const page = ALL_PAGES.find(p => p.key === key)
-                        return (
-                          <label key={key} className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-[#f7f8fa] cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formPermissions.includes(key)}
-                              onChange={() => handleTogglePermission(key)}
-                              className="rounded"
-                            />
-                            <span className="text-[13px] text-[#2b2b2b]">{page?.label || key}</span>
-                          </label>
-                        )
-                      })}
-                    </div>
-                    {(() => {
-                      const section = getSectionForPage(group.keys.find(k => CUSTOMER_FILTER_PAGES.includes(k)) || "")
-                      if (!section) return null
-                      const anyChecked = group.keys.some(k => CUSTOMER_FILTER_PAGES.includes(k) && formPermissions.includes(k))
-                      if (!anyChecked) return null
-                      const perms = section === "customers" ? formCustomerPermissions
-                        : section === "class_records" ? formCustomerPermissionsCR
-                        : formCustomerPermissionsPay
-                      const setPerms = section === "customers" ? setFormCustomerPermissions
-                        : section === "class_records" ? setFormCustomerPermissionsCR
-                        : setFormCustomerPermissionsPay
-                      return (
-                        <div className="px-4 py-2.5 border-t border-[#e8e8e8] bg-[#fafbfc]">
-                          <span className="text-[11px] text-[#8f959e] block mb-2">选择该角色可见的会员身份类型</span>
-                          {memberIdentityNames.length === 0 ? (
-                            <span className="text-[12px] text-[#b0b5bb] block py-1">暂无会员身份类型</span>
-                          ) : (
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                              {memberIdentityNames.map((name) => (
-                                <label key={name} className="flex items-center gap-2 py-0.5 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={perms.includes(name)}
-                                    onChange={() => {
-                                      setPerms(prev =>
-                                        prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-                                      )
-                                    }}
-                                    className="rounded"
-                                  />
-                                  <span className="text-[12px] text-[#2b2b2b]">{name}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#e8e8e8]">
-                <button
-                  className="h-8 px-4 rounded-md border border-[#e0e0e0] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
-                  onClick={() => setPermDialogOpen(false)}
-                >
-                  取消
-                </button>
-                <button
-                  className="h-8 px-4 rounded-md bg-[#3370ff] text-white text-[12px] hover:bg-[#2860e1]"
-                  onClick={handleSavePermissions}
-                >
-                  保存
-                </button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

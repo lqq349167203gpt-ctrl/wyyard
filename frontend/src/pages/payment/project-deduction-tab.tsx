@@ -17,7 +17,6 @@ import {
 import { customerApi, projectDeductionApi, type Customer, type ProjectDeduction } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
-import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 const PROJECT_TYPE_OPTIONS = [
   { value: "membership-cards", label: "会员卡" },
@@ -65,11 +64,7 @@ type AvailableDeductionItem = {
 }
 
 export function ProjectDeductionTab() {
-  const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
   const [customers, setCustomers] = useState<Customer[]>([])
-
-  const cpRef = useRef(cp)
-  cpRef.current = cp
 
   const nicknameToCustomer = useMemo(() => {
     const map: Record<string, Customer> = {}
@@ -163,20 +158,10 @@ export function ProjectDeductionTab() {
 
   // 加载客户列表
   useEffect(() => {
-    if (!permReady) return
     customerApi.list().then((data) => {
-      let filtered = data
-      const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
-      if (cu.role !== "超级管理员") {
-        if (cpRef.current.length > 0) {
-          filtered = data.filter(c => c.member_type && cpRef.current.includes(c.member_type))
-        } else {
-          filtered = []
-        }
-      }
-      setCustomers(filtered)
+      setCustomers(data)
     }).catch(() => {})
-  }, [permReady])
+  }, [])
 
   // 扣次记录加载由 useServerPagination hook 自动处理
 

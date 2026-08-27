@@ -1,5 +1,6 @@
 const { visitApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
+const { canEditRecord } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -65,6 +66,8 @@ Page({
     loading: true,
     leaderMap: {},
     editMode: false,
+    todayVisitCount: 0,
+    todayArrivedCount: 0,
   },
 
   async onLoad() {
@@ -211,10 +214,11 @@ Page({
 
   // ---------- 数据 ----------
 
-  async loadData(spaceId) {
+  async loadData(spaceId, options = {}) {
     if (this._loading) return
     this._loading = true
-    this.setData({ loading: true })
+    const silent = Boolean(options.silent)
+    if (!silent) this.setData({ loading: true })
     try {
       const sid = spaceId !== undefined ? spaceId : this.data.spaceId
       const reqDate = this.data.currentDate
@@ -229,13 +233,18 @@ Page({
       // 迁移 localStorage 排序到后端 sort_order
       await this._migrateLocalOrder(visits || [])
 
-      const leaderMap = this.buildLeaderMap(visits || [])
+      const visibleVisits = (visits || []).map(v => Object.assign({}, v, {
+        can_edit: canEditRecord(v, 'visits'),
+      }))
+      const leaderMap = this.buildLeaderMap(visibleVisits)
 
       this._calendarCounts = counts || {}
       this.setData({
-        visits: visits || [],
+        visits: visibleVisits,
         visitCounts: counts || {},
         leaderMap,
+        todayVisitCount: visibleVisits.length,
+        todayArrivedCount: visibleVisits.filter(v => v.arrived && !v.cancelled).length,
         loading: false,
       })
     } catch (e) {
@@ -351,23 +360,68 @@ Page({
   },
 
   onArrivalTap(e) {
-    const { visit, arrivalTime } = e.detail
-    if (visit.cancelled) return
-    const arrived = !!arrivalTime
+    const { visit, arrived } = e.detail
+    if (!visit || visit.cancelled) return
+    if (!this._arrivalUpdating) this._arrivalUpdating = new Set()
+    if (this._arrivalUpdating.has(visit.id)) return
+    this._arrivalUpdating.add(visit.id)
+
+    const previousVisits = this.data.visits
+    const optimisticVisits = previousVisits.map(item => {
+      if (item.id !== visit.id) return item
+      const arrivedDelta = arrived === Boolean(item.arrived) ? 0 : (arrived ? 1 : -1)
+      return {
+        ...item,
+        arrived,
+        arrival_time: '',
+        arrived_count: Math.max(0, (item.arrived_count || 0) + arrivedDelta),
+      }
+    })
+    // 先即时反馈，再等待后端完成扣卡等业务；失败时恢复原状态。
+    this.setData({
+      visits: optimisticVisits,
+      leaderMap: this.buildLeaderMap(optimisticVisits),
+      todayArrivedCount: optimisticVisits.filter(item => item.arrived && !item.cancelled).length,
+    })
+    wx.showToast({ title: arrived ? '已确认到店' : '已设为未到店' })
 
     visitApi.update(visit.id, {
       arrived,
-      arrival_time: arrivalTime || null,
-    }).then(() => {
-      wx.showToast({ title: arrived ? '已确认到店' : '已取消到店' })
-      this.loadData()
+      arrival_time: null,
+    }).then((updatedVisit) => {
+      const visits = this.data.visits.map(item => {
+        if (item.id !== visit.id) return item
+        return {
+          ...item,
+          ...(updatedVisit || {}),
+          arrived,
+          arrival_time: '',
+          arrived_count: Math.max(0, item.arrived_count || 0),
+          can_edit: item.can_edit,
+        }
+      })
+      this.setData({
+        visits,
+        leaderMap: this.buildLeaderMap(visits),
+        todayArrivedCount: visits.filter(item => item.arrived && !item.cancelled).length,
+      })
+      // 静默同步扣卡余量等服务端计算字段；列表不隐藏，因此不会跳回顶部。
+      this.loadData(undefined, { silent: true })
     }).catch(() => {
+      this.setData({
+        visits: previousVisits,
+        leaderMap: this.buildLeaderMap(previousVisits),
+        todayArrivedCount: previousVisits.filter(item => item.arrived && !item.cancelled).length,
+      })
       wx.showToast({ title: '操作失败', icon: 'none' })
+    }).finally(() => {
+      this._arrivalUpdating.delete(visit.id)
     })
   },
 
   onCancelVisitTap(e) {
     const visit = e.detail.visit
+    if (!visit.can_edit) return
     const cancelled = !visit.cancelled
 
     visitApi.update(visit.id, { cancelled }).then(() => {
@@ -389,7 +443,8 @@ Page({
   },
 
   onDeleteTap(e) {
-    const visit = e.currentTarget.dataset.visit
+    const visit = e.detail.visit || e.currentTarget.dataset.visit
+    if (!visit || !visit.can_edit) return
     wx.showModal({
       title: '确认删除',
       content: `确定删除 ${visit.nickname} 的邀约记录？`,

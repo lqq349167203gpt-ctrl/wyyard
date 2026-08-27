@@ -11,11 +11,13 @@ function login() {
             wx.setStorageSync('auth_token', data.token)
             wx.setStorageSync('currentUser', data.account)
             wx.setStorageSync('userPermissions', data.permissions)
+            wx.setStorageSync('userEditPermissions', data.edit_permissions || { visits: 'own', activities: 'own' })
             const app = getApp()
             if (app) {
               app.globalData.token = data.token
               app.globalData.currentUser = data.account
               app.globalData.permissions = data.permissions || []
+              app.globalData.editPermissions = data.edit_permissions || { visits: 'own', activities: 'own' }
               if (app.scheduleUsageTracking) app.scheduleUsageTracking()
               else if (app.startUsageTracking) app.startUsageTracking()
             }
@@ -35,11 +37,13 @@ function bindAccount(token, username, password) {
     wx.setStorageSync('auth_token', data.token)
     wx.setStorageSync('currentUser', data.account)
     wx.setStorageSync('userPermissions', data.permissions)
+    wx.setStorageSync('userEditPermissions', data.edit_permissions || { visits: 'own', activities: 'own' })
     const app = getApp()
     if (app) {
       app.globalData.token = data.token
       app.globalData.currentUser = data.account
       app.globalData.permissions = data.permissions || []
+      app.globalData.editPermissions = data.edit_permissions || { visits: 'own', activities: 'own' }
       if (app.scheduleUsageTracking) app.scheduleUsageTracking()
       else if (app.startUsageTracking) app.startUsageTracking()
     }
@@ -51,12 +55,14 @@ function logout() {
   wx.removeStorageSync('auth_token')
   wx.removeStorageSync('currentUser')
   wx.removeStorageSync('userPermissions')
+  wx.removeStorageSync('userEditPermissions')
   const app = getApp()
   if (app) {
     if (app.stopUsageTracking) app.stopUsageTracking()
     app.globalData.token = ''
     app.globalData.currentUser = null
     app.globalData.permissions = []
+    app.globalData.editPermissions = { visits: 'own', activities: 'own' }
   }
 }
 

@@ -53,7 +53,27 @@
 .head-row2 {
   display: flex;
   align-items: center;
-  margin-top: 12rpx;
+  margin-top: 14rpx;
+}
+
+.head-summary {
+  min-width: 0;
+  font-size: 23rpx;
+  color: #8f959e;
+  white-space: nowrap;
+}
+
+.summary-count {
+  color: #646a73;
+  font-weight: 500;
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* 下拉日历 */
@@ -158,16 +178,17 @@
 .edit-toggle {
   display: flex;
   align-items: center;
-  height: 48rpx;
-  padding: 0 24rpx;
-  background-color: #f2f3f5;
-  border-radius: 8rpx;
+  height: 44rpx;
+  padding: 0 20rpx;
+  background-color: #ffffff;
+  border: 1rpx solid #ebedf0;
+  border-radius: 6rpx;
   flex-shrink: 0;
 }
 
 .edit-toggle text {
-  font-size: 26rpx;
-  color: #4e535a;
+  font-size: 23rpx;
+  color: #646a73;
 }
 
 .edit-toggle.active {
@@ -180,7 +201,7 @@
 
 /* 访客列表 */
 .visit-list {
-  padding: 164rpx 0 20rpx;
+  padding: 170rpx 0 20rpx;
 }
 
 /* 浮动按钮 */
@@ -188,9 +209,9 @@
   position: fixed;
   right: 32rpx;
   bottom: 200rpx;
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 28rpx;
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 50%;
   background-color: #3370ff;
   display: flex;
   align-items: center;
@@ -200,22 +221,21 @@
 
 .export-btn {
   height: 44rpx;
-  padding: 0 24rpx;
-  border: 1rpx solid #d0d3d6;
-  border-radius: 8rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid #ebedf0;
+  border-radius: 6rpx;
   display: flex;
   align-items: center;
-  margin-left: auto;
   flex-shrink: 0;
 }
 
 .export-btn text {
-  font-size: 26rpx;
-  color: #8f959e;
+  font-size: 23rpx;
+  color: #646a73;
 }
 
 .fab-icon {
-  font-size: 52rpx;
+  font-size: 48rpx;
   color: #ffffff;
   display: flex;
   align-items: center;

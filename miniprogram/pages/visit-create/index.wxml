@@ -47,8 +47,8 @@
       </view>
     </view>
     <view class="form-item">
-      <text class="form-label">本次需求</text>
-      <input class="form-input" placeholder="描述客户需求" placeholder-class="form-input-placeholder" value="{{needs}}" bindinput="onNeedsInput" />
+      <text class="form-label">来访需求</text>
+      <input class="form-input" placeholder="请输入来访需求" placeholder-class="form-input-placeholder" value="{{needs}}" bindinput="onNeedsInput" />
     </view>
     <view class="form-item last" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>

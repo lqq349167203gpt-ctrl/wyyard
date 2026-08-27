@@ -1,6 +1,7 @@
 """活动场次穷举测试 — 5种场次类型，逐字段、逐角色验证"""
-import pytest
 import uuid
+
+import pytest
 
 
 def _u():
@@ -72,6 +73,84 @@ class TestClassRecordFull:
         })
         assert resp.status_code == 200
         assert created_customer["id"] in resp.json()["teacher_ids"]
+
+    def test_conversion_mode_skips_duplicate_side_effects(self, client, created_customer, monkeypatch):
+        from app.api import class_records as class_records_api
+        from app.services import class_record_service
+
+        identity_refreshes = []
+        notifications = []
+        monkeypatch.setattr(
+            class_record_service,
+            "_refresh_affected_identities",
+            lambda customer_ids: identity_refreshes.append(customer_ids),
+        )
+        monkeypatch.setattr(
+            class_records_api.activity_assignment_notification_service,
+            "notify_new_assignments",
+            lambda *args, **kwargs: notifications.append((args, kwargs)),
+        )
+
+        resp = client.post("/api/class-records?conversion=true", json={
+            "date": "2026-08-05",
+            "course_id": "c1",
+            "course_name": "转换中的沙龙",
+            "participant_ids": [created_customer["id"]],
+        })
+        assert resp.status_code == 200
+        deleted = client.delete(f"/api/class-records/{resp.json()['id']}?conversion=true")
+        assert deleted.status_code == 200
+        assert identity_refreshes == []
+        assert notifications == []
+
+    def test_conversion_mode_updates_salon_subtype_in_place(self, client, monkeypatch):
+        from app.api import class_records as class_records_api
+        from app.services import class_record_service
+
+        created = client.post("/api/class-records?conversion=true", json={
+            "date": "2026-08-05",
+            "course_id": "",
+            "course_name": "读书会",
+            "course_type": "读书会",
+            "membership_deduction_count": 2,
+        })
+        assert created.status_code == 200
+        record_id = created.json()["id"]
+
+        deduction_syncs = []
+        identity_refreshes = []
+        notifications = []
+        monkeypatch.setattr(
+            class_record_service,
+            "_sync_deduction",
+            lambda *args: deduction_syncs.append(args),
+        )
+        monkeypatch.setattr(
+            class_record_service,
+            "_refresh_affected_identities",
+            lambda customer_ids: identity_refreshes.append(customer_ids),
+        )
+        monkeypatch.setattr(
+            class_records_api.activity_assignment_notification_service,
+            "notify_new_assignments",
+            lambda *args, **kwargs: notifications.append((args, kwargs)),
+        )
+
+        updated = client.patch(
+            f"/api/class-records/{record_id}?conversion=true",
+            json={
+                "course_name": "创业者Talk",
+                "course_type": "创业者Talk",
+                "membership_deduction_count": 2,
+            },
+        )
+        assert updated.status_code == 200
+        assert updated.json()["id"] == record_id
+        assert updated.json()["course_type"] == "创业者Talk"
+        assert updated.json()["membership_deduction_count"] == 2
+        assert deduction_syncs == []
+        assert identity_refreshes == []
+        assert notifications == []
 
     def test_update_basic(self, client):
         resp = client.post("/api/class-records", json={
@@ -481,6 +560,42 @@ class TestEmotionalReleaseSessionFull:
 
 @pytest.mark.usefixtures("bypass_owner_invitation_validation")
 class TestEnergyKnotSessionFull:
+    def test_session_changes_do_not_write_membership_usage(self, client, created_customer, monkeypatch):
+        from app.services import membership_card_service
+
+        membership_writes = []
+        monkeypatch.setattr(
+            membership_card_service,
+            "_save_deductions",
+            lambda: membership_writes.append("deductions"),
+        )
+        monkeypatch.setattr(
+            membership_card_service,
+            "_save_debts",
+            lambda: membership_writes.append("debts"),
+        )
+        monkeypatch.setattr(
+            membership_card_service,
+            "_save_customer_usages",
+            lambda customer_ids: membership_writes.append(tuple(customer_ids)),
+        )
+
+        created = client.post("/api/energy-knot-sessions?conversion=true", json={
+            "date": "2026-08-01",
+            "owner_id": created_customer["id"],
+            "owner_name": created_customer["nickname"],
+        })
+        assert created.status_code == 200
+        session_id = created.json()["id"]
+        assert client.patch(
+            f"/api/energy-knot-sessions/{session_id}",
+            json={"course_description": "更新简介"},
+        ).status_code == 200
+        assert client.delete(
+            f"/api/energy-knot-sessions/{session_id}?conversion=true"
+        ).status_code == 200
+        assert membership_writes == []
+
     def test_create_basic(self, client, created_customer):
         resp = client.post("/api/energy-knot-sessions", json={
             "date": "2026-08-01",
@@ -599,6 +714,89 @@ class TestInternalCourseSessionFull:
                 "course_name": f"测试_{ct}",
             })
             assert resp.status_code == 200, f"创建 {ct} 失败"
+
+    def test_conversion_mode_skips_duplicate_side_effects(self, client, created_customer, monkeypatch):
+        from app.api import internal_course_sessions as internal_course_sessions_api
+        from app.services import internal_course_session_service, membership_card_service
+
+        identity_refreshes = []
+        notifications = []
+        deduction_saves = []
+        monkeypatch.setattr(
+            internal_course_session_service,
+            "_refresh_affected_identities",
+            lambda customer_ids: identity_refreshes.append(customer_ids),
+        )
+        monkeypatch.setattr(
+            internal_course_sessions_api.activity_assignment_notification_service,
+            "notify_new_assignments",
+            lambda *args, **kwargs: notifications.append((args, kwargs)),
+        )
+        monkeypatch.setattr(
+            membership_card_service,
+            "_save_deductions",
+            lambda: deduction_saves.append("deductions"),
+        )
+        monkeypatch.setattr(
+            membership_card_service,
+            "_save_debts",
+            lambda: deduction_saves.append("debts"),
+        )
+
+        for course_type in ["疗愈师课程", "商业框架陪跑", "落地赋能班"]:
+            resp = client.post("/api/internal-course-sessions?conversion=true", json={
+                "date": "2026-08-02",
+                "course_type": course_type,
+                "course_name": course_type,
+                "participant_ids": [created_customer["id"]],
+            })
+            assert resp.status_code == 200
+            deleted = client.delete(
+                f"/api/internal-course-sessions/{resp.json()['id']}?conversion=true"
+            )
+            assert deleted.status_code == 200
+
+        assert identity_refreshes == []
+        assert notifications == []
+        assert deduction_saves == []
+
+    def test_conversion_mode_updates_internal_subtype_without_side_effects(
+        self, client, created_customer, monkeypatch
+    ):
+        from app.api import internal_course_sessions as internal_course_sessions_api
+        from app.services import internal_course_session_service
+
+        identity_refreshes = []
+        notifications = []
+        monkeypatch.setattr(
+            internal_course_session_service,
+            "_refresh_affected_identities",
+            lambda customer_ids: identity_refreshes.append(customer_ids),
+        )
+        monkeypatch.setattr(
+            internal_course_sessions_api.activity_assignment_notification_service,
+            "notify_new_assignments",
+            lambda *args, **kwargs: notifications.append((args, kwargs)),
+        )
+
+        created = client.post("/api/internal-course-sessions?conversion=true", json={
+            "date": "2026-08-02",
+            "course_type": "疗愈师课程",
+            "course_name": "疗愈师课程",
+            "participant_ids": [created_customer["id"]],
+        })
+        assert created.status_code == 200
+        session_id = created.json()["id"]
+
+        updated = client.patch(
+            f"/api/internal-course-sessions/{session_id}?conversion=true",
+            json={"course_type": "商业框架陪跑", "course_name": "商业框架陪跑"},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["id"] == session_id
+        assert updated.json()["course_type"] == "商业框架陪跑"
+        assert identity_refreshes == []
+        assert notifications == []
 
     def test_create_with_description(self, client):
         resp = client.post("/api/internal-course-sessions", json={

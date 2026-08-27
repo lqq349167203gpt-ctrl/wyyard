@@ -192,6 +192,7 @@ class TestLogin:
             headers={"Authorization": f"Bearer {first.json()['token']}"},
         )
         assert replaced.status_code == 401
+        assert replaced.headers["x-auth-reason"] == "kicked"
 
     def test_session_list_prunes_expired_and_merges_legacy_duplicates(self, make_account):
         from app.config.settings import settings

@@ -8,7 +8,6 @@ import {
 import { customerApi, type Customer } from "@/lib/api"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
-import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import { EmptyValue } from "@/components/empty-value"
 
 const SORT_FIELDS = ["member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "referral_date"] as const
@@ -38,14 +37,6 @@ interface Props {
 }
 
 export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, refreshKey = 0, summary = null }: Props) {
-  const { permissions: cpCustomers, ready: permReady } = useCustomerPermissions("customers")
-
-  // Keep latest permission values in refs so the fetch function always reads current state
-  const permReadyRef = useRef(permReady)
-  permReadyRef.current = permReady
-  const cpRef = useRef(cpCustomers)
-  cpRef.current = cpCustomers
-
   // 排序状态
   const [sortState, setSortState] = useState<{
     field: SortField | null
@@ -61,24 +52,6 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
   }, [])
 
   const fetchFn = useCallback(async (page: number, pageSize: number) => {
-    // Wait for permissions to be ready
-    if (!permReadyRef.current) {
-      return { items: [] as Customer[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
-    }
-
-    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
-    const allowed = cpRef.current
-
-    // Non-admin with no allowed types → empty result
-    if (currentUser.role !== "超级管理员" && allowed.length === 0) {
-      return { items: [] as Customer[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
-    }
-
-    // Non-admin with permission restrictions → pass allowed types to backend
-    const memberTypes = currentUser.role !== "超级管理员" && allowed.length > 0
-      ? allowed.join(",")
-      : undefined
-
     return customerApi.listPaginated(page, pageSize, {
       nickname: filterNickname || undefined,
       member_type: filterIdentity || undefined,
@@ -86,7 +59,6 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
       referrer_handler: filterReferrerHandler || undefined,
       tag_ids: filterTagIds.length ? filterTagIds.join(",") : undefined,
       tag_match: filterTagMatch,
-      member_types: memberTypes,
       sort_by: sortField || undefined,
       sort_order: sortOrder,
     })
@@ -103,15 +75,6 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
     }
   }, [refreshKey, refresh])
 
-  // Re-fetch when permissions become ready (skip initial mount when already ready)
-  const isFirst = useRef(true)
-  useEffect(() => {
-    if (permReady && !isFirst.current) {
-      refresh()
-    }
-    isFirst.current = false
-  }, [permReady, refresh])
-
   // 筛选条件变化时回到第一页（跳过首次挂载）
   const filterInitRef = useRef(true)
   useEffect(() => {
@@ -127,7 +90,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
   return (
       <div className="dv-list w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
         <style>{`.dv-list th, .dv-list td { overflow: hidden; font-size: 13px; }`}</style>
-        {loading || !permReady ? (
+        {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
         ) : paginatedItems.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">暂无数据</div>

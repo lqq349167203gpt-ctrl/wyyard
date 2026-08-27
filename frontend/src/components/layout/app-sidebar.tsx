@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom"
 import { useMemo, useState, useEffect } from "react"
 import {
-  IconBellRinging,
   IconBasket,
   IconStar,
   IconCalendarEvent,
@@ -12,7 +11,6 @@ import {
   IconUser,
   IconUsersGroup,
   IconSettings,
-  IconBell,
   IconLock,
   IconUserOff,
   IconStars,
@@ -28,6 +26,7 @@ import {
   IconTags,
   IconChartPie,
   IconLogin,
+  IconChartDots,
 } from "@tabler/icons-react"
 import {
   Sidebar,
@@ -45,14 +44,14 @@ import { usePagePermissions } from "@/hooks/use-page-permissions"
 
 type SidebarItem = {
   title: string
-  icon: typeof IconBellRinging
+  icon: typeof IconBasket
   path: string
   permission: string
   clearTab?: string
 }
 
 const businessItems = [
-  { title: "提醒", icon: IconBellRinging, path: "/business-reminders", permission: "business-reminders" },
+  { title: "自定义筛选", icon: IconChartDots, path: "/custom-analysis", permission: "custom-analysis" },
   { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "referral-statistics" },
   { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "member-statistics" },
   { title: "课程", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
@@ -87,7 +86,6 @@ const configItems = [
   { title: "疗愈老师", icon: IconSparkles, path: "/healing-identities", permission: "healing-identities" },
   { title: "组织信息", icon: IconUser, path: "/organizations", permission: "organizations" },
   { title: "空间配置", icon: IconSettings, path: "/courses/spaces", permission: "spaces" },
-  { title: "提醒配置", icon: IconBell, path: "/config/reminders", permission: "reminders" },
 ]
 
 const accountItems = [
@@ -102,6 +100,7 @@ const systemItems = [
   { title: "系统日志", icon: IconFileText, path: "/system-logs", permission: "system-logs" },
   { title: "操作日志", icon: IconClipboardText, path: "/operation-logs", permission: "operation-logs" },
   { title: "使用统计", icon: IconLogin, path: "/login-records", permission: "login-records" },
+  { title: "分析日志", icon: IconChartDots, path: "/analysis-logs", permission: "analysis-logs" },
 ]
 
 function getIsSuperAdmin(): boolean {

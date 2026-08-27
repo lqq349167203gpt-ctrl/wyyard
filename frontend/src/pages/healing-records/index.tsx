@@ -330,8 +330,8 @@ export default function HealingRecordsPage() {
               <Input type="time" value={inviteTime} onChange={(event) => setInviteTime(event.target.value)} className="h-8 text-[12px]" />
             </div>
             <div className="grid grid-cols-[64px_1fr] items-start gap-3">
-              <label className="pt-2 text-right text-[12px] text-[#4e535a]">本次需求</label>
-              <Textarea value={inviteNeeds} onChange={(event) => setInviteNeeds(event.target.value)} rows={4} maxLength={5000} placeholder="请输入本次需求" className="min-h-[88px] resize-none rounded-[4px] text-[12px]" />
+              <label className="pt-2 text-right text-[12px] text-[#4e535a]">来访需求</label>
+              <Textarea value={inviteNeeds} onChange={(event) => setInviteNeeds(event.target.value)} rows={4} maxLength={5000} placeholder="请输入来访需求" className="min-h-[88px] resize-none rounded-[4px] text-[12px]" />
             </div>
             <div className="grid grid-cols-[64px_1fr] items-center gap-3">
               <label className="text-right text-[12px] text-[#4e535a]">邀约人</label>

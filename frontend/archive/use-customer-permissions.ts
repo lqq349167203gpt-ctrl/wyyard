@@ -1,3 +1,5 @@
+// [已废弃] 原“用户信息权限”按会员身份过滤客户的 Hook。
+// 替代方案：仅通过角色的页面权限控制页面访问，不再按会员身份限制用户数据。
 import { useState, useEffect } from "react"
 import { positionCustomerPermissionApi } from "@/lib/api"
 
@@ -22,13 +24,11 @@ export function useCustomerPermissions(section: string) {
       .then((all) => {
         const perms = all[user.role] || []
         setPermissions(perms)
-        // 同步更新 localStorage
         const key = KEY_MAP[section]
         if (key) localStorage.setItem(key, JSON.stringify(perms))
         setReady(true)
       })
       .catch(() => {
-        // fallback to localStorage
         const key = KEY_MAP[section]
         setPermissions(JSON.parse(localStorage.getItem(key) || "[]"))
         setReady(true)

@@ -26,6 +26,7 @@ from app.services import (
     oh_card_reading_service,
     other_project_service,
     tea_seat_fee_service,
+    visit_note_service,
     visit_service,
 )
 
@@ -61,10 +62,25 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
     ]
     payment_records = _build_payment_records(customer_id, date)
     offline_course_records = _build_offline_course_records(customer_id)
-    visit_records = [
-        r.model_dump(mode="json")
-        for r in visit_service.list_visits(customer_id=customer_id)
-    ]
+    visits = visit_service.list_visits(customer_id=customer_id)
+    notes_by_visit: dict[str, list[dict]] = {visit.id: [] for visit in visits}
+    for note in visit_note_service.list_notes(notes_by_visit):
+        notes_by_visit.setdefault(note.visit_id, []).append(
+            {
+                "id": note.id,
+                "category": note.category,
+                "content": note.content,
+                "created_by_id": note.created_by_id,
+                "created_by": note.created_by,
+                "created_at": note.created_at,
+                "updated_at": note.updated_at,
+            }
+        )
+    visit_records = []
+    for visit in visits:
+        record = visit.model_dump(mode="json")
+        record["visit_notes"] = notes_by_visit.get(visit.id, [])
+        visit_records.append(record)
 
     return {
         "customer": basic,

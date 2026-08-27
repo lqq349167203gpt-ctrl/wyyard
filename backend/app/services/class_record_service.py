@@ -1,11 +1,11 @@
 import threading
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from app.models.class_record import ClassRecord, ClassRecordCreate
-from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service, membership_card_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "class_records.json"
 _records: Dict[str, ClassRecord] = {}
@@ -95,8 +95,7 @@ def _deduct_for_record(record):
     with membership_card_service._deduct_lock:
         for cid in chargeable:
             membership_card_service._do_sync_activity_count(cid, activity_key, deduction_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usages(chargeable)
 
 
 def _restore_for_record(record):
@@ -106,8 +105,7 @@ def _restore_for_record(record):
     with membership_card_service._deduct_lock:
         for cid in chargeable:
             membership_card_service._do_sync_activity_count(cid, activity_key, 0)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usages(chargeable)
 
 
 def _sync_deduction(record, old_chargeable, new_chargeable):
@@ -121,11 +119,11 @@ def _sync_deduction(record, old_chargeable, new_chargeable):
         else membership_card_service.get_activity_deduction_count(record)
     )
     with membership_card_service._deduct_lock:
-        for cid in old_chargeable | new_chargeable:
+        affected_ids = old_chargeable | new_chargeable
+        for cid in affected_ids:
             target_count = deduction_count if cid in new_chargeable else 0
             membership_card_service._do_sync_activity_count(cid, activity_key, target_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usages(affected_ids)
 
 
 def _refresh_affected_identities(customer_ids: set):
@@ -152,7 +150,7 @@ def _get_all_member_ids(record) -> set:
     return ids
 
 
-def create_record(data: ClassRecordCreate) -> ClassRecord:
+def create_record(data: ClassRecordCreate, refresh_identities: bool = True) -> ClassRecord:
     now = datetime.now(timezone.utc)
     record = ClassRecord(
         id=str(uuid.uuid4())[:12],
@@ -163,11 +161,17 @@ def create_record(data: ClassRecordCreate) -> ClassRecord:
     _records[record.id] = record
     _save(record.id)
     _deduct_for_record(record)
-    _refresh_affected_identities(_get_all_member_ids(record))
+    if refresh_identities:
+        _refresh_affected_identities(_get_all_member_ids(record))
     return record
 
 
-def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
+def update_record(
+    record_id: str,
+    data: dict,
+    refresh_identities: bool = True,
+    sync_deductions: bool = True,
+) -> Optional[ClassRecord]:
     with _record_lock:
         record = _records.get(record_id)
         if not record or record.is_deleted:
@@ -177,7 +181,7 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
         old_chargeable = _get_group_member_ids(record)
 
         for key, value in data.items():
-            if hasattr(record, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
+            if hasattr(record, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
                 setattr(record, key, value)
         record.membership_deduction_count = (
             0
@@ -189,10 +193,12 @@ def update_record(record_id: str, data: dict) -> Optional[ClassRecord]:
         _save(record_id)
 
         new_chargeable = _get_group_member_ids(record)
-        _sync_deduction(record, old_chargeable, new_chargeable)
+        if sync_deductions:
+            _sync_deduction(record, old_chargeable, new_chargeable)
 
         # 刷新所有受影响客户的会员身份（旧参与者 + 新参与者）
-        _refresh_affected_identities(old_chargeable | _get_all_member_ids(record))
+        if refresh_identities:
+            _refresh_affected_identities(old_chargeable | _get_all_member_ids(record))
         return record
 
 
@@ -213,7 +219,7 @@ def update_participants(record_id: str, participant_ids: List[str]):
     return record, []
 
 
-def delete_record(record_id: str) -> bool:
+def delete_record(record_id: str, refresh_identities: bool = True) -> bool:
     record = _records.get(record_id)
     if not record or record.is_deleted:
         return False
@@ -222,7 +228,8 @@ def delete_record(record_id: str) -> bool:
     record.is_deleted = True
     record.deleted_at = datetime.now(timezone.utc)
     _save(record_id)
-    _refresh_affected_identities(affected_ids)
+    if refresh_identities:
+        _refresh_affected_identities(affected_ids)
     return True
 
 

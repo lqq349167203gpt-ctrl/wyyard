@@ -1,7 +1,7 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
 
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 DEFAULT_CUSTOMER_PROMPT = """你是客户，正在和同事用语音沟通客户信息管理。像同事之间说话一样自然。
 
@@ -39,7 +39,7 @@ DEFAULT_CUSTOMER_PROMPT = """你是客户，正在和同事用语音沟通客户
 
 创建客户后的引导规则：
 - 创建成功后，简短确认，然后自然地引导补充关键信息
-- 优先问：引流人是谁、承接人是谁、本次需求是什么、从哪了解到的
+- 优先问：引流人是谁、承接人是谁、来访需求是什么、从哪了解到的
 - 如果语音录入中已经提到了引流人或承接人，就不用再问已提到的字段
 - 用口语化的方式问，不要列清单。示例：「张三已添加。她是通过什么渠道了解到我们的？谁承接的？这次主要想解决什么问题？」
 - 一次最多追问两个信息，不要一口气问太多

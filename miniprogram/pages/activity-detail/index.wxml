@@ -1,10 +1,14 @@
 <page-meta page-style="{{showPicker || showTypePicker ? 'overflow:hidden;height:100vh;' : ''}}" />
-<view class="container">
+<view class="container {{readOnly ? 'read-only' : ''}}">
   <view class="loading-wrap" wx:if="{{loading}}">
     <text class="loading-text">加载中...</text>
   </view>
 
   <block wx:if="{{!loading}}">
+  <view class="record-meta">
+    <text>创建人 · {{createdBy || '未记录'}}</text>
+    <text class="readonly-text" wx:if="{{readOnly}}">部分信息仅创建人可改</text>
+  </view>
   <!-- 参与者 -->
   <view class="form-card">
     <view class="participant-grid" wx:if="{{participantList.length > 0}}">
@@ -34,7 +38,7 @@
     </view>
     <view class="form-item last">
       <text class="form-label">时间</text>
-      <view class="time-range">
+      <view class="time-range" wx:if="{{!readOnly}}">
         <picker class="form-picker" mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
           <view class="picker-display">{{startTime}}</view>
         </picker>
@@ -43,6 +47,7 @@
           <view class="picker-display">{{endTime}}</view>
         </picker>
       </view>
+      <text wx:else class="protected-value">{{startTime || '-'}}{{endTime ? ' 至 ' + endTime : ''}}</text>
     </view>
   </view>
 
@@ -52,28 +57,31 @@
     <!-- 类型 -->
     <view class="form-item" bindtap="onTypePickerOpen">
       <text class="form-label">类型</text>
-      <view class="picker-display">{{typeLabel || unifiedTypes[unifiedIndex].label}}</view>
+      <view class="{{readOnly ? 'protected-value' : 'picker-display'}}">{{typeLabel || unifiedTypes[unifiedIndex].label}}</view>
     </view>
 
     <!-- 名称 -->
     <view class="form-item">
       <text class="form-label">名称</text>
-      <input class="form-input" placeholder="活动名称（选填）" placeholder-style="color: #b0b5bb;" value="{{activityName}}" bindinput="onNameInput" />
+      <input wx:if="{{!readOnly}}" class="form-input" placeholder="活动名称（选填）" placeholder-style="color: #b0b5bb;" value="{{activityName}}" bindinput="onNameInput" />
+      <text wx:else class="protected-value">{{activityName || '-'}}</text>
     </view>
 
     <!-- 沙龙/内部课程: 活动方式 -->
     <view class="form-item" wx:if="{{activityType === 'class' || activityType === 'ics'}}">
       <text class="form-label">活动方式</text>
-      <picker class="form-picker" mode="selector" range="{{activityModes}}" value="{{activityModeIndex}}" bindchange="onActivityModeChange">
+      <picker wx:if="{{!readOnly}}" class="form-picker" mode="selector" range="{{activityModes}}" value="{{activityModeIndex}}" bindchange="onActivityModeChange">
         <view class="picker-display">{{activityModes[activityModeIndex]}}</view>
       </picker>
+      <text wx:else class="protected-value">{{activityModes[activityModeIndex] || '-'}}</text>
     </view>
 
     <!-- 沙龙: 公益 -->
     <view class="form-item switch-row" wx:if="{{activityType === 'class'}}">
       <text class="form-label">公益</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{isPublicWelfare}}" bindchange="onPublicWelfareChange" color="#3370ff" />
+        <switch wx:if="{{!readOnly}}" checked="{{isPublicWelfare}}" bindchange="onPublicWelfareChange" color="#3370ff" />
+        <text wx:else class="protected-value">{{isPublicWelfare ? '公益' : '-'}}</text>
       </view>
     </view>
 
@@ -82,20 +90,22 @@
       <text class="form-label">案主</text>
       <view class="picker-value-wrap">
         <text style="{{ownerName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{ownerName || '选择案主'}}</text>
-        <text class="picker-clear" wx:if="{{ownerId}}" catchtap="onOwnerClear">x</text>
+        <text class="picker-clear" wx:if="{{ownerId && !readOnly}}" catchtap="onOwnerClear">x</text>
       </view>
     </view>
 
     <!-- 销卡（仅 eks） -->
     <view class="form-item" wx:if="{{activityType === 'eks'}}">
       <text class="form-label">销卡</text>
-      <input class="form-input" type="number" placeholder="2" placeholder-style="color: #b0b5bb;" value="{{deductionCount}}" bindinput="onEksDeductionInput" />
+      <input wx:if="{{!readOnly}}" class="form-input" type="number" placeholder="2" placeholder-style="color: #b0b5bb;" value="{{deductionCount}}" bindinput="onEksDeductionInput" />
+      <text wx:else class="protected-value">{{deductionCount || '-'}}</text>
     </view>
 
     <!-- 扣卡次数（eks/ics 不显示） -->
     <view class="form-item" wx:if="{{activityType !== 'eks' && activityType !== 'ics'}}">
       <text class="form-label">扣卡次数</text>
-      <input class="form-input" type="number" placeholder="1" placeholder-style="color: #b0b5bb;" value="{{membershipDeductionCount}}" bindinput="onDeductionCountInput" />
+      <input wx:if="{{!readOnly}}" class="form-input" type="number" placeholder="1" placeholder-style="color: #b0b5bb;" value="{{membershipDeductionCount}}" bindinput="onDeductionCountInput" />
+      <text wx:else class="protected-value">{{membershipDeductionCount}}</text>
     </view>
 
     <!-- 老师（多选：class/eks/ics） -->
@@ -103,7 +113,7 @@
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
         <text style="{{teacherDisplay ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{teacherDisplay || '选择老师'}}</text>
-        <text class="picker-clear" wx:if="{{teacherIds.length > 0}}" catchtap="onTeacherClear">x</text>
+        <text class="picker-clear" wx:if="{{teacherIds.length > 0 && !readOnly}}" catchtap="onTeacherClear">x</text>
       </view>
     </view>
 
@@ -112,7 +122,7 @@
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
         <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || '选择老师'}}</text>
-        <text class="picker-clear" wx:if="{{achieverId}}" catchtap="onAchieverClear">x</text>
+        <text class="picker-clear" wx:if="{{achieverId && !readOnly}}" catchtap="onAchieverClear">x</text>
       </view>
     </view>
   </view>
@@ -130,7 +140,8 @@
   <!-- 描述 -->
   <view class="form-card">
     <view class="form-item column last">
-      <textarea class="form-textarea" style="height: 160rpx;" placeholder="输入活动简介..." placeholder-class="form-textarea-placeholder" value="{{description}}" bindinput="onDescriptionInput" />
+      <textarea wx:if="{{!readOnly}}" class="form-textarea" style="height: 160rpx;" placeholder="输入活动简介..." placeholder-class="form-textarea-placeholder" value="{{description}}" bindinput="onDescriptionInput" />
+      <text wx:else class="protected-description">{{description || '-'}}</text>
     </view>
   </view>
 
@@ -227,7 +238,7 @@
 
   <!-- 操作按钮 -->
   <view class="actions">
-    <button class="btn-danger" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
+    <button class="btn-danger" wx:if="{{!readOnly}}" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
     <button class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
   </block>

@@ -15,7 +15,6 @@ import {
 import { customerApi, projectRefundApi, type Customer, type ProjectRefund } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
-import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 function EmptyValue({ className }: { className?: string }) {
   return <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className ?? ""}`} />
@@ -55,11 +54,7 @@ type RefundableItem = {
 }
 
 export function RefundTab() {
-  const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
   const [customers, setCustomers] = useState<Customer[]>([])
-
-  const cpRef = useRef(cp)
-  cpRef.current = cp
 
   const nicknameToCustomer = useMemo(() => {
     const map: Record<string, Customer> = {}
@@ -132,20 +127,10 @@ export function RefundTab() {
 
   // 加载客户列表
   useEffect(() => {
-    if (!permReady) return
     customerApi.list().then((data) => {
-      let filtered = data
-      const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
-      if (cu.role !== "超级管理员") {
-        if (cpRef.current.length > 0) {
-          filtered = data.filter(c => c.member_type && cpRef.current.includes(c.member_type))
-        } else {
-          filtered = []
-        }
-      }
-      setCustomers(filtered)
+      setCustomers(data)
     }).catch(() => {})
-  }, [permReady])
+  }, [])
 
   // 选中用户后：并行查询全部类型，合并所有可退费项目
   const handleSelectCustomer = useCallback(async (c: Customer) => {

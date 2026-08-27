@@ -1,6 +1,7 @@
 const { classRecordApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
+const { canEditRecord } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -328,6 +329,9 @@ Page({
         r.startTime = parts[0] || ''
         r.endTime = parts.length > 1 ? parts[1] : ''
         r.key = `${r.source}_${r.id}`
+        const rawRecord = rawMap[r.key] || {}
+        r.canEdit = canEditRecord(rawRecord, 'activities')
+        r.createdBy = rawRecord.created_by || ''
         r.displayName = r.name || r.badge
         const typeParts = []
         if (r.name) typeParts.push(r.badge)

@@ -34,8 +34,6 @@ import HealingIdentitiesPage from "@/pages/healing-identities"
 import ArrivalFeedbackPage from "@/pages/arrival-feedback"
 import ChangePasswordPage from "@/pages/change-password"
 import DisabledCustomersPage from "@/pages/disabled-customers"
-import RemindersPage from "@/pages/reminders"
-import BusinessRemindersPage from "@/pages/business-reminders"
 import ChatHistoryPage from "@/pages/chat-history"
 import StatisticsPage from "@/pages/statistics"
 import ProductSalesPage from "@/pages/product-sales"
@@ -48,6 +46,8 @@ import FollowupRecordsPage from "@/pages/followup-records"
 import OfflineCourseRecordsPage from "@/pages/offline-course-records"
 import DebtRecordsPage from "@/pages/debt-records"
 import CustomerTagsPage from "@/pages/customer-tags"
+import CustomAnalysisPage from "@/pages/custom-analysis"
+import AnalysisLogsPage from "@/pages/analysis-logs"
 import TeaGuestConsumptionRecordsPage from "@/pages/tea-guest-consumption-records"
 import TeaGuestExpensesPage from "@/pages/tea-guest-expenses"
 import { hasPagePermission } from "@/lib/page-permissions"
@@ -57,6 +57,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
 
 
 
+  "/custom-analysis": "custom-analysis",
+  "/analysis-logs": "analysis-logs",
   "/healing-records": "healing-records",
   "/healing-records/new": "healing-records",
   "/healing-records/:id/edit": "healing-records",
@@ -82,8 +84,6 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/courses/spaces": "spaces",
   "/organizations": "organizations",
   "/healing-identities": "healing-identities",
-  "/config/reminders": "reminders",
-  "/business-reminders": "business-reminders",
   "/referral-statistics": "referral-statistics",
   "/chat-history": "chat-history",
   "/statistics": "statistics",
@@ -187,6 +187,8 @@ function App() {
 
 
               <Route path="/config/member-identities" element={<MemberIdentitiesPage />} />
+              <Route path="/custom-analysis" element={<CustomAnalysisPage />} />
+              <Route path="/analysis-logs" element={<AnalysisLogsPage />} />
               <Route path="/config/customer-tags" element={<CustomerTagsPage />} />
               <Route path="/healing-records" element={<HealingRecordsPage />} />
               <Route path="/healing-records/new" element={<CustomerFormPage />} />
@@ -198,8 +200,8 @@ function App() {
               <Route path="/healing-identities" element={<HealingIdentitiesPage />} />
               <Route path="/operation-logs" element={<OperationLogsPage />} />
               <Route path="/login-records" element={<LoginRecordsPage />} />
-              <Route path="/config/reminders" element={<RemindersPage />} />
-              <Route path="/business-reminders" element={<BusinessRemindersPage />} />
+              <Route path="/config/reminders" element={<Navigate to="/custom-analysis" replace />} />
+              <Route path="/business-reminders" element={<Navigate to="/custom-analysis" replace />} />
               <Route path="/referral-statistics" element={<ReferralStatisticsPage />} />
               <Route path="/chat-history" element={<ChatHistoryPage />} />
               <Route path="/statistics" element={<StatisticsPage />} />

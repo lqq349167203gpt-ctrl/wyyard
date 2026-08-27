@@ -99,14 +99,14 @@ class TestCustomerTrafficSource:
 
 
 class TestCustomerFollowUpStatus:
-    def test_defaults_to_new(self, client):
+    def test_defaults_to_unconfigured(self, client):
         resp = client.post("/api/customers", json={"nickname": f"跟进状态_{_uid()}"})
         assert resp.status_code == 200
         customer_id = resp.json()["id"]
-        assert resp.json()["follow_up_status"] == "新添加"
+        assert resp.json()["follow_up_status"] == "未配置"
         client.delete(f"/api/customers/{customer_id}")
 
-    @pytest.mark.parametrize("status", ["新添加", "沟通中", "已到店", "已成交", "沉默/流失"])
+    @pytest.mark.parametrize("status", ["新添加", "前期沟通中", "已邀约未到店", "已到店", "已成交", "沉默/流失", "未配置"])
     def test_accepts_all_supported_statuses(self, client, status):
         resp = client.post("/api/customers", json={
             "nickname": f"跟进状态_{_uid()}",
@@ -120,9 +120,19 @@ class TestCustomerFollowUpStatus:
     def test_updates_status(self, client):
         created = client.post("/api/customers", json={"nickname": f"跟进状态_{_uid()}"}).json()
         customer_id = created["id"]
-        resp = client.patch(f"/api/customers/{customer_id}", json={"follow_up_status": "沟通中"})
+        resp = client.patch(f"/api/customers/{customer_id}", json={"follow_up_status": "前期沟通中"})
         assert resp.status_code == 200
-        assert resp.json()["follow_up_status"] == "沟通中"
+        assert resp.json()["follow_up_status"] == "前期沟通中"
+        client.delete(f"/api/customers/{customer_id}")
+
+    def test_normalizes_legacy_communicating_status(self, client):
+        resp = client.post("/api/customers", json={
+            "nickname": f"旧跟进状态_{_uid()}",
+            "follow_up_status": "沟通中",
+        })
+        assert resp.status_code == 200
+        customer_id = resp.json()["id"]
+        assert resp.json()["follow_up_status"] == "前期沟通中"
         client.delete(f"/api/customers/{customer_id}")
 
     def test_rejects_unknown_status(self, client):

@@ -18,6 +18,7 @@ _recent_page_views: dict[tuple[str, str, str], datetime] = {}
 
 PAGE_NAMES = {
     # PC 管理端
+    "/custom-analysis": "自定义筛选",
     "/business-reminders": "提醒",
     "/referral-statistics": "引流统计",
     "/member-statistics": "会员情况",
@@ -51,6 +52,7 @@ PAGE_NAMES = {
     "/system-logs": "系统日志",
     "/operation-logs": "操作日志",
     "/login-records": "使用统计",
+    "/analysis-logs": "分析日志",
     # 管理员小程序
     "/pages/customers/index": "客户",
     "/pages/customer-form/index": "客户编辑",
@@ -75,6 +77,7 @@ PAGE_NAMES = {
     "/pages/voice-chat/index": "语音助手",
     "/pages/text-editor/index": "文本编辑",
     "/pages/me/index": "我的",
+    "/pages/custom-analysis/index": "自定义筛选",
 }
 
 

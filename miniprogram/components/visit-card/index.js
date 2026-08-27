@@ -3,21 +3,22 @@ Component({
     visit: { type: Object, value: {} },
     leaderName: { type: String, value: '' },
     editMode: { type: Boolean, value: false },
+    editable: { type: Boolean, value: true },
+    sortable: { type: Boolean, value: true },
+    arrivalEditable: { type: Boolean, value: true },
     canMoveUp: { type: Boolean, value: false },
     canMoveDown: { type: Boolean, value: false },
   },
 
   data: {
     remainingText: '',
-    showArrivalDialog: false,
-    arrivalTime: '',
   },
 
   observers: {
     'visit': function (visit) {
       if (!visit) return
       const count = visit.remaining_count
-      let remainingText = '-'
+      let remainingText = ''
       if (count === -999) {
         remainingText = '不限次'
       } else if (count !== null && count !== undefined) {
@@ -38,10 +39,12 @@ Component({
     },
 
     onMoveUp() {
+      if (!this.data.sortable) return
       this.triggerEvent('moveup', { visit: this.data.visit })
     },
 
     onMoveDown() {
+      if (!this.data.sortable) return
       this.triggerEvent('movedown', { visit: this.data.visit })
     },
 
@@ -54,34 +57,18 @@ Component({
     },
 
     onDeleteTap(e) {
+      if (!this.data.editable) return
       this.triggerEvent('delete', { visit: this.data.visit })
     },
 
-    onArrivalTap(e) {
-      if (this.data.visit.cancelled) return
-      const now = new Date()
-      const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      this.setData({ showArrivalDialog: true, arrivalTime: time })
-    },
-
-    onArrivalTimeChange(e) {
-      this.setData({ arrivalTime: e.detail.value })
-    },
-
-    onCloseArrivalDialog() {
-      this.setData({ showArrivalDialog: false })
-    },
-
-    onConfirmArrival() {
-      this.setData({ showArrivalDialog: false })
-      this.triggerEvent('arrival', { visit: this.data.visit, arrivalTime: this.data.arrivalTime })
-    },
-
-    onCancelArrival(e) {
-      this.triggerEvent('arrival', { visit: this.data.visit, arrivalTime: '' })
+    onArrivalToggleTap() {
+      const visit = this.data.visit
+      if (!visit || visit.cancelled || !this.data.arrivalEditable) return
+      this.triggerEvent('arrival', { visit, arrived: !Boolean(visit.arrived) })
     },
 
     onCancelVisitTap() {
+      if (!this.data.editable) return
       this.triggerEvent('cancelvisit', { visit: this.data.visit })
     },
   },

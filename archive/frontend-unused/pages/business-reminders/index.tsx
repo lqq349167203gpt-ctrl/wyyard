@@ -1,3 +1,4 @@
+// 已归档：提醒功能已从前端入口、路由和角色权限中移除。
 import { useState, useCallback, useRef } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Bell } from "lucide-react"

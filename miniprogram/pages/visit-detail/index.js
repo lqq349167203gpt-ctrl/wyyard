@@ -7,12 +7,14 @@ Page({
   },
 
   onLoad(options) {
+    if (!getApp().checkLogin()) return
     if (options.id) {
       this.loadVisit(options.id)
     }
   },
 
   onShow() {
+    if (!getApp().checkLogin()) return
     if (this.data.visit) {
       this.loadVisit(this.data.visit.id)
     }

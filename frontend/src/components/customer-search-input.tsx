@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
-import { X } from "lucide-react"
+import { Check, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { type Customer, type CustomerLight } from "@/lib/api"
 
@@ -19,6 +19,8 @@ export interface CustomerSearchInputProps {
   placeholder?: string
   /** Allow multiple selections */
   multi?: boolean
+  /** Compact multi-select display for narrow table columns */
+  compactMulti?: boolean
   /** Filter customers by position (e.g., "成就君") */
   positionFilter?: string
   /** Customer IDs to exclude from results */
@@ -54,6 +56,7 @@ export function CustomerSearchInput({
   onSelectItem,
   placeholder = "",
   multi = false,
+  compactMulti = false,
   positionFilter,
   excludeIds = [],
   disabled = false,
@@ -80,13 +83,14 @@ export function CustomerSearchInput({
     const el = ref.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    const h = 192 // max-h-48
+    const h = compactMulti ? 220 : 192
     const below = window.innerHeight - r.bottom
     const above = r.top
+    const width = dropdownWidth ?? r.width
     const s: React.CSSProperties = {
       position: "fixed",
-      left: r.left,
-      width: dropdownWidth ?? r.width,
+      left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
+      width,
       zIndex: 2147483647, // 最大 z-index 值
     }
     if (below >= h || below >= above) {
@@ -97,7 +101,7 @@ export function CustomerSearchInput({
       s.maxHeight = Math.min(h, above - 8)
     }
     setPos(s)
-  }, [dropdownWidth])
+  }, [compactMulti, dropdownWidth])
 
   // Click outside to close
   useEffect(() => {
@@ -152,19 +156,27 @@ export function CustomerSearchInput({
     })
   }, [customers, search, excludeIds, positionFilter, filterSelected, selectedNames])
 
-  const removeItem = (name: string) => {
-    if (multi) {
-      onChange(selectedNames.filter(n => n !== name))
-    } else {
-      onChange("")
-    }
-  }
+  const compactOptions = useMemo(() => {
+    const seen = new Set<string>()
+    return customers.filter((customer) => {
+      if (!customer.nickname || seen.has(customer.nickname)) return false
+      if (excludeIds.includes(customer.id)) return false
+      if (positionFilter && !(customer.positions || []).includes(positionFilter)) return false
+      seen.add(customer.nickname)
+      return true
+    }).sort((a, b) => {
+      if (!positionFilter) return 0
+      const orderA = a.position_sort_orders?.[positionFilter] ?? 9999
+      const orderB = b.position_sort_orders?.[positionFilter] ?? 9999
+      return orderA - orderB
+    })
+  }, [customers, excludeIds, positionFilter])
 
   const selectItem = (customer: Customer | CustomerLight) => {
     if (multi) {
       onChange([...selectedNames, customer.nickname])
       setSearch("")
-      inputRef.current?.focus()
+      requestAnimationFrame(() => inputRef.current?.focus())
     } else {
       onChange(customer.nickname)
       if (onSelectItem) {
@@ -176,41 +188,80 @@ export function CustomerSearchInput({
     }
   }
 
+  const toggleCompactItem = (customer: Customer | CustomerLight) => {
+    if (selectedNames.includes(customer.nickname)) {
+      onChange(selectedNames.filter((name) => name !== customer.nickname))
+    } else {
+      onChange([...selectedNames, customer.nickname])
+    }
+  }
+
+  const renderMultiInput = () => (
+    <input
+      key="multi-search-input"
+      ref={inputRef}
+      className="h-5 w-[60px] shrink-0 border-none bg-transparent text-[12px] outline-none"
+      value={search}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => { setSearch(event.target.value); calcPos(); setOpen(true) }}
+      onFocus={() => { calcPos(); setOpen(true) }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          // 搜索框的 Enter 不参与 enterToNext 跳焦
+          event.stopPropagation()
+          return
+        }
+        if ((event.key === "Backspace" || event.key === "Delete") && search === "" && selectedNames.length > 0) {
+          event.preventDefault()
+          onChange(selectedNames.slice(0, -1))
+        }
+      }}
+      placeholder={selectedNames.length === 0 ? placeholder : ""}
+      disabled={disabled}
+      autoComplete="off"
+    />
+  )
+
   return (
     <div className="relative" ref={ref}>
       {multi ? (
         // Multi-select: badges inline with search input
         <div
           style={{ borderRadius: radiusValue }}
-          className={`h-7 w-full border border-[#e8eaed] bg-white px-1.5 flex items-center gap-1 overflow-x-auto scrollbar-hide ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
-          onClick={() => { if (!disabled) { calcPos(); setOpen(true); inputRef.current?.focus() } }}
+          className={`h-7 w-full border border-[#e8eaed] bg-white px-1.5 flex items-center ${compactMulti ? "gap-0 overflow-hidden" : "gap-1 overflow-x-auto scrollbar-hide"} ${disabled ? "opacity-50" : ""} ${open ? "border-[#3370ff]" : ""} ${className}`}
+          onClick={() => {
+            if (disabled) return
+            calcPos()
+            if (compactMulti) {
+              if (open) {
+                setOpen(false)
+                setSearch("")
+              } else {
+                setOpen(true)
+              }
+            } else {
+              setOpen(true)
+              requestAnimationFrame(() => inputRef.current?.focus())
+            }
+          }}
         >
-          {selectedNames.map(name => (
-            <span key={name} className="inline-flex items-center px-1 py-0.5 rounded bg-[#f5f6f7] text-[11px] text-[#4e535a] shrink-0">
-              {name}
+          {compactMulti ? (
+            <span
+              className={`min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-[11px] scrollbar-hide ${selectedNames.length > 0 ? "text-[#2b2f36]" : "text-[#c0c4cc]"}`}
+              title={selectedNames.join("、")}
+            >
+              {selectedNames.length > 0 ? selectedNames.join("、") : placeholder}
             </span>
-          ))}
-          <input
-            ref={inputRef}
-            className="shrink-0 w-[60px] h-5 border-none outline-none text-[12px] bg-transparent"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); calcPos(); setOpen(true) }}
-            onFocus={() => { calcPos(); setOpen(true) }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                // 搜索框的 Enter 不参与 enterToNext 跳焦
-                e.stopPropagation()
-                return
-              }
-              if ((e.key === "Backspace" || e.key === "Delete") && search === "" && selectedNames.length > 0) {
-                e.preventDefault()
-                removeItem(selectedNames[selectedNames.length - 1])
-              }
-            }}
-            placeholder={selectedNames.length === 0 ? placeholder : ""}
-            disabled={disabled}
-            autoComplete="off"
-          />
+          ) : (
+            <>
+              {selectedNames.map(name => (
+                <span key={name} className="inline-flex shrink-0 items-center rounded bg-[#f5f6f7] px-1 py-0.5 text-[11px] text-[#4e535a]">
+                  {name}
+                </span>
+              ))}
+              {renderMultiInput()}
+            </>
+          )}
         </div>
       ) : (
         // Single select: show input with X clear button
@@ -257,7 +308,43 @@ export function CustomerSearchInput({
       )}
 
       {/* Dropdown via portal */}
-      {open && !disabled && search && createPortal(
+      {open && !disabled && compactMulti && createPortal(
+        <div
+          ref={dropdownRef}
+          className="overflow-hidden border border-[#dee0e3] bg-white shadow-md"
+          style={{ ...pos, borderRadius: radiusValue }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <div className="grid max-h-[210px] grid-cols-3 gap-1 overflow-y-auto p-2">
+            {compactOptions.slice(0, MAX_VISIBLE).map((customer) => {
+              const selected = selectedNames.includes(customer.nickname)
+              return (
+                <button
+                  key={customer.id}
+                  type="button"
+                  title={customer.nickname}
+                  className={`flex h-7 min-w-0 items-center gap-1 rounded-[4px] border px-1.5 text-left text-[12px] ${selected
+                    ? "border-[#a8c1ff] bg-[#f0f5ff] text-[#3370ff]"
+                    : "border-[#e8eaed] bg-white text-[#2b2f36] hover:bg-[#f7f8fa]"
+                  }`}
+                  onClick={() => toggleCompactItem(customer)}
+                >
+                  <span className={`inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-[2px] border ${selected ? "border-[#3370ff] bg-[#3370ff]" : "border-[#c9cdd4] bg-white"}`}>
+                    {selected && <Check className="h-2.5 w-2.5 text-white" />}
+                  </span>
+                  <span className="whitespace-nowrap">{customer.nickname}</span>
+                </button>
+              )
+            })}
+            {compactOptions.length === 0 && (
+              <div className="col-span-3 py-4 text-center text-[12px] text-[#8f959e]">无匹配结果</div>
+            )}
+          </div>
+        </div>,
+        portalContainer || document.body
+      )}
+
+      {open && !disabled && !compactMulti && search && createPortal(
         <div ref={dropdownRef} onPointerDown={(e) => e.stopPropagation()}>
           {(filtered.length > 0 || onNoResultsClick) && (() => {
             const exactMatch = filtered.some(c => c.nickname.toLowerCase() === search.trim().toLowerCase())

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, CircleAlert } from "lucide-react"
 import {
   Area,
   Bar,
@@ -18,6 +18,7 @@ import { calcYAxisWidth } from "@/lib/utils"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tooltip as HintTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { EmptyValue } from "@/components/empty-value"
 
 type RangeMode = "month" | "year"
@@ -423,6 +424,20 @@ export default function CourseStatisticsPage() {
               </div>
               <div className="ml-1 flex items-center gap-2">
                 <span className="text-[12px] text-[#8f959e]">时间单位</span>
+                <HintTooltip>
+                  <TooltipTrigger
+                    render={(
+                      <button
+                        type="button"
+                        aria-label="查看时间单位说明"
+                        className="inline-flex h-4 w-4 items-center justify-center text-[#b7bdc6] transition-colors hover:text-[#8f959e]"
+                      >
+                        <CircleAlert className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  />
+                  <TooltipContent>时间单位的选择仅影响折线图的横坐标的时间分布</TooltipContent>
+                </HintTooltip>
                 <div className="flex items-center rounded-[4px] bg-[#f0f1f3] p-[2px]">
                   {rangeMode === "month" && (
                     <SegmentButton active={granularity === "day"} onClick={() => setGranularity("day")}>日</SegmentButton>
@@ -944,7 +959,7 @@ export default function CourseStatisticsPage() {
                     <th className="px-3 font-normal">昵称</th>
                     <th className="px-3 font-normal">会员身份</th>
                     <th className="px-3 font-normal">参与身份</th>
-                    <th className="px-3 font-normal">当日需求</th>
+                    <th className="px-3 font-normal">来访需求</th>
                     <th className="px-3 text-right font-normal">当天成交金额</th>
                     <th className="px-3 font-normal">成交人</th>
                   </tr>

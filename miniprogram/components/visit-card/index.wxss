@@ -3,35 +3,49 @@
   border-radius: 8rpx;
   margin: 0 24rpx 16rpx;
   overflow: hidden;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid #ebedf0;
 }
 
 .card.editing {
-  background-color: #f8f9fa;
+  background-color: #fafbfc;
+}
+
+.card.read-only {
+  border-color: #ebedf0;
+}
+
+.card.cancelled {
+  background-color: #fafbfc;
+}
+
+.card.cancelled .nickname,
+.card.cancelled .row-meta,
+.card.cancelled .needs-row {
+  color: #b0b5bb;
 }
 
 .card-main {
   display: flex;
-  align-items: center;
-  padding: 28rpx 32rpx;
+  align-items: flex-start;
+  padding: 24rpx 28rpx;
 }
 
 .move-btns {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  margin-right: 20rpx;
+  margin-right: 16rpx;
   flex-shrink: 0;
 }
 
 .move-btn {
-  width: 48rpx;
-  height: 40rpx;
+  width: 44rpx;
+  height: 38rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #f2f3f5;
-  border-radius: 8rpx;
+  border-radius: 6rpx;
 }
 
 .move-btn text {
@@ -51,21 +65,25 @@
 
 .row-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 10rpx;
+  gap: 12rpx;
 }
 
 .name-area {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  flex: 1;
+  min-width: 0;
 }
 
 .nickname {
   font-size: 30rpx;
   font-weight: 500;
   color: #1f2329;
+  line-height: 1.6;
 }
 
 .nickname.cancelled {
@@ -73,168 +91,136 @@
 }
 
 .leader-tag {
-  font-size: 22rpx;
+  font-size: 21rpx;
   color: #3370ff;
+  background-color: rgba(51, 112, 255, 0.09);
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  line-height: 1.6;
 }
 
 .member-tag {
-  font-size: 22rpx;
-  color: #8f959e;
+  font-size: 21rpx;
+  color: #646a73;
+  background-color: #f2f3f5;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  line-height: 1.6;
 }
 
-.row-bottom {
+.member-summary {
+  font-size: 21rpx;
+  color: #646a73;
+  background-color: #f2f3f5;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  line-height: 1.6;
+}
+
+.readonly-mark {
+  font-size: 21rpx;
+  color: #8f959e;
+  border: 1rpx solid #dcdfe4;
+  padding: 1rpx 11rpx;
+  border-radius: 6rpx;
+  line-height: 1.6;
+}
+
+.row-meta {
   display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.info-text {
+  align-items: baseline;
+  gap: 10rpx;
+  margin-top: 12rpx;
   font-size: 24rpx;
-  color: #8f959e;
+  color: #646a73;
 }
 
-.info-sep {
-  font-size: 22rpx;
-  color: #d0d3d6;
+.meta-sep {
+  color: #ccd3da;
 }
 
-.remaining {
+.needs-row {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 10rpx;
   font-size: 24rpx;
+  color: #646a73;
+  line-height: 1.6;
+}
+
+.needs-label {
   color: #8f959e;
+  flex-shrink: 0;
+  margin-right: 8rpx;
+}
+
+.needs-content {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
 }
 
 .arrival-badge {
+  flex-shrink: 0;
   font-size: 24rpx;
-  color: #8f959e;
-  border: 1rpx solid #d0d3d6;
   border-radius: 8rpx;
-  padding: 6rpx 20rpx;
+  padding: 10rpx 28rpx;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.arrival-badge.todo {
+  color: #ffffff;
+  background-color: #3370ff;
 }
 
 .arrival-badge.arrived {
   color: #3370ff;
-  border-color: #3370ff;
+  background-color: rgba(51, 112, 255, 0.09);
+  font-weight: 400;
 }
 
-.card-arrow {
-  font-size: 36rpx;
-  color: #d0d3d6;
-  margin-left: 12rpx;
+.arrival-badge.disabled {
+  color: #b0b5bb;
+  background-color: #f2f3f5;
+}
+
+.cancelled-tag {
   flex-shrink: 0;
+  font-size: 21rpx;
+  color: #8f959e;
+  background-color: #f2f3f5;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  line-height: 1.6;
 }
 
 .card-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 14rpx 32rpx;
-  border-top: 1rpx solid #f0f1f2;
+  margin-top: 18rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #f5f6f7;
 }
 
-.visit-status-actions {
+.creator-text {
+  color: #8f959e;
+  font-size: 22rpx;
+}
+
+.action-list {
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  margin-right: auto;
-}
-
-.cancel-visit-btn {
-  font-size: 24rpx;
-  color: #8f959e;
-  padding: 6rpx 0;
+  gap: 28rpx;
+  margin-left: auto;
 }
 
 .action-btn {
   font-size: 24rpx;
-  padding: 6rpx 12rpx;
-}
-
-.action-divider {
-  width: 1rpx;
-  height: 24rpx;
-  background-color: #e8eaed;
-  margin: 0 8rpx;
-}
-
-.edit-btn {
-  color: #4e535a;
+  color: #646a73;
+  padding: 4rpx 0;
 }
 
 .delete-btn {
-  color: #8f959e;
-}
-
-/* 到店时间弹窗 */
-.dialog-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.dialog-box {
-  width: 560rpx;
-  background-color: #ffffff;
-  border-radius: 24rpx;
-  overflow: hidden;
-}
-
-.dialog-title {
-  font-size: 32rpx;
-  font-weight: 500;
-  color: #1f2329;
-  text-align: center;
-  padding: 40rpx 0 24rpx;
-}
-
-.dialog-body {
-  padding: 0 40rpx 32rpx;
-}
-
-.dialog-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20rpx 0;
-}
-
-.dialog-label {
-  font-size: 28rpx;
-  color: #4e535a;
-}
-
-.time-picker {
-  font-size: 28rpx;
-  color: #1f2329;
-  background-color: #f2f3f5;
-  padding: 12rpx 24rpx;
-  border-radius: 8rpx;
-}
-
-.dialog-footer {
-  display: flex;
-  border-top: 1rpx solid #f0f1f2;
-}
-
-.dialog-btn {
-  flex: 1;
-  text-align: center;
-  padding: 28rpx 0;
-  font-size: 30rpx;
-}
-
-.dialog-btn.cancel {
-  color: #8f959e;
-  border-right: 1rpx solid #f0f1f2;
-}
-
-.dialog-btn.confirm {
-  color: #3370ff;
-  font-weight: 500;
+  color: #d97070;
 }

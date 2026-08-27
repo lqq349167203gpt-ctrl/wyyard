@@ -1,0 +1,188 @@
+<view class="page">
+  <view class="loading" wx:if="{{loading}}">正在加载筛选项...</view>
+
+  <block wx:else>
+    <view class="header-card">
+      <view class="header-copy">
+        <text class="page-title">自定义筛选</text>
+        <text class="page-subtitle">按自己的条件找出客户，查看邀约、到店和成交情况</text>
+      </view>
+      <button class="save-button" bindtap="onSaveTemplate">保存模板</button>
+    </view>
+
+    <view class="section-card template-row">
+      <text class="row-label">筛选模板</text>
+      <picker class="row-picker" mode="selector" range="{{templateOptions}}" range-key="name" value="{{templateIndex}}" bindchange="onTemplateChange">
+        <view class="picker-value {{templateIndex === 0 ? 'placeholder' : ''}}">{{templateOptions[templateIndex].name}}<text class="picker-arrow">⌄</text></view>
+      </picker>
+    </view>
+
+    <view class="section-card">
+      <view class="section-head">
+        <text class="section-index">01</text>
+        <text class="section-title">筛选客户</text>
+      </view>
+
+      <view class="logic-row">
+        <view class="logic-switch">
+          <view class="logic-item {{plan.condition_logic === 'all' ? 'active' : ''}}" data-value="all" bindtap="onLogicTap">全部符合</view>
+          <view class="logic-item {{plan.condition_logic === 'any' ? 'active' : ''}}" data-value="any" bindtap="onLogicTap">任意一条</view>
+        </view>
+        <view class="preset-group">
+          <view class="preset" data-value="today" bindtap="onDatePreset">当天</view>
+          <view class="preset" data-value="week" bindtap="onDatePreset">本周</view>
+          <view class="preset" data-value="month" bindtap="onDatePreset">本月</view>
+          <view class="preset" data-value="all" bindtap="onDatePreset">全部</view>
+        </view>
+      </view>
+
+      <view class="date-range">
+        <picker class="date-picker" mode="date" value="{{plan.date_from}}" bindchange="onDateFromChange">
+          <view class="date-value {{plan.date_from ? '' : 'placeholder'}}">{{plan.date_from || '开始日期'}}</view>
+        </picker>
+        <text class="date-separator">至</text>
+        <picker class="date-picker" mode="date" value="{{plan.date_to}}" bindchange="onDateToChange">
+          <view class="date-value {{plan.date_to ? '' : 'placeholder'}}">{{plan.date_to || '结束日期'}}</view>
+        </picker>
+      </view>
+
+      <view class="condition-empty" wx:if="{{conditionRows.length === 0}}" bindtap="onAddCondition">当前查询全部客户，点击添加筛选条件</view>
+      <view class="condition-card" wx:for="{{conditionRows}}" wx:key="index">
+        <view class="condition-top">
+          <picker class="condition-picker" mode="selector" range="{{fieldOptions}}" range-key="label" value="{{item.fieldIndex}}" data-index="{{index}}" bindchange="onConditionFieldChange">
+            <view class="condition-choice">{{item.fieldLabel}}<text class="picker-arrow">⌄</text></view>
+          </picker>
+          <picker class="condition-picker operator" mode="selector" range="{{item.operatorOptions}}" range-key="label" value="{{item.operatorIndex}}" data-index="{{index}}" bindchange="onConditionOperatorChange">
+            <view class="condition-choice secondary">{{item.operatorLabel}}<text class="picker-arrow">⌄</text></view>
+          </picker>
+          <view class="condition-remove" data-index="{{index}}" bindtap="onRemoveCondition">×</view>
+        </view>
+        <view class="condition-value-row" wx:if="{{!item.noValue}}">
+          <block wx:if="{{item.between}}">
+            <input class="condition-input half" value="{{item.valueStart}}" placeholder="起始值" data-index="{{index}}" data-part="start" bindinput="onConditionValueInput" />
+            <text class="date-separator">至</text>
+            <input class="condition-input half" value="{{item.valueEnd}}" placeholder="结束值" data-index="{{index}}" data-part="end" bindinput="onConditionValueInput" />
+          </block>
+          <picker wx:elif="{{item.useOptions}}" class="value-picker" mode="selector" range="{{item.valueOptions}}" range-key="label" value="{{item.valueIndex}}" data-index="{{index}}" bindchange="onConditionOptionChange">
+            <view class="condition-input {{item.value ? '' : 'placeholder'}}">{{item.value || '选择筛选值'}}<text class="picker-arrow">⌄</text></view>
+          </picker>
+          <input wx:else class="condition-input" value="{{item.value}}" placeholder="{{item.placeholder}}" data-index="{{index}}" bindinput="onConditionValueInput" />
+        </view>
+      </view>
+      <view class="add-condition" bindtap="onAddCondition">＋ 添加条件</view>
+    </view>
+
+    <view class="section-card">
+      <view class="section-head">
+        <text class="section-index">02</text>
+        <text class="section-title">统计指标</text>
+      </view>
+      <view class="chip-list">
+        <view class="metric-chip {{item.selected ? 'selected' : ''}}" wx:for="{{metricOptions}}" wx:key="value" data-value="{{item.value}}" bindtap="onMetricTap">
+          <view class="chip-check">{{item.selected ? '✓' : ''}}</view>
+          <text>{{item.label}}</text>
+        </view>
+      </view>
+      <view class="dimension-row">
+        <text class="dimension-label">拆分对比</text>
+        <picker class="dimension-picker" mode="selector" range="{{dimensionOptions}}" range-key="label" value="{{dimensionIndex}}" bindchange="onDimensionChange">
+          <view class="picker-value">{{dimensionOptions[dimensionIndex].label}}<text class="picker-arrow">⌄</text></view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="section-card">
+      <view class="section-head columns-head">
+        <view><text class="section-index">03</text><text class="section-title">显示内容</text></view>
+        <view class="text-action" bindtap="onOpenColumns">设置</view>
+      </view>
+      <view class="selected-columns">
+        <text class="column-tag" wx:for="{{selectedColumns}}" wx:key="value">{{item.label}}</text>
+      </view>
+    </view>
+
+    <view class="query-bar">
+      <button class="reset-button" bindtap="onReset">重置</button>
+      <button class="query-button" loading="{{querying}}" disabled="{{querying}}" bindtap="onQuery">{{result ? '更新结果' : '查询'}}</button>
+    </view>
+
+    <view class="result-area" wx:if="{{result}}">
+      <view class="result-heading"><text class="result-title">筛选结果</text><text class="result-total">共 {{result.total}} 人</text></view>
+      <view class="cards-grid">
+        <view class="result-card {{item.is_total ? 'total' : ''}}" wx:for="{{metricCards}}" wx:key="key">
+          <text class="card-title">{{item.title}}</text>
+          <view><text class="card-number">{{item.format === 'currency' ? '¥' : ''}}{{item.count}}</text><text class="card-unit" wx:if="{{item.format !== 'currency'}}">{{item.unit}}</text></view>
+        </view>
+      </view>
+
+      <view class="dimension-block" wx:if="{{dimensionCards.length}}">
+        <text class="dimension-title">分组结果</text>
+        <view class="cards-grid">
+          <view class="result-card {{item.title === '未配置' ? 'empty-card' : ''}}" wx:for="{{dimensionCards}}" wx:key="key">
+            <text class="card-title">{{item.title}}</text>
+            <view><text class="card-number">{{item.count}}</text><text class="card-unit">{{item.unit}}</text></view>
+          </view>
+        </view>
+      </view>
+
+      <view class="customer-list">
+        <view class="customer-row" wx:for="{{resultItems}}" wx:key="id" data-id="{{item.id}}" bindtap="onCustomerTap">
+          <view class="customer-head"><text class="customer-name">{{item.nickname}}</text><text class="customer-arrow">›</text></view>
+          <view class="customer-fields">
+            <view class="customer-field" wx:for="{{item.fields}}" wx:for-item="field" wx:key="label">
+              <text class="field-label">{{field.label}}</text><text class="field-value">{{field.value}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="empty" wx:if="{{resultItems.length === 0}}">暂无符合条件的客户</view>
+      </view>
+
+      <view class="pagination" wx:if="{{result.total_pages > 1}}">
+        <button class="page-button {{result.page <= 1 ? 'disabled' : ''}}" disabled="{{result.page <= 1}}" bindtap="onPrevPage">上一页</button>
+        <text class="page-info">{{result.page}} / {{result.total_pages}}</text>
+        <button class="page-button {{result.page >= result.total_pages ? 'disabled' : ''}}" disabled="{{result.page >= result.total_pages}}" bindtap="onNextPage">下一页</button>
+      </view>
+    </view>
+  </block>
+
+  <view class="sheet-mask" wx:if="{{showColumnPicker}}" bindtap="onCloseColumns"></view>
+  <view class="column-sheet" wx:if="{{showColumnPicker}}">
+    <view class="sheet-head"><text class="sheet-title">选择显示内容</text><text class="sheet-done" bindtap="onCloseColumns">完成</text></view>
+    <scroll-view class="sheet-list" scroll-y>
+      <view class="sheet-item" wx:for="{{columnOptions}}" wx:key="value" data-value="{{item.value}}" bindtap="onColumnToggle">
+        <text class="sheet-item-name">{{item.label}}</text>
+        <text class="sheet-item-note" wx:if="{{item.locked}}">固定显示</text>
+        <view class="sheet-check {{item.selected ? 'selected' : ''}}">{{item.selected ? '✓' : ''}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="save-template-mask" wx:if="{{showSaveTemplate}}" bindtap="onSaveTemplateMaskTap">
+    <view class="save-template-dialog" catchtap="stopPropagation">
+      <view class="save-template-head">
+        <text class="save-template-title">保存筛选模板</text>
+      </view>
+      <view class="save-template-body">
+        <view class="save-form-row">
+          <text class="save-form-label">模板名称</text>
+          <input class="save-form-input" value="{{templateName}}" maxlength="30" placeholder="例如：本月引流转化" placeholder-class="save-form-placeholder" bindinput="onTemplateNameInput" />
+        </view>
+        <view class="save-form-row">
+          <text class="save-form-label">模板简介</text>
+          <input class="save-form-input" value="{{templateDescription}}" maxlength="200" placeholder="简要说明模板用途（选填）" placeholder-class="save-form-placeholder" bindinput="onTemplateDescriptionInput" />
+        </view>
+        <view class="save-form-row">
+          <text class="save-form-label">可见范围</text>
+          <view class="save-scope-options">
+            <view class="save-scope-item {{templateScope === 'private' ? 'active' : ''}}" data-scope="private" bindtap="onTemplateScopeTap">仅自己可见</view>
+            <view class="save-scope-item {{templateScope === 'shared' ? 'active' : ''}}" data-scope="shared" bindtap="onTemplateScopeTap">团队共享</view>
+          </view>
+        </view>
+      </view>
+      <view class="save-template-actions">
+        <button class="save-dialog-button cancel" disabled="{{savingTemplate}}" bindtap="onCloseSaveTemplate">取消</button>
+        <button class="save-dialog-button confirm" loading="{{savingTemplate}}" disabled="{{savingTemplate}}" bindtap="onConfirmSaveTemplate">保存</button>
+      </view>
+    </view>
+  </view>
+</view>

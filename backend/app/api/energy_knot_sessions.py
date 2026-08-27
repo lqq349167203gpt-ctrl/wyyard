@@ -4,6 +4,12 @@ from app.models.energy_knot_session import EnergyKnotSessionCreate
 from app.services import activity_assignment_notification_service, energy_knot_session_service
 from app.services.customer_service import list_all_customers
 from app.utils.pagination import paginate
+from app.utils.record_ownership import (
+    ACTIVITY_CREATOR_ONLY_FIELDS,
+    ensure_creator_for_changed_fields,
+    ensure_record_creator,
+    stamp_creator,
+)
 
 router = APIRouter(prefix="/api/energy-knot-sessions", tags=["energy-knot-sessions"])
 
@@ -52,7 +58,9 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 @router.post("")
 def create_session(data: EnergyKnotSessionCreate, request: Request, conversion: bool = False):
     try:
-        session = energy_knot_session_service.create_session(data, refresh_identities=not conversion)
+        session = energy_knot_session_service.create_session(
+            stamp_creator(data, request), refresh_identities=not conversion
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
@@ -68,6 +76,9 @@ def create_session(data: EnergyKnotSessionCreate, request: Request, conversion: 
 @router.patch("/{session_id}")
 def update_session(session_id: str, data: dict, request: Request):
     old_session = energy_knot_session_service.get_session(session_id)
+    ensure_creator_for_changed_fields(
+        request, old_session, data, ACTIVITY_CREATOR_ONLY_FIELDS, "课表受保护信息", "activities"
+    )
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_session)
     try:
         session = energy_knot_session_service.update_session(session_id, data)
@@ -86,7 +97,10 @@ def update_session(session_id: str, data: dict, request: Request):
 
 
 @router.delete("/{session_id}")
-def delete_session(session_id: str, conversion: bool = False):
+def delete_session(session_id: str, request: Request, conversion: bool = False):
+    ensure_record_creator(
+        request, energy_knot_session_service.get_session(session_id), "课表内容", "activities"
+    )
     if not energy_knot_session_service.delete_session(session_id, refresh_identities=not conversion):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "删除成功"}

@@ -1,9 +1,12 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends
+from pydantic import Field
 
 from app.middleware.jwt_auth import require_page_permission
 from app.models.base import StrictBaseModel
 from app.services import (
-    position_customer_permission_service,
+    position_edit_permission_service,
     position_page_permission_service,
     position_permission_service,
 )
@@ -20,10 +23,7 @@ class PermissionUpdate(StrictBaseModel):
 class FullPermissionUpdate(StrictBaseModel):
     position: str
     pages: list[str]
-    customers: list[str] = []
-    class_records: list[str] = []
-    payment: list[str] = []
-    page_permissions: dict[str, list[str]] = {}
+    edit_permissions: dict[str, Literal["own", "all"]] = Field(default_factory=dict)
 
 
 @router.get("")
@@ -43,9 +43,18 @@ async def get_page_permissions(position: str):
     return {page: perms.get(position, []) for page, perms in all_perms.items()}
 
 
+@router.get("/edit-permissions")
+async def get_all_edit_permissions():
+    return position_edit_permission_service.get_all()
+
+
 @router.get("/{position}")
 async def get_permissions(position: str):
-    return {"position": position, "pages": position_permission_service.get_permissions(position)}
+    return {
+        "position": position,
+        "pages": position_permission_service.get_permissions(position),
+        "edit_permissions": position_edit_permission_service.get_permissions(position),
+    }
 
 
 @router.put("")
@@ -57,14 +66,12 @@ async def set_permissions(data: PermissionUpdate, _manager_role: str = Depends(r
 @router.put("/full")
 async def set_full_permissions(data: FullPermissionUpdate, _manager_role: str = Depends(require_account_manager)):
     position_permission_service.set_permissions(data.position, data.pages)
-    # 无条件写入三块客户权限；空列表表示"该 position 不可见任何身份"，必须落盘
-    position_customer_permission_service.set_customer_permissions("customers", data.position, data.customers)
-    position_customer_permission_service.set_customer_permissions("class_records", data.position, data.class_records)
-    position_customer_permission_service.set_customer_permissions("payment", data.position, data.payment)
-    # 按页面存储的权限：page_permissions 缺失的 page 不会清空（保留旧值），
-    # 这是为了支持增量保存；前端若需清空某 page 应显式传空列表
-    for page_key, member_types in data.page_permissions.items():
-        position_page_permission_service.set_page_permissions(page_key, data.position, member_types)
+    edit_permissions = dict(data.edit_permissions)
+    if "class-records" not in data.pages:
+        edit_permissions["visits"] = "own"
+    if "daily-activities" not in data.pages:
+        edit_permissions["activities"] = "own"
+    position_edit_permission_service.set_permissions(data.position, edit_permissions)
     return {"message": "已保存"}
 
 

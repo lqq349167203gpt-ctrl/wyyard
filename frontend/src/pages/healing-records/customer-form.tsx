@@ -11,7 +11,7 @@ import { CustomerTagField } from "@/components/customer-tag-editor"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
-  follow_up_status: "新添加",
+  follow_up_status: "未配置",
   member_type: "", paid_content: [], visit_count: 0,
   basic_info: "", assessment: "", tags: "", traffic_source: "", traffic_source_detail: "",
 }
@@ -23,7 +23,6 @@ const UPDATE_FIELDS = [
   "traffic_source", "traffic_source_detail",
   "work_status", "work_description",
   "basic_info", "assessment", "tags", "other_info",
-  "member_type", "paid_content", "visit_count",
 ]
 
 function getTodayDate(): string {
@@ -301,7 +300,7 @@ export default function CustomerFormPage() {
 
         {/* 流量情况 */}
         <div>
-          <h2 className="text-[13px] font-normal text-[#1f2329] mb-3">流量情况</h2>
+          <h2 className="mb-3 text-[13px] font-normal text-[#1f2329]">流量情况</h2>
           <div className="flex flex-wrap gap-x-[14px] gap-y-3 pl-[15px]">
             <div>
               <div className="flex items-center gap-2">
@@ -331,18 +330,6 @@ export default function CustomerFormPage() {
               </div>
               {referrerHandlerError && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{referrerHandlerError}</p>}
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">跟进状态</label>
-              <SelectDropdown
-                value={form.follow_up_status || "新添加"}
-                options={["新添加", "沟通中", "已到店", "已成交", "沉默/流失"].map(value => ({
-                  value,
-                  label: value,
-                }))}
-                onChange={(value) => setField("follow_up_status", value)}
-                className="w-[200px]"
-              />
-            </div>
             <div className="flex basis-full items-center gap-2">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">流量来源</label>
               <SelectDropdown
@@ -366,6 +353,27 @@ export default function CustomerFormPage() {
                   <CustomerSearchInput customers={customers} value={form.traffic_source_detail || ""} onChange={(v) => setField("traffic_source_detail", typeof v === "string" ? v : v[0] || "")} placeholder="所属人" filterSelected={false} />
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-[#f0f0f0]" />
+
+        {/* 标签信息 */}
+        <div>
+          <h2 className="mb-3 text-[13px] font-normal text-[#1f2329]">标签信息</h2>
+          <div className="flex flex-wrap gap-x-[14px] gap-y-3 pl-[15px]">
+            <div className="flex items-center gap-2">
+              <label className="w-12 flex-shrink-0 text-right text-[12px] font-normal text-[#4e535a]">跟进阶段</label>
+              <SelectDropdown
+                value={form.follow_up_status || "未配置"}
+                options={["新添加", "前期沟通中", "已邀约未到店", "已到店", "已成交", "沉默/流失", "未配置"].map(value => ({
+                  value,
+                  label: value,
+                }))}
+                onChange={(value) => setField("follow_up_status", value)}
+                className="w-[200px]"
+              />
             </div>
             <CustomerTagField
               tags={availableTags}

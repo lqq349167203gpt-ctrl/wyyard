@@ -9,7 +9,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { customerApi, visitApi, dailyGroupingApi, spaceApi, type Customer, type VisitRecord, type Space } from "@/lib/api"
-import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 import CustomerDetailView from "@/pages/healing-records/components/detail-view"
 import { SpaceDropdown } from "@/components/space-dropdown"
@@ -54,7 +53,6 @@ export default function ClassRecordsPage() {
   // 共享状态
   const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
-  const { permissions: cp, ready: cpReady } = useCustomerPermissions("class_records")
 
   // 人员分组
   const [groups, setGroups] = useState<{ name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]>([])
@@ -112,13 +110,11 @@ export default function ClassRecordsPage() {
 
   // 加载日期范围内的到场人数（轻量 API，日期滑块需要）
   useEffect(() => {
-    if (!cpReady) return
-    const memberTypes = cp.join(",")
     const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
-    visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate, spaceId: selectedSpaceId || undefined })
+    visitApi.counts({ startDate: dateRangeStart, endDate, spaceId: selectedSpaceId || undefined })
       .then(setVisitCounts)
       .catch(() => {})
-  }, [dateRangeStart, cpReady, cp, selectedSpaceId])
+  }, [dateRangeStart, selectedSpaceId])
 
   const handleSpaceSelect = useCallback((id: string) => {
     startTransition(() => {
@@ -198,13 +194,12 @@ export default function ClassRecordsPage() {
 
       {/* 内容区 */}
       <div className="flex flex-col flex-1 min-h-0 min-w-0">
-        <div className="flex-1 overflow-y-auto min-w-0">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           <VisitsDetailView
             externalDate={detailDate}
             onExternalDateChange={(d) => startTransition(() => setDetailDate(d))}
             hideDateBar
             onCustomerClick={(id) => { setSelectedCustomerId(id); setCustomerDetailOpen(true) }}
-            onCustomerEdit={(id) => navigate(`/healing-records/${id}/edit?back=${encodeURIComponent("/courses/class-records")}`)}
             onActivityClick={(id) => {
               const customer = allCustomers.find(c => c.id === id)
               setActivityNickname(customer?.nickname || customer?.name || "")

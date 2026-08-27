@@ -48,6 +48,10 @@
       <text class="menu-label">客户标签</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onCustomAnalysisTap" wx:if="{{canCustomAnalysis}}">
+      <text class="menu-label">自定义筛选</text>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
 
   <!-- 退出按钮 -->

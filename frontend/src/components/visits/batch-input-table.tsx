@@ -1,21 +1,25 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react"
-import { Plus, Trash2, FileText, GripVertical, Edit, CalendarX2, CalendarSync } from "lucide-react"
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react"
+import { Plus, Trash2, FileText, GripVertical, Edit, CalendarX2, CalendarSync, ChevronDown, ChevronUp, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { visitApi, membershipCardApi, consumptionRecordsApi, type CustomerLight, type MembershipCard } from "@/lib/api"
+import { visitApi, visitNoteApi, membershipCardApi, consumptionRecordsApi, type CustomerLight, type MembershipCard, type VisitNote } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
+import { VisitNoteCell } from "@/components/visits/visit-note-cell"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 interface Row {
   key: number
   visit_id: string
+  created_by_id: string
+  created_by: string
   visit_time: string
   customer_id: string
   nickname: string
@@ -34,7 +38,7 @@ interface Row {
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_id: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", activities: "" }
+  return { key: nextKey++, visit_id: "", created_by_id: "", created_by: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", activities: "" }
 }
 
 export interface VisitChangedCell {
@@ -58,6 +62,7 @@ function initRows(): Row[] {
 }
 
 type RowStatus = "idle" | "saving" | "saved" | "error"
+type ViewSegment = "all" | "mine"
 
 interface BatchInputTableProps {
   date: string
@@ -68,7 +73,6 @@ interface BatchInputTableProps {
   onSavedCountChange?: (count: number) => void
   onSavingCountChange?: (count: number) => void
   onCustomerClick?: (customerId: string) => void
-  onCustomerEdit?: (customerId: string) => void
   onActivityClick?: (customerId: string) => void
   onCreateCustomer?: (nickname: string) => void
   onUndoRedoChange?: (canUndo: boolean, canRedo: boolean, undo: () => void, redo: () => void, history: VisitHistoryEntry[]) => void
@@ -80,6 +84,8 @@ interface BatchInputTableProps {
   previewChangedCells?: VisitChangedCell[]
   locked?: boolean
   onClosePreview?: () => void
+  toolbarLeading?: React.ReactNode
+  toolbarTrailing?: React.ReactNode
 }
 
 function getRemainingCount(cards: MembershipCard[], customerId: string): number | null {
@@ -101,23 +107,60 @@ function formatRemaining(count: number | null): string {
 type LongTextField = "needs" | "feedback" | "healing_notes"
 
 const LONG_TEXT_LABELS: Record<LongTextField, string> = {
-  needs: "本次需求",
+  needs: "来访需求",
   feedback: "客户信息",
   healing_notes: "跟进点",
 }
 
-export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onCustomerEdit, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview }: BatchInputTableProps) {
+const VISIT_CREATOR_ONLY_FIELDS = new Set<keyof Row>([
+  "customer_id",
+  "nickname",
+  "visit_time",
+  "needs",
+  "referrer_handler",
+])
+
+const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 78, 80, 64, 207, 203, 203, 60, 60, 74, 74, 92] as const
+
+export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview, toolbarLeading, toolbarTrailing }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
   const [deleteKey, setDeleteKey] = useState<number | null>(null)
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({})
+  const [notesByVisitId, setNotesByVisitId] = useState<Record<string, VisitNote[]>>({})
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
+  const headerScrollRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const pendingScrollToBottomRef = useRef(false)
   const [editor, setEditor] = useState<{ key: number; field: LongTextField; label: string; nickname: string } | null>(null)
   const [editorValue, setEditorValue] = useState("")
   const cardsRef = useRef<MembershipCard[]>([])
+  const currentUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}") }
+    catch { return {} }
+  }, [])
+  const currentActorId = String(currentUser.id || "")
+  const currentActorName = String(currentUser.owner || currentUser.username || "")
+  const editPermissions = useEditPermissions()
+  const canEditAllVisits = currentUser.role === "超级管理员" || editPermissions.visits === "all"
+  const [viewSegment, setViewSegment] = useState<ViewSegment>(() => {
+    try { return localStorage.getItem("visit_view_segment") === "mine" ? "mine" : "all" }
+    catch { return "all" }
+  })
+  const [needsExpanded, setNeedsExpanded] = useState(false)
+  const isOwnRow = useCallback((row: Row) => {
+    if (!row.visit_id) return true
+    if (row.created_by_id) return Boolean(currentActorId && row.created_by_id === currentActorId)
+    return Boolean(row.created_by && currentActorName && row.created_by === currentActorName)
+  }, [currentActorId, currentActorName])
+  const canEditRow = useCallback((row: Row) => (
+    canEditAllVisits || isOwnRow(row)
+  ), [canEditAllVisits, isOwnRow])
+  const canEditField = useCallback((row: Row, field: keyof Row) => (
+    canEditRow(row) || !VISIT_CREATOR_ONLY_FIELDS.has(field)
+  ), [canEditRow])
 
   // 撤回/重做历史栈
   const [undoStack, setUndoStack] = useState<VisitHistoryEntry[]>([])
@@ -294,7 +337,12 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   // 预览模式：使用预览数据
   const isPreview = !!previewRows
   const isLocked = locked || isPreview
-  const displayRows = previewRows || rows
+  const allDisplayRows = previewRows || rows
+  const mineDisplayRows = useMemo(
+    () => allDisplayRows.filter(isOwnRow),
+    [allDisplayRows, isOwnRow],
+  )
+  const displayRows = viewSegment === "mine" ? mineDisplayRows : allDisplayRows
   const displayChangedKeys = previewChangedKeys || []
   const changedCellMap = useMemo(() => {
     const map = new Map<number, Set<string>>()
@@ -308,6 +356,10 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const isCellChanged = useCallback((rowKey: number, field: string) => {
     return changedCellMap.get(rowKey)?.has(field) ?? false
   }, [changedCellMap])
+
+  useEffect(() => {
+    try { localStorage.setItem("visit_view_segment", viewSegment) } catch {}
+  }, [viewSegment])
 
   // 组件卸载时刷入待记录的编辑历史
   useEffect(() => {
@@ -353,6 +405,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       initialLoaded.current = true
       if (!visits.length) {
         setRows(initRows())
+        setNotesByVisitId({})
         savedVisitIds.current = {}
         setRowStatus({})
         setSavedCount(0)
@@ -367,6 +420,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         loaded.push({
           key,
           visit_id: v.id,
+          created_by_id: v.created_by_id || "",
+          created_by: v.created_by || "",
           visit_time: v.visit_time || "",
           customer_id: v.customer_id,
           nickname: v.nickname,
@@ -389,6 +444,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       savedVisitIds.current = ids
       setRowStatus(statuses)
       setSavedCount(visits.length)
+      visitNoteApi.listByVisits(visits.map((visit) => visit.id)).then((notes) => {
+        if (cancelled) return
+        const grouped: Record<string, VisitNote[]> = {}
+        for (const note of notes) {
+          if (!grouped[note.visit_id]) grouped[note.visit_id] = []
+          grouped[note.visit_id].push(note)
+        }
+        setNotesByVisitId(grouped)
+      }).catch(() => {})
     }).catch((err) => { console.error("[BATCH] 加载失败:", err) })
     return () => { cancelled = true }
   }, [date, spaceId])
@@ -403,15 +467,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     try {
       if (existingId) {
         const result = await visitApi.update(existingId, {
-          visit_time: row.visit_time || "",
-          customer_id: row.customer_id,
           is_leader: row.is_leader,
-          needs: row.needs,
-          referrer_handler: row.referrer_handler,
           arrived: row.arrived,
           arrival_time: row.arrived ? row.visit_time : "",
-          feedback: row.feedback,
-          healing_notes: row.healing_notes,
+          ...(canEditRow(row) ? {
+            customer_id: row.customer_id,
+            visit_time: row.visit_time || "",
+            needs: row.needs,
+            referrer_handler: row.referrer_handler,
+          } : {}),
         })
         // 更新剩余次数
         if (result?.remaining_count !== undefined) {
@@ -434,14 +498,17 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           referrer_handler: row.referrer_handler,
           arrived: row.arrived,
           arrival_time: row.arrived ? row.visit_time : "",
-          feedback: row.feedback,
-          healing_notes: row.healing_notes,
           space_id: spaceId || undefined,
         }
         const result = await visitApi.create(payload)
         if (result?.id) {
           savedVisitIds.current[row.key] = result.id
-          setRows(prev => prev.map(r => r.key === row.key ? { ...r, visit_id: result.id } : r))
+          setRows(prev => prev.map(r => r.key === row.key ? {
+            ...r,
+            visit_id: result.id,
+            created_by_id: result.created_by_id || currentActorId,
+            created_by: result.created_by || currentActorName,
+          } : r))
         }
         setSavedCount(c => c + 1)
       }
@@ -456,7 +523,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       }
     }
-  }, [date, spaceId, onSaved])
+  }, [date, spaceId, onSaved, canEditRow, currentActorId, currentActorName])
 
   // 同步 saveRow 到 ref，供 restoreFromHistory 使用
   useEffect(() => { saveRowRef.current = saveRow }, [saveRow])
@@ -471,14 +538,14 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   }, [saveRow])
 
   const FIELD_LABELS: Record<string, string> = {
-    visit_time: "到店时间", nickname: "昵称", member_type: "会员类型",
-    is_leader: "组长", needs: "需求", referrer_handler: "引流处理",
-    arrived: "到店状态", feedback: "反馈", healing_notes: "疗愈记录",
+    visit_time: "到店时间", nickname: "昵称", member_type: "会员身份",
+    is_leader: "组长", needs: "来访需求", referrer_handler: "引流处理",
+    arrived: "到店状态", feedback: "客户信息", healing_notes: "跟进点",
   }
 
   const updateRow = useCallback((key: number, field: keyof Row, value: any) => {
     const row = rowsRef.current.find(r => r.key === key)
-    if (!row || row.cancelled) return
+    if (!row || row.cancelled || !canEditField(row, field)) return
     const name = row?.nickname || "未命名"
     const label = FIELD_LABELS[field as string] || field
     let desc = `编辑了「${name}」的${label}`
@@ -491,9 +558,10 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       setRowStatus(prev => ({ ...prev, [key]: "idle" }))
     }
     scheduleSave(key)
-  }, [rowStatus, scheduleSave, pushEditHistory])
+  }, [rowStatus, scheduleSave, pushEditHistory, canEditField])
 
   const openEditor = (row: Row, field: LongTextField) => {
+    if (!canEditField(row, field)) return
     setEditor({ key: row.key, field, label: LONG_TEXT_LABELS[field], nickname: row.nickname || "未命名" })
     setEditorValue(row[field])
   }
@@ -506,7 +574,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   const cancelVisit = useCallback(async (row: Row) => {
     const visitId = savedVisitIds.current[row.key]
-    if (!visitId || row.arrived || row.cancelled) return
+    if (!visitId || row.arrived || row.cancelled || !canEditRow(row)) return
     if (timersRef.current[row.key]) {
       clearTimeout(timersRef.current[row.key])
       delete timersRef.current[row.key]
@@ -528,11 +596,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       window.alert(error instanceof Error ? error.message : "取消邀约失败")
     }
-  }, [onSaved, pushHistory])
+  }, [onSaved, pushHistory, canEditRow])
 
   const restoreVisit = useCallback(async (row: Row) => {
     const visitId = savedVisitIds.current[row.key]
-    if (!visitId || !row.cancelled) return
+    if (!visitId || !row.cancelled || !canEditRow(row)) return
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       await visitApi.update(visitId, { cancelled: false })
@@ -550,10 +618,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       window.alert(error instanceof Error ? error.message : "恢复邀约失败")
     }
-  }, [onSaved, pushHistory])
+  }, [onSaved, pushHistory, canEditRow])
 
   const removeRow = useCallback(async (key: number) => {
     const row = rowsRef.current.find(r => r.key === key)
+    if (!row || !canEditRow(row)) return
     pushHistory("删除了人员", [key], `删除了「${row?.nickname || "未命名"}」`, undefined, [{ rowKey: key, fields: ["__deleted"] }])
     if (timersRef.current[key]) { clearTimeout(timersRef.current[key]); delete timersRef.current[key] }
     const visitId = savedVisitIds.current[key]
@@ -565,17 +634,35 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     delete savedVisitIds.current[key]
     setRows(prev => prev.filter(r => r.key !== key))
     setRowStatus(prev => { const n = { ...prev }; delete n[key]; return n })
-  }, [date, spaceId, onSaved])
+  }, [date, spaceId, onSaved, canEditRow])
 
   const addRow = useCallback(async () => {
     const row = emptyRow()
     const allFields = Object.keys(row).filter(k => k !== "key") as string[]
     pushHistory("新增了人员", undefined, undefined, undefined, [{ rowKey: row.key, fields: allFields }])
+    pendingScrollToBottomRef.current = true
     setRows(prev => [...prev, row])
     try { await saveRow(row) } catch { /* saveRow handles its own errors */ }
   }, [saveRow, pushHistory])
 
+  useLayoutEffect(() => {
+    if (!pendingScrollToBottomRef.current) return
+    pendingScrollToBottomRef.current = false
+    const scrollContainer = scrollRef.current
+    if (!scrollContainer) return
+    scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: "smooth" })
+  }, [rows.length])
+
+  const handleTableScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const header = headerScrollRef.current
+    if (header && header.scrollLeft !== event.currentTarget.scrollLeft) {
+      header.scrollLeft = event.currentTarget.scrollLeft
+    }
+  }, [])
+
   const handleDragStart = useCallback((key: number) => {
+    const row = rowsRef.current.find(r => r.key === key)
+    if (!row || row.cancelled) return
     dragKeyRef.current = key
   }, [])
 
@@ -592,7 +679,23 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const handleDrop = useCallback((targetKey: number) => {
     const sourceKey = dragKeyRef.current
     if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
-    pushHistory("调整了人员顺序")
+    const sourceRow = rowsRef.current.find(r => r.key === sourceKey)
+    if (!sourceRow || sourceRow.cancelled) {
+      setDragOverKey(null)
+      return
+    }
+    const visibleRows = viewSegment === "mine"
+      ? rowsRef.current.filter(isOwnRow)
+      : rowsRef.current
+    const sourceIndex = visibleRows.findIndex(row => row.key === sourceKey)
+    const targetIndex = visibleRows.findIndex(row => row.key === targetKey)
+    if (sourceIndex === -1 || targetIndex === -1) { setDragOverKey(null); return }
+    const subject = sourceRow.nickname || "未命名邀约"
+    pushHistory(
+      "调整了人员顺序",
+      undefined,
+      `将「${subject}」从第 ${sourceIndex + 1} 位移动到第 ${targetIndex + 1} 位`,
+    )
     setRows(prev => {
       const srcIdx = prev.findIndex(r => r.key === sourceKey)
       const tgtIdx = prev.findIndex(r => r.key === targetKey)
@@ -604,13 +707,17 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       // 同步排序到后端
       const ids = next.map(r => savedVisitIds.current[r.key]).filter(Boolean)
       if (ids.length) {
-        visitApi.reorder(ids).catch(e => console.error("保存排序失败:", e))
+        visitApi.reorder(ids, {
+          movedName: subject,
+          fromPosition: sourceIndex + 1,
+          toPosition: targetIndex + 1,
+        }).catch(e => console.error("保存排序失败:", e))
       }
       return next
     })
     dragKeyRef.current = null
     setDragOverKey(null)
-  }, [date, spaceId])
+  }, [date, spaceId, pushHistory, viewSegment, isOwnRow])
 
   const handleCustomerSelect = useCallback((key: number, customer: any) => {
     // 检查是否已存在该客户
@@ -624,7 +731,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   }, [scheduleSave])
 
   return (
-    <div className={`bg-white rounded-lg relative ${isLocked ? "visit-table-locked" : ""}`}>
+    <div className={`relative flex min-h-0 flex-1 flex-col rounded-lg bg-white ${isLocked ? "visit-table-locked" : ""}`}>
       {isLocked && (
         <style>{`
           .visit-table-locked input,
@@ -647,34 +754,96 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={onClosePreview}>返回编辑</Button>
         </div>
       )}
-      <div ref={scrollRef} className="overflow-x-auto scrollbar-hide">
-        <div className="min-w-[1474px]">
-          <table className="text-[12px] w-full" style={{ tableLayout: "fixed" }}>
-          <thead>
+      <div className="flex h-10 shrink-0 items-center gap-3 border-b border-[#f0f0f0] px-3.5">
+        {toolbarLeading && (
+          <>
+            <div className="flex shrink-0 items-center gap-2">{toolbarLeading}</div>
+            <span className="h-3.5 w-px shrink-0 bg-[#e8eaed]" aria-hidden="true" />
+          </>
+        )}
+        <div className="flex items-center gap-1.5" aria-label="邀约记录范围">
+          <button
+            type="button"
+            onClick={() => setViewSegment("all")}
+            className={`h-7 rounded-full px-3 text-[12px] transition-colors ${viewSegment === "all" ? "bg-[#1f2329] text-white" : "border-[0.5px] border-[#e1e4e7] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}
+          >
+            全部 {allDisplayRows.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewSegment("mine")}
+            className={`h-7 rounded-full px-3 text-[12px] transition-colors ${viewSegment === "mine" ? "bg-[#1f2329] text-white" : "border-[0.5px] border-[#e1e4e7] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}
+          >
+            我录入的 {mineDisplayRows.length}
+          </button>
+        </div>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button type="button" className="hidden shrink-0 items-center gap-1 text-[12px] text-[#8f959e] min-[1100px]:inline-flex">
+                仅创建人可编辑
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            }
+          />
+          <TooltipContent>昵称、邀约人、时间、来访需求及取消/删除仅创建人可操作</TooltipContent>
+        </Tooltip>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            className="flex h-[22px] shrink-0 items-center gap-0.5 rounded border-[0.5px] border-[#d0d3d6] px-2 text-[11px] text-[#8f959e] hover:bg-[#f5f6f7] hover:text-[#4e535a]"
+            onClick={() => setNeedsExpanded((expanded) => !expanded)}
+            aria-expanded={needsExpanded}
+            aria-label={needsExpanded ? "缩略来访需求、客户信息和跟进点" : "展开来访需求、客户信息和跟进点"}
+          >
+            {needsExpanded ? "缩略" : "展开"}
+            {needsExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          {toolbarTrailing}
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div ref={headerScrollRef} className="shrink-0 overflow-hidden">
+          <div className="min-w-[1384px]">
+            <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
+              </colgroup>
+          <thead className="bg-[#f7f8fa]">
             <tr className="bg-[#f7f8fa] text-[#8f959e]">
-              <th className="w-[24px]"></th>
-              <th className="px-1.5 py-2 text-center font-normal w-[36px]">到店</th>
-              <th className="pl-2 pr-[10px] py-2 text-left font-normal w-[64px]">组长</th>
-              <th className="pl-0 pr-2.5 py-2 text-left font-normal w-[64px]">时间</th>
-              <th className="pl-0 pr-1.5 py-2 text-left font-normal w-[78px]">昵称</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[80px]">会员身份</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[64px]">剩余次数</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[240px]">本次需求</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[74px]">邀约人</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[60px]">参与活动</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[60px]">今日成交</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[220px]">客户信息</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[220px]">跟进点</th>
-              <th className="px-1.5 py-2 text-left font-normal w-[74px]">所属组长</th>
-              <th className="px-1.5 py-2 text-center font-normal w-[116px] sticky right-0 bg-[#f7f8fa] z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)]">操作</th>
+              <th className="bg-[#f7f8fa]"></th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-center font-normal">到店</th>
+              <th className="bg-[#f7f8fa] py-2 pl-2 pr-[10px] text-left font-normal">组长</th>
+              <th className="bg-[#f7f8fa] py-2 pl-0 pr-2.5 text-left font-normal">时间</th>
+              <th className="bg-[#f7f8fa] py-2 pl-0 pr-1.5 text-left font-normal">昵称</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">会员身份</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">剩余次数</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">来访需求</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">客户信息</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">跟进点</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">参与活动</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">今日成交</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">邀约人</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">所属组长</th>
+              <th className="sticky right-0 z-10 bg-[#f7f8fa] px-1.5 py-2 text-center font-normal">操作</th>
             </tr>
           </thead>
+            </table>
+          </div>
+        </div>
+        <div ref={scrollRef} onScroll={handleTableScroll} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-hide">
+          <div className="min-w-[1384px]">
+            <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
+              </colgroup>
           <tbody className="[&_tr:first-child>td]:pt-[12px] [&_tr:last-child>td]:pb-[6px]">
             {displayRows.map((row, idx) => {
               const status = rowStatus[row.key] || "idle"
               // 找到上方最近的组长行
               const leaderRow = row.is_leader ? null : displayRows.slice(0, idx).reverse().find(r => r.is_leader)
               const isChanged = displayChangedKeys.includes(row.key)
+              const rowReadOnly = !canEditRow(row)
               return (
                 <tr
                   key={row.key}
@@ -696,6 +865,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       checked={row.arrived}
                       disabled={row.cancelled}
                       onChange={(e) => updateRow(row.key, "arrived", e.target.checked)}
+                      aria-label={`${row.nickname || "客户"}是否到店`}
                       className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer disabled:cursor-not-allowed"
                     />
                   </td>
@@ -713,36 +883,48 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     />
                   </td>
                   <td className={`pl-0 pr-2.5 py-1.5 ${isCellChanged(row.key, "visit_time") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <input
-                      type="time"
-                      value={row.visit_time}
-                      disabled={row.cancelled}
-                      onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
-                      className={`h-7 text-[12px] w-[56px] time-no-icon rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
-                    />
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 items-center text-[12px] tabular-nums ${row.visit_time ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}>
+                        {row.visit_time || "-"}
+                      </span>
+                    ) : (
+                      <input
+                        type="time"
+                        value={row.visit_time}
+                        disabled={row.cancelled}
+                        onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
+                        className={`h-7 text-[12px] w-[56px] time-no-icon rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
+                      />
+                    )}
                   </td>
                   <td className={`pl-0 pr-1.5 py-1.5 ${isCellChanged(row.key, "nickname") || isCellChanged(row.key, "customer_id") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <CustomerSearchInput rounded="2px"
-                      customers={customers as any[]}
-                      value={row.nickname}
-                      disabled={row.cancelled}
-                      showClear={false}
-                      excludeIds={rows.filter(r => r.key !== row.key && r.customer_id).map(r => r.customer_id)}
-                      onChange={(v) => {
-                        const name = typeof v === "string" ? v : v[0] || ""
-                        if (!name) { updateRow(row.key, "nickname", ""); updateRow(row.key, "customer_id", ""); setRows(prev => prev.map(r => r.key === row.key ? { ...r, member_type: "", remaining_count: null } : r)) }
-                      }}
-                      onSelectItem={(c) => handleCustomerSelect(row.key, c)}
-                      onNoResultsClick={(text) => onCreateCustomer?.(text.trim())}
-                      onBlur={(v) => {
-                        if (v && !customers.some(c => c.nickname === v)) {
-                          setRows(prev => prev.map(r => r.key === row.key ? { ...r, nickname: "", customer_id: "", member_type: "", remaining_count: null } : r))
-                          scheduleSave(row.key)
-                        }
-                      }}
-                      placeholder=""
-                      className="h-7 [&]:border-[0.5px]"
-                    />
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.nickname ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.nickname}>
+                        {row.nickname || "-"}
+                      </span>
+                    ) : (
+                      <CustomerSearchInput rounded="2px"
+                        customers={customers as any[]}
+                        value={row.nickname}
+                        disabled={row.cancelled}
+                        showClear={false}
+                        excludeIds={rows.filter(r => r.key !== row.key && r.customer_id).map(r => r.customer_id)}
+                        onChange={(v) => {
+                          const name = typeof v === "string" ? v : v[0] || ""
+                          if (!name) { updateRow(row.key, "nickname", ""); updateRow(row.key, "customer_id", ""); setRows(prev => prev.map(r => r.key === row.key ? { ...r, member_type: "", remaining_count: null } : r)) }
+                        }}
+                        onSelectItem={(c) => handleCustomerSelect(row.key, c)}
+                        onNoResultsClick={(text) => onCreateCustomer?.(text.trim())}
+                        onBlur={(v) => {
+                          if (v && !customers.some(c => c.nickname === v)) {
+                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, nickname: "", customer_id: "", member_type: "", remaining_count: null } : r))
+                            scheduleSave(row.key)
+                          }
+                        }}
+                        placeholder=""
+                        className="h-7 [&]:border-[0.5px]"
+                      />
+                    )}
                   </td>
                   <td className="px-1.5 py-1.5">
                     <span className="inline-block max-w-[80px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#2b2f36]">{row.member_type}</span>
@@ -751,38 +933,63 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <button
-                      type="button"
-                      disabled={row.cancelled}
-                      onClick={() => openEditor(row, "needs")}
-                      className={`w-full h-7 flex items-center gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.needs ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
-                    >
-                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{row.needs}</span>
-                      <Edit className="h-3 w-3 shrink-0 text-[#c9cdd4]" />
-                    </button>
+                    {rowReadOnly ? (
+                      <span
+                        className={`flex min-h-7 w-full min-w-0 text-[12px] ${needsExpanded ? "items-start whitespace-pre-wrap break-words py-1" : "h-7 items-center"} ${row.needs ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
+                        title={needsExpanded ? undefined : row.needs}
+                      >
+                        {needsExpanded ? (
+                          row.needs || "-"
+                        ) : (
+                          <span className="block w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                            {row.needs.replace(/\s+/g, " ").trim() || "-"}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={row.cancelled}
+                        onClick={() => openEditor(row, "needs")}
+                        className={`flex min-h-7 w-full gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${needsExpanded ? "items-start py-1" : "h-7 items-center"} ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.needs ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
+                        title={needsExpanded ? undefined : row.needs}
+                      >
+                        <span className={`block min-w-0 flex-1 ${needsExpanded ? "whitespace-pre-wrap break-words" : "overflow-hidden text-ellipsis whitespace-nowrap"}`}>
+                          {needsExpanded ? row.needs : row.needs.replace(/\s+/g, " ").trim()}
+                        </span>
+                        <Edit className={`h-3 w-3 shrink-0 text-[#c9cdd4] ${needsExpanded ? "mt-0.5" : ""}`} />
+                      </button>
+                    )}
                   </td>
-                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "referrer_handler") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <CustomerSearchInput rounded="2px"
-                      customers={customers as any[]}
-                      value={row.referrer_handler}
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
+                    <VisitNoteCell
+                      visitId={row.visit_id}
+                      nickname={row.nickname}
+                      title="客户信息"
+                      category="customer_info"
+                      notes={notesByVisitId[row.visit_id] || []}
                       disabled={row.cancelled}
-                      showClear={false}
-                      onChange={(v) => updateRow(row.key, "referrer_handler", typeof v === "string" ? v : v[0] || "")}
-                      onSelectItem={(c) => updateRow(row.key, "referrer_handler", c.nickname)}
-                      onBlur={(v) => {
-                        if (v && !customers.some(c => c.nickname === v)) {
-                          updateRow(row.key, "referrer_handler", "")
-                        }
-                      }}
-                      placeholder=""
-                      className="h-7 [&]:border-[0.5px]"
+                      expanded={needsExpanded}
+                      onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
+                    />
+                  </td>
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
+                    <VisitNoteCell
+                      visitId={row.visit_id}
+                      nickname={row.nickname}
+                      title="跟进点"
+                      category="follow_up"
+                      notes={notesByVisitId[row.visit_id] || []}
+                      disabled={row.cancelled}
+                      expanded={needsExpanded}
+                      onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
                     />
                   </td>
                   <td className="px-1.5 py-1.5 text-left">
                     {row.activities && row.customer_id ? (
                       <button
                         onClick={() => onActivityClick?.(row.customer_id)}
-                        className="text-[12px] text-[#3370ff] hover:underline"
+                        className="text-[12px] text-[#2b2f36] hover:underline"
                       >
                         {row.activities.split("、").length}场
                       </button>
@@ -793,34 +1000,35 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
                     </span>
                   </td>
-                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <button
-                      type="button"
-                      disabled={row.cancelled}
-                      onClick={() => openEditor(row, "feedback")}
-                      className={`w-full h-7 flex items-center gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.feedback ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
-                    >
-                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{row.feedback}</span>
-                      <Edit className="h-3 w-3 shrink-0 text-[#c9cdd4]" />
-                    </button>
-                  </td>
-                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    <button
-                      type="button"
-                      disabled={row.cancelled}
-                      onClick={() => openEditor(row, "healing_notes")}
-                      className={`w-full h-7 flex items-center gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.healing_notes ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
-                    >
-                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{row.healing_notes}</span>
-                      <Edit className="h-3 w-3 shrink-0 text-[#c9cdd4]" />
-                    </button>
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "referrer_handler") ? "bg-[#f5eeff] rounded" : ""}`}>
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.referrer_handler ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.referrer_handler}>
+                        {row.referrer_handler || "-"}
+                      </span>
+                    ) : (
+                      <CustomerSearchInput rounded="2px"
+                        customers={customers as any[]}
+                        value={row.referrer_handler}
+                        disabled={row.cancelled}
+                        showClear={false}
+                        onChange={(v) => updateRow(row.key, "referrer_handler", typeof v === "string" ? v : v[0] || "")}
+                        onSelectItem={(c) => updateRow(row.key, "referrer_handler", c.nickname)}
+                        onBlur={(v) => {
+                          if (v && !customers.some(c => c.nickname === v)) {
+                            updateRow(row.key, "referrer_handler", "")
+                          }
+                        }}
+                        placeholder=""
+                        className="h-7 [&]:border-[0.5px]"
+                      />
+                    )}
                   </td>
                   <td className="px-1.5 py-1.5">
                     <span className="text-[12px] text-[#8f959e]">{leaderRow?.nickname || ""}</span>
                   </td>
-                  <td className={`px-1.5 py-1.5 text-center sticky right-0 z-10 relative before:content-[''] before:absolute before:top-0 before:bottom-0 before:-left-2 before:w-2 before:[background:linear-gradient(to_left,rgba(0,0,0,0.02),transparent)] bg-white`}>
+                  <td className="sticky right-0 z-10 bg-white px-1.5 py-1.5 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      {(row.cancelled || (!row.arrived && Boolean(row.visit_id))) && (
+                      {!rowReadOnly && (row.cancelled || (!row.arrived && Boolean(row.visit_id))) && (
                         <>
                           <Tooltip>
                             <TooltipTrigger
@@ -857,38 +1065,31 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                             />
                             <TooltipContent>详情</TooltipContent>
                           </Tooltip>
-                          {!row.cancelled && (
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <button
-                                    onClick={() => onCustomerEdit?.(row.customer_id)}
-                                    className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#3370ff]"
-                                    aria-label="编辑"
-                                  >
-                                    <Edit className="h-3.5 w-3.5" />
-                                  </button>
-                                }
-                              />
-                              <TooltipContent>编辑</TooltipContent>
-                            </Tooltip>
-                          )}
                         </>
                       )}
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              onClick={() => setDeleteKey(row.key)}
-                              className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#e02020]"
-                              aria-label="删除"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          }
-                        />
-                        <TooltipContent>删除</TooltipContent>
-                      </Tooltip>
+                      {rowReadOnly ? (
+                        <span
+                            className="max-w-[76px] truncate text-[12px] text-[#8f959e]"
+                          title="昵称、邀约人、时间、来访需求及取消/删除仅创建人可操作"
+                        >
+                          {row.created_by || "未记录"}
+                        </span>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                onClick={() => setDeleteKey(row.key)}
+                                className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#e02020]"
+                                aria-label="删除"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            }
+                          />
+                          <TooltipContent>删除</TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -897,6 +1098,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           </tbody>
         </table>
         </div>
+      </div>
       </div>
 
       <HorizontalScrollbar scrollRef={scrollRef} />

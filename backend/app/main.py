@@ -12,6 +12,7 @@ from app.api.activity_registrations import router as activity_registrations_rout
 from app.api.activity_themes import router as activity_themes_router
 from app.api.agents import router as agents_router
 from app.api.ai_configs import router as ai_configs_router
+from app.api.analysis_logs import router as analysis_logs_router
 from app.api.business_reminders import router as business_reminders_router
 from app.api.chat_history import router as chat_history_router
 from app.api.chat_logs import router as chat_logs_router
@@ -22,6 +23,7 @@ from app.api.communication_records import router as communication_records_router
 from app.api.consumption_records import router as consumption_records_router
 from app.api.course_types import router as course_types_router
 from app.api.courses import router as courses_router
+from app.api.custom_analysis import router as custom_analysis_router
 from app.api.customer_ai_config import router as customer_ai_config_router
 from app.api.customer_detail import router as customer_detail_router
 from app.api.customer_tags import router as customer_tags_router
@@ -51,7 +53,6 @@ from app.api.operation_logs import router as operation_logs_router
 from app.api.organizations import router as organizations_router
 from app.api.other_projects import router as other_projects_router
 from app.api.payment_exports import router as payment_exports_router
-from app.api.position_customer_permissions import router as position_customer_permissions_router
 from app.api.position_permissions import router as position_permissions_router
 from app.api.positions import router as positions_router
 from app.api.project_deductions import router as project_deductions_router
@@ -68,6 +69,7 @@ from app.api.tea_seat_fees import router as tea_seat_fees_router
 from app.api.uploads import router as uploads_router
 from app.api.visit_ai_config import router as visit_ai_config_router
 from app.api.visit_history import router as visit_history_router
+from app.api.visit_notes import router as visit_notes_router
 from app.api.visits import router as visits_router
 from app.api.voice import router as voice_router
 from app.api.wechat import router as wechat_router
@@ -82,7 +84,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 中间件顺序：后 add 的在更外层。CORSMiddleware 最后 add（最外层），
-# 保证 AuthMiddleware 直接返回的 401 也带 CORS 头；X-New-Token 需暴露给前端读取。
+# 保证 AuthMiddleware 直接返回的 401 也带 CORS 头；认证相关响应头需暴露给客户端读取。
 app.add_middleware(OperationLogMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
@@ -91,13 +93,15 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-New-Token"],
+    expose_headers=["X-New-Token", "X-Auth-Reason"],
 )
 
 
 app.include_router(agents_router)
 
 app.include_router(customers_router)
+app.include_router(custom_analysis_router)
+app.include_router(analysis_logs_router)
 app.include_router(customer_tags_router)
 app.include_router(ai_configs_router)
 app.include_router(customer_ai_config_router)
@@ -133,7 +137,6 @@ app.include_router(login_records_router)
 app.include_router(accounts_router)
 app.include_router(position_permissions_router)
 app.include_router(positions_router)
-app.include_router(position_customer_permissions_router)
 app.include_router(daily_groupings_router)
 app.include_router(activity_permissions_router)
 app.include_router(reminders_router)
@@ -158,6 +161,7 @@ app.include_router(debt_records_router)
 app.include_router(consumption_records_router)
 app.include_router(activity_history_router)
 app.include_router(visit_history_router)
+app.include_router(visit_notes_router)
 app.include_router(wechat_router)
 app.include_router(voice_router)
 app.include_router(chat_logs_router)

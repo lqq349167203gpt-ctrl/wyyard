@@ -28,7 +28,6 @@ import { POSITION_COURSE_TEACHER } from "@/lib/positions"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
-import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 
 /* ========== 常量 ========== */
 
@@ -289,19 +288,14 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   const appliedNicknameRef = useRef("")
   const appliedCloserNameRef = useRef("")
 
-  // 权限 & 客户
-  const { permissions: cp, ready: permReady } = useCustomerPermissions("payment")
+  // 客户
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customersReady, setCustomersReady] = useState(false)
   const { organizations, hasAnyOrganization } = useOrganizations()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
   const [noAssignmentDialogOpen, setNoAssignmentDialogOpen] = useState(false)
 
-  const cpRef = useRef(cp)
-  cpRef.current = cp
-  const customersRef = useRef<Customer[]>([])
   const customersReadyRef = useRef(false)
-  const isSuperAdminRef = useRef(false)
   const [refundedKeys, setRefundedKeys] = useState(new Set<string>())
 
   const courseTeachers = useMemo(() =>
@@ -315,13 +309,6 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       return { items: [] as UnifiedItem[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
     }
     const params: any = {}
-    if (!isSuperAdminRef.current) {
-      const allowed = customersRef.current
-      if (allowed.length === 0) {
-        return { items: [] as UnifiedItem[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
-      }
-      params.customer_ids = allowed.map(c => c.id).join(",")
-    }
     if (appliedNicknameRef.current) params.nickname = appliedNicknameRef.current
     if (appliedCloserNameRef.current) params.closer_name = appliedCloserNameRef.current
     const hasParams = Object.keys(params).length > 0
@@ -357,20 +344,8 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
 
   // 加载客户
   useEffect(() => {
-    if (!permReady) return
     customerApi.list().then((data) => {
-      let filtered = data
-      const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
-      isSuperAdminRef.current = cu.role === "超级管理员"
-      if (cu.role !== "超级管理员") {
-        if (cpRef.current.length > 0) {
-          filtered = data.filter(c => c.member_type && cpRef.current.includes(c.member_type))
-        } else {
-          filtered = []
-        }
-      }
-      setCustomers(filtered)
-      customersRef.current = filtered
+      setCustomers(data)
       customersReadyRef.current = true
       setCustomersReady(true)
       refresh()
@@ -386,7 +361,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       setCustomersReady(true)
       refresh()
     })
-  }, [permReady])
+  }, [])
 
   // 搜索
   const handleFilterChange = (field: "nickname" | "closer", value: string) => {

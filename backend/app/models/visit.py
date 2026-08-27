@@ -1,7 +1,9 @@
-from app.models.base import SafeBaseModel
-from pydantic import field_validator
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
+from pydantic import field_validator
+
+from app.models.base import SafeBaseModel
 
 
 class ActivityInfo(SafeBaseModel):
@@ -30,10 +32,12 @@ class VisitRecordBase(SafeBaseModel):
     feedback: str = ""  # 疗愈师回复
     healing_notes: str = ""  # 跟进记录
     sort_order: int = 0  # 排序权重，越小越靠前
+    created_by_id: str = ""  # 创建账号 ID（服务端写入）
+    created_by: str = ""  # 创建人显示名称（服务端写入）
 
     @field_validator(
         "visit_time", "member_type", "needs", "referrer_handler",
-        "space_id", "arrival_time",
+        "space_id", "arrival_time", "created_by_id", "created_by",
         "experience", "feedback", "healing_notes",
         mode="before",
     )

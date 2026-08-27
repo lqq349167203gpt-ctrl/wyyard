@@ -8,23 +8,25 @@ from langchain_openai import ChatOpenAI
 
 from app.config.settings import settings
 from app.models.customer import CustomerCreate
-from app.models.visit import VisitRecordCreate
-from app.models.membership_card import MembershipCardCreate
-from app.models.group_case import GroupCaseCreate
 from app.models.emotional_release import EmotionalReleaseCreate
 from app.models.energy_knot import EnergyKnotCreate
+from app.models.group_case import GroupCaseCreate
 from app.models.internal_course import InternalCourseCreate
+from app.models.membership_card import MembershipCardCreate
 from app.models.other_project import OtherProjectCreate
-from app.services import customer_service
-from app.services import visit_service
-from app.services import membership_card_service
+from app.models.visit import VisitRecordCreate
+from app.services import (
+    customer_service,
+    emotional_release_service,
+    energy_knot_service,
+    group_case_service,
+    internal_course_service,
+    membership_card_service,
+    other_project_service,
+    system_helper_config_service,
+    visit_service,
+)
 from app.services.chat_parser import _escape_xml
-from app.services import group_case_service
-from app.services import emotional_release_service
-from app.services import energy_knot_service
-from app.services import internal_course_service
-from app.services import other_project_service
-from app.services import system_helper_config_service
 
 ACTION_LABELS = {
     "create_customer": "新建客户",
@@ -46,7 +48,7 @@ FIELD_LABELS = {
     "visit_date": "到访日期",
     "visit_time": "到访时间",
     "space_id": "空间",
-    "needs": "需求",
+    "needs": "来访需求",
     "arrived": "已到场",
     "card_type": "卡类型",
     "price": "价格",
@@ -90,7 +92,7 @@ ENTRY_PROMPT = """你是"无忧茶院"后台管理系统的 AI 数据录入助�
 - nickname（必填）— 客户昵称
 - visit_date（必填）— 到访日期，格式 YYYY-MM-DD，默认今天
 - visit_time（可选）— 到访时间，格式 HH:MM
-- needs（可选）— 需求
+- needs（可选）— 来访需求
 - arrived（可选）— 是否已到场，默认 true
 
 ### 3. create_membership_card — 会员卡购买

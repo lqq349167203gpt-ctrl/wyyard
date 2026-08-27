@@ -25,6 +25,8 @@ class InternalCourseSessionBase(SafeBaseModel):
     room_id: str = ""
     room_name: str = ""
     space_name: str = ""
+    created_by_id: str = ""
+    created_by: str = ""
 
 
 class InternalCourseSessionCreate(InternalCourseSessionBase):

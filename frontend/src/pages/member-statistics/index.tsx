@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { CircleAlert } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { statisticsApi, customerDetailApi, type ActivityRecord, type PaymentRecord } from "@/lib/api"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tooltip as HintTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { EmptyValue } from "@/components/empty-value"
@@ -340,6 +342,20 @@ export default function MemberStatisticsPage() {
               </div>
               <div className="ml-1 flex items-center gap-2">
                 <span className="text-[12px] text-[#8f959e]">时间单位</span>
+                <HintTooltip>
+                  <TooltipTrigger
+                    render={(
+                      <button
+                        type="button"
+                        aria-label="查看时间单位说明"
+                        className="inline-flex h-4 w-4 items-center justify-center text-[#b7bdc6] transition-colors hover:text-[#8f959e]"
+                      >
+                        <CircleAlert className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  />
+                  <TooltipContent>时间单位的选择仅影响折线图的横坐标的时间分布</TooltipContent>
+                </HintTooltip>
                 <div className="flex items-center bg-[#f0f1f3] rounded-[4px] p-[2px]">
                   {timeView === "month" && (
                     <button
@@ -685,7 +701,7 @@ export default function MemberStatisticsPage() {
                   <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                     <span className="w-28 shrink-0">日期</span>
                     <span className="w-20 shrink-0">邀约人</span>
-                    <span className="flex-1 min-w-0">需求</span>
+                    <span className="flex-1 min-w-0">来访需求</span>
                   </div>
                   {detailRecords.map((r, i) => (
                     <div key={i} className="flex items-center px-4 py-2 hover:bg-[#f7f8fa] text-[12px] text-[#4e535a]">

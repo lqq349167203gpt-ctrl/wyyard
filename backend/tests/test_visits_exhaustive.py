@@ -1,6 +1,6 @@
 """到访记录穷举测试 — 覆盖每个字段、每种筛选、每种业务规则"""
-import pytest
 import uuid
+from types import SimpleNamespace
 
 
 def _u():
@@ -56,7 +56,7 @@ class TestVisitCreate:
         assert resp.json()["cancelled"] is False
 
     def test_needs_field(self, client, created_customer):
-        """本次需求"""
+        """来访需求"""
         resp = self._make(client, created_customer, needs="想体验情绪释放")
         assert resp.status_code == 200
         assert resp.json()["needs"] == "想体验情绪释放"
@@ -140,13 +140,13 @@ class TestVisitUpdate:
         vid = self._create(client, created_customer)
         resp = client.patch(f"/api/visits/{vid}", json={"feedback": "更新反馈"})
         assert resp.status_code == 200
-        assert resp.json()["feedback"] == "更新反馈"
+        assert resp.json()["feedback"].endswith("不闹：更新反馈")
 
     def test_update_healing_notes(self, client, created_customer):
         vid = self._create(client, created_customer)
         resp = client.patch(f"/api/visits/{vid}", json={"healing_notes": "更新疗愈"})
         assert resp.status_code == 200
-        assert resp.json()["healing_notes"] == "更新疗愈"
+        assert resp.json()["healing_notes"].endswith("不闹：更新疗愈")
 
     def test_update_arrived(self, client, created_customer):
         vid = self._create(client, created_customer)
@@ -263,8 +263,83 @@ class TestVisitUpdate:
         data = resp.json()
         assert data["needs"] == "新需求"
         assert data["experience"] == "新体验"
-        assert data["feedback"] == "新反馈"
-        assert data["healing_notes"] == "新记录"
+        assert data["feedback"].endswith("不闹：新反馈")
+        assert data["healing_notes"].endswith("不闹：新记录")
+
+
+class TestVisitArrivalSyncPerformance:
+    """到店扣卡只处理当天活动，并且只持久化当前客户。"""
+
+    def test_arrival_and_restore_are_scoped_to_date_and_customer(self, monkeypatch):
+        from app.services import (
+            class_record_service,
+            emotional_release_session_service,
+            group_case_session_service,
+            membership_card_service,
+            visit_service,
+        )
+
+        customer_id = "customer-performance"
+        activity_date = "2026-08-24"
+        session = SimpleNamespace(id="session-1")
+        class_record = SimpleNamespace(id="class-1", is_public_welfare=False)
+        queried_dates = []
+        synced = []
+        saved_customers = []
+
+        monkeypatch.setattr(
+            group_case_session_service,
+            "list_sessions",
+            lambda date=None: queried_dates.append(("gcs", date)) or [session],
+        )
+        monkeypatch.setattr(
+            emotional_release_session_service,
+            "list_sessions",
+            lambda date=None: queried_dates.append(("ers", date)) or [session],
+        )
+        monkeypatch.setattr(
+            class_record_service,
+            "list_records",
+            lambda date=None: queried_dates.append(("class", date)) or [class_record],
+        )
+        monkeypatch.setattr(group_case_session_service, "_get_chargeable_ids", lambda _: {customer_id})
+        monkeypatch.setattr(emotional_release_session_service, "_get_chargeable_ids", lambda _: {customer_id})
+        monkeypatch.setattr(class_record_service, "_get_group_member_ids", lambda _: {customer_id})
+        monkeypatch.setattr(membership_card_service, "get_activity_deduction_count", lambda _: 2)
+        monkeypatch.setattr(
+            membership_card_service,
+            "_do_sync_activity_count",
+            lambda cid, key, count: synced.append((cid, key, count)),
+        )
+        monkeypatch.setattr(
+            membership_card_service,
+            "_save_customer_usage",
+            lambda cid: saved_customers.append(cid),
+        )
+
+        visit = SimpleNamespace(customer_id=customer_id, visit_date=activity_date)
+        visit_service._deduct_for_arrival(visit)
+        visit_service._restore_for_arrival(visit)
+
+        assert queried_dates == [
+            ("gcs", activity_date),
+            ("ers", activity_date),
+            ("class", activity_date),
+            ("gcs", activity_date),
+            ("ers", activity_date),
+            ("class", activity_date),
+        ]
+        assert synced[:3] == [
+            (customer_id, "gcs:session-1", 2),
+            (customer_id, "ers:session-1", 2),
+            (customer_id, "class:class-1", 2),
+        ]
+        assert synced[3:] == [
+            (customer_id, "gcs:session-1", 0),
+            (customer_id, "ers:session-1", 0),
+            (customer_id, "class:class-1", 0),
+        ]
+        assert saved_customers == [customer_id, customer_id]
 
 
 class TestVisitReorderOperationLog:
@@ -289,6 +364,55 @@ class TestVisitReorderOperationLog:
         assert log["entity_id"] == ""
         assert log["after_data"] is None
         assert all(record_id not in str(log) for record_id in ids)
+
+    def test_reorder_log_records_moved_customer_and_positions(self, client):
+        ids = [_u(), _u(), _u()]
+        response = client.post(
+            "/api/visits/reorder",
+            json={
+                "ids": ids,
+                "moved_name": "小林",
+                "from_position": 3,
+                "to_position": 1,
+            },
+        )
+        assert response.status_code == 200
+
+        logs = client.get(
+            "/api/operation-logs",
+            params={"section": "邀约", "source": "pc"},
+        ).json()
+        log = next(item for item in logs if item["path"] == "/api/visits/reorder")
+
+        assert log["content"] == "调整邀约排序：将“小林”从第3位移动到第1位"
+        assert log["after_data"] is None
+
+
+class TestActivityOrderOperationLog:
+    """课表排序应归入课表并记录具体移动内容。"""
+
+    def test_activity_order_log_records_course_and_positions(self, client):
+        response = client.post(
+            "/api/activity-orders",
+            json={
+                "date": "2026-08-20",
+                "space_id": "space-1",
+                "order": ["class-a", "gcs-b"],
+                "moved_name": "读书会",
+                "from_position": 1,
+                "to_position": 2,
+            },
+        )
+        assert response.status_code == 200
+
+        logs = client.get(
+            "/api/operation-logs",
+            params={"section": "课表", "source": "pc"},
+        ).json()
+        log = next(item for item in logs if item["path"] == "/api/activity-orders")
+
+        assert log["content"] == "调整课表排序：将“读书会”从第1位移动到第2位"
+        assert log["after_data"] is None
 
 
 class TestVisitDelete:

@@ -8,7 +8,7 @@ from app.models.base import StrictBaseModel
 from app.services import (
     account_service,
     login_record_service,
-    position_customer_permission_service,
+    position_edit_permission_service,
     position_permission_service,
     session_service,
 )
@@ -71,7 +71,7 @@ async def create_account(
 
 ALL_PAGE_KEYS = [
     # 数据
-    "business-reminders", "referral-statistics",
+    "custom-analysis", "referral-statistics",
     "member-statistics", "course-statistics", "product-sales", "statistics", "financial-overview",
     # 报表
     "daily-report",
@@ -85,11 +85,11 @@ ALL_PAGE_KEYS = [
     "emotional-releases", "oh-card-readings",
     "energy-knots", "internal-courses", "tea-seat-fees", "offline-courses", "other-projects",
     # 信息配置
-    "member-identities", "customer-tags", "healing-identities", "organizations", "spaces", "reminders",
+    "member-identities", "customer-tags", "healing-identities", "organizations", "spaces",
     # 账号管理
     "position-management", "change-password", "disabled-customers",
     # 系统配置
-    "agents", "chat-history", "system-logs", "operation-logs", "login-records",
+    "agents", "chat-history", "system-logs", "operation-logs", "login-records", "analysis-logs",
     # 茶客业务
     "tea-guest-consumption-records", "tea-guest-expenses",
 ]
@@ -134,16 +134,12 @@ async def login(data: LoginRequest, request: StarletteRequest):
     )
 
     if result.role == "超级管理员":
-        from app.services import member_identity_service
-        all_identities = [i.name for i in member_identity_service.list_identities()]
         return {
             "success": True,
             "token": token,
             "account": account_data,
             "permissions": ALL_PAGE_KEYS,
-            "customer_permissions": all_identities,
-            "customer_permissions_class_records": all_identities,
-            "customer_permissions_payment": all_identities,
+            "edit_permissions": position_edit_permission_service.get_permissions(result.role),
         }
 
     permissions = position_permission_service.get_permissions(result.role)
@@ -152,9 +148,7 @@ async def login(data: LoginRequest, request: StarletteRequest):
         "token": token,
         "account": account_data,
         "permissions": permissions,
-        "customer_permissions": position_customer_permission_service.get_customer_permissions("customers", result.role),
-        "customer_permissions_class_records": position_customer_permission_service.get_customer_permissions("class_records", result.role),
-        "customer_permissions_payment": position_customer_permission_service.get_customer_permissions("payment", result.role),
+        "edit_permissions": position_edit_permission_service.get_permissions(result.role),
     }
 
 

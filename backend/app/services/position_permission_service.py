@@ -4,7 +4,7 @@ from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "position_permissions.json"
 _permissions: Dict[str, List[str]] = {}
-REMOVED_PAGE_KEYS = {"commission-records", "staff-benefits"}
+REMOVED_PAGE_KEYS = {"business-reminders", "commission-records", "reminders", "staff-benefits"}
 
 
 def _active_pages(pages: List[str]) -> List[str]:

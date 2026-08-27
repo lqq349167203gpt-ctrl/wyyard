@@ -2082,19 +2082,25 @@ def get_referral_statistics(
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人昵称"),
     member_types: str | None = Query(None, description="会员类型筛选，逗号分隔多选"),
+    follow_up_status: str | None = Query(None, description="跟进阶段"),
+    traffic_source: str | None = Query(None, description="流量来源；未配置表示空值"),
     tag_ids: str | None = Query(None, description="客户标签 ID，逗号分隔多选"),
     tag_match: str = Query("any", pattern="^(any|all)$", description="多标签匹配方式"),
     request: Request = None,
 ):
-    """获取引流统计：跟进状态分布、变化趋势和人员明细。"""
+    """获取引流统计：跟进阶段分布、变化趋势和人员明细。"""
     date_from, date_to = _get_date_range(date_from, date_to)
     type_filter = _parse_member_types(member_types)
     status_names = [status.value for status in FollowUpStatus]
+    status_filter = follow_up_status if isinstance(follow_up_status, str) and follow_up_status else None
+    traffic_source_filter = traffic_source if isinstance(traffic_source, str) and traffic_source else None
+    if status_filter and status_filter not in status_names:
+        raise HTTPException(status_code=422, detail="跟进阶段不存在")
     all_customers = customer_service.list_customers()
+    actor_id = getattr(getattr(request, "state", None), "user_id", "")
     matched_tag_customer_ids: set[str] | None = None
     if isinstance(tag_ids, str) and tag_ids:
         requested_tag_ids = [tag_id.strip() for tag_id in tag_ids.split(",") if tag_id.strip()]
-        actor_id = getattr(getattr(request, "state", None), "user_id", "")
         resolved_tag_match = tag_match if isinstance(tag_match, str) else "any"
         try:
             matched_tag_customer_ids = customer_tag_service.customer_ids_for_tags(
@@ -2122,27 +2128,109 @@ def get_referral_statistics(
             key=lambda item: (-item[1], item[0]),
         )
     ]
-    customers = [
+    traffic_source_counts: dict[str, int] = defaultdict(int)
+    for customer in all_customers:
+        referral_date = (customer.referral_date or "").strip()
+        if not referral_date or not (date_from <= referral_date <= date_to):
+            continue
+        source_name = (customer.traffic_source or "").strip() or "未配置"
+        traffic_source_counts[source_name] += 1
+    traffic_source_names = [
+        name
+        for name, _count in sorted(
+            ((name, count) for name, count in traffic_source_counts.items() if name != "未配置"),
+            key=lambda item: (-item[1], item[0]),
+        )
+    ]
+    if "未配置" in traffic_source_counts:
+        traffic_source_names.append("未配置")
+    scoped_customers = [
         customer
         for customer in all_customers
         if (not referrer or (customer.referrer or "").strip() == referrer)
         and (not type_filter or (customer.member_type or "") in type_filter)
-        and (matched_tag_customer_ids is None or customer.id in matched_tag_customer_ids)
+    ]
+    visible_tags_by_customer = customer_tag_service.visible_tags_by_customer(actor_id)
+    tag_totals: dict[str, int] = defaultdict(int)
+    for customer in scoped_customers:
+        referral_date = (customer.referral_date or "").strip()
+        if not referral_date or not (date_from <= referral_date <= date_to):
+            continue
+        customer_status = (
+            getattr(customer.follow_up_status, "value", customer.follow_up_status)
+            or FollowUpStatus.UNCONFIGURED.value
+        )
+        if status_filter and customer_status != status_filter:
+            continue
+        customer_traffic_source = (customer.traffic_source or "").strip() or "未配置"
+        if traffic_source_filter and customer_traffic_source != traffic_source_filter:
+            continue
+        for tag in visible_tags_by_customer.get(customer.id, []):
+            tag_id = str(tag.get("id") or "")
+            if tag_id:
+                tag_totals[tag_id] += 1
+
+    tag_filtered_customers = [
+        customer
+        for customer in scoped_customers
+        if matched_tag_customer_ids is None or customer.id in matched_tag_customer_ids
+    ]
+    summary_status_totals = {status: 0 for status in status_names}
+    for customer in tag_filtered_customers:
+        referral_date = (customer.referral_date or "").strip()
+        if not referral_date or not (date_from <= referral_date <= date_to):
+            continue
+        customer_traffic_source = (customer.traffic_source or "").strip() or "未配置"
+        if traffic_source_filter and customer_traffic_source != traffic_source_filter:
+            continue
+        customer_status = (
+            getattr(customer.follow_up_status, "value", customer.follow_up_status)
+            or FollowUpStatus.UNCONFIGURED.value
+        )
+        if customer_status not in status_names:
+            customer_status = FollowUpStatus.UNCONFIGURED.value
+        summary_status_totals[customer_status] += 1
+
+    summary_traffic_source_totals: dict[str, int] = defaultdict(int)
+    for customer in tag_filtered_customers:
+        referral_date = (customer.referral_date or "").strip()
+        if not referral_date or not (date_from <= referral_date <= date_to):
+            continue
+        customer_status = (
+            getattr(customer.follow_up_status, "value", customer.follow_up_status)
+            or FollowUpStatus.UNCONFIGURED.value
+        )
+        if status_filter and customer_status != status_filter:
+            continue
+        source_name = (customer.traffic_source or "").strip() or "未配置"
+        summary_traffic_source_totals[source_name] += 1
+
+    customers = [
+        customer
+        for customer in tag_filtered_customers
+        if (
+            not status_filter
+            or (getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.UNCONFIGURED.value) == status_filter
+        )
+        and (
+            not traffic_source_filter
+            or ((customer.traffic_source or "").strip() or "未配置") == traffic_source_filter
+        )
     ]
 
     customers_by_date: dict[str, dict[str, int]] = defaultdict(
         lambda: {status: 0 for status in status_names}
     )
     for customer in customers:
-        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
+        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.UNCONFIGURED.value
         if status not in status_names:
-            status = FollowUpStatus.NEW.value
+            status = FollowUpStatus.UNCONFIGURED.value
         referral_date = (customer.referral_date or "").strip()
         if not referral_date:
             continue
         customers_by_date[referral_date][status] += 1
 
-    # 按引流日期范围过滤：只统计选定时间范围内引流的客户
+    # 卡片与列表只统计当前选择的引流日期范围。
     daily_new = {
         referral_date: values
         for referral_date, values in customers_by_date.items()
@@ -2165,20 +2253,19 @@ def get_referral_statistics(
 
     members = []
     for customer in customers:
-        # 按引流日期范围过滤：只保留选定时间范围内引流的客户
         referral_date = (customer.referral_date or "").strip()
-        if not referral_date:
-            continue
-        if not (date_from <= referral_date <= date_to):
+        if not referral_date or not (date_from <= referral_date <= date_to):
             continue
         stats = _get_customer_stats(customer.id, None, None)
-        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.NEW.value
+        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.UNCONFIGURED.value
         members.append({
             "id": customer.id,
             "nickname": customer.nickname or "",
             "referral_date": referral_date,
             "member_type": customer.member_type or "",
             "referrer": customer.referrer or "",
+            "traffic_source": customer.traffic_source or "",
+            "referrer_handler": customer.referrer_handler or "",
             "follow_up_status": status,
             "first_visit_date": stats.get("first_visit_date", "-"),
             "invited_count": stats.get("invited_count", 0),
@@ -2190,16 +2277,18 @@ def get_referral_statistics(
         })
 
     return {
-        "total_people": sum(sum(v.values()) for v in daily_new.values()),
+        "total_people": sum(sum(values.values()) for values in daily_new.values()),
         "status_names": status_names,
         "status_totals": status_totals,
+        "summary_total_people": sum(summary_status_totals.values()),
+        "summary_status_totals": summary_status_totals,
+        "summary_traffic_source_totals": dict(summary_traffic_source_totals),
+        "tag_totals": dict(tag_totals),
         "referrer_names": referrer_names,
+        "traffic_source_names": traffic_source_names,
         # 全量会员类型选项（不受会员类型筛选影响，避免选项塌缩）
         "member_type_names": _sort_member_type_names(
             {c.member_type or "" for c in all_customers}
-        ),
-        "chart_new": _aggregate_member_by_granularity(
-            daily_new, granularity, date_from, date_to, status_names
         ),
         "chart_total": _aggregate_member_cumulative(
             cumulative_by_date, granularity, date_from, date_to, status_names

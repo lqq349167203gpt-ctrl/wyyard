@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "访客详情",
-  "usingComponents": {}
+  "usingComponents": {
+    "visit-note-section": "/components/visit-note-section/index"
+  }
 }

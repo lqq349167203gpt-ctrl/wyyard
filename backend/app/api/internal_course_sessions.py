@@ -3,6 +3,12 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.internal_course_session import InternalCourseSessionCreate
 from app.services import activity_assignment_notification_service, internal_course_session_service
 from app.utils.pagination import paginate
+from app.utils.record_ownership import (
+    ACTIVITY_CREATOR_ONLY_FIELDS,
+    ensure_creator_for_changed_fields,
+    ensure_record_creator,
+    stamp_creator,
+)
 
 router = APIRouter(prefix="/api/internal-course-sessions", tags=["internal-course-sessions"])
 
@@ -38,20 +44,26 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 
 @router.post("")
-def create_session(data: InternalCourseSessionCreate, request: Request):
-    session = internal_course_session_service.create_session(data)
-    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
-    activity_assignment_notification_service.notify_new_assignments(
-        "ics",
-        session,
-        operator=operator,
+def create_session(data: InternalCourseSessionCreate, request: Request, conversion: bool = False):
+    session = internal_course_session_service.create_session(
+        stamp_creator(data, request), refresh_identities=not conversion
     )
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+    if not conversion:
+        activity_assignment_notification_service.notify_new_assignments(
+            "ics",
+            session,
+            operator=operator,
+        )
     return session
 
 
 @router.patch("/{session_id}")
-def update_session(session_id: str, data: dict, request: Request):
+def update_session(session_id: str, data: dict, request: Request, conversion: bool = False):
     old_session = internal_course_session_service.get_session(session_id)
+    ensure_creator_for_changed_fields(
+        request, old_session, data, ACTIVITY_CREATOR_ONLY_FIELDS, "课表受保护信息", "activities"
+    )
     old_ids = set(old_session.participant_ids) if old_session else set()
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_session)
 
@@ -59,7 +71,9 @@ def update_session(session_id: str, data: dict, request: Request):
     old_description = old_session.course_description if old_session else ""
 
     try:
-        session = internal_course_session_service.update_session(session_id, data)
+        session = internal_course_session_service.update_session(
+            session_id, data, refresh_identities=not conversion
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not session:
@@ -70,7 +84,7 @@ def update_session(session_id: str, data: dict, request: Request):
     new_description = session.course_description or ""
     name_changed = (new_course_name != old_course_name)
     desc_changed = (new_description != old_description)
-    if (name_changed or desc_changed) and old_ids:
+    if not conversion and (name_changed or desc_changed) and old_ids:
         operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
         display_name = session.course_name
         activity_date = session.date
@@ -95,30 +109,30 @@ def update_session(session_id: str, data: dict, request: Request):
             )
 
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
-    activity_assignment_notification_service.notify_new_assignments(
-        "ics",
-        session,
-        previous_member_ids=old_member_ids,
-        operator=operator,
-    )
+    if not conversion:
+        activity_assignment_notification_service.notify_new_assignments(
+            "ics",
+            session,
+            previous_member_ids=old_member_ids,
+            operator=operator,
+        )
     return session
 
 
 @router.delete("/{session_id}")
-def delete_session(session_id: str, request: Request):
+def delete_session(session_id: str, request: Request, conversion: bool = False):
     old_session = internal_course_session_service.get_session(session_id)
-    if not old_session:
-        raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_record_creator(request, old_session, "课表内容", "activities")
 
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
     activity_name = old_session.course_name
     activity_date = old_session.date
     participant_ids = list(old_session.participant_ids)
 
-    if not internal_course_session_service.delete_session(session_id):
+    if not internal_course_session_service.delete_session(session_id, refresh_identities=not conversion):
         raise HTTPException(status_code=404, detail="记录不存在")
 
-    if participant_ids:
+    if participant_ids and not conversion:
         from app.services import client_notification_service
         for cid in participant_ids:
             client_notification_service.create_notification(

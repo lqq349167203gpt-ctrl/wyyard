@@ -35,7 +35,7 @@ Page({
     referrer: '',
     referral_date: getTodayDate(),
     referrer_handler: '',
-    follow_up_status: '新添加',
+    follow_up_status: '未配置',
     traffic_source: '',
     traffic_source_detail: '',
     needTrafficDetail: false,
@@ -46,7 +46,7 @@ Page({
     tags: '',
     other_info: '',
     trafficSources: TRAFFIC_SOURCES,
-    followUpStatuses: ['新添加', '沟通中', '已到店', '已成交', '沉默/流失'],
+    followUpStatuses: ['新添加', '前期沟通中', '已邀约未到店', '已到店', '已成交', '沉默/流失', '未配置'],
     customerTags: [],
     selectedTagIds: [],
     selectedTagText: '',
@@ -256,7 +256,7 @@ Page({
   },
 
   onFollowUpStatusChange(e) {
-    const statuses = ['新添加', '沟通中', '已到店', '已成交', '沉默/流失']
+    const statuses = ['新添加', '前期沟通中', '已邀约未到店', '已到店', '已成交', '沉默/流失', '未配置']
     this.setData({ follow_up_status: statuses[e.detail.value] })
   },
 

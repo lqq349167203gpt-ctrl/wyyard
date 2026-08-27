@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 
 from app.models.membership_card import MembershipCard, MembershipCardCreate
 from app.services import customer_service
-from app.services.storage import load_data, save_data, save_item
+from app.services.storage import delete_item, load_data, save_data, save_item
 
 FILENAME = "membership_cards.json"
 DEDUCTIONS_FILE = "membership_deductions.json"
@@ -148,6 +148,28 @@ def list_debt_activity_usage_records(customer_id: str) -> list[dict]:
 def _save_debts():
     save_data(DEBTS_FILE, _debts)
     save_data(DEBT_ACTIVITIES_FILE, _debt_activities)
+
+
+def _save_customer_usage(customer_id: str):
+    """只持久化单个客户的扣卡与欠卡数据，避免高频到店操作整表重写。"""
+    mappings = (
+        (DEDUCTIONS_FILE, _deductions),
+        (DEBTS_FILE, _debts),
+        (DEBT_ACTIVITIES_FILE, _debt_activities),
+    )
+    for filename, mapping in mappings:
+        value = mapping.get(customer_id)
+        if value:
+            save_item(filename, customer_id, value)
+        else:
+            delete_item(filename, customer_id)
+
+
+def _save_customer_usages(customer_ids: set[str]):
+    """批量持久化本次实际受影响的客户，不改写无关客户数据。"""
+    for customer_id in customer_ids:
+        if customer_id:
+            _save_customer_usage(customer_id)
 
 
 def get_debt(customer_id: str) -> int:

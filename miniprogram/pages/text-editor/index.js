@@ -8,8 +8,8 @@ Page({
   onLoad(options) {
     if (!getApp().checkLogin()) return
     if (getApp().trackUsagePage) getApp().trackUsagePage('/pages/text-editor/index')
-    const field = options.field || ''
-    const label = options.label || ''
+    const field = decodeURIComponent(options.field || '')
+    const label = decodeURIComponent(options.label || '')
     wx.setNavigationBarTitle({ title: label })
 
     // 从上一页读取当前值

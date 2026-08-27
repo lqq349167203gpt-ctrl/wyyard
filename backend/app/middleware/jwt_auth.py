@@ -120,7 +120,11 @@ def _log_auth_failure(reason: str, path: str, account_id: str = "", jti: str = "
 
 def _unauthorized(reason: str, path: str, account_id: str = "", jti: str = "") -> JSONResponse:
     _log_auth_failure(reason, path, account_id, jti)
-    return _json_response(401, "认证无效")
+    response = _json_response(401, "认证无效")
+    # 保持响应正文不暴露认证细节，仅通过响应头供受信任客户端判断：
+    # 普通过期可静默续登，停用/改密/被踢则必须退出。
+    response.headers["X-Auth-Reason"] = reason
+    return response
 
 
 def _maybe_renew_token(payload: dict) -> str:

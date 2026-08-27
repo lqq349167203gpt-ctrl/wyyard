@@ -1,14 +1,15 @@
 .container {
   min-height: 100vh;
-  background-color: #f2f3f5;
-  padding-bottom: 40rpx;
+  box-sizing: border-box;
+  background-color: #f4f5f6;
+  padding: 20rpx 24rpx 40rpx;
 }
 
 /* ============ Hero ============ */
 .hero {
   background: #fff;
-  padding: 32rpx 32rpx 0;
-  border-bottom: 2rpx solid #ebedf0;
+  padding: 28rpx 28rpx 24rpx;
+  border-radius: 16rpx;
 }
 
 .hero-top {
@@ -27,24 +28,24 @@
   margin-left: auto;
   font-size: 24rpx;
   color: #646a73;
-  border: 2rpx solid #ebedf0;
-  border-radius: 6rpx;
-  padding: 8rpx 24rpx;
+  border: 1rpx solid #dee0e3;
+  border-radius: 8rpx;
+  padding: 6rpx 20rpx;
   flex-shrink: 0;
 }
 
-.hero-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 18rpx;
+.hero-sub {
+  margin-top: 6rpx;
+  color: #8f959e;
+  font-size: 22rpx;
 }
 
 .hero-stats {
   display: flex;
-  margin-top: 30rpx;
-  padding: 24rpx 0 26rpx;
-  border-top: 2rpx solid #ebedf0;
+  gap: 16rpx;
+  margin-top: 22rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f0f0f0;
 }
 
 .hstat {
@@ -53,8 +54,8 @@
 }
 
 .hstat + .hstat {
-  border-left: 2rpx solid #ebedf0;
-  padding-left: 28rpx;
+  border-left: none;
+  padding-left: 0;
 }
 
 .hstat-num {
@@ -118,32 +119,29 @@
 .sec {
   margin-top: 20rpx;
   background: #fff;
-  border-top: 2rpx solid #ebedf0;
-  border-bottom: 2rpx solid #ebedf0;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  overflow: hidden;
 }
 
 .sec-title {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  padding: 22rpx 32rpx 18rpx;
-  font-size: 25rpx;
-  font-weight: 700;
-  color: #1f2329;
-}
-
-.sec-title::after {
-  content: "";
-  flex: 1;
-  height: 2rpx;
-  background: #ebedf0;
+  margin-bottom: 8rpx;
+  color: #212631;
+  font-size: 26rpx;
+  font-weight: 600;
 }
 
 .kv {
   display: flex;
-  padding: 14rpx 32rpx;
-  font-size: 26rpx;
   align-items: baseline;
+  gap: 20rpx;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #f3f4f5;
+  font-size: 26rpx;
+}
+
+.kv:last-child {
+  border-bottom: none;
 }
 
 .kv .k {
@@ -154,14 +152,14 @@
 }
 
 .kv .v {
-  color: #1f2329;
+  color: #212631;
   min-width: 0;
   flex: 1;
   word-break: break-all;
 }
 
 .blk {
-  padding: 16rpx 32rpx 20rpx;
+  padding: 14rpx 0;
 }
 
 .blk .k {
@@ -179,14 +177,52 @@
   word-break: break-all;
 }
 
-.blk + .blk {
-  border-top: 2rpx dashed #eef0f2;
+/* ============ 身份与状态 ============ */
+.identity-value {
+  font-size: 25rpx;
+  font-weight: 400;
+}
+
+.mechanism {
+  margin-left: auto;
+  color: #b7bdc6;
+  font-size: 20rpx;
+  white-space: nowrap;
+}
+
+.tag-zone {
+  padding-top: 16rpx;
+}
+
+.tag-zone-label {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #a8b1bd;
+  font-size: 24rpx;
+}
+
+.identity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.identity-tag {
+  padding: 4rpx 16rpx;
+  border: 1rpx solid #e1e4e7;
+  border-radius: 999rpx;
+  background: #fafbfc;
+  color: #646a73;
+  font-size: 21rpx;
+  line-height: 1.5;
 }
 
 /* ============ 记录区 ============ */
 .record-section {
   margin-top: 20rpx;
   background: #fff;
+  border-radius: 16rpx;
+  overflow: hidden;
 }
 
 .seg-wrap {
@@ -301,14 +337,52 @@
   margin-left: auto;
 }
 
+.rec-visit-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  min-width: 0;
+}
+
+.rec-head-visit .pill {
+  margin-left: 0;
+}
+
+.rec-inviter {
+  max-width: 210rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 22rpx;
+  font-weight: 400;
+  color: #8f959e;
+}
+
 .rec-name {
   font-size: 27rpx;
   font-weight: 600;
   color: #1f2329;
 }
 
-.rec-name-gap {
+.rec-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
   margin-top: 12rpx;
+}
+
+.rec-head-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
+.rec-deduct {
+  font-size: 24rpx;
+  color: #646a73;
 }
 
 .rec-amt {

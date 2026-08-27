@@ -4,24 +4,6 @@ function formatMoney(value) {
   return '¥' + String(Math.round(value || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
-// 计算「N天未到店」预警签：≤7天灰 / 8-30天蓝 / >30天红，未到店灰
-function computeDaysPill(lastVisitDate) {
-  let daysAgo = -1
-  if (lastVisitDate) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const vd = new Date(lastVisitDate)
-    vd.setHours(0, 0, 0, 0)
-    if (!isNaN(vd.getTime())) {
-      daysAgo = Math.floor((today - vd) / 86400000)
-    }
-  }
-  if (daysAgo < 0) return { cls: 'pill-gray', text: '未到店' }
-  if (daysAgo <= 7) return { cls: 'pill-gray', text: daysAgo + '天前' }
-  if (daysAgo <= 30) return { cls: 'pill-blue', text: daysAgo + '天前' }
-  return { cls: 'pill-warn', text: daysAgo + '天未到店' }
-}
-
 function normalizePurchaseItem(item, key) {
   const isOfflineCourse = item.type === '线下落地课程'
   const remaining = item.remaining
@@ -96,8 +78,6 @@ Page({
     firstVisit: '',
     totalPayment: 0,
     totalPaymentText: '¥0',
-    daysPillClass: '',
-    daysPillText: '',
     genderAgeText: '',
     workText: '',
     activities: [],
@@ -151,17 +131,14 @@ Page({
       const c = detail.customer
 
       // 疗愈老师
-      const healerText = (c.positions || [])
+      const healerIdentityText = (c.positions || [])
         .filter(p => ['成就君', '能量结老师', '课程老师'].includes(p))
         .join('、')
+      const healerText = c.service_teacher || healerIdentityText
 
       const visitRecords = detail.visit_records || []
       const arrived = visitRecords.filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
       const firstVisit = arrived.length > 0 ? arrived[0].visit_date : ''
-      const lastVisitDate = arrived.length > 0 ? arrived[arrived.length - 1].visit_date : ''
-
-      // 预警签（详情接口不含 last_visit_date，从已到店记录推导最近到店日期）
-      const daysPill = computeDaysPill(lastVisitDate)
 
       // 基本信息合并字段
       const gender = c.gender || ''
@@ -209,8 +186,6 @@ Page({
         firstVisit,
         totalPayment,
         totalPaymentText: formatMoney(totalPayment),
-        daysPillClass: daysPill.cls,
-        daysPillText: daysPill.text,
         genderAgeText,
         workText,
         activities,

@@ -2484,23 +2484,22 @@ export default function DailyActivitiesPage() {
             </colgroup>
             <thead>
               <tr className="bg-[#f7f8fa]">
-                <th className="px-2 py-1.5 text-center text-[12px] text-[#8f959e] font-normal" style={{ borderRight: "0.5px solid #f0f0f0" }}>周主题</th>
+                <th className="px-2 py-1 text-center text-[12px] text-[#8f959e] font-normal" style={{ borderRight: "0.5px solid #f0f0f0" }}>周主题</th>
                 {["一", "二", "三", "四", "五", "六", "日"].map(d => (
-                  <th key={d} className="px-1 py-1.5 text-center text-[11px] text-[#8f959e] font-normal">{d}</th>
+                  <th key={d} className="px-1 py-1 text-center text-[11px] text-[#8f959e] font-normal">{d}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {themeWeeks.flatMap((week, wi) => {
+              {themeWeeks.map((week, wi) => {
                 const firstTheme = week.days.map(day => themeMap.get(day.date)).find(theme => theme?.week_theme)
                 const weekThemeText = firstTheme?.week_theme || ""
                 const isLastWeek = wi === themeWeeks.length - 1
-                const dateRow = (
-                  <tr key={`date-${wi}`}>
+                return (
+                  <tr key={`week-${wi}`}>
                     <td
-                      rowSpan={2}
                       className="px-2 text-center text-[12px] text-[#2b2f36] cursor-pointer hover:bg-[#f0f5ff] overflow-hidden text-ellipsis whitespace-nowrap"
-                      style={{ height: "28px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
+                      style={{ height: "22px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
                       onClick={() => { if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
                     >
                       {weekThemeText}
@@ -2509,107 +2508,34 @@ export default function DailyActivitiesPage() {
                       const dayNum = day.date.split("-")[2].replace(/^0/, "")
                       const isSelected = day.date === detailDate
                       const isToday = day.date === today
+                      const dayTheme = day.inMonth ? themeMap.get(day.date)?.day_theme || "" : ""
+                      const hasActivities = (calendarCounts[day.date] || 0) > 0
                       return (
                         <td
-                          key={`date-${day.date}`}
-                          className={`px-1 text-center text-[10px] cursor-pointer transition-colors ${
-                            !day.inMonth ? "bg-[#fdfdfd]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "bg-[#fdfdfd] text-[#b0b5bb]"
+                          key={day.date}
+                          className={`cursor-pointer overflow-hidden px-1 text-center text-[12px] transition-colors ${
+                            !day.inMonth ? "bg-[#fdfdfd] text-[#b0b5bb]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36]"
                           }`}
-                          style={{ height: "14px" }}
+                          style={{ height: "22px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
                           onClick={() => day.inMonth && setDetailDate(day.date)}
                         >
-                          {day.inMonth ? <div className="relative w-full h-full flex flex-col items-center justify-center"><span className={`${(calendarCounts[day.date] || 0) > 0 ? "text-[#2b2f36]" : "text-[#b0b5bb]"}`}>{dayNum}</span></div> : ""}
+                          <div className="flex min-w-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap">
+                            <span className={`shrink-0 text-[10px] ${
+                              !day.inMonth ? "text-[#b0b5bb]" : isToday ? "text-[#3370ff]" : hasActivities ? "text-[#2b2f36]" : "text-[#8f959e]"
+                            }`}>{dayNum}</span>
+                            {dayTheme && <span className="min-w-0 truncate">{dayTheme}</span>}
+                          </div>
                         </td>
                       )
                     })}
                   </tr>
                 )
-                const themeRow = (
-                  <tr key={`theme-${wi}`}>
-                    {week.days.map((day) => {
-                      const dayTheme = themeMap.get(day.date)?.day_theme || ""
-                      const isSelected = day.date === detailDate
-                      return (
-                        <td
-                          key={`theme-${day.date}`}
-                          className={`px-1 text-center text-[12px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap ${
-                            !day.inMonth ? "" : ""
-                          }`}
-                          style={{ height: "20px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
-                          onClick={() => day.inMonth && setDetailDate(day.date)}
-                        >
-                          {day.inMonth ? (dayTheme || "") : ""}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-                return [dateRow, themeRow]
               })}
             </tbody>
           </table>
         </div>}
-        <div className="mt-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <span className="text-[14px] font-medium text-[#2b2f36] pl-2">{detailDate.split("-")[1].replace(/^0/, "")}月{detailDate.split("-")[2].replace(/^0/, "")}日活动</span>
-              {savingCount > 0 ? (
-                <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
-              ) : savedCount > 0 ? (
-                <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
-              ) : null}
-            </div>
-            {/* 历史记录/撤回/重做按钮 */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  if (previewEntry) { setPreviewEntry(null); setHistoryPanelOpen(false) }
-                  else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
-                }}
-                className={`h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] ${historyPanelOpen ? "bg-[#f0f0f0]" : ""}`}
-                title="历史记录"
-              >
-                <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
-              </button>
-              <button
-                onClick={undo}
-                disabled={!canUndo || !!previewEntry}
-                className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-                title="撤回 (Ctrl+Z)"
-              >
-                <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-              </button>
-              <button
-                onClick={redo}
-                disabled={!canRedo || !!previewEntry}
-                className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-                title="重做 (Ctrl+Shift+Z)"
-              >
-                <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-              </button>
-            </div>
-          </div>
-          {dayParticipants.length > 0 && (
-            <div className="flex flex-wrap gap-1 pl-2 mt-2.5">
-              {dayParticipants.map(p => (
-                <span
-                  key={p.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: p.id, nickname: p.nickname }))
-                    e.dataTransfer.effectAllowed = "copy"
-                  }}
-                  className="inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[12px] text-[#3370ff] cursor-grab active:cursor-grabbing hover:bg-[#e0edff] transition-colors"
-                >
-                  {p.nickname}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Activity cards */}
-        <div className="flex-1 overflow-y-auto min-w-0" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" onMouseDown={(e) => e.stopPropagation()}>
           {detailLoading ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Loader2 className="h-8 w-8 text-muted-foreground mb-2 animate-spin" />
@@ -2640,6 +2566,71 @@ export default function DailyActivitiesPage() {
               previewChangedCells={previewChangedCells}
               locked={!!previewEntry}
               onClosePreview={() => setPreviewEntry(null)}
+              toolbarLeading={(
+                <>
+                  <span className="text-[12px] font-medium text-[#2b2f36]">
+                    {detailDate.split("-")[1].replace(/^0/, "")}月{detailDate.split("-")[2].replace(/^0/, "")}日活动
+                  </span>
+                  {savingCount > 0 ? (
+                    <span className="hidden items-center gap-1 text-[11px] text-[#8f959e] min-[1100px]:inline-flex">
+                      <span className="h-[5px] w-[5px] rounded-full bg-[#3370ff]" />
+                      保存中
+                    </span>
+                  ) : savedCount > 0 ? (
+                    <span className="hidden items-center gap-1 text-[11px] text-[#8f959e] min-[1100px]:inline-flex">
+                      <span className="h-[5px] w-[5px] rounded-full bg-[#639922]" />
+                      已保存
+                    </span>
+                  ) : null}
+                </>
+              )}
+              toolbarTrailing={(
+                <>
+                  <button
+                    onClick={() => {
+                      if (previewEntry) { setPreviewEntry(null); setHistoryPanelOpen(false) }
+                      else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
+                    }}
+                    className={`flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] ${historyPanelOpen ? "bg-[#f0f0f0]" : ""}`}
+                    title="历史记录"
+                  >
+                    <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
+                  </button>
+                  <button
+                    onClick={undo}
+                    disabled={!canUndo || !!previewEntry}
+                    className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
+                    title="撤回 (Ctrl+Z)"
+                  >
+                    <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+                  </button>
+                  <button
+                    onClick={redo}
+                    disabled={!canRedo || !!previewEntry}
+                    className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
+                    title="重做 (Ctrl+Shift+Z)"
+                  >
+                    <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+                  </button>
+                </>
+              )}
+              toolbarSupplement={dayParticipants.length > 0 ? (
+                <div className="mb-2 mt-2.5 flex flex-wrap gap-1 pl-2">
+                  {dayParticipants.map(p => (
+                    <span
+                      key={p.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: p.id, nickname: p.nickname }))
+                        e.dataTransfer.effectAllowed = "copy"
+                      }}
+                      className="inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[12px] text-[#3370ff] cursor-grab active:cursor-grabbing hover:bg-[#e0edff] transition-colors"
+                    >
+                      {p.nickname}
+                    </span>
+                  ))}
+                </div>
+              ) : undefined}
             />
           )}
         </div>

@@ -275,6 +275,44 @@ def _count_activity_days(customer_id: str, all_class_records, all_group_cases,
     return len(active_dates)
 
 
+def _apply_member_type(customer, member_type: str, matched_identity: Optional[MemberIdentity]) -> None:
+    """保存系统判定的会员身份，并留下可追溯的系统操作记录。"""
+    previous_type = customer.member_type or ""
+    if previous_type == member_type:
+        return
+
+    customer_service.update_customer(customer.id, CustomerUpdate(member_type=member_type))
+    try:
+        from app.models.operation_log import OperationLogCreate
+        from app.services.operation_log_service import create_log
+
+        customer_name = customer.nickname or customer.name or customer.id[:8]
+        previous_label = previous_type or "未设置"
+        next_label = member_type or "未设置"
+        reason = (
+            f"命中会员身份“{matched_identity.name}”的系统规则"
+            if matched_identity
+            else "当前未命中任何会员身份规则"
+        )
+        create_log(
+            OperationLogCreate(
+                section="客户资料",
+                content=f"客户“{customer_name}”：会员身份变更：{previous_label} → {next_label}（{reason}）",
+            ),
+            extra={
+                "source": "system",
+                "method": "PATCH",
+                "path": f"/api/customers/{customer.id}/member-identity",
+                "entity_id": customer.id,
+                "before_data": {"nickname": customer_name, "member_type": previous_type},
+                "after_data": {"nickname": customer_name, "member_type": member_type},
+            },
+        )
+    except Exception:
+        # 身份判定是主流程，日志异常不能影响业务数据保存。
+        pass
+
+
 def refresh_member_type(customer_id: str):
     """根据管理员已配置的身份规则刷新 member_type，不从卡类型名称推测或补建规则。"""
     customer = customer_service.get_customer(customer_id)
@@ -296,10 +334,10 @@ def refresh_member_type(customer_id: str):
         internal_course_service,
         internal_course_session_service,
         membership_card_service,
+        offline_course_service,
         oh_card_reading_service,
         other_project_service,
         tea_seat_fee_service,
-        offline_course_service,
         visit_service,
     )
 
@@ -377,9 +415,11 @@ def refresh_member_type(customer_id: str):
 
     # 按 sort_order 顺序匹配，第一条命中即为身份
     member_type = ""
+    matched_identity: Optional[MemberIdentity] = None
     for identity in identities:
         if not identity.conditions:
             member_type = identity.name
+            matched_identity = identity
             break
         results = [_check_condition(cond, customer_id, arrival_count, activity_count,
                                     customer_cards, customer_courses,
@@ -395,10 +435,10 @@ def refresh_member_type(customer_id: str):
             matched = all(results)
         if matched:
             member_type = identity.name
+            matched_identity = identity
             break
 
-    if customer.member_type != member_type:
-        customer_service.update_customer(customer_id, CustomerUpdate(member_type=member_type))
+    _apply_member_type(customer, member_type, matched_identity)
 
 
 def refresh_all():
@@ -414,10 +454,10 @@ def refresh_all():
         internal_course_service,
         internal_course_session_service,
         membership_card_service,
+        offline_course_service,
         oh_card_reading_service,
         other_project_service,
         tea_seat_fee_service,
-        offline_course_service,
         visit_service,
     )
 
@@ -550,9 +590,11 @@ def refresh_all():
         customer_total_payment = max(customer_total_payment, 0)
 
         member_type = ""
+        matched_identity: Optional[MemberIdentity] = None
         for identity in identities:
             if not identity.conditions:
                 member_type = identity.name
+                matched_identity = identity
                 break
             results = [_check_condition(cond, c.id, arrival_count, activity_count,
                                         customer_cards, customer_courses,
@@ -568,7 +610,7 @@ def refresh_all():
                 matched = all(results)
             if matched:
                 member_type = identity.name
+                matched_identity = identity
                 break
 
-        if c.member_type != member_type:
-            customer_service.update_customer(c.id, CustomerUpdate(member_type=member_type))
+        _apply_member_type(c, member_type, matched_identity)

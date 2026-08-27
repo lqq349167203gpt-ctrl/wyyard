@@ -12,10 +12,12 @@ from app.utils.request_context import get_client_ip
 SECTION_MAP = {
     "/api/tea-guest/consumption-records": "茶客业务 · 消费记录",
     "/api/tea-guest/expenses": "茶客业务 · 支出",
+    "/api/custom-analysis": "自定义筛选",
     "/api/financial/commissions": "分成",
     "/api/financial/staff-benefits": "人员福利",
     "/api/customers": "客户资料",
     "/api/visits": "邀约",
+    "/api/visit-notes": "邀约",
     "/api/healing-records": "客户资料",
     "/api/courses": "活动配置",
     "/api/course-types": "活动配置",
@@ -23,6 +25,7 @@ SECTION_MAP = {
     "/api/member-identities": "会员身份",
     "/api/customer-tags": "客户标签",
     "/api/activity-permissions": "课表",
+    "/api/activity-orders": "课表",
     "/api/membership-cards": "付费项目",
     "/api/group-cases": "课表",
     "/api/group-case-sessions": "课表",
@@ -53,7 +56,7 @@ SECTION_MAP = {
     "/api/business-reminders": "提醒",
     "/api/activity-themes": "课表",
     "/api/organizations": "组织信息",
-    "/api/activity-history": "邀约",
+    "/api/activity-history": "课表",
     "/api/visit-history": "邀约",
     "/api/communication-records": "沟通记录",
     "/api/offline-courses": "付费项目",
@@ -89,6 +92,7 @@ GETTER_MAP = {
     "/api/class-records": ("课表", "class_record_service", "get_record"),
     "/api/accounts": ("账号管理", "account_service", "get_account"),
     "/api/visits": ("邀约", "visit_service", "get_visit"),
+    "/api/visit-notes": ("邀约", "visit_note_service", "get_note"),
     "/api/daily-groupings": ("邀约", "daily_grouping_service", "get_grouping"),
     "/api/positions": ("账号管理", "position_service", "get_position"),
     "/api/position-permissions": ("账号管理", "position_permission_service", "get_permissions"),
@@ -111,6 +115,7 @@ PAGE_LABELS: dict[str, str] = {
     "tea-guest-consumption-records": "茶客业务 · 消费记录",
     "tea-guest-expenses": "茶客业务 · 支出",
     "dashboard": "工作台",
+    "custom-analysis": "自定义筛选",
     "customers": "客户资料",
     "healing-records": "客户资料",
     "activity-records": "数据记录",
@@ -148,6 +153,7 @@ PAGE_LABELS: dict[str, str] = {
     "system-logs": "系统日志",
     "operation-logs": "操作日志",
     "login-records": "使用统计",
+    "analysis-logs": "分析日志",
     "accounts": "账号管理",
     "change-password": "密码修改",
     "member-identities": "会员身份",
@@ -164,7 +170,7 @@ PAGE_LABELS: dict[str, str] = {
     "business-reminders": "提醒",
     "activity-themes": "课表",
     "organizations": "组织信息",
-    "activity-history": "邀约",
+    "activity-history": "课表",
     "visit-history": "邀约",
     "offline-courses": "付费项目",
     "expenses": "支出项",
@@ -226,7 +232,7 @@ FIELD_NAMES = {
     "id": "记录编号", "project_id": "项目编号", "project_type": "项目类型",
     "nickname": "昵称", "name": "名称", "title": "标题", "username": "用户名", "owner": "归属人",
     "phone": "手机", "email": "邮箱", "gender": "性别", "birthday": "生日",
-    "member_type": "会员类型", "activity_types": "活动类型", "member_identity": "会员身份", "healing_identity": "疗愈老师",
+    "member_type": "会员身份", "activity_types": "活动类型", "member_identity": "会员身份", "healing_identity": "疗愈老师",
     "note": "备注", "description": "描述", "content": "内容", "section": "板块",
     "status": "状态", "type": "类型", "date": "日期", "start_time": "开始时间",
     "end_time": "结束时间", "teacher_ids": "课程老师", "course_name": "沙龙名称",
@@ -242,8 +248,8 @@ FIELD_NAMES = {
     "cost_category": "成本分类", "expense_type": "支出类型", "month": "分成月份",
     "person_name": "人员", "benefit_date": "福利日期",
     "sort_order": "排序", "is_public_welfare": "公益",
-    "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "疗愈师回复",
-    "needs": "需求", "visit_date": "到访日期",
+    "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "客户信息",
+    "needs": "来访需求", "visit_date": "到访日期",
     "visit_time": "预计时间", "customer_id": "客户",
     "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "角色", "permissions": "权限",
     "groups": "分组", "materials": "资料", "images": "图片",
@@ -264,9 +270,10 @@ FIELD_NAMES = {
     "wechat": "微信", "core_situation": "核心情况",
     "deal_date": "成交日期", "last_visit_date": "最近到店", "other_info": "其他信息",
     "service_teacher": "服务老师", "is_leader": "组长",
-    "need_tags": "需求标签", "follow_up_node": "跟进节点", "follow_up_status": "跟进状态",
+    "need_tags": "需求标签", "follow_up_node": "跟进节点", "follow_up_status": "跟进阶段",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
+    "edit_permissions": "信息编辑范围",
     "operator": "匹配方式", "conditions": "匹配条件",
     "customers": "客户信息可见身份", "class_records": "人员安排可见身份", "payment": "付费项目可见身份",
     "purchase_count": "购买次数", "closer_name": "成交人", "closer_id": "成交人", "closers": "成交人", "category": "分类",
@@ -278,7 +285,8 @@ FIELD_NAMES = {
     "effective_date": "生效日期", "organization_id": "组织", "rooms": "房间", "teachers": "老师", "themes": "主题",
     "enabled": "启用状态", "is_system": "系统角色",
     "daily_card_usage": "日卡使用",
-    "healing_notes": "疗愈笔记", "activity_count": "活动次数", "welfare_count": "公益次数",
+    "healing_notes": "跟进点", "activity_count": "活动次数", "welfare_count": "公益次数",
+    "visit_id": "邀约记录", "category_label": "记录类型",
     "activities": "活动记录",
     "provider": "模型供应商", "model": "模型", "api_key": "API密钥", "base_url": "接口地址",
     "system_prompt": "系统提示词", "temperature": "温度", "max_tokens": "最大Token数",
@@ -287,7 +295,7 @@ FIELD_NAMES = {
     "duration_type": "时长类型", "duration_value": "时长值",
     "record_date": "上课日期", "teacher": "课程老师", "result": "课程结果",
     "validity_value": "有效期", "validity_unit": "有效期单位",
-    "created_by": "创建人", "created_at": "创建时间", "updated_at": "更新时间",
+    "created_by": "创建人", "created_by_id": "创建账号编号", "created_at": "创建时间", "updated_at": "更新时间",
     "is_deleted": "是否删除", "deleted_at": "删除时间", "voided": "是否退费", "voided_at": "退费时间",
 }
 
@@ -338,17 +346,15 @@ def get_before_data(path: str, entity_id: str, body: dict = None) -> dict:
     body = body or {}
     clean_path = re.sub(r"/[a-f0-9-]+$", "", path)
 
-    # position-permissions full: merge page permissions and customer permissions
+    # position-permissions full: 页面权限与跨创建人编辑范围
     if "/api/position-permissions/full" in path:
         position = body.get("position", "")
         if position:
             try:
-                from app.services import position_customer_permission_service, position_permission_service
+                from app.services import position_edit_permission_service, position_permission_service
                 pages = position_permission_service.get_permissions(position)
-                c = position_customer_permission_service.get_customer_permissions("customers", position)
-                cr = position_customer_permission_service.get_customer_permissions("class_records", position)
-                p = position_customer_permission_service.get_customer_permissions("payment", position)
-                return {"position": position, "pages": pages, "customers": c, "class_records": cr, "payment": p}
+                edit_permissions = position_edit_permission_service.get_permissions(position)
+                return {"position": position, "pages": pages, "edit_permissions": edit_permissions}
             except Exception:
                 pass
         return None
@@ -496,7 +502,25 @@ VALUE_LABELS = {
     "True": "是", "False": "否",
     "true": "是", "false": "否",
     "offline": "线下", "online": "线上",
+    "own": "仅本人录入", "all": "全部记录",
 }
+
+EDIT_PERMISSION_LABELS = {
+    "visits": "邀约编辑范围",
+    "activities": "课表编辑范围",
+}
+
+
+def _format_edit_permission_changes(old_value: object, new_value: object) -> list[str]:
+    old_permissions = old_value if isinstance(old_value, dict) else {}
+    new_permissions = new_value if isinstance(new_value, dict) else {}
+    changes = []
+    for key, label in EDIT_PERMISSION_LABELS.items():
+        old_scope = VALUE_LABELS.get(str(old_permissions.get(key, "own")), "仅本人录入")
+        new_scope = VALUE_LABELS.get(str(new_permissions.get(key, "own")), "仅本人录入")
+        if old_scope != new_scope:
+            changes.append(f"{label}({old_scope}→{new_scope})")
+    return changes
 
 def _format_value(val, field_name: str = "") -> str:
     if val is None or val == "" or val == []:
@@ -622,6 +646,11 @@ def _build_set_summary(after: dict) -> str:
     for key, new_val in after.items():
         if key in ("id", "created_at", "updated_at"):
             continue
+        if key == "edit_permissions" and isinstance(new_val, dict):
+            changes = _format_edit_permission_changes({}, new_val)
+            if changes:
+                parts.extend(changes)
+            continue
         field_name = FIELD_NAMES.get(key, key)
         if isinstance(new_val, dict) and any(isinstance(v, dict) for v in new_val.values()):
             # 活动权限格式：{member_type: {activity_type: {view, participate}}}
@@ -657,6 +686,9 @@ def build_change_description(before: dict, after: dict) -> str:
             continue
         old_val = before.get(key)
         if old_val == new_val:
+            continue
+        if key == "edit_permissions" and isinstance(new_val, dict):
+            changes.extend(_format_edit_permission_changes(old_val, new_val))
             continue
         if key == "groups" and isinstance(old_val, list) and isinstance(new_val, list):
             diff = _diff_groups(old_val, new_val)
@@ -797,11 +829,20 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     if not entity_name and before:
         entity_name = get_entity_name(before)
 
-    # 邀约排序使用 POST 只是接口实现细节，不是新增邀约。
-    # 记录数量便于审计，但不把无业务含义的记录 ID 列表写进日志。
-    if path.rstrip("/") == "/api/visits/reorder":
-        ids = body.get("ids", []) if isinstance(body, dict) else []
-        return f"调整邀约排序（{len(ids)}条记录）" if ids else "调整邀约排序"
+    # 排序使用 POST 只是接口实现细节，不是新增记录。优先记录具体移动内容，
+    # 旧客户端未传移动上下文时仍保留可读的数量摘要，不暴露原始 ID。
+    reorder_path = path.rstrip("/")
+    if reorder_path in ("/api/visits/reorder", "/api/activity-orders"):
+        section = "邀约" if reorder_path == "/api/visits/reorder" else "课表"
+        moved_name = str(body.get("moved_name") or "").strip() if isinstance(body, dict) else ""
+        from_position = body.get("from_position") if isinstance(body, dict) else None
+        to_position = body.get("to_position") if isinstance(body, dict) else None
+        if moved_name and from_position is not None and to_position is not None:
+            return f"调整{section}排序：将“{moved_name}”从第{from_position}位移动到第{to_position}位"
+        item_ids = body.get("ids", []) if isinstance(body, dict) else []
+        item_order = body.get("order", []) if isinstance(body, dict) else []
+        count = len(item_ids or item_order)
+        return f"调整{section}排序（{count}条记录）" if count else f"调整{section}排序"
 
     if path.startswith("/api/financial/commissions"):
         return _build_financial_record_content(method, "commission", body or {}, before or {})
@@ -1113,7 +1154,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
                 return f"活动权限：{desc}"
         return "更新活动权限配置"
 
-    # 角色完整权限：合并页面权限和用户信息权限
+    # 角色完整权限：合并页面权限和信息编辑范围
     if "/api/position-permissions/full" in path:
         position = body.get("position", "")
         desc = build_change_description(before or {}, body)
@@ -1396,7 +1437,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             after_data = body.get("permissions", body) if body else None
             if isinstance(log_context, dict) and "after_data" in log_context:
                 after_data = log_context["after_data"]
-            if path.rstrip("/") == "/api/visits/reorder":
+            if path.rstrip("/") in ("/api/visits/reorder", "/api/activity-orders"):
                 after_data = None
             if after_data:
                 after_data = _scrub_sensitive(after_data)

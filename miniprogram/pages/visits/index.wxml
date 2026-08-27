@@ -17,11 +17,16 @@
       </picker>
     </view>
     <view class="head-row2">
-      <view class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
-        <text>{{editMode ? '完成' : '排序'}}</text>
+      <view class="head-summary">
+        今日 <text class="summary-count">{{todayVisitCount}}</text> 位邀约 · <text class="summary-count">{{todayArrivedCount}}</text> 已到店
       </view>
-      <view class="export-btn" catchtap="onExportTap">
-        <text>导出</text>
+      <view class="head-actions">
+        <view class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
+          <text>{{editMode ? '完成' : '排序'}}</text>
+        </view>
+        <view class="export-btn" catchtap="onExportTap">
+          <text>导出</text>
+        </view>
       </view>
     </view>
     <!-- 下拉日历 -->
@@ -60,6 +65,9 @@
       visit="{{item}}"
       leader-name="{{leaderMap[item.customer_id] || ''}}"
       edit-mode="{{editMode}}"
+      editable="{{item.can_edit}}"
+      sortable="{{true}}"
+      arrival-editable="{{!item.cancelled}}"
       can-move-up="{{index > 0}}"
       can-move-down="{{index < visits.length - 1}}"
       bind:cardtap="onVisitTap"

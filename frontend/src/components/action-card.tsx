@@ -32,7 +32,7 @@ const FIELD_LABELS: Record<string, string> = {
   visit_date: "到访日期",
   visit_time: "到访时间",
   activity_type: "活动类型",
-  needs: "需求",
+  needs: "来访需求",
   card_type: "卡类型",
   price: "价格",
   effective_date: "生效日期",

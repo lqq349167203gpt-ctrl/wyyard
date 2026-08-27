@@ -106,10 +106,12 @@ def update_position(position_id: str, data: PositionUpdate) -> Optional[Position
     if old_name and old_name != position.name:
         from app.services import account_service
         from app.services.position_customer_permission_service import rename_position_in_permissions as rename_pcp
+        from app.services.position_edit_permission_service import rename_position_in_permissions as rename_pep
         from app.services.position_page_permission_service import rename_position_in_page_permissions as rename_ppp
         from app.services.position_permission_service import rename_position_in_permissions as rename_pp
         rename_pp(old_name, position.name)
         rename_pcp(old_name, position.name)
+        rename_pep(old_name, position.name)
         rename_ppp(old_name, position.name)
         for acc in account_service.list_accounts():
             if acc.role == old_name:
@@ -134,4 +136,6 @@ def delete_position(position_id: str) -> bool:
         position.is_deleted = True
         position.deleted_at = datetime.now(timezone.utc)
         _save(position_id)
+    from app.services.position_edit_permission_service import remove_position_from_permissions
+    remove_position_from_permissions(position.name)
     return True

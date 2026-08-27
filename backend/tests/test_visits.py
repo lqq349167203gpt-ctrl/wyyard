@@ -1,5 +1,4 @@
 """到访记录 API 测试"""
-import pytest
 
 
 class TestVisitCRUD:
@@ -66,7 +65,7 @@ class TestVisitCRUD:
         assert data["arrived"] is True
         assert data["needs"] == "放松身心"
         assert data["experience"] == "体验很好"
-        assert data["feedback"] == "感谢反馈"
+        assert data["feedback"].endswith("不闹：感谢反馈")
 
     def test_update_visit_not_found(self, client):
         resp = client.patch("/api/visits/nonexistent-id", json={"arrived": True})

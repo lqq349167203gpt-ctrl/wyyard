@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Query
-from app.models.base import StrictBaseModel
 from typing import List, Optional
 
+from fastapi import APIRouter, Query
+
+from app.models.base import StrictBaseModel
 from app.services import activity_order_service
 
 router = APIRouter(prefix="/api/activity-orders", tags=["activity-orders"])
@@ -11,6 +12,9 @@ class SaveOrderRequest(StrictBaseModel):
     date: str
     space_id: str = ""
     order: List[str]
+    moved_name: str = ""
+    from_position: Optional[int] = None
+    to_position: Optional[int] = None
 
 
 @router.get("")

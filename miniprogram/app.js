@@ -19,6 +19,7 @@ App({
     token: '',
     currentUser: null,
     permissions: [],
+    editPermissions: { visits: 'own', activities: 'own' },
     // 开发模式开关：手动维护，提审前必须为 false（check-release.sh 强制拦截）
     devMode: DEV,
     _selectedActivity: null,
@@ -41,6 +42,7 @@ App({
         this.globalData.token = token
         this.globalData.currentUser = user
         this.globalData.permissions = wx.getStorageSync('userPermissions') || []
+        this.globalData.editPermissions = wx.getStorageSync('userEditPermissions') || { visits: 'own', activities: 'own' }
       }
       this.globalData._loginReady = Promise.resolve()
     }
@@ -140,8 +142,11 @@ App({
     const { positionPermissionApi } = require('./utils/api')
     const result = await positionPermissionApi.get(user.role)
     const permissions = (result && result.pages) || []
+    const editPermissions = (result && result.edit_permissions) || { visits: 'own', activities: 'own' }
     this.globalData.permissions = permissions
+    this.globalData.editPermissions = editPermissions
     wx.setStorageSync('userPermissions', permissions)
+    wx.setStorageSync('userEditPermissions', editPermissions)
     return permissions
   },
 
@@ -152,6 +157,7 @@ App({
       wx.removeStorageSync('auth_token')
       wx.removeStorageSync('currentUser')
       wx.removeStorageSync('userPermissions')
+      wx.removeStorageSync('userEditPermissions')
       this.globalData.token = ''
       this.globalData.currentUser = null
       const { authApi } = require('./utils/api')
@@ -162,9 +168,11 @@ App({
       this.globalData.token = data.token
       this.globalData.currentUser = data.account
       this.globalData.permissions = data.permissions || []
+      this.globalData.editPermissions = data.edit_permissions || { visits: 'own', activities: 'own' }
       wx.setStorageSync('auth_token', data.token)
       wx.setStorageSync('currentUser', data.account)
       wx.setStorageSync('userPermissions', data.permissions)
+      wx.setStorageSync('userEditPermissions', this.globalData.editPermissions)
       console.log('[dev-login] token 已存入 storage')
       this.scheduleUsageTracking()
     } catch (err) {
@@ -205,9 +213,11 @@ App({
     wx.removeStorageSync('auth_token')
     wx.removeStorageSync('currentUser')
     wx.removeStorageSync('userPermissions')
+    wx.removeStorageSync('userEditPermissions')
     this.globalData.token = ''
     this.globalData.currentUser = null
     this.globalData.permissions = []
+    this.globalData.editPermissions = { visits: 'own', activities: 'own' }
     wx.reLaunch({ url: '/pages/login/index' })
   },
 })

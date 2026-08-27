@@ -191,7 +191,7 @@ def set_customer_tags(customer_id: str, data: CustomerTagAssignmentUpdate, reque
     removed_names = sorted(before_names - after_names)
     changes: list[str] = []
     if added_names:
-        changes.append(f"添加标签“{'、'.join(added_names)}”")
+        changes.append(f"新增标签“{'、'.join(added_names)}”")
     if removed_names:
         changes.append(f"移除标签“{'、'.join(removed_names)}”")
     if not changes:
@@ -201,7 +201,7 @@ def set_customer_tags(customer_id: str, data: CustomerTagAssignmentUpdate, reque
     _set_operation_log_context(
         request,
         entity_id=customer_id,
-        content=f"客户“{customer_name}”：{'；'.join(changes)}",
+        content=f"客户“{customer_name}”：调整客户标签：{'；'.join(changes)}",
         before_data=_assignment_snapshot(customer_name, before_tags),
         after_data=_assignment_snapshot(customer_name, after_tags),
     )

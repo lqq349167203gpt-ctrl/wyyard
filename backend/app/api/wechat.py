@@ -7,7 +7,7 @@ from app.services import (
     account_service,
     customer_service,
     login_record_service,
-    position_customer_permission_service,
+    position_edit_permission_service,
     position_permission_service,
     wechat_service,
 )
@@ -32,23 +32,17 @@ def _build_login_response(account) -> dict:
     account_data.pop("password", None)
 
     if account.role == "超级管理员":
-        from app.services import member_identity_service
-        all_identities = [i.name for i in member_identity_service.list_identities()]
         return {
             "account": account_data,
             "permissions": ALL_PAGE_KEYS,
-            "customer_permissions": all_identities,
-            "customer_permissions_class_records": all_identities,
-            "customer_permissions_payment": all_identities,
+            "edit_permissions": position_edit_permission_service.get_permissions(account.role),
         }
 
     permissions = position_permission_service.get_permissions(account.role)
     return {
         "account": account_data,
         "permissions": permissions,
-        "customer_permissions": position_customer_permission_service.get_customer_permissions("customers", account.role),
-        "customer_permissions_class_records": position_customer_permission_service.get_customer_permissions("class_records", account.role),
-        "customer_permissions_payment": position_customer_permission_service.get_customer_permissions("payment", account.role),
+        "edit_permissions": position_edit_permission_service.get_permissions(account.role),
     }
 
 

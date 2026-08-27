@@ -15,7 +15,6 @@ import {
 import { visitApi, customerApi, accountApi, visitHistoryApi, type VisitRecord, type CustomerLight, type CustomerCreate, type VisitHistoryRecord } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
-import { useCustomerPermissions } from "@/hooks/use-customer-permissions"
 import { BatchInputTable, type VisitHistoryEntry, type VisitChangedCell } from "./batch-input-table"
 
 // ===== 三级手风琴组件（天→小时→条目）=====
@@ -118,7 +117,6 @@ interface DetailViewProps {
   onExternalDateChange?: (date: string) => void
   hideDateBar?: boolean
   onCustomerClick?: (customerId: string) => void
-  onCustomerEdit?: (customerId: string) => void
   onActivityClick?: (customerId: string) => void
   onDataLoaded?: (visits: VisitRecord[]) => void
   spaceId?: string
@@ -126,7 +124,7 @@ interface DetailViewProps {
   groups?: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onCustomerEdit, onActivityClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -347,7 +345,6 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
   }, [])
 
-  const { permissions: cp, ready: permReady } = useCustomerPermissions("class_records")
   const [customerListReady, setCustomerListReady] = useState(false)
 
   const visibleIds = useMemo(() => new Set(customerList.map(c => c.id)), [customerList])
@@ -405,13 +402,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
   }, [visits, onDataLoaded, customerListReady])
 
-  // 加载每日到场人数，使用 member_types + 日期范围做权限过滤
+  // 加载每日到场人数
   const countsRetryRef = useRef(0)
   const refreshCounts = () => {
     const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
-    const memberTypes = cp.join(",")
     const load = () => {
-      visitApi.counts({ memberTypes: memberTypes || undefined, startDate: dateRangeStart, endDate, spaceId })
+      visitApi.counts({ startDate: dateRangeStart, endDate, spaceId })
         .then(setDailyCounts)
         .catch(() => {
           if (countsRetryRef.current < 2) {
@@ -428,22 +424,16 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         .catch(() => {})
     }
   }
-  useEffect(() => { if (permReady) refreshCounts() }, [permReady, dateRangeStart, cp])
+  useEffect(() => { refreshCounts() }, [dateRangeStart, spaceId])
 
   // 加载客户列表供搜索组件使用
   const customerRetryRef = useRef(0)
   useEffect(() => {
-    if (!permReady) return
     let cancelled = false
     const load = () => {
       customerApi.light().then((data) => {
         if (cancelled) return
-        let filtered = data
-        const cu = JSON.parse(localStorage.getItem("currentUser") || "{}")
-        if (cu.role !== "超级管理员") {
-          filtered = data.filter(c => !c.member_type || cp.includes(c.member_type))
-        }
-        setCustomerList(filtered)
+        setCustomerList(data)
         setCustomerListReady(true)
       }).catch(() => {
         if (!cancelled && customerRetryRef.current < 2) {
@@ -456,7 +446,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
     load()
     return () => { cancelled = true }
-  }, [permReady, cp])
+  }, [])
 
   const handleAdd = async () => {
     if (onRequireSpaces) {
@@ -571,7 +561,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         "预计时间": v.visit_time || "",
         "参与次数": v.visit_count || 0,
         "会员身份": v.member_type || "",
-        "当日需求": v.needs || "",
+        "来访需求": v.needs || "",
         "组长情况": role || "-",
         "组长获得的信息": "",
         "邀约人": v.referrer_handler || "",
@@ -638,10 +628,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   }
 
   return (
-    <div className="w-full space-y-3 transition-[padding] duration-200" style={{ paddingRight: historyPanelOpen ? 320 : 0 }}>
+    <div className="flex h-full min-h-0 w-full flex-col gap-3 transition-[padding] duration-200" style={{ paddingRight: historyPanelOpen ? 320 : 0 }}>
       {/* 日期条 */}
       {!hideDateBar && (
-      <div className="flex items-center gap-1 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-1 px-3 py-2">
         <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={() => setDateRangeStart(formatDate(addDays(new Date(dateRangeStart), -7)))}>
           <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
         </button>
@@ -680,50 +670,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       )}
 
       {/* 到场人员列表 */}
-      <div className="bg-white rounded-lg overflow-x-clip">
-        <div className="px-4 py-3 flex items-center justify-between overflow-visible">
-          <div className="flex items-center shrink-0">
-            <span className="text-xs font-medium text-[#2b2f36]">预计到场</span>
-            <span className="text-xs text-[#2b2f36] ml-2">{filteredVisits.filter(visit => !visit.cancelled).length} 人</span>
-            {savingCount > 0 ? (
-              <span className="text-[11px] text-[#3370ff] ml-3">保存中...</span>
-            ) : tableSavedCount > 0 ? (
-              <span className="text-[11px] text-[#8f959e] ml-3">已保存在云端</span>
-            ) : null}
-            <button className="h-[22px] text-[11px] text-[#8f959e] hover:text-[#4e535a] ml-[18px] flex items-center gap-1 border-[0.5px] border-[#d0d3d6] rounded px-2" onClick={handleExport}>
-              <Download className="h-3 w-3" /> 导出
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            {/* 历史记录/撤回/重做按钮 */}
-            <button
-              onClick={() => {
-                if (previewEntry) { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }
-                else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
-              }}
-              className={`h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] ${historyPanelOpen ? "bg-[#f0f0f0]" : ""}`}
-              title="历史记录"
-            >
-              <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
-            </button>
-            <button
-              onClick={undo}
-              disabled={!canUndo || !!previewEntry}
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-              title="撤回 (Ctrl+Z)"
-            >
-              <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-            </button>
-            <button
-              onClick={redo}
-              disabled={!canRedo || !!previewEntry}
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
-              title="重做 (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-            </button>
-          </div>
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-white">
         <BatchInputTable
           date={selectedDate}
           customers={customerList}
@@ -733,7 +680,6 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           onSavedCountChange={setTableSavedCount}
           onSavingCountChange={setSavingCount}
           onCustomerClick={onCustomerClick}
-          onCustomerEdit={onCustomerEdit}
           onActivityClick={onActivityClick}
           onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }}
           onUndoRedoChange={handleUndoRedoChange}
@@ -745,6 +691,60 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           previewChangedCells={computedChangedCells}
           locked={!!previewEntry}
           onClosePreview={() => { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}
+          toolbarLeading={(
+            <>
+              <span className="text-[12px] font-medium text-[#2b2f36]">
+                到场 {filteredVisits.filter(visit => !visit.cancelled).length} 人
+              </span>
+              {savingCount > 0 ? (
+                <span className="hidden items-center gap-1 text-[11px] text-[#8f959e] min-[1100px]:inline-flex">
+                  <span className="h-[5px] w-[5px] rounded-full bg-[#3370ff]" />
+                  保存中
+                </span>
+              ) : tableSavedCount > 0 ? (
+                <span className="hidden items-center gap-1 text-[11px] text-[#8f959e] min-[1100px]:inline-flex">
+                  <span className="h-[5px] w-[5px] rounded-full bg-[#639922]" />
+                  已保存
+                </span>
+              ) : null}
+            </>
+          )}
+          toolbarTrailing={(
+            <>
+              <button className="flex h-[22px] items-center gap-1 rounded border-[0.5px] border-[#d0d3d6] px-2 text-[11px] text-[#8f959e] hover:bg-[#f5f6f7] hover:text-[#4e535a]" onClick={handleExport}>
+                <Download className="h-3 w-3" /> 导出
+              </button>
+              <span className="h-3.5 w-px shrink-0 bg-[#e8eaed]" aria-hidden="true" />
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    if (previewEntry) { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }
+                    else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
+                  }}
+                  className={`flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] ${historyPanelOpen ? "bg-[#f0f0f0]" : ""}`}
+                  title="历史记录"
+                >
+                  <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
+                </button>
+                <button
+                  onClick={undo}
+                  disabled={!canUndo || !!previewEntry}
+                  className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
+                  title="撤回 (Ctrl+Z)"
+                >
+                  <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+                </button>
+                <button
+                  onClick={redo}
+                  disabled={!canRedo || !!previewEntry}
+                  className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
+                  title="重做 (Ctrl+Shift+Z)"
+                >
+                  <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
+                </button>
+              </div>
+            </>
+          )}
         />
       </div>
 
@@ -830,11 +830,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 修改需求弹窗 */}
+      {/* 修改来访需求弹窗 */}
       <Dialog open={!!editVisit} onOpenChange={(open) => !open && setEditVisit(null)}>
         <DialogContent className="w-[480px] max-w-[90vw] p-0 gap-0">
           <DialogHeader className="px-6 pt-3 pb-2 border-b border-[#f0f0f0]">
-            <DialogTitle className="text-[14px] font-normal">修改需求</DialogTitle>
+            <DialogTitle className="text-[14px] font-normal">修改来访需求</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -846,8 +846,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <Input rounded="[2px]" type="date" value={editDate} disabled className="h-8 text-xs" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-xs text-[#4e535a] font-light text-right tracking-widest pt-2">需求</span>
-              <Textarea value={editNeeds} onChange={(e) => setEditNeeds(e.target.value)} rows={2} className="resize-none text-xs" placeholder="请输入需求" />
+              <span className="text-xs text-[#4e535a] font-light text-right tracking-widest pt-2">来访需求</span>
+              <Textarea value={editNeeds} onChange={(e) => setEditNeeds(e.target.value)} rows={2} className="resize-none text-xs" placeholder="请输入来访需求" />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-[#f0f0f0]">
               <Button variant="outline" size="sm" onClick={() => setEditVisit(null)}>取消</Button>

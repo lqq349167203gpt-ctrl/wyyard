@@ -87,7 +87,7 @@
             <view class="arrow {{item.open ? 'up' : ''}}"></view>
           </view>
         </view>
-        <view class="c-l3"><text class="k">当日需求</text><text class="v">{{item.needText || ''}}<text class="dash" wx:if="{{!item.needText}}">-</text></text></view>
+        <view class="c-l3"><text class="k">来访需求</text><text class="v">{{item.needText || ''}}<text class="dash" wx:if="{{!item.needText}}">-</text></text></view>
         <view class="c-detail">
           <view class="d-row"><text class="d-label">客户信息</text><text class="d-val">{{item.infoText || ''}}<text class="dash" wx:if="{{!item.infoText}}">-</text></text></view>
           <view class="d-row"><text class="d-label">跟进点</text><text class="d-val">{{item.followText || ''}}<text class="dash" wx:if="{{!item.followText}}">-</text></text></view>

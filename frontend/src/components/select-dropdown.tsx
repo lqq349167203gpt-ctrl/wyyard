@@ -28,6 +28,8 @@ interface SelectDropdownSingleProps {
   portalContainer?: HTMLElement | null
   dropdownWidth?: number
   menuMaxHeight?: number
+  singleLineMulti?: boolean
+  triggerLabel?: string
 }
 
 interface SelectDropdownMultiProps {
@@ -49,6 +51,8 @@ interface SelectDropdownMultiProps {
   portalContainer?: HTMLElement | null
   dropdownWidth?: number
   menuMaxHeight?: number
+  singleLineMulti?: boolean
+  triggerLabel?: string
 }
 
 type SelectDropdownProps = SelectDropdownSingleProps | SelectDropdownMultiProps
@@ -74,6 +78,8 @@ export function SelectDropdown({
   portalContainer,
   dropdownWidth,
   menuMaxHeight = 200,
+  singleLineMulti = false,
+  triggerLabel,
 }: SelectDropdownProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -263,14 +269,21 @@ export function SelectDropdown({
     <div ref={rootRef} data-dropdown className={`relative ${className}`}>
       <button type="button"
         style={{ borderRadius: radiusValue }}
-        className={`flex items-center justify-between w-full border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${buttonClassName}`}
+        className={`flex items-center justify-between w-full border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : singleLineMulti ? "h-8 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${buttonClassName}`}
         onMouseDown={handleToggle}
         disabled={disabled}
       >
-        {multi && currentLabels.length > 0 ? (
-          <div className="flex flex-wrap gap-1 py-1">
+        {triggerLabel ? (
+          <span className="truncate text-[#3370ff]">{triggerLabel}</span>
+        ) : multi && currentLabels.length > 0 ? (
+          <div
+            title={singleLineMulti ? currentLabels.join("、") : undefined}
+            className={singleLineMulti
+              ? "flex min-w-0 flex-1 flex-nowrap gap-1 overflow-x-auto whitespace-nowrap py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              : "flex flex-wrap gap-1 py-1"}
+          >
             {currentLabels.map((label, i) => (
-              <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#f0f1f2] text-[11px] text-[#2b2f36]">
+              <span key={i} className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#f0f1f2] px-1.5 py-0.5 text-[11px] text-[#2b2f36]">
                 {label}
                 <button type="button" className="text-[#8f959e] hover:text-[#f54a45]"
                   onMouseDown={(e) => { e.stopPropagation(); const arr = (value as string[]).filter((_, idx) => idx !== i); (onChange as (value: string[]) => void)(arr) }}>

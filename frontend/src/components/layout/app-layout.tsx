@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
 
 
 
+  "/custom-analysis": "无忧 - 自定义筛选",
   "/visits": "无忧 - 到场人员",
   "/healing-records": "无忧 - 客户信息",
   "/courses/class-records": "无忧 - 人员安排",
@@ -37,6 +38,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/organizations": "无忧 - 组织信息",
   "/operation-logs": "无忧 - 操作日志",
   "/login-records": "无忧 - 使用统计",
+  "/analysis-logs": "无忧 - 分析日志",
   "/referral-statistics": "无忧 - 引流统计",
   "/course-statistics": "无忧 - 课程",
   "/communication-records": "无忧 - 沟通记录",

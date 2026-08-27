@@ -7,6 +7,7 @@ const {
   BADGE_COLORS, ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
   SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
 } = require('../../utils/activity-constants')
+const { canEditRecord } = require('../../utils/record-ownership')
 
 const SOURCE_TO_TYPE = {
   class_record: 'class',
@@ -73,6 +74,8 @@ Page({
     loading: true,
     saving: false,
     deleting: false,
+    readOnly: false,
+    createdBy: '',
     _recordId: '',
     _source: '',
   },
@@ -99,6 +102,8 @@ Page({
     this._originalType = activityType
 
     const initData = {
+      readOnly: !canEditRecord(raw, 'activities'),
+      createdBy: raw.created_by || '',
       activityType,
       typeLabel,
       typeColor,
@@ -108,7 +113,9 @@ Page({
       startTime: raw.start_time || '09:00',
       endTime: raw.end_time || '10:00',
       activityName: raw.activity_name || raw.name || raw.course_name || '',
-      description: raw.description || raw.course_description || '',
+      description: activityType === 'eks'
+        ? (raw.course_description || '')
+        : (raw.description || raw.course_description || ''),
       deductionCount: this._parseEksDeductionCount(raw.description, activityType),
       ownerId: raw.owner_id || '',
       ownerName: raw.owner_name || '',
@@ -232,8 +239,14 @@ Page({
     this.setData({ date: e.detail.value })
     this.loadDayVisitors(e.detail.value)
   },
-  onStartTimeChange(e) { this.setData({ startTime: e.detail.value }) },
-  onEndTimeChange(e) { this.setData({ endTime: e.detail.value }) },
+  onStartTimeChange(e) {
+    if (this.data.readOnly) return
+    this.setData({ startTime: e.detail.value })
+  },
+  onEndTimeChange(e) {
+    if (this.data.readOnly) return
+    this.setData({ endTime: e.detail.value })
+  },
 
   onSpaceChange(e) {
     const spaceIndex = e.detail.value
@@ -249,6 +262,7 @@ Page({
   // ---------- 类型选择弹窗 ----------
 
   onTypePickerOpen() {
+    if (this.data.readOnly) return
     this.setData({ showTypePicker: true, typePickerStep: 1 })
   },
 
@@ -342,6 +356,7 @@ Page({
   },
 
   onPublicWelfareChange(e) {
+    if (this.data.readOnly) return
     this.setData({ isPublicWelfare: e.detail.value })
   },
 
@@ -411,6 +426,7 @@ Page({
   },
 
   onOwnerPickerOpen() {
+    if (this.data.readOnly) return
     const list = this.data.dayVisitors.map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
     this.setData({
       showPicker: true, pickerTitle: '案主', pickerMode: 'owner',
@@ -419,6 +435,7 @@ Page({
   },
 
   onTeacherPickerOpen() {
+    if (this.data.readOnly) return
     const { activityType } = this.data
     const position = TEACHER_POSITION[activityType] || ''
     const isSingle = SINGLE_TEACHER_TYPES.includes(activityType)
@@ -480,14 +497,17 @@ Page({
   },
 
   onOwnerClear() {
+    if (this.data.readOnly) return
     this.setData({ ownerId: '', ownerName: '' })
   },
 
   onTeacherClear() {
+    if (this.data.readOnly) return
     this.setData({ teacherIds: [], teacherNames: [], teacherDisplay: '' })
   },
 
   onAchieverClear() {
+    if (this.data.readOnly) return
     this.setData({ achieverId: '', achieverName: '' })
   },
 
@@ -496,11 +516,11 @@ Page({
   async onSave() {
     const { activityType } = this.data
 
-    if (activityType === 'class' && this.data.courseIndex < 0) {
+    if (!this.data.readOnly && activityType === 'class' && this.data.courseIndex < 0) {
       wx.showToast({ title: '请选择课程', icon: 'none' })
       return
     }
-    if (['gcs', 'ers', 'eks'].includes(activityType) && !this.data.ownerId) {
+    if (!this.data.readOnly && ['gcs', 'ers', 'eks'].includes(activityType) && !this.data.ownerId) {
       wx.showToast({ title: '请选择案主', icon: 'none' })
       return
     }
@@ -513,14 +533,16 @@ Page({
     const room = this.data.rooms[this.data.roomIndex]
     const baseFields = {
       date: this.data.date,
-      start_time: this.data.startTime || null,
-      end_time: this.data.endTime || null,
       space_id: space?.id || '',
       room_id: room?.id || '',
       room_name: room?.name || '',
       space_name: space?.name || '',
-      activity_mode: this.data.activityModes[this.data.activityModeIndex],
       participant_ids: this.data.participantIds,
+      ...(this.data.readOnly ? {} : {
+        start_time: this.data.startTime || null,
+        end_time: this.data.endTime || null,
+        activity_mode: this.data.activityModes[this.data.activityModeIndex],
+      }),
     }
 
     let payload
@@ -528,21 +550,24 @@ Page({
       case 'class': {
         const course = this.data.courses[this.data.courseIndex]
         payload = Object.assign({}, baseFields, {
+          is_published: this.data.isPublished,
+        }, this.data.readOnly ? {} : {
+          is_public_welfare: this.data.isPublicWelfare,
           course_id: '',
           course_name: course.name,
           activity_name: this.data.activityName || '',
           course_type: course.name,
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
-          is_public_welfare: this.data.isPublicWelfare,
           membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
-          is_published: this.data.isPublished,
         })
         break
       }
       case 'gcs':
       case 'ers':
         payload = Object.assign({}, baseFields, {
+          is_published: this.data.isPublished,
+        }, this.data.readOnly ? {} : {
           owner_id: this.data.ownerId,
           owner_name: this.data.ownerName,
           name: this.data.activityName,
@@ -551,11 +576,12 @@ Page({
           achiever_name: this.data.achieverName,
           teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
           membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
-          is_published: this.data.isPublished,
         })
         break
       case 'eks':
         payload = Object.assign({}, baseFields, {
+          is_published: this.data.isPublished,
+        }, this.data.readOnly ? {} : {
           owner_id: this.data.ownerId,
           owner_name: this.data.ownerName,
           name: this.data.activityName,
@@ -563,17 +589,17 @@ Page({
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
           membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
-          is_published: this.data.isPublished,
         })
         break
       case 'ics':
         payload = Object.assign({}, baseFields, {
+          is_published: this.data.isPublished,
+        }, this.data.readOnly ? {} : {
           course_name: this.data.activityName || this.data.icsCourseType || '',
           course_type: this.data.icsCourseType || '',
           course_description: this.data.description,
           teacher_ids: this.data.teacherIds,
           membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
-          is_published: this.data.isPublished,
         })
         break
     }
@@ -583,7 +609,7 @@ Page({
 
     this.setData({ saving: true })
     try {
-      const typeChanged = activityType !== this._originalType
+      const typeChanged = !this.data.readOnly && activityType !== this._originalType
       if (typeChanged) {
         // 类型变更：先创建新记录，成功后再删除旧记录（防止创建失败导致数据丢失）
         await api.create(payload)
@@ -612,6 +638,10 @@ Page({
   // ---------- 删除 ----------
 
   onDelete() {
+    if (this.data.readOnly) {
+      wx.showToast({ title: '只能删除自己创建的课表内容', icon: 'none' })
+      return
+    }
     wx.showModal({
       title: '确认删除',
       content: '删除后不可恢复，确定删除？',

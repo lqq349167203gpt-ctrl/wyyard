@@ -18,6 +18,7 @@ export function clearAuthState() {
   localStorage.removeItem("isLoggedIn")
   localStorage.removeItem("currentUser")
   localStorage.removeItem("userPermissions")
+  localStorage.removeItem("userEditPermissions")
   localStorage.removeItem("userCustomerPermissions")
   localStorage.removeItem("userCustomerPermissionsClassRecords")
   localStorage.removeItem("userCustomerPermissionsPayment")
@@ -277,7 +278,7 @@ export interface PaidContentItem {
   salesperson: string
 }
 
-export type CustomerFollowUpStatus = "新添加" | "沟通中" | "已到店" | "已成交" | "沉默/流失"
+export type CustomerFollowUpStatus = "新添加" | "前期沟通中" | "已邀约未到店" | "已到店" | "已成交" | "沉默/流失" | "未配置"
 
 export type CustomerTagScope = "public" | "private"
 
@@ -550,8 +551,22 @@ export interface ActivityInfo {
   is_welfare: boolean
 }
 
+export type VisitNoteCategory = "customer_info" | "follow_up"
+
+export interface VisitNoteSummary {
+  id: string
+  category: VisitNoteCategory
+  content: string
+  created_by_id: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 export interface VisitRecord {
   id: string
+  created_by_id: string
+  created_by: string
   visit_date: string
   visit_time: string
   customer_id: string
@@ -577,6 +592,7 @@ export interface VisitRecord {
   experience: string
   feedback: string
   healing_notes: string
+  visit_notes?: VisitNoteSummary[]
   daily_amount: number
   created_at: string
   updated_at: string
@@ -597,6 +613,13 @@ export interface VisitRecordCreate {
   cancelled?: boolean
   feedback?: string
   healing_notes?: string
+}
+
+export interface VisitNote extends VisitNoteSummary {
+  visit_id: string
+  category_label: string
+  can_edit: boolean
+  can_delete: boolean
 }
 
 export interface CustomerSearchResult {
@@ -641,7 +664,26 @@ export const visitApi = {
     const str = qs.toString()
     return request<Record<string, number>>(`/api/visits/counts${str ? `?${str}` : ""}`)
   },
-  reorder: (ids: string[]) => request<{ message: string }>("/api/visits/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
+  reorder: (ids: string[], movement?: { movedName: string; fromPosition: number; toPosition: number }) =>
+    request<{ message: string }>("/api/visits/reorder", {
+      method: "POST",
+      body: JSON.stringify({
+        ids,
+        moved_name: movement?.movedName,
+        from_position: movement?.fromPosition,
+        to_position: movement?.toPosition,
+      }),
+    }),
+}
+
+export const visitNoteApi = {
+  list: (visitId: string) => request<VisitNote[]>(`/api/visit-notes?visit_id=${encodeURIComponent(visitId)}`),
+  listByVisits: (visitIds: string[]) => request<VisitNote[]>(`/api/visit-notes?visit_ids=${encodeURIComponent(visitIds.join(","))}`),
+  create: (data: { visit_id: string; category: VisitNoteCategory; content: string }) =>
+    request<VisitNote>("/api/visit-notes", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, content: string) =>
+    request<VisitNote>(`/api/visit-notes/${id}`, { method: "PATCH", body: JSON.stringify({ content }) }),
+  delete: (id: string) => request<{ ok: boolean }>(`/api/visit-notes/${id}`, { method: "DELETE" }),
 }
 
 // Course
@@ -765,6 +807,8 @@ export const uploadApi = {
 }
 
 export interface ClassRecord {
+  created_by_id: string
+  created_by: string
   id: string
   date: string
   start_time: string | null
@@ -822,9 +866,9 @@ export const classRecordApi = {
     if (params?.teacher_id) qs.set("teacher_id", params.teacher_id)
     return request<PaginatedResponse<UnifiedRecord>>(`/api/class-records/unified?${qs.toString()}`)
   },
-  create: (data: ClassRecordCreate) => request<ClassRecord>("/api/class-records", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<ClassRecordCreate>) => request<ClassRecord>(`/api/class-records/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => request<{ message: string }>(`/api/class-records/${id}`, { method: "DELETE" }),
+  create: (data: ClassRecordCreate, conversion = false) => request<ClassRecord>(`/api/class-records${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<ClassRecordCreate>, conversion = false) => request<ClassRecord>(`/api/class-records/${id}${conversion ? "?conversion=true" : ""}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string, conversion = false) => request<{ message: string }>(`/api/class-records/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   updateParticipants: (id: string, participantIds: string[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/participants`, { method: "PATCH", body: JSON.stringify({ participant_ids: participantIds }) }),
   updateGroups: (id: string, groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/groups`, { method: "PATCH", body: JSON.stringify({ groups }) }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/class-records/search-customers?q=${encodeURIComponent(keyword)}`),
@@ -896,6 +940,8 @@ export const groupCaseApi = {
 
 // Group Case Sessions
 export interface GroupCaseSession {
+  created_by_id: string
+  created_by: string
   id: string
   date: string
   start_time: string | null
@@ -1182,6 +1228,8 @@ export const emotionalReleaseApi = {
 
 // Emotional Release Sessions
 export interface EmotionalReleaseSession {
+  created_by_id: string
+  created_by: string
   id: string
   date: string
   start_time: string | null
@@ -1247,6 +1295,8 @@ export const emotionalReleaseSessionApi = {
 
 // Energy Knot Sessions
 export interface EnergyKnotSession {
+  created_by_id: string
+  created_by: string
   id: string
   date: string
   start_time: string | null
@@ -1312,6 +1362,8 @@ export const energyKnotSessionApi = {
 
 // Internal Course Sessions
 export interface InternalCourseSession {
+  created_by_id: string
+  created_by: string
   id: string
   date: string
   start_time: string | null
@@ -1365,9 +1417,9 @@ export interface InternalCourseSessionCustomerSearchResult {
 export const internalCourseSessionApi = {
   list: (date?: string) => request<InternalCourseSession[]>(`/api/internal-course-sessions${date ? `?date=${date}` : ""}`),
   listPaginated: (date: string | undefined, page: number, pageSize: number) => request<PaginatedResponse<InternalCourseSession>>(`/api/internal-course-sessions?${date ? `date=${date}&` : ""}page=${page}&page_size=${pageSize}`),
-  create: (data: InternalCourseSessionCreate) => request<InternalCourseSession>("/api/internal-course-sessions", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<InternalCourseSessionCreate>) => request<InternalCourseSession & { warnings?: string[] }>(`/api/internal-course-sessions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => request<{ message: string }>(`/api/internal-course-sessions/${id}`, { method: "DELETE" }),
+  create: (data: InternalCourseSessionCreate, conversion = false) => request<InternalCourseSession>(`/api/internal-course-sessions${conversion ? "?conversion=true" : ""}`, { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<InternalCourseSessionCreate>, conversion = false) => request<InternalCourseSession & { warnings?: string[] }>(`/api/internal-course-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string, conversion = false) => request<{ message: string }>(`/api/internal-course-sessions/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<InternalCourseSessionCustomerSearchResult[]>(`/api/internal-course-sessions/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
@@ -2372,7 +2424,7 @@ export const accountApi = {
   create: (data: AccountCreate) => request<Account>("/api/accounts", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<AccountCreate>) => request<Account>(`/api/accounts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/accounts/${id}`, { method: "DELETE" }),
-  login: (username: string, password: string) => request<{ success: boolean; message?: string; token?: string; account?: Account; permissions?: string[]; customer_permissions?: string[]; customer_permissions_class_records?: string[]; customer_permissions_payment?: string[] }>("/api/accounts/login", { method: "POST", body: JSON.stringify({ username, password }) }),
+  login: (username: string, password: string) => request<{ success: boolean; message?: string; token?: string; account?: Account; permissions?: string[]; edit_permissions?: PositionEditPermissions }>("/api/accounts/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   changePassword: (id: string, oldPassword: string, newPassword: string) => request<{ message: string }>(`/api/accounts/${id}/change-password`, { method: "POST", body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }) }),
   resetPassword: (id: string, newPassword: string) => request<{ message: string }>(`/api/accounts/${id}/reset-password`, { method: "POST", body: JSON.stringify({ new_password: newPassword }) }),
   listSessions: () => request<{ id: string; account_id: string; device_info: string; device_id?: string; ip: string; login_time: string; last_active: string }[]>("/api/accounts/sessions"),
@@ -2384,20 +2436,19 @@ export const accountApi = {
 }
 
 // Position Permissions
-export const positionPermissionApi = {
-  getAll: () => request<Record<string, string[]>>("/api/position-permissions"),
-  get: (position: string) => request<{ position: string; pages: string[] }>(`/api/position-permissions/${position}`),
-  set: (position: string, pages: string[]) => request<{ message: string }>("/api/position-permissions", { method: "PUT", body: JSON.stringify({ position, pages }) }),
-  setFull: (position: string, pages: string[], customers: string[], classRecords: string[], payment: string[], pagePermissions?: Record<string, string[]>) => request<{ message: string }>("/api/position-permissions/full", { method: "PUT", body: JSON.stringify({ position, pages, customers, class_records: classRecords, payment, page_permissions: pagePermissions || {} }) }),
-  getPagePermissions: () => request<Record<string, Record<string, string[]>>>("/api/position-permissions/page-permissions"),
+export type PositionEditScope = "own" | "all"
+export interface PositionEditPermissions {
+  visits: PositionEditScope
+  activities: PositionEditScope
 }
 
-// Position Customer Permissions (section: customers | class_records | payment)
-export const positionCustomerPermissionApi = {
-  getAll: (section: string) => request<Record<string, string[]>>(`/api/position-customer-permissions/${section}`),
-  get: (section: string, position: string) => request<{ position: string; member_types: string[] }>(`/api/position-customer-permissions/${section}/${position}`),
-  set: (section: string, position: string, memberTypes: string[]) => request<{ message: string }>(`/api/position-customer-permissions/${section}`, { method: "PUT", body: JSON.stringify({ position, member_types: memberTypes }) }),
-  setBatch: (position: string, data: { customers: string[]; class_records: string[]; payment: string[] }) => request<{ message: string }>(`/api/position-customer-permissions/batch`, { method: "PUT", body: JSON.stringify({ position, ...data }) }),
+export const positionPermissionApi = {
+  getAll: () => request<Record<string, string[]>>("/api/position-permissions"),
+  get: (position: string) => request<{ position: string; pages: string[]; edit_permissions: PositionEditPermissions }>(`/api/position-permissions/${position}`),
+  set: (position: string, pages: string[]) => request<{ message: string }>("/api/position-permissions", { method: "PUT", body: JSON.stringify({ position, pages }) }),
+  setFull: (position: string, pages: string[], editPermissions: PositionEditPermissions) => request<{ message: string }>("/api/position-permissions/full", { method: "PUT", body: JSON.stringify({ position, pages, edit_permissions: editPermissions }) }),
+  getPagePermissions: () => request<Record<string, Record<string, string[]>>>("/api/position-permissions/page-permissions"),
+  getEditPermissions: () => request<Record<string, PositionEditPermissions>>("/api/position-permissions/edit-permissions"),
 }
 
 // Activity Permissions (活动配置)
@@ -2537,10 +2588,22 @@ export const activityOrderApi = {
     if (spaceId) params.set("space_id", spaceId)
     return request<string[]>(`/api/activity-orders?${params.toString()}`)
   },
-  save: (date: string, spaceId: string, order: string[]) =>
+  save: (
+    date: string,
+    spaceId: string,
+    order: string[],
+    movement?: { movedName: string; fromPosition: number; toPosition: number },
+  ) =>
     request<{ ok: boolean }>(`/api/activity-orders`, {
       method: "POST",
-      body: JSON.stringify({ date, space_id: spaceId, order }),
+      body: JSON.stringify({
+        date,
+        space_id: spaceId,
+        order,
+        moved_name: movement?.movedName,
+        from_position: movement?.fromPosition,
+        to_position: movement?.toPosition,
+      }),
     }),
 }
 
@@ -2817,9 +2880,13 @@ export interface ReferralStatistics {
   total_people: number
   status_names: CustomerFollowUpStatus[]
   status_totals: Record<CustomerFollowUpStatus, number>
+  summary_total_people: number
+  summary_status_totals: Record<CustomerFollowUpStatus, number>
+  summary_traffic_source_totals: Record<string, number>
+  tag_totals: Record<string, number>
   referrer_names: string[]
+  traffic_source_names: string[]
   member_type_names: string[]
-  chart_new: Record<string, string | number>[]
   chart_total: Record<string, string | number>[]
   members: Array<{
     id: string
@@ -2827,6 +2894,8 @@ export interface ReferralStatistics {
     referral_date: string
     member_type: string
     referrer: string
+    traffic_source: string
+    referrer_handler: string
     follow_up_status: CustomerFollowUpStatus
     first_visit_date: string
     invited_count: number
@@ -2849,6 +2918,174 @@ export interface DashboardSummary {
   transactions_this_month: number
   not_arrived_customers: number
   not_arrived_days: number
+}
+
+export type AnalysisField =
+  | "nickname"
+  | "name"
+  | "gender"
+  | "age"
+  | "member_type"
+  | "follow_up_status"
+  | "customer_tags"
+  | "traffic_source"
+  | "referrer"
+  | "referrer_handler"
+  | "service_teacher"
+  | "referral_date"
+  | "created_at"
+  | "first_visit_date"
+  | "last_visit_date"
+  | "invitation_count"
+  | "visit_count"
+  | "activity_count"
+  | "activity_types"
+  | "activity_names"
+  | "communication_count"
+  | "last_communication_date"
+  | "total_consumption"
+  | "purchased_projects"
+  | "created_by"
+  | "inviter_names"
+  | "invitation_count_period"
+  | "visit_count_period"
+  | "cancelled_count_period"
+  | "activity_count_period"
+  | "payment_categories"
+  | "payment_projects"
+  | "payment_closers"
+  | "payment_methods"
+  | "payment_count_period"
+  | "payment_amount_period"
+  | "latest_payment_date"
+
+export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty"
+export type AnalysisCardDimension = "none" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "activity_types" | "purchased_projects"
+export type AnalysisMetric = "total_customers" | "created_customers" | "referred_customers" | "invited_customers" | "arrived_customers" | "activity_customers" | "converted_customers" | "payment_orders" | "payment_amount"
+
+export interface AnalysisCondition {
+  field: AnalysisField
+  operator: AnalysisOperator
+  value: unknown
+}
+
+export interface AnalysisPlan {
+  title: string
+  total_card_title: string
+  conditions: AnalysisCondition[]
+  condition_logic: "all" | "any"
+  date_from: string
+  date_to: string
+  metrics: AnalysisMetric[]
+  card_dimension: AnalysisCardDimension
+  columns: AnalysisField[]
+  sort_by: AnalysisField
+  sort_order: "asc" | "desc"
+}
+
+export interface AnalysisMetadata {
+  fields: Array<{
+    value: AnalysisField
+    label: string
+    group: string
+    value_type: "text" | "number" | "date" | "select" | "multi_select"
+    operators: AnalysisOperator[]
+    options: string[]
+  }>
+  operators: Array<{ value: AnalysisOperator; label: string }>
+  card_dimensions: Array<{ value: AnalysisCardDimension; label: string }>
+  metrics: Array<{ value: AnalysisMetric; label: string; unit: string; format: "number" | "currency" }>
+}
+
+export interface AnalysisResult {
+  plan: AnalysisPlan
+  cards: Array<{ key: string; title: string; count: number; unit: string; format: "number" | "currency"; is_total: boolean }>
+  items: Array<Record<string, unknown> & { id: string; nickname: string }>
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface AnalysisTemplate {
+  id: string
+  name: string
+  description: string
+  scope: "private" | "shared"
+  plan: AnalysisPlan
+  created_by_id: string
+  created_by_name: string
+  use_count: number
+  last_used_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AnalysisLog {
+  id: string
+  operator: string
+  source: "pc" | "miniprogram"
+  ip: string
+  content: string
+  log_type: "analysis_executed" | "template_created" | "template_updated" | "template_deleted"
+  config: {
+    模板名称?: string
+    模板简介?: string
+    可见范围?: string
+    筛选条件数?: number
+    列表字段?: string[]
+    标题?: string
+    时间范围?: string
+    条件关系?: string
+    筛选条件?: Array<{ 字段: string; 规则: string; 值: unknown }>
+    统计指标?: string[]
+    拆分方式?: string
+    显示字段?: string[]
+    排序方式?: string
+    结果人数?: number
+  }
+  created_at: string
+}
+
+export const customAnalysisApi = {
+  metadata: () => request<AnalysisMetadata>("/api/custom-analysis/metadata"),
+  parse: (query: string) => request<{ plan: AnalysisPlan; parsed_by: "ai" | "local"; warning: string }>("/api/custom-analysis/parse", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }),
+  execute: (plan: AnalysisPlan, page = 1, pageSize = 20) => request<AnalysisResult>("/api/custom-analysis/execute", {
+    method: "POST",
+    body: JSON.stringify({ plan, page, page_size: pageSize }),
+  }),
+  listTemplates: () => request<AnalysisTemplate[]>("/api/custom-analysis/templates"),
+  createTemplate: (data: { name: string; description: string; scope: "private" | "shared"; plan: AnalysisPlan }) => request<AnalysisTemplate>("/api/custom-analysis/templates", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+  updateTemplate: (id: string, data: Partial<{ name: string; description: string; scope: "private" | "shared"; plan: AnalysisPlan }>) => request<AnalysisTemplate>(`/api/custom-analysis/templates/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  }),
+  deleteTemplate: (id: string) => request<{ message: string }>(`/api/custom-analysis/templates/${id}`, { method: "DELETE" }),
+  markTemplateUsed: (id: string) => request<AnalysisTemplate>(`/api/custom-analysis/templates/${id}/use`, { method: "POST" }),
+}
+
+export const analysisLogApi = {
+  list: (params: {
+    operator?: string
+    source?: "pc" | "miniprogram"
+    record_type?: "analysis" | "template"
+    date_from?: string
+    date_to?: string
+    page?: number
+    page_size?: number
+  } = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") searchParams.set(key, String(value))
+    })
+    return request<PaginatedResponse<AnalysisLog> & { operators: string[] }>(`/api/analysis-logs?${searchParams.toString()}`)
+  },
 }
 
 export const statisticsApi = {
@@ -2910,13 +3147,15 @@ export const statisticsApi = {
     if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
     return request<CourseStatistics>(`/api/statistics/courses?${searchParams.toString()}`)
   },
-  referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all" }) => {
+  referrals: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; member_types?: string; follow_up_status?: CustomerFollowUpStatus; traffic_source?: string; tag_ids?: string; tag_match?: "any" | "all" }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
     if (params.granularity) searchParams.set("granularity", params.granularity)
     if (params.referrer) searchParams.set("referrer", params.referrer)
     if (params.member_types) searchParams.set("member_types", params.member_types)
+    if (params.follow_up_status) searchParams.set("follow_up_status", params.follow_up_status)
+    if (params.traffic_source) searchParams.set("traffic_source", params.traffic_source)
     if (params.tag_ids) searchParams.set("tag_ids", params.tag_ids)
     if (params.tag_match) searchParams.set("tag_match", params.tag_match)
     return request<ReferralStatistics>(`/api/statistics/referrals?${searchParams.toString()}`)

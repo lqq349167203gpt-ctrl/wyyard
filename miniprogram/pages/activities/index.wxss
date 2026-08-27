@@ -185,6 +185,29 @@
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
+.card.read-only {
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+.readonly-status {
+  color: #8f959e;
+  font-size: 22rpx;
+}
+
+.card-line2 .creator-text {
+  margin-left: 16rpx;
+  padding-left: 16rpx;
+  border-left: 1rpx solid #e8eaed;
+  color: #8f959e;
+  font-size: 21rpx;
+}
+
+.card-line2 .creator-text:first-child {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
+}
+
 .card-time {
   width: 92rpx;
   flex-shrink: 0;

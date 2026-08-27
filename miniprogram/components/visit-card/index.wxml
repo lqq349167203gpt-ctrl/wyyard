@@ -1,7 +1,7 @@
-<view class="card {{editMode ? 'editing' : ''}}" bindtap="onCardTap" bindlongpress="onCardLongPress">
+<view class="card {{editMode ? 'editing' : ''}} {{editable ? '' : 'read-only'}} {{visit.cancelled ? 'cancelled' : ''}}" bindtap="onCardTap" bindlongpress="onCardLongPress">
   <view class="card-main">
     <!-- 编辑模式：上下移动按钮 -->
-    <view class="move-btns" wx:if="{{editMode}}">
+    <view class="move-btns" wx:if="{{editMode && sortable}}">
       <view class="move-btn {{canMoveUp ? '' : 'disabled'}}" catchtap="onMoveUp">
         <text>▲</text>
       </view>
@@ -15,51 +15,35 @@
           <text class="nickname {{visit.cancelled ? 'cancelled' : ''}}">{{visit.nickname}}</text>
           <text class="leader-tag" wx:if="{{visit.is_leader}}">组长</text>
           <text class="member-tag" wx:if="{{leaderName}}">{{leaderName}}组员</text>
+          <text class="member-summary" wx:if="{{visit.member_type || remainingText}}">{{visit.member_type}}{{visit.member_type && remainingText ? ' · ' : ''}}{{remainingText}}</text>
+          <text class="readonly-mark" wx:if="{{!editable}}">部分只读</text>
+        </view>
+        <view
+          class="arrival-badge {{visit.arrived ? 'arrived' : 'todo'}} {{arrivalEditable ? '' : 'disabled'}}"
+          wx:if="{{!editMode && !visit.cancelled}}"
+          catchtap="onArrivalToggleTap"
+        >
+          <text>{{visit.arrived ? '已到店' : '未到店'}}</text>
+        </view>
+        <text class="cancelled-tag" wx:if="{{!editMode && visit.cancelled}}">已取消</text>
+      </view>
+      <view class="row-meta">
+        <text>预计 {{visit.visit_time || '-'}}</text>
+        <text class="meta-sep">·</text>
+        <text>到店 {{visit.arrived_count || 0}} 次</text>
+      </view>
+      <view class="needs-row" wx:if="{{visit.needs}}">
+        <text class="needs-label">来访需求</text>
+        <text class="needs-content">{{visit.needs}}</text>
+      </view>
+      <view class="card-actions">
+        <text class="creator-text">创建人 {{visit.created_by || '未记录'}}</text>
+        <view class="action-list" wx:if="{{!editMode}}">
+          <text class="action-btn" wx:if="{{editable && !visit.arrived}}" catchtap="onCancelVisitTap">{{visit.cancelled ? '恢复' : '取消'}}</text>
+          <text class="action-btn" catchtap="onProfileTap">资料</text>
+          <text class="action-btn delete-btn" wx:if="{{editable && !visit.cancelled}}" catchtap="onDeleteTap">删除</text>
         </view>
       </view>
-      <view class="row-bottom">
-        <text class="info-text" wx:if="{{visit.member_type}}">{{visit.member_type}}</text>
-        <text class="info-sep" wx:if="{{visit.member_type && remainingText}}">|</text>
-        <text class="remaining">{{remainingText}}</text>
-      </view>
-    </view>
-    <view class="card-arrow" wx:if="{{!editMode && !visit.cancelled}}">›</view>
-  </view>
-
-  <view class="card-actions" wx:if="{{!editMode}}">
-    <view class="visit-status-actions">
-      <view class="arrival-badge {{visit.arrived ? 'arrived' : ''}}" wx:if="{{!visit.cancelled}}" catchtap="{{visit.arrived ? 'onCancelArrival' : 'onArrivalTap'}}">
-        <text>{{visit.arrived ? '已到店' : '未到店'}}</text>
-      </view>
-      <view class="cancel-visit-btn" wx:if="{{!visit.arrived}}" catchtap="onCancelVisitTap">
-        <text>{{visit.cancelled ? '恢复' : '取消'}}</text>
-      </view>
-    </view>
-    <view class="action-btn" catchtap="onProfileTap">
-      <text>资料</text>
-    </view>
-    <view class="action-divider"></view>
-    <view class="action-btn delete-btn" catchtap="onDeleteTap">
-      <text>删除</text>
-    </view>
-  </view>
-</view>
-
-<!-- 到店时间弹窗 -->
-<view class="dialog-mask" wx:if="{{showArrivalDialog}}" catchtap="onCloseArrivalDialog">
-  <view class="dialog-box" catchtap>
-    <view class="dialog-title">确认到店</view>
-    <view class="dialog-body">
-      <view class="dialog-field">
-        <text class="dialog-label">到店时间</text>
-        <picker mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
-          <view class="time-picker">{{arrivalTime}}</view>
-        </picker>
-      </view>
-    </view>
-    <view class="dialog-footer">
-      <view class="dialog-btn cancel" catchtap="onCloseArrivalDialog">取消</view>
-      <view class="dialog-btn confirm" catchtap="onConfirmArrival">确认</view>
     </view>
   </view>
 </view>

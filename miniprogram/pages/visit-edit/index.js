@@ -1,10 +1,13 @@
 const { visitApi, spaceApi, customerApi } = require('../../utils/api')
+const { canEditRecord } = require('../../utils/record-ownership')
 
 Page({
   data: {
     visit: null,
     loading: true,
     saving: false,
+    readOnly: false,
+    createdBy: '',
     spaceName: '',
     visitDate: '',
     visitTime: '09:00',
@@ -14,8 +17,6 @@ Page({
     referrerHandlerId: '',
     isLeader: false,
     needs: '',
-    feedback: '',
-    healingNotes: '',
     arrived: false,
     arrivalTime: '',
     // 搜索选择弹窗
@@ -28,12 +29,14 @@ Page({
   },
 
   onLoad(options) {
+    if (!getApp().checkLogin()) return
     if (options.id) {
       this.loadVisit(options.id)
     }
   },
 
   onShow() {
+    if (!getApp().checkLogin()) return
     if (this.data._expectNewCustomer) {
       const oldIds = new Set(this.data.allCustomers.map(c => c.id))
       this.loadCustomers().then(() => {
@@ -67,6 +70,8 @@ Page({
       }
       this.setData({
         visit,
+        readOnly: !canEditRecord(visit, 'visits'),
+        createdBy: visit.created_by || '',
         spaceName,
         loading: false,
         visitDate: visit.visit_date || '',
@@ -77,8 +82,6 @@ Page({
         referrerHandlerId: visit.referrer_handler_id || '',
         isLeader: visit.is_leader || false,
         needs: visit.needs || '',
-        feedback: visit.feedback || '',
-        healingNotes: visit.healing_notes || '',
         arrived: visit.arrived || false,
         arrivalTime: visit.arrival_time || '',
       })
@@ -111,31 +114,50 @@ Page({
     this.setData({ isLeader: e.detail.value })
   },
 
-  onOpenEditor(e) {
-    const { field, label } = e.currentTarget.dataset
-    wx.navigateTo({ url: `/pages/text-editor/index?field=${encodeURIComponent(field)}&label=${encodeURIComponent(label)}` })
-  },
-
   onNeedsInput(e) { this.setData({ needs: e.detail.value }) },
-  onFeedbackInput(e) { this.setData({ feedback: e.detail.value }) },
-  onHealingNotesInput(e) { this.setData({ healingNotes: e.detail.value }) },
 
-  onArrivedChange(e) {
+  async onArrivedChange(e) {
+    const previousArrived = this.data.arrived
+    const previousArrivalTime = this.data.arrivalTime
     const arrived = e.detail.value
     const arrivalTime = arrived ? (() => {
       const now = new Date()
       return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     })() : ''
     this.setData({ arrived, arrivalTime })
+    if (this.data.readOnly) {
+      try {
+        await visitApi.update(this.data.visit.id, {
+          arrived,
+          arrival_time: arrivalTime || null,
+        })
+        this.setData({ visit: { ...this.data.visit, arrived, arrival_time: arrivalTime } })
+        wx.showToast({ title: arrived ? '已确认到店' : '已取消到店' })
+      } catch (e) {
+        this.setData({ arrived: previousArrived, arrivalTime: previousArrivalTime })
+      }
+    }
   },
 
-  onArrivalTimeChange(e) {
-    this.setData({ arrivalTime: e.detail.value })
+  async onArrivalTimeChange(e) {
+    const previousArrivalTime = this.data.arrivalTime
+    const arrivalTime = e.detail.value
+    this.setData({ arrivalTime })
+    if (this.data.readOnly) {
+      try {
+        await visitApi.update(this.data.visit.id, { arrival_time: arrivalTime || null })
+        this.setData({ visit: { ...this.data.visit, arrival_time: arrivalTime } })
+        wx.showToast({ title: '到店时间已更新' })
+      } catch (err) {
+        this.setData({ arrivalTime: previousArrivalTime })
+      }
+    }
   },
 
   // 搜索选择弹窗
   onPickerOpen(e) {
     const field = e.currentTarget.dataset.field
+    if (this.data.readOnly && (field === 'customer' || field === 'referrerHandler')) return
     const titleMap = { customer: '客户', referrerHandler: '邀约人' }
     this.setData({
       showPicker: true,
@@ -192,17 +214,17 @@ Page({
     this.setData({ saving: true })
     try {
       await visitApi.update(this.data.visit.id, {
-        visit_date: this.data.visitDate,
-        visit_time: this.data.visitTime,
-        customer_id: this.data.customerId,
-        referrer_handler: this.data.referrerHandler,
-        referrer_handler_id: this.data.referrerHandlerId || '',
         is_leader: this.data.isLeader,
-        needs: this.data.needs,
-        feedback: this.data.feedback,
-        healing_notes: this.data.healingNotes,
         arrived: this.data.arrived,
         arrival_time: this.data.arrivalTime || null,
+        ...(this.data.readOnly ? {} : {
+          customer_id: this.data.customerId,
+          visit_date: this.data.visitDate,
+          visit_time: this.data.visitTime,
+          referrer_handler: this.data.referrerHandler,
+          referrer_handler_id: this.data.referrerHandlerId || '',
+          needs: this.data.needs,
+        }),
       })
       wx.showToast({ title: '已保存' })
       wx.navigateBack()

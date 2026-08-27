@@ -7,6 +7,7 @@ Page({
     canCommRecords: false,
     canDailyReport: false,
     canCustomerTags: false,
+    canCustomAnalysis: false,
   },
 
   async onShow() {
@@ -27,6 +28,7 @@ Page({
       canCommRecords: app.checkPagePermission('communication-records'),
       canDailyReport: app.checkPagePermission('daily-report'),
       canCustomerTags: app.checkPagePermission('customer-tags'),
+      canCustomAnalysis: app.checkPagePermission('custom-analysis'),
     })
   },
 
@@ -48,6 +50,10 @@ Page({
 
   onCustomerTagsTap() {
     wx.navigateTo({ url: '/pages/customer-tags/index' })
+  },
+
+  onCustomAnalysisTap() {
+    wx.navigateTo({ url: '/pages/custom-analysis/index' })
   },
 
   onLogout() {

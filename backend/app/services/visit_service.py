@@ -101,15 +101,16 @@ def _get_customer_activities(customer_id: str, date: Optional[str] = None) -> Li
 
 def _build_all_activities(date: Optional[str] = None) -> dict[str, list[ActivityInfo]]:
     """批量构建指定日期所有客户的活动映射 {customer_id: [ActivityInfo]}，一次遍历 5 个模块"""
+    from collections import defaultdict
+
     from app.services import (
         class_record_service,
-        group_case_session_service,
+        customer_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
-        customer_service,
     )
-    from collections import defaultdict
 
     # 构建 leader 集合
     leader_set = {v.customer_id for v in _visits.values()
@@ -217,11 +218,12 @@ def _build_customer_activity_counts() -> dict[str, int]:
     if _activity_counts_cache is not None and now - _activity_counts_ts < 5:
         return _activity_counts_cache
     from collections import defaultdict
+
     from app.services import (
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
     )
     counts: dict[str, int] = defaultdict(int)
@@ -260,9 +262,9 @@ def _count_customer_activities_by_type(customer_id: str, activity_type: str) -> 
     """按活动类型统计某客户参与的活动次数"""
     from app.services import (
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
     )
     if activity_type == "membership":
@@ -305,6 +307,7 @@ def _build_customer_welfare_counts() -> dict[str, int]:
     if _welfare_counts_cache is not None and now - _welfare_counts_ts < 5:
         return _welfare_counts_cache
     from collections import defaultdict
+
     from app.services import class_record_service
 
     counts: dict[str, int] = defaultdict(int)
@@ -359,11 +362,11 @@ def count_arrived_chargeable_activities(customer_id: str) -> int:
     """统计某客户所有已到场的可扣费活动数（用于显示活动扣卡次数）"""
     from app.services import (
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
+        internal_course_service,
     )
-    from app.services import internal_course_service
     if internal_course_service.has_active_course(customer_id):
         return 0
 
@@ -497,6 +500,11 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
         print(f"[list_visits_light] _build_customer_activity_counts error: {e}", flush=True)
         all_activity_counts = {}
 
+    all_arrived_counts: dict[str, int] = {}
+    for visit in _visits.values():
+        if not visit.is_deleted and not visit.cancelled and visit.arrived:
+            all_arrived_counts[visit.customer_id] = all_arrived_counts.get(visit.customer_id, 0) + 1
+
     result = []
     today = datetime.now().strftime("%Y-%m-%d")
     for r in sorted(records, key=lambda r: (r.cancelled, r.sort_order, -r.created_at.timestamp())):
@@ -523,8 +531,11 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "nickname": customer.nickname if customer else "",
                 "phone": getattr(r, 'phone', '') or "",
                 "visit_date": r.visit_date,
+                "visit_time": r.visit_time or "",
+                "needs": r.needs or "",
                 "arrived": r.arrived,
                 "arrival_time": r.arrival_time or "",
+                "arrived_count": all_arrived_counts.get(r.customer_id, 0),
                 "cancelled": r.cancelled,
                 "is_leader": r.is_leader,
                 "space_id": r.space_id or "",
@@ -533,6 +544,8 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "activity_count": all_activity_counts.get(r.customer_id, 0),
                 "visit_count": count_customer_visits(r.customer_id),
                 "created_at": r.created_at.isoformat() if hasattr(r.created_at, 'isoformat') else str(r.created_at),
+                "created_by_id": r.created_by_id,
+                "created_by": r.created_by,
             })
         except Exception as e:
             print(f"[list_visits_light] record {r.id} error: {e}", flush=True)
@@ -617,7 +630,7 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
         if requested_cancelled is True:
             data = {"cancelled": True, "arrived": False, "arrival_time": ""}
         for key, value in data.items():
-            if hasattr(record, key) and key not in ("id", "created_at", "created_by"):
+            if hasattr(record, key) and key not in ("id", "created_at", "created_by_id", "created_by"):
                 setattr(record, key, value)
         new_arrived = record.arrived
         record.updated_at = datetime.now(timezone.utc)
@@ -635,6 +648,21 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
     return record
 
 
+def update_collaboration_summary(visit_id: str, field: str, value: str) -> Optional[VisitRecord]:
+    """更新多人协作记录的兼容汇总字段，不触发邀约业务状态校验。"""
+    if field not in {"feedback", "healing_notes"}:
+        raise ValueError("不支持的协作汇总字段")
+    with _visit_lock:
+        record = _visits.get(visit_id)
+        if not record:
+            return None
+        setattr(record, field, value)
+        record.updated_at = datetime.now(timezone.utc)
+        _visits[visit_id] = record
+        _save(visit_id)
+        return record
+
+
 def reorder_visits(ids: list):
     """批量更新排序权重，ids 按期望顺序排列"""
     with _visit_lock:
@@ -648,60 +676,37 @@ def reorder_visits(ids: list):
 
 def _deduct_for_arrival(visit):
     """到店扣费：遍历当天所有 session，对参与/主持的人员扣减会员活动次数"""
-    from app.services import membership_card_service
     from app.services import (
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
-        energy_knot_session_service,
-        internal_course_session_service,
+        group_case_session_service,
+        membership_card_service,
     )
     cid = visit.customer_id
     date = visit.visit_date
 
     with membership_card_service._deduct_lock:
-        for s in group_case_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = group_case_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(
-                        cid,
-                        f"gcs:{s.id}",
-                        membership_card_service.get_activity_deduction_count(s),
-                    )
+        for s in group_case_session_service.list_sessions(date=date):
+            chargeable = group_case_session_service._get_chargeable_ids(s)
+            if cid in chargeable:
+                membership_card_service._do_sync_activity_count(
+                    cid,
+                    f"gcs:{s.id}",
+                    membership_card_service.get_activity_deduction_count(s),
+                )
 
-        for s in emotional_release_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = emotional_release_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(
-                        cid,
-                        f"ers:{s.id}",
-                        membership_card_service.get_activity_deduction_count(s),
-                    )
+        for s in emotional_release_session_service.list_sessions(date=date):
+            chargeable = emotional_release_session_service._get_chargeable_ids(s)
+            if cid in chargeable:
+                membership_card_service._do_sync_activity_count(
+                    cid,
+                    f"ers:{s.id}",
+                    membership_card_service.get_activity_deduction_count(s),
+                )
 
-        for s in energy_knot_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = energy_knot_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(
-                        cid,
-                        f"eks:{s.id}",
-                        membership_card_service.get_activity_deduction_count(s),
-                    )
-
-        for s in internal_course_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = internal_course_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(
-                        cid,
-                        f"ics:{s.id}",
-                        membership_card_service.get_activity_deduction_count(s),
-                    )
-
-        for cr in class_record_service.list_records():
-            if cr.date == date and not cr.is_public_welfare:
+        # 能量结和内部课程不产生会员卡扣卡，无需参与到店同步。
+        for cr in class_record_service.list_records(date=date):
+            if not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
                 if cid in chargeable:
                     membership_card_service._do_sync_activity_count(
@@ -710,56 +715,39 @@ def _deduct_for_arrival(visit):
                         membership_card_service.get_activity_deduction_count(cr),
                     )
 
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usage(cid)
 
 
 def _restore_for_arrival(visit):
     """取消到场退费：遍历当天所有 session，退还参与/主持人员的会员活动扣费"""
-    from app.services import membership_card_service
     from app.services import (
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
-        energy_knot_session_service,
-        internal_course_session_service,
+        group_case_session_service,
+        membership_card_service,
     )
     cid = visit.customer_id
     date = visit.visit_date
 
     with membership_card_service._deduct_lock:
-        for s in group_case_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = group_case_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(cid, f"gcs:{s.id}", 0)
+        for s in group_case_session_service.list_sessions(date=date):
+            chargeable = group_case_session_service._get_chargeable_ids(s)
+            if cid in chargeable:
+                membership_card_service._do_sync_activity_count(cid, f"gcs:{s.id}", 0)
 
-        for s in emotional_release_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = emotional_release_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(cid, f"ers:{s.id}", 0)
+        for s in emotional_release_session_service.list_sessions(date=date):
+            chargeable = emotional_release_session_service._get_chargeable_ids(s)
+            if cid in chargeable:
+                membership_card_service._do_sync_activity_count(cid, f"ers:{s.id}", 0)
 
-        for s in energy_knot_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = energy_knot_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(cid, f"eks:{s.id}", 0)
-
-        for s in internal_course_session_service.list_sessions():
-            if s.date == date and not s.is_deleted:
-                chargeable = internal_course_session_service._get_chargeable_ids(s)
-                if cid in chargeable:
-                    membership_card_service._do_sync_activity_count(cid, f"ics:{s.id}", 0)
-
-        for cr in class_record_service.list_records():
-            if cr.date == date and not cr.is_public_welfare:
+        # 能量结和内部课程不产生会员卡扣卡，无需参与到店同步。
+        for cr in class_record_service.list_records(date=date):
+            if not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
                 if cid in chargeable:
                     membership_card_service._do_sync_activity_count(cid, f"class:{cr.id}", 0)
 
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usage(cid)
 
 
 def _remove_from_parallel_lists(ids: list, names: list, target_id: str):
@@ -775,11 +763,13 @@ def _remove_from_parallel_lists(ids: list, names: list, target_id: str):
 def _cleanup_activity_records(customer_id: str, date: str):
     """删除到场人员时，同步清理当日所有活动记录中的该人员"""
     from app.services import (
-        class_record_service, group_case_session_service,
-        emotional_release_session_service, energy_knot_session_service,
+        class_record_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
+        membership_card_service,
     )
-    from app.services import membership_card_service
 
     # 沙龙：teacher_ids, participant_ids, groups
     try:

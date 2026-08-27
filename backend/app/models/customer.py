@@ -34,10 +34,12 @@ class SelfTag(str, Enum):
 
 class FollowUpStatus(str, Enum):
     NEW = "新添加"
-    COMMUNICATING = "沟通中"
+    COMMUNICATING = "前期沟通中"
+    INVITED_NOT_VISITED = "已邀约未到店"
     VISITED = "已到店"
     CONVERTED = "已成交"
     SILENT_OR_LOST = "沉默/流失"
+    UNCONFIGURED = "未配置"
 
 
 class Position(str, Enum):
@@ -68,7 +70,7 @@ class CustomerBase(SafeBaseModel):
     referrer: str = Field(default="", max_length=50)
     referral_date: str = Field(default="", max_length=10)
     referrer_handler: str = Field(default="", max_length=50)
-    follow_up_status: FollowUpStatus = FollowUpStatus.NEW
+    follow_up_status: FollowUpStatus = FollowUpStatus.UNCONFIGURED
     member_type: str = Field(default="", max_length=50)
     paid_content: List[PaidContentItem] = Field(default=[], max_length=20)
     visit_count: int = Field(default=0, ge=0)
@@ -113,6 +115,12 @@ class CustomerBase(SafeBaseModel):
     @classmethod
     def validate_referral_date(cls, v: str) -> str:
         return _validate_iso_date(v)
+
+    @field_validator("follow_up_status", mode="before")
+    @classmethod
+    def normalize_legacy_follow_up_status(cls, v):
+        # 兼容历史数据及尚未更新的旧端；对外统一展示为新名称。
+        return FollowUpStatus.COMMUNICATING.value if v == "沟通中" else v
 
     @field_validator("age")
     @classmethod
@@ -206,6 +214,12 @@ class CustomerUpdate(StrictBaseModel):
     @classmethod
     def validate_referral_date(cls, v: Optional[str]) -> Optional[str]:
         return _validate_iso_date(v) if v is not None else v
+
+    @field_validator("follow_up_status", mode="before")
+    @classmethod
+    def normalize_legacy_follow_up_status(cls, v):
+        # 兼容尚未更新的旧端提交，保存时统一落为新名称。
+        return FollowUpStatus.COMMUNICATING.value if v == "沟通中" else v
 
     @field_validator("age")
     @classmethod

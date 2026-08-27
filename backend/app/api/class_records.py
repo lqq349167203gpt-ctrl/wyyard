@@ -7,6 +7,12 @@ from app.models.base import StrictBaseModel
 from app.services import activity_assignment_notification_service, class_record_service
 from app.services.customer_service import get_customer, list_all_customers
 from app.utils.pagination import paginate
+from app.utils.record_ownership import (
+    ACTIVITY_CREATOR_ONLY_FIELDS,
+    ensure_creator_for_changed_fields,
+    ensure_record_creator,
+    stamp_creator,
+)
 
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
 
@@ -172,25 +178,29 @@ def list_unified(
 
 
 @router.post("")
-def create_record(data: dict, request: Request):
+def create_record(data: dict, request: Request, conversion: bool = False):
     from app.models.class_record import ClassRecordCreate
     try:
-        record = ClassRecordCreate(**data)
+        record = stamp_creator(ClassRecordCreate(**data), request)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    created = class_record_service.create_record(record)
+    created = class_record_service.create_record(record, refresh_identities=not conversion)
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
-    activity_assignment_notification_service.notify_new_assignments(
-        "class",
-        created,
-        operator=operator,
-    )
+    if not conversion:
+        activity_assignment_notification_service.notify_new_assignments(
+            "class",
+            created,
+            operator=operator,
+        )
     return created
 
 
 @router.patch("/{record_id}")
-def update_record(record_id: str, data: dict, request: Request):
+def update_record(record_id: str, data: dict, request: Request, conversion: bool = False):
     old_record = class_record_service.get_record(record_id)
+    ensure_creator_for_changed_fields(
+        request, old_record, data, ACTIVITY_CREATOR_ONLY_FIELDS, "课表受保护信息", "activities"
+    )
     old_ids = set(old_record.participant_ids) if old_record else set()
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
@@ -199,7 +209,12 @@ def update_record(record_id: str, data: dict, request: Request):
     old_activity_name = old_record.activity_name if old_record else ""
     old_description = old_record.course_description if old_record else ""
 
-    record = class_record_service.update_record(record_id, data)
+    record = class_record_service.update_record(
+        record_id,
+        data,
+        refresh_identities=not conversion,
+        sync_deductions=not conversion,
+    )
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
 
@@ -209,7 +224,7 @@ def update_record(record_id: str, data: dict, request: Request):
     new_description = record.course_description or ""
     name_changed = (new_course_name != old_course_name or new_activity_name != old_activity_name)
     desc_changed = (new_description != old_description)
-    if (name_changed or desc_changed) and old_ids:
+    if not conversion and (name_changed or desc_changed) and old_ids:
         operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
         display_name = record.activity_name or record.course_name
         activity_date = record.date
@@ -238,7 +253,7 @@ def update_record(record_id: str, data: dict, request: Request):
             )
 
     # 如果 participant_ids 被修改，同步清理小程序报名记录 + 发送通知
-    if "participant_ids" in data:
+    if not conversion and "participant_ids" in data:
         new_ids = set(record.participant_ids)
         removed_ids = old_ids - new_ids
         if removed_ids:
@@ -267,12 +282,13 @@ def update_record(record_id: str, data: dict, request: Request):
                 )
 
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
-    activity_assignment_notification_service.notify_new_assignments(
-        "class",
-        record,
-        previous_member_ids=old_member_ids,
-        operator=operator,
-    )
+    if not conversion:
+        activity_assignment_notification_service.notify_new_assignments(
+            "class",
+            record,
+            previous_member_ids=old_member_ids,
+            operator=operator,
+        )
     return record
 
 
@@ -283,6 +299,8 @@ class ParticipantUpdate(StrictBaseModel):
 @router.patch("/{record_id}/participants")
 def update_participants(record_id: str, data: ParticipantUpdate, request: Request):
     old_record = class_record_service.get_record(record_id)
+    if not old_record:
+        raise HTTPException(status_code=404, detail="记录不存在")
     old_ids = set(old_record.participant_ids) if old_record else set()
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
@@ -336,6 +354,8 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
 @router.patch("/{record_id}/groups")
 def update_groups(record_id: str, data: dict, request: Request):
     old_record = class_record_service.get_record(record_id)
+    if not old_record:
+        raise HTTPException(status_code=404, detail="记录不存在")
     old_ids = set(old_record.participant_ids) if old_record else set()
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
@@ -391,17 +411,16 @@ def update_groups(record_id: str, data: dict, request: Request):
 
 
 @router.delete("/{record_id}")
-def delete_record(record_id: str, request: Request):
+def delete_record(record_id: str, request: Request, conversion: bool = False):
     old_record = class_record_service.get_record(record_id)
-    if not old_record:
-        raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_record_creator(request, old_record, "课表内容", "activities")
 
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
     activity_name = old_record.activity_name or old_record.course_name
     activity_date = old_record.date
     participant_ids = list(old_record.participant_ids)
 
-    if not class_record_service.delete_record(record_id):
+    if not class_record_service.delete_record(record_id, refresh_identities=not conversion):
         raise HTTPException(status_code=404, detail="记录不存在")
 
     # 清理该活动的小程序报名记录 + 通知所有参与者
@@ -417,7 +436,7 @@ def delete_record(record_id: str, request: Request):
         delete_item("client_signups.json", sid)
 
     all_notified = set(participant_ids) | signup_customer_ids
-    if all_notified:
+    if all_notified and not conversion:
         from app.services import client_notification_service
         for cid in all_notified:
             client_notification_service.create_notification(

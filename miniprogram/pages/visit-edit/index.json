@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "编辑邀约",
-  "usingComponents": {}
+  "usingComponents": {
+    "visit-note-section": "/components/visit-note-section/index"
+  }
 }

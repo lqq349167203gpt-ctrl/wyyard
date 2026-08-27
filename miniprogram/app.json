@@ -12,6 +12,7 @@
     "pages/customer-form/index",
     "pages/customer-profile/index",
     "pages/customer-tags/index",
+    "pages/custom-analysis/index",
     "pages/payment/index",
     "pages/payment-create/index",
     "pages/payment-detail/index",

@@ -771,15 +771,15 @@ Page({
     const titleMap = { visit: '到店记录', invited: '受邀记录', cancelled: '取消记录', activity_today: '今日参与记录', payment: '成交详情' }
     const headerMap = {
       visit: [
-        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
+        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '来访需求', cls: 'c3' },
         { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
       ],
       invited: [
-        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
+        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '来访需求', cls: 'c3' },
         { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
       ],
       cancelled: [
-        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '需求', cls: 'c3' },
+        { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '来访需求', cls: 'c3' },
         { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
       ],
       activity_today: [

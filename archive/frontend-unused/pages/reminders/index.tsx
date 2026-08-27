@@ -1,3 +1,4 @@
+// 已归档：提醒配置已从前端入口、路由和角色权限中移除。
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit } from "lucide-react"

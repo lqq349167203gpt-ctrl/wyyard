@@ -1,12 +1,13 @@
 import io
-from fastapi import APIRouter, HTTPException, Query
+
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.models.visit import VisitRecordCreate
-from app.services import visit_service
-from app.services import customer_service
+from app.services import customer_service, visit_service
 from app.services.customer_service import get_customer
 from app.utils.pagination import paginate
+from app.utils.record_ownership import ensure_creator_for_changed_fields, ensure_record_creator, stamp_creator
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
@@ -26,11 +27,11 @@ def _fill_daily_amount(items: list, date: str):
     if not date:
         return
     from app.services import (
-        membership_card_service,
-        group_case_service,
         emotional_release_service,
         energy_knot_service,
+        group_case_service,
         internal_course_service,
+        membership_card_service,
         oh_card_reading_service,
         other_project_service,
     )
@@ -151,7 +152,7 @@ async def reorder_visits(data: dict):
 async def export_visits(date: str = None, space_id: str = None):
     """导出邀约到场 xlsx，格式与 PC 端一致"""
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
     records = visit_service.list_visits(date, space_id=space_id)
     items = [_fill_member_type(r) for r in records if not r.cancelled]
@@ -171,7 +172,7 @@ async def export_visits(date: str = None, space_id: str = None):
             "预计时间": v.get("visit_time") or "",
             "参与次数": v.get("visit_count") or 0,
             "会员身份": v.get("member_type") or "",
-            "当日需求": v.get("needs") or "",
+            "来访需求": v.get("needs") or "",
             "组长情况": role or "-",
             "组长获得的信息": "",
             "邀约人": v.get("referrer_handler") or "",
@@ -181,7 +182,7 @@ async def export_visits(date: str = None, space_id: str = None):
         # 空表也返回有效 xlsx（只有表头）
         rows = []
 
-    headers = ["引流人", "客户昵称", "预计时间", "参与次数", "会员身份", "当日需求", "组长情况", "组长获得的信息", "邀约人"]
+    headers = ["引流人", "客户昵称", "预计时间", "参与次数", "会员身份", "来访需求", "组长情况", "组长获得的信息", "邀约人"]
     col_widths = [10, 12, 10, 10, 12, 40, 10, 30, 10]
 
     wb = Workbook()
@@ -247,26 +248,74 @@ async def get_visit(visit_id: str):
 
 
 @router.post("")
-async def create_visit(data: VisitRecordCreate):
+async def create_visit(data: VisitRecordCreate, request: Request):
     try:
-        record = visit_service.create_visit(data)
+        record = visit_service.create_visit(stamp_creator(data, request))
         return _fill_member_type(record)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.patch("/{visit_id}")
-async def update_visit(visit_id: str, data: dict):
+async def update_visit(visit_id: str, data: dict, request: Request):
     # 记录更新前的到场状态
     old_record = visit_service.get_visit(visit_id)
+    ensure_creator_for_changed_fields(
+        request,
+        old_record,
+        data,
+        {
+            "visit_date",
+            "visit_time",
+            "customer_id",
+            "needs",
+            "referrer_handler",
+            "cancelled",
+        },
+        "邀约的邀约人、时间、来访需求或取消状态",
+        "visits",
+    )
     old_arrived = old_record.arrived if old_record else False
 
+    # 兼容旧客户端：客户信息/跟进点不再覆盖整段文本，而是按当前账号追加为独立记录。
+    collaboration_fields = {
+        "feedback": "customer_info",
+        "healing_notes": "follow_up",
+    }
+    collaboration_updates = []
+    for field, category in collaboration_fields.items():
+        if field not in data:
+            continue
+        content = str(data.pop(field) or "").strip()
+        current = str(getattr(old_record, field, "") or "").strip() if old_record else ""
+        if content and content != current:
+            collaboration_updates.append((category, content))
+
     try:
-        record = visit_service.update_visit(visit_id, data)
+        record = visit_service.update_visit(visit_id, data) if data else old_record
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    if collaboration_updates:
+        from app.services import visit_note_service
+
+        creator_id = getattr(request.state, "user_id", "") or ""
+        creator = (
+            getattr(request.state, "user_owner", "")
+            or getattr(request.state, "user_name", "")
+            or ""
+        )
+        for category, content in collaboration_updates:
+            visit_note_service.create_note(
+                visit_id,
+                category,
+                content,
+                creator_id=creator_id,
+                creator=creator,
+            )
+        record = visit_service.get_visit(visit_id)
 
     # 从未到场 → 已到场：发送通知给客户
     if not old_arrived and record.arrived:
@@ -288,7 +337,8 @@ async def update_visit(visit_id: str, data: dict):
 
 
 @router.delete("/{visit_id}")
-async def delete_visit(visit_id: str):
+async def delete_visit(visit_id: str, request: Request):
+    ensure_record_creator(request, visit_service.get_visit(visit_id), "邀约", "visits")
     if not visit_service.delete_visit(visit_id):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "已删除"}

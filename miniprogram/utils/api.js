@@ -4,8 +4,12 @@ const { BASE_URL } = require('./config')
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
+let _silentLoginPromise = null
+let _logoutScheduled = false
 let _lastTrackedPagePath = ''
 const DEVICE_ID_KEY = 'wyyard_device_id'
+const DEFAULT_EDIT_PERMISSIONS = { visits: 'own', activities: 'own' }
+const SECURITY_AUTH_REASONS = ['disabled', 'password_changed', 'kicked']
 
 function _getDeviceId() {
   let deviceId = wx.getStorageSync(DEVICE_ID_KEY)
@@ -13,6 +17,136 @@ function _getDeviceId() {
   deviceId = `mini-${Date.now()}-${Math.random().toString(36).slice(2)}`
   wx.setStorageSync(DEVICE_ID_KEY, deviceId)
   return deviceId
+}
+
+function _getResponseHeader(headers, name) {
+  const target = String(name || '').toLowerCase()
+  const source = headers || {}
+  const keys = Object.keys(source)
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i].toLowerCase() === target) return source[keys[i]] || ''
+  }
+  return ''
+}
+
+function _saveLoginState(data) {
+  if (!data || !data.token || !data.account) return false
+  const permissions = data.permissions || []
+  const editPermissions = data.edit_permissions || DEFAULT_EDIT_PERMISSIONS
+  wx.setStorageSync('auth_token', data.token)
+  wx.setStorageSync('currentUser', data.account)
+  wx.setStorageSync('userPermissions', permissions)
+  wx.setStorageSync('userEditPermissions', editPermissions)
+
+  const app = getApp()
+  if (app) {
+    app.globalData.token = data.token
+    app.globalData.currentUser = data.account
+    app.globalData.permissions = permissions
+    app.globalData.editPermissions = editPermissions
+    if (app.scheduleUsageTracking) app.scheduleUsageTracking()
+    else if (app.startUsageTracking) app.startUsageTracking()
+  }
+  _logoutScheduled = false
+  return true
+}
+
+function _saveRenewedToken(headers, requestToken) {
+  const renewedToken = _getResponseHeader(headers, 'x-new-token')
+  if (!renewedToken || !requestToken) return
+
+  // 并发请求可能先后返回。只有本地仍是该请求使用的旧 token 时才写入续期 token，
+  // 防止晚到的旧响应覆盖刚刚重新登录得到的新会话。
+  const currentToken = wx.getStorageSync('auth_token')
+  if (currentToken !== requestToken) return
+  wx.setStorageSync('auth_token', renewedToken)
+  const app = getApp()
+  if (app) app.globalData.token = renewedToken
+}
+
+function _getWxLoginCode() {
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success: (result) => {
+        if (result && result.code) resolve(result.code)
+        else reject(new Error('微信登录凭证为空'))
+      },
+      fail: (error) => reject(new Error('微信登录失败：' + ((error && error.errMsg) || '未知错误'))),
+    })
+  })
+}
+
+function _silentRelogin() {
+  if (_silentLoginPromise) return _silentLoginPromise
+
+  _silentLoginPromise = _getWxLoginCode().then((code) => new Promise((resolve, reject) => {
+    wx.request({
+      url: `${BASE_URL}/api/wechat/login`,
+      method: 'POST',
+      data: { code },
+      timeout: 30000,
+      header: {
+        'Content-Type': 'application/json',
+        'X-Client-Type': 'miniprogram',
+        'X-Device-ID': _getDeviceId(),
+      },
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          if (res.data && res.data.bound !== false && _saveLoginState(res.data)) {
+            resolve(res.data)
+            return
+          }
+          const error = new Error('当前微信未绑定可用账号')
+          error.permanent = true
+          reject(error)
+          return
+        }
+        const error = new Error(_extractErrorMessage(res.data))
+        // 换取登录态的接口也可能因微信网络、code 短暂失效等返回 4xx；
+        // 只有明确返回“未绑定”才退出，其余失败均保留现有登录信息供下次重试。
+        error.permanent = false
+        reject(error)
+      },
+      fail: (error) => reject(new Error('网络连接失败：' + ((error && error.errMsg) || '请稍后重试'))),
+    })
+  })).finally(() => {
+    _silentLoginPromise = null
+  })
+
+  return _silentLoginPromise
+}
+
+function _clearAuthAndGoLogin(reason) {
+  if (_logoutScheduled) return
+  _logoutScheduled = true
+  _loginPromise = null
+  _silentLoginPromise = null
+  wx.removeStorageSync('auth_token')
+  wx.removeStorageSync('currentUser')
+  wx.removeStorageSync('userPermissions')
+  wx.removeStorageSync('userEditPermissions')
+
+  const app = getApp()
+  if (app) {
+    if (app.stopUsageTracking) app.stopUsageTracking()
+    app.globalData.token = ''
+    app.globalData.currentUser = null
+    app.globalData.permissions = []
+    app.globalData.editPermissions = DEFAULT_EDIT_PERMISSIONS
+  }
+
+  const messages = {
+    disabled: '账号已停用，请联系管理员',
+    password_changed: '密码已修改，请重新登录',
+    kicked: '账号已在其他设备登录',
+  }
+  wx.showToast({ title: messages[reason] || '登录状态已失效', icon: 'none' })
+  setTimeout(() => {
+    wx.reLaunch({
+      url: '/pages/login/index',
+      complete: () => { _logoutScheduled = false },
+    })
+  }, 1000)
 }
 
 // base64 字符表（JWT 使用 base64url，解码前需先替换 -/_ 并补齐 padding）
@@ -97,6 +231,7 @@ function _ensureLogin() {
   wx.removeStorageSync('auth_token')
   wx.removeStorageSync('currentUser')
   wx.removeStorageSync('userPermissions')
+  wx.removeStorageSync('userEditPermissions')
   _loginPromise = Promise.resolve(app._devAutoLogin())
     .catch((err) => {
       console.warn('[request] devAutoLogin 失败，本次请求降级为无 token 直连:', err)
@@ -166,7 +301,7 @@ async function request(path, options = {}) {
     // skipAuth（登录类）请求不附带 token：建立会话不需要已有会话，
     // 也避免过期 token 触发后端 AuthMiddleware 误拒登录请求
     const token = options.skipAuth ? '' : wx.getStorageSync('auth_token')
-    const req = wx.request({
+    wx.request({
       url: `${BASE_URL}${path}`,
       method: options.method || 'GET',
       data: options.data,
@@ -182,21 +317,38 @@ async function request(path, options = {}) {
       ),
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
+          _saveRenewedToken(res.header, token)
           resolve(res.data)
         } else if (res.statusCode === 401) {
-          _loginPromise = null
-          wx.removeStorageSync('auth_token')
-          wx.removeStorageSync('currentUser')
-          wx.removeStorageSync('userPermissions')
-          const app = getApp()
-          if (app) {
-            app.globalData.token = ''
-            app.globalData.currentUser = null
-            app.globalData.permissions = []
+          const reason = _getResponseHeader(res.header, 'x-auth-reason')
+          const currentToken = wx.getStorageSync('auth_token')
+
+          // 请求发出后若已有其他请求完成续期/重登，本次 401 属于旧请求；
+          // 直接使用最新 token 重试，绝不能把新登录状态清掉。
+          if (!options.skipAuth && !options._authRetry && token && currentToken && currentToken !== token) {
+            request(path, Object.assign({}, options, { _authRetry: true })).then(resolve).catch(reject)
+            return
           }
-          wx.showToast({ title: '登录已过期', icon: 'none' })
-          setTimeout(() => wx.reLaunch({ url: '/pages/login/index' }), 1500)
-          reject(new Error('登录已过期'))
+
+          // 普通过期或旧版后端未携带原因时，后台微信重登并自动重试原请求。
+          // 账号停用、改密、主动踢出等安全场景不做静默恢复。
+          if (!options.skipAuth && !options._authRetry && SECURITY_AUTH_REASONS.indexOf(reason) === -1) {
+            _silentRelogin()
+              .then(() => request(path, Object.assign({}, options, { _authRetry: true })))
+              .then(resolve)
+              .catch((error) => {
+                if (error && error.permanent) {
+                  _clearAuthAndGoLogin(reason)
+                } else if (!options.silent) {
+                  wx.showToast({ title: '网络不稳定，请重试', icon: 'none' })
+                }
+                reject(error)
+              })
+            return
+          }
+
+          _clearAuthAndGoLogin(reason)
+          reject(new Error('登录状态已失效'))
         } else {
           const msg = _extractErrorMessage(res.data)
           console.error('[request] 请求失败:', path, 'status:', res.statusCode, 'msg:', msg)
@@ -206,7 +358,7 @@ async function request(path, options = {}) {
       },
       fail: (err) => {
         console.error('[request] 网络错误:', path, err)
-        wx.showToast({ title: '网络错误', icon: 'none' })
+        if (!options.silent) wx.showToast({ title: '网络错误', icon: 'none' })
         reject(err)
       },
     })
@@ -246,6 +398,13 @@ const visitApi = {
     if (spaceId) params.push(`space_id=${spaceId}`)
     return `${BASE_URL}/api/visits/export${params.length ? '?' + params.join('&') : ''}`
   },
+}
+
+const visitNoteApi = {
+  list: (visitId) => request(`/api/visit-notes?visit_id=${encodeURIComponent(visitId)}`),
+  create: (data) => request('/api/visit-notes', { method: 'POST', data }),
+  update: (id, content) => request(`/api/visit-notes/${id}`, { method: 'PATCH', data: { content } }),
+  delete: (id) => request(`/api/visit-notes/${id}`, { method: 'DELETE' }),
 }
 
 // 活动 API
@@ -527,9 +686,22 @@ const expenseApi = {
   delete: (id) => request(`/api/expenses/${id}`, { method: 'DELETE' }),
 }
 
+// 自定义筛选
+const customAnalysisApi = {
+  metadata: () => request('/api/custom-analysis/metadata'),
+  execute: (plan, page = 1, pageSize = 20) => request('/api/custom-analysis/execute', {
+    method: 'POST',
+    data: { plan, page, page_size: pageSize },
+  }),
+  listTemplates: () => request('/api/custom-analysis/templates'),
+  createTemplate: (data) => request('/api/custom-analysis/templates', { method: 'POST', data }),
+  markTemplateUsed: (id) => request(`/api/custom-analysis/templates/${id}/use`, { method: 'POST' }),
+}
+
 module.exports = {
   request,
   visitApi,
+  visitNoteApi,
   classRecordApi,
   customerApi,
   customerTagApi,
@@ -549,4 +721,5 @@ module.exports = {
   paymentApi,
   communicationRecordApi,
   expenseApi,
+  customAnalysisApi,
 }

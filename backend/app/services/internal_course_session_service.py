@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from app.models.internal_course_session import InternalCourseSession, InternalCourseSessionCreate
-from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "internal_course_sessions.json"
 _sessions: Dict[str, InternalCourseSession] = {}
@@ -57,46 +57,18 @@ def _get_chargeable_ids(session) -> set:
 
 
 def _deduct_for_session(session):
-    """为新创建的活动扣费"""
-    from app.services import membership_card_service
-    chargeable = membership_card_service.filter_arrived_customer_ids(
-        session.date,
-        _get_chargeable_ids(session),
-    )
-    activity_key = f"ics:{session.id}"
-    deduction_count = membership_card_service.get_activity_deduction_count(session)
-    with membership_card_service._deduct_lock:
-        for cid in chargeable:
-            membership_card_service._do_sync_activity_count(cid, activity_key, deduction_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+    """内部课程不扣卡，无需写入扣卡与欠卡数据。"""
+    return None
 
 
 def _restore_for_session(session):
-    """为删除的活动退费"""
-    from app.services import membership_card_service
-    chargeable = _get_chargeable_ids(session)
-    activity_key = f"ics:{session.id}"
-    with membership_card_service._deduct_lock:
-        for cid in chargeable:
-            membership_card_service._do_sync_activity_count(cid, activity_key, 0)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+    """内部课程不扣卡，删除时无需恢复扣卡数据。"""
+    return None
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
-    """同步参与人员和单场扣卡次数。"""
-    from app.services import membership_card_service
-    old_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, old_chargeable)
-    new_chargeable = membership_card_service.filter_arrived_customer_ids(session.date, new_chargeable)
-    activity_key = f"ics:{session.id}"
-    deduction_count = membership_card_service.get_activity_deduction_count(session)
-    with membership_card_service._deduct_lock:
-        for cid in old_chargeable | new_chargeable:
-            target_count = deduction_count if cid in new_chargeable else 0
-            membership_card_service._do_sync_activity_count(cid, activity_key, target_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+    """内部课程不扣卡，参与人员变化无需同步扣卡数据。"""
+    return None
 
 
 def _get_all_member_ids(session) -> set:
@@ -117,7 +89,7 @@ def _refresh_affected_identities(customer_ids: set):
                 pass
 
 
-def create_session(data: InternalCourseSessionCreate) -> InternalCourseSession:
+def create_session(data: InternalCourseSessionCreate, refresh_identities: bool = True) -> InternalCourseSession:
     now = datetime.now(timezone.utc)
     session = InternalCourseSession(
         id=str(uuid.uuid4())[:12],
@@ -128,11 +100,16 @@ def create_session(data: InternalCourseSessionCreate) -> InternalCourseSession:
     _sessions[session.id] = session
     _save(session.id)
     _deduct_for_session(session)
-    _refresh_affected_identities(_get_all_member_ids(session))
+    if refresh_identities:
+        _refresh_affected_identities(_get_all_member_ids(session))
     return session
 
 
-def update_session(session_id: str, data: dict) -> Optional[InternalCourseSession]:
+def update_session(
+    session_id: str,
+    data: dict,
+    refresh_identities: bool = True,
+) -> Optional[InternalCourseSession]:
     from app.services import visit_service
 
     session = _sessions.get(session_id)
@@ -148,7 +125,7 @@ def update_session(session_id: str, data: dict) -> Optional[InternalCourseSessio
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
+        if hasattr(session, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
             setattr(session, key, value)
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session
@@ -156,12 +133,13 @@ def update_session(session_id: str, data: dict) -> Optional[InternalCourseSessio
 
     new_chargeable = _get_chargeable_ids(session)
     _sync_deduction(session, old_chargeable, new_chargeable)
-    _refresh_affected_identities(old_ids | _get_all_member_ids(session))
+    if refresh_identities:
+        _refresh_affected_identities(old_ids | _get_all_member_ids(session))
 
     return session
 
 
-def delete_session(session_id: str) -> bool:
+def delete_session(session_id: str, refresh_identities: bool = True) -> bool:
     session = _sessions.get(session_id)
     if not session or session.is_deleted:
         return False
@@ -170,7 +148,8 @@ def delete_session(session_id: str) -> bool:
     session.is_deleted = True
     session.deleted_at = datetime.now(timezone.utc)
     _save(session_id)
-    _refresh_affected_identities(affected_ids)
+    if refresh_identities:
+        _refresh_affected_identities(affected_ids)
     return True
 
 

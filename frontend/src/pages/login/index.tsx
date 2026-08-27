@@ -42,9 +42,7 @@ export default function LoginPage() {
         localStorage.setItem("authToken", result.token)
         localStorage.setItem("currentUser", JSON.stringify(result.account))
         storePagePermissions(permissions)
-        localStorage.setItem("userCustomerPermissions", JSON.stringify(result.customer_permissions || []))
-        localStorage.setItem("userCustomerPermissionsClassRecords", JSON.stringify(result.customer_permissions_class_records || []))
-        localStorage.setItem("userCustomerPermissionsPayment", JSON.stringify(result.customer_permissions_payment || []))
+        localStorage.setItem("userEditPermissions", JSON.stringify(result.edit_permissions || { visits: "own", activities: "own" }))
         if (rememberAccount) {
           localStorage.setItem("rememberedUsername", username)
         } else {

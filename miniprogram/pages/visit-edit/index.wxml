@@ -1,4 +1,8 @@
-<view class="container" wx:if="{{!loading}}">
+<view class="container {{readOnly ? 'read-only' : ''}}" wx:if="{{!loading}}">
+  <view class="record-meta">
+    <text>创建人 · {{createdBy || '未记录'}}</text>
+    <text class="readonly-text" wx:if="{{readOnly}}">部分信息仅创建人可改</text>
+  </view>
   <!-- 是否组长 -->
   <view class="form-card">
     <view class="form-item last compact-row">
@@ -13,16 +17,22 @@
   <view class="form-card">
     <view class="form-item">
       <text class="form-label">日期</text>
-      <picker class="form-picker" mode="date" value="{{visitDate}}" bindchange="onDateChange">
+      <picker wx:if="{{!readOnly}}" class="form-picker" mode="date" value="{{visitDate}}" bindchange="onDateChange">
         <view class="picker-display">{{visitDate}}</view>
       </picker>
+      <text wx:else class="protected-value">{{visitDate || '-'}}</text>
     </view>
-    <view class="form-item">
+    <view class="form-item last">
       <text class="form-label">预计时间</text>
-      <picker class="form-picker" mode="time" value="{{visitTime}}" bindchange="onTimeChange">
+      <picker wx:if="{{!readOnly}}" class="form-picker" mode="time" value="{{visitTime}}" bindchange="onTimeChange">
         <view class="picker-display">{{visitTime}}</view>
       </picker>
+      <text wx:else class="protected-value">{{visitTime || '-'}}</text>
     </view>
+  </view>
+
+  <!-- 到店状态允许现场其他员工协作修改 -->
+  <view class="form-card arrival-card">
     <view class="form-item switch-row {{arrived ? '' : 'last'}}">
       <text class="form-label">到店</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
@@ -42,40 +52,26 @@
     <view class="form-item" bindtap="onPickerOpen" data-field="customer">
       <text class="form-label">客户</text>
       <view class="picker-value-wrap">
-        <text class="{{nickname ? '' : 'placeholder'}}">{{nickname || '选择用户'}}</text>
-        <text class="picker-clear" wx:if="{{nickname}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="{{nickname ? '' : 'placeholder'}}">{{nickname || (readOnly ? '-' : '选择用户')}}</text>
+        <text class="picker-clear" wx:if="{{nickname && !readOnly}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="form-item">
-      <text class="form-label">本次需求</text>
-      <input class="form-input" value="{{needs}}" bindinput="onNeedsInput" placeholder="描述客户需求" placeholder-class="form-input-placeholder" />
+      <text class="form-label">来访需求</text>
+      <input wx:if="{{!readOnly}}" class="form-input" value="{{needs}}" bindinput="onNeedsInput" placeholder="请输入来访需求" placeholder-class="form-input-placeholder" />
+      <text wx:else class="protected-value protected-value-wrap">{{needs || '-'}}</text>
     </view>
     <view class="form-item last" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>
       <view class="picker-value-wrap">
-        <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || '选择用户'}}</text>
-        <text class="picker-clear" wx:if="{{referrerHandler}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
+        <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || (readOnly ? '-' : '选择用户')}}</text>
+        <text class="picker-clear" wx:if="{{referrerHandler && !readOnly}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
       </view>
     </view>
   </view>
 
-  <!-- 记录 -->
-  <view class="form-card">
-    <view class="form-item column textarea-row">
-      <text class="form-label" style="margin-bottom: 16rpx;">客户信息</text>
-      <view class="text-preview" bindtap="onOpenEditor" data-field="feedback" data-label="客户信息">
-        <text class="text-preview-content {{feedback ? '' : 'text-preview-placeholder'}}">{{feedback || '点击输入客户信息'}}</text>
-        <text class="text-preview-count">{{feedback.length}} 字</text>
-      </view>
-    </view>
-    <view class="form-item column textarea-row last">
-      <text class="form-label" style="margin-bottom: 16rpx;">跟进点</text>
-      <view class="text-preview" bindtap="onOpenEditor" data-field="healingNotes" data-label="跟进点">
-        <text class="text-preview-content {{healingNotes ? '' : 'text-preview-placeholder'}}">{{healingNotes || '点击输入跟进点'}}</text>
-        <text class="text-preview-count">{{healingNotes.length}} 字</text>
-      </view>
-    </view>
-  </view>
+  <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" />
+  <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" />
 
   <!-- 搜索选择弹窗 -->
   <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>

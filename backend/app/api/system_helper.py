@@ -43,7 +43,7 @@ class SystemHelperRequest(StrictBaseModel):
 
 # 权限与页面的映射关系
 PERMISSION_PAGE_MAP = {
-    "business-reminders": ("提醒", "/business-reminders"),
+    "custom-analysis": ("自定义筛选", "/custom-analysis"),
     "referral-statistics": ("引流统计", "/referral-statistics"),
     "member-statistics": ("会员情况", "/member-statistics"),
     "course-statistics": ("课程", "/course-statistics"),
@@ -82,7 +82,6 @@ PERMISSION_PAGE_MAP = {
     "healing-identities": ("疗愈老师", "/healing-identities"),
     "organizations": ("组织信息", "/organizations"),
     "spaces": ("疗愈空间", "/courses/spaces"),
-    "reminders": ("提醒配置", "/config/reminders"),
     "position-management": ("账号管理", "/positions/management"),
     "change-password": ("密码修改", "/change-password"),
     "disabled-customers": ("停用客户", "/disabled-customers"),
@@ -91,6 +90,7 @@ PERMISSION_PAGE_MAP = {
     "system-logs": ("系统日志", "/system-logs"),
     "operation-logs": ("操作日志", "/operation-logs"),
     "login-records": ("使用统计", "/login-records"),
+    "analysis-logs": ("分析日志", "/analysis-logs"),
 }
 
 

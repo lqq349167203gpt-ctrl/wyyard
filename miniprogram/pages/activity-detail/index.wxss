@@ -4,6 +4,39 @@
   min-height: 100vh;
 }
 
+.record-meta {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+  padding: 0 4rpx;
+  color: #8f959e;
+  font-size: 24rpx;
+}
+
+.readonly-text {
+  padding-left: 16rpx;
+  border-left: 1rpx solid #e8eaed;
+}
+
+.protected-value {
+  flex: 1;
+  color: #2b2f36;
+  font-size: 28rpx;
+  text-align: right;
+}
+
+.protected-description {
+  display: block;
+  width: 100%;
+  min-height: 96rpx;
+  color: #2b2f36;
+  font-size: 28rpx;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .container.no-scroll {
   overflow: hidden;
   height: 100vh;

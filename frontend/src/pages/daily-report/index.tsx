@@ -143,7 +143,7 @@ export default function DailyReportPage() {
     // 第一部分：当日客户
     html += `<table><colgroup><col width="60"><col width="50"><col width="80"><col width="60"><col width="50"><col width="50"><col width="50"><col width="50"><col width="50"><col width="60"><col width="120"><col width="120"><col width="100"><col width="100"><col width="70"><col width="50"><col width="40"></colgroup>`
     html += `<tr class="section"><td colspan="16">当日客户（${sortedVisits.length}人）</td></tr>`
-    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th><th>当日需求</th><th>客户信息</th><th>跟进点</th><th>今日成交</th><th>邀约</th><th>到场</th></tr>`
+    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th><th>来访需求</th><th>客户信息</th><th>跟进点</th><th>今日成交</th><th>邀约</th><th>到场</th></tr>`
     for (const v of sortedVisits) {
       html += `<tr>
         <td>${esc(v.referrer || "-")}</td>
@@ -694,7 +694,7 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-center font-normal w-[50px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("activity_count")}><span className="inline-flex items-center gap-0">总参与<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "activity_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "activity_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[48px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("today_activity")}><span className="inline-flex items-center gap-0">今日<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "today_activity" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "today_activity" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[57px] border-b-[0.5px] border-[#e8eaed]">剩余次数</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">当日需求</th>
+                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">来访需求</th>
                   <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">客户信息</th>
                   <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">跟进点</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[74px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("daily_amount")}><span className="inline-flex items-center gap-0">今日成交<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "daily_amount" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "daily_amount" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
@@ -897,7 +897,7 @@ export default function DailyReportPage() {
                 <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                   <span className="w-32 shrink-0">日期</span>
                   <span className="w-20 shrink-0">邀约人</span>
-                  <span className="w-24 shrink-0">需求</span>
+                  <span className="w-24 shrink-0">来访需求</span>
                   <span className="flex-1">客户信息</span>
                   <span className="w-24 shrink-0">跟进点</span>
                   <span className="w-11 shrink-0" />
@@ -927,7 +927,7 @@ export default function DailyReportPage() {
                 <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                   <span className="w-40 shrink-0">日期</span>
                   <span className="w-20 shrink-0">邀约人</span>
-                  <span className="w-24 shrink-0">需求</span>
+                  <span className="w-24 shrink-0">来访需求</span>
                   <span className="flex-1">客户信息</span>
                   <span className="w-24 shrink-0">跟进点</span>
                   <span className="w-11 shrink-0" />
@@ -957,7 +957,7 @@ export default function DailyReportPage() {
                 <div className="flex items-center px-4 py-1.5 text-[11px] text-[#8f959e] border-b border-[#f0f0f0]">
                   <span className="w-40 shrink-0">日期</span>
                   <span className="w-20 shrink-0">邀约人</span>
-                  <span className="w-24 shrink-0">需求</span>
+                  <span className="w-24 shrink-0">来访需求</span>
                   <span className="flex-1">客户信息</span>
                   <span className="w-24 shrink-0">跟进点</span>
                   <span className="w-11 shrink-0" />

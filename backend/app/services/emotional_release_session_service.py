@@ -69,8 +69,7 @@ def _deduct_for_session(session):
     with membership_card_service._deduct_lock:
         for cid in chargeable:
             membership_card_service._do_sync_activity_count(cid, activity_key, deduction_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usages(chargeable)
 
 
 def _restore_for_session(session):
@@ -81,8 +80,7 @@ def _restore_for_session(session):
     with membership_card_service._deduct_lock:
         for cid in chargeable:
             membership_card_service._do_sync_activity_count(cid, activity_key, 0)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usages(chargeable)
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
@@ -93,11 +91,11 @@ def _sync_deduction(session, old_chargeable, new_chargeable):
     activity_key = f"ers:{session.id}"
     deduction_count = membership_card_service.get_activity_deduction_count(session)
     with membership_card_service._deduct_lock:
-        for cid in old_chargeable | new_chargeable:
+        affected_ids = old_chargeable | new_chargeable
+        for cid in affected_ids:
             target_count = deduction_count if cid in new_chargeable else 0
             membership_card_service._do_sync_activity_count(cid, activity_key, target_count)
-        membership_card_service._save_deductions()
-        membership_card_service._save_debts()
+        membership_card_service._save_customer_usages(affected_ids)
 
 
 def _get_all_member_ids(session) -> set:
@@ -161,7 +159,7 @@ def update_session(session_id: str, data: dict):
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
+        if hasattr(session, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
             setattr(session, key, value)
 
     # 案主不能同时是参与者

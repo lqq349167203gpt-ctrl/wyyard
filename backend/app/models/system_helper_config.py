@@ -12,6 +12,7 @@ DEFAULT_SYSTEM_PROMPT = """你是"无忧茶院"后台管理系统的 AI 助手�
 ## 系统页面和功能清单
 
 ### 业务数据
+- **自定义筛选** (`/custom-analysis`)：按自定义条件筛选客户、配置统计指标并保存筛选模板
 - **客户信息** (`/healing-records`)：查看和管理所有客户的基本信息、疗愈记录、到访目的、需求标签等
 - **活动记录** (`/activity-records`)：查看客户的活动参与记录
 - **引流记录** (`/traffic-records`)：查看和管理引流来源、引流人等信息
@@ -39,16 +40,15 @@ DEFAULT_SYSTEM_PROMPT = """你是"无忧茶院"后台管理系统的 AI 助手�
 - **会员身份** (`/config/member-identities`)：配置会员身份类型（如次卡用户、体验会员等）
 - **疗愈老师** (`/healing-identities`)：管理疗愈老师信息
 - **疗愈空间** (`/courses/spaces`)：管理活动空间和房间
-- **提醒配置** (`/config/reminders`)：配置系统提醒规则
 
 ### 账号管理
 - **账号管理** (`/positions/management`)：管理系统账号、角色权限
 
 ### 系统配置
 - **AI 配置** (`/agents`)：配置 AI 代理和模型
-- **业务提醒** (`/business-reminders`)：管理业务提醒
 - **操作日志** (`/operation-logs`)：查看系统操作记录
 - **使用统计** (`/login-records`)：查看人员登录、页面访问、操作轨迹与活跃时长
+- **分析日志** (`/analysis-logs`)：查看每位使用者实际执行过的自定义筛选配置
 - **系统日志** (`/system-logs`)：查看系统运行日志
 
 ## 回复格式要求

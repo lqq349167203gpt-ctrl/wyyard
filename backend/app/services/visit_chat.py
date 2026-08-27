@@ -255,11 +255,11 @@ def record_customer_needs(customer_name: str, needs: str) -> str:
             customer_id=customer["id"],
             space_id=space_id, needs=needs,
         ))
-        _log_visit(f"新增邀约 {customer['nickname']}（{date}）并记录需求：{needs}")
+        _log_visit(f"新增邀约 {customer['nickname']}（{date}）并记录来访需求：{needs}")
         return json.dumps({"ok": True, "action": "needs", "name": customer["nickname"], "needs": needs, "auto_added": True}, ensure_ascii=False)
 
     visit_service.update_visit(visit.id, {"needs": needs})
-    _log_visit(f"{customer['nickname']}记录需求：{needs}", method="PATCH")
+    _log_visit(f"{customer['nickname']}记录来访需求：{needs}", method="PATCH")
     return json.dumps({"ok": True, "action": "needs", "name": customer["nickname"], "needs": needs}, ensure_ascii=False)
 
 
@@ -286,7 +286,15 @@ def record_customer_feedback(customer_name: str, feedback: str) -> str:
     if not visit:
         return json.dumps({"ok": False, "reason": "not_in_list", "name": customer["nickname"]}, ensure_ascii=False)
 
-    visit_service.update_visit(visit.id, {"feedback": feedback})
+    from app.services import visit_note_service
+
+    operator = _ctx_var.get().get("operator", "")
+    visit_note_service.create_note(
+        visit.id,
+        "customer_info",
+        feedback,
+        creator=operator or "AI 助手",
+    )
     _log_visit(f"{customer['nickname']}记录反馈：{feedback}", method="PATCH")
     return json.dumps({"ok": True, "action": "feedback", "name": customer["nickname"], "feedback": feedback}, ensure_ascii=False)
 
@@ -566,7 +574,7 @@ def _build_reply_from_tools(tool_call_log: list) -> str:
             if action == "leave":
                 return f"{name}已从名单中移除。"
             if action == "needs":
-                return f"{name}的需求已记录。"
+                return f"{name}的来访需求已记录。"
             if action == "feedback":
                 return f"{name}的反馈已记录。"
             if action == "referrer":

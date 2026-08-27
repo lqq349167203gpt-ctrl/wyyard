@@ -44,6 +44,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
+  "miniprogramRoot": "./",
   "libVersion": "3.16.1",
   "appid": "wxefe15693e167e37a",
   "projectname": "wyyard-miniprogram",
