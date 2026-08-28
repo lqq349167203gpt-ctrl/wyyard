@@ -5,7 +5,12 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.services import payment_export_service, position_permission_service
+from app.services import (
+    customer_access_service,
+    customer_service,
+    payment_export_service,
+    position_permission_service,
+)
 
 router = APIRouter(prefix="/api/payment-exports", tags=["payment-exports"])
 
@@ -81,6 +86,11 @@ def export_payment_records(
         page_permissions = position_permission_service.get_permissions(user_role)
         if "payment" not in page_permissions:
             raise HTTPException(status_code=403, detail="无付费项目页面权限")
+    customer_access_service.require_transaction_access(request, detail=True)
+    visible_customer_ids = customer_access_service.visible_customer_ids(
+        request,
+        customer_service.list_all_customers(),
+    )
 
     resolved_from, resolved_to, filename = _resolve_export_range(
         range_type,
@@ -92,6 +102,7 @@ def export_payment_records(
         user_role,
         resolved_from,
         resolved_to,
+        allowed_customer_ids=visible_customer_ids,
     )
     if record_count == 0:
         raise HTTPException(status_code=404, detail="所选时间范围内暂无付费记录")

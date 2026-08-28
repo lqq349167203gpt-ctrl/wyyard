@@ -1,6 +1,6 @@
 import uuid
 
-from app.services import position_permission_service
+from app.services import position_edit_permission_service, position_permission_service
 
 
 def _create_account(client, suffix: str):
@@ -26,12 +26,17 @@ def _create_account(client, suffix: str):
 def test_customer_tags_keep_private_tags_isolated_and_filter_customers(client, created_customer):
     suffix = uuid.uuid4().hex[:10]
     previous_permissions = position_permission_service.get_permissions("管理员")
+    previous_edit_permissions = position_edit_permission_service.get_permissions("管理员")
     account_ids: list[str] = []
     public_tag_id = ""
     private_tag_id = ""
     first_headers: dict[str, str] = {}
     try:
         position_permission_service.set_permissions("管理员", ["healing-records"])
+        position_edit_permission_service.set_permissions(
+            "管理员",
+            position_edit_permission_service.SUPER_ADMIN_PERMISSIONS,
+        )
         first, first_headers = _create_account(client, suffix + "a")
         second, second_headers = _create_account(client, suffix + "b")
         account_ids.extend([first["id"], second["id"]])
@@ -127,6 +132,7 @@ def test_customer_tags_keep_private_tags_isolated_and_filter_customers(client, c
         assert hidden_referral_statistics.status_code == 403
     finally:
         position_permission_service.set_permissions("管理员", previous_permissions)
+        position_edit_permission_service.set_permissions("管理员", previous_edit_permissions)
         if private_tag_id and first_headers:
             client.delete(f"/api/customer-tags/{private_tag_id}", headers=first_headers)
         if public_tag_id:

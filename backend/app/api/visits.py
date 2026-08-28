@@ -4,12 +4,28 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.models.visit import VisitRecordCreate
-from app.services import customer_service, visit_service
+from app.services import customer_access_service, customer_service, visit_service
 from app.services.customer_service import get_customer
 from app.utils.pagination import paginate
 from app.utils.record_ownership import ensure_creator_for_changed_fields, ensure_record_creator, stamp_creator
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
+
+
+def _visible_customer_ids(request: Request | None) -> set[str] | None:
+    if request is None:
+        return None
+    return customer_access_service.visible_customer_ids(
+        request,
+        customer_service.list_customers(),
+    )
+
+
+def _filter_visible_visits(request: Request | None, records: list) -> list:
+    visible_ids = _visible_customer_ids(request)
+    if visible_ids is None:
+        return records
+    return [record for record in records if record.customer_id in visible_ids]
 
 
 def _fill_member_type(record):
@@ -83,10 +99,15 @@ async def list_visits(
     space_id: str = None,
     page: int | None = Query(None, ge=1),
     page_size: int | None = Query(None, ge=1, le=100),
+    request: Request = None,
 ):
-    records = visit_service.list_visits(date, customer_id, space_id)
+    records = _filter_visible_visits(
+        request,
+        visit_service.list_visits(date, customer_id, space_id),
+    )
     items = [_fill_member_type(r) for r in records]
-    if date:
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    if date and customer_access_service.can_view_transaction_summary(role):
         _fill_daily_amount(items, date)
     if page is not None:
         return paginate(items, page, page_size or 10)
@@ -97,10 +118,15 @@ async def list_visits(
 async def list_visits_light(
     date: str = None,
     space_id: str = None,
+    request: Request = None,
 ):
     """轻量版列表，不计算活动详情，适用于主页快速加载"""
     try:
-        return visit_service.list_visits_light(date, space_id)
+        items = visit_service.list_visits_light(date, space_id)
+        visible_ids = _visible_customer_ids(request)
+        if visible_ids is None:
+            return items
+        return [item for item in items if item.get("customer_id") in visible_ids]
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -114,6 +140,7 @@ async def get_visit_counts(
     end_date: str | None = Query(None),
     member_types: str | None = Query(None),
     space_id: str | None = Query(None),
+    request: Request = None,
 ):
     """返回各日期的到场人数统计 {date: count}，不做活动计数。支持 member_types 过滤权限"""
     ids = None
@@ -130,31 +157,51 @@ async def get_visit_counts(
         ids = [x for x in customer_ids.split(",") if x]
         if not ids:
             return {}
+    visible_ids = _visible_customer_ids(request)
+    if visible_ids is not None:
+        ids = list(visible_ids if ids is None else visible_ids.intersection(ids))
+        if not ids:
+            return {}
     return visit_service.get_date_counts(ids, start_date, end_date, space_id)
 
 
 @router.get("/search-customers")
-async def search_customers(q: str = ""):
-    return visit_service.search_customers(q)
+async def search_customers(q: str = "", request: Request = None):
+    results = visit_service.search_customers(q)
+    visible_ids = _visible_customer_ids(request)
+    if visible_ids is None:
+        return results
+    return [result for result in results if result.id in visible_ids]
 
 
 @router.post("/reorder")
-async def reorder_visits(data: dict):
+async def reorder_visits(data: dict, request: Request):
     """批量更新排序权重。传入 {"ids": ["id1", "id2", ...]} 按顺序设置 sort_order"""
     ids = data.get("ids", [])
     if not ids:
         raise HTTPException(status_code=400, detail="ids 不能为空")
+    records = {record.id: record for record in visit_service.list_visits()}
+    if any(visit_id not in records for visit_id in ids):
+        raise HTTPException(status_code=404, detail="邀约记录不存在")
+    visible_ids = _visible_customer_ids(request)
+    if visible_ids is not None and any(
+        records[visit_id].customer_id not in visible_ids for visit_id in ids
+    ):
+        raise HTTPException(status_code=403, detail="只能调整可见客户的邀约顺序")
     visit_service.reorder_visits(ids)
     return {"message": "排序已更新"}
 
 
 @router.get("/export")
-async def export_visits(date: str = None, space_id: str = None):
+async def export_visits(date: str = None, space_id: str = None, request: Request = None):
     """导出邀约到场 xlsx，格式与 PC 端一致"""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-    records = visit_service.list_visits(date, space_id=space_id)
+    records = _filter_visible_visits(
+        request,
+        visit_service.list_visits(date, space_id=space_id),
+    )
     items = [_fill_member_type(r) for r in records if not r.cancelled]
 
     # 构建组长映射（复用 PC 端逻辑）
@@ -240,15 +287,17 @@ async def export_visits(date: str = None, space_id: str = None):
 
 
 @router.get("/{visit_id}")
-async def get_visit(visit_id: str):
+async def get_visit(visit_id: str, request: Request):
     record = visit_service.get_visit(visit_id)
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    customer_access_service.require_customer_scope(request, record.customer_id)
     return _fill_member_type(record)
 
 
 @router.post("")
 async def create_visit(data: VisitRecordCreate, request: Request):
+    customer_access_service.require_customer_scope(request, data.customer_id, action="邀约")
     try:
         record = visit_service.create_visit(stamp_creator(data, request))
         return _fill_member_type(record)
@@ -260,6 +309,11 @@ async def create_visit(data: VisitRecordCreate, request: Request):
 async def update_visit(visit_id: str, data: dict, request: Request):
     # 记录更新前的到场状态
     old_record = visit_service.get_visit(visit_id)
+    if not old_record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    customer_access_service.require_customer_scope(request, old_record.customer_id, action="修改")
+    if data.get("customer_id") and data["customer_id"] != old_record.customer_id:
+        customer_access_service.require_customer_scope(request, data["customer_id"], action="邀约")
     ensure_creator_for_changed_fields(
         request,
         old_record,
@@ -338,7 +392,11 @@ async def update_visit(visit_id: str, data: dict, request: Request):
 
 @router.delete("/{visit_id}")
 async def delete_visit(visit_id: str, request: Request):
-    ensure_record_creator(request, visit_service.get_visit(visit_id), "邀约", "visits")
+    record = visit_service.get_visit(visit_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    customer_access_service.require_customer_scope(request, record.customer_id, action="删除")
+    ensure_record_creator(request, record, "邀约", "visits")
     if not visit_service.delete_visit(visit_id):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"message": "已删除"}

@@ -182,7 +182,9 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                 <TableCell className="tabular-nums text-[#2b2f36]">
                   {c.activity_count ? `${c.activity_count} 场` : <EmptyValue />}
                 </TableCell>
-                <TableCell className="tabular-nums text-[#2b2f36]">¥{(c.total_payment ?? 0).toLocaleString()}</TableCell>
+                <TableCell className="tabular-nums text-[#2b2f36]">
+                  {c.total_payment === null ? <span className="text-[#c9cdd4]">—</span> : `¥${c.total_payment.toLocaleString()}`}
+                </TableCell>
                 <TableCell className="text-[11px] text-[#8f959e] tabular-nums">
                   {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString("zh-CN") : <EmptyValue />}
                 </TableCell>

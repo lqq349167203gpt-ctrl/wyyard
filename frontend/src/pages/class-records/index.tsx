@@ -30,6 +30,7 @@ export default function ClassRecordsPage() {
   const navigate = useNavigate()
   const [allCustomers, setAllCustomers] = useState<Customer[]>([])
   const [spaces, setSpaces] = useState<Space[]>([])
+  const [spacesLoaded, setSpacesLoaded] = useState(false)
   const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
     try { return localStorage.getItem("selected-space-id") || "" } catch { return "" }
   })
@@ -66,13 +67,19 @@ export default function ClassRecordsPage() {
         setAllCustomers(customers)
       })
       .catch((e) => { console.error("customerApi.list failed:", e) })
-    spaceApi.list().then((data) => {
-      setSpaces(data)
-      if (!selectedSpaceId && data.length > 0) {
-        setSelectedSpaceId(data[0].id)
-        localStorage.setItem("selected-space-id", data[0].id)
-      }
-    }).catch(() => {})
+    spaceApi.list()
+      .then((data) => {
+        setSpaces(data)
+        const nextSpaceId = data.some(space => space.id === selectedSpaceId)
+          ? selectedSpaceId
+          : data[0]?.id || ""
+        if (nextSpaceId !== selectedSpaceId) {
+          setSelectedSpaceId(nextSpaceId)
+          if (nextSpaceId) localStorage.setItem("selected-space-id", nextSpaceId)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSpacesLoaded(true))
   }
 
   useEffect(() => { load() }, [])
@@ -110,11 +117,19 @@ export default function ClassRecordsPage() {
 
   // 加载日期范围内的到场人数（轻量 API，日期滑块需要）
   useEffect(() => {
+    if (!spacesLoaded || !selectedSpaceId) {
+      setVisitCounts({})
+      return
+    }
+    let cancelled = false
     const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
-    visitApi.counts({ startDate: dateRangeStart, endDate, spaceId: selectedSpaceId || undefined })
-      .then(setVisitCounts)
+    visitApi.counts({ startDate: dateRangeStart, endDate, spaceId: selectedSpaceId })
+      .then((counts) => {
+        if (!cancelled) setVisitCounts(counts)
+      })
       .catch(() => {})
-  }, [dateRangeStart, selectedSpaceId])
+    return () => { cancelled = true }
+  }, [dateRangeStart, selectedSpaceId, spacesLoaded])
 
   const handleSpaceSelect = useCallback((id: string) => {
     startTransition(() => {

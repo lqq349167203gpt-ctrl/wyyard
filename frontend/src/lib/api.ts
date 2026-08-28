@@ -318,7 +318,7 @@ export interface Customer {
   paid_content: PaidContentItem[]
   visit_count: number
   activity_count: number
-  total_payment: number
+  total_payment: number | null
   last_visit_date?: string | null
   core_situation: string
   need_tags: string
@@ -341,6 +341,8 @@ export interface Customer {
   created_at: string
   updated_at: string
   customer_tags?: CustomerTag[]
+  contact_permissions?: ContactPermissions
+  customer_access_permissions?: CustomerAccessPermissions
 }
 
 export type CustomerCreate = Omit<Customer, "id" | "created_at" | "updated_at">
@@ -371,13 +373,18 @@ export interface DisabledCustomer {
 }
 
 let _customerLightCache: CustomerLight[] | null = null
+let _customerLightCachedAt = 0
+const CUSTOMER_LIGHT_CACHE_TTL = 30_000
 
 export const customerApi = {
   list: () => request<Customer[]>("/api/customers"),
-  light: () => {
-    if (_customerLightCache) return Promise.resolve(_customerLightCache)
+  light: (forceRefresh = false) => {
+    if (!forceRefresh && _customerLightCache && Date.now() - _customerLightCachedAt < CUSTOMER_LIGHT_CACHE_TTL) {
+      return Promise.resolve(_customerLightCache)
+    }
     return request<CustomerLight[]>("/api/customers/light").then(data => {
       _customerLightCache = data
+      _customerLightCachedAt = Date.now()
       return data
     })
   },
@@ -397,14 +404,19 @@ export const customerApi = {
     if (filters?.sort_order) params.set("sort_order", filters.sort_order)
     return request<PaginatedResponse<Customer>>(`/api/customers?${params.toString()}`)
   },
-  clearLightCache: () => { _customerLightCache = null },
+  clearLightCache: () => { _customerLightCache = null; _customerLightCachedAt = 0 },
 	  get: (id: string) => request<Customer>(`/api/customers/${id}`),
+  accessContact: (id: string, field: ContactField, action: "view" | "copy") =>
+    request<{ field: ContactField; value: string }>(`/api/customers/${id}/contact-access`, {
+      method: "POST",
+      body: JSON.stringify({ field, action }),
+    }),
   create: (data: Partial<CustomerCreate>) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
   update: (id: string, data: Partial<CustomerCreate>) => request<Customer>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
   delete: (id: string) => request<{ message: string }>(`/api/customers/${id}`, { method: "DELETE" }).then(r => { _customerLightCache = null; return r }),
   listDisabled: () => request<DisabledCustomer[]>(`/api/customers/disabled`),
   restore: (id: string) => request<Customer>(`/api/customers/${id}/restore`, { method: "POST" }).then(r => { _customerLightCache = null; return r }),
-  permanentDelete: (id: string) => request<{ message: string }>(`/api/customers/${id}/permanent`, { method: "DELETE" }),
+  permanentDelete: (id: string) => request<{ message: string }>(`/api/customers/${id}/permanent`, { method: "DELETE" }).then(r => { _customerLightCache = null; _customerLightCachedAt = 0; return r }),
   generateTags: (tags: string) => request<{ tags: string }>("/api/customers/generate-tags", { method: "POST", body: JSON.stringify({ tags }) }),
 }
 
@@ -2437,9 +2449,47 @@ export const accountApi = {
 
 // Position Permissions
 export type PositionEditScope = "own" | "all"
+export type ContactField = "phone" | "wechat"
+export type ContactAction = "view" | "copy" | "edit"
+export interface ContactActionPermissions {
+  view: boolean
+  copy: boolean
+  edit: boolean
+}
+export interface ContactPermissions {
+  phone: ContactActionPermissions
+  wechat: ContactActionPermissions
+}
+export type CustomerDataScope = "none" | "related" | "all"
+export type TransactionAccess = "none" | "summary" | "detail"
+export interface CustomerAccessPermissions {
+  scope: CustomerDataScope
+  relations: {
+    referrer: boolean
+    referrer_handler: boolean
+  }
+  sensitive_fields: {
+    visit_purpose: boolean
+    trauma_history: boolean
+    current_block: boolean
+    work_info: boolean
+    other_info: boolean
+  }
+  detail_tabs: {
+    follow_up: boolean
+    communication: boolean
+    activities: boolean
+    customer_followups: boolean
+    card_statistics: boolean
+    offline_courses: boolean
+  }
+  transaction_access: TransactionAccess
+}
 export interface PositionEditPermissions {
   visits: PositionEditScope
   activities: PositionEditScope
+  contacts: ContactPermissions
+  customer_access: CustomerAccessPermissions
 }
 
 export const positionPermissionApi = {
@@ -2862,7 +2912,7 @@ export interface CourseStatistics {
     participant_count: number
     new_count: number
     old_count: number
-    daily_transaction_amount: number
+    daily_transaction_amount: number | null
     participants: Array<{
       id: string
       nickname: string
@@ -2870,7 +2920,7 @@ export interface CourseStatistics {
       identity_group: "新人" | "老人" | string
       participation_role: string
       daily_need: string
-      daily_transaction_amount: number
+      daily_transaction_amount: number | null
       closers: string
     }>
   }>
@@ -2941,6 +2991,7 @@ export type AnalysisField =
   | "activity_count"
   | "activity_types"
   | "activity_names"
+  | "course_teachers"
   | "communication_count"
   | "last_communication_date"
   | "total_consumption"
@@ -2957,6 +3008,7 @@ export type AnalysisField =
   | "payment_methods"
   | "payment_count_period"
   | "payment_amount_period"
+  | "payment_dates"
   | "latest_payment_date"
 
 export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty"
@@ -2967,6 +3019,16 @@ export interface AnalysisCondition {
   field: AnalysisField
   operator: AnalysisOperator
   value: unknown
+  inherit_period?: boolean
+}
+
+export interface AnalysisComparisonGroup {
+  id: string
+  name: string
+  conditions: AnalysisCondition[]
+  condition_logic: "all" | "any"
+  date_from: string
+  date_to: string
 }
 
 export interface AnalysisPlan {
@@ -2982,6 +3044,8 @@ export interface AnalysisPlan {
   columns: AnalysisField[]
   sort_by: AnalysisField
   sort_order: "asc" | "desc"
+  analysis_mode: "single" | "comparison"
+  comparison_groups: AnalysisComparisonGroup[]
 }
 
 export interface AnalysisMetadata {
@@ -3006,6 +3070,23 @@ export interface AnalysisResult {
   page: number
   page_size: number
   total_pages: number
+  comparison_groups?: Array<{
+    id: string
+    name: string
+    date_from: string
+    date_to: string
+    total: number
+    cards: Array<{ key: string; title: string; count: number; unit: string; format: "number" | "currency"; is_total: boolean }>
+  }>
+  comparison_rows?: Array<{
+    metric: AnalysisMetric
+    title: string
+    unit: string
+    format: "number" | "currency"
+    values: number[]
+    difference: number | null
+    difference_rate: number | null
+  }>
 }
 
 export interface AnalysisTemplate {

@@ -4,7 +4,11 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.base import StrictBaseModel
-from app.services import activity_assignment_notification_service, class_record_service
+from app.services import (
+    activity_assignment_notification_service,
+    class_record_service,
+    customer_access_service,
+)
 from app.services.customer_service import get_customer, list_all_customers
 from app.utils.pagination import paginate
 from app.utils.record_ownership import (
@@ -17,10 +21,18 @@ from app.utils.record_ownership import (
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
 
 
-def _fill_visit_nicknames(visits):
+def _visible_customer_ids(request: Request | None) -> set[str] | None:
+    if request is None:
+        return None
+    return customer_access_service.visible_customer_ids(request, list_all_customers())
+
+
+def _fill_visit_nicknames(visits, visible_ids: set[str] | None = None):
     """为到访记录注入客户昵称"""
     result = []
     for v in visits:
+        if visible_ids is not None and v.customer_id not in visible_ids:
+            continue
         data = v.model_dump(mode="json")
         customer = get_customer(v.customer_id) if v.customer_id else None
         data["nickname"] = customer.nickname if customer else ""
@@ -29,7 +41,7 @@ def _fill_visit_nicknames(visits):
     return result
 
 
-def _fill_names(items: list) -> list:
+def _fill_names(items: list, visible_ids: set[str] | None = None) -> list:
     """从客户信息实时填充 owner_name / host_name"""
     customers = list_all_customers()
     customer_map = {c.id: c for c in customers}
@@ -45,7 +57,10 @@ def _fill_names(items: list) -> list:
         for field in ("owner_name", "host_name"):
             id_field = field.replace("_name", "_id")
             if id_field in data:
-                actual = get_name(data.get(id_field, ""))
+                customer_id = data.get(id_field, "")
+                actual = get_name(customer_id)
+                if field == "owner_name" and visible_ids is not None and customer_id not in visible_ids:
+                    actual = ""
                 if data.get(field) != actual:
                     data[field] = actual
 
@@ -70,6 +85,7 @@ def list_unified(
     end_date: str | None = Query(None),
     space_id: str | None = Query(None),
     teacher_id: str | None = Query(None),
+    request: Request = None,
 ):
     from app.services import (
         emotional_release_session_service,
@@ -100,7 +116,7 @@ def list_unified(
         items.append({"type": "ics", "data": s.model_dump(mode="json") if hasattr(s, "model_dump") else s, "date": s.get("date", "") if isinstance(s, dict) else getattr(s, "date", "")})
 
     # 从客户数据实时填充名称
-    items = _fill_names(items)
+    items = _fill_names(items, _visible_customer_ids(request))
 
     # 回填 space_name / room_name（含已删除的空间/房间）
     from app.services import space_service
@@ -184,6 +200,11 @@ def create_record(data: dict, request: Request, conversion: bool = False):
         record = stamp_creator(ClassRecordCreate(**data), request)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    customer_access_service.require_new_customer_ids(
+        request,
+        record.participant_ids,
+        action="添加",
+    )
     created = class_record_service.create_record(record, refresh_identities=not conversion)
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
     if not conversion:
@@ -198,6 +219,15 @@ def create_record(data: dict, request: Request, conversion: bool = False):
 @router.patch("/{record_id}")
 def update_record(record_id: str, data: dict, request: Request, conversion: bool = False):
     old_record = class_record_service.get_record(record_id)
+    if not old_record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    if "participant_ids" in data:
+        customer_access_service.require_new_customer_ids(
+            request,
+            data.get("participant_ids") or [],
+            existing_ids=old_record.participant_ids,
+            action="添加",
+        )
     ensure_creator_for_changed_fields(
         request, old_record, data, ACTIVITY_CREATOR_ONLY_FIELDS, "课表受保护信息", "activities"
     )
@@ -302,6 +332,12 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
     old_ids = set(old_record.participant_ids) if old_record else set()
+    customer_access_service.require_new_customer_ids(
+        request,
+        data.participant_ids,
+        existing_ids=old_ids,
+        action="添加",
+    )
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
     record, warnings = class_record_service.update_participants(record_id, data.participant_ids)
@@ -360,6 +396,30 @@ def update_groups(record_id: str, data: dict, request: Request):
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
     groups = data.get("groups", [])
+    submitted_group_ids = {
+        customer_id
+        for group in groups
+        for customer_id in (
+            [group.get("leader_id", ""), group.get("deputy_id", "")]
+            + list(group.get("member_ids", []) or [])
+        )
+        if customer_id
+    }
+    existing_group_ids = {
+        customer_id
+        for group in (old_record.groups or [])
+        for customer_id in (
+            [group.leader_id, group.deputy_id]
+            + list(group.member_ids or [])
+        )
+        if customer_id
+    }
+    customer_access_service.require_new_customer_ids(
+        request,
+        submitted_group_ids,
+        existing_ids=existing_group_ids,
+        action="添加",
+    )
     try:
         record, warnings = class_record_service.update_groups(record_id, groups)
     except ValueError as e:
@@ -485,7 +545,11 @@ def calendar_counts():
 
 
 @router.get("/dashboard")
-def dashboard(date: str = Query(...), space_id: str = Query("")):
+def dashboard(
+    date: str = Query(...),
+    space_id: str = Query(""),
+    request: Request = None,
+):
     """单次请求返回当天全部数据，替代 8 个独立 API 调用"""
     from datetime import datetime, timedelta
 
@@ -557,7 +621,11 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     # 填充 host_name / achiever_name / teacher_names
     customers = list_all_customers()
     customer_map = {c.id: c.nickname for c in customers}
+    visible_ids = _visible_customer_ids(request)
+    if visible_ids is None:
+        visible_ids = set(customer_map)
     for s in records_gcs + records_ers:
+        s.owner_name = customer_map.get(s.owner_id, "") if s.owner_id in visible_ids else ""
         if s.host_id and not s.host_name:
             s.host_name = customer_map.get(s.host_id, "")
         if s.achiever_id and not s.achiever_name:
@@ -575,8 +643,45 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
     for d in gcs_dicts + ers_dicts + eks_dicts + ics_dicts + cr_dicts:
         ids = d.get("teacher_ids", []) or []
         d["teacher_names"] = [customer_map.get(tid, "") for tid in ids if customer_map.get(tid)]
-        pids = d.get("participant_ids", []) or []
-        d["participant_names"] = [customer_map.get(pid, "") for pid in pids if customer_map.get(pid)]
+        participant_ids = list(d.get("participant_ids", []) or [])
+        for group in d.get("groups", []) or []:
+            participant_ids.extend(
+                value
+                for value in (
+                    group.get("leader_id", ""),
+                    group.get("deputy_id", ""),
+                )
+                if value
+            )
+            participant_ids.extend(group.get("member_ids", []) or [])
+        visible_participant_ids = list(
+            dict.fromkeys(
+                participant_id
+                for participant_id in participant_ids
+                if participant_id in visible_ids and participant_id not in ids
+            )
+        )
+        d["participant_names"] = [
+            customer_map.get(pid, "")
+            for pid in visible_participant_ids
+            if customer_map.get(pid)
+        ]
+        d["visible_participant_count"] = len(visible_participant_ids)
+        owner_id = d.get("owner_id", "")
+        if owner_id and owner_id not in visible_ids:
+            d["owner_name"] = ""
+
+    visible_visit_ids = list(visible_ids)
+    visit_counts = (
+        visit_service.get_date_counts(
+            visible_visit_ids,
+            start_date=start_date,
+            end_date=end_date,
+            space_id=space_id if space_id else None,
+        )
+        if visible_visit_ids
+        else {}
+    )
 
     return {
         "class_records": cr_dicts,
@@ -584,13 +689,20 @@ def dashboard(date: str = Query(...), space_id: str = Query("")):
         "ers_sessions": ers_dicts,
         "eks_sessions": eks_dicts,
         "ics_sessions": ics_dicts,
-        "visits": _fill_visit_nicknames(visit_service.list_visits(date, space_id=space_id if space_id else None)),
-        "visit_counts": visit_service.get_date_counts(start_date=start_date, end_date=end_date, space_id=space_id if space_id else None),
+        "visits": _fill_visit_nicknames(
+            visit_service.list_visits(date, space_id=space_id if space_id else None),
+            visible_ids,
+        ),
+        "visit_counts": visit_counts,
         "calendar_counts": dict(cal_counts),
         "groupings": daily_grouping_service.get_grouping(date) or {"date": date, "groups": []},
     }
 
 
 @router.get("/search-customers")
-def search_customers(q: str = ""):
-    return class_record_service.search_customers(q)
+def search_customers(q: str = "", request: Request = None):
+    results = class_record_service.search_customers(q)
+    visible_ids = _visible_customer_ids(request)
+    if visible_ids is None:
+        return results
+    return [result for result in results if result.get("id") in visible_ids]

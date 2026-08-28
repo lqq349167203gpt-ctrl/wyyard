@@ -60,12 +60,20 @@
     <view class="kv">
       <text class="k">电话</text>
       <text class="v">{{customer.phone}}</text>
+      <view class="contact-actions" wx:if="{{customer.phone}}">
+        <text class="contact-action" wx:if="{{customer.contact_permissions.phone.view && !revealedContacts.phone}}" bindtap="onContactView" data-field="phone">查看</text>
+        <text class="contact-action" wx:if="{{customer.contact_permissions.phone.copy}}" bindtap="onContactCopy" data-field="phone">复制</text>
+      </view>
     </view>
     <view class="kv">
       <text class="k">微信</text>
       <text class="v">{{customer.wechat}}</text>
+      <view class="contact-actions" wx:if="{{customer.wechat}}">
+        <text class="contact-action" wx:if="{{customer.contact_permissions.wechat.view && !revealedContacts.wechat}}" bindtap="onContactView" data-field="wechat">查看</text>
+        <text class="contact-action" wx:if="{{customer.contact_permissions.wechat.copy}}" bindtap="onContactCopy" data-field="wechat">复制</text>
+      </view>
     </view>
-    <view class="kv">
+    <view class="kv" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.work_info}}">
       <text class="k">工作</text>
       <text class="v">{{workText}}</text>
     </view>
@@ -97,21 +105,21 @@
   </view>
 
   <!-- 疗愈信息 -->
-  <view class="sec">
+  <view class="sec" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.visit_purpose || customerAccessPermissions.sensitive_fields.trauma_history || customerAccessPermissions.sensitive_fields.current_block || customerAccessPermissions.sensitive_fields.other_info}}">
     <view class="sec-title">疗愈信息</view>
-    <view class="blk">
+    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.visit_purpose}}">
       <text class="k">到访目的</text>
       <text class="v">{{customer.tags}}</text>
     </view>
-    <view class="blk">
+    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.trauma_history}}">
       <text class="k">创伤经历</text>
       <text class="v">{{customer.basic_info}}</text>
     </view>
-    <view class="blk">
+    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.current_block}}">
       <text class="k">当下卡点</text>
-      <text class="v">{{customer.assessment}}</text>
+      <text class="v">{{customer.assessment || customer.core_situation}}</text>
     </view>
-    <view class="blk">
+    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.other_info}}">
       <text class="k">其他信息</text>
       <text class="v">{{customer.other_info}}</text>
     </view>
@@ -262,6 +270,25 @@
           </view>
         </view>
       </block>
+    </view>
+
+    <!-- 客户回访 -->
+    <view wx:if="{{activeTab === 'followups'}}">
+      <view wx:if="{{activityFollowups.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="rec-list" wx:if="{{activityFollowups.length > 0}}">
+        <view class="rec" wx:for="{{activityFollowups}}" wx:key="id">
+          <view class="rec-head">
+            <text class="rec-name">{{item.activity_name || '活动回访'}}</text>
+            <text class="rec-sub-date">{{item.activity_date || '-'}}</text>
+          </view>
+          <view class="rec-sub" wx:if="{{item.activity_category || item.teacher}}">
+            <text wx:if="{{item.activity_category}}">{{item.activity_category}}</text>
+            <text class="sep" wx:if="{{item.activity_category && item.teacher}}">·</text>
+            <text wx:if="{{item.teacher}}">{{item.teacher}}</text>
+          </view>
+          <view class="rec-body">{{item.content || '-'}}</view>
+        </view>
+      </view>
     </view>
 
     <!-- 线下落地课程 -->

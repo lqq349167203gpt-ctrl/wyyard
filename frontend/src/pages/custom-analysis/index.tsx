@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
-import { GripVertical, Plus, Save, Trash2, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Save, Trash2, X } from "lucide-react"
 
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -47,14 +48,16 @@ const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   payment_closers: "成交人",
   payment_count_period: "期间成交单数",
   payment_amount_period: "期间成交金额",
+  payment_dates: "成交日期",
+  course_teachers: "课程老师",
 }
 
 function monthRange() {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-  return { date_from: `${year}-${month}-01`, date_to: `${year}-${month}-${day}` }
+  const lastDay = String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, "0")
+  return { date_from: `${year}-${month}-01`, date_to: `${year}-${month}-${lastDay}` }
 }
 
 function weekRange() {
@@ -69,6 +72,137 @@ function todayRange() {
   const now = new Date()
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
   return { date_from: today, date_to: today }
+}
+
+function selectedMonthRange(value: string) {
+  const [year, month] = value.split("-").map(Number)
+  if (!year || !month) return null
+  const lastDay = new Date(year, month, 0).getDate()
+  return {
+    date_from: `${year}-${String(month).padStart(2, "0")}-01`,
+    date_to: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+  }
+}
+
+function selectedPeriodValue(dateFrom: string, dateTo: string) {
+  const selectedMonth = dateFrom && dateFrom.slice(0, 7) === dateTo.slice(0, 7)
+    && selectedMonthRange(dateFrom.slice(0, 7))?.date_from === dateFrom
+    && selectedMonthRange(dateFrom.slice(0, 7))?.date_to === dateTo
+    ? dateFrom.slice(0, 7)
+    : ""
+  const selectedYear = dateFrom && dateTo
+    && dateFrom === `${dateFrom.slice(0, 4)}-01-01`
+    && dateTo === `${dateFrom.slice(0, 4)}-12-31`
+    ? dateFrom.slice(0, 4)
+    : ""
+  return selectedYear ? `year-${selectedYear}` : selectedMonth ? `month-${selectedMonth}` : ""
+}
+
+function AnalysisDatePicker({ value, onChange, ariaLabel }: { value: string; onChange: (value: string) => void; ariaLabel: string }) {
+  const today = new Date()
+  const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  const [open, setOpen] = useState(false)
+  const [viewMonth, setViewMonth] = useState(() => value.slice(0, 7) || todayValue.slice(0, 7))
+  const [position, setPosition] = useState<React.CSSProperties>({})
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) setViewMonth(value.slice(0, 7) || todayValue.slice(0, 7))
+  }, [open, todayValue, value])
+
+  useEffect(() => {
+    if (!open) return
+    const updatePosition = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const width = 280
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
+      const spaceBelow = window.innerHeight - rect.bottom
+      setPosition(spaceBelow >= 330
+        ? { left, top: rect.bottom + 4, width }
+        : { bottom: window.innerHeight - rect.top + 4, left, width })
+    }
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const clickedDropdown = event.composedPath().some(node => node instanceof HTMLElement && node.hasAttribute("data-dropdown"))
+      if (clickedDropdown) return
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    updatePosition()
+    document.addEventListener("mousedown", closeOnOutsideClick)
+    window.addEventListener("resize", updatePosition)
+    window.addEventListener("scroll", updatePosition, true)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick)
+      window.removeEventListener("resize", updatePosition)
+      window.removeEventListener("scroll", updatePosition, true)
+    }
+  }, [open])
+
+  const [year, month] = viewMonth.split("-").map(Number)
+  const firstWeekday = new Date(year, month - 1, 1).getDay()
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const cells = [...Array.from({ length: firstWeekday }, () => null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)]
+  const yearOptions = useMemo(
+    () => Array.from({ length: 26 }, (_, index) => today.getFullYear() + 1 - index).map(item => ({ value: String(item), label: `${item}年` })),
+    [today],
+  )
+  const calendarMonthOptions = useMemo(
+    () => Array.from({ length: 12 }, (_, index) => ({ value: String(index + 1).padStart(2, "0"), label: `${index + 1}月` })),
+    [],
+  )
+  const moveMonth = (offset: number) => {
+    const next = new Date(year, month - 1 + offset, 1)
+    setViewMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`)
+  }
+  const displayValue = value
+    ? `${value.slice(0, 4)}年${Number(value.slice(5, 7))}月${Number(value.slice(8, 10))}日`
+    : "选择日期"
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={ariaLabel}
+        onClick={() => setOpen(current => !current)}
+        className={`flex h-7 w-[132px] shrink-0 items-center gap-1 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-left text-[11px] ${value ? "text-[#2b2f36]" : "text-[#8f959e]"}`}
+      >
+        <CalendarDays className="h-3.5 w-3.5 shrink-0 text-[#8f959e]" />
+        <span className="min-w-0 flex-1 truncate">{displayValue}</span>
+        <ChevronDown className={`h-3 w-3 shrink-0 text-[#8f959e] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && typeof document !== "undefined" && createPortal(
+        <div ref={panelRef} className="fixed z-[2147483646] rounded-[6px] border border-[#e1e4e7] bg-white p-3 shadow-[0_8px_24px_rgba(31,35,41,0.14)]" style={position}>
+          <div className="mb-2.5 flex items-center gap-1.5">
+            <button type="button" onClick={() => moveMonth(-1)} className="flex h-7 w-7 items-center justify-center rounded-[3px] text-[#646a73] hover:bg-[#f5f6f7]" aria-label="上个月"><ChevronLeft className="h-3.5 w-3.5" /></button>
+            <SelectDropdown value={String(year)} options={yearOptions} onChange={next => setViewMonth(`${next}-${String(month).padStart(2, "0")}`)} size="sm" className="w-[92px]" buttonClassName="!h-7 !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" dropdownWidth={104} menuMaxHeight={260} />
+            <SelectDropdown value={String(month).padStart(2, "0")} options={calendarMonthOptions} onChange={next => setViewMonth(`${year}-${next}`)} size="sm" className="w-[72px]" buttonClassName="!h-7 !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" dropdownWidth={80} menuMaxHeight={260} />
+            <button type="button" onClick={() => moveMonth(1)} className="ml-auto flex h-7 w-7 items-center justify-center rounded-[3px] text-[#646a73] hover:bg-[#f5f6f7]" aria-label="下个月"><ChevronRight className="h-3.5 w-3.5" /></button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 border-b border-[#f0f0f0] pb-1">
+            {["日", "一", "二", "三", "四", "五", "六"].map(weekday => <div key={weekday} className="flex h-6 items-center justify-center text-[10px] text-[#8f959e]">{weekday}</div>)}
+          </div>
+          <div className="mt-1 grid grid-cols-7 gap-0.5">
+            {cells.map((day, index) => {
+              if (!day) return <span key={`empty-${index}`} className="h-7" />
+              const dateValue = `${viewMonth}-${String(day).padStart(2, "0")}`
+              const selected = dateValue === value
+              const isToday = dateValue === todayValue
+              return <button key={dateValue} type="button" onClick={() => { onChange(dateValue); setOpen(false) }} className={`flex h-7 items-center justify-center rounded-[3px] text-[11px] ${selected ? "bg-[#3370ff] text-white" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36] hover:bg-[#f5f6f7]"}`}>{day}</button>
+            })}
+          </div>
+          <div className="mt-2 flex justify-end border-t border-[#f0f0f0] pt-2">
+            <button type="button" onClick={() => { onChange(todayValue); setOpen(false) }} className="h-6 px-2 text-[11px] text-[#3370ff] hover:text-[#285dcc]">今天</button>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  )
 }
 
 function defaultPlan(): AnalysisPlan {
@@ -87,24 +221,56 @@ function defaultPlan(): AnalysisPlan {
     ],
     sort_by: "referral_date",
     sort_order: "desc",
+    analysis_mode: "single",
+    comparison_groups: [],
+  }
+}
+
+function comparisonGroupId() {
+  return `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function createComparisonGroup(name: string, source?: AnalysisPlan["comparison_groups"][number]): AnalysisPlan["comparison_groups"][number] {
+  const range = source ? { date_from: source.date_from, date_to: source.date_to } : monthRange()
+  return {
+    id: comparisonGroupId(),
+    name,
+    conditions: source?.conditions.map(condition => ({
+      ...condition,
+      value: Array.isArray(condition.value) ? [...condition.value] : condition.value,
+    })) ?? [],
+    condition_logic: source?.condition_logic ?? "all",
+    ...range,
   }
 }
 
 const EmptyLine = () => <span className="inline-block h-[2px] w-[8px] rounded-full bg-[#e5e8eb] align-middle" />
 
 function clonePlan(plan: AnalysisPlan): AnalysisPlan {
+  const metrics = plan.metrics.filter(metric => metric !== "created_customers")
   return {
     ...plan,
     conditions: plan.conditions.map(condition => ({
       ...condition,
       value: Array.isArray(condition.value) ? [...condition.value] : condition.value,
     })),
-    metrics: [...plan.metrics],
+    analysis_mode: plan.analysis_mode ?? "single",
+    comparison_groups: (plan.comparison_groups ?? []).map(group => ({
+      ...group,
+      id: group.id || comparisonGroupId(),
+      conditions: group.conditions.map(condition => ({
+        ...condition,
+        value: Array.isArray(condition.value) ? [...condition.value] : condition.value,
+      })),
+    })),
+    metrics: metrics.length ? metrics : ["total_customers"],
+    card_metric: plan.card_metric === "created_customers" ? "total_customers" : plan.card_metric,
     columns: [...plan.columns],
   }
 }
 
 function conditionValueText(condition: AnalysisCondition): string {
+  if (condition.inherit_period) return ""
   if (VALUELESS_OPERATORS.has(condition.operator)) return ""
   if (Array.isArray(condition.value)) return condition.value.join("，")
   return String(condition.value ?? "")
@@ -119,6 +285,13 @@ function renderValue(field: AnalysisField, value: unknown) {
   if (["activity_count", "activity_count_period"].includes(field)) return `${value}场`
   if (field === "payment_count_period") return `${value}单`
   return Array.isArray(value) ? value.join("、") : String(value)
+}
+
+function formatMetricValue(value: number, valueFormat: "number" | "currency", unit: string, signed = false) {
+  const prefix = value < 0 ? "-" : signed && value > 0 ? "+" : ""
+  const formatted = Math.abs(Number(value)).toLocaleString("zh-CN", { maximumFractionDigits: 2 })
+  if (valueFormat === "currency") return `${prefix}¥${formatted}`
+  return `${prefix}${formatted}${unit ? ` ${unit}` : ""}`
 }
 
 export default function CustomAnalysisPage() {
@@ -181,15 +354,106 @@ export default function CustomAnalysisPage() {
     return [...groups.entries()].map(([group, children]) => ({ value: `group-${group}`, label: group, children }))
   }, [metadata])
   const columnOptions = useMemo(() => (metadata?.fields ?? []).map(field => ({ value: field.value, label: field.label })), [metadata])
+  const periodOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    return Array.from({ length: 10 }, (_, index) => currentYear + 1 - index).flatMap(year => [
+      { value: `year-${year}`, label: `${year}年全年` },
+      {
+        value: `months-${year}`,
+        label: `${year}年按月`,
+        children: Array.from({ length: 12 }, (_, monthIndex) => {
+        const month = String(monthIndex + 1).padStart(2, "0")
+          return { value: `month-${year}-${month}`, label: `${year}年${monthIndex + 1}月` }
+        }),
+      },
+    ])
+  }, [])
   const selectedTemplate = templates.find(template => template.id === selectedTemplateId)
   const canManageSelectedTemplate = !!selectedTemplate && (selectedTemplate.created_by_id === currentUser.id || currentUser.role === "超级管理员")
 
+  const validateComparisonGroups = (targetPlan: AnalysisPlan) => {
+    if (targetPlan.analysis_mode !== "comparison" || targetPlan.comparison_groups.every(group => group.name.trim())) return true
+    setError("请填写完整的对比组名称")
+    return false
+  }
+
+  const setAnalysisMode = (mode: AnalysisPlan["analysis_mode"]) => {
+    setResult(null)
+    setPlan(current => {
+      if (mode === "single") return { ...current, analysis_mode: mode }
+      if (current.comparison_groups.length >= 2) return { ...current, analysis_mode: mode }
+      const source = {
+        id: "",
+        name: "",
+        conditions: current.conditions,
+        condition_logic: current.condition_logic,
+        date_from: current.date_from,
+        date_to: current.date_to,
+      }
+      const first = createComparisonGroup("对比组 A", source)
+      const second = createComparisonGroup("对比组 B", source)
+      return { ...current, analysis_mode: mode, comparison_groups: [first, second] }
+    })
+  }
+
+  const updateComparisonGroup = (groupIndex: number, patch: Partial<AnalysisPlan["comparison_groups"][number]>) => {
+    setPlan(current => ({
+      ...current,
+      comparison_groups: current.comparison_groups.map((group, index) => index === groupIndex ? { ...group, ...patch } : group),
+    }))
+  }
+
+  const updateComparisonCondition = (groupIndex: number, conditionIndex: number, patch: Partial<AnalysisCondition>) => {
+    setPlan(current => ({
+      ...current,
+      comparison_groups: current.comparison_groups.map((group, index) => index === groupIndex ? {
+        ...group,
+        conditions: group.conditions.map((condition, innerIndex) => innerIndex === conditionIndex ? { ...condition, ...patch } : condition),
+      } : group),
+    }))
+  }
+
+  const addComparisonCondition = (groupIndex: number) => {
+    const field = metadata?.fields[0]
+    if (!field) return
+    setPlan(current => ({
+      ...current,
+      comparison_groups: current.comparison_groups.map((group, index) => index === groupIndex ? {
+        ...group,
+        conditions: [...group.conditions, { field: field.value, operator: field.operators[0] ?? "eq", value: "", inherit_period: false }],
+      } : group),
+    }))
+  }
+
+  const copyComparisonGroup = (groupIndex: number) => {
+    setPlan(current => {
+      if (current.comparison_groups.length >= 4) return current
+      const source = current.comparison_groups[groupIndex]
+      const copy = createComparisonGroup(`对比组 ${String.fromCharCode(65 + current.comparison_groups.length)}`, source)
+      return { ...current, comparison_groups: [...current.comparison_groups, copy] }
+    })
+  }
+
+  const removeComparisonGroup = (groupIndex: number) => {
+    setPlan(current => current.comparison_groups.length <= 2 ? current : {
+      ...current,
+      comparison_groups: current.comparison_groups.filter((_, index) => index !== groupIndex),
+    })
+  }
+
   const execute = async (nextPlan = plan, page = 1) => {
-    const incomplete = nextPlan.conditions.find(condition => !VALUELESS_OPERATORS.has(condition.operator) && (
+    if (!validateComparisonGroups(nextPlan)) return
+    const conditionGroups = nextPlan.analysis_mode === "comparison"
+      ? nextPlan.comparison_groups.map(group => ({ name: group.name, conditions: group.conditions }))
+      : [{ name: "当前筛选", conditions: nextPlan.conditions }]
+    const incompleteGroup = conditionGroups.find(group => group.conditions.some(condition => !condition.inherit_period && !VALUELESS_OPERATORS.has(condition.operator) && (
+      condition.value === "" || condition.value === null || (Array.isArray(condition.value) && condition.value.some(item => !item))
+    )))
+    const incomplete = incompleteGroup?.conditions.find(condition => !condition.inherit_period && !VALUELESS_OPERATORS.has(condition.operator) && (
       condition.value === "" || condition.value === null || (Array.isArray(condition.value) && condition.value.some(item => !item))
     ))
     if (incomplete) {
-      setError(`请填写“${fieldLabels[incomplete.field]}”的筛选值`)
+      setError(`${incompleteGroup?.name}：请填写“${fieldLabels[incomplete.field]}”的筛选值`)
       return
     }
     setExecuting(true)
@@ -197,7 +461,7 @@ export default function CustomAnalysisPage() {
     try {
       const data = await customAnalysisApi.execute(nextPlan, page, 20)
       setResult(data)
-      setPlan(data.plan)
+      setPlan(clonePlan(data.plan))
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "查询失败，请稍后重试")
     } finally {
@@ -229,7 +493,7 @@ export default function CustomAnalysisPage() {
   const updateConditionField = (index: number, field: AnalysisField) => {
     const definition = fieldByName.get(field)
     const operator = definition?.operators[0] ?? "eq"
-    updateCondition(index, { field, operator, value: VALUELESS_OPERATORS.has(operator) ? null : "" })
+    updateCondition(index, { field, operator, value: VALUELESS_OPERATORS.has(operator) ? null : "", inherit_period: false })
   }
 
   const removeCondition = (index: number) => setPlan(current => ({ ...current, conditions: current.conditions.filter((_, conditionIndex) => conditionIndex !== index) }))
@@ -261,7 +525,7 @@ export default function CustomAnalysisPage() {
   }
 
   const createTemplate = async () => {
-    if (!templateName.trim()) return
+    if (!templateName.trim() || !validateComparisonGroups(plan)) return
     setSavingTemplate(true)
     setError("")
     try {
@@ -284,7 +548,7 @@ export default function CustomAnalysisPage() {
   }
 
   const updateSelectedTemplate = async () => {
-    if (!selectedTemplate || !canManageSelectedTemplate) return
+    if (!selectedTemplate || !canManageSelectedTemplate || !validateComparisonGroups(plan)) return
     setSavingTemplate(true)
     setError("")
     try {
@@ -311,41 +575,126 @@ export default function CustomAnalysisPage() {
 
   const setDatePreset = (preset: "today" | "week" | "month" | "year" | "all") => {
     const now = new Date()
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
     if (preset === "today") setPlan(current => ({ ...current, ...todayRange() }))
     if (preset === "week") setPlan(current => ({ ...current, ...weekRange() }))
     if (preset === "month") setPlan(current => ({ ...current, ...monthRange() }))
-    if (preset === "year") setPlan(current => ({ ...current, date_from: `${now.getFullYear()}-01-01`, date_to: today }))
+    if (preset === "year") setPlan(current => ({ ...current, date_from: `${now.getFullYear()}-01-01`, date_to: `${now.getFullYear()}-12-31` }))
     if (preset === "all") setPlan(current => ({ ...current, date_from: "", date_to: "" }))
   }
 
-  const renderConditionValue = (condition: AnalysisCondition, index: number) => {
-    if (VALUELESS_OPERATORS.has(condition.operator)) return null
+  const setSelectedMonth = (value: string) => {
+    const range = selectedMonthRange(value)
+    if (range) setPlan(current => ({ ...current, ...range }))
+  }
+
+  const setSelectedYear = (value: string) => {
+    const year = Number(value)
+    if (!year) return
+    setPlan(current => ({ ...current, date_from: `${year}-01-01`, date_to: `${year}-12-31` }))
+  }
+
+  const setSelectedPeriod = (value: string) => {
+    if (value.startsWith("year-")) {
+      setSelectedYear(value.slice(5))
+      return
+    }
+    if (value.startsWith("month-")) setSelectedMonth(value.slice(6))
+  }
+
+  const setComparisonPeriod = (groupIndex: number, value: string) => {
+    if (value.startsWith("year-")) {
+      const year = value.slice(5)
+      updateComparisonGroup(groupIndex, { date_from: `${year}-01-01`, date_to: `${year}-12-31` })
+      return
+    }
+    if (value.startsWith("month-")) {
+      const range = selectedMonthRange(value.slice(6))
+      if (range) updateComparisonGroup(groupIndex, range)
+    }
+  }
+
+  const setComparisonPreset = (groupIndex: number, preset: "today" | "week" | "month" | "year" | "all") => {
+    const now = new Date()
+    if (preset === "today") updateComparisonGroup(groupIndex, todayRange())
+    if (preset === "week") updateComparisonGroup(groupIndex, weekRange())
+    if (preset === "month") updateComparisonGroup(groupIndex, monthRange())
+    if (preset === "year") updateComparisonGroup(groupIndex, { date_from: `${now.getFullYear()}-01-01`, date_to: `${now.getFullYear()}-12-31` })
+    if (preset === "all") updateComparisonGroup(groupIndex, { date_from: "", date_to: "" })
+  }
+
+  const renderConditionValue = (condition: AnalysisCondition, index: number, groupIndex?: number) => {
     const definition = fieldByName.get(condition.field)
-    const values = Array.isArray(condition.value) ? condition.value.map(String) : []
-    if (condition.operator === "between") {
-      const inputType = definition?.value_type === "date" ? "date" : definition?.value_type === "number" ? "number" : "text"
+    const owner = groupIndex === undefined ? plan : plan.comparison_groups[groupIndex]
+    const updateValue = (patch: Partial<AnalysisCondition>) => groupIndex === undefined
+      ? updateCondition(index, patch)
+      : updateComparisonCondition(groupIndex, index, patch)
+    const ownerDateSummary = owner.date_from && owner.date_to
+      ? `${owner.date_from.replaceAll("-", ".")}–${owner.date_to.replaceAll("-", ".")}`
+      : owner.date_from ? `${owner.date_from.replaceAll("-", ".")} 起`
+        : owner.date_to ? `截至 ${owner.date_to.replaceAll("-", ".")}` : "全部时间"
+    if (condition.inherit_period && definition?.value_type === "date") {
       return (
-        <div className="flex h-7 min-w-0 flex-1 items-center rounded-[4px] border border-transparent bg-transparent hover:border-[#e1e4e7] focus-within:border-[#b9cdf8] focus-within:bg-white">
-          <input type={inputType} value={values[0] ?? ""} onChange={event => updateCondition(index, { value: [event.target.value, values[1] ?? ""] })} className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] text-[#2b2f36] outline-none" />
-          <span className="text-[11px] text-[#8f959e]">至</span>
-          <input type={inputType} value={values[1] ?? ""} onChange={event => updateCondition(index, { value: [values[0] ?? "", event.target.value] })} className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] text-[#2b2f36] outline-none" />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="flex h-7 min-w-0 flex-1 items-center rounded-[4px] border border-[#b9cdf8] bg-[#f7faff] px-2 text-[11px] text-[#3370ff]">
+            <span className="truncate">跟随统计周期 · {ownerDateSummary}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => updateValue({ inherit_period: false, operator: "between", value: [owner.date_from, owner.date_to] })}
+            className="h-7 shrink-0 px-1.5 text-[11px] text-[#646a73] hover:text-[#3370ff]"
+          >
+            单独设置
+          </button>
         </div>
       )
+    }
+    if (VALUELESS_OPERATORS.has(condition.operator)) return null
+    const values = Array.isArray(condition.value) ? condition.value.map(String) : []
+    const inheritPeriodButton = definition?.value_type === "date" ? (
+      <button
+        type="button"
+        onClick={() => updateValue({ inherit_period: true, operator: "between", value: null })}
+        className="h-7 shrink-0 rounded-[3px] px-2 text-[11px] text-[#3370ff] hover:bg-[#f0f5ff]"
+      >
+        跟随统计周期
+      </button>
+    ) : null
+    if (condition.operator === "between") {
+      if (definition?.value_type === "date") {
+        return (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            <AnalysisDatePicker value={values[0] ?? ""} onChange={value => updateValue({ value: [value, values[1] ?? ""] })} ariaLabel={`${definition.label}开始日期`} />
+            <span className="text-[11px] text-[#8f959e]">至</span>
+            <AnalysisDatePicker value={values[1] ?? ""} onChange={value => updateValue({ value: [values[0] ?? "", value] })} ariaLabel={`${definition.label}结束日期`} />
+            {inheritPeriodButton}
+          </div>
+        )
+      }
+      const inputType = definition?.value_type === "number" ? "number" : "text"
+      return (
+        <div className="flex h-7 min-w-0 flex-1 items-center rounded-[4px] border border-transparent bg-transparent hover:border-[#e1e4e7] focus-within:border-[#b9cdf8] focus-within:bg-white">
+          <input type={inputType} value={values[0] ?? ""} onChange={event => updateValue({ value: [event.target.value, values[1] ?? ""] })} className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] text-[#2b2f36] outline-none" />
+          <span className="text-[11px] text-[#8f959e]">至</span>
+          <input type={inputType} value={values[1] ?? ""} onChange={event => updateValue({ value: [values[0] ?? "", event.target.value] })} className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] text-[#2b2f36] outline-none" />
+        </div>
+      )
+    }
+    if (definition?.value_type === "date") {
+      return <div className="flex min-w-0 flex-1 items-center gap-1.5"><AnalysisDatePicker value={conditionValueText(condition)} onChange={value => updateValue({ value })} ariaLabel={definition.label} />{inheritPeriodButton}</div>
     }
     if (definition?.options.length) {
       const options = definition.options.map(value => ({ value, label: value }))
       return condition.operator === "in" ? (
-        <SelectDropdown value={values} options={options} onChange={value => updateCondition(index, { value })} multi singleLineMulti size="sm" className="min-w-0 flex-1" buttonClassName="!h-7 !border-transparent !bg-transparent !px-2 !text-[12px] hover:!border-[#e1e4e7]" dropdownWidth={220} />
+        <SelectDropdown value={values} options={options} onChange={value => updateValue({ value })} multi singleLineMulti size="sm" className="min-w-0 flex-1" buttonClassName="!h-7 !border-transparent !bg-transparent !px-2 !text-[12px] hover:!border-[#e1e4e7]" dropdownWidth={220} />
       ) : (
-        <SelectDropdown value={conditionValueText(condition)} options={options} onChange={value => updateCondition(index, { value })} size="sm" className="min-w-0 flex-1" buttonClassName="!h-7 !border-transparent !bg-transparent !px-2 !text-[12px] hover:!border-[#e1e4e7]" dropdownWidth={220} />
+        <SelectDropdown value={conditionValueText(condition)} options={options} onChange={value => updateValue({ value })} size="sm" className="min-w-0 flex-1" buttonClassName="!h-7 !border-transparent !bg-transparent !px-2 !text-[12px] hover:!border-[#e1e4e7]" dropdownWidth={220} />
       )
     }
     return (
       <Input
-        type={definition?.value_type === "date" ? "date" : definition?.value_type === "number" ? "number" : "text"}
+        type={definition?.value_type === "number" ? "number" : "text"}
         value={conditionValueText(condition)}
-        onChange={event => updateCondition(index, { value: NUMBER_FIELDS.has(condition.field) && event.target.value !== "" ? Number(event.target.value) : event.target.value })}
+        onChange={event => updateValue({ value: NUMBER_FIELDS.has(condition.field) && event.target.value !== "" ? Number(event.target.value) : event.target.value })}
         className="h-7 min-w-0 flex-1 rounded-[4px] border-transparent bg-transparent px-2 text-[12px] font-normal shadow-none hover:border-[#e1e4e7] focus-visible:border-[#b9cdf8] focus-visible:bg-white focus-visible:ring-0"
       />
     )
@@ -363,20 +712,27 @@ export default function CustomAnalysisPage() {
     const currentWeek = weekRange()
     const currentMonth = monthRange()
     const now = new Date()
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
     if (!plan.date_from && !plan.date_to) return "all"
     if (plan.date_from === currentDay.date_from && plan.date_to === currentDay.date_to) return "today"
     if (plan.date_from === currentWeek.date_from && plan.date_to === currentWeek.date_to) return "week"
     if (plan.date_from === currentMonth.date_from && plan.date_to === currentMonth.date_to) return "month"
-    if (plan.date_from === `${now.getFullYear()}-01-01` && plan.date_to === today) return "year"
+    if (plan.date_from === `${now.getFullYear()}-01-01` && plan.date_to === `${now.getFullYear()}-12-31`) return "year"
     return "custom"
   })()
   const dateSummary = plan.date_from && plan.date_to ? `${plan.date_from.replaceAll("-", ".")}–${plan.date_to.replaceAll("-", ".")}` : "全部时间"
-  const querySummary = `${dateSummary} · ${plan.conditions.length} 个条件 · ${plan.metrics.length} 项总数 · ${plan.columns.length} 列`
+  const selectedPeriod = selectedPeriodValue(plan.date_from, plan.date_to)
+  const querySummary = plan.analysis_mode === "comparison"
+    ? `${plan.comparison_groups.length} 个对比组 · ${plan.metrics.length} 项共用指标`
+    : `${dateSummary} · ${plan.conditions.length} 个条件 · ${plan.metrics.length} 项总数 · ${plan.columns.length} 列`
   const metricCards = result?.cards.filter(card => !card.key.startsWith("dimension-")) ?? []
   const dimensionCards = result?.cards.filter(card => card.key.startsWith("dimension-")) ?? []
   const dimensionLabel = metadata?.card_dimensions.find(item => item.value === result?.plan.card_dimension)?.label ?? "分组"
   const dimensionMetricLabel = metadata?.metrics.find(item => item.value === result?.plan.card_metric)?.label ?? "符合条件人数"
+  const splitHint = plan.card_dimension === "purchased_projects"
+    ? plan.card_metric === "payment_amount" || plan.card_metric === "payment_orders"
+      ? "每笔成交只归入对应项目，各项目合计与总数一致"
+      : "同一客户购买多个项目时会分别计入对应分组"
+    : "每组单独出一张卡"
 
   if (metadataLoading) return <div className="py-16 text-center text-sm text-muted-foreground">正在加载可用筛选项...</div>
 
@@ -402,6 +758,7 @@ export default function CustomAnalysisPage() {
             />
             {canManageSelectedTemplate && <Button variant="outline" size="sm" onClick={updateSelectedTemplate} disabled={savingTemplate} className="h-8 rounded-[4px] border border-[#dee0e3] bg-white px-3 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7]">更新模板</Button>}
             <Button variant="outline" size="sm" onClick={() => {
+              if (!validateComparisonGroups(plan)) return
               setTemplateName("")
               setTemplateDescription("")
               setTemplateScope("private")
@@ -414,26 +771,53 @@ export default function CustomAnalysisPage() {
         {error && <div className="mx-[22px] mt-3 rounded-[4px] border border-[#f1d9dc] bg-[#fff8f8] px-3 py-2 text-[12px] text-[#b94a58]">{error}</div>}
 
         <div className="space-y-3 px-[22px] py-3">
-          <div>
+          <div className="flex items-center gap-1 rounded-[4px] bg-[#f7f8fa] p-1">
+            <button type="button" onClick={() => setAnalysisMode("single")} className={`h-7 rounded-[3px] px-3 text-[12px] ${plan.analysis_mode === "single" ? "bg-white text-[#1f2329] shadow-[0_1px_3px_rgba(31,35,41,0.08)]" : "text-[#646a73]"}`}>单组筛选</button>
+            <button type="button" onClick={() => setAnalysisMode("comparison")} className={`h-7 rounded-[3px] px-3 text-[12px] ${plan.analysis_mode === "comparison" ? "bg-white text-[#3370ff] shadow-[0_1px_3px_rgba(31,35,41,0.08)]" : "text-[#646a73]"}`}>方案对比</button>
+            <span className="ml-2 text-[11px] text-[#8f959e]">方案对比支持每组使用不同日期和不同筛选条件</span>
+          </div>
+          {plan.analysis_mode === "single" ? <div>
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
               <span className="text-[12px] font-medium text-[#3370ff]">① 筛选客户</span>
-              <div className="ml-1 flex items-center rounded-[4px] border border-[#e1e4e7] p-0.5">
-                <button type="button" onClick={() => setPlan(current => ({ ...current, condition_logic: "all" }))} className={`h-6 rounded-[3px] px-2.5 text-[11px] ${plan.condition_logic === "all" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73]"}`}>全部符合</button>
-                <button type="button" onClick={() => setPlan(current => ({ ...current, condition_logic: "any" }))} className={`h-6 rounded-[3px] px-2.5 text-[11px] ${plan.condition_logic === "any" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73]"}`}>任意一条</button>
+            </div>
+            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-[4px] bg-[#f7f8fa] px-2.5 py-2">
+              <div className="mr-1 min-w-[190px]">
+                <div className="text-[12px] font-medium text-[#4e535a]">统计周期</div>
+                <div className="mt-0.5 text-[10px] text-[#8f959e]">限定期间邀约、到场、活动和成交指标</div>
               </div>
-              <span className="text-[12px] text-[#79838f]">时间</span>
-              <div className="flex h-7 items-center rounded-[4px] border border-[#e1e4e7] bg-white">
-                <input type="date" value={plan.date_from} onChange={event => setPlan(current => ({ ...current, date_from: event.target.value }))} className={`h-full w-[110px] border-none bg-transparent px-2 text-[12px] outline-none ${plan.date_from ? "text-[#2b2f36]" : "date-empty text-[#8f959e]"}`} />
+              <SelectDropdown
+                value={selectedPeriod}
+                options={periodOptions}
+                onChange={setSelectedPeriod}
+                placeholder="选择年份或月份"
+                size="sm"
+                className="w-[156px]"
+                buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none"
+                dropdownWidth={176}
+                menuMaxHeight={320}
+              />
+              <span className="text-[10px] text-[#b0b5bb]">或自定义</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <AnalysisDatePicker value={plan.date_from} onChange={value => setPlan(current => ({ ...current, date_from: value }))} ariaLabel="统计周期开始日期" />
                 <span className="text-[11px] text-[#8f959e]">至</span>
-                <input type="date" value={plan.date_to} onChange={event => setPlan(current => ({ ...current, date_to: event.target.value }))} className={`h-full w-[110px] border-none bg-transparent px-2 text-[12px] outline-none ${plan.date_to ? "text-[#2b2f36]" : "date-empty text-[#8f959e]"}`} />
+                <AnalysisDatePicker value={plan.date_to} onChange={value => setPlan(current => ({ ...current, date_to: value }))} ariaLabel="统计周期结束日期" />
               </div>
               <button type="button" onClick={() => setDatePreset("today")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "today" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>当天</button>
               <button type="button" onClick={() => setDatePreset("week")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "week" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>本周</button>
               <button type="button" onClick={() => setDatePreset("month")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "month" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>本月</button>
+              <button type="button" onClick={() => setDatePreset("year")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "year" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>本年</button>
               <button type="button" onClick={() => setDatePreset("all")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "all" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>全部</button>
-              <button type="button" onClick={addCondition} className="ml-auto flex h-7 items-center text-[12px] text-[#3370ff] hover:text-[#285dcc]"><Plus className="mr-0.5 h-3.5 w-3.5" />加条件</button>
             </div>
 
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-[12px] font-medium text-[#4e535a]">客户筛选条件</span>
+              <div className="flex items-center rounded-[4px] border border-[#e1e4e7] bg-white p-0.5">
+                <button type="button" onClick={() => setPlan(current => ({ ...current, condition_logic: "all" }))} className={`h-6 rounded-[3px] px-2.5 text-[11px] ${plan.condition_logic === "all" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73]"}`}>全部符合</button>
+                <button type="button" onClick={() => setPlan(current => ({ ...current, condition_logic: "any" }))} className={`h-6 rounded-[3px] px-2.5 text-[11px] ${plan.condition_logic === "any" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73]"}`}>任意一条</button>
+              </div>
+              <button type="button" onClick={addCondition} className="flex h-7 items-center rounded-[3px] px-1.5 text-[12px] text-[#3370ff] hover:bg-[#f0f5ff] hover:text-[#285dcc]"><Plus className="mr-0.5 h-3.5 w-3.5" />加条件</button>
+              <span className="text-[11px] text-[#8f959e]">付费条件会同步限定成交金额、单数和人数</span>
+            </div>
             {plan.conditions.length === 0 ? <button type="button" onClick={addCondition} className="flex h-8 w-full items-center justify-center rounded-[4px] border border-dashed border-[#e1e4e7] bg-white text-[12px] text-[#8f959e] hover:border-[#b9cdf8] hover:text-[#3370ff]">当前查询全部客户，点击添加筛选条件</button> : (
               <div className="space-y-1">
                 {plan.conditions.map((condition, index) => {
@@ -445,7 +829,7 @@ export default function CustomAnalysisPage() {
                       <SelectDropdown value={condition.operator} options={operatorOptions} onChange={value => {
                         const operator = value as AnalysisOperator
                         const nextValue = VALUELESS_OPERATORS.has(operator) ? null : operator === "between" ? ["", ""] : operator === "in" ? [] : Array.isArray(condition.value) ? condition.value[0] ?? "" : condition.value
-                        updateCondition(index, { operator, value: nextValue })
+                        updateCondition(index, { operator, value: nextValue, inherit_period: false })
                       }} size="sm" className="w-[90px] shrink-0" buttonClassName="!h-7 !border-transparent !bg-transparent !px-1.5 !text-[12px] !text-[#8f959e] hover:!border-[#e1e4e7]" />
                       {renderConditionValue(condition, index)}
                       <button type="button" onClick={() => removeCondition(index)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] text-[#b0b5bb] hover:bg-[#f0f1f3] hover:text-[#4e535a]" aria-label="删除筛选条件"><X className="h-3.5 w-3.5" /></button>
@@ -454,7 +838,70 @@ export default function CustomAnalysisPage() {
                 })}
               </div>
             )}
-          </div>
+          </div> : <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-[12px] font-medium text-[#3370ff]">① 设置对比组</span>
+              <span className="text-[11px] text-[#8f959e]">每组独立设置统计周期和筛选条件，指标在下方统一选择</span>
+              {plan.comparison_groups.length < 4 && <button type="button" onClick={() => copyComparisonGroup(plan.comparison_groups.length - 1)} className="ml-auto flex h-7 items-center rounded-[3px] px-2 text-[12px] text-[#3370ff] hover:bg-[#f0f5ff]"><Plus className="mr-0.5 h-3.5 w-3.5" />增加对比组</button>}
+            </div>
+            <div className="grid gap-2 xl:grid-cols-2">
+              {plan.comparison_groups.map((group, groupIndex) => (
+                <div key={group.id || groupIndex} className="min-w-0 rounded-[5px] border border-[#e1e4e7] bg-white">
+                  <div className="flex items-center gap-2 border-b border-[#f0f0f0] px-3 py-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f0f5ff] text-[11px] text-[#3370ff]">{String.fromCharCode(65 + groupIndex)}</span>
+                    <input value={group.name} onChange={event => updateComparisonGroup(groupIndex, { name: event.target.value })} maxLength={24} className="h-7 min-w-0 flex-1 rounded-[3px] border border-transparent px-1.5 text-[13px] font-medium text-[#2b2f36] outline-none hover:border-[#e1e4e7] focus:border-[#b9cdf8]" aria-label={`对比组 ${groupIndex + 1} 名称`} />
+                    <button type="button" onClick={() => copyComparisonGroup(groupIndex)} disabled={plan.comparison_groups.length >= 4} className="flex h-7 items-center rounded-[3px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7] disabled:opacity-40" title="复制为新的对比组"><Copy className="mr-1 h-3.5 w-3.5" />复制</button>
+                    <button type="button" onClick={() => removeComparisonGroup(groupIndex)} disabled={plan.comparison_groups.length <= 2} className="flex h-7 w-7 items-center justify-center rounded-[3px] text-[#b0b5bb] hover:bg-[#fff4f4] hover:text-[#d85b65] disabled:opacity-30" aria-label={`删除${group.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                  <div className="space-y-2 px-3 py-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5 rounded-[4px] bg-[#f7f8fa] p-2">
+                      <span className="mr-1 text-[11px] font-medium text-[#4e535a]">统计周期</span>
+                      <SelectDropdown value={selectedPeriodValue(group.date_from, group.date_to)} options={periodOptions} onChange={value => setComparisonPeriod(groupIndex, value)} placeholder="年份或月份" size="sm" className="w-[144px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[11px] !shadow-none" dropdownWidth={176} menuMaxHeight={320} />
+                      <AnalysisDatePicker value={group.date_from} onChange={value => updateComparisonGroup(groupIndex, { date_from: value })} ariaLabel={`${group.name}统计开始日期`} />
+                      <span className="text-[11px] text-[#8f959e]">至</span>
+                      <AnalysisDatePicker value={group.date_to} onChange={value => updateComparisonGroup(groupIndex, { date_to: value })} ariaLabel={`${group.name}统计结束日期`} />
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setComparisonPreset(groupIndex, "month")} className="h-6 rounded-[3px] border border-[#e1e4e7] bg-white px-1.5 text-[10px] text-[#646a73]">本月</button>
+                        <button type="button" onClick={() => setComparisonPreset(groupIndex, "year")} className="h-6 rounded-[3px] border border-[#e1e4e7] bg-white px-1.5 text-[10px] text-[#646a73]">本年</button>
+                        <button type="button" onClick={() => setComparisonPreset(groupIndex, "all")} className="h-6 rounded-[3px] border border-[#e1e4e7] bg-white px-1.5 text-[10px] text-[#646a73]">全部</button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-[#4e535a]">组内条件</span>
+                      <div className="flex items-center rounded-[4px] border border-[#e1e4e7] p-0.5">
+                        <button type="button" onClick={() => updateComparisonGroup(groupIndex, { condition_logic: "all" })} className={`h-6 rounded-[3px] px-2 text-[10px] ${group.condition_logic === "all" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73]"}`}>全部符合</button>
+                        <button type="button" onClick={() => updateComparisonGroup(groupIndex, { condition_logic: "any" })} className={`h-6 rounded-[3px] px-2 text-[10px] ${group.condition_logic === "any" ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73]"}`}>任意一条</button>
+                      </div>
+                      <button type="button" onClick={() => addComparisonCondition(groupIndex)} className="flex h-6 items-center px-1.5 text-[11px] text-[#3370ff]"><Plus className="mr-0.5 h-3 w-3" />加条件</button>
+                    </div>
+                    {group.conditions.length === 0 ? <button type="button" onClick={() => addComparisonCondition(groupIndex)} className="flex h-8 w-full items-center justify-center rounded-[4px] border border-dashed border-[#e1e4e7] text-[11px] text-[#8f959e] hover:border-[#b9cdf8] hover:text-[#3370ff]">当前组不限制客户条件，点击添加</button> : (
+                      <div className="space-y-1">
+                        {group.conditions.map((condition, conditionIndex) => {
+                          const definition = fieldByName.get(condition.field)
+                          const operatorOptions = (definition?.operators ?? []).map(operator => ({ value: operator, label: operatorLabels[operator] ?? operator }))
+                          return <div key={`${condition.field}-${conditionIndex}`} className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-[4px] border border-[#eceef0] bg-[#fbfcfd] px-1.5 py-1">
+                            <SelectDropdown value={condition.field} options={groupedFieldOptions} onChange={value => {
+                              const field = value as AnalysisField
+                              const nextDefinition = fieldByName.get(field)
+                              const operator = nextDefinition?.operators[0] ?? "eq"
+                              updateComparisonCondition(groupIndex, conditionIndex, { field, operator, value: VALUELESS_OPERATORS.has(operator) ? null : "", inherit_period: false })
+                            }} size="sm" className="w-[130px] shrink-0" buttonClassName="!h-7 !border-transparent !bg-transparent !px-1.5 !text-[11px] !font-medium hover:!border-[#e1e4e7]" dropdownWidth={180} menuMaxHeight={300} />
+                            <SelectDropdown value={condition.operator} options={operatorOptions} onChange={value => {
+                              const operator = value as AnalysisOperator
+                              const nextValue = VALUELESS_OPERATORS.has(operator) ? null : operator === "between" ? ["", ""] : operator === "in" ? [] : Array.isArray(condition.value) ? condition.value[0] ?? "" : condition.value
+                              updateComparisonCondition(groupIndex, conditionIndex, { operator, value: nextValue, inherit_period: false })
+                            }} size="sm" className="w-[84px] shrink-0" buttonClassName="!h-7 !border-transparent !bg-transparent !px-1.5 !text-[11px] !text-[#8f959e] hover:!border-[#e1e4e7]" />
+                            {renderConditionValue(condition, conditionIndex, groupIndex)}
+                            <button type="button" onClick={() => updateComparisonGroup(groupIndex, { conditions: group.conditions.filter((_, index) => index !== conditionIndex) })} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] text-[#b0b5bb] hover:bg-[#f0f1f3] hover:text-[#4e535a]" aria-label="删除筛选条件"><X className="h-3.5 w-3.5" /></button>
+                          </div>
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>}
 
           <div>
             <div className="mb-1.5 flex items-baseline gap-2"><span className="text-[12px] font-medium text-[#3370ff]">② 统计指标</span><span className="text-[11px] text-[#8f959e]">勾选后显示在结果上方</span></div>
@@ -464,10 +911,11 @@ export default function CustomAnalysisPage() {
                 return <button key={metric.value} type="button" onClick={() => toggleMetric(metric.value)} className={`flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px] ${selected ? "border-[#b9cdf8] bg-[#f7faff] text-[#2b2f36]" : "border-[#e5e7ea] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}><span className={`flex h-3 w-3 items-center justify-center rounded-[2px] border text-[9px] ${selected ? "border-[#3370ff] bg-[#3370ff] text-white" : "border-[#c9cdd4]"}`}>{selected ? "✓" : ""}</span>{metric.label}</button>
               })}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>拆分指标</span><SelectDropdown value={plan.card_metric} options={metadata?.metrics ?? []} onChange={value => setPlan(current => ({ ...current, card_metric: value as AnalysisMetric }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="ml-1">拆分维度</span><SelectDropdown value={plan.card_dimension} options={metadata?.card_dimensions ?? []} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="text-[11px] text-[#b7bdc6]">每组单独出一张卡</span></div>
+            {plan.analysis_mode === "single" && <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>拆分指标</span><SelectDropdown value={plan.card_metric} options={metadata?.metrics ?? []} onChange={value => setPlan(current => ({ ...current, card_metric: value as AnalysisMetric }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="ml-1">拆分维度</span><SelectDropdown value={plan.card_dimension} options={metadata?.card_dimensions ?? []} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="text-[11px] text-[#b7bdc6]">{splitHint}</span></div>}
+            {plan.analysis_mode === "comparison" && <div className="mt-2 text-[11px] text-[#8f959e]">所有对比组共用以上统计指标，便于横向比较。</div>}
           </div>
 
-          <div>
+          {plan.analysis_mode === "single" && <div>
             <div className="mb-1.5 flex items-baseline gap-2"><span className="text-[12px] font-medium text-[#3370ff]">③ 显示列</span><span className="text-[11px] text-[#8f959e]">最多 10 列，拖动排序</span></div>
             <div className="flex min-h-7 flex-wrap gap-1.5">
               {plan.columns.map((field, index) => <div key={field} draggable onDragStart={() => setDraggedColumnIndex(index)} onDragEnd={() => setDraggedColumnIndex(null)} onDragOver={event => event.preventDefault()} onDrop={() => { if (draggedColumnIndex !== null) reorderColumn(draggedColumnIndex, index); setDraggedColumnIndex(null) }} className={`flex h-7 cursor-grab items-center rounded-[4px] border border-[#e5e7ea] bg-[#fafbfc] px-2 text-[11px] text-[#4e535a] active:cursor-grabbing ${draggedColumnIndex === index ? "opacity-50" : ""}`} title="拖动调整列表顺序"><GripVertical className="mr-1 h-3.5 w-3.5 text-[#a1a6ad]" /><span>{fieldLabels[field]}</span></div>)}
@@ -477,7 +925,7 @@ export default function CustomAnalysisPage() {
                 setPlan(current => ({ ...current, columns: nextColumns }))
               }} multi triggerLabel="+ 添加" hideChevron className="w-[64px]" buttonClassName="!h-7 !rounded-[4px] !border !border-dashed !border-[#b9cdf8] !bg-white !px-2 !text-[11px] !shadow-none" dropdownWidth={280} menuMaxHeight={300} />
             </div>
-          </div>
+          </div>}
         </div>
 
         <div className="flex items-center gap-3 border-t border-[#f0f0f0] bg-[#fafbfc] px-[22px] py-2.5">
@@ -486,7 +934,40 @@ export default function CustomAnalysisPage() {
           <Button size="sm" onClick={() => execute(plan, 1)} disabled={executing} className="h-8 rounded-[4px] border border-[#3370ff] bg-[#3370ff] px-5 text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{executing ? "查询中" : result ? "更新结果" : "查询"}</Button>
         </div>
 
-        {result && <div className="border-t-[0.5px] border-[#f0f0f0]">
+        {result?.comparison_groups?.length ? <div className="border-t-[0.5px] border-[#f0f0f0] px-[22px] py-4">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <div><span className="text-[14px] font-medium text-[#2b2f36]">方案对比结果</span><span className="ml-2 text-[11px] text-[#8f959e]">各组独立筛选，统计指标保持一致</span></div>
+            <span className="text-[11px] text-[#8f959e]">{executing ? "正在更新..." : `${result.comparison_groups.length} 个对比组`}</span>
+          </div>
+          <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {result.comparison_groups.map((group, index) => <div key={group.id} className="rounded-[4px] border border-[#e1e4e7] bg-[#fafbfc] px-3 py-2.5">
+              <div className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#f0f5ff] text-[10px] text-[#3370ff]">{String.fromCharCode(65 + index)}</span><span className="truncate text-[12px] font-medium text-[#2b2f36]">{group.name}</span></div>
+              <div className="mt-1.5 text-[11px] text-[#8f959e]">{group.date_from || "最早"} 至 {group.date_to || "至今"}</div>
+              <div className="mt-1 text-[12px] text-[#4e535a]">符合条件 <span className="font-medium tabular-nums text-[#1f2329]">{group.total}</span> 人</div>
+            </div>)}
+          </div>
+          <div className="overflow-x-auto rounded-[4px] border border-[#e1e4e7]">
+            <Table className="min-w-[720px]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[160px] bg-[#f7f8fa] px-3 text-[12px] font-normal text-[#8f959e]">统计指标</TableHead>
+                  {result.comparison_groups.map(group => <TableHead key={group.id} className="min-w-[140px] bg-[#f7f8fa] px-3 text-right text-[12px] font-normal text-[#8f959e]">{group.name}</TableHead>)}
+                  {result.comparison_groups.length === 2 && <TableHead className="w-[120px] bg-[#f7f8fa] px-3 text-right text-[12px] font-normal text-[#8f959e]">B − A</TableHead>}
+                  {result.comparison_groups.length === 2 && <TableHead className="w-[110px] bg-[#f7f8fa] px-3 text-right text-[12px] font-normal text-[#8f959e]">差异率</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(result.comparison_rows ?? []).map(row => <TableRow key={row.metric} className="h-11">
+                  <TableCell className="px-3 text-[12px] font-medium text-[#4e535a]">{row.title}</TableCell>
+                  {row.values.map((value, index) => <TableCell key={`${row.metric}-${index}`} className="px-3 text-right text-[13px] font-medium tabular-nums text-[#212631]">{formatMetricValue(value, row.format, row.unit)}</TableCell>)}
+                  {result.comparison_groups?.length === 2 && <TableCell className={`px-3 text-right text-[12px] tabular-nums ${(row.difference ?? 0) > 0 ? "text-[#16875d]" : (row.difference ?? 0) < 0 ? "text-[#d85b65]" : "text-[#646a73]"}`}>{row.difference === null ? "—" : formatMetricValue(row.difference, row.format, row.unit, true)}</TableCell>}
+                  {result.comparison_groups?.length === 2 && <TableCell className={`px-3 text-right text-[12px] tabular-nums ${(row.difference_rate ?? 0) > 0 ? "text-[#16875d]" : (row.difference_rate ?? 0) < 0 ? "text-[#d85b65]" : "text-[#646a73]"}`}>{row.difference_rate === null ? "基准为 0" : `${row.difference_rate > 0 ? "+" : ""}${row.difference_rate}%`}</TableCell>}
+                </TableRow>)}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mt-2 text-[11px] text-[#8f959e]">人数类指标按组内客户去重；同一客户可能同时出现在多个对比组中，因此各组人数不直接相加。</div>
+        </div> : result && <div className="border-t-[0.5px] border-[#f0f0f0]">
           <div className="px-[22px] pt-4">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {metricCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] bg-white px-3 py-2.5 ${card.is_total ? "border-[#cfdcf5]" : "border-[#eceef0]"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[20px] font-medium leading-none text-[#212631] tabular-nums">{card.format === "currency" ? `¥${Number(card.count).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}` : Number(card.count).toLocaleString("zh-CN")}{card.format !== "currency" && <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span>}</div></div>)}

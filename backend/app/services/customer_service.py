@@ -1,7 +1,7 @@
-import uuid
 import threading
+import uuid
 from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 from app.models.customer import Customer, CustomerCreate, CustomerUpdate
 from app.services.storage import load_data, save_data, save_item
@@ -54,6 +54,17 @@ def get_by_phone(phone: str) -> Optional[Customer]:
     """按手机号查找客户"""
     for customer in _customers.values():
         if customer.phone == phone and not customer.is_deleted:
+            return customer
+    return None
+
+
+def get_by_nickname(nickname: str) -> Optional[Customer]:
+    """按昵称获取有效客户；已停用客户不会作为业务输入候选。"""
+    target = (nickname or "").strip()
+    if not target:
+        return None
+    for customer in _customers.values():
+        if not customer.is_deleted and customer.nickname == target:
             return customer
     return None
 

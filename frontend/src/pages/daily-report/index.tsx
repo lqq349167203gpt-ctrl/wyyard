@@ -172,7 +172,8 @@ export default function DailyReportPage() {
     for (const a of activities) {
       const teacherNames = (a.teacher_ids || []).map(id => customers.find(c => c.id === id)?.nickname || "").filter(Boolean).join("、")
       const allMemberIds = [...(a.participant_ids || []), ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))]
-      const uniqueIds = [...new Set(allMemberIds)].filter(id => !a.teacher_ids?.includes(id))
+      const visibleCustomerIds = new Set(customers.map(customer => customer.id))
+      const uniqueIds = [...new Set(allMemberIds)].filter(id => !a.teacher_ids?.includes(id) && visibleCustomerIds.has(id))
       const identityTypeMap: Record<string, string> = {}
       for (const identity of memberIdentities) { if (identity.type && identity.name) identityTypeMap[identity.name] = identity.type }
       const oldMembers: string[] = [], newMembers: string[] = []
@@ -275,17 +276,18 @@ export default function DailyReportPage() {
   // 计算每个客户当日参与的活动场数
   const todayActivityCountMap = useMemo(() => {
     const map: Record<string, number> = {}
+    const visibleCustomerIds = new Set(customers.map(customer => customer.id))
     for (const a of activities) {
       const allIds = [
         ...(a.participant_ids || []),
         ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
       ]
-      for (const id of [...new Set(allIds)]) {
+      for (const id of [...new Set(allIds)].filter(id => visibleCustomerIds.has(id))) {
         map[id] = (map[id] || 0) + 1
       }
     }
     return map
-  }, [activities])
+  }, [activities, customers])
 
   const dateRange = useMemo(() => Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i))), [dateRangeStart])
 
@@ -761,7 +763,8 @@ export default function DailyReportPage() {
                     ...(a.participant_ids || []),
                     ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
                   ]
-                  const uniqueIds = [...new Set(allMemberIds)].filter(id => !a.teacher_ids?.includes(id))
+                  const visibleCustomerIds = new Set(customers.map(customer => customer.id))
+                  const uniqueIds = [...new Set(allMemberIds)].filter(id => !a.teacher_ids?.includes(id) && visibleCustomerIds.has(id))
                   const identityTypeMap: Record<string, string> = {}
                   for (const identity of memberIdentities) {
                     if (identity.type && identity.name) identityTypeMap[identity.name] = identity.type

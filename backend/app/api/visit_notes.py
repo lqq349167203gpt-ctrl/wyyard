@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.models.visit_note import VisitNoteCreate, VisitNoteUpdate
-from app.services import position_permission_service, visit_note_service, visit_service
+from app.services import (
+    customer_access_service,
+    position_permission_service,
+    visit_note_service,
+    visit_service,
+)
 
 
 def _require_visit_permission(request: Request) -> str:
@@ -68,6 +73,14 @@ def _subject(visit_id: str) -> str:
     return customer.nickname if customer else "未知客户"
 
 
+def _require_visit_customer_scope(request: Request, visit_id: str, *, action: str = "查看"):
+    visit = visit_service.get_visit(visit_id)
+    if not visit:
+        raise HTTPException(status_code=404, detail="邀约记录不存在")
+    customer_access_service.require_customer_scope(request, visit.customer_id, action=action)
+    return visit
+
+
 def _log_content(action: str, note, previous: str | None = None) -> str:
     category = CATEGORY_LABELS[note.category]
     customer = _subject(note.visit_id)
@@ -87,11 +100,14 @@ def list_visit_notes(
         ids.append(visit_id)
     if not ids:
         raise HTTPException(status_code=400, detail="请指定邀约记录")
+    for current_visit_id in set(ids):
+        _require_visit_customer_scope(request, current_visit_id)
     return [_response(note, request) for note in visit_note_service.list_notes(ids)]
 
 
 @router.post("")
 def create_visit_note(data: VisitNoteCreate, request: Request):
+    _require_visit_customer_scope(request, data.visit_id, action="新增信息到")
     account_id, owner_name, username = _actor(request)
     try:
         note = visit_note_service.create_note(
@@ -116,6 +132,7 @@ def update_visit_note(note_id: str, data: VisitNoteUpdate, request: Request):
     existing = visit_note_service.get_note(note_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    _require_visit_customer_scope(request, existing.visit_id, action="修改")
     account_id, owner_name, username = _actor(request)
     if not visit_note_service.can_manage_note(existing, account_id, owner_name, username):
         raise HTTPException(status_code=403, detail="只能修改自己录入的信息")
@@ -139,6 +156,7 @@ def delete_visit_note(note_id: str, request: Request):
     note = visit_note_service.get_note(note_id)
     if not note:
         raise HTTPException(status_code=404, detail="记录不存在")
+    _require_visit_customer_scope(request, note.visit_id, action="删除")
     account_id, owner_name, username = _actor(request)
     if not visit_note_service.can_manage_note(note, account_id, owner_name, username):
         raise HTTPException(status_code=403, detail="只能删除自己录入的信息")

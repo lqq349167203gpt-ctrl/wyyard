@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.emotional_release_session import EmotionalReleaseSessionCreate
-from app.services import activity_assignment_notification_service, emotional_release_session_service
+from app.services import (
+    activity_assignment_notification_service,
+    customer_access_service,
+    emotional_release_session_service,
+)
 from app.services.customer_service import list_all_customers
 from app.utils.pagination import paginate
 from app.utils.record_ownership import (
@@ -14,10 +18,15 @@ from app.utils.record_ownership import (
 router = APIRouter(prefix="/api/emotional-release-sessions", tags=["emotional-release-sessions"])
 
 
-def _fill_ers_names(sessions: list) -> list:
+def _fill_ers_names(sessions: list, request: Request | None = None) -> list:
     from app.services import space_service
     customers = list_all_customers()
     cmap = {c.id: c for c in customers}
+    visible_ids = (
+        customer_access_service.visible_customer_ids(request, customers)
+        if request
+        else set(cmap)
+    )
     _space_map: dict[str, str] = {}
     _room_map: dict[str, str] = {}
     for sp in space_service.get_all_spaces():
@@ -34,7 +43,10 @@ def _fill_ers_names(sessions: list) -> list:
     for s in sessions:
         for field in ("owner_name", "host_name"):
             id_field = field.replace("_name", "_id")
-            actual = get_name(getattr(s, id_field, ""))
+            customer_id = getattr(s, id_field, "")
+            actual = get_name(customer_id)
+            if field == "owner_name" and customer_id not in visible_ids:
+                actual = ""
             if getattr(s, field, "") != actual:
                 setattr(s, field, actual)
         sid = getattr(s, "space_id", "")
@@ -49,9 +61,14 @@ def _fill_ers_names(sessions: list) -> list:
 
 
 @router.get("")
-def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+def list_sessions(
+    date: str = "",
+    page: int | None = Query(None, ge=1),
+    page_size: int | None = Query(None, ge=1, le=100),
+    request: Request = None,
+):
     items = emotional_release_session_service.list_sessions(date or None)
-    items = _fill_ers_names(items)
+    items = _fill_ers_names(items, request)
     if page is not None:
         return paginate(items, page, page_size or 10)
     return items
@@ -59,6 +76,8 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 @router.post("")
 def create_session(data: EmotionalReleaseSessionCreate, request: Request, conversion: bool = False):
+    customer_access_service.require_customer_scope(request, data.owner_id, action="设置为案主")
+    customer_access_service.require_new_customer_ids(request, data.participant_ids, action="添加")
     try:
         session = emotional_release_session_service.create_session(
             stamp_creator(data, request), refresh_identities=not conversion
@@ -78,6 +97,17 @@ def create_session(data: EmotionalReleaseSessionCreate, request: Request, conver
 @router.patch("/{session_id}")
 def update_session(session_id: str, data: dict, request: Request):
     old_session = emotional_release_session_service.get_session(session_id)
+    if not old_session:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    if data.get("owner_id") and data["owner_id"] != old_session.owner_id:
+        customer_access_service.require_customer_scope(request, data["owner_id"], action="设置为案主")
+    if "participant_ids" in data:
+        customer_access_service.require_new_customer_ids(
+            request,
+            data.get("participant_ids") or [],
+            existing_ids=old_session.participant_ids,
+            action="添加",
+        )
     ensure_creator_for_changed_fields(
         request, old_session, data, ACTIVITY_CREATOR_ONLY_FIELDS, "课表受保护信息", "activities"
     )
@@ -113,5 +143,9 @@ def delete_session(session_id: str, request: Request, conversion: bool = False):
 
 
 @router.get("/search-customers")
-def search_customers(q: str = "", date: str = ""):
-    return emotional_release_session_service.search_customers(q, date)
+def search_customers(q: str = "", date: str = "", request: Request = None):
+    results = emotional_release_session_service.search_customers(q, date)
+    if request is None:
+        return results
+    visible_ids = customer_access_service.visible_customer_ids(request, list_all_customers())
+    return [result for result in results if result.get("id") in visible_ids]

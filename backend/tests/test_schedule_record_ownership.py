@@ -2,6 +2,8 @@
 
 import uuid
 
+from app.services import position_edit_permission_service
+
 
 def _create_other_account_headers(client):
     suffix = uuid.uuid4().hex[:10]
@@ -298,10 +300,7 @@ def test_super_admin_can_edit_other_creators_schedule_content(client, created_cu
         "password": password,
     })
     assert login.status_code == 200
-    assert login.json()["edit_permissions"] == {
-        "visits": "all",
-        "activities": "all",
-    }
+    assert login.json()["edit_permissions"] == position_edit_permission_service.SUPER_ADMIN_PERMISSIONS
     headers = {"Authorization": f"Bearer {login.json()['token']}"}
 
     try:

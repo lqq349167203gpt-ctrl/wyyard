@@ -10,6 +10,7 @@ from app.config.settings import settings
 from app.models.customer import CustomerCreate, CustomerUpdate
 from app.models.operation_log import OperationLogCreate
 from app.services import (
+    customer_contact_service,
     customer_service,
     membership_card_service,
     operation_log_service,
@@ -193,6 +194,26 @@ def update_customer_fields(customer_name: str, nickname: str = "", gender: str =
     if not update_data:
         return json.dumps({"ok": False, "reason": "no_fields", "name": customer["nickname"]}, ensure_ascii=False)
 
+    # AI 对话不能绕过角色联系方式权限；首次新建仍由 create_customer 独立处理。
+    role = _ctx_var.get().get("role", "")
+    denied_contact_fields = [
+        field
+        for field in ("phone", "wechat")
+        if field in update_data
+        and not customer_contact_service.can_access(role, field, "edit")
+    ]
+    if denied_contact_fields:
+        field_labels = ["手机号" if field == "phone" else "微信号" for field in denied_contact_fields]
+        return json.dumps(
+            {
+                "ok": False,
+                "reason": "forbidden_contact_edit",
+                "name": customer["nickname"],
+                "fields": field_labels,
+            },
+            ensure_ascii=False,
+        )
+
     # 确定性归一化与校验（性别/手机号/流量来源/工作情况），不合法不入库
     update_data, err_json = _normalize_customer_fields(update_data)
     if err_json:
@@ -259,6 +280,8 @@ def query_customer_info(customer_name: str) -> str:
     }
     for field, label in FIELD_MAP.items():
         val = getattr(full, field, None)
+        if field in ("phone", "wechat"):
+            val = customer_contact_service.mask_contact(field, str(val or ""))
         if val is not None and val != "" and val != 0:
             info[label] = str(val)
 
@@ -391,12 +414,20 @@ TOOLS = [create_customer, update_customer_fields, query_customer_info, delete_cu
 TOOL_MAP = {t.name: t for t in TOOLS}
 
 # 运行时上下文（async-safe）
-_ctx_var = contextvars.ContextVar("customer_chat_ctx", default={"operator": ""})
+_ctx_var = contextvars.ContextVar(
+    "customer_chat_ctx",
+    default={"operator": "", "role": ""},
+)
 
 
-async def customer_chat(message: str, history: list, operator: str = "") -> dict:
+async def customer_chat(
+    message: str,
+    history: list,
+    operator: str = "",
+    role: str = "",
+) -> dict:
     """客户对话主入口。使用 LLM tool calling 理解意图并执行操作。"""
-    _ctx_var.set({"operator": operator})
+    _ctx_var.set({"operator": operator, "role": role})
 
     prompt_config = get_customer_ai_config()
     model_config = get_miniapp_ai_config()
@@ -529,6 +560,9 @@ def _build_reply_from_tools(tool_call_log: list) -> str:
                 return f"没有需要修改的内容。"
             if reason == "invalid_field":
                 return f"{result.get('error', '字段格式不对')}"
+            if reason == "forbidden_contact_edit":
+                fields = "、".join(result.get("fields", []))
+                return f"当前角色没有修改{fields}的权限。"
             if reason == "error":
                 return f"操作失败：{result.get('error', '未知错误')[:100]}"
 

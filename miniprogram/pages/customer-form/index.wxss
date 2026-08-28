@@ -27,6 +27,36 @@
   text-align: right;
 }
 
+.contact-field {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16rpx;
+}
+
+.contact-field .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-field .form-input[disabled] {
+  color: #646a73;
+  opacity: 1;
+}
+
+.contact-action {
+  flex-shrink: 0;
+  color: #646a73;
+  font-size: 24rpx;
+  line-height: 44rpx;
+}
+
+.contact-action:active {
+  color: #1f2329;
+}
+
 .picker-display {
   flex: 1;
   font-size: 28rpx;

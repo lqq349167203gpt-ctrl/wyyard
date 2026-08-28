@@ -71,6 +71,8 @@ Page({
   data: {
     customerId: '',
     customer: null,
+    customerAccessPermissions: null,
+    revealedContacts: { phone: false, wechat: false },
     customerTags: [],
     loading: true,
     loadError: '',
@@ -90,6 +92,7 @@ Page({
     absentCount: 0,
     purchaseSummary: [],
     paymentRecords: [],
+    activityFollowups: [],
     offlineCourseRecords: [],
     trafficDetailLabel: '流量链接',
     activeTab: 'healing',
@@ -122,7 +125,12 @@ Page({
   },
 
   async loadData(id) {
-    this.setData({ loading: true, loadError: '', commRecords: [] })
+    this.setData({
+      loading: true,
+      loadError: '',
+      commRecords: [],
+      revealedContacts: { phone: false, wechat: false },
+    })
     try {
       const [detail, customerTags] = await Promise.all([
         customerApi.detail(id),
@@ -146,7 +154,10 @@ Page({
       const genderAgeText = gender && age ? (gender + ' · ' + age) : (gender || age)
       const workText = [c.work_status, c.work_description].filter(Boolean).join(' · ')
 
-      const totalPayment = (detail.payment_records || []).reduce((sum, r) => sum + (r.amount || 0), 0)
+      const customerAccessPermissions = c.customer_access_permissions || null
+      const totalPayment = c.total_payment == null
+        ? null
+        : Number(c.total_payment || 0)
       // 活动记录
       const activities = (detail.activities || []).map(function(a) {
         return Object.assign({}, a, {
@@ -171,6 +182,7 @@ Page({
 
       // 线下落地课程记录
       const offlineCourseRecords = detail.offline_course_records || []
+      const activityFollowups = detail.activity_followups || []
 
       // 流量来源对应的详情标签
       const ts = c.traffic_source || ''
@@ -181,11 +193,12 @@ Page({
 
       this.setData({
         customer: c,
+        customerAccessPermissions,
         customerTags,
         healerText,
         firstVisit,
         totalPayment,
-        totalPaymentText: formatMoney(totalPayment),
+        totalPaymentText: totalPayment == null ? '—' : formatMoney(totalPayment),
         genderAgeText,
         workText,
         activities,
@@ -195,6 +208,7 @@ Page({
         absentCount,
         purchaseSummary,
         paymentRecords,
+        activityFollowups,
         offlineCourseRecords,
         trafficDetailLabel,
         loading: false,
@@ -202,7 +216,7 @@ Page({
       this.updateTabCounts()
 
       // 加载沟通记录
-      if (c.nickname) {
+      if (c.nickname && (!customerAccessPermissions || customerAccessPermissions.detail_tabs.communication)) {
         this.loadCommunicationRecords(c.nickname)
       }
     } catch (e) {
@@ -215,16 +229,23 @@ Page({
   },
 
   updateTabCounts() {
-    const { healingRecords, commRecords, activities, purchaseSummary, offlineCourseRecords, paymentRecords } = this.data
+    const { healingRecords, commRecords, activities, activityFollowups, purchaseSummary, offlineCourseRecords, paymentRecords, customerAccessPermissions } = this.data
+    const access = customerAccessPermissions
+    const tabs = [
+      (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进点', count: healingRecords.length },
+      (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: commRecords.length },
+      (!access || access.detail_tabs.activities) && { key: 'activities', label: '活动', count: activities.length },
+      (!access || access.detail_tabs.customer_followups) && { key: 'followups', label: '回访', count: activityFollowups.length },
+      (!access || access.detail_tabs.card_statistics) && { key: 'purchase', label: '卡次', count: purchaseSummary.length },
+      (!access || access.detail_tabs.offline_courses) && { key: 'offline_course', label: '课程', count: offlineCourseRecords.length },
+      (!access || access.transaction_access === 'detail') && { key: 'payment', label: '交易', count: paymentRecords.length },
+    ].filter(Boolean)
+    const activeTab = tabs.some(tab => tab.key === this.data.activeTab)
+      ? this.data.activeTab
+      : ((tabs[0] && tabs[0].key) || '')
     this.setData({
-      tabs: [
-        { key: 'healing', label: '跟进点', count: healingRecords.length },
-        { key: 'communication', label: '沟通', count: commRecords.length },
-        { key: 'activities', label: '活动', count: activities.length },
-        { key: 'purchase', label: '卡次', count: purchaseSummary.length },
-        { key: 'offline_course', label: '课程', count: offlineCourseRecords.length },
-        { key: 'payment', label: '交易', count: paymentRecords.length },
-      ],
+      tabs,
+      activeTab,
     })
   },
 
@@ -238,6 +259,31 @@ Page({
 
   onEditTap() {
     wx.navigateTo({ url: `/pages/customer-form/index?id=${this.data.customerId}` })
+  },
+
+  async onContactView(e) {
+    const field = e.currentTarget.dataset.field
+    try {
+      const result = await customerApi.accessContact(this.data.customerId, field, 'view')
+      this.setData({
+        [`customer.${field}`]: result.value,
+        [`revealedContacts.${field}`]: true,
+      })
+    } catch (error) {
+      wx.showToast({ title: error.message || '查看失败', icon: 'none' })
+    }
+  },
+
+  async onContactCopy(e) {
+    const field = e.currentTarget.dataset.field
+    try {
+      const result = await customerApi.accessContact(this.data.customerId, field, 'copy')
+      await new Promise((resolve, reject) => {
+        wx.setClipboardData({ data: result.value, success: resolve, fail: reject })
+      })
+    } catch (error) {
+      wx.showToast({ title: error.message || '复制失败', icon: 'none' })
+    }
   },
 
   async loadCommunicationRecords(nickname) {

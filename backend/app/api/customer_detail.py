@@ -10,6 +10,8 @@ from fastapi import APIRouter, HTTPException, Request
 from app.services import (
     activity_followup_service,
     class_record_service,
+    customer_access_service,
+    customer_contact_service,
     customer_service,
     emotional_release_service,
     emotional_release_session_service,
@@ -34,37 +36,63 @@ router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
 
 
 @router.get("/{customer_id}")
-def get_customer_detail(customer_id: str, request: Request = None, date: str | None = None):
+def get_customer_detail(customer_id: str, request: Request, date: str | None = None):
     """获取单个客户的完整聚合详情"""
     # 客户角色只能查看自己的数据
-    if request:
-        user_role = getattr(request.state, "user_role", "")
-        if user_role == "customer":
-            state_customer_id = getattr(request.state, "customer_id", "")
-            if state_customer_id != customer_id:
-                raise HTTPException(status_code=403, detail="权限不足")
+    user_role = getattr(request.state, "user_role", "")
+    if user_role == "customer":
+        state_customer_id = getattr(request.state, "customer_id", "")
+        if state_customer_id != customer_id:
+            raise HTTPException(status_code=403, detail="权限不足")
     customer = customer_service.get_customer(customer_id)
     if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
+    is_customer_self = user_role == "customer"
+    if not is_customer_self and not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有查看该客户的权限")
+
+    permissions = None if is_customer_self else customer_access_service.get_customer_permissions(user_role)
+    can_follow_up = is_customer_self or bool(permissions["detail_tabs"]["follow_up"])
+    can_view_activities = is_customer_self or bool(permissions["detail_tabs"]["activities"])
+    can_view_followups = is_customer_self or bool(permissions["detail_tabs"]["customer_followups"])
+    can_view_cards = is_customer_self or bool(permissions["detail_tabs"]["card_statistics"])
+    can_view_offline = is_customer_self or bool(permissions["detail_tabs"]["offline_courses"])
+    transaction_level = "detail" if is_customer_self else permissions["transaction_access"]
 
     basic = customer.model_dump(mode="json")
+    if not is_customer_self:
+        basic = customer_access_service.protect_sensitive_data(basic, user_role)
+        basic = customer_contact_service.protect_customer_data(
+            basic,
+            user_role,
+            include_permissions=True,
+        )
+        basic["customer_access_permissions"] = permissions
     basic["visit_count"] = visit_service.count_customer_visits(customer_id)
 
-    purchase_summary = _build_purchase_summary(customer_id)
+    purchase_summary = _build_purchase_summary(customer_id) if can_view_cards else []
     # date 参数：只返回该日期的活动
-    if date:
+    if not can_view_activities:
+        activities = []
+    elif date:
         activities = _build_activities(customer_id, date_filter={date})
     else:
         activities = _build_activities(customer_id)
     healing_records = [
         r.model_dump(mode="json")
         for r in healing_record_service.list_records(customer_id)
-    ]
-    payment_records = _build_payment_records(customer_id, date)
-    offline_course_records = _build_offline_course_records(customer_id)
+    ] if can_follow_up else []
+    all_payment_records = _build_payment_records(customer_id, date) if transaction_level != "none" else []
+    basic["total_payment"] = (
+        sum(float(record.get("amount") or 0) for record in all_payment_records if not record.get("voided"))
+        if transaction_level != "none"
+        else None
+    )
+    payment_records = all_payment_records if transaction_level == "detail" else []
+    offline_course_records = _build_offline_course_records(customer_id) if can_view_offline else []
     visits = visit_service.list_visits(customer_id=customer_id)
     notes_by_visit: dict[str, list[dict]] = {visit.id: [] for visit in visits}
-    for note in visit_note_service.list_notes(notes_by_visit):
+    for note in (visit_note_service.list_notes(notes_by_visit) if can_follow_up else []):
         notes_by_visit.setdefault(note.visit_id, []).append(
             {
                 "id": note.id,
@@ -77,7 +105,7 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
             }
         )
     visit_records = []
-    for visit in visits:
+    for visit in (visits if can_follow_up else []):
         record = visit.model_dump(mode="json")
         record["visit_notes"] = notes_by_visit.get(visit.id, [])
         visit_records.append(record)
@@ -89,7 +117,7 @@ def get_customer_detail(customer_id: str, request: Request = None, date: str | N
         "activity_followups": [
             record.model_dump(mode="json")
             for record in activity_followup_service.list_followups(customer_id)
-        ],
+        ] if can_view_followups else [],
         "healing_records": healing_records,
         "payment_records": payment_records,
         "offline_course_records": offline_course_records,

@@ -26,6 +26,7 @@ AnalysisField = Literal[
     "activity_count",
     "activity_types",
     "activity_names",
+    "course_teachers",
     "communication_count",
     "last_communication_date",
     "total_consumption",
@@ -42,6 +43,7 @@ AnalysisField = Literal[
     "payment_methods",
     "payment_count_period",
     "payment_amount_period",
+    "payment_dates",
     "latest_payment_date",
 ]
 
@@ -85,14 +87,31 @@ AnalysisMetric = Literal[
     "payment_amount",
 ]
 
+INHERITABLE_DATE_FIELDS = {
+    "referral_date",
+    "created_at",
+    "first_visit_date",
+    "last_visit_date",
+    "last_communication_date",
+    "payment_dates",
+    "latest_payment_date",
+}
+
 
 class AnalysisCondition(StrictBaseModel):
     field: AnalysisField
     operator: AnalysisOperator
     value: Any = None
+    inherit_period: bool = False
 
     @model_validator(mode="after")
     def validate_value(self):
+        if self.inherit_period:
+            if self.field not in INHERITABLE_DATE_FIELDS:
+                raise ValueError("仅日期条件可跟随统计周期")
+            self.operator = "between"
+            self.value = None
+            return self
         if self.operator in {"is_empty", "is_not_empty"}:
             self.value = None
         elif self.operator == "between":
@@ -105,6 +124,28 @@ class AnalysisCondition(StrictBaseModel):
                 raise ValueError("多选条件不能为空")
         elif self.value is None or self.value == "":
             raise ValueError("筛选值不能为空")
+        return self
+
+
+class AnalysisComparisonGroup(StrictBaseModel):
+    id: str = Field(default="", max_length=40)
+    name: str = Field(min_length=1, max_length=24)
+    conditions: list[AnalysisCondition] = Field(default_factory=list, max_length=20)
+    condition_logic: Literal["all", "any"] = "all"
+    date_from: str = ""
+    date_to: str = ""
+
+    @field_validator("id", "name")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_date_range(self):
+        parsed_from = date.fromisoformat(self.date_from) if self.date_from else None
+        parsed_to = date.fromisoformat(self.date_to) if self.date_to else None
+        if parsed_from and parsed_to and parsed_from > parsed_to:
+            raise ValueError(f"对比组“{self.name}”的开始日期不能晚于结束日期")
         return self
 
 
@@ -134,6 +175,8 @@ class AnalysisPlan(StrictBaseModel):
     )
     sort_by: AnalysisField = "referral_date"
     sort_order: Literal["asc", "desc"] = "desc"
+    analysis_mode: Literal["single", "comparison"] = "single"
+    comparison_groups: list[AnalysisComparisonGroup] = Field(default_factory=list, max_length=4)
 
     @field_validator("title", "total_card_title")
     @classmethod
@@ -162,6 +205,8 @@ class AnalysisPlan(StrictBaseModel):
         parsed_to = date.fromisoformat(self.date_to) if self.date_to else None
         if parsed_from and parsed_to and parsed_from > parsed_to:
             raise ValueError("开始日期不能晚于结束日期")
+        if self.analysis_mode == "comparison" and len(self.comparison_groups) < 2:
+            raise ValueError("方案对比至少需要两个对比组")
         return self
 
 

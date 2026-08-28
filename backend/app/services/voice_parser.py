@@ -331,11 +331,13 @@ async def modify_customer_data(current_data: dict, instruction: str) -> dict:
     """根据用户指令修改现有客户数据，返回修改后的完整数据。
     智能判断指令是否指向不同客户，自动切换。"""
     # 如果没有传 current_data 或缺少 id，尝试智能查找
+    loaded_from_database = False
     if not current_data or not current_data.get("id"):
         found = _find_customer_from_instruction(instruction)
         if not found:
             raise HTTPException(status_code=400, detail="未找到该客户，请在指令中包含客户昵称、姓名或手机号")
         current_data = found
+        loaded_from_database = True
     else:
         # 已有 current_data，但指令可能指向另一个客户
         # 例：上次改的是"余墨"，用户说"把娟娟的电话改成139xxx"
@@ -343,6 +345,15 @@ async def modify_customer_data(current_data: dict, instruction: str) -> dict:
         if other and other.get("id") != current_data.get("id"):
             # 指令中提到了不同的客户，切换过去
             current_data = other
+            loaded_from_database = True
+
+    # AI 辅助修改只负责生成草稿，不能借由自动匹配返回数据库中的明文联系方式。
+    if loaded_from_database:
+        from app.services import customer_contact_service
+
+        current_data = dict(current_data)
+        current_data["phone"] = customer_contact_service.mask_phone(current_data.get("phone", ""))
+        current_data["wechat"] = customer_contact_service.mask_wechat(current_data.get("wechat", ""))
 
     model_config = get_miniapp_ai_config()
     api_key = model_config.api_key or settings.llm_api_key

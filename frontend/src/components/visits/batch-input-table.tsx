@@ -120,7 +120,7 @@ const VISIT_CREATOR_ONLY_FIELDS = new Set<keyof Row>([
   "referrer_handler",
 ])
 
-const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 78, 80, 64, 207, 203, 203, 60, 60, 74, 74, 92] as const
+const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 78, 80, 64, 207, 203, 203, 60, 60, 74, 74, 76, 76] as const
 
 export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview, toolbarLeading, toolbarTrailing }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
@@ -802,9 +802,9 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           {toolbarTrailing}
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div ref={headerScrollRef} className="shrink-0 overflow-hidden">
-          <div className="min-w-[1384px]">
+          <div className="min-w-[1444px]">
             <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
@@ -825,14 +825,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">今日成交</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">邀约人</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">所属组长</th>
-              <th className="sticky right-0 z-10 bg-[#f7f8fa] px-1.5 py-2 text-center font-normal">操作</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">创建人</th>
+              <th className="sticky right-0 z-20 bg-[#f7f8fa] px-1.5 py-2 text-center font-normal">操作</th>
             </tr>
           </thead>
             </table>
           </div>
         </div>
         <div ref={scrollRef} onScroll={handleTableScroll} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-hide">
-          <div className="min-w-[1384px]">
+          <div className="min-w-[1444px]">
             <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
@@ -844,6 +845,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               const leaderRow = row.is_leader ? null : displayRows.slice(0, idx).reverse().find(r => r.is_leader)
               const isChanged = displayChangedKeys.includes(row.key)
               const rowReadOnly = !canEditRow(row)
+              const creatorName = row.visit_id ? row.created_by || "未记录" : "待保存"
               return (
                 <tr
                   key={row.key}
@@ -1026,7 +1028,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className="px-1.5 py-1.5">
                     <span className="text-[12px] text-[#8f959e]">{leaderRow?.nickname || ""}</span>
                   </td>
-                  <td className="sticky right-0 z-10 bg-white px-1.5 py-1.5 text-center">
+                  <td className="px-1.5 py-1.5">
+                    <span
+                      className={`block truncate text-[12px] ${row.created_by ? "text-[#8f959e]" : "text-[#c9cdd4]"}`}
+                      title={creatorName}
+                    >
+                      {creatorName}
+                    </span>
+                  </td>
+                  <td className="sticky right-0 z-20 bg-white px-1.5 py-1.5 text-center">
                     <div className="flex items-center justify-center gap-1">
                       {!rowReadOnly && (row.cancelled || (!row.arrived && Boolean(row.visit_id))) && (
                         <>
@@ -1067,14 +1077,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                           </Tooltip>
                         </>
                       )}
-                      {rowReadOnly ? (
-                        <span
-                            className="max-w-[76px] truncate text-[12px] text-[#8f959e]"
-                          title="昵称、邀约人、时间、来访需求及取消/删除仅创建人可操作"
-                        >
-                          {row.created_by || "未记录"}
-                        </span>
-                      ) : (
+                      {!rowReadOnly && (
                         <Tooltip>
                           <TooltipTrigger
                             render={
@@ -1097,6 +1100,12 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
             })}
           </tbody>
         </table>
+        </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-px right-[76px] top-px z-30 w-3 bg-[linear-gradient(to_right,transparent,rgba(31,35,41,0.08))]"
+        >
+          <span className="absolute inset-y-0 right-0 w-px bg-[#dfe2e6]" />
         </div>
       </div>
       </div>

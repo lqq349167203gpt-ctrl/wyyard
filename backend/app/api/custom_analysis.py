@@ -9,7 +9,12 @@ from app.models.custom_analysis import (
     AnalysisTemplateCreate,
     AnalysisTemplateUpdate,
 )
-from app.services import custom_analysis_service, custom_analysis_template_service
+from app.services import (
+    custom_analysis_service,
+    custom_analysis_template_service,
+    customer_access_service,
+    customer_service,
+)
 
 router = APIRouter(
     prefix="/api/custom-analysis",
@@ -21,7 +26,17 @@ router = APIRouter(
 @router.get("/metadata")
 async def get_metadata(request: Request):
     actor_id = getattr(request.state, "user_id", "")
-    return await asyncio.to_thread(custom_analysis_service.metadata, actor_id)
+    role = getattr(request.state, "user_role", "") or ""
+    allowed_customer_ids = customer_access_service.visible_customer_ids(
+        request, customer_service.list_customers()
+    )
+    return await asyncio.to_thread(
+        custom_analysis_service.metadata,
+        actor_id,
+        allowed_customer_ids,
+        customer_access_service.transaction_access(role) == "detail",
+        customer_access_service.can_view_detail_tab(role, "communication"),
+    )
 
 
 def _actor(request: Request) -> tuple[str, str, bool]:
@@ -32,11 +47,18 @@ def _actor(request: Request) -> tuple[str, str, bool]:
 
 
 def _template_snapshot(template) -> dict:
+    comparison_groups = template.plan.comparison_groups if template.plan.analysis_mode == "comparison" else []
     return {
         "模板名称": template.name,
         "模板简介": template.description or "—",
         "可见范围": "团队共享" if template.scope == "shared" else "仅自己可见",
-        "筛选条件数": len(template.plan.conditions),
+        "分析模式": "方案对比" if comparison_groups else "单组筛选",
+        "筛选条件数": (
+            sum(len(group.conditions) for group in comparison_groups)
+            if comparison_groups
+            else len(template.plan.conditions)
+        ),
+        "对比组": [group.name for group in comparison_groups],
         "统计指标": [custom_analysis_service.METRIC_LABELS[metric][0] for metric in template.plan.metrics],
         "拆分指标": custom_analysis_service.METRIC_LABELS[template.plan.card_metric][0],
         "拆分维度": custom_analysis_service.CARD_DIMENSION_LABELS[template.plan.card_dimension],
@@ -45,10 +67,26 @@ def _template_snapshot(template) -> dict:
 
 
 def _plan_snapshot(plan, result_total: int) -> dict:
+    if plan.analysis_mode == "comparison":
+        return {
+            "标题": plan.title,
+            "分析模式": "方案对比",
+            "统计指标": [custom_analysis_service.METRIC_LABELS[item][0] for item in plan.metrics],
+            "对比组": [
+                {
+                    "名称": group.name,
+                    "时间范围": f"{group.date_from or '最早'} 至 {group.date_to or '至今'}",
+                    "条件关系": "全部符合" if group.condition_logic == "all" else "任意一条符合",
+                    "条件数": len(group.conditions),
+                }
+                for group in plan.comparison_groups
+            ],
+            "各组人数合计": result_total,
+        }
     conditions = []
     for condition in plan.conditions:
-        value = condition.value
-        if condition.operator == "between" and isinstance(value, list):
+        value = "跟随统计周期" if condition.inherit_period else condition.value
+        if not condition.inherit_period and condition.operator == "between" and isinstance(value, list):
             value = " 至 ".join(str(item) for item in value)
         elif isinstance(value, list):
             value = "、".join(str(item) for item in value)
@@ -174,16 +212,47 @@ async def parse_query(data: AnalysisParseRequest, request: Request):
 @router.post("/execute")
 async def execute_query(data: AnalysisExecuteRequest, request: Request):
     actor_id = getattr(request.state, "user_id", "")
+    role = getattr(request.state, "user_role", "") or ""
+    allow_payment_details = customer_access_service.transaction_access(role) == "detail"
+    allow_communication = customer_access_service.can_view_detail_tab(role, "communication")
+    payment_fields = set(custom_analysis_service.FIELD_GROUPS["付费行为"])
+    all_conditions = list(data.plan.conditions)
+    for group in data.plan.comparison_groups:
+        all_conditions.extend(group.conditions)
+    plan_fields = {
+        *(condition.field for condition in all_conditions),
+        *data.plan.columns,
+        data.plan.sort_by,
+        data.plan.card_dimension,
+    }
+    payment_metrics = {"converted_customers", "payment_orders", "payment_amount"}
+    if not allow_payment_details and (
+        plan_fields.intersection(payment_fields)
+        or set(data.plan.metrics).intersection(payment_metrics)
+        or data.plan.card_metric in payment_metrics
+    ):
+        raise HTTPException(status_code=403, detail="当前角色没有客户交易明细权限，请移除付费相关筛选项")
+    if not allow_communication and plan_fields.intersection(custom_analysis_service.FIELD_GROUPS["沟通行为"]):
+        raise HTTPException(status_code=403, detail="当前角色没有沟通记录查看权限")
+    allowed_customer_ids = customer_access_service.visible_customer_ids(
+        request, customer_service.list_customers()
+    )
     result = await asyncio.to_thread(
         custom_analysis_service.execute_plan,
         data.plan,
         actor_id,
         data.page,
         data.page_size,
+        allowed_customer_ids,
     )
     if data.page == 1:
+        comparison_count = len(result.get("comparison_groups", []))
         request.state.operation_log_context = {
-            "content": f"执行自定义筛选“{data.plan.title}”：筛选出 {result['total']} 人",
+            "content": (
+                f"执行方案对比“{data.plan.title}”：完成 {comparison_count} 个对比组"
+                if comparison_count
+                else f"执行自定义筛选“{data.plan.title}”：筛选出 {result['total']} 人"
+            ),
             "after_data": _plan_snapshot(data.plan, result["total"]),
         }
     else:

@@ -30,6 +30,21 @@ Page({
     gender: '',
     phone: '',
     wechat: '',
+    contactPermissions: {
+      phone: { view: false, copy: false, edit: false },
+      wechat: { view: false, copy: false, edit: false },
+    },
+    customerAccessPermissions: {
+      sensitive_fields: {
+        visit_purpose: true,
+        trauma_history: true,
+        current_block: true,
+        work_info: true,
+        other_info: true,
+      },
+    },
+    contactDirty: { phone: false, wechat: false },
+    revealedContacts: { phone: false, wechat: false },
     age: '',
     service_teacher: '',
     referrer: '',
@@ -210,6 +225,10 @@ Page({
         gender: c.gender || '',
         phone: c.phone || '',
         wechat: c.wechat || '',
+        contactPermissions: c.contact_permissions || this.data.contactPermissions,
+        customerAccessPermissions: c.customer_access_permissions || this.data.customerAccessPermissions,
+        contactDirty: { phone: false, wechat: false },
+        revealedContacts: { phone: false, wechat: false },
         age: c.age || '',
         service_teacher: c.service_teacher || '',
         referrer: c.referrer || '',
@@ -233,7 +252,36 @@ Page({
 
   onInput(e) {
     const field = e.currentTarget.dataset.field
-    this.setData({ [field]: e.detail.value })
+    const updates = { [field]: e.detail.value }
+    if (field === 'phone' || field === 'wechat') {
+      updates[`contactDirty.${field}`] = true
+    }
+    this.setData(updates)
+  },
+
+  async onContactView(e) {
+    const field = e.currentTarget.dataset.field
+    try {
+      const result = await customerApi.accessContact(this.data.id, field, 'view')
+      this.setData({
+        [field]: result.value,
+        [`revealedContacts.${field}`]: true,
+      })
+    } catch (error) {
+      wx.showToast({ title: error.message || '查看失败', icon: 'none' })
+    }
+  },
+
+  async onContactCopy(e) {
+    const field = e.currentTarget.dataset.field
+    try {
+      const result = await customerApi.accessContact(this.data.id, field, 'copy')
+      await new Promise((resolve, reject) => {
+        wx.setClipboardData({ data: result.value, success: resolve, fail: reject })
+      })
+    } catch (error) {
+      wx.showToast({ title: error.message || '复制失败', icon: 'none' })
+    }
   },
 
   onOpenEditor(e) {
@@ -366,6 +414,17 @@ Page({
       }
 
       if (this.data.isEdit) {
+        const sensitive = this.data.customerAccessPermissions.sensitive_fields || {}
+        if (sensitive.visit_purpose === false) delete data.tags
+        if (sensitive.trauma_history === false) delete data.basic_info
+        if (sensitive.current_block === false) delete data.core_situation
+        if (sensitive.work_info === false) {
+          delete data.work_status
+          delete data.work_description
+        }
+        if (sensitive.other_info === false) delete data.other_info
+        if (!this.data.contactDirty.phone) delete data.phone
+        if (!this.data.contactDirty.wechat) delete data.wechat
         await customerApi.update(this.data.id, data)
         if (this.data.tagsLoaded) {
           await customerTagApi.setForCustomer(this.data.id, this.data.selectedTagIds)

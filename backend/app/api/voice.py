@@ -134,8 +134,12 @@ async def customer_chat(req: CustomerChatRequest, request: Request):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="消息为空")
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "") or ""
+    role = getattr(request.state, "user_role", "") or ""
     result = await customer_chat_service.customer_chat(
-        req.message, req.history, operator=operator
+        req.message,
+        req.history,
+        operator=operator,
+        role=role,
     )
 
     # 写入沟通记录

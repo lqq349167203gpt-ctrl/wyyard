@@ -1,24 +1,29 @@
 """消费记录聚合 API — 付费记录 + 销卡记录"""
-from fastapi import APIRouter, Query
-from app.utils.pagination import paginate
+
+from fastapi import APIRouter, Query, Request
+
 from app.services import (
-    membership_card_service,
-    group_case_service,
+    customer_access_service,
+    customer_service,
     emotional_release_service,
     energy_knot_service,
+    group_case_service,
     internal_course_service,
+    membership_card_service,
     oh_card_reading_service,
+    other_project_deduction_service,
     other_project_service,
     project_deduction_service,
-    other_project_deduction_service,
 )
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/consumption-records", tags=["consumption-records"])
 
 
 @router.get("/daily-totals")
-def get_daily_payment_totals(date: str = Query(...)):
+def get_daily_payment_totals(request: Request, date: str = Query(...)):
     """返回指定日期各客户的成交总额 {customer_id: total_amount}"""
+    customer_access_service.require_transaction_access(request, detail=True)
     totals: dict[str, float] = {}
 
     # 会员活动
@@ -56,7 +61,11 @@ def get_daily_payment_totals(date: str = Query(...)):
         if p.deal_date == date:
             totals[p.customer_id] = totals.get(p.customer_id, 0) + p.fee
 
-    return totals
+    visible_ids = customer_access_service.visible_customer_ids(
+        request,
+        customer_service.list_all_customers(),
+    )
+    return {customer_id: amount for customer_id, amount in totals.items() if customer_id in visible_ids}
 
 
 TYPE_LABELS = {
@@ -70,11 +79,13 @@ TYPE_LABELS = {
 
 @router.get("/payments")
 def list_payment_records(
+    request: Request,
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
+    customer_access_service.require_transaction_access(request, detail=True)
     records = []
 
     # 会员活动
@@ -189,8 +200,9 @@ def list_payment_records(
             "customer_id": p.customer_id,
         })
 
+    records = customer_access_service.filter_record_dicts(request, records)
+
     # 填充 nickname
-    from app.services import customer_service
     customer_map = {}
     for r in records:
         cid = r["customer_id"]
@@ -215,11 +227,13 @@ def list_payment_records(
 
 @router.get("/deductions")
 def list_deduction_records(
+    request: Request,
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
+    customer_access_service.require_transaction_access(request, detail=True)
     records = []
 
     # 项目销卡
@@ -230,6 +244,7 @@ def list_deduction_records(
             "type": TYPE_LABELS.get(d.project_type, d.project_type),
             "name": d.project_name,
             "count": d.count,
+            "customer_id": d.customer_id,
         })
 
     # 其他项目销卡
@@ -240,13 +255,19 @@ def list_deduction_records(
             "type": "其他项目",
             "name": d.project_name,
             "count": d.count,
+            "customer_id": d.customer_id,
         })
+
+    records = customer_access_service.filter_record_dicts(request, records)
 
     # 日期过滤
     if date_from:
         records = [r for r in records if r["date"] >= date_from]
     if date_to:
         records = [r for r in records if r["date"] <= date_to]
+
+    for record in records:
+        record.pop("customer_id", None)
 
     records.sort(key=lambda r: r["date"], reverse=True)
     return paginate(records, page, page_size)

@@ -1,7 +1,12 @@
 from fastapi import APIRouter, HTTPException, Request
 
 from app.models.customer_tag import CustomerTagAssignmentUpdate, CustomerTagCreate, CustomerTagUpdate
-from app.services import customer_service, customer_tag_service, position_permission_service
+from app.services import (
+    customer_access_service,
+    customer_service,
+    customer_tag_service,
+    position_permission_service,
+)
 
 router = APIRouter(prefix="/api/customer-tags", tags=["customer-tags"])
 
@@ -166,8 +171,11 @@ def delete_tag(tag_id: str, request: Request):
 @router.get("/customers/{customer_id}")
 def list_customer_tags(customer_id: str, request: Request):
     actor_id, _, _, _ = _require_tag_access(request)
-    if not customer_service.get_customer(customer_id):
+    customer = customer_service.get_customer(customer_id)
+    if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有查看该客户的权限")
     return customer_tag_service.list_customer_tags(customer_id, actor_id)
 
 
@@ -177,8 +185,10 @@ def set_customer_tags(customer_id: str, data: CustomerTagAssignmentUpdate, reque
     if role != "超级管理员" and "healing-records" not in permissions:
         raise HTTPException(status_code=403, detail="无权编辑客户标签")
     customer = customer_service.get_customer(customer_id)
-    if not customer:
+    if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有修改该客户的权限")
     before_tags = customer_tag_service.list_customer_tags(customer_id, actor_id)
     try:
         after_tags = customer_tag_service.set_customer_tags(customer_id, data.tag_ids, actor_id, actor_name)

@@ -1,5 +1,6 @@
 import logging
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import Field
@@ -10,6 +11,8 @@ from app.middleware.rate_limit import limiter
 from app.models.base import StrictBaseModel
 from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerUpdate
 from app.services import (
+    customer_access_service,
+    customer_contact_service,
     customer_service,
     customer_tag_service,
     emotional_release_service,
@@ -27,6 +30,7 @@ from app.services.chat_parser import generate_tags, parse_chat_log
 from app.services.excel_parser import parse_excel
 from app.services.visit_service import _count_customer_activities, count_customer_visits, get_last_visit_date
 from app.utils.pagination import paginate
+from app.utils.request_context import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,11 @@ class TagsGenerateRequest(StrictBaseModel):
 
 class BatchRequest(StrictBaseModel):
     ids: list[str] = Field(max_length=500)
+
+
+class ContactAccessRequest(StrictBaseModel):
+    field: Literal["phone", "wechat"]
+    action: Literal["view", "copy"]
 
 
 def _fill_total_payment(customer_id: str) -> float:
@@ -190,7 +199,7 @@ async def list_customers(
     sort_by: str | None = Query(None),
     sort_order: str | None = Query(None),
 ):
-    customers = customer_service.list_customers()
+    customers = customer_access_service.filter_customers(request, customer_service.list_customers())
     items = _build_enriched_items(customers)
 
     # Apply filters
@@ -244,10 +253,20 @@ async def list_customers(
         item["customer_tags"] = visible_tags.get(item["id"], [])
 
     # Sort
-    if sort_by and sort_by in _SORTABLE_FIELDS:
+    role = getattr(request.state, "user_role", "")
+    can_view_payment = customer_access_service.can_view_transaction_summary(role)
+    if sort_by and sort_by in _SORTABLE_FIELDS and (sort_by != "total_payment" or can_view_payment):
         _sort_customer_items(items, sort_by, sort_order)
     else:
         items.sort(key=lambda c: c.get("created_at", ""), reverse=True)
+
+    protected_items = []
+    for item in items:
+        protected = customer_access_service.protect_sensitive_data(item, role)
+        if not can_view_payment:
+            protected["total_payment"] = None
+        protected_items.append(customer_contact_service.protect_customer_data(protected, role))
+    items = protected_items
 
     if page is not None:
         return paginate(items, page, page_size or 10)
@@ -270,13 +289,18 @@ async def create_customer(data: CustomerCreate, request: Request):
         customer = customer_service.create_customer(data)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return _fill_visit_count(customer)
+    # 新建响应可回显刚刚由当前操作者录入的内容；后续查询仍统一脱敏。
+    result = _fill_visit_count(customer)
+    result["contact_permissions"] = customer_contact_service.get_role_permissions(
+        getattr(request.state, "user_role", "")
+    )
+    return result
 
 
 @router.get("/light")
-async def list_customers_light():
+async def list_customers_light(request: Request):
     """轻量端点：只返回常用字段，供人员到场/引流记录等页面使用"""
-    customers = customer_service.list_customers()
+    customers = customer_access_service.filter_customers(request, customer_service.list_customers())
     return [
         {
             "id": c.id,
@@ -297,10 +321,10 @@ async def list_customers_light():
 
 
 @router.post("/batch")
-async def batch_customers(data: BatchRequest):
+async def batch_customers(data: BatchRequest, request: Request):
     """批量获取客户信息，只返回 id/nickname/name/member_type/positions"""
     id_set = set(data.ids)
-    customers = customer_service.list_customers()
+    customers = customer_access_service.filter_customers(request, customer_service.list_customers())
     return [
         {
             "id": c.id,
@@ -316,10 +340,13 @@ async def batch_customers(data: BatchRequest):
 
 
 @router.get("/disabled")
-async def list_disabled_customers():
+async def list_disabled_customers(request: Request):
     """列出所有已停用的客户"""
-    customers = customer_service.list_disabled_customers()
-    return [
+    customers = customer_access_service.filter_customers(
+        request,
+        customer_service.list_disabled_customers(),
+    )
+    items = [
         {
             "id": c.id,
             "nickname": c.nickname,
@@ -331,34 +358,110 @@ async def list_disabled_customers():
         }
         for c in customers
     ]
+    role = getattr(request.state, "user_role", "")
+    return [customer_contact_service.protect_customer_data(item, role) for item in items]
+
+
+@router.post("/{customer_id}/contact-access")
+async def access_customer_contact(customer_id: str, data: ContactAccessRequest, request: Request):
+    customer = customer_service.get_customer(customer_id)
+    if not customer or customer.is_deleted:
+        raise HTTPException(status_code=404, detail="客户不存在")
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有查看该客户的权限")
+
+    role = getattr(request.state, "user_role", "")
+    if not customer_contact_service.can_access(role, data.field, data.action):
+        action_label = "查看" if data.action == "view" else "复制"
+        field_label = "手机号" if data.field == "phone" else "微信号"
+        raise HTTPException(status_code=403, detail=f"没有{action_label}{field_label}的权限")
+
+    value = str(getattr(customer, data.field, "") or "")
+    request.state.skip_operation_log = True
+    customer_contact_service.record_access(
+        field=data.field,
+        action=data.action,
+        customer_id=customer.id,
+        customer_name=customer.nickname or customer.name or "未命名客户",
+        operator=(getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")),
+        operator_role=role,
+        source=getattr(request.state, "source", "pc"),
+        ip=get_client_ip(request),
+    )
+    return {"field": data.field, "value": value}
 
 
 @router.get("/{customer_id}")
-async def get_customer(customer_id: str):
+async def get_customer(customer_id: str, request: Request):
     customer = customer_service.get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
     if customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
-    return _fill_visit_count(customer)
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有查看该客户的权限")
+    role = getattr(request.state, "user_role", "")
+    result = customer_access_service.protect_sensitive_data(_fill_visit_count(customer), role)
+    if not customer_access_service.can_view_transaction_summary(role):
+        result["total_payment"] = None
+    result["customer_access_permissions"] = customer_access_service.get_customer_permissions(role)
+    return customer_contact_service.protect_customer_data(
+        result,
+        role,
+        include_permissions=True,
+    )
 
 
 @router.patch("/{customer_id}")
-async def update_customer(customer_id: str, data: CustomerUpdate):
+async def update_customer(customer_id: str, data: CustomerUpdate, request: Request):
     customer = customer_service.get_customer(customer_id)
     if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
+    update_data = data.model_dump(exclude_unset=True)
+    role = getattr(request.state, "user_role", "")
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有修改该客户的权限")
+    blocked_sensitive_fields = [
+        field
+        for field in update_data
+        if not customer_access_service.can_view_sensitive_field(role, field)
+    ]
+    if blocked_sensitive_fields:
+        raise HTTPException(status_code=403, detail="不能修改无权查看的客户隐私信息")
+    for field in ("phone", "wechat"):
+        if field in update_data and not customer_contact_service.can_access(role, field, "edit"):
+            field_label = "手机号" if field == "phone" else "微信号"
+            raise HTTPException(status_code=403, detail=f"没有修改{field_label}的权限")
     try:
         customer = customer_service.update_customer(customer_id, data)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
-    return _fill_visit_count(customer)
+    changed_contact_labels = [
+        "手机号" if field == "phone" else "微信号"
+        for field in ("phone", "wechat")
+        if field in update_data
+    ]
+    if changed_contact_labels:
+        request.state.operation_log_context = {
+            "content": f'修改客户“{customer.nickname or customer.name or "未命名客户"}”的{"、".join(changed_contact_labels)}',
+            "entity_id": customer.id,
+        }
+    # 修改响应仅回显当前请求刚提交的数据；重新查询时仍统一脱敏。
+    result = _fill_visit_count(customer)
+    result["customer_access_permissions"] = customer_access_service.get_customer_permissions(role)
+    result["contact_permissions"] = customer_contact_service.get_role_permissions(role)
+    return result
 
 
 @router.delete("/{customer_id}")
 async def delete_customer(customer_id: str, request: Request):
+    customer = customer_service.get_customer(customer_id)
+    if not customer or customer.is_deleted:
+        raise HTTPException(status_code=404, detail="客户不存在")
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有停用该客户的权限")
     deleted_by = getattr(request.state, "user_name", "") or "未知"
     if not customer_service.delete_customer(customer_id, deleted_by):
         raise HTTPException(status_code=404, detail="客户不存在")
@@ -366,11 +469,15 @@ async def delete_customer(customer_id: str, request: Request):
 
 
 @router.post("/{customer_id}/restore")
-async def restore_customer(customer_id: str, _admin: str = Depends(require_admin)):
+async def restore_customer(customer_id: str, request: Request, _admin: str = Depends(require_admin)):
     customer = customer_service.restore_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在或未被停用")
-    return _fill_visit_count(customer)
+    return customer_contact_service.protect_customer_data(
+        _fill_visit_count(customer),
+        getattr(request.state, "user_role", ""),
+        include_permissions=True,
+    )
 
 
 @router.delete("/{customer_id}/permanent")

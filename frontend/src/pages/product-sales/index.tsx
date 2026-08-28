@@ -14,7 +14,7 @@ function getDaysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
 }
 
-const PRODUCT_TYPES = ["全部", "会员卡", "觉醒游戏", "情绪释放", "OH卡诊断", "能量结", "内部课程", "其他项目"]
+const PRODUCT_TYPES = ["全部", "会员卡", "觉醒游戏", "情绪释放", "OH卡诊断", "能量结", "内部课程", "落地课程", "其他项目"]
 
 const TYPE_KEYS = [
   { label: "总金额", key: "total" },
@@ -24,6 +24,7 @@ const TYPE_KEYS = [
   { label: "OH卡诊断", key: "OH卡诊断" },
   { label: "能量结", key: "能量结" },
   { label: "内部课程", key: "内部课程" },
+  { label: "落地课程", key: "落地课程" },
   { label: "其他项目", key: "其他项目" },
 ]
 

@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 
-from app.models.custom_analysis import AnalysisCondition, AnalysisPlan
+import pytest
+
+from app.models.custom_analysis import AnalysisComparisonGroup, AnalysisCondition, AnalysisPlan
 from app.services import custom_analysis_service
 
 
@@ -34,6 +36,13 @@ def _row(customer_id: str, **overrides):
         "activity_count_period": 0,
         "payment_count_period": 0,
         "payment_amount_period": 0,
+        "payment_dates": [],
+        "course_teachers": [],
+        "_payment_amounts_by_project_period": {},
+        "_payment_orders_by_project_period": {},
+        "_payment_events_period": [],
+        "_invitation_events_period": [],
+        "_activity_events_period": [],
     }
     row.update(overrides)
     return row
@@ -133,6 +142,250 @@ def test_split_comparison_uses_selected_metric(monkeypatch):
     ]
 
 
+def test_payment_amount_split_by_project_reconciles_with_total(monkeypatch):
+    rows = [
+        _row(
+            "c1",
+            payment_amount_period=300,
+            purchased_projects=["会员卡·体验会员", "内部课程·疗愈师课程"],
+            _payment_amounts_by_project_period={"会员卡·体验会员": 100, "内部课程·疗愈师课程": 200},
+        ),
+        _row(
+            "c2",
+            payment_amount_period=50,
+            purchased_projects=["会员卡·体验会员"],
+            _payment_amounts_by_project_period={"会员卡·体验会员": 50},
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        metrics=["payment_amount"],
+        card_metric="payment_amount",
+        card_dimension="purchased_projects",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+    metric_card = next(card for card in result["cards"] if card["key"] == "payment_amount")
+    dimension_cards = [card for card in result["cards"] if card["key"].startswith("dimension-")]
+
+    assert metric_card["count"] == 350
+    assert {card["title"]: card["count"] for card in dimension_cards} == {
+        "内部课程·疗愈师课程": 200.0,
+        "会员卡·体验会员": 150.0,
+    }
+    assert sum(card["count"] for card in dimension_cards) == metric_card["count"]
+
+
+@pytest.mark.parametrize("operator", ["eq", "contains"])
+def test_payment_condition_scopes_amount_and_orders_to_matching_transactions(monkeypatch, operator):
+    rows = [
+        _row(
+            "c1",
+            payment_categories=["会员卡", "内部课程"],
+            payment_count_period=2,
+            payment_amount_period=300,
+            _payment_events_period=[
+                {
+                    "purchased_projects": ["会员卡·体验会员"],
+                    "payment_categories": ["会员卡"],
+                    "payment_projects": ["体验会员"],
+                    "payment_closers": ["小王"],
+                    "payment_methods": ["微信"],
+                    "payment_dates": ["2026-08-01"],
+                    "amount": 100,
+                    "project_label": "会员卡·体验会员",
+                },
+                {
+                    "purchased_projects": ["内部课程·疗愈师课程"],
+                    "payment_categories": ["内部课程"],
+                    "payment_projects": ["疗愈师课程"],
+                    "payment_closers": ["小李"],
+                    "payment_methods": ["支付宝"],
+                    "payment_dates": ["2026-08-02"],
+                    "amount": 200,
+                    "project_label": "内部课程·疗愈师课程",
+                },
+            ],
+        ),
+        _row(
+            "c2",
+            payment_categories=["会员卡"],
+            payment_count_period=1,
+            payment_amount_period=50,
+            _payment_events_period=[
+                {
+                    "purchased_projects": ["会员卡·体验会员"],
+                    "payment_categories": ["会员卡"],
+                    "payment_projects": ["体验会员"],
+                    "payment_closers": ["小王"],
+                    "payment_methods": ["微信"],
+                    "payment_dates": ["2026-08-03"],
+                    "amount": 50,
+                    "project_label": "会员卡·体验会员",
+                },
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[AnalysisCondition(field="payment_categories", operator=operator, value="会员卡")],
+        metrics=["total_customers", "converted_customers", "payment_orders", "payment_amount"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert result["total"] == 2
+    assert {card["key"]: card["count"] for card in result["cards"]} == {
+        "total_customers": 2,
+        "converted_customers": 2,
+        "payment_orders": 2,
+        "payment_amount": 150,
+    }
+    assert {item["id"]: item["payment_amount_period"] for item in result["items"]} == {
+        "c1": 100,
+        "c2": 50,
+    }
+
+
+def test_course_teacher_condition_scopes_activity_metrics(monkeypatch):
+    rows = [
+        _row(
+            "c1",
+            course_teachers=["奥雅", "耀凯"],
+            activity_count_period=2,
+            _activity_events_period=[
+                {"activity_types": ["内部课程"], "activity_names": ["课程A"], "course_teachers": ["奥雅"]},
+                {"activity_types": ["沙龙活动"], "activity_names": ["活动B"], "course_teachers": ["耀凯"]},
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[AnalysisCondition(field="course_teachers", operator="eq", value="奥雅")],
+        metrics=["total_customers", "activity_customers"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert {card["key"]: card["count"] for card in result["cards"]} == {
+        "total_customers": 1,
+        "activity_customers": 1,
+    }
+    assert result["items"][0]["activity_count_period"] == 1
+    assert result["items"][0]["activity_names"] == ["课程A"]
+
+
+def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
+    rows = [
+        _row(
+            "c1",
+            inviter_names=["奥雅", "耀凯"],
+            invitation_count_period=2,
+            visit_count_period=2,
+            _invitation_events_period=[
+                {"inviter_names": ["奥雅"], "visit_date": "2026-01-05", "arrived": True, "cancelled": False},
+                {"inviter_names": ["耀凯"], "visit_date": "2026-01-08", "arrived": True, "cancelled": False},
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[AnalysisCondition(field="inviter_names", operator="eq", value="奥雅")],
+        metrics=["invited_customers", "arrived_customers"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert {card["key"]: card["count"] for card in result["cards"]} == {
+        "invited_customers": 1,
+        "arrived_customers": 1,
+    }
+    assert result["items"][0]["invitation_count_period"] == 1
+    assert result["items"][0]["visit_count_period"] == 1
+
+
+def test_comparison_groups_use_independent_periods_and_conditions(monkeypatch):
+    def dataset(_actor_id, date_from="", date_to="", _allowed_customer_ids=None):
+        if date_from == "2026-01-01":
+            return [
+                _row("c1", referrer="奥雅", payment_count_period=1, payment_amount_period=100),
+                _row("c2", referrer="耀凯", payment_count_period=1, payment_amount_period=900),
+            ]
+        return [
+            _row("c3", referrer="奥雅", payment_count_period=1, payment_amount_period=800),
+            _row("c4", referrer="耀凯", payment_count_period=2, payment_amount_period=300),
+        ]
+
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", dataset)
+    plan = AnalysisPlan(
+        analysis_mode="comparison",
+        metrics=["total_customers", "payment_orders", "payment_amount"],
+        comparison_groups=[
+            AnalysisComparisonGroup(
+                id="a",
+                name="1月奥雅",
+                date_from="2026-01-01",
+                date_to="2026-01-31",
+                conditions=[AnalysisCondition(field="referrer", operator="eq", value="奥雅")],
+            ),
+            AnalysisComparisonGroup(
+                id="b",
+                name="2月耀凯",
+                date_from="2026-02-01",
+                date_to="2026-02-28",
+                conditions=[AnalysisCondition(field="referrer", operator="eq", value="耀凯")],
+            ),
+        ],
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert [group["name"] for group in result["comparison_groups"]] == ["1月奥雅", "2月耀凯"]
+    assert [row["values"] for row in result["comparison_rows"]] == [[1, 1], [1, 2], [100.0, 300.0]]
+    assert result["comparison_rows"][2]["difference"] == 200.0
+    assert result["comparison_rows"][2]["difference_rate"] == 200.0
+
+
+def test_payment_date_condition_matches_any_transaction_date():
+    row = _row("c1", payment_dates=["2026-05-12", "2026-08-20"])
+
+    assert custom_analysis_service._matches(
+        row,
+        AnalysisCondition(field="payment_dates", operator="between", value=["2026-08-01", "2026-08-31"]),
+    )
+    assert not custom_analysis_service._matches(
+        row,
+        AnalysisCondition(field="payment_dates", operator="between", value=["2026-06-01", "2026-06-30"]),
+    )
+
+
+def test_date_condition_can_inherit_plan_period():
+    condition = AnalysisCondition(
+        field="payment_dates",
+        operator="eq",
+        value=None,
+        inherit_period=True,
+    )
+    row = _row("c1", payment_dates=["2026-05-12", "2026-08-20"])
+
+    assert custom_analysis_service._matches(row, condition, "2026-08-01", "2026-08-31")
+    assert not custom_analysis_service._matches(row, condition, "2026-06-01", "2026-06-30")
+    assert custom_analysis_service._matches(row, condition, "", "")
+
+
+def test_non_date_condition_cannot_inherit_plan_period():
+    with pytest.raises(ValueError, match="仅日期条件可跟随统计周期"):
+        AnalysisCondition(
+            field="nickname",
+            operator="eq",
+            value=None,
+            inherit_period=True,
+        )
+
+
 def test_local_parser_recognizes_common_conditions(monkeypatch):
     monkeypatch.setattr(custom_analysis_service.customer_service, "list_customers", lambda: [
         SimpleNamespace(
@@ -165,7 +418,11 @@ def test_local_parser_recognizes_common_conditions(monkeypatch):
 def test_metadata_endpoint(client):
     response = client.get("/api/custom-analysis/metadata")
     assert response.status_code == 200
-    assert any(item["value"] == "follow_up_status" for item in response.json()["fields"])
+    metadata = response.json()
+    assert any(item["value"] == "follow_up_status" for item in metadata["fields"])
+    assert any(item["value"] == "payment_dates" and item["label"] == "成交日期" for item in metadata["fields"])
+    assert not any(item["value"] == "created_customers" for item in metadata["metrics"])
+    assert any(item["value"] == "referred_customers" and item["label"] == "新引流客户数" for item in metadata["metrics"])
 
 
 def test_execute_endpoint_returns_matching_customer(client, sample_customer):

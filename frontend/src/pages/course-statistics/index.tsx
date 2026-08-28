@@ -343,7 +343,7 @@ export default function CourseStatisticsPage() {
     } else if (courseSort.key === "activity_type_label") {
       comparison = left.activity_type_label.localeCompare(right.activity_type_label, "zh-CN")
     } else {
-      comparison = left[courseSort.key] - right[courseSort.key]
+      comparison = Number(left[courseSort.key] ?? 0) - Number(right[courseSort.key] ?? 0)
     }
     if (comparison === 0) {
       comparison = `${left.date} ${left.start_time}`.localeCompare(`${right.date} ${right.start_time}`)
@@ -972,7 +972,9 @@ export default function CourseStatisticsPage() {
                       <td className="truncate px-3 py-2.5">{participant.participation_role || "参与者"}</td>
                       <td className="break-words px-3 py-2.5 leading-5" title={participant.daily_need || undefined}>{participant.daily_need || <EmptyValue />}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
-                        ¥{participant.daily_transaction_amount.toLocaleString("zh-CN")}
+                        {participant.daily_transaction_amount == null
+                          ? <span className="text-[#c9cdd4]">-</span>
+                          : `¥${participant.daily_transaction_amount.toLocaleString("zh-CN")}`}
                       </td>
                       <td className="truncate px-3 py-2.5" title={participant.closers || undefined}>{participant.closers || <EmptyValue />}</td>
                     </tr>

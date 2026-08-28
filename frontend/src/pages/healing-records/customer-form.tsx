@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Copy, Eye, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { customerApi, customerTagApi, type CustomerCreate, type CustomerLight, type CustomerTag } from "@/lib/api"
+import { customerApi, customerTagApi, type ContactPermissions, type CustomerAccessPermissions, type CustomerCreate, type CustomerLight, type CustomerTag } from "@/lib/api"
 import { CustomerTagField } from "@/components/customer-tag-editor"
 
 const emptyCustomer: Record<string, any> = {
@@ -24,6 +24,11 @@ const UPDATE_FIELDS = [
   "work_status", "work_description",
   "basic_info", "assessment", "tags", "other_info",
 ]
+
+const EMPTY_CONTACT_PERMISSIONS: ContactPermissions = {
+  phone: { view: false, copy: false, edit: false },
+  wechat: { view: false, copy: false, edit: false },
+}
 
 function getTodayDate(): string {
   return new Date().toLocaleDateString("sv-SE")
@@ -68,12 +73,17 @@ export default function CustomerFormPage() {
   const [tagsLoaded, setTagsLoaded] = useState(false)
   const [tagsLoading, setTagsLoading] = useState(true)
   const [tagLoadError, setTagLoadError] = useState("")
+  const [contactPermissions, setContactPermissions] = useState<ContactPermissions>(EMPTY_CONTACT_PERMISSIONS)
+  const [customerAccessPermissions, setCustomerAccessPermissions] = useState<CustomerAccessPermissions | null>(null)
+  const [contactDirty, setContactDirty] = useState({ phone: false, wechat: false })
+  const [revealedContacts, setRevealedContacts] = useState({ phone: false, wechat: false })
+  const [copiedContact, setCopiedContact] = useState<"phone" | "wechat" | null>(null)
   const initializedRef = useRef(false)
   const initialTagIdsRef = useRef<string[]>([])
 
   // 加载客户列表（供搜索输入用）
   useEffect(() => {
-    customerApi.light().then(setCustomers).catch(() => {})
+    customerApi.light(true).then(setCustomers).catch(() => {})
   }, [])
 
   // 加载草稿或客户数据
@@ -111,6 +121,8 @@ export default function CustomerFormPage() {
         age: ageParts ? ageParts[1] || "" : isRangeOnly ? "" : c.age || "",
         age_range: ageParts?.[2] || (isRangeOnly ? c.age : ""),
       })
+      setContactPermissions(c.contact_permissions || EMPTY_CONTACT_PERMISSIONS)
+      setCustomerAccessPermissions(c.customer_access_permissions || null)
     }).catch(() => {
       alert("加载客户信息失败")
       navigate(backPath)
@@ -152,10 +164,18 @@ export default function CustomerFormPage() {
   useEffect(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
-      try { localStorage.setItem(draftKey, JSON.stringify(form)) } catch {}
+      try {
+        const draft = { ...form }
+        // 编辑页不在浏览器本地持久化已解密联系方式；新建草稿仍可保留当前录入。
+        if (id) {
+          delete draft.phone
+          delete draft.wechat
+        }
+        localStorage.setItem(draftKey, JSON.stringify(draft))
+      } catch {}
     }, 500)
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
-  }, [form, draftKey])
+  }, [form, draftKey, id])
 
   // 保存到服务端
   const [saving, setSaving] = useState(false)
@@ -182,6 +202,20 @@ export default function CustomerFormPage() {
         payload.created_by = currentUser.owner || currentUser.username || ""
       }
       if (entityId) {
+        const sensitive = customerAccessPermissions?.sensitive_fields
+        if (sensitive?.visit_purpose === false) delete payload.tags
+        if (sensitive?.trauma_history === false) delete payload.basic_info
+        if (sensitive?.current_block === false) {
+          delete payload.assessment
+          delete payload.core_situation
+        }
+        if (sensitive?.work_info === false) {
+          delete payload.work_status
+          delete payload.work_description
+        }
+        if (sensitive?.other_info === false) delete payload.other_info
+        if (!contactDirty.phone) delete payload.phone
+        if (!contactDirty.wechat) delete payload.wechat
         await customerApi.update(entityId, payload as Partial<CustomerCreate>)
         const initialTagIds = initialTagIdsRef.current
         const tagsChanged = selectedTagIds.length !== initialTagIds.length
@@ -206,7 +240,24 @@ export default function CustomerFormPage() {
     } finally {
       setSaving(false)
     }
-  }, [form, entityId, navigate, backPath, selectedTagIds, tagsLoaded, customers, draftKey])
+  }, [form, entityId, navigate, backPath, selectedTagIds, tagsLoaded, customers, draftKey, contactDirty, customerAccessPermissions])
+
+  const accessContact = async (field: "phone" | "wechat", action: "view" | "copy") => {
+    if (!entityId) return
+    try {
+      const result = await customerApi.accessContact(entityId, field, action)
+      if (action === "view") {
+        setField(field, result.value)
+        setRevealedContacts(current => ({ ...current, [field]: true }))
+      } else {
+        await navigator.clipboard.writeText(result.value)
+        setCopiedContact(field)
+        window.setTimeout(() => setCopiedContact(current => current === field ? null : current), 1600)
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "操作失败")
+    }
+  }
 
   // 引流人/承接人验证（blur 时检查）
   const validateReferrer = (value: string, field: "referrer" | "referrer_handler") => {
@@ -277,22 +328,56 @@ export default function CustomerFormPage() {
             <div>
               <div className="flex items-center gap-2">
                 <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">微信</label>
-                <Input value={form.wechat || ""} onChange={(e) => { setField("wechat", e.target.value); setFieldErrors(prev => { const { wechat, ...rest } = prev; return rest }) }} placeholder="请输入" className="w-[200px]" />
+                <Input
+                  value={form.wechat || ""}
+                  onFocus={(event) => { if (isEdit && !revealedContacts.wechat) event.currentTarget.select() }}
+                  onChange={(e) => { setField("wechat", e.target.value); setContactDirty(current => ({ ...current, wechat: true })); setFieldErrors(prev => { const { wechat, ...rest } = prev; return rest }) }}
+                  placeholder="请输入"
+                  className="w-[200px]"
+                  disabled={isEdit && !contactPermissions.wechat.edit}
+                />
+                {isEdit && form.wechat && contactPermissions.wechat.view && !revealedContacts.wechat && (
+                  <button type="button" className="inline-flex h-7 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]" onClick={() => accessContact("wechat", "view")}>
+                    <Eye className="h-3 w-3" />查看
+                  </button>
+                )}
+                {isEdit && form.wechat && contactPermissions.wechat.copy && (
+                  <button type="button" className="inline-flex h-7 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]" onClick={() => accessContact("wechat", "copy")}>
+                    <Copy className="h-3 w-3" />{copiedContact === "wechat" ? "已复制" : "复制"}
+                  </button>
+                )}
               </div>
               {fieldErrors.wechat && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{fieldErrors.wechat}</p>}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">电话</label>
-                <Input value={form.phone || ""} onChange={(e) => { setField("phone", e.target.value); setFieldErrors(prev => { const { phone, ...rest } = prev; return rest }) }} placeholder="请输入" className="w-[200px]" />
+                <Input
+                  value={form.phone || ""}
+                  onFocus={(event) => { if (isEdit && !revealedContacts.phone) event.currentTarget.select() }}
+                  onChange={(e) => { setField("phone", e.target.value); setContactDirty(current => ({ ...current, phone: true })); setFieldErrors(prev => { const { phone, ...rest } = prev; return rest }) }}
+                  placeholder="请输入"
+                  className="w-[200px]"
+                  disabled={isEdit && !contactPermissions.phone.edit}
+                />
+                {isEdit && form.phone && contactPermissions.phone.view && !revealedContacts.phone && (
+                  <button type="button" className="inline-flex h-7 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]" onClick={() => accessContact("phone", "view")}>
+                    <Eye className="h-3 w-3" />查看
+                  </button>
+                )}
+                {isEdit && form.phone && contactPermissions.phone.copy && (
+                  <button type="button" className="inline-flex h-7 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]" onClick={() => accessContact("phone", "copy")}>
+                    <Copy className="h-3 w-3" />{copiedContact === "phone" ? "已复制" : "复制"}
+                  </button>
+                )}
               </div>
               {fieldErrors.phone && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{fieldErrors.phone}</p>}
             </div>
-            <div className="flex items-center gap-2 w-full">
+            {(!isEdit || customerAccessPermissions?.sensitive_fields.work_info !== false) && <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">工作情况</label>
               <SelectDropdown value={form.work_status || ""} options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }]} placeholder="是否在职" onChange={(v) => setField("work_status", v)} className="w-[100px]" />
               <Input value={form.work_description || ""} onChange={(e) => setField("work_description", e.target.value)} placeholder="工作情况详情..." className="flex-1 mr-[96px]" />
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -401,22 +486,22 @@ export default function CustomerFormPage() {
                 <CustomerSearchInput customers={customers} value={form.service_teacher || ""} onChange={(v) => setField("service_teacher", typeof v === "string" ? v : v[0] || "")} placeholder="请搜索" excludeIds={form.id ? [form.id] : []} filterSelected={false} />
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full">
+            {(!isEdit || customerAccessPermissions?.sensitive_fields.visit_purpose !== false) && <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">到访目的</label>
               <Input value={form.tags || ""} onChange={(e) => setField("tags", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
-            </div>
-            <div className="flex items-center gap-2 w-full">
+            </div>}
+            {(!isEdit || customerAccessPermissions?.sensitive_fields.trauma_history !== false) && <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">创伤经历</label>
               <Input value={form.basic_info || ""} onChange={(e) => setField("basic_info", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
-            </div>
-            <div className="flex items-center gap-2 w-full">
+            </div>}
+            {(!isEdit || customerAccessPermissions?.sensitive_fields.current_block !== false) && <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">当下卡点</label>
               <Input value={form.assessment || ""} onChange={(e) => setField("assessment", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
-            </div>
-            <div className="flex items-center gap-2 w-full">
+            </div>}
+            {(!isEdit || customerAccessPermissions?.sensitive_fields.other_info !== false) && <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">其他信息</label>
               <Input value={form.other_info || ""} onChange={(e) => setField("other_info", e.target.value)} placeholder="请输入" className="flex-1 mr-[96px]" />
-            </div>
+            </div>}
           </div>
         </div>
       </div>

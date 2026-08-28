@@ -10,6 +10,7 @@ from app.services import (
     class_record_service,
     course_service,
     course_type_service,
+    customer_access_service,
     customer_service,
     customer_tag_service,
     emotional_release_service,
@@ -22,6 +23,7 @@ from app.services import (
     internal_course_session_service,
     member_identity_service,
     membership_card_service,
+    offline_course_service,
     oh_card_reading_service,
     organization_service,
     other_project_service,
@@ -64,6 +66,7 @@ def _payment_record_groups() -> list[list]:
         emotional_release_service.list_releases(),
         energy_knot_service.list_knots(),
         internal_course_service.list_courses(),
+        offline_course_service.list_courses(),
         oh_card_reading_service.list_readings(),
         other_project_service.list_projects(),
     ]
@@ -84,7 +87,7 @@ def _record_matches_teacher(record, teacher_id: str, teacher_names: set[str]) ->
     return legacy_id == teacher_id or bool(legacy_name and legacy_name in teacher_names)
 
 
-def _build_dashboard_summary(today: date) -> dict:
+def _build_dashboard_summary(today: date, request: Request | None = None) -> dict:
     """构建客户资料页经营指标，日期均按自然月统计。"""
     current_start = today.replace(day=1)
     previous_end = current_start - timedelta(days=1)
@@ -95,35 +98,55 @@ def _build_dashboard_summary(today: date) -> dict:
     previous_from = previous_start.isoformat()
     previous_to = previous_end.isoformat()
 
-    customers = customer_service.list_customers()
+    active_customers = customer_service.list_customers()
+    customers = (
+        customer_access_service.filter_customers(request, active_customers)
+        if request
+        else active_customers
+    )
+    visible_customer_ids = {customer.id for customer in customers}
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    can_view_payment = customer_access_service.can_view_transaction_summary(role)
     new_customers = sum(
         1
         for customer in customers
         if current_from <= customer.created_at.date().isoformat() <= current_to
     )
 
-    current_arrivals = len(visit_service.get_arrived_customer_ids(current_from, current_to))
-    previous_arrivals = len(visit_service.get_arrived_customer_ids(previous_from, previous_to))
+    current_arrivals = len(
+        visit_service.get_arrived_customer_ids(current_from, current_to).intersection(
+            visible_customer_ids
+        )
+    )
+    previous_arrivals = len(
+        visit_service.get_arrived_customer_ids(previous_from, previous_to).intersection(
+            visible_customer_ids
+        )
+    )
     arrival_change_rate = None
     if previous_arrivals > 0:
         arrival_change_rate = round((current_arrivals - previous_arrivals) / previous_arrivals * 100, 1)
 
     monthly_revenue = 0.0
     monthly_transactions = 0
-    for records in _payment_record_groups():
+    for records in (_payment_record_groups() if can_view_payment else []):
         for record in records:
             record_date = _get_record_date(record)
             if (
                 record_date
                 and current_from <= record_date <= current_to
                 and not getattr(record, "voided", False)
+                and getattr(record, "customer_id", "") in visible_customer_ids
             ):
                 monthly_revenue += _get_record_amount(record)
                 monthly_transactions += 1
 
     not_arrived_days = 14
     recent_arrival_from = (today - timedelta(days=not_arrived_days)).isoformat()
-    recently_arrived_ids = visit_service.get_arrived_customer_ids(recent_arrival_from, current_to)
+    recently_arrived_ids = visit_service.get_arrived_customer_ids(
+        recent_arrival_from,
+        current_to,
+    ).intersection(visible_customer_ids)
     not_arrived_customers = sum(1 for customer in customers if customer.id not in recently_arrived_ids)
 
     return {
@@ -141,9 +164,9 @@ def _build_dashboard_summary(today: date) -> dict:
 
 
 @router.get("/dashboard")
-def get_dashboard_summary():
+def get_dashboard_summary(request: Request = None):
     """获取客户资料页四项核心经营指标。"""
-    return _build_dashboard_summary(date.today())
+    return _build_dashboard_summary(date.today(), request)
 
 
 def _get_customer_stats(customer_id: str, date_from: str | None = None, date_to: str | None = None) -> dict:
@@ -298,15 +321,26 @@ def get_overview(
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     member_types: str | None = Query(None, description="会员类型筛选，逗号分隔多选"),
     referrer: str | None = Query(None, description="引流人筛选"),
+    request: Request = None,
 ):
     date_from, date_to = _get_date_range(date_from, date_to)
     type_filter = _parse_member_types(member_types)
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
 
-    customers_map = {c.id: c for c in customer_service.list_all_customers()}
+    all_customers = customer_service.list_all_customers()
+    visible_customer_ids = (
+        customer_access_service.visible_customer_ids(request, all_customers)
+        if request
+        else {customer.id for customer in all_customers}
+    )
+    customers_map = {c.id: c for c in all_customers if c.id in visible_customer_ids}
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    can_view_payment = customer_access_service.can_view_transaction_summary(role)
 
     def _visit_visible(v) -> bool:
         """邀约/到访记录是否通过筛选：会员类型看客户资料，引流人看邀约记录上的邀约人"""
+        if v.customer_id not in visible_customer_ids:
+            return False
         if type_filter:
             c = customers_map.get(v.customer_id or "")
             if not c or (c.member_type or "") not in type_filter:
@@ -317,6 +351,8 @@ def get_overview(
 
     def _customer_visible(customer_id: str | None) -> bool:
         """成交记录是否通过筛选：会员类型和引流人均看客户资料"""
+        if customer_id not in visible_customer_ids:
+            return False
         if not type_filter and not referrer_filter:
             return True
         if not customer_id:
@@ -342,7 +378,7 @@ def get_overview(
 
     # 2. 成交人数（按 deal_date 去重客户）
     converted_by_date: dict[str, set] = defaultdict(set)
-    services = _payment_record_groups()
+    services = _payment_record_groups() if can_view_payment else []
     for records in services:
         for r in records:
             deal_date = _get_record_date(r)
@@ -375,13 +411,24 @@ def get_details(
     total: bool = Query(False, description="是否统计总数据（不限日期范围）"),
     member_types: str | None = Query(None, description="会员类型筛选，逗号分隔多选"),
     referrer: str | None = Query(None, description="引流人筛选"),
+    request: Request = None,
 ):
     date_from, date_to = _get_date_range(date_from, date_to)
     type_filter = _parse_member_types(member_types)
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
 
     # 1. 先构建成交人员集合（用于标记邀约/到访记录的成交状态）
-    customers_map = {c.id: c for c in customer_service.list_all_customers()}
+    all_customers = customer_service.list_all_customers()
+    visible_customer_ids = (
+        customer_access_service.visible_customer_ids(request, all_customers)
+        if request
+        else {customer.id for customer in all_customers}
+    )
+    customers_map = {c.id: c for c in all_customers if c.id in visible_customer_ids}
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    transaction_access = customer_access_service.transaction_access(role)
+    can_view_payment = transaction_access in {"summary", "detail"}
+    can_view_payment_details = transaction_access == "detail"
     TYPE_LABELS = {
         "membership-cards": "会员卡",
         "group-cases": "觉醒游戏",
@@ -399,15 +446,20 @@ def get_details(
         ("internal-courses", internal_course_service.list_courses()),
         ("oh-card-readings", oh_card_reading_service.list_readings()),
         ("other-projects", other_project_service.list_projects()),
-    ]
+    ] if can_view_payment else []
     # 收集范围内有成交的客户 ID 及其成交类型
     converted_customer_ids: set[str] = set()
-    for type_name, records in services:
-        for r in records:
-            deal_date = _get_record_date(r)
-            customer_id = getattr(r, "customer_id", None)
-            if deal_date and customer_id and date_from <= deal_date <= date_to:
-                converted_customer_ids.add(customer_id)
+    if can_view_payment_details:
+        for type_name, records in services:
+            for r in records:
+                deal_date = _get_record_date(r)
+                customer_id = getattr(r, "customer_id", None)
+                if (
+                    deal_date
+                    and customer_id in visible_customer_ids
+                    and date_from <= deal_date <= date_to
+                ):
+                    converted_customer_ids.add(customer_id)
 
     # 2. 获取邀约到访人员（排除无客户关联的记录）
     invited_list = []
@@ -421,7 +473,7 @@ def get_details(
     for v in visits:
         visit_date = v.visit_date
         cid = v.customer_id or ""
-        if not cid:
+        if not cid or cid not in visible_customer_ids:
             continue
         # 从 customer_id 反查客户信息
         if cid not in _cust_cache:
@@ -466,11 +518,15 @@ def get_details(
 
     # 3. 获取成交人员
     converted_list = []
-    for type_name, records in services:
+    for type_name, records in (services if can_view_payment_details else []):
         for r in records:
             deal_date = _get_record_date(r)
             customer_id = getattr(r, "customer_id", None)
-            if deal_date and customer_id and date_from <= deal_date <= date_to:
+            if (
+                deal_date
+                and customer_id in visible_customer_ids
+                and date_from <= deal_date <= date_to
+            ):
                 c = customers_map.get(customer_id)
                 c_member_type = c.member_type if c and c.member_type else ""
                 c_referrer = ((c.referrer if c else "") or "").strip()
@@ -528,7 +584,7 @@ def get_details(
         r["cancelled_count"] = stats.get("cancelled_count", 0)
         r["visit_count"] = stats.get("visit_count", 0)
         r["activity_count"] = stats.get("activity_count", 0)
-        r["total_consumption"] = stats.get("total_consumption", 0)
+        r["total_consumption"] = stats.get("total_consumption", 0) if can_view_payment else None
         r["visit_interval"] = stats.get("visit_interval", "-")
 
     # 成交记录：activity_count 改为当天活动次数（与弹窗一致）
@@ -571,6 +627,7 @@ PRODUCT_TYPE_MAP = {
     "oh-card-readings": "OH卡诊断",
     "energy-knots": "能量结",
     "internal-courses": "内部课程",
+    "offline-courses": "落地课程",
     "other-projects": "其他项目",
 }
 
@@ -587,11 +644,23 @@ def get_products(
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人筛选"),
     teacher_id: str | None = Query(None, description="疗愈老师客户ID（按成交人筛选）"),
+    request: Request = None,
 ):
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    if not customer_access_service.can_view_transaction_summary(role):
+        raise HTTPException(status_code=403, detail="没有查看交易数据的权限")
     date_from, date_to = _get_date_range(date_from, date_to)
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
     teacher_filter = (_normalize_query_str(teacher_id) or "").strip()
-    customers_map = {c.id: c for c in customer_service.list_all_customers()}
+    all_customers = customer_service.list_all_customers()
+    active_customers = customer_service.list_customers()
+    visible_customer_ids = (
+        customer_access_service.visible_customer_ids(request, all_customers)
+        if request
+        else {customer.id for customer in all_customers}
+    )
+    active_nicknames = {customer.nickname for customer in active_customers if customer.nickname}
+    customers_map = {c.id: c for c in all_customers if c.id in visible_customer_ids}
     teacher_course_hours = _course_teacher_hours_in_range(date_from, date_to)
     teachers = sorted(
         (
@@ -621,6 +690,7 @@ def get_products(
         ("oh-card-readings", oh_card_reading_service.list_readings()),
         ("energy-knots", energy_knot_service.list_knots()),
         ("internal-courses", internal_course_service.list_courses()),
+        ("offline-courses", offline_course_service.list_courses()),
         ("other-projects", other_project_service.list_projects()),
     ]
 
@@ -685,11 +755,13 @@ def get_products(
         for r in records:
             deal_date = _get_record_date(r)
             customer_id = getattr(r, "customer_id", None)
+            if customer_id not in visible_customer_ids:
+                continue
             voided = getattr(r, "voided", False)
             if deal_date and not voided and date_from <= deal_date <= date_to:
                 # 引流人筛选
                 c_referrer = ((customers_map.get(customer_id).referrer if customers_map.get(customer_id) else None) or "").strip()
-                if c_referrer:
+                if c_referrer and c_referrer in active_nicknames:
                     option_referrer_counts[c_referrer] += 1
                 if referrer_filter and c_referrer != referrer_filter:
                     continue
@@ -772,6 +844,8 @@ def get_products(
     daily_arrived: dict[str, int] = defaultdict(int)
     daily_cancelled: dict[str, int] = defaultdict(int)
     for v in visit_service.list_visits():
+        if v.customer_id not in visible_customer_ids:
+            continue
         visit_date = v.visit_date
         if visit_date and date_from <= visit_date <= date_to:
             if v.cancelled:
@@ -896,15 +970,28 @@ def get_product_details(
     product_type: str | None = Query(None, description="产品类型筛选"),
     referrer: str | None = Query(None, description="引流人筛选"),
     teacher_id: str | None = Query(None, description="疗愈老师客户ID（按成交人筛选）"),
+    request: Request = None,
 ):
     """获取产品数据某天某列的详情"""
+
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    if not customer_access_service.can_view_transaction_summary(role):
+        raise HTTPException(status_code=403, detail="没有查看交易数据的权限")
+    if type in {"persons", "amount", "count", "purchase"} and customer_access_service.transaction_access(role) != "detail":
+        raise HTTPException(status_code=403, detail="当前角色只能查看交易汇总，不能查看订单明细")
 
     def _get_amount(r):
         return getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0
 
     referrer_filter = (_normalize_query_str(referrer) or "").strip()
     teacher_filter = (_normalize_query_str(teacher_id) or "").strip()
-    customers_map = {c.id: c for c in customer_service.list_all_customers()}
+    all_customers = customer_service.list_all_customers()
+    visible_customer_ids = (
+        customer_access_service.visible_customer_ids(request, all_customers)
+        if request
+        else {customer.id for customer in all_customers}
+    )
+    customers_map = {c.id: c for c in all_customers if c.id in visible_customer_ids}
     selected_teacher = customers_map.get(teacher_filter)
     teacher_names = {
         value.strip()
@@ -916,7 +1003,10 @@ def get_product_details(
     }
 
     def _record_visible(record) -> bool:
-        customer = customers_map.get(getattr(record, "customer_id", None) or "")
+        customer_id = getattr(record, "customer_id", None) or ""
+        if customer_id not in visible_customer_ids:
+            return False
+        customer = customers_map.get(customer_id)
         if referrer_filter and ((customer.referrer if customer else "") or "").strip() != referrer_filter:
             return False
         return _record_matches_teacher(record, teacher_filter, teacher_names)
@@ -924,7 +1014,7 @@ def get_product_details(
     if type == "invited":
         records = []
         for v in visit_service.list_visits():
-            if v.visit_date == date:
+            if v.visit_date == date and v.customer_id in visible_customer_ids:
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 activity_count = 0
                 if v.customer_id and v.arrived:
@@ -946,7 +1036,7 @@ def get_product_details(
     if type == "cancelled":
         records = []
         for v in visit_service.list_visits():
-            if v.visit_date == date and v.cancelled:
+            if v.visit_date == date and v.cancelled and v.customer_id in visible_customer_ids:
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 records.append({
                     "nickname": c.nickname if c else (v.customer_id or "-"),
@@ -960,7 +1050,7 @@ def get_product_details(
     if type == "arrived":
         records = []
         for v in visit_service.list_visits():
-            if v.visit_date == date and v.arrived:
+            if v.visit_date == date and v.arrived and v.customer_id in visible_customer_ids:
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 activity_count = 0
                 if v.customer_id:
@@ -985,6 +1075,7 @@ def get_product_details(
             ("oh-card-readings", oh_card_reading_service.list_readings()),
             ("energy-knots", energy_knot_service.list_knots()),
             ("internal-courses", internal_course_service.list_courses()),
+            ("offline-courses", offline_course_service.list_courses()),
             ("other-projects", other_project_service.list_projects()),
         ]
         TYPE_LABELS = {
@@ -994,6 +1085,7 @@ def get_product_details(
             "oh-card-readings": "OH卡诊断",
             "energy-knots": "能量结",
             "internal-courses": "内部课程",
+            "offline-courses": "落地课程",
             "other-projects": "其他项目",
         }
         records = []
@@ -1308,6 +1400,7 @@ def get_member_statistics(
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人昵称"),
     time_by: str = Query("created", description="时间计算依据: created/referral"),
+    request: Request = None,
 ):
     """获取会员情况统计：各类型会员人数 + 新增人数变化趋势"""
     date_from, date_to = _get_date_range(date_from, date_to)
@@ -1328,7 +1421,11 @@ def get_member_statistics(
     type_names = [identity.name for identity in reversed(identities)]
 
     # 获取所有客户，按引流人筛选
-    all_customers = customer_service.list_customers()
+    active_customers = customer_service.list_customers()
+    active_nicknames = {customer.nickname for customer in active_customers if customer.nickname}
+    all_customers = customer_access_service.filter_customers(request, active_customers) if request else active_customers
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    can_view_payment = customer_access_service.can_view_transaction_summary(role)
     customers = [
         c for c in all_customers
         if not referrer or (c.referrer or "").strip() == referrer
@@ -1341,7 +1438,7 @@ def get_member_statistics(
         if not time_key or not (date_from <= time_key <= date_to):
             continue
         name = (c.referrer or "").strip()
-        if name:
+        if name and name in active_nicknames:
             referrer_counts[name] += 1
     referrer_names = [
         name for name, _ in sorted(referrer_counts.items(), key=lambda item: (-item[1], item[0]))
@@ -1419,7 +1516,7 @@ def get_member_statistics(
             "visit_count": stats.get("visit_count", 0),
             "visit_interval": stats.get("visit_interval", "-"),
             "activity_count": stats.get("activity_count", 0),
-            "total_consumption": stats.get("total_consumption", 0),
+            "total_consumption": stats.get("total_consumption", 0) if can_view_payment else None,
         })
 
     return {
@@ -1722,6 +1819,7 @@ def get_course_statistics(
     activity_type: str | None = Query(None, description="活动类型编码"),
     course_subtype: str | None = Query(None, description="沙龙活动或内部课程二级类目"),
     teacher_id: str | None = Query(None, description="疗愈老师客户 ID"),
+    request: Request = None,
 ):
     """获取课程数、课时数及参与人数统计。"""
     date_from, date_to = _get_date_range(date_from, date_to)
@@ -1756,6 +1854,15 @@ def get_course_statistics(
 
     all_customers = customer_service.list_customers()
     customer_map = {customer.id: customer for customer in all_customers}
+    visible_customer_ids = (
+        customer_access_service.visible_customer_ids(request, all_customers)
+        if request
+        else set(customer_map)
+    )
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    transaction_access = customer_access_service.transaction_access(role)
+    can_view_payment = transaction_access in {"summary", "detail"}
+    can_view_payment_details = transaction_access == "detail"
     identity_groups = {
         identity.name: identity.type
         for identity in member_identity_service.list_identities()
@@ -1866,9 +1973,11 @@ def get_course_statistics(
         subtype_totals[subtype_name]["course_count"] += 1
         subtype_totals[subtype_name]["class_hours"] += activity_hours
         subtype_totals[subtype_name]["participant_count"] += len(
-            _course_participant_ids(subtype_activity_type, activity)
+            _course_participant_ids(subtype_activity_type, activity).intersection(
+                visible_customer_ids
+            )
         )
-    payment_groups = _payment_record_groups()
+    payment_groups = _payment_record_groups() if can_view_payment else []
     daily_payments, daily_needs = _course_customer_daily_context(
         date_from,
         date_to,
@@ -1896,7 +2005,13 @@ def get_course_statistics(
             teacher_ids = _course_activity_teacher_ids(activity)
             course_count += 1
             activity_hours = _course_activity_hours(type_key, activity)
-            participant_roles = _course_participant_roles(type_key, activity)
+            participant_roles = {
+                participant_id: participant_role
+                for participant_id, participant_role in _course_participant_roles(
+                    type_key, activity
+                ).items()
+                if participant_id in visible_customer_ids
+            }
             participant_ids = set(participant_roles)
             activity_participants = len(participant_ids)
             class_hours += activity_hours
@@ -1927,8 +2042,14 @@ def get_course_statistics(
                     "identity_group": identity_group,
                     "participation_role": participant_roles[participant_id],
                     "daily_need": daily_needs.get((activity.date, participant_id), ""),
-                    "daily_transaction_amount": round(payment["amount"], 2),
-                    "closers": "、".join(sorted(payment["closers"])),
+                    "daily_transaction_amount": (
+                        round(payment["amount"], 2) if can_view_payment_details else None
+                    ),
+                    "closers": (
+                        "、".join(sorted(payment["closers"]))
+                        if can_view_payment_details
+                        else ""
+                    ),
                 })
             participant_details.sort(key=lambda item: (item["nickname"], item["id"]))
             teacher_names = []
@@ -1965,10 +2086,20 @@ def get_course_statistics(
                     item["identity_group"] != "新人"
                     for item in participant_details
                 ),
-                "daily_transaction_amount": round(sum(
-                    item["daily_transaction_amount"]
-                    for item in participant_details
-                ), 2),
+                "daily_transaction_amount": (
+                    round(
+                        sum(
+                            daily_payments.get(
+                                (activity.date, participant_id),
+                                {"amount": 0.0},
+                            )["amount"]
+                            for participant_id in participant_ids
+                        ),
+                        2,
+                    )
+                    if can_view_payment
+                    else None
+                ),
                 "participants": participant_details,
             })
 
@@ -2008,7 +2139,11 @@ def get_course_statistics(
     for type_key in selected_types:
         for activity in selected_activities_by_type[type_key]:
             activity_hours = _course_activity_hours(type_key, activity)
-            activity_participant_count = len(_course_participant_ids(type_key, activity))
+            activity_participant_count = len(
+                _course_participant_ids(type_key, activity).intersection(
+                    visible_customer_ids
+                )
+            )
             for activity_teacher_id in _course_activity_teacher_ids(activity):
                 if activity_teacher_id not in teacher_statistics:
                     continue
@@ -2016,17 +2151,24 @@ def get_course_statistics(
                 teacher_statistics[activity_teacher_id]["class_hours"] += activity_hours
                 teacher_statistics[activity_teacher_id]["participant_count"] += activity_participant_count
 
-    for transaction_teacher_id, amount in _teacher_transaction_amounts(
-        teachers,
-        date_from,
-        date_to,
-        payment_groups,
-        {
-            (activity_date, participant_id)
-            for activity_date, participant_ids in filtered_participants_by_date.items()
-            for participant_id in participant_ids
-        } if activity_type == "class" else None,
-    ).items():
+    teacher_transaction_amounts = (
+        _teacher_transaction_amounts(
+            teachers,
+            date_from,
+            date_to,
+            payment_groups,
+            {
+                (activity_date, participant_id)
+                for activity_date, participant_ids in filtered_participants_by_date.items()
+                for participant_id in participant_ids
+            }
+            if activity_type == "class"
+            else None,
+        )
+        if can_view_payment
+        else {}
+    )
+    for transaction_teacher_id, amount in teacher_transaction_amounts.items():
         teacher_statistics[transaction_teacher_id]["transaction_amount"] = round(amount, 2)
 
     return {
@@ -2096,7 +2238,11 @@ def get_referral_statistics(
     traffic_source_filter = traffic_source if isinstance(traffic_source, str) and traffic_source else None
     if status_filter and status_filter not in status_names:
         raise HTTPException(status_code=422, detail="跟进阶段不存在")
-    all_customers = customer_service.list_customers()
+    active_customers = customer_service.list_customers()
+    active_nicknames = {customer.nickname for customer in active_customers if customer.nickname}
+    all_customers = customer_access_service.filter_customers(request, active_customers) if request else active_customers
+    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    can_view_payment = customer_access_service.can_view_transaction_summary(role)
     actor_id = getattr(getattr(request, "state", None), "user_id", "")
     matched_tag_customer_ids: set[str] | None = None
     if isinstance(tag_ids, str) and tag_ids:
@@ -2119,7 +2265,7 @@ def get_referral_statistics(
         if not (date_from <= referral_date <= date_to):
             continue
         referrer_name = (customer.referrer or "").strip()
-        if referrer_name:
+        if referrer_name and referrer_name in active_nicknames:
             referrer_counts[referrer_name] += 1
     referrer_names = [
         name
@@ -2273,7 +2419,7 @@ def get_referral_statistics(
             "visit_count": stats.get("visit_count", 0),
             "visit_interval": stats.get("visit_interval", "-"),
             "activity_count": stats.get("activity_count", 0),
-            "total_consumption": stats.get("total_consumption", 0),
+            "total_consumption": stats.get("total_consumption", 0) if can_view_payment else None,
         })
 
     return {

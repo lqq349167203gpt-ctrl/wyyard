@@ -72,6 +72,8 @@ const METHOD_LABELS: Record<string, string> = {
   PATCH: "更新",
   DELETE: "删除",
   GET: "查询",
+  VIEW: "查看",
+  COPY: "复制",
 }
 
 const METHOD_COLORS: Record<string, string> = {
@@ -80,6 +82,8 @@ const METHOD_COLORS: Record<string, string> = {
   PATCH: "bg-blue-50 text-blue-600",
   DELETE: "bg-red-50 text-red-600",
   GET: "bg-gray-50 text-gray-600",
+  VIEW: "bg-gray-50 text-gray-600",
+  COPY: "bg-gray-50 text-gray-600",
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -123,7 +127,7 @@ const FIELD_CN: Record<string, string> = {
   location: "地点", address: "地址",
   start_date: "开始日期", end_date: "结束日期",
   remaining_count: "剩余次数", total_count: "总次数", card_type: "卡类型", purchase_count: "购买场次",
-  customer_id: "客户", customer_name: "用户",
+  customer_id: "客户", customer_name: "用户", contact_field: "联系方式",
   space_id: "空间", room_id: "房间", space_name: "空间名", room_name: "房间名",
   organization_id: "组织",
   password: "密码", old_password: "旧密码", new_password: "新密码",
@@ -131,7 +135,7 @@ const FIELD_CN: Record<string, string> = {
   follow_up_node: "跟进节点", follow_up_action: "跟进动作", follow_up_status: "跟进阶段",
   tracking_plan: "跟进计划",
   pages: "页面权限", page_permissions: "页面权限", member_types: "历史用户信息权限",
-  edit_permissions: "信息编辑范围", visits: "邀约",
+  edit_permissions: "信息编辑范围", contacts: "客户联系方式权限", visits: "邀约",
   operator: "匹配方式", conditions: "匹配条件",
   customers: "客户信息可见身份", class_records: "人员安排可见身份", payment: "付费项目可见身份",
   referrer_handler: "引流处理人", traffic_source_detail: "流量来源详情",
@@ -319,6 +323,35 @@ const getPermissionLogDisplayContent = (log: OperationLog) => {
     if (oldScope !== newScope) {
       changes.push(`${label}：${EDIT_SCOPE_LABELS[oldScope] || oldScope} → ${EDIT_SCOPE_LABELS[newScope] || newScope}`)
     }
+  })
+
+  const oldContacts = oldEdit.contacts && typeof oldEdit.contacts === "object"
+    ? oldEdit.contacts as Record<string, unknown>
+    : {}
+  const newContacts = newEdit.contacts && typeof newEdit.contacts === "object"
+    ? newEdit.contacts as Record<string, unknown>
+    : {}
+  ;([
+    { field: "phone", label: "手机号" },
+    { field: "wechat", label: "微信号" },
+  ] as const).forEach(({ field, label }) => {
+    const oldActions = oldContacts[field] && typeof oldContacts[field] === "object"
+      ? oldContacts[field] as Record<string, unknown>
+      : {}
+    const newActions = newContacts[field] && typeof newContacts[field] === "object"
+      ? newContacts[field] as Record<string, unknown>
+      : {}
+    ;([
+      { action: "view", label: "查看" },
+      { action: "copy", label: "复制" },
+      { action: "edit", label: "修改" },
+    ] as const).forEach(({ action, label: actionLabel }) => {
+      const oldEnabled = oldActions[action] === true
+      const newEnabled = newActions[action] === true
+      if (oldEnabled !== newEnabled) {
+        changes.push(`${label}${actionLabel}权限：${oldEnabled ? "开启" : "关闭"} → ${newEnabled ? "开启" : "关闭"}`)
+      }
+    })
   })
 
   return changes.length > 0 ? `${position}：${changes.join("；")}` : `${position}：权限无变更`
@@ -623,9 +656,22 @@ export default function OperationLogsPage() {
       if (key === "closers") return formatCellValue([val], key)
       if (key === "edit_permissions") {
         const permissions = val as Record<string, unknown>
+        const contacts = permissions.contacts && typeof permissions.contacts === "object"
+          ? permissions.contacts as Record<string, Record<string, boolean>>
+          : {}
+        const formatActions = (field: "phone" | "wechat") => {
+          const actions = contacts[field] || {}
+          return [
+            actions.view ? "查看" : "",
+            actions.copy ? "复制" : "",
+            actions.edit ? "修改" : "",
+          ].filter(Boolean).join("、") || "无"
+        }
         return [
           `邀约：${EDIT_SCOPE_LABELS[String(permissions.visits || "own")] || String(permissions.visits || "own")}`,
           `课表：${EDIT_SCOPE_LABELS[String(permissions.activities || "own")] || String(permissions.activities || "own")}`,
+          `手机号：${formatActions("phone")}`,
+          `微信号：${formatActions("wechat")}`,
         ].join("；")
       }
       return Object.entries(val as Record<string, unknown>)
@@ -698,7 +744,7 @@ export default function OperationLogsPage() {
           <label className="text-[12px] text-[#8f959e]">操作类型</label>
           <SelectDropdown
             value={methodFilter}
-            options={[{value: "", label: "全部"}, {value: "POST", label: "新增"}, {value: "UPDATE", label: "更新"}, {value: "DELETE", label: "删除"}]}
+            options={[{value: "", label: "全部"}, {value: "POST", label: "新增"}, {value: "UPDATE", label: "更新"}, {value: "DELETE", label: "删除"}, {value: "VIEW", label: "查看"}, {value: "COPY", label: "复制"}]}
             placeholder="全部"
             onChange={(v) => handleFilterChange("method", v)}
             className="w-28"

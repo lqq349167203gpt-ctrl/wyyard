@@ -257,7 +257,7 @@ FIELD_NAMES = {
     "start_date": "开始日期", "end_date": "结束日期",
     "owner_id": "案主", "space_name": "空间名",
     "card_type": "卡类型", "remaining_count": "剩余次数", "total_count": "总次数", "effective_date": "生效日期", "expiry_date": "到期日期", "voided": "退费状态", "voided_at": "退费时间",
-    "customer_name": "用户", "customer_nickname": "用户昵称",
+    "customer_name": "用户", "customer_nickname": "用户昵称", "contact_field": "联系方式",
     "password": "密码", "old_password": "旧密码", "new_password": "新密码",
     "positions": "疗愈老师",
     "referrer": "引流人", "traffic_source": "流量来源", "age": "年龄",
@@ -273,7 +273,7 @@ FIELD_NAMES = {
     "need_tags": "需求标签", "follow_up_node": "跟进节点", "follow_up_status": "跟进阶段",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
-    "edit_permissions": "信息编辑范围",
+    "edit_permissions": "信息权限", "contacts": "客户联系方式权限", "customer_access": "客户数据权限",
     "operator": "匹配方式", "conditions": "匹配条件",
     "customers": "客户信息可见身份", "class_records": "人员安排可见身份", "payment": "付费项目可见身份",
     "purchase_count": "购买次数", "closer_name": "成交人", "closer_id": "成交人", "closers": "成交人", "category": "分类",
@@ -520,6 +520,58 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
         new_scope = VALUE_LABELS.get(str(new_permissions.get(key, "own")), "仅本人录入")
         if old_scope != new_scope:
             changes.append(f"{label}({old_scope}→{new_scope})")
+    old_contacts = old_permissions.get("contacts") if isinstance(old_permissions.get("contacts"), dict) else {}
+    new_contacts = new_permissions.get("contacts") if isinstance(new_permissions.get("contacts"), dict) else {}
+    for field, field_label in (("phone", "手机号"), ("wechat", "微信号")):
+        old_actions = old_contacts.get(field) if isinstance(old_contacts.get(field), dict) else {}
+        new_actions = new_contacts.get(field) if isinstance(new_contacts.get(field), dict) else {}
+        for action, action_label in (("view", "查看"), ("copy", "复制"), ("edit", "修改")):
+            old_enabled = old_actions.get(action) is True
+            new_enabled = new_actions.get(action) is True
+            if old_enabled != new_enabled:
+                changes.append(f"{field_label}{action_label}权限({'开启' if new_enabled else '关闭'})")
+
+    old_customer = old_permissions.get("customer_access") if isinstance(old_permissions.get("customer_access"), dict) else {}
+    new_customer = new_permissions.get("customer_access") if isinstance(new_permissions.get("customer_access"), dict) else {}
+    scope_labels = {"none": "不可查看", "related": "与本人相关", "all": "全部客户"}
+    old_scope = scope_labels.get(str(old_customer.get("scope", "none")), "不可查看")
+    new_scope = scope_labels.get(str(new_customer.get("scope", "none")), "不可查看")
+    if old_scope != new_scope:
+        changes.append(f"客户可见范围({old_scope}→{new_scope})")
+
+    def _append_boolean_changes(group_key: str, labels: dict[str, str]) -> None:
+        old_group = old_customer.get(group_key) if isinstance(old_customer.get(group_key), dict) else {}
+        new_group = new_customer.get(group_key) if isinstance(new_customer.get(group_key), dict) else {}
+        for key, label in labels.items():
+            old_enabled = old_group.get(key) is True
+            new_enabled = new_group.get(key) is True
+            if old_enabled != new_enabled:
+                changes.append(f"{label}权限({'开启' if new_enabled else '关闭'})")
+
+    _append_boolean_changes("relations", {
+        "referrer": "本人引流客户",
+        "referrer_handler": "本人承接客户",
+    })
+    _append_boolean_changes("sensitive_fields", {
+        "visit_purpose": "到访目的查看",
+        "trauma_history": "创伤经历查看",
+        "current_block": "当下卡点查看",
+        "work_info": "工作情况查看",
+        "other_info": "其他信息查看",
+    })
+    _append_boolean_changes("detail_tabs", {
+        "follow_up": "跟进点查看",
+        "communication": "沟通记录查看",
+        "activities": "活动记录查看",
+        "customer_followups": "客户回访查看",
+        "card_statistics": "卡次统计查看",
+        "offline_courses": "线下落地课程查看",
+    })
+    transaction_labels = {"none": "不可查看", "summary": "仅汇总", "detail": "汇总与明细"}
+    old_transaction = transaction_labels.get(str(old_customer.get("transaction_access", "none")), "不可查看")
+    new_transaction = transaction_labels.get(str(new_customer.get("transaction_access", "none")), "不可查看")
+    if old_transaction != new_transaction:
+        changes.append(f"交易数据权限({old_transaction}→{new_transaction})")
     return changes
 
 def _format_value(val, field_name: str = "") -> str:

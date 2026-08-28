@@ -158,6 +158,23 @@
   word-break: break-all;
 }
 
+.contact-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.contact-action {
+  color: #646a73;
+  font-size: 22rpx;
+  line-height: 44rpx;
+}
+
+.contact-action:active {
+  color: #1f2329;
+}
+
 .blk {
   padding: 14rpx 0;
 }

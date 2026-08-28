@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.communication_record import CommunicationRecordCreate
-from app.services import communication_record_service
+from app.services import communication_record_service, customer_access_service, customer_service
 
 router = APIRouter(prefix="/api/communication-records", tags=["communication-records"])
 
@@ -45,16 +45,40 @@ def _record_response(record, request: Request) -> dict:
     return data
 
 
+def _require_customer_access(request: Request, nickname: str):
+    customer = customer_service.get_by_nickname(nickname)
+    if not customer:
+        raise HTTPException(status_code=404, detail="客户不存在或已停用")
+    role = getattr(request.state, "user_role", "") or ""
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(status_code=403, detail="没有查看该客户的权限")
+    if not customer_access_service.can_view_detail_tab(role, "communication"):
+        raise HTTPException(status_code=403, detail="没有查看沟通记录的权限")
+    return customer
+
+
 @router.get("")
 def list_communication_records(request: Request, customer_nickname: str = Query(None)):
     records = communication_record_service.list_records()
     if customer_nickname:
+        _require_customer_access(request, customer_nickname)
         records = [r for r in records if r.customer_nickname == customer_nickname]
+    else:
+        role = getattr(request.state, "user_role", "") or ""
+        if not customer_access_service.can_view_detail_tab(role, "communication"):
+            raise HTTPException(status_code=403, detail="没有查看沟通记录的权限")
+        visible_names = {
+            customer.nickname
+            for customer in customer_access_service.filter_customers(request, customer_service.list_customers())
+            if customer.nickname
+        }
+        records = [record for record in records if record.customer_nickname in visible_names]
     return [_record_response(record, request) for record in records]
 
 
 @router.post("")
 def create_communication_record(data: CommunicationRecordCreate, request: Request):
+    _require_customer_access(request, data.customer_nickname)
     account_id, owner_name, username = _actor(request)
     creator = owner_name or username
     record = communication_record_service.create_record(data, creator, account_id)
@@ -72,6 +96,9 @@ def update_communication_record(record_id: str, data: CommunicationRecordCreate,
     existing = communication_record_service.get_record(record_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    _require_customer_access(request, existing.customer_nickname)
+    if data.customer_nickname != existing.customer_nickname:
+        _require_customer_access(request, data.customer_nickname)
     account_id, owner_name, username = _actor(request)
     if not communication_record_service.can_manage_record(
         existing, account_id, owner_name, username,
@@ -97,6 +124,7 @@ def delete_communication_record(record_id: str, request: Request):
     record = communication_record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    _require_customer_access(request, record.customer_nickname)
     account_id, owner_name, username = _actor(request)
     if not communication_record_service.can_manage_record(
         record, account_id, owner_name, username,

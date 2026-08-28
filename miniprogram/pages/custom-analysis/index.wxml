@@ -17,35 +17,54 @@
       </picker>
     </view>
 
-    <view class="section-card">
+    <view class="mode-switch-card">
+      <view class="mode-item {{plan.analysis_mode === 'single' ? 'active' : ''}}" data-value="single" bindtap="onAnalysisModeTap">单组筛选</view>
+      <view class="mode-item {{plan.analysis_mode === 'comparison' ? 'active' : ''}}" data-value="comparison" bindtap="onAnalysisModeTap">方案对比</view>
+    </view>
+
+    <view class="section-card" wx:if="{{plan.analysis_mode === 'single'}}">
       <view class="section-head">
         <text class="section-index">01</text>
         <text class="section-title">筛选客户</text>
       </view>
 
-      <view class="logic-row">
-        <view class="logic-switch">
-          <view class="logic-item {{plan.condition_logic === 'all' ? 'active' : ''}}" data-value="all" bindtap="onLogicTap">全部符合</view>
-          <view class="logic-item {{plan.condition_logic === 'any' ? 'active' : ''}}" data-value="any" bindtap="onLogicTap">任意一条</view>
+      <view class="period-panel">
+        <view class="period-head">
+          <view class="period-copy">
+            <text class="period-title">统计周期</text>
+            <text class="period-subtitle">限定期间邀约、到场、活动和成交指标</text>
+          </view>
+          <picker class="period-picker" mode="multiSelector" range="{{periodRange}}" value="{{periodValue}}" bindchange="onPeriodChange">
+            <view class="period-value">{{periodLabel}}<text class="picker-arrow">⌄</text></view>
+          </picker>
         </view>
         <view class="preset-group">
           <view class="preset" data-value="today" bindtap="onDatePreset">当天</view>
           <view class="preset" data-value="week" bindtap="onDatePreset">本周</view>
           <view class="preset" data-value="month" bindtap="onDatePreset">本月</view>
+          <view class="preset" data-value="year" bindtap="onDatePreset">本年</view>
           <view class="preset" data-value="all" bindtap="onDatePreset">全部</view>
+        </view>
+        <view class="date-range">
+          <picker class="date-picker" mode="date" value="{{plan.date_from}}" bindchange="onDateFromChange">
+            <view class="date-value {{plan.date_from ? '' : 'placeholder'}}">{{plan.date_from || '开始日期'}}</view>
+          </picker>
+          <text class="date-separator">至</text>
+          <picker class="date-picker" mode="date" value="{{plan.date_to}}" bindchange="onDateToChange">
+            <view class="date-value {{plan.date_to ? '' : 'placeholder'}}">{{plan.date_to || '结束日期'}}</view>
+          </picker>
         </view>
       </view>
 
-      <view class="date-range">
-        <picker class="date-picker" mode="date" value="{{plan.date_from}}" bindchange="onDateFromChange">
-          <view class="date-value {{plan.date_from ? '' : 'placeholder'}}">{{plan.date_from || '开始日期'}}</view>
-        </picker>
-        <text class="date-separator">至</text>
-        <picker class="date-picker" mode="date" value="{{plan.date_to}}" bindchange="onDateToChange">
-          <view class="date-value {{plan.date_to ? '' : 'placeholder'}}">{{plan.date_to || '结束日期'}}</view>
-        </picker>
+      <view class="condition-heading">
+        <text class="condition-title">客户筛选条件</text>
+        <view class="logic-switch">
+          <view class="logic-item {{plan.condition_logic === 'all' ? 'active' : ''}}" data-value="all" bindtap="onLogicTap">全部符合</view>
+          <view class="logic-item {{plan.condition_logic === 'any' ? 'active' : ''}}" data-value="any" bindtap="onLogicTap">任意一条</view>
+        </view>
+        <view class="add-condition-inline" bindtap="onAddCondition">＋ 条件</view>
       </view>
-
+      <text class="condition-hint">付费条件会同步限定成交金额、单数和人数</text>
       <view class="condition-empty" wx:if="{{conditionRows.length === 0}}" bindtap="onAddCondition">当前查询全部客户，点击添加筛选条件</view>
       <view class="condition-card" wx:for="{{conditionRows}}" wx:key="index">
         <view class="condition-top">
@@ -57,11 +76,31 @@
           </picker>
           <view class="condition-remove" data-index="{{index}}" bindtap="onRemoveCondition">×</view>
         </view>
-        <view class="condition-value-row" wx:if="{{!item.noValue}}">
-          <block wx:if="{{item.between}}">
+        <view class="condition-value-row inherited-period" wx:if="{{item.inheritPeriod}}">
+          <text class="inherited-period-value">跟随统计周期 · {{item.periodSummary}}</text>
+          <view class="condition-text-action" data-index="{{index}}" bindtap="onConditionUseOwnDate">单独设置</view>
+        </view>
+        <view class="condition-value-row" wx:elif="{{!item.noValue}}">
+          <block wx:if="{{item.between && item.isDate}}">
+            <picker class="condition-date-picker" mode="date" value="{{item.valueStart}}" data-index="{{index}}" data-part="start" bindchange="onConditionValueInput">
+              <view class="condition-input half {{item.valueStart ? '' : 'placeholder'}}">{{item.valueStart || '开始日期'}}</view>
+            </picker>
+            <text class="date-separator">至</text>
+            <picker class="condition-date-picker" mode="date" value="{{item.valueEnd}}" data-index="{{index}}" data-part="end" bindchange="onConditionValueInput">
+              <view class="condition-input half {{item.valueEnd ? '' : 'placeholder'}}">{{item.valueEnd || '结束日期'}}</view>
+            </picker>
+            <view class="condition-follow-action" data-index="{{index}}" bindtap="onConditionInheritPeriod">跟随周期</view>
+          </block>
+          <block wx:elif="{{item.between}}">
             <input class="condition-input half" value="{{item.valueStart}}" placeholder="起始值" data-index="{{index}}" data-part="start" bindinput="onConditionValueInput" />
             <text class="date-separator">至</text>
             <input class="condition-input half" value="{{item.valueEnd}}" placeholder="结束值" data-index="{{index}}" data-part="end" bindinput="onConditionValueInput" />
+          </block>
+          <block wx:elif="{{item.isDate}}">
+            <picker class="condition-date-picker single" mode="date" value="{{item.value}}" data-index="{{index}}" bindchange="onConditionValueInput">
+              <view class="condition-input {{item.value ? '' : 'placeholder'}}">{{item.value || '选择日期'}}</view>
+            </picker>
+            <view class="condition-follow-action" data-index="{{index}}" bindtap="onConditionInheritPeriod">跟随周期</view>
           </block>
           <picker wx:elif="{{item.useOptions}}" class="value-picker" mode="selector" range="{{item.valueOptions}}" range-key="label" value="{{item.valueIndex}}" data-index="{{index}}" bindchange="onConditionOptionChange">
             <view class="condition-input {{item.value ? '' : 'placeholder'}}">{{item.value || '选择筛选值'}}<text class="picker-arrow">⌄</text></view>
@@ -69,7 +108,93 @@
           <input wx:else class="condition-input" value="{{item.value}}" placeholder="{{item.placeholder}}" data-index="{{index}}" bindinput="onConditionValueInput" />
         </view>
       </view>
-      <view class="add-condition" bindtap="onAddCondition">＋ 添加条件</view>
+    </view>
+
+    <view class="section-card comparison-section" wx:else>
+      <view class="section-head comparison-section-head">
+        <view><text class="section-index">01</text><text class="section-title">对比条件</text></view>
+        <view class="add-group {{comparisonGroupRows.length >= 4 ? 'disabled' : ''}}" wx:if="{{comparisonGroupRows.length < 4}}" bindtap="onAddComparisonGroup">＋ 对比组</view>
+      </view>
+      <text class="comparison-hint">每组可设置不同日期和任意筛选条件，统计指标在各组之间共用。</text>
+
+      <view class="comparison-group" wx:for="{{comparisonGroupRows}}" wx:key="id" wx:for-item="group" wx:for-index="groupIndex">
+        <view class="comparison-group-head">
+          <text class="group-badge">{{group.badge}}</text>
+          <input class="group-name" value="{{group.name}}" maxlength="24" data-group-index="{{groupIndex}}" bindinput="onComparisonNameInput" />
+          <view class="group-action {{comparisonGroupRows.length >= 4 ? 'disabled' : ''}}" data-group-index="{{groupIndex}}" bindtap="onCopyComparisonGroup">复制</view>
+          <view class="group-action danger {{comparisonGroupRows.length <= 2 ? 'disabled' : ''}}" data-group-index="{{groupIndex}}" bindtap="onRemoveComparisonGroup">删除</view>
+        </view>
+
+        <view class="group-period">
+          <view class="period-head">
+            <view class="period-copy"><text class="period-title">统计周期</text><text class="period-subtitle">{{group.periodSummary}}</text></view>
+            <picker class="period-picker" mode="multiSelector" range="{{periodRange}}" value="{{group.periodValue}}" data-group-index="{{groupIndex}}" bindchange="onComparisonPeriodChange">
+              <view class="period-value">{{group.periodLabel}}<text class="picker-arrow">⌄</text></view>
+            </picker>
+          </view>
+          <view class="preset-group compact">
+            <view class="preset" data-group-index="{{groupIndex}}" data-value="month" bindtap="onComparisonDatePreset">本月</view>
+            <view class="preset" data-group-index="{{groupIndex}}" data-value="year" bindtap="onComparisonDatePreset">本年</view>
+            <view class="preset" data-group-index="{{groupIndex}}" data-value="all" bindtap="onComparisonDatePreset">全部</view>
+          </view>
+          <view class="date-range">
+            <picker class="date-picker" mode="date" value="{{group.date_from}}" data-group-index="{{groupIndex}}" data-part="from" bindchange="onComparisonDateChange">
+              <view class="date-value {{group.date_from ? '' : 'placeholder'}}">{{group.date_from || '开始日期'}}</view>
+            </picker>
+            <text class="date-separator">至</text>
+            <picker class="date-picker" mode="date" value="{{group.date_to}}" data-group-index="{{groupIndex}}" data-part="to" bindchange="onComparisonDateChange">
+              <view class="date-value {{group.date_to ? '' : 'placeholder'}}">{{group.date_to || '结束日期'}}</view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="condition-heading group-condition-heading">
+          <text class="condition-title">筛选条件</text>
+          <view class="logic-switch">
+            <view class="logic-item {{group.condition_logic === 'all' ? 'active' : ''}}" data-group-index="{{groupIndex}}" data-value="all" bindtap="onComparisonLogicTap">全部符合</view>
+            <view class="logic-item {{group.condition_logic === 'any' ? 'active' : ''}}" data-group-index="{{groupIndex}}" data-value="any" bindtap="onComparisonLogicTap">任意一条</view>
+          </view>
+          <view class="add-condition-inline" data-group-index="{{groupIndex}}" bindtap="onComparisonAddCondition">＋ 条件</view>
+        </view>
+        <view class="condition-empty compact-empty" wx:if="{{group.conditionRows.length === 0}}" data-group-index="{{groupIndex}}" bindtap="onComparisonAddCondition">暂不限定客户条件，点击添加</view>
+
+        <view class="condition-card group-condition-card" wx:for="{{group.conditionRows}}" wx:key="index" wx:for-item="condition" wx:for-index="conditionIndex">
+          <view class="condition-top">
+            <picker class="condition-picker" mode="selector" range="{{fieldOptions}}" range-key="label" value="{{condition.fieldIndex}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionFieldChange">
+              <view class="condition-choice">{{condition.fieldLabel}}<text class="picker-arrow">⌄</text></view>
+            </picker>
+            <picker class="condition-picker operator" mode="selector" range="{{condition.operatorOptions}}" range-key="label" value="{{condition.operatorIndex}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionOperatorChange">
+              <view class="condition-choice secondary">{{condition.operatorLabel}}<text class="picker-arrow">⌄</text></view>
+            </picker>
+            <view class="condition-remove" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onRemoveCondition">×</view>
+          </view>
+          <view class="condition-value-row inherited-period" wx:if="{{condition.inheritPeriod}}">
+            <text class="inherited-period-value">跟随本组周期 · {{condition.periodSummary}}</text>
+            <view class="condition-text-action" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onConditionUseOwnDate">单独设置</view>
+          </view>
+          <view class="condition-value-row" wx:elif="{{!condition.noValue}}">
+            <block wx:if="{{condition.between && condition.isDate}}">
+              <picker class="condition-date-picker" mode="date" value="{{condition.valueStart}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" data-part="start" bindchange="onConditionValueInput"><view class="condition-input half {{condition.valueStart ? '' : 'placeholder'}}">{{condition.valueStart || '开始日期'}}</view></picker>
+              <text class="date-separator">至</text>
+              <picker class="condition-date-picker" mode="date" value="{{condition.valueEnd}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" data-part="end" bindchange="onConditionValueInput"><view class="condition-input half {{condition.valueEnd ? '' : 'placeholder'}}">{{condition.valueEnd || '结束日期'}}</view></picker>
+              <view class="condition-follow-action" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onConditionInheritPeriod">跟随周期</view>
+            </block>
+            <block wx:elif="{{condition.between}}">
+              <input class="condition-input half" value="{{condition.valueStart}}" placeholder="起始值" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" data-part="start" bindinput="onConditionValueInput" />
+              <text class="date-separator">至</text>
+              <input class="condition-input half" value="{{condition.valueEnd}}" placeholder="结束值" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" data-part="end" bindinput="onConditionValueInput" />
+            </block>
+            <block wx:elif="{{condition.isDate}}">
+              <picker class="condition-date-picker single" mode="date" value="{{condition.value}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionValueInput"><view class="condition-input {{condition.value ? '' : 'placeholder'}}">{{condition.value || '选择日期'}}</view></picker>
+              <view class="condition-follow-action" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onConditionInheritPeriod">跟随周期</view>
+            </block>
+            <picker wx:elif="{{condition.useOptions}}" class="value-picker" mode="selector" range="{{condition.valueOptions}}" range-key="label" value="{{condition.valueIndex}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionOptionChange">
+              <view class="condition-input {{condition.value ? '' : 'placeholder'}}">{{condition.value || '选择筛选值'}}<text class="picker-arrow">⌄</text></view>
+            </picker>
+            <input wx:else class="condition-input" value="{{condition.value}}" placeholder="{{condition.placeholder}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindinput="onConditionValueInput" />
+          </view>
+        </view>
+      </view>
     </view>
 
     <view class="section-card">
@@ -83,21 +208,22 @@
           <text>{{item.label}}</text>
         </view>
       </view>
-      <view class="dimension-row">
+      <view class="dimension-row" wx:if="{{plan.analysis_mode === 'single'}}">
         <text class="dimension-label">拆分指标</text>
         <picker class="dimension-picker" mode="selector" range="{{dimensionMetricOptions}}" range-key="label" value="{{dimensionMetricIndex}}" bindchange="onDimensionMetricChange">
           <view class="picker-value">{{dimensionMetricOptions[dimensionMetricIndex].label}}<text class="picker-arrow">⌄</text></view>
         </picker>
       </view>
-      <view class="dimension-row dimension-row-secondary">
+      <view class="dimension-row dimension-row-secondary" wx:if="{{plan.analysis_mode === 'single'}}">
         <text class="dimension-label">拆分维度</text>
         <picker class="dimension-picker" mode="selector" range="{{dimensionOptions}}" range-key="label" value="{{dimensionIndex}}" bindchange="onDimensionChange">
           <view class="picker-value">{{dimensionOptions[dimensionIndex].label}}<text class="picker-arrow">⌄</text></view>
         </picker>
       </view>
+      <text class="shared-metric-hint" wx:if="{{plan.analysis_mode === 'comparison'}}">以上指标会同时用于所有对比组。</text>
     </view>
 
-    <view class="section-card">
+    <view class="section-card" wx:if="{{plan.analysis_mode === 'single'}}">
       <view class="section-head columns-head">
         <view><text class="section-index">03</text><text class="section-title">显示内容</text></view>
         <view class="text-action" bindtap="onOpenColumns">设置</view>
@@ -112,7 +238,30 @@
       <button class="query-button" loading="{{querying}}" disabled="{{querying}}" bindtap="onQuery">{{result ? '更新结果' : '查询'}}</button>
     </view>
 
-    <view class="result-area" wx:if="{{result}}">
+    <view class="result-area comparison-result" wx:if="{{result && plan.analysis_mode === 'comparison'}}">
+      <view class="result-heading"><text class="result-title">方案对比结果</text><text class="result-total">{{comparisonResultGroups.length}} 个对比组</text></view>
+      <view class="comparison-summary-list">
+        <view class="comparison-summary" wx:for="{{comparisonResultGroups}}" wx:key="id">
+          <view class="comparison-summary-head"><text class="group-badge">{{item.badge}}</text><text class="comparison-summary-name">{{item.name}}</text></view>
+          <text class="comparison-summary-period">{{item.periodSummary}}</text>
+          <text class="comparison-summary-total">符合条件 {{item.total}} 人</text>
+        </view>
+      </view>
+      <view class="comparison-metric-list">
+        <view class="comparison-metric" wx:for="{{comparisonResultRows}}" wx:key="metric">
+          <text class="comparison-metric-title">{{item.title}}</text>
+          <view class="comparison-value-row" wx:for="{{item.valuesView}}" wx:for-item="valueItem" wx:key="name">
+            <text class="comparison-value-name">{{valueItem.name}}</text><text class="comparison-value-number">{{valueItem.value}}</text>
+          </view>
+          <view class="comparison-difference {{item.differenceTone}}" wx:if="{{comparisonResultGroups.length === 2}}">
+            <text>B − A：{{item.differenceView}}</text><text>差异率：{{item.differenceRateView}}</text>
+          </view>
+        </view>
+      </view>
+      <text class="comparison-result-note">人数类指标在每个组内去重；同一客户可能同时属于多个对比组。</text>
+    </view>
+
+    <view class="result-area" wx:elif="{{result}}">
       <view class="result-heading"><text class="result-title">筛选结果</text><text class="result-total">共 {{result.total}} 人</text></view>
       <view class="cards-grid">
         <view class="result-card {{item.is_total ? 'total' : ''}}" wx:for="{{metricCards}}" wx:key="key">

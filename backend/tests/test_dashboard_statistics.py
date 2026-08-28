@@ -106,6 +106,30 @@ def test_referral_statistics_filters_referrer_and_groups_status(monkeypatch):
             referral_date="2026-07-06",
             created_at=datetime(2026, 6, 26),
         ),
+        # 引流人筛选只显示当前仍有效的客户昵称；这两条作为有效引流人员，
+        # 本身没有引流日期，不参与下方人数统计。
+        SimpleNamespace(
+            id="referrer-xiaolin",
+            nickname="小林",
+            member_type="",
+            referrer="",
+            referrer_handler="",
+            traffic_source="",
+            follow_up_status="未配置",
+            referral_date="",
+            created_at=datetime(2026, 6, 1),
+        ),
+        SimpleNamespace(
+            id="referrer-xiaozhou",
+            nickname="小周",
+            member_type="",
+            referrer="",
+            referrer_handler="",
+            traffic_source="",
+            follow_up_status="未配置",
+            referral_date="",
+            created_at=datetime(2026, 6, 1),
+        ),
     ]
     monkeypatch.setattr(statistics.customer_service, "list_customers", lambda: customers)
     monkeypatch.setattr(

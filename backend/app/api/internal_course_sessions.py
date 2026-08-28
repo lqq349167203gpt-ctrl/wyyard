@@ -1,7 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.internal_course_session import InternalCourseSessionCreate
-from app.services import activity_assignment_notification_service, internal_course_session_service
+from app.services import (
+    activity_assignment_notification_service,
+    customer_access_service,
+    internal_course_session_service,
+)
+from app.services.customer_service import list_all_customers
 from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
@@ -45,6 +50,7 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 @router.post("")
 def create_session(data: InternalCourseSessionCreate, request: Request, conversion: bool = False):
+    customer_access_service.require_new_customer_ids(request, data.participant_ids, action="添加")
     session = internal_course_session_service.create_session(
         stamp_creator(data, request), refresh_identities=not conversion
     )
@@ -61,6 +67,15 @@ def create_session(data: InternalCourseSessionCreate, request: Request, conversi
 @router.patch("/{session_id}")
 def update_session(session_id: str, data: dict, request: Request, conversion: bool = False):
     old_session = internal_course_session_service.get_session(session_id)
+    if not old_session:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    if "participant_ids" in data:
+        customer_access_service.require_new_customer_ids(
+            request,
+            data.get("participant_ids") or [],
+            existing_ids=old_session.participant_ids,
+            action="添加",
+        )
     ensure_creator_for_changed_fields(
         request, old_session, data, ACTIVITY_CREATOR_ONLY_FIELDS, "课表受保护信息", "activities"
     )
@@ -149,5 +164,9 @@ def delete_session(session_id: str, request: Request, conversion: bool = False):
 
 
 @router.get("/search-customers")
-def search_customers(q: str = ""):
-    return internal_course_session_service.search_customers(q)
+def search_customers(q: str = "", request: Request = None):
+    results = internal_course_session_service.search_customers(q)
+    if request is None:
+        return results
+    visible_ids = customer_access_service.visible_customer_ids(request, list_all_customers())
+    return [result for result in results if result.get("id") in visible_ids]

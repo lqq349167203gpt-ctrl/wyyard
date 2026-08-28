@@ -20,10 +20,59 @@ class PermissionUpdate(StrictBaseModel):
     pages: list[str]
 
 
+class ContactActionPermissionUpdate(StrictBaseModel):
+    view: bool = False
+    copy_allowed: bool = Field(default=False, validation_alias="copy", serialization_alias="copy")
+    edit: bool = False
+
+
+class ContactPermissionUpdate(StrictBaseModel):
+    phone: ContactActionPermissionUpdate = Field(default_factory=ContactActionPermissionUpdate)
+    wechat: ContactActionPermissionUpdate = Field(default_factory=ContactActionPermissionUpdate)
+
+
+class CustomerRelationUpdate(StrictBaseModel):
+    referrer: bool = False
+    referrer_handler: bool = False
+
+
+class SensitiveFieldPermissionUpdate(StrictBaseModel):
+    visit_purpose: bool = False
+    trauma_history: bool = False
+    current_block: bool = False
+    work_info: bool = False
+    other_info: bool = False
+
+
+class CustomerDetailTabPermissionUpdate(StrictBaseModel):
+    follow_up: bool = False
+    communication: bool = False
+    activities: bool = False
+    customer_followups: bool = False
+    card_statistics: bool = False
+    offline_courses: bool = False
+
+
+class CustomerAccessPermissionUpdate(StrictBaseModel):
+    scope: Literal["none", "related", "all"] = "none"
+    relations: CustomerRelationUpdate = Field(default_factory=CustomerRelationUpdate)
+    sensitive_fields: SensitiveFieldPermissionUpdate = Field(default_factory=SensitiveFieldPermissionUpdate)
+    detail_tabs: CustomerDetailTabPermissionUpdate = Field(default_factory=CustomerDetailTabPermissionUpdate)
+    transaction_access: Literal["none", "summary", "detail"] = "none"
+
+
+class EditPermissionUpdate(StrictBaseModel):
+    visits: Literal["own", "all"] = "own"
+    activities: Literal["own", "all"] = "own"
+    contacts: ContactPermissionUpdate = Field(default_factory=ContactPermissionUpdate)
+    # 兼容尚未升级的 PC/小程序：未提交该字段时由服务层按旧角色的完整可见能力处理。
+    customer_access: CustomerAccessPermissionUpdate | None = None
+
+
 class FullPermissionUpdate(StrictBaseModel):
     position: str
     pages: list[str]
-    edit_permissions: dict[str, Literal["own", "all"]] = Field(default_factory=dict)
+    edit_permissions: EditPermissionUpdate = Field(default_factory=EditPermissionUpdate)
 
 
 @router.get("")
@@ -66,7 +115,7 @@ async def set_permissions(data: PermissionUpdate, _manager_role: str = Depends(r
 @router.put("/full")
 async def set_full_permissions(data: FullPermissionUpdate, _manager_role: str = Depends(require_account_manager)):
     position_permission_service.set_permissions(data.position, data.pages)
-    edit_permissions = dict(data.edit_permissions)
+    edit_permissions = data.edit_permissions.model_dump(by_alias=True, exclude_none=True)
     if "class-records" not in data.pages:
         edit_permissions["visits"] = "own"
     if "daily-activities" not in data.pages:

@@ -23,9 +23,16 @@ def test_product_statistics_filters_healing_teacher_and_keeps_teacher_options(mo
         nickname="客户甲",
         name="",
         positions=[],
-        referrer="小红",
+        referrer="耀凯",
     )
-    customers = [teacher, other_teacher, customer]
+    deleted_referrer = SimpleNamespace(
+        id="deleted-referrer",
+        nickname="耀凯",
+        name="",
+        positions=[],
+        referrer="",
+    )
+    customers = [teacher, other_teacher, customer, deleted_referrer]
     matching_record = SimpleNamespace(
         customer_id="customer-1",
         deal_date="2026-08-01",
@@ -65,6 +72,11 @@ def test_product_statistics_filters_healing_teacher_and_keeps_teacher_options(mo
 
     # 产品销售为保留停用人员的历史成交筛选，读取的是包含停用客户的全量数据源。
     monkeypatch.setattr(statistics.customer_service, "list_all_customers", lambda: customers)
+    monkeypatch.setattr(
+        statistics.customer_service,
+        "list_customers",
+        lambda: [teacher, other_teacher, customer],
+    )
     monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
         ("class", "沙龙活动", lambda **_kwargs: [teacher_1_course, teacher_2_course]),
     ))
@@ -75,6 +87,7 @@ def test_product_statistics_filters_healing_teacher_and_keeps_teacher_options(mo
         (statistics.oh_card_reading_service, "list_readings"),
         (statistics.energy_knot_service, "list_knots"),
         (statistics.internal_course_service, "list_courses"),
+        (statistics.offline_course_service, "list_courses"),
         (statistics.other_project_service, "list_projects"),
         (statistics.visit_service, "list_visits"),
     ):
@@ -101,6 +114,7 @@ def test_product_statistics_filters_healing_teacher_and_keeps_teacher_options(mo
         {"id": "teacher-1", "name": "老师甲"},
         {"id": "teacher-2", "name": "老师乙"},
     ]
+    assert "耀凯" not in result["referrer_names"]
 
 
 def test_record_teacher_filter_supports_legacy_closer_name():
@@ -112,3 +126,59 @@ def test_record_teacher_filter_supports_legacy_closer_name():
 
     assert statistics._record_matches_teacher(record, "teacher-1", {"老师甲"})
     assert not statistics._record_matches_teacher(record, "teacher-2", {"老师乙"})
+
+
+def test_product_statistics_includes_offline_courses(monkeypatch):
+    customer = SimpleNamespace(
+        id="customer-1",
+        nickname="客户甲",
+        name="",
+        positions=[],
+        referrer="",
+    )
+    offline_course = SimpleNamespace(
+        customer_id="customer-1",
+        deal_date="2026-08-01",
+        created_at=None,
+        voided=False,
+        amount=3600,
+        fee=None,
+        price=None,
+        closers=[],
+        closer_id=None,
+        closer_name=None,
+    )
+
+    monkeypatch.setattr(statistics.customer_service, "list_all_customers", lambda: [customer])
+    monkeypatch.setattr(statistics.customer_service, "list_customers", lambda: [customer])
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", ())
+    for service, method in (
+        (statistics.membership_card_service, "list_cards"),
+        (statistics.group_case_service, "list_cases"),
+        (statistics.emotional_release_service, "list_releases"),
+        (statistics.oh_card_reading_service, "list_readings"),
+        (statistics.energy_knot_service, "list_knots"),
+        (statistics.internal_course_service, "list_courses"),
+        (statistics.other_project_service, "list_projects"),
+        (statistics.visit_service, "list_visits"),
+    ):
+        monkeypatch.setattr(service, method, lambda: [])
+    monkeypatch.setattr(statistics.offline_course_service, "list_courses", lambda: [offline_course])
+
+    result = statistics.get_products(
+        date_from="2026-08-01",
+        date_to="2026-08-01",
+        product_type="落地课程",
+        name_filter=None,
+        granularity="day",
+        referrer=None,
+        teacher_id=None,
+    )
+
+    assert result["total_amount"] == 3600
+    assert result["total_count"] == 1
+    assert result["total_persons"] == 1
+    assert result["type_amounts"]["落地课程"] == 3600
+    assert result["type_counts"]["落地课程"] == 1
+    assert result["type_persons"]["落地课程"] == 1
+    assert result["daily_table"][0]["converted_amount"] == 3600

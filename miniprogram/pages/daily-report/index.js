@@ -423,7 +423,7 @@ Page({
         pushId(g.deputy_id)
         ;(g.member_ids || []).forEach(pushId)
       })
-      const uniqueIds = [...new Set(allIds)].filter(id => !teacherIds.includes(id))
+      const uniqueIds = [...new Set(allIds)].filter(id => !teacherIds.includes(id) && customerMap[id])
       const oldMembers = []
       const newMembers = []
       uniqueIds.forEach(id => {

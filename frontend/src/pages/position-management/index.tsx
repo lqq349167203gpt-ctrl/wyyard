@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,16 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { positionApi, positionPermissionApi, accountApi } from "@/lib/api"
-import type { Position, Account, PositionEditPermissions, PositionEditScope } from "@/lib/api"
+import type {
+  ContactAction,
+  ContactField,
+  CustomerDataScope,
+  Position,
+  Account,
+  PositionEditPermissions,
+  PositionEditScope,
+  TransactionAccess,
+} from "@/lib/api"
 import { normalizePagePermissions, removePagePermissions } from "@/lib/page-permissions"
 import { storePagePermissions } from "@/hooks/use-page-permissions"
 import { storeEditPermissions } from "@/hooks/use-edit-permissions"
@@ -79,6 +88,71 @@ const PERMISSION_GROUPS = [
 const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
   visits: "own",
   activities: "own",
+  contacts: {
+    phone: { view: false, copy: false, edit: false },
+    wechat: { view: false, copy: false, edit: false },
+  },
+  customer_access: {
+    scope: "none",
+    relations: { referrer: false, referrer_handler: false },
+    sensitive_fields: {
+      visit_purpose: false,
+      trauma_history: false,
+      current_block: false,
+      work_info: false,
+      other_info: false,
+    },
+    detail_tabs: {
+      follow_up: false,
+      communication: false,
+      activities: false,
+      customer_followups: false,
+      card_statistics: false,
+      offline_courses: false,
+    },
+    transaction_access: "none",
+  },
+}
+
+const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
+  visits: "all",
+  activities: "all",
+  contacts: {
+    phone: { view: true, copy: true, edit: true },
+    wechat: { view: true, copy: true, edit: true },
+  },
+  customer_access: {
+    scope: "all",
+    relations: { referrer: true, referrer_handler: true },
+    sensitive_fields: {
+      visit_purpose: true,
+      trauma_history: true,
+      current_block: true,
+      work_info: true,
+      other_info: true,
+    },
+    detail_tabs: {
+      follow_up: true,
+      communication: true,
+      activities: true,
+      customer_followups: true,
+      card_statistics: true,
+      offline_courses: true,
+    },
+    transaction_access: "detail",
+  },
+}
+
+type PermissionSection = "pages" | "edit"
+type PendingNavigation =
+  | { type: "position"; positionId: string }
+  | { type: "tab"; tab: string }
+
+function permissionSnapshot(pages: string[], editPermissions: PositionEditPermissions) {
+  return JSON.stringify({
+    pages: [...pages].sort(),
+    editPermissions,
+  })
 }
 
 export default function PositionManagementPage() {
@@ -86,13 +160,6 @@ export default function PositionManagementPage() {
     try { return localStorage.getItem("tab_position-management") || "accounts" } catch { return "accounts" }
   })
 
-  const handleTabChange = (key: string) => {
-    setActiveTab(key)
-    try { localStorage.setItem("tab_position-management", key) } catch {}
-    if (key === "roles" && !selectedPositionId && positions.length > 0) {
-      setSelectedPositionId(positions[0].id)
-    }
-  }
   const [positions, setPositions] = useState<Position[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [permissions, setPermissions] = useState<Record<string, string[]>>({})
@@ -103,22 +170,28 @@ export default function PositionManagementPage() {
   const [selectedPositionId, setSelectedPositionId] = useState<string | null>(() => {
     try { return localStorage.getItem("selectedPositionId") || null } catch { return null }
   })
-  // 权限 Tab 切换
-  const [permTab, setPermTab] = useState<"page" | "edit">("page")
+  const [permissionSection, setPermissionSection] = useState<PermissionSection>(() => {
+    try {
+      const stored = localStorage.getItem("role_permission_section")
+      return stored === "edit" || stored === "business" || stored === "privacy" ? "edit" : "pages"
+    } catch {
+      return "pages"
+    }
+  })
 
   // 权限编辑状态
   const [formPermissions, setFormPermissions] = useState<string[]>([])
   const [formEditPermissions, setFormEditPermissions] = useState<PositionEditPermissions>(DEFAULT_EDIT_PERMISSIONS)
+  const [savedPermissionSnapshot, setSavedPermissionSnapshot] = useState("")
   const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState("")
+  const [saveError, setSaveError] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
 
   // 新增角色 Dialog
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [formName, setFormName] = useState("")
   const [formDescription, setFormDescription] = useState("")
-
-  // 保存结果 Dialog
-  const [saveResultOpen, setSaveResultOpen] = useState(false)
-  const [saveResult, setSaveResult] = useState<{ success: boolean; message: string }>({ success: true, message: "" })
 
   // 删除确认 Dialog
   const [deletePosition, setDeletePosition] = useState<Position | null>(null)
@@ -136,6 +209,9 @@ export default function PositionManagementPage() {
         positionPermissionApi.getEditPermissions(),
       ])
       setPositions(p)
+      setSelectedPositionId(current => current && p.some(position => position.id === current)
+        ? current
+        : p[0]?.id || null)
       setAccounts(a)
       setPermissions(perm)
       setEditPermissions(editPerm)
@@ -153,37 +229,92 @@ export default function PositionManagementPage() {
     }
   }, [selectedPositionId])
 
-  // 选中角色变化时，加载权限到 form 状态
-  const lastLoadedPositionId = useRef<string | null>(selectedPositionId)
+  // 选中角色变化时，加载权限到表单状态
   useEffect(() => {
-    if (!selectedPositionId) {
-      lastLoadedPositionId.current = null
-      return
-    }
+    if (!selectedPositionId) return
     const pos = positions.find(p => p.id === selectedPositionId)
     if (!pos) return
-    setFormPermissions(
+    const nextPages = (
       pos.name === "超级管理员"
         ? ALL_PAGES.map(page => page.key)
         : normalizePagePermissions(permissions[pos.name] || [])
     )
-    setFormEditPermissions(
+    const nextEditPermissions = (
       pos.name === "超级管理员"
-        ? { visits: "all", activities: "all" }
+        ? FULL_EDIT_PERMISSIONS
         : editPermissions[pos.name] || DEFAULT_EDIT_PERMISSIONS
     )
-    // 仅当角色真正切换时才重置 permTab，避免保存后 loadData 刷新把用户拉回"页面权限"
-    if (lastLoadedPositionId.current !== selectedPositionId) {
-      lastLoadedPositionId.current = selectedPositionId
-      setPermTab("page")
-    }
+    setFormPermissions(nextPages)
+    setFormEditPermissions(nextEditPermissions)
+    setSavedPermissionSnapshot(permissionSnapshot(nextPages, nextEditPermissions))
   }, [selectedPositionId, positions, permissions, editPermissions])
 
   const selectedPosition = positions.find(p => p.id === selectedPositionId) || null
   const isSystemRole = selectedPosition?.is_system || false
+  const hasUnsavedChanges = Boolean(
+    selectedPosition
+      && !isSystemRole
+      && savedPermissionSnapshot
+      && permissionSnapshot(formPermissions, formEditPermissions) !== savedPermissionSnapshot
+  )
+  const enabledContactPermissionCount = (["phone", "wechat"] as ContactField[]).reduce(
+    (total, field) => total + (["view", "copy", "edit"] as ContactAction[])
+      .filter(action => formEditPermissions.contacts[field][action]).length,
+    0,
+  )
 
   const getPersonCount = (positionName: string) => {
     return accounts.filter(a => a.role === positionName).length
+  }
+
+  const selectPermissionSection = (section: PermissionSection) => {
+    setPermissionSection(section)
+    try { localStorage.setItem("role_permission_section", section) } catch {}
+  }
+
+  const performNavigation = (navigation: PendingNavigation) => {
+    setSaveMessage("")
+    setSaveError(false)
+    if (navigation.type === "position") {
+      setSelectedPositionId(navigation.positionId)
+      return
+    }
+    setActiveTab(navigation.tab)
+    try { localStorage.setItem("tab_position-management", navigation.tab) } catch {}
+  }
+
+  const resetCurrentPermissions = () => {
+    if (!selectedPosition) return
+    const nextPages = selectedPosition.name === "超级管理员"
+      ? ALL_PAGES.map(page => page.key)
+      : normalizePagePermissions(permissions[selectedPosition.name] || [])
+    const nextEditPermissions = selectedPosition.name === "超级管理员"
+      ? FULL_EDIT_PERMISSIONS
+      : editPermissions[selectedPosition.name] || DEFAULT_EDIT_PERMISSIONS
+    setFormPermissions(nextPages)
+    setFormEditPermissions(nextEditPermissions)
+    setSavedPermissionSnapshot(permissionSnapshot(nextPages, nextEditPermissions))
+  }
+
+  const requestNavigation = (navigation: PendingNavigation) => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation(navigation)
+      return
+    }
+    performNavigation(navigation)
+  }
+
+  const handleTabChange = (key: string) => {
+    if (key === activeTab) return
+    if (key === "roles" && !selectedPositionId && positions.length > 0) {
+      setSelectedPositionId(positions[0].id)
+    }
+    requestNavigation({ type: "tab", tab: key })
+  }
+
+  const handlePositionChange = (positionId: string) => {
+    if (positionId === selectedPositionId) return
+    requestNavigation({ type: "position", positionId })
   }
 
   const handleTogglePermission = (pageKey: string) => {
@@ -200,6 +331,78 @@ export default function PositionManagementPage() {
       }
       return next
     })
+  }
+
+  const handleToggleContactPermission = (field: ContactField, action: ContactAction) => {
+    if (isSystemRole) return
+    setFormEditPermissions(current => ({
+      ...current,
+      contacts: {
+        ...current.contacts,
+        [field]: {
+          ...current.contacts[field],
+          [action]: !current.contacts[field][action],
+        },
+      },
+    }))
+  }
+
+  const handleCustomerScopeChange = (scope: CustomerDataScope) => {
+    if (isSystemRole) return
+    setFormEditPermissions(current => ({
+      ...current,
+      customer_access: { ...current.customer_access, scope },
+    }))
+  }
+
+  const handleToggleCustomerRelation = (key: "referrer" | "referrer_handler") => {
+    if (isSystemRole) return
+    setFormEditPermissions(current => ({
+      ...current,
+      customer_access: {
+        ...current.customer_access,
+        relations: {
+          ...current.customer_access.relations,
+          [key]: !current.customer_access.relations[key],
+        },
+      },
+    }))
+  }
+
+  const handleToggleSensitiveField = (key: keyof PositionEditPermissions["customer_access"]["sensitive_fields"]) => {
+    if (isSystemRole) return
+    setFormEditPermissions(current => ({
+      ...current,
+      customer_access: {
+        ...current.customer_access,
+        sensitive_fields: {
+          ...current.customer_access.sensitive_fields,
+          [key]: !current.customer_access.sensitive_fields[key],
+        },
+      },
+    }))
+  }
+
+  const handleToggleDetailTab = (key: keyof PositionEditPermissions["customer_access"]["detail_tabs"]) => {
+    if (isSystemRole) return
+    setFormEditPermissions(current => ({
+      ...current,
+      customer_access: {
+        ...current.customer_access,
+        detail_tabs: {
+          ...current.customer_access.detail_tabs,
+          [key]: !current.customer_access.detail_tabs[key],
+        },
+      },
+    }))
+  }
+
+  const handleTransactionAccessChange = (transactionAccess: TransactionAccess) => {
+    if (isSystemRole) return
+    setFormEditPermissions(current => ({
+      ...current,
+      customer_access: { ...current.customer_access, transaction_access: transactionAccess },
+    }))
   }
 
   const handleCreate = async () => {
@@ -229,9 +432,11 @@ export default function PositionManagementPage() {
     }
   }
 
-  const handleSave = async () => {
-    if (!selectedPosition || isSystemRole || saving) return
+  const savePermissions = async () => {
+    if (!selectedPosition || isSystemRole || saving) return false
     setSaving(true)
+    setSaveMessage("")
+    setSaveError(false)
     try {
       await positionPermissionApi.setFull(
         selectedPosition.name,
@@ -245,15 +450,39 @@ export default function PositionManagementPage() {
           storeEditPermissions(formEditPermissions)
         }
       } catch {}
-      setSaveResult({ success: true, message: "权限保存成功" })
+      setSavedPermissionSnapshot(permissionSnapshot(formPermissions, formEditPermissions))
+      setSaveMessage("已保存")
       // 保存后立即重新拉取最新数据，确保切角色回来后 UI 状态正确
       await loadData()
+      return true
     } catch (e: any) {
-      setSaveResult({ success: false, message: e?.message || "保存失败" })
+      setSaveMessage(e?.message || "保存失败")
+      setSaveError(true)
+      return false
     } finally {
       setSaving(false)
-      setSaveResultOpen(true)
     }
+  }
+
+  const handleSave = () => {
+    void savePermissions()
+  }
+
+  const discardAndNavigate = () => {
+    if (!pendingNavigation) return
+    const navigation = pendingNavigation
+    resetCurrentPermissions()
+    setPendingNavigation(null)
+    performNavigation(navigation)
+  }
+
+  const saveAndNavigate = async () => {
+    if (!pendingNavigation) return
+    const navigation = pendingNavigation
+    const saved = await savePermissions()
+    if (!saved) return
+    setPendingNavigation(null)
+    performNavigation(navigation)
   }
 
   const handleDelete = async () => {
@@ -304,52 +533,59 @@ export default function PositionManagementPage() {
       {activeTab === "accounts" && <AccountsContent embedded />}
 
       {activeTab === "roles" && (
-        <div className="flex gap-4" style={{ height: 'calc(100vh - 180px)' }}>
-          {/* 左侧面板 */}
-          <div className="w-[234px] bg-white rounded-lg flex flex-col shrink-0">
-            <div className="flex items-center justify-between px-4 h-11 border-b border-[#f0f0f0]">
-              <span className="text-[13px] font-medium text-[#2b2f36]">角色列表</span>
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-[#3370ff] hover:text-[#3370ff] hover:bg-[#f0f5ff]" onClick={() => setCreateDialogOpen(true)}>
-                新增
+        <div className="flex gap-3" style={{ height: "calc(100vh - 180px)" }}>
+          {/* 左侧角色列表 */}
+          <div className="flex w-[232px] shrink-0 flex-col overflow-hidden rounded-[4px] border border-[#f0f0f0] bg-white">
+            <div className="flex h-12 items-center justify-between border-b border-[#f0f0f0] px-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-[13px] font-medium text-[#1f2329]">角色</span>
+                <span className="text-[12px] text-[#8f959e]">{positions.length} 个</span>
+              </div>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-[12px] text-[#3370ff] hover:bg-[#f5f6f7] hover:text-[#3370ff]" onClick={() => setCreateDialogOpen(true)}>
+                新增角色
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="py-8 text-center text-xs text-muted-foreground">加载中...</div>
+                <div className="py-8 text-center text-[12px] text-[#8f959e]">加载中...</div>
               ) : positions.length === 0 ? (
-                <div className="py-8 text-center text-xs text-muted-foreground">暂无角色</div>
+                <div className="py-8 text-center text-[12px] text-[#8f959e]">暂无角色</div>
               ) : (
                 positions.map((pos) => {
                   const isSelected = selectedPositionId === pos.id
                   return (
                     <div
                       key={pos.id}
-                      className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors group ${
-                        isSelected ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36] hover:bg-[#f7f8fa]"
-                      }`}
-                      onClick={() => setSelectedPositionId(pos.id)}
+                      className={`group flex h-12 cursor-pointer items-center justify-between border-l-2 px-3.5 transition-colors ${
+                        isSelected ? "bg-[#f7f8fa] text-[#1f2329]" : "text-[#2b2f36] hover:bg-[#f7f8fa]"
+                      } ${isSelected ? "border-l-[#3370ff]" : "border-l-transparent"}`}
+                      onClick={() => handlePositionChange(pos.id)}
                     >
-                      <span className="text-[13px] truncate">{pos.name}</span>
-                      <div className="flex items-center gap-1">
-                        {!pos.is_system && (
-                          <>
-                            <button
-                              className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
-                              onClick={(e) => { e.stopPropagation(); setEditingPosition(pos); setEditName(pos.name) }}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </button>
-                            <button
-                              className="h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f0] transition-all"
-                              onClick={(e) => { e.stopPropagation(); setDeletePosition(pos); setDeleteConfirmName("") }}
-                            >
-                              <Trash2 className="h-3 w-3 text-destructive" />
-                            </button>
-                          </>
-                        )}
-                        <span className={`text-[11px] ${isSelected ? "text-[#3370ff]/70" : "text-[#8f959e]"}`}>
-                          {getPersonCount(pos.name)}人
+                      <div className={`min-w-0 truncate text-[13px] ${isSelected ? "font-medium" : ""}`}>{pos.name}</div>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <span className={`mr-1 text-[12px] text-[#8f959e] ${!pos.is_system ? "group-hover:hidden" : ""}`}>
+                          {getPersonCount(pos.name)} 人
                         </span>
+                        {!pos.is_system && (
+                          <div className="hidden items-center gap-0.5 group-hover:flex">
+                            <button
+                              className="flex h-7 w-7 items-center justify-center rounded-[4px] opacity-0 transition-opacity hover:bg-[#f5f6f7] disabled:cursor-default disabled:text-[#c9cdd4] group-hover:opacity-100"
+                              onClick={(e) => { e.stopPropagation(); setEditingPosition(pos); setEditName(pos.name) }}
+                              disabled={isSelected && hasUnsavedChanges}
+                              title={isSelected && hasUnsavedChanges ? "请先保存权限修改" : "编辑角色名称"}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              className="flex h-7 w-7 items-center justify-center rounded-[4px] opacity-0 transition-opacity hover:bg-[#f5f6f7] disabled:cursor-default disabled:opacity-40 group-hover:opacity-100"
+                              onClick={(e) => { e.stopPropagation(); setDeletePosition(pos); setDeleteConfirmName("") }}
+                              disabled={isSelected && hasUnsavedChanges}
+                              title={isSelected && hasUnsavedChanges ? "请先保存权限修改" : "删除角色"}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -358,57 +594,89 @@ export default function PositionManagementPage() {
             </div>
           </div>
 
-          {/* 右侧面板 */}
-          <div className="flex-1 bg-white rounded-lg flex flex-col min-w-0">
-            <div className="flex items-center justify-between px-4 h-11 border-b border-[#f0f0f0]">
-              <div className="flex items-center gap-6">
-                <button
-                  className={`relative px-1 pb-0.5 text-[13px] transition-colors ${permTab === "page" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
-                  onClick={() => setPermTab("page")}
-                >
-                  页面权限
-                  {permTab === "page" && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#3370ff] rounded-t-sm" />}
-                </button>
-                <button
-                  className={`relative px-1 pb-0.5 text-[13px] transition-colors ${permTab === "edit" ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
-                  onClick={() => setPermTab("edit")}
-                >
-                  信息编辑
-                  {permTab === "edit" && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#3370ff] rounded-t-sm" />}
-                </button>
-                {selectedPosition && isSystemRole && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#f0f1f2] text-[#8f959e]">系统角色</span>
+          {/* 右侧权限工作区 */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-[#f0f0f0] bg-white">
+            <div className="flex min-h-[60px] items-center justify-between px-5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-[14px] font-medium text-[#1f2329]">{selectedPosition?.name || "角色权限"}</span>
+                  {selectedPosition && <span className="text-[12px] text-[#8f959e]">{getPersonCount(selectedPosition.name)} 人</span>}
+                  {selectedPosition && isSystemRole && (
+                    <span className="rounded-[4px] bg-[#f0f1f2] px-1.5 py-0.5 text-[12px] text-[#8f959e]">系统角色</span>
+                  )}
+                </div>
+                {selectedPosition && (
+                  <div className="mt-1 truncate text-[12px] text-[#8f959e]">
+                    {selectedPosition.description || "配置该角色可访问的页面和可操作的信息范围"}
+                  </div>
                 )}
               </div>
-              {selectedPosition && !isSystemRole && (
-                <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
-                  {saving ? "保存中..." : "保存"}
-                </Button>
-              )}
+              <div className="flex shrink-0 items-center gap-3">
+                {hasUnsavedChanges && <span className="text-[12px] text-[#8f959e]">有未保存修改</span>}
+                {saveMessage && (saveError || !hasUnsavedChanges) && (
+                  <span className={`text-[12px] ${saveError ? "text-[#c4506a]" : "text-[#8f959e]"}`}>{saveMessage}</span>
+                )}
+                {selectedPosition && !isSystemRole && (
+                  <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
+                    {saving ? "保存中..." : "保存修改"}
+                  </Button>
+                )}
+              </div>
             </div>
+            {selectedPosition && (
+              <div className="flex h-10 shrink-0 items-end gap-6 border-b border-[#e8e8e8] px-5">
+                {([
+                  { key: "pages" as PermissionSection, label: "页面权限", summary: `${formPermissions.length}/${ALL_PAGES.length}` },
+                  { key: "edit" as PermissionSection, label: "信息权限", summary: "5 类" },
+                ]).map(section => {
+                  const selected = permissionSection === section.key
+                  return (
+                    <button
+                      key={section.key}
+                      type="button"
+                      onClick={() => selectPermissionSection(section.key)}
+                      className={`relative flex h-10 items-center gap-1.5 px-1 text-[14px] transition-colors ${
+                        selected ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
+                      }`}
+                    >
+                      <span>{section.label}</span>
+                      <span className={`text-[12px] tabular-nums ${selected ? "text-[#3370ff]" : "text-[#8f959e]"}`}>{section.summary}</span>
+                      {selected && <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             {!selectedPosition ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">请从左侧选择角色</p>
-                  <p className="text-xs text-muted-foreground mt-1">选择后可配置页面权限和信息编辑范围</p>
+                  <p className="text-[13px] text-[#8f959e]">请从左侧选择角色</p>
+                  <p className="mt-1 text-[12px] text-[#c9cdd4]">选择后可配置页面访问和信息权限</p>
                 </div>
               </div>
             ) : (
-              <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {/* 页面权限 */}
-                  {permTab === "page" && <div>
-                    {PERMISSION_GROUPS.map((group) => {
-                      const checkedCount = group.keys.filter(k => formPermissions.includes(k)).length
-                      return (
-                        <div key={group.label} className="mb-4">
-                          <div className="flex items-center justify-between px-3 py-2 bg-[#f7f8fa] rounded-md mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[12px] font-medium text-[#2b2f36]">{group.label}</span>
-                              <span className="text-[11px] text-[#8f959e]">({checkedCount}/{group.keys.length})</span>
-                            </div>
-                            {!isSystemRole && (
-                              <label className="flex items-center gap-2 cursor-pointer">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+                {permissionSection === "pages" && (
+                  <div className="max-w-[980px]">
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-[14px] font-medium text-[#1f2329]">页面权限</div>
+                        <div className="mt-1 text-[12px] text-[#8f959e]">勾选该角色可以进入的页面，页面分组全部展开显示。</div>
+                      </div>
+                      <span className="shrink-0 text-[12px] text-[#8f959e]">已开启 {formPermissions.length} / {ALL_PAGES.length}</span>
+                    </div>
+                    <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+                      {PERMISSION_GROUPS.map((group) => {
+                        const checkedCount = group.keys.filter(k => formPermissions.includes(k)).length
+                        return (
+                          <div key={group.label} className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
+                            <div className="flex h-10 items-center justify-between border-b border-[#f0f0f0] bg-[#f7f8fa] px-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[13px] font-medium text-[#2b2f36]">{group.label}</span>
+                                <span className="text-[12px] text-[#8f959e]">{checkedCount}/{group.keys.length}</span>
+                              </div>
+                              {!isSystemRole && (
+                                <label className="flex cursor-pointer items-center gap-2">
                                 <input
                                   type="checkbox"
                                   checked={group.keys.every(k => formPermissions.includes(k))}
@@ -425,40 +693,47 @@ export default function PositionManagementPage() {
                                       }
                                     }
                                   }}
-                                  className="rounded"
+                                  className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
                                 />
-                                <span className="text-[11px] text-[#8f959e]">全选</span>
-                              </label>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 px-3">
-                            {group.keys.map((key) => {
-                              const page = ALL_PAGES.find(p => p.key === key)
-                              return (
-                                <label key={key} className={`flex items-center gap-3 py-1.5 rounded ${isSystemRole ? "" : "hover:bg-[#fafbfc] cursor-pointer"}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={formPermissions.includes(key)}
-                                    onChange={() => handleTogglePermission(key)}
-                                    disabled={isSystemRole}
-                                    className="rounded"
-                                  />
-                                  <span className="text-[13px] text-[#2b2b2b]">{page?.label || key}</span>
+                                <span className="text-[12px] text-[#8f959e]">全选</span>
                                 </label>
-                              )
-                            })}
+                              )}
+                            </div>
+                            <div className="grid min-h-[52px] grid-cols-2 content-start gap-x-4 gap-y-1 px-3 py-2.5">
+                              {group.keys.map((key) => {
+                                const page = ALL_PAGES.find(p => p.key === key)
+                                return (
+                                  <label key={key} className={`flex items-center gap-3 rounded-[4px] py-1.5 ${isSystemRole ? "" : "cursor-pointer hover:bg-[#f7f8fa]"}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={formPermissions.includes(key)}
+                                      onChange={() => handleTogglePermission(key)}
+                                      disabled={isSystemRole}
+                                      className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
+                                    />
+                                    <span className="text-[13px] text-[#2b2f36]">{page?.label || key}</span>
+                                  </label>
+                                )
+                              })}
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>}
+                            </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
-                  {permTab === "edit" && (
-                    <div className="max-w-[720px]">
-                      <p className="mb-4 text-[12px] text-[#8f959e]">
-                        “全部记录”允许该角色修改他人录入的受保护信息；未开放时仍按创建人规则处理。
-                      </p>
-                      <div className="divide-y divide-[#f0f0f0] border-y border-[#f0f0f0]">
+                {permissionSection === "edit" && (
+                  <div className="max-w-[860px] space-y-7">
+                    <section>
+                      <div className="mb-3 flex items-end justify-between gap-4">
+                        <div>
+                          <div className="text-[14px] font-medium text-[#1f2329]">业务编辑范围</div>
+                          <div className="mt-1 text-[12px] text-[#8f959e]">设置该角色能否修改其他人录入的受保护信息。</div>
+                        </div>
+                        <span className="shrink-0 text-[12px] text-[#8f959e]">未开放时按创建人规则处理</span>
+                      </div>
+                      <div className="divide-y divide-[#f0f0f0] overflow-hidden rounded-[4px] border border-[#f0f0f0]">
                         {([
                           {
                             key: "visits" as const,
@@ -475,12 +750,12 @@ export default function PositionManagementPage() {
                         ]).map((item) => {
                           const pageEnabled = formPermissions.includes(item.pageKey)
                           return (
-                            <div key={item.key} className="flex items-center justify-between gap-6 px-3 py-4">
+                            <div key={item.key} className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
                               <div className="min-w-0">
                                 <div className="text-[13px] font-medium text-[#2b2f36]">{item.label}</div>
                                 <div className="mt-1 text-[12px] text-[#8f959e]">{item.description}</div>
                                 {!pageEnabled && (
-                                  <div className="mt-1 text-[11px] text-[#c9cdd4]">请先开启“{item.label}”页面权限</div>
+                                  <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“{item.label}”页面权限</div>
                                 )}
                               </div>
                               <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
@@ -510,13 +785,192 @@ export default function PositionManagementPage() {
                           )
                         })}
                       </div>
-                      <p className="mt-3 text-[11px] text-[#8f959e]">
+                      <p className="mt-2.5 text-[12px] text-[#8f959e]">
                         客户信息和跟进点仍按每条内容的填写人分别控制，不受此设置影响。
                       </p>
-                    </div>
-                  )}
-                </div>
-              </>
+                    </section>
+
+                    <section>
+                      <div className="mb-3">
+                        <div className="text-[14px] font-medium text-[#1f2329]">客户资料可见范围</div>
+                        <div className="mt-1 text-[12px] text-[#8f959e]">先限制能看到哪些客户，再决定可查看的信息内容。</div>
+                      </div>
+                      <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
+                        <div className="flex min-h-[64px] items-center justify-between gap-6 px-4 py-3">
+                          <div>
+                            <div className="text-[13px] text-[#2b2f36]">数据范围</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">“与本人相关”可按引流关系和承接关系组合。</div>
+                          </div>
+                          <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
+                            {([
+                              { value: "all" as CustomerDataScope, label: "全部客户" },
+                              { value: "related" as CustomerDataScope, label: "与本人相关" },
+                              { value: "none" as CustomerDataScope, label: "不可查看" },
+                            ]).map(option => {
+                              const selected = formEditPermissions.customer_access.scope === option.value
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  disabled={isSystemRole}
+                                  onClick={() => handleCustomerScopeChange(option.value)}
+                                  className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors ${selected ? "bg-[#1f2329] text-white" : "text-[#646a73] hover:bg-[#f5f6f7]"}`}
+                                >
+                                  {option.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        {formEditPermissions.customer_access.scope === "related" && (
+                          <div className="flex min-h-[52px] items-center gap-8 border-t border-[#f0f0f0] bg-[#fafbfc] px-4">
+                            {([
+                              { key: "referrer" as const, label: "本人是引流人" },
+                              { key: "referrer_handler" as const, label: "本人是承接人" },
+                            ]).map(item => (
+                              <label key={item.key} className="flex cursor-pointer items-center gap-2 text-[13px] text-[#2b2f36]">
+                                <input
+                                  type="checkbox"
+                                  checked={formEditPermissions.customer_access.relations[item.key]}
+                                  disabled={isSystemRole}
+                                  onChange={() => handleToggleCustomerRelation(item.key)}
+                                  className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
+                                />
+                                {item.label}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
+                    <section>
+                      <div className="mb-3">
+                        <div className="text-[14px] font-medium text-[#1f2329]">隐私信息查看</div>
+                        <div className="mt-1 text-[12px] text-[#8f959e]">未勾选的字段在客户列表、详情页和管理端小程序中都不返回内容。</div>
+                      </div>
+                      <div className="grid grid-cols-2 overflow-hidden rounded-[4px] border border-[#f0f0f0] md:grid-cols-3">
+                        {([
+                          { key: "visit_purpose" as const, label: "到访目的" },
+                          { key: "trauma_history" as const, label: "创伤经历" },
+                          { key: "current_block" as const, label: "当下卡点" },
+                          { key: "work_info" as const, label: "工作情况" },
+                          { key: "other_info" as const, label: "其他信息" },
+                        ]).map(item => (
+                          <label key={item.key} className="flex min-h-[48px] cursor-pointer items-center gap-2 border-b border-r border-[#f0f0f0] px-4 text-[13px] text-[#2b2f36] last:border-b-0">
+                            <input
+                              type="checkbox"
+                              checked={formEditPermissions.customer_access.sensitive_fields[item.key]}
+                              disabled={isSystemRole}
+                              onChange={() => handleToggleSensitiveField(item.key)}
+                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
+                            />
+                            {item.label}
+                          </label>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section>
+                      <div className="mb-3">
+                        <div className="text-[14px] font-medium text-[#1f2329]">详情内容查看</div>
+                        <div className="mt-1 text-[12px] text-[#8f959e]">控制客户详情页下方各类记录；无权限的栏目不显示。</div>
+                      </div>
+                      <div className="grid grid-cols-2 overflow-hidden rounded-[4px] border border-[#f0f0f0] md:grid-cols-3">
+                        {([
+                          { key: "follow_up" as const, label: "跟进点" },
+                          { key: "communication" as const, label: "沟通记录" },
+                          { key: "activities" as const, label: "活动记录" },
+                          { key: "customer_followups" as const, label: "客户回访" },
+                          { key: "card_statistics" as const, label: "卡次统计" },
+                          { key: "offline_courses" as const, label: "线下落地课程" },
+                        ]).map(item => (
+                          <label key={item.key} className="flex min-h-[48px] cursor-pointer items-center gap-2 border-b border-r border-[#f0f0f0] px-4 text-[13px] text-[#2b2f36]">
+                            <input
+                              type="checkbox"
+                              checked={formEditPermissions.customer_access.detail_tabs[item.key]}
+                              disabled={isSystemRole}
+                              onChange={() => handleToggleDetailTab(item.key)}
+                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
+                            />
+                            {item.label}
+                          </label>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section>
+                      <div className="mb-3">
+                        <div className="text-[14px] font-medium text-[#1f2329]">交易数据查看</div>
+                        <div className="mt-1 text-[12px] text-[#8f959e]">与客户消费金额、产品销售和客户详情交易记录使用同一权限。</div>
+                      </div>
+                      <div className="flex min-h-[64px] items-center justify-between gap-6 rounded-[4px] border border-[#f0f0f0] px-4 py-3">
+                        <div className="text-[13px] text-[#2b2f36]">交易信息层级</div>
+                        <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
+                          {([
+                            { value: "none" as TransactionAccess, label: "不可查看" },
+                            { value: "summary" as TransactionAccess, label: "仅汇总" },
+                            { value: "detail" as TransactionAccess, label: "汇总与明细" },
+                          ]).map(option => {
+                            const selected = formEditPermissions.customer_access.transaction_access === option.value
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                disabled={isSystemRole}
+                                onClick={() => handleTransactionAccessChange(option.value)}
+                                className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors ${selected ? "bg-[#1f2329] text-white" : "text-[#646a73] hover:bg-[#f5f6f7]"}`}
+                              >
+                                {option.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <div className="mb-3 flex items-end justify-between gap-4">
+                        <div>
+                          <div className="text-[14px] font-medium text-[#1f2329]">联系方式权限</div>
+                          <div className="mt-1 text-[12px] text-[#8f959e]">控制已有客户手机号和微信号的查看、复制与修改权限。</div>
+                        </div>
+                        <span className="shrink-0 text-[12px] text-[#8f959e]">已开启 {enabledContactPermissionCount} / 6</span>
+                      </div>
+                      <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
+                        <div className="grid grid-cols-[minmax(120px,1fr)_96px_96px_96px] items-center bg-[#f7f8fa] px-4 py-2.5 text-[13px] text-[#8f959e]">
+                          <span>联系方式</span>
+                          <span className="text-center">查看明文</span>
+                          <span className="text-center">复制</span>
+                          <span className="text-center">修改</span>
+                        </div>
+                        {([
+                          { field: "phone" as ContactField, label: "手机号" },
+                          { field: "wechat" as ContactField, label: "微信号" },
+                        ]).map(item => (
+                          <div key={item.field} className="grid min-h-[52px] grid-cols-[minmax(120px,1fr)_96px_96px_96px] items-center border-t border-[#f0f0f0] px-4">
+                            <span className="text-[13px] text-[#2b2f36]">{item.label}</span>
+                            {(["view", "copy", "edit"] as ContactAction[]).map(action => (
+                              <label key={action} className={`flex h-full items-center justify-center ${isSystemRole ? "" : "cursor-pointer"}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={formEditPermissions.contacts[item.field][action]}
+                                  disabled={isSystemRole}
+                                  onChange={() => handleToggleContactPermission(item.field, action)}
+                                  className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2.5 text-[12px] leading-5 text-[#8f959e]">
+                        新建客户时可正常录入。查看、复制和修改已有联系方式都会进入操作日志，日志不会保存联系方式明文。
+                      </div>
+                    </section>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -525,16 +979,16 @@ export default function PositionManagementPage() {
       {/* 新增角色 Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
-          <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">新增角色</DialogTitle>
+          <DialogHeader className="border-b border-[#f0f0f0] px-5 py-3">
+            <DialogTitle className="text-[14px] font-normal">新增角色</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5">
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">名称</span>
+              <span className="text-right text-[12px] text-[#4e535a]">名称</span>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="输入角色名称" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">简介</span>
+              <span className="text-right text-[12px] text-[#4e535a]">简介</span>
               <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="输入角色简介（可选）" />
             </div>
           </div>
@@ -548,12 +1002,12 @@ export default function PositionManagementPage() {
       {/* 编辑角色名称 Dialog */}
       <Dialog open={!!editingPosition} onOpenChange={(open) => { if (!open) { setEditingPosition(null); setEditName("") } }}>
         <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
-          <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">编辑角色名称</DialogTitle>
+          <DialogHeader className="border-b border-[#f0f0f0] px-5 py-3">
+            <DialogTitle className="text-[14px] font-normal">编辑角色名称</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5">
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">名称</span>
+              <span className="text-right text-[12px] text-[#4e535a]">名称</span>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="输入角色名称" />
             </div>
           </div>
@@ -564,17 +1018,22 @@ export default function PositionManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 保存结果 Dialog */}
-      <Dialog open={saveResultOpen} onOpenChange={setSaveResultOpen}>
-        <DialogContent className="max-w-xs p-0 gap-0">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-base">{saveResult.success ? "保存成功" : "保存失败"}</DialogTitle>
+      {/* 未保存修改确认 */}
+      <Dialog open={!!pendingNavigation} onOpenChange={(open) => { if (!open && !saving) setPendingNavigation(null) }}>
+        <DialogContent className="w-[400px] max-w-[90vw] gap-0 p-0">
+          <DialogHeader className="border-b border-[#f0f0f0] px-5 py-3">
+            <DialogTitle className="text-[14px] font-normal">权限尚未保存</DialogTitle>
           </DialogHeader>
-          <div className="px-6 py-5">
-            <p className="text-[13px] text-[#2b2f36]">{saveResult.message}</p>
+          <div className="px-5 py-5 text-[13px] text-[#2b2f36]">
+            当前角色有未保存的权限修改，是否先保存再离开？
+            {saveError && saveMessage && <div className="mt-2 text-[12px] text-[#c4506a]">{saveMessage}</div>}
           </div>
-          <div className="flex justify-end px-5 py-3 border-t">
-            <Button size="sm" onClick={() => setSaveResultOpen(false)}>确定</Button>
+          <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setPendingNavigation(null)} disabled={saving}>继续编辑</Button>
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={discardAndNavigate} disabled={saving}>放弃修改</Button>
+            <Button size="sm" className="h-8 text-[12px]" onClick={() => { void saveAndNavigate() }} disabled={saving}>
+              {saving ? "保存中..." : "保存并离开"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -583,13 +1042,13 @@ export default function PositionManagementPage() {
       <AlertDialog open={!!deletePosition} onOpenChange={() => { setDeletePosition(null); setDeleteConfirmName("") }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除角色</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-[14px] font-normal">删除角色</AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px]">
               确定要删除「{deletePosition?.name}」吗？该角色下的人员不会被删除。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="px-6 pb-2">
-            <label className="text-xs text-muted-foreground mb-1 block">请输入角色名称确认删除</label>
+            <label className="mb-1 block text-[12px] text-[#8f959e]">请输入角色名称确认删除</label>
             <Input
               value={deleteConfirmName}
               onChange={(e) => setDeleteConfirmName(e.target.value)}

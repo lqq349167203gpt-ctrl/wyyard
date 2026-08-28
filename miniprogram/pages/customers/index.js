@@ -24,6 +24,8 @@ Page({
     // 引流人
     referrerList: [],
     selectedReferrers: [],
+    activeCustomerNicknames: [],
+    activeCustomerNamesLoaded: false,
     // 到店间隔
     rangeMin: 0,
     rangeMax: 60,
@@ -44,7 +46,21 @@ Page({
     }
     this.loadMemberTypes()
     this.loadCustomerTags()
+    this.loadActiveCustomerNames()
     this.loadData(true)
+  },
+
+  async loadActiveCustomerNames() {
+    try {
+      const customers = await customerApi.light()
+      this.setData({
+        activeCustomerNicknames: (customers || []).map(customer => customer.nickname).filter(Boolean),
+        activeCustomerNamesLoaded: true,
+      })
+      this.updateReferrerList()
+    } catch (e) {
+      console.error('加载有效客户昵称失败:', e)
+    }
   },
 
   async loadMemberTypes() {
@@ -100,11 +116,12 @@ Page({
 
   // 更新引流人列表（从已加载客户中提取，按人数从多到少排列）
   updateReferrerList() {
-    const { customers, selectedReferrers } = this.data
+    const { customers, selectedReferrers, activeCustomerNicknames, activeCustomerNamesLoaded } = this.data
+    const activeNames = new Set(activeCustomerNicknames)
     const countMap = {}
     for (const c of customers) {
       const name = (c.referrer || '').trim()
-      if (name) {
+      if (name && (!activeCustomerNamesLoaded || activeNames.has(name))) {
         countMap[name] = (countMap[name] || 0) + 1
       }
     }

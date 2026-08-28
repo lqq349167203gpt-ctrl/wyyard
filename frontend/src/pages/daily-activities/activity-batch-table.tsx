@@ -1219,14 +1219,14 @@ export function ActivityBatchTable({
 
   const hasEks = rows.some(r => r.record_type === "eks")
   const hasOwnerType = rows.some(r => r.record_type !== "class" && r.record_type !== "ics")
-  const tableMinWidth = hasOwnerType ? 1413 : 1257
-  const fixedColumnWidth = 867 + (hasOwnerType ? 86 : 0) + (hasEks ? 40 : 0)
+  const tableMinWidth = hasOwnerType ? 1471 : 1315
+  const fixedColumnWidth = 925 + (hasOwnerType ? 86 : 0) + (hasEks ? 40 : 0)
   const participantColumnWidth = (tableMinWidth - fixedColumnWidth) / 2
   const columnWidths = [
     24, 46, 122, 80, 126,
     ...(hasOwnerType ? [86] : []),
     ...(hasEks ? [40] : []),
-    57, 62, 80, 160, participantColumnWidth, participantColumnWidth, 42, 68,
+    57, 62, 80, 160, participantColumnWidth, participantColumnWidth, 76, 40, 52,
   ]
 
   const handleTableScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -1338,7 +1338,7 @@ export function ActivityBatchTable({
         <div className="ml-auto flex shrink-0 items-center gap-1">{toolbarTrailing}</div>
       </div>
       {toolbarSupplement}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div ref={headerScrollRef} className="shrink-0 overflow-hidden">
           <div style={{ minWidth: tableMinWidth }}>
             <table className="w-full border-separate border-spacing-y-[6px] text-[12px]" style={{ tableLayout: "fixed" }}>
@@ -1360,8 +1360,11 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal">简介</th>
               <th className="px-1 py-2 text-left font-normal">老人</th>
               <th className="px-1 py-2 text-left font-normal">新人</th>
-              <th className="sticky right-[68px] z-10 w-[42px] bg-[#f7f8fa] px-1 py-2 text-center font-normal">发布</th>
-              <th className="sticky right-0 z-10 w-[68px] bg-[#f7f8fa] px-1 py-2 text-center font-normal">操作</th>
+              <th className="px-1 py-2 text-left font-normal">创建人</th>
+              <th className="sticky right-[52px] z-20 w-[40px] bg-[#f7f8fa] py-2 pl-1 pr-0 font-normal">
+                  <span className="flex w-full items-center justify-center whitespace-nowrap">发布</span>
+              </th>
+              <th className="sticky right-0 z-20 w-[52px] bg-[#f7f8fa] px-0 py-2 text-center font-normal">操作</th>
             </tr>
           </thead>
             </table>
@@ -1380,6 +1383,9 @@ export function ActivityBatchTable({
               const hasCellChanges = !!rowChangedFields && rowChangedFields.size > 0
               const { oldMembers, newMembers } = splitParticipants(row.participant_ids)
               const rowReadOnly = !canEditRow(row)
+              const creatorName = row.pendingCreate || !row.record_id
+                ? "待保存"
+                : row.created_by || "未记录"
               const typeLabel = row.record_type === "class"
                 ? (row.class_course_type || "沙龙")
                 : row.record_type === "ics"
@@ -1688,7 +1694,7 @@ export function ActivityBatchTable({
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "host_names") || isCellChanged(row.key, "host_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {rowReadOnly ? (
                       <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${hostDisplayText ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={hostDisplayText}>
-                        {hostDisplayText || "-"}
+                        {hostDisplayText}
                       </span>
                     ) : (
                       <CustomerSearchInput rounded="2px"
@@ -1709,7 +1715,7 @@ export function ActivityBatchTable({
                         }}
                         positionFilter={TEACHER_POSITION_MAP[row.record_type]}
                         filterSelected
-                        placeholder="选择老师"
+                        placeholder=""
                         className="h-7 [&]:border-[0.5px] [&]:text-[11px]"
                       />
                     )}
@@ -1781,9 +1787,19 @@ export function ActivityBatchTable({
                     </span>
                   </td>
 
+                  {/* 创建人 */}
+                  <td className="px-1 py-0.5 align-top">
+                    <span
+                      className={`block h-7 truncate leading-7 text-[12px] ${row.created_by ? "text-[#8f959e]" : "text-[#c9cdd4]"}`}
+                      title={creatorName}
+                    >
+                      {creatorName}
+                    </span>
+                  </td>
+
                   {/* 发布到客户端 */}
-                  <td className={`sticky right-[68px] z-10 px-1 py-0.5 text-center align-top ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
-                    <div className="flex h-7 items-center justify-center">
+                  <td className={`sticky right-[52px] z-20 py-0.5 pl-1 pr-0 text-center align-top ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
+                    <div className="flex h-7 w-full items-center justify-center">
                       <input
                         type="checkbox"
                         checked={row.is_published}
@@ -1795,17 +1811,9 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 操作 */}
-                  <td className="sticky right-0 z-10 w-[68px] bg-white px-1 py-0.5 text-center">
-                    {rowReadOnly ? (
-                      <span
-                        className="inline-flex h-7 max-w-[60px] items-center truncate text-[12px] text-[#8f959e]"
-                        title="公益、时间、类型、名称、老师、方式、扣卡、案主、部位、简介及删除仅创建人可操作"
-                      >
-                        {row.created_by || "未记录"}
-                      </span>
-                    ) : (
+                  <td className="sticky right-0 z-20 w-[52px] bg-white px-0 py-0.5 text-center">
+                    {!rowReadOnly && (
                       <div className="flex h-7 items-center justify-center gap-1">
-                        <span className="text-[11px] text-[#8f959e]">自己</span>
                         <button
                           onClick={() => handleDelete(row)}
                           className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[#8f959e] hover:text-[#e02020]"
@@ -1821,6 +1829,12 @@ export function ActivityBatchTable({
             })}
           </tbody>
         </table>
+        </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-[6px] right-[92px] top-[6px] z-30 w-3 bg-[linear-gradient(to_right,transparent,rgba(31,35,41,0.08))]"
+        >
+          <span className="absolute inset-y-0 right-0 w-px bg-[#dfe2e6]" />
         </div>
       </div>
       </div>

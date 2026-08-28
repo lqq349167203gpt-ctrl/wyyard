@@ -10,7 +10,7 @@ import { uploadApi, customerApi, customerTagApi, healingRecordApi, customerDetai
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Upload, Copy, Edit, Inbox, Trash2 } from "lucide-react"
+import { X, Upload, Copy, Edit, Eye, Inbox, Trash2 } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
 
 interface HealingRec {
@@ -82,7 +82,9 @@ export default function DetailView({
   const [offlineCoursePage, setOfflineCoursePage] = useState(1)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [revealedContacts, setRevealedContacts] = useState<Record<"phone" | "wechat", boolean>>({ phone: false, wechat: false })
+  const [copiedContact, setCopiedContact] = useState<"phone" | "wechat" | null>(null)
+  const [loadError, setLoadError] = useState<{ message: string; retryable: boolean } | null>(null)
   const [commRecords, setCommRecords] = useState<CommunicationRecord[]>([])
   const [commPage, setCommPage] = useState(1)
   const [commContent, setCommContent] = useState("")
@@ -113,6 +115,8 @@ export default function DetailView({
     setLoading(true)
     setLoadError(null)
     setCopied(false)
+    setRevealedContacts({ phone: false, wechat: false })
+    setCopiedContact(null)
     setCommRecords([])
     setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1); setFollowupsPage(1); setOfflineCoursePage(1)
     try {
@@ -126,14 +130,36 @@ export default function DetailView({
       })
       // 加载沟通记录
       const nickname = data.customer?.nickname
-      if (nickname) {
+      const access = data.customer?.customer_access_permissions
+      const communicationAllowed = !access || access.detail_tabs.communication
+      const availableTabs = [
+        access?.detail_tabs.follow_up !== false && "healing",
+        communicationAllowed && "communication",
+        access?.detail_tabs.activities !== false && "activities",
+        access?.detail_tabs.customer_followups !== false && "followups",
+        access?.detail_tabs.card_statistics !== false && "purchase",
+        access?.detail_tabs.offline_courses !== false && "offline_course",
+        access?.transaction_access === "detail" && "payment",
+      ].filter(Boolean) as (typeof activeTab)[]
+      setActiveTab(current => availableTabs.includes(current) ? current : (availableTabs[0] || "healing"))
+      if (nickname && communicationAllowed) {
         communicationRecordApi.list(nickname).then(setCommRecords).catch(() => setCommRecords([]))
       } else {
         setCommRecords([])
       }
     } catch (e) {
       if (seq !== loadSeqRef.current) return
-      setLoadError("加载失败，请重试")
+      const errorMessage = e instanceof Error ? e.message : ""
+      const permissionDenied = errorMessage.includes("没有查看该客户的权限") || errorMessage.includes("权限不足")
+      const customerMissing = errorMessage.includes("客户不存在")
+      setLoadError({
+        message: permissionDenied
+          ? "暂无查看该客户资料的权限"
+          : customerMissing
+            ? "该客户资料不存在或已被停用"
+            : "客户资料加载失败，请稍后重试",
+        retryable: !permissionDenied && !customerMissing,
+      })
       console.error(e)
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
@@ -145,6 +171,26 @@ export default function DetailView({
   const onClear = () => { setDetail(null); setSearchValue(""); onClearSelection() }
 
   const refresh = () => { if (detail) loadDetail(detail.customer.id) }
+
+  const accessContact = async (field: "phone" | "wechat", action: "view" | "copy") => {
+    if (!detail) return
+    try {
+      const result = await customerApi.accessContact(detail.customer.id, field, action)
+      if (action === "view") {
+        setDetail(current => current ? {
+          ...current,
+          customer: { ...current.customer, [field]: result.value },
+        } : current)
+        setRevealedContacts(current => ({ ...current, [field]: true }))
+      } else {
+        await navigator.clipboard.writeText(result.value)
+        setCopiedContact(field)
+        window.setTimeout(() => setCopiedContact(current => current === field ? null : current), 1600)
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "操作失败")
+    }
+  }
 
   const openVisitEditor = (visitDate: string) => {
     localStorage.setItem("shared-selected-date", visitDate)
@@ -252,8 +298,10 @@ export default function DetailView({
   if (loadError) {
     return (
       <div className="py-16 text-center space-y-2">
-        <p className="text-[12px] text-[#c4506a]">{loadError}</p>
-        <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => selectedCustomerId && loadDetail(selectedCustomerId)}>重试</Button>
+        <p className="text-[12px] text-[#646a73]">{loadError.message}</p>
+        {loadError.retryable && (
+          <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => selectedCustomerId && loadDetail(selectedCustomerId)}>重试</Button>
+        )}
       </div>
     )
   }
@@ -261,19 +309,20 @@ export default function DetailView({
   if (!detail) return null
 
   const c = detail.customer
+  const access = c.customer_access_permissions
   const arrivedRecords = (detail?.visit_records || []).filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
   const firstVisit = arrivedRecords.length > 0 ? arrivedRecords[0].visit_date : ""
   // 指标：参与活动场数 = 活动日期属于已到店日期集合的场数；消费额 = 未退费交易求和
   const arrivedActivityCount = (detail?.activities || []).filter(a => arrivedDates.has(a.date)).length
-  const totalSpend = (detail?.payment_records || []).filter(g => !g.voided).reduce((sum, g) => sum + g.amount, 0)
+  const totalSpend = c.total_payment ?? (access ? null : (detail?.payment_records || []).filter(g => !g.voided).reduce((sum, g) => sum + g.amount, 0))
   const workInfo = c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "")
   const archiveFields: [string, string][] = [
-    ["到访目的", c.tags || ""],
-    ["创伤经历", c.basic_info || ""],
-    ["当下卡点", c.assessment || ""],
-    ["工作情况", workInfo],
-    ["其他信息", c.other_info || ""],
-  ]
+    (!access || access.sensitive_fields.visit_purpose) && ["到访目的", c.tags || ""],
+    (!access || access.sensitive_fields.trauma_history) && ["创伤经历", c.basic_info || ""],
+    (!access || access.sensitive_fields.current_block) && ["当下卡点", c.assessment || c.core_situation || ""],
+    (!access || access.sensitive_fields.work_info) && ["工作情况", workInfo],
+    (!access || access.sensitive_fields.other_info) && ["其他信息", c.other_info || ""],
+  ].filter(Boolean) as [string, string][]
   const todayStr = new Date().toLocaleDateString("sv-SE")
   // 次数余量摘要：余量为 0 或已过期的项目不显示；内部课程按不限次展示
   const remainSummary = (detail?.purchase_summary || [])
@@ -381,11 +430,11 @@ export default function DetailView({
                 <div className="text-[#a8b1bd] text-[10.5px] mt-px">累计到店</div>
               </div>
               <div className="bg-[#212631] rounded-[10px] px-3 pt-[9px] pb-2">
-                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{arrivedActivityCount}<span className="text-[10.5px] font-semibold"> 场</span></div>
+                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{access?.detail_tabs.activities === false ? "—" : arrivedActivityCount}{access?.detail_tabs.activities !== false && <span className="text-[10.5px] font-semibold"> 场</span>}</div>
                 <div className="text-[#a8b1bd] text-[10.5px] mt-px">参与活动</div>
               </div>
               <div className="bg-[#212631] rounded-[10px] px-3 pt-[9px] pb-2">
-                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">¥{totalSpend.toLocaleString()}</div>
+                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{totalSpend === null ? "—" : `¥${totalSpend.toLocaleString()}`}</div>
                 <div className="text-[#a8b1bd] text-[10.5px] mt-px">累计消费</div>
               </div>
             </div>
@@ -396,7 +445,7 @@ export default function DetailView({
               </div>
               <div className="flex items-baseline justify-between">
                 <span>首次到访</span>
-                <b className="text-[#212631] font-semibold tabular-nums">{firstVisit || <DvEmpty />}</b>
+                <b className="text-[#212631] font-semibold tabular-nums">{access?.detail_tabs.follow_up === false ? <DvEmpty /> : (firstVisit || <DvEmpty />)}</b>
               </div>
             </div>
           </div>
@@ -404,7 +453,37 @@ export default function DetailView({
           {/* 联系与来源 */}
           <div className="bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-4 py-3 shrink-0">
             <h3 className="text-[12.5px] font-bold text-[#212631] mb-0.5">联系与来源</h3>
-            {([["电话", c.phone], ["微信", c.wechat], ["引流人", c.referrer], ["承接人", c.referrer_handler], ["流量来源", c.traffic_source]] as [string, React.ReactNode][]).map(([l, v]) => (
+            {([
+              { field: "phone" as const, label: "电话", value: c.phone },
+              { field: "wechat" as const, label: "微信", value: c.wechat },
+            ]).map(item => {
+              const permission = c.contact_permissions?.[item.field]
+              return (
+                <div key={item.field} className="flex items-center gap-2.5 border-b border-[#f3f4f5] py-[6px] text-[12px]">
+                  <span className="w-10 shrink-0 text-[#a8b1bd]">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-right font-medium text-[#212631]">{item.value || <DvEmpty />}</span>
+                  {item.value && permission?.view && !revealedContacts[item.field] && (
+                    <button
+                      type="button"
+                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]"
+                      onClick={() => accessContact(item.field, "view")}
+                    >
+                      <Eye className="h-3 w-3" />查看
+                    </button>
+                  )}
+                  {item.value && permission?.copy && (
+                    <button
+                      type="button"
+                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]"
+                      onClick={() => accessContact(item.field, "copy")}
+                    >
+                      <Copy className="h-3 w-3" />{copiedContact === item.field ? "已复制" : "复制"}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+            {([["引流人", c.referrer], ["承接人", c.referrer_handler], ["流量来源", c.traffic_source]] as [string, React.ReactNode][]).map(([l, v]) => (
               <div key={l} className="flex items-center justify-between gap-2.5 py-[6px] border-b border-[#f3f4f5] text-[12px]">
                 <span className="text-[#a8b1bd] shrink-0">{l}</span>
                 <span className="text-[#212631] font-medium text-right truncate">{v || <DvEmpty />}</span>
@@ -501,11 +580,20 @@ export default function DetailView({
                 { key: "healing" as const, label: "跟进点", cnt: (detail?.visit_records || []).length },
                 { key: "communication" as const, label: "沟通记录", cnt: commRecords.length },
                 { key: "activities" as const, label: "活动记录", cnt: (detail?.activities || []).length },
-                { key: "followups" as const, label: "用户回访", cnt: (detail?.activity_followups || []).length },
+                { key: "followups" as const, label: "客户回访", cnt: (detail?.activity_followups || []).length },
                 { key: "purchase" as const, label: "卡次统计", cnt: null as number | null },
                 { key: "offline_course" as const, label: "线下落地课程", cnt: (detail?.offline_course_records || []).length },
                 { key: "payment" as const, label: "交易记录", cnt: (detail?.payment_records || []).length },
-              ].map(tab => (
+              ].filter(tab => {
+                if (!access) return true
+                if (tab.key === "healing") return access.detail_tabs.follow_up
+                if (tab.key === "communication") return access.detail_tabs.communication
+                if (tab.key === "activities") return access.detail_tabs.activities
+                if (tab.key === "followups") return access.detail_tabs.customer_followups
+                if (tab.key === "purchase") return access.detail_tabs.card_statistics
+                if (tab.key === "offline_course") return access.detail_tabs.offline_courses
+                return access.transaction_access === "detail"
+              }).map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => {

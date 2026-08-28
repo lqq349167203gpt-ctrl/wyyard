@@ -133,6 +133,7 @@ def _build_rows(
     user_role: str,
     date_from: str | None = None,
     date_to: str | None = None,
+    allowed_customer_ids: set[str] | None = None,
 ) -> list[dict]:
     organization_names = {
         organization.id: organization.name
@@ -142,6 +143,11 @@ def _build_rows(
     for project_type, type_label, list_records in PROJECT_SOURCES:
         for record in list_records():
             item = record.model_dump(mode="json")
+            if (
+                allowed_customer_ids is not None
+                and item.get("customer_id") not in allowed_customer_ids
+            ):
+                continue
             created_at = item.get("created_at") or ""
             deal_date = item.get("deal_date") or ""
             normalized_deal_date = str(deal_date)[:10]
@@ -184,8 +190,15 @@ def build_payment_export(
     user_role: str,
     date_from: str | None = None,
     date_to: str | None = None,
+    *,
+    allowed_customer_ids: set[str] | None = None,
 ) -> tuple[io.BytesIO, int]:
-    rows = _build_rows(user_role, date_from, date_to)
+    rows = _build_rows(
+        user_role,
+        date_from,
+        date_to,
+        allowed_customer_ids=allowed_customer_ids,
+    )
     workbook = Workbook()
     worksheet = workbook.active
     worksheet.title = "全部付费记录"

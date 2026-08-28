@@ -313,7 +313,7 @@ export function SelectDropdown({
 
       {open && createPortal(
         <>
-          <div ref={menuRef} className="bg-white border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, borderRadius: radiusValue, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
+          <div ref={menuRef} data-dropdown className="bg-white border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, borderRadius: radiusValue, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
             {options.map((opt) => {
               const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
               const hasChildren = opt.children && opt.children.length > 0
@@ -344,7 +344,7 @@ export function SelectDropdown({
             })}
           </div>
           {hoveredOption?.children && hoveredOption.children.length > 0 && (
-            <div ref={subMenuRef}
+            <div ref={subMenuRef} data-dropdown
               className="bg-white rounded-r-md border border-l-0 border-[#e8e8e8] overflow-y-auto"
               style={{ ...subMenuPos, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}
               onMouseEnter={handleSubMenuMouseEnter}

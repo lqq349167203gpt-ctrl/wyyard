@@ -17,11 +17,19 @@
     </view>
     <view class="form-item">
       <text class="form-label">电话</text>
-      <input class="form-input" placeholder="手机号" placeholder-class="form-input-placeholder" type="number" value="{{phone}}" bindinput="onInput" data-field="phone" />
+      <view class="contact-field">
+        <input class="form-input" placeholder="手机号" placeholder-class="form-input-placeholder" type="{{isEdit ? 'text' : 'number'}}" value="{{phone}}" bindinput="onInput" data-field="phone" disabled="{{isEdit && !contactPermissions.phone.edit}}" />
+        <text class="contact-action" wx:if="{{isEdit && phone && contactPermissions.phone.view && !revealedContacts.phone}}" bindtap="onContactView" data-field="phone">查看</text>
+        <text class="contact-action" wx:if="{{isEdit && phone && contactPermissions.phone.copy}}" bindtap="onContactCopy" data-field="phone">复制</text>
+      </view>
     </view>
     <view class="form-item">
       <text class="form-label">微信</text>
-      <input class="form-input" placeholder="微信号" placeholder-class="form-input-placeholder" value="{{wechat}}" bindinput="onInput" data-field="wechat" />
+      <view class="contact-field">
+        <input class="form-input" placeholder="微信号" placeholder-class="form-input-placeholder" value="{{wechat}}" bindinput="onInput" data-field="wechat" disabled="{{isEdit && !contactPermissions.wechat.edit}}" />
+        <text class="contact-action" wx:if="{{isEdit && wechat && contactPermissions.wechat.view && !revealedContacts.wechat}}" bindtap="onContactView" data-field="wechat">查看</text>
+        <text class="contact-action" wx:if="{{isEdit && wechat && contactPermissions.wechat.copy}}" bindtap="onContactCopy" data-field="wechat">复制</text>
+      </view>
     </view>
     <view class="form-item">
       <text class="form-label">年龄</text>
@@ -141,38 +149,38 @@
 
   <!-- 详细信息 -->
   <view class="form-card">
-    <view class="form-item">
+    <view class="form-item" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.work_info}}">
       <text class="form-label">工作情况</text>
       <picker class="form-picker" mode="selector" range="{{['在职', '离职', '自由职业']}}" bindchange="onWorkStatusChange">
         <view class="picker-display {{work_status ? '' : 'placeholder'}}">{{work_status || '选择状态'}}</view>
       </picker>
     </view>
-    <view class="form-item">
+    <view class="form-item" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.work_info}}">
       <text class="form-label">工作描述</text>
       <input class="form-input" placeholder="描述工作内容" placeholder-class="form-input-placeholder" value="{{work_description}}" bindinput="onInput" data-field="work_description" />
     </view>
-    <view class="form-item column last">
+    <view class="form-item column last" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.trauma_history}}">
       <text class="form-label" style="margin-bottom: 16rpx;">创伤经历</text>
       <view class="text-preview" bindtap="onOpenEditor" data-field="basic_info" data-label="创伤经历">
         <text class="text-preview-content {{basic_info ? '' : 'text-preview-placeholder'}}">{{basic_info || '点击输入创伤经历'}}</text>
         <text class="text-preview-count">{{basic_info.length}} 字</text>
       </view>
     </view>
-    <view class="form-item column last">
+    <view class="form-item column last" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.current_block}}">
       <text class="form-label" style="margin-bottom: 16rpx;">当下卡点</text>
       <view class="text-preview" bindtap="onOpenEditor" data-field="core_situation" data-label="当下卡点">
         <text class="text-preview-content {{core_situation ? '' : 'text-preview-placeholder'}}">{{core_situation || '点击输入当下卡点'}}</text>
         <text class="text-preview-count">{{core_situation.length}} 字</text>
       </view>
     </view>
-    <view class="form-item column last">
+    <view class="form-item column last" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.visit_purpose}}">
       <text class="form-label" style="margin-bottom: 16rpx;">到访目的</text>
       <view class="text-preview" bindtap="onOpenEditor" data-field="tags" data-label="到访目的">
         <text class="text-preview-content {{tags ? '' : 'text-preview-placeholder'}}">{{tags || '点击输入到访目的'}}</text>
         <text class="text-preview-count">{{tags.length}} 字</text>
       </view>
     </view>
-    <view class="form-item column last">
+    <view class="form-item column last" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.other_info}}">
       <text class="form-label" style="margin-bottom: 16rpx;">其他信息</text>
       <view class="text-preview" bindtap="onOpenEditor" data-field="other_info" data-label="其他信息">
         <text class="text-preview-content {{other_info ? '' : 'text-preview-placeholder'}}">{{other_info || '点击输入其他信息'}}</text>
