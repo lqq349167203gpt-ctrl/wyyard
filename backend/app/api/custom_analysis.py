@@ -38,6 +38,8 @@ def _template_snapshot(template) -> dict:
         "可见范围": "团队共享" if template.scope == "shared" else "仅自己可见",
         "筛选条件数": len(template.plan.conditions),
         "统计指标": [custom_analysis_service.METRIC_LABELS[metric][0] for metric in template.plan.metrics],
+        "拆分指标": custom_analysis_service.METRIC_LABELS[template.plan.card_metric][0],
+        "拆分维度": custom_analysis_service.CARD_DIMENSION_LABELS[template.plan.card_dimension],
         "列表字段": [custom_analysis_service.FIELD_LABELS[field] for field in template.plan.columns],
     }
 
@@ -66,7 +68,8 @@ def _plan_snapshot(plan, result_total: int) -> dict:
         "条件关系": "全部符合" if plan.condition_logic == "all" else "任意一条符合",
         "筛选条件": conditions,
         "统计指标": [custom_analysis_service.METRIC_LABELS[item][0] for item in plan.metrics],
-        "拆分方式": custom_analysis_service.CARD_DIMENSION_LABELS[plan.card_dimension],
+        "拆分指标": custom_analysis_service.METRIC_LABELS[plan.card_metric][0],
+        "拆分维度": custom_analysis_service.CARD_DIMENSION_LABELS[plan.card_dimension],
         "显示字段": [custom_analysis_service.FIELD_LABELS[item] for item in plan.columns],
         "排序方式": f"{custom_analysis_service.FIELD_LABELS[plan.sort_by]}（{'升序' if plan.sort_order == 'asc' else '降序'}）",
         "结果人数": result_total,

@@ -2977,6 +2977,7 @@ export interface AnalysisPlan {
   date_from: string
   date_to: string
   metrics: AnalysisMetric[]
+  card_metric: AnalysisMetric
   card_dimension: AnalysisCardDimension
   columns: AnalysisField[]
   sort_by: AnalysisField
@@ -3039,6 +3040,8 @@ export interface AnalysisLog {
     条件关系?: string
     筛选条件?: Array<{ 字段: string; 规则: string; 值: unknown }>
     统计指标?: string[]
+    拆分指标?: string
+    拆分维度?: string
     拆分方式?: string
     显示字段?: string[]
     排序方式?: string

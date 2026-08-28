@@ -84,7 +84,13 @@
         </view>
       </view>
       <view class="dimension-row">
-        <text class="dimension-label">拆分对比</text>
+        <text class="dimension-label">拆分指标</text>
+        <picker class="dimension-picker" mode="selector" range="{{dimensionMetricOptions}}" range-key="label" value="{{dimensionMetricIndex}}" bindchange="onDimensionMetricChange">
+          <view class="picker-value">{{dimensionMetricOptions[dimensionMetricIndex].label}}<text class="picker-arrow">⌄</text></view>
+        </picker>
+      </view>
+      <view class="dimension-row dimension-row-secondary">
+        <text class="dimension-label">拆分维度</text>
         <picker class="dimension-picker" mode="selector" range="{{dimensionOptions}}" range-key="label" value="{{dimensionIndex}}" bindchange="onDimensionChange">
           <view class="picker-value">{{dimensionOptions[dimensionIndex].label}}<text class="picker-arrow">⌄</text></view>
         </picker>
@@ -116,11 +122,11 @@
       </view>
 
       <view class="dimension-block" wx:if="{{dimensionCards.length}}">
-        <text class="dimension-title">分组结果</text>
+        <text class="dimension-title">{{dimensionResultTitle}}</text>
         <view class="cards-grid">
           <view class="result-card {{item.title === '未配置' ? 'empty-card' : ''}}" wx:for="{{dimensionCards}}" wx:key="key">
             <text class="card-title">{{item.title}}</text>
-            <view><text class="card-number">{{item.count}}</text><text class="card-unit">{{item.unit}}</text></view>
+            <view><text class="card-number">{{item.format === 'currency' ? '¥' : ''}}{{item.count}}</text><text class="card-unit" wx:if="{{item.format !== 'currency'}}">{{item.unit}}</text></view>
           </view>
         </view>
       </view>

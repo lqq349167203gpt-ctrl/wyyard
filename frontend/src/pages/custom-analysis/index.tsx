@@ -79,6 +79,7 @@ function defaultPlan(): AnalysisPlan {
     condition_logic: "all",
     ...monthRange(),
     metrics: ["total_customers"],
+    card_metric: "total_customers",
     card_dimension: "none",
     columns: [
       "nickname", "member_type", "follow_up_status", "referrer", "inviter_names",
@@ -375,6 +376,7 @@ export default function CustomAnalysisPage() {
   const metricCards = result?.cards.filter(card => !card.key.startsWith("dimension-")) ?? []
   const dimensionCards = result?.cards.filter(card => card.key.startsWith("dimension-")) ?? []
   const dimensionLabel = metadata?.card_dimensions.find(item => item.value === result?.plan.card_dimension)?.label ?? "分组"
+  const dimensionMetricLabel = metadata?.metrics.find(item => item.value === result?.plan.card_metric)?.label ?? "符合条件人数"
 
   if (metadataLoading) return <div className="py-16 text-center text-sm text-muted-foreground">正在加载可用筛选项...</div>
 
@@ -462,7 +464,7 @@ export default function CustomAnalysisPage() {
                 return <button key={metric.value} type="button" onClick={() => toggleMetric(metric.value)} className={`flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px] ${selected ? "border-[#b9cdf8] bg-[#f7faff] text-[#2b2f36]" : "border-[#e5e7ea] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}><span className={`flex h-3 w-3 items-center justify-center rounded-[2px] border text-[9px] ${selected ? "border-[#3370ff] bg-[#3370ff] text-white" : "border-[#c9cdd4]"}`}>{selected ? "✓" : ""}</span>{metric.label}</button>
               })}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>按</span><SelectDropdown value={plan.card_dimension} options={metadata?.card_dimensions ?? []} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span>拆分对比</span><span className="text-[11px] text-[#b7bdc6]">每组单独出一张卡</span></div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>拆分指标</span><SelectDropdown value={plan.card_metric} options={metadata?.metrics ?? []} onChange={value => setPlan(current => ({ ...current, card_metric: value as AnalysisMetric }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="ml-1">拆分维度</span><SelectDropdown value={plan.card_dimension} options={metadata?.card_dimensions ?? []} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="text-[11px] text-[#b7bdc6]">每组单独出一张卡</span></div>
           </div>
 
           <div>
@@ -490,9 +492,9 @@ export default function CustomAnalysisPage() {
               {metricCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] bg-white px-3 py-2.5 ${card.is_total ? "border-[#cfdcf5]" : "border-[#eceef0]"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[20px] font-medium leading-none text-[#212631] tabular-nums">{card.format === "currency" ? `¥${Number(card.count).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}` : Number(card.count).toLocaleString("zh-CN")}{card.format !== "currency" && <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span>}</div></div>)}
             </div>
             {dimensionCards.length > 0 && <div className="mt-4 border-t border-[#f0f0f0] pt-3">
-              <div className="mb-2 text-[12px] font-medium text-[#4e535a]">按{dimensionLabel}拆分</div>
+              <div className="mb-2 text-[12px] font-medium text-[#4e535a]">{dimensionMetricLabel} · 按{dimensionLabel}拆分</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                {dimensionCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] px-3 py-2.5 ${card.title === "未配置" ? "border-[#e5e7ea] bg-[#fafbfc]" : "border-[#eceef0] bg-white"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[20px] font-medium leading-none text-[#212631] tabular-nums">{Number(card.count).toLocaleString("zh-CN")}<span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span></div></div>)}
+                {dimensionCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] px-3 py-2.5 ${card.title === "未配置" ? "border-[#e5e7ea] bg-[#fafbfc]" : "border-[#eceef0] bg-white"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[20px] font-medium leading-none text-[#212631] tabular-nums">{card.format === "currency" ? `¥${Number(card.count).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}` : Number(card.count).toLocaleString("zh-CN")}{card.format !== "currency" && <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span>}</div></div>)}
               </div>
             </div>}
           </div>

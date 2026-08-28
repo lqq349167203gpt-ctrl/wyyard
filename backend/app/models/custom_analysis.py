@@ -116,6 +116,7 @@ class AnalysisPlan(StrictBaseModel):
     date_from: str = ""
     date_to: str = ""
     metrics: list[AnalysisMetric] = Field(default_factory=lambda: ["total_customers"], min_length=1, max_length=9)
+    card_metric: AnalysisMetric = "total_customers"
     card_dimension: CardDimension = "follow_up_status"
     columns: list[AnalysisField] = Field(
         default_factory=lambda: [

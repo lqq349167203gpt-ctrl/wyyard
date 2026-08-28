@@ -527,6 +527,12 @@
   border-top: 1rpx solid #f0f0f0;
 }
 
+.dimension-row-secondary {
+  margin-top: 12rpx;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .columns-head {
   justify-content: space-between;
 }

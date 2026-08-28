@@ -37,6 +37,7 @@ function defaultPlan() {
     conditions: [],
     condition_logic: 'all',
     metrics: ['total_customers'],
+    card_metric: 'total_customers',
     card_dimension: 'none',
     columns: ['nickname', 'member_type', 'follow_up_status', 'referrer', 'visit_count_period', 'payment_amount_period'],
     sort_by: 'referral_date',
@@ -66,6 +67,8 @@ Page({
     fieldOptions: [],
     conditionRows: [],
     metricOptions: [],
+    dimensionMetricOptions: [],
+    dimensionMetricIndex: 0,
     dimensionOptions: [],
     dimensionIndex: 0,
     templateOptions: [{ id: '', name: '选择已保存模板' }],
@@ -81,6 +84,7 @@ Page({
     result: null,
     metricCards: [],
     dimensionCards: [],
+    dimensionResultTitle: '分组结果',
     resultItems: [],
     resultColumns: [],
   },
@@ -149,7 +153,11 @@ Page({
         placeholder: condition.operator === 'in' ? '多个值用逗号分隔' : '输入筛选值',
       }
     })
+    const cardMetric = plan.card_metric || 'total_customers'
+    plan.card_metric = cardMetric
     const metricOptions = (metadata.metrics || []).map(item => Object.assign({}, item, { selected: plan.metrics.includes(item.value) }))
+    const dimensionMetricOptions = metadata.metrics || []
+    const dimensionMetricIndex = Math.max(0, dimensionMetricOptions.findIndex(item => item.value === cardMetric))
     const dimensionOptions = metadata.card_dimensions || []
     const dimensionIndex = Math.max(0, dimensionOptions.findIndex(item => item.value === plan.card_dimension))
     const selectedColumns = plan.columns.map(value => {
@@ -157,7 +165,7 @@ Page({
       return { value, label: field ? field.label : value }
     })
     const columnOptions = metadata.fields.map(item => Object.assign({}, item, { selected: plan.columns.includes(item.value), locked: item.value === 'nickname' }))
-    this.setData({ plan, conditionRows, metricOptions, dimensionOptions, dimensionIndex, selectedColumns, columnOptions })
+    this.setData({ plan, conditionRows, metricOptions, dimensionMetricOptions, dimensionMetricIndex, dimensionOptions, dimensionIndex, selectedColumns, columnOptions })
   },
 
   onTemplateChange(e) {
@@ -267,6 +275,12 @@ Page({
   onDimensionChange(e) {
     const plan = clonePlan(this.data.plan)
     plan.card_dimension = this.data.dimensionOptions[Number(e.detail.value)].value
+    this.syncPlanView(plan)
+  },
+
+  onDimensionMetricChange(e) {
+    const plan = clonePlan(this.data.plan)
+    plan.card_metric = this.data.dimensionMetricOptions[Number(e.detail.value)].value
     this.syncPlanView(plan)
   },
 
@@ -386,10 +400,13 @@ Page({
         nickname: item.nickname || '未命名',
         fields: result.plan.columns.filter(field => field !== 'nickname').map(field => ({ label: fieldMap[field] || field, value: displayValue(field, item[field]) })),
       }))
+      const dimensionMetric = (this.data.metadata.metrics || []).find(item => item.value === result.plan.card_metric)
+      const dimension = (this.data.metadata.card_dimensions || []).find(item => item.value === result.plan.card_dimension)
       this.setData({
         result,
         metricCards: (result.cards || []).filter(card => !String(card.key).startsWith('dimension-')),
         dimensionCards: (result.cards || []).filter(card => String(card.key).startsWith('dimension-')),
+        dimensionResultTitle: `${dimensionMetric ? dimensionMetric.label : '符合条件人数'} · 按${dimension ? dimension.label : '分组'}拆分`,
         resultItems,
         resultColumns: result.plan.columns,
         querying: false,

@@ -112,6 +112,27 @@ def test_execute_plan_supports_any_logic_and_selected_metrics(monkeypatch):
     }
 
 
+def test_split_comparison_uses_selected_metric(monkeypatch):
+    rows = [
+        _row("c1", traffic_source="小红书", payment_amount_period=398),
+        _row("c2", traffic_source="小红书", payment_amount_period=5999),
+        _row("c3", traffic_source="抖音", payment_amount_period=0),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        card_metric="payment_amount",
+        card_dimension="traffic_source",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+    dimension_cards = [card for card in result["cards"] if card["key"].startswith("dimension-")]
+
+    assert dimension_cards == [
+        {"key": "dimension-0", "title": "小红书", "count": 6397.0, "unit": "元", "format": "currency", "is_total": False},
+        {"key": "dimension-1", "title": "抖音", "count": 0.0, "unit": "元", "format": "currency", "is_total": False},
+    ]
+
+
 def test_local_parser_recognizes_common_conditions(monkeypatch):
     monkeypatch.setattr(custom_analysis_service.customer_service, "list_customers", lambda: [
         SimpleNamespace(
