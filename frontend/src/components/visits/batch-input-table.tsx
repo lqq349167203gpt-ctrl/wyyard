@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
 import { VisitNoteCell } from "@/components/visits/visit-note-cell"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { createTableDragPreview } from "@/lib/table-drag-preview"
 
 interface Row {
   key: number
@@ -130,13 +131,19 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({})
   const [notesByVisitId, setNotesByVisitId] = useState<Record<string, VisitNote[]>>({})
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
+  const [draggingKey, setDraggingKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
+  const dragPreviewRef = useRef<HTMLDivElement | null>(null)
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pendingScrollToBottomRef = useRef(false)
   const [editor, setEditor] = useState<{ key: number; field: LongTextField; label: string; nickname: string } | null>(null)
   const [editorValue, setEditorValue] = useState("")
   const cardsRef = useRef<MembershipCard[]>([])
+  useEffect(() => () => {
+    dragPreviewRef.current?.remove()
+    dragPreviewRef.current = null
+  }, [])
   const currentUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}") }
     catch { return {} }
@@ -660,10 +667,29 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     }
   }, [])
 
-  const handleDragStart = useCallback((key: number) => {
+  const resetDragState = useCallback(() => {
+    dragKeyRef.current = null
+    setDraggingKey(null)
+    setDragOverKey(null)
+    dragPreviewRef.current?.remove()
+    dragPreviewRef.current = null
+  }, [])
+
+  const handleDragStart = useCallback((e: React.DragEvent<HTMLTableCellElement>, key: number) => {
     const row = rowsRef.current.find(r => r.key === key)
     if (!row || row.cancelled) return
     dragKeyRef.current = key
+    setDraggingKey(key)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", `visit:${key}`)
+    dragPreviewRef.current?.remove()
+    const preview = createTableDragPreview({
+      leading: row.member_type || "邀约",
+      title: row.nickname || "未命名邀约",
+      trailing: row.visit_time || "时间未设置",
+    })
+    dragPreviewRef.current = preview
+    e.dataTransfer.setDragImage(preview, 20, 19)
   }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent, key: number) => {
@@ -671,17 +697,14 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     if (dragKeyRef.current !== key) setDragOverKey(key)
   }, [])
 
-  const handleDragEnd = useCallback(() => {
-    dragKeyRef.current = null
-    setDragOverKey(null)
-  }, [])
+  const handleDragEnd = useCallback(() => { resetDragState() }, [resetDragState])
 
   const handleDrop = useCallback((targetKey: number) => {
     const sourceKey = dragKeyRef.current
-    if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
+    if (sourceKey === null || sourceKey === targetKey) { resetDragState(); return }
     const sourceRow = rowsRef.current.find(r => r.key === sourceKey)
     if (!sourceRow || sourceRow.cancelled) {
-      setDragOverKey(null)
+      resetDragState()
       return
     }
     const visibleRows = viewSegment === "mine"
@@ -689,7 +712,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       : rowsRef.current
     const sourceIndex = visibleRows.findIndex(row => row.key === sourceKey)
     const targetIndex = visibleRows.findIndex(row => row.key === targetKey)
-    if (sourceIndex === -1 || targetIndex === -1) { setDragOverKey(null); return }
+    if (sourceIndex === -1 || targetIndex === -1) { resetDragState(); return }
     const subject = sourceRow.nickname || "未命名邀约"
     pushHistory(
       "调整了人员顺序",
@@ -715,9 +738,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       }
       return next
     })
-    dragKeyRef.current = null
-    setDragOverKey(null)
-  }, [date, spaceId, pushHistory, viewSegment, isOwnRow])
+    resetDragState()
+  }, [date, spaceId, pushHistory, viewSegment, isOwnRow, resetDragState])
 
   const handleCustomerSelect = useCallback((key: number, customer: any) => {
     // 检查是否已存在该客户
@@ -849,14 +871,14 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               return (
                 <tr
                   key={row.key}
-                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""} ${isChanged ? "bg-[#fff8e6]" : ""} ${row.cancelled ? "[&>td:not(:last-child)]:opacity-55 bg-[#fafbfc]" : ""}`}
+                  className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "[&>td]:shadow-[inset_0_2px_0_#3370ff]" : ""} ${draggingKey === row.key ? "bg-[#f7f8fa] opacity-60" : ""} ${isChanged ? "bg-[#fff8e6]" : ""} ${row.cancelled ? "[&>td:not(:last-child)]:opacity-55 bg-[#fafbfc]" : ""} transition-opacity`}
                   onDragOver={(e) => handleDragOver(e, row.key)}
                   onDrop={() => handleDrop(row.key)}
                 >
                   <td
                     className={`px-0.5 py-1.5 text-center ${row.cancelled ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"}`}
                     draggable={!row.cancelled}
-                    onDragStart={() => handleDragStart(row.key)}
+                    onDragStart={(e) => handleDragStart(e, row.key)}
                     onDragEnd={handleDragEnd}
                   >
                     <GripVertical className="h-3.5 w-3.5 text-[#c9cdd4] mx-auto" />

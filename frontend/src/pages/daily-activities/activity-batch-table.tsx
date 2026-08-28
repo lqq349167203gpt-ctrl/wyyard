@@ -17,6 +17,7 @@ import { SpaceRoomDropdown } from "@/components/space-room-dropdown"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { CardCallbacks } from "./index"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { createTableDragPreview } from "@/lib/table-drag-preview"
 
 type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics"
 
@@ -287,7 +288,9 @@ export function ActivityBatchTable({
   const rowStatusRef = useRef(rowStatus)
   rowStatusRef.current = rowStatus
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
+  const [draggingKey, setDraggingKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
+  const dragPreviewRef = useRef<HTMLDivElement | null>(null)
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pendingScrollToBottomRef = useRef(false)
@@ -301,6 +304,10 @@ export function ActivityBatchTable({
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
   const [editingDescriptionKey, setEditingDescriptionKey] = useState<number | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState("")
+  useEffect(() => () => {
+    dragPreviewRef.current?.remove()
+    dragPreviewRef.current = null
+  }, [])
   const currentUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}") }
     catch { return {} }
@@ -1051,14 +1058,39 @@ export function ActivityBatchTable({
   }, [updateRowMulti])
 
   // 拖拽排序
-  const handleDragStart = useCallback((key: number) => {
-    if (rowsRef.current.some(row => row.key === key)) dragKeyRef.current = key
+  const resetDragState = useCallback(() => {
+    dragKeyRef.current = null
+    setDraggingKey(null)
+    setDragOverKey(null)
+    dragPreviewRef.current?.remove()
+    dragPreviewRef.current = null
+  }, [])
+  const handleDragStart = useCallback((e: React.DragEvent<HTMLTableCellElement>, key: number) => {
+    const row = rowsRef.current.find(item => item.key === key)
+    if (!row) return
+    dragKeyRef.current = key
+    setDraggingKey(key)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", `activity:${key}`)
+    dragPreviewRef.current?.remove()
+    const typeLabel = row.record_type === "class"
+      ? (row.class_course_type || TYPE_NAMES[row.record_type])
+      : row.record_type === "ics"
+        ? (row.ics_course_key.replace("ics:", "") || TYPE_NAMES[row.record_type])
+        : TYPE_NAMES[row.record_type]
+    const preview = createTableDragPreview({
+      leading: typeLabel,
+      title: row.name || typeLabel || "未命名课程",
+      trailing: [row.start_time, row.end_time].filter(Boolean).join(" – ") || "时间未设置",
+    })
+    dragPreviewRef.current = preview
+    e.dataTransfer.setDragImage(preview, 20, 19)
   }, [])
   const handleDragOver = useCallback((e: React.DragEvent, key: number) => {
     e.preventDefault()
     if (dragKeyRef.current !== key) setDragOverKey(key)
   }, [])
-  const handleDragEnd = useCallback(() => { dragKeyRef.current = null; setDragOverKey(null) }, [])
+  const handleDragEnd = useCallback(() => { resetDragState() }, [resetDragState])
   const handleDrop = useCallback((targetKey: number, e?: React.DragEvent) => {
     const sourceKey = dragKeyRef.current
     // 外部拖入（添加参与者）
@@ -1079,10 +1111,10 @@ export function ActivityBatchTable({
       return
     }
     // 内部排序
-    if (sourceKey === null || sourceKey === targetKey) { setDragOverKey(null); return }
+    if (sourceKey === null || sourceKey === targetKey) { resetDragState(); return }
     const sourceRow = rowsRef.current.find(r => r.key === sourceKey)
     if (!sourceRow) {
-      setDragOverKey(null)
+      resetDragState()
       return
     }
     const visibleRows = viewSegment === "mine"
@@ -1090,7 +1122,7 @@ export function ActivityBatchTable({
       : rowsRef.current
     const sourceIndex = visibleRows.findIndex(row => row.key === sourceKey)
     const targetIndex = visibleRows.findIndex(row => row.key === targetKey)
-    if (sourceIndex === -1 || targetIndex === -1) { setDragOverKey(null); return }
+    if (sourceIndex === -1 || targetIndex === -1) { resetDragState(); return }
     const subject = sourceRow.name || TYPE_NAMES[sourceRow.record_type] || "未命名课程"
     pushHistory(
       "调整了排序",
@@ -1115,9 +1147,8 @@ export function ActivityBatchTable({
       }).catch(() => {})
       return next
     })
-    dragKeyRef.current = null
-    setDragOverKey(null)
-  }, [date, spaceId, updateRow, saveRow, pushHistory, canEditField, viewSegment, isOwnRow])
+    resetDragState()
+  }, [date, spaceId, updateRow, saveRow, pushHistory, canEditField, viewSegment, isOwnRow, resetDragState])
 
   // 获取 host 显示名称
   const getHostDisplay = useCallback((row: ActivityRow): string[] => {
@@ -1395,7 +1426,7 @@ export function ActivityBatchTable({
               return (
                 <tr
                   key={row.key}
-                  className={`${isChanged && !hasCellChanges ? "bg-[#f5eeff]" : "hover:bg-[#fafbfc]"} ${dragOverKey === row.key ? "border-t-2 border-t-[#3370ff]" : ""}`}
+                  className={`${isChanged && !hasCellChanges ? "bg-[#f5eeff]" : "hover:bg-[#fafbfc]"} ${dragOverKey === row.key ? "[&>td]:shadow-[inset_0_2px_0_#3370ff]" : ""} ${draggingKey === row.key ? "bg-[#f7f8fa] opacity-60" : ""} transition-opacity`}
                   onDragOver={(e) => handleDragOver(e, row.key)}
                   onDrop={(e) => handleDrop(row.key, e)}
                 >
@@ -1403,10 +1434,12 @@ export function ActivityBatchTable({
                   <td
                     className="px-1 py-0.5 cursor-grab active:cursor-grabbing text-center align-top"
                     draggable
-                    onDragStart={() => handleDragStart(row.key)}
+                    onDragStart={(e) => handleDragStart(e, row.key)}
                     onDragEnd={handleDragEnd}
                   >
-                    <GripVertical className="h-3.5 w-3.5 text-[#c9cdd4] mx-auto" />
+                    <span className="flex h-7 items-center justify-center">
+                      <GripVertical className="h-3.5 w-3.5 text-[#c9cdd4]" />
+                    </span>
                   </td>
 
                   {/* 公益 */}

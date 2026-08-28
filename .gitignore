@@ -24,3 +24,6 @@ dist/
 *.sql
 *.sql.gz
 backend/uploads/materials/
+
+# 微信开发者工具本机私有配置
+**/project.private.config.json
