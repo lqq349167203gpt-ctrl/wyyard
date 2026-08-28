@@ -11,6 +11,7 @@ from app.services import (
     position_edit_permission_service,
     position_permission_service,
     session_service,
+    wechat_service,
 )
 from app.utils.request_context import get_client_ip, get_client_source
 
@@ -150,6 +151,40 @@ async def login(data: LoginRequest, request: StarletteRequest):
         "permissions": permissions,
         "edit_permissions": position_edit_permission_service.get_permissions(result.role),
     }
+
+
+class BindWechatRequest(StrictBaseModel):
+    code: str
+
+
+@router.post("/bind-wechat")
+async def bind_wechat(data: BindWechatRequest, request: StarletteRequest):
+    """密码登录成功后静默绑定微信 openid，便于 token 过期后无感续登。
+
+    用当前已登录 JWT 解出的 account_id 与 wx.login 的 openid 建立关联；
+    不重新发 token、不创建登录 session、不记登录日志。
+    """
+    account_id = getattr(request.state, "user_id", "")
+    if not account_id:
+        raise HTTPException(status_code=401, detail="未登录")
+
+    try:
+        wx_result = wechat_service.jscode2session(data.code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    openid = wx_result.get("openid")
+    if not openid:
+        raise HTTPException(status_code=400, detail="微信登录失败：未获取到 openid")
+
+    existing = wechat_service.find_session_by_openid(openid)
+    if existing:
+        if existing.account_id == account_id:
+            return {"bound": True}
+        raise HTTPException(status_code=409, detail="该微信已绑定其他账号")
+
+    wechat_service.create_session(openid, account_id)
+    return {"bound": True}
 
 
 @router.patch("/{account_id}")

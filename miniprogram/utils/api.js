@@ -472,6 +472,10 @@ const customerApi = {
   create: (data) => request('/api/customers', { method: 'POST', data }),
   update: (id, data) => request(`/api/customers/${id}`, { method: 'PATCH', data }),
   delete: (id) => request(`/api/customers/${id}`, { method: 'DELETE' }),
+  accessContact: (id, field, action) => request(`/api/customers/${id}/contact-access`, {
+    method: 'POST',
+    data: { field, action },
+  }),
 }
 
 // 客户标签 API（公共标签 + 当前账号私有标签）
@@ -534,6 +538,7 @@ const authApi = {
   devLogin: (username) => request('/api/wechat/dev-login', { method: 'POST', data: { username }, skipAuth: true }),
   passwordLogin: (username, password) => request('/api/accounts/login', { method: 'POST', data: { username, password }, skipAuth: true }),
   bind: (token, username, password) => request('/api/wechat/bind', { method: 'POST', data: { token, username, password }, skipAuth: true }),
+  bindWechat: (code) => request('/api/accounts/bind-wechat', { method: 'POST', data: { code } }),
 }
 
 // ---- 付费项目 API ----

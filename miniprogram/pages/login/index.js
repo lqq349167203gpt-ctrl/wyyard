@@ -79,11 +79,23 @@ Page({
         throw new Error(data.message || '用户名或密码错误')
       }
       this._saveLogin(data)
+      this._silentBindWechat()
       wx.switchTab({ url: '/pages/customers/index' })
     }).catch((err) => {
       this.setData({ error: err.message || '用户名或密码错误' })
     }).finally(() => {
       this.setData({ loading: false })
+    })
+  },
+
+  _silentBindWechat() {
+    // 静默绑定当前微信 openid：token 过期后可用 openid 无感续登，失败不影响登录
+    wx.login({
+      success: (res) => {
+        if (!res.code) return
+        authApi.bindWechat(res.code).catch(() => {})
+      },
+      fail: () => {},
     })
   },
 
