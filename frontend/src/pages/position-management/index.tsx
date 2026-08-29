@@ -46,7 +46,7 @@ const ALL_PAGES = [
   { key: "followup-records", label: "回访记录" },
   // 付费
   { key: "payment", label: "付费项目" },
-  { key: "payment-deductions", label: "销卡" },
+  { key: "payment-deductions", label: "销卡/退课" },
   { key: "payment-refunds", label: "退费" },
   { key: "expenses", label: "支出项" },
   { key: "debt-records", label: "欠卡记录" },

@@ -25,7 +25,6 @@ import {
   type ActivityTheme, type MemberIdentity,
 } from "@/lib/api"
 import { SpaceDropdown } from "@/components/space-dropdown"
-import { CustomerSearchInput } from "@/components/customer-search-input"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { ActivityBatchTable, type HistoryEntry } from "./activity-batch-table"
 import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
@@ -2404,7 +2403,6 @@ export default function DailyActivitiesPage() {
   const withdrawalCustomers = (selectedWithdrawalCourse?.availableParticipantIds || [])
     .map(id => allCustomers.find(customer => customer.id === id))
     .filter((customer): customer is CustomerLight => Boolean(customer))
-  const withdrawalCustomerName = withdrawalCustomers.find(customer => customer.id === withdrawalCustomerId)?.nickname || ""
 
   const openWithdrawalDialog = () => {
     const firstCourse = withdrawalCourses[0]
@@ -2719,17 +2717,17 @@ export default function DailyActivitiesPage() {
             </div>
             <div className="grid grid-cols-[64px_1fr] items-center gap-3">
               <span className="text-right text-[12px] text-[#4e535a]">参与人</span>
-              <CustomerSearchInput
-                customers={withdrawalCustomers}
-                value={withdrawalCustomerName}
-                onChange={value => {
-                  if (!value) setWithdrawalCustomerId("")
-                }}
-                onSelectItem={customer => setWithdrawalCustomerId(customer.id)}
-                placeholder={withdrawalCourseId ? "搜索并选择参与人" : "请先选择课程"}
+              <SelectDropdown
+                value={withdrawalCustomerId}
+                options={withdrawalCustomers.map(customer => ({
+                  value: customer.id,
+                  label: customer.nickname || customer.name,
+                }))}
+                onChange={value => setWithdrawalCustomerId(value)}
+                placeholder={withdrawalCourseId ? "选择参与人" : "请先选择课程"}
                 disabled={!withdrawalCourseId}
-                className="!h-8 !rounded-[4px] !border-[#dee0e3]"
-                dropdownWidth={280}
+                className="w-full"
+                buttonClassName="!h-8 !rounded-[4px] !border !border-[#dee0e3] !bg-white !text-[12px] !shadow-none"
               />
             </div>
             <div className="ml-[76px] text-[12px] leading-5 text-[#8f959e]">

@@ -531,13 +531,7 @@ export function ProjectDeductionTab() {
   }
 
   return (
-    <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
-      <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
-      {/* 标题栏 */}
-      <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
-        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">销卡</span>
-        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部销卡记录</span>
-      </div>
+    <div className="flex flex-col gap-3 flex-1 min-h-0">
       {/* 表格卡：筛选条 + 数据表 */}
       <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">

@@ -34,7 +34,7 @@ const PAGE_LABELS: Record<string, string> = {
   "statistics": "服务数据",
   "daily-report": "每日报表",
   "payment": "付费项目",
-  "payment-deductions": "销卡",
+  "payment-deductions": "销卡/退课",
   "payment-refunds": "退费",
   "expenses": "支出项",
   "debt-records": "欠卡记录",

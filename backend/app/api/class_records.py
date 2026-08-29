@@ -462,6 +462,43 @@ def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: 
     return updated
 
 
+@router.get("/withdrawals")
+def list_withdrawals():
+    items = class_record_service.list_withdrawals()
+    for item in items:
+        customer = get_customer(item["customer_id"]) if item["customer_id"] else None
+        item["nickname"] = (customer.nickname or customer.name) if customer else ""
+    return items
+
+
+@router.delete("/{record_id}/withdrawals/{customer_id}")
+def cancel_withdrawal(record_id: str, customer_id: str, request: Request):
+    record = class_record_service.get_record(record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="课程记录不存在")
+    customer = get_customer(customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="客户不存在")
+    before_data = record.model_dump(mode="json")
+    try:
+        updated, changed = class_record_service.cancel_withdrawal(record_id, customer_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not updated:
+        raise HTTPException(status_code=404, detail="课程记录不存在")
+    if not changed:
+        raise HTTPException(status_code=404, detail="该客户未办理退课")
+    activity_name = updated.activity_name or updated.course_name or "未命名课程"
+    customer_name = customer.nickname or customer.name or "未命名客户"
+    request.state.operation_log_context = {
+        "content": f"取消退课：{customer_name} · {activity_name}（{updated.date}）",
+        "entity_id": record_id,
+        "before_data": before_data,
+        "after_data": updated.model_dump(mode="json"),
+    }
+    return updated
+
+
 @router.patch("/{record_id}/groups")
 def update_groups(record_id: str, data: dict, request: Request):
     old_record = class_record_service.get_record(record_id)

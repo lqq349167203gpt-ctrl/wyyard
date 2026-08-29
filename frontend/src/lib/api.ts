@@ -888,10 +888,21 @@ export const classRecordApi = {
   delete: (id: string, conversion = false) => request<{ message: string }>(`/api/class-records/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   updateParticipants: (id: string, participantIds: string[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/participants`, { method: "PATCH", body: JSON.stringify({ participant_ids: participantIds }) }),
   withdrawParticipant: (id: string, customerId: string) => request<ClassRecord>(`/api/class-records/${id}/withdrawals`, { method: "POST", body: JSON.stringify({ customer_id: customerId }) }),
+  cancelWithdrawal: (id: string, customerId: string) => request<ClassRecord>(`/api/class-records/${id}/withdrawals/${customerId}`, { method: "DELETE" }),
+  listWithdrawals: () => request<WithdrawalRecord[]>("/api/class-records/withdrawals"),
   updateGroups: (id: string, groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/groups`, { method: "PATCH", body: JSON.stringify({ groups }) }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/class-records/search-customers?q=${encodeURIComponent(keyword)}`),
   calendarCounts: () => request<Record<string, number>>("/api/class-records/calendar-counts"),
   dashboard: (date: string, spaceId?: string) => request<DashboardData>(`/api/class-records/dashboard?date=${date}${spaceId ? `&space_id=${spaceId}` : ""}`),
+}
+
+export interface WithdrawalRecord {
+  record_id: string
+  customer_id: string
+  nickname: string
+  activity_name: string
+  date: string
+  start_time: string
 }
 
 export interface DashboardData {

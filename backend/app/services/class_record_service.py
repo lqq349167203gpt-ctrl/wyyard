@@ -356,6 +356,61 @@ def withdraw_participant(record_id: str, customer_id: str) -> tuple[Optional[Cla
     return record, True
 
 
+def cancel_withdrawal(record_id: str, customer_id: str) -> tuple[Optional[ClassRecord], bool]:
+    """取消退课：从退课名单移除该客户，恢复其在本课程中的扣卡。"""
+    with _record_lock:
+        record = _records.get(record_id)
+        if not record or record.is_deleted:
+            return None, False
+        if customer_id not in set(record.withdrawn_participant_ids or []):
+            return record, False
+
+        old_chargeable = _get_group_member_ids(record)
+        record.withdrawn_participant_ids = [
+            participant_id
+            for participant_id in record.withdrawn_participant_ids
+            if participant_id != customer_id
+        ]
+        new_chargeable = _get_group_member_ids(record)
+        record.updated_at = datetime.now(timezone.utc)
+        _records[record_id] = record
+        _save(record_id)
+        try:
+            _sync_deduction(record, old_chargeable, new_chargeable)
+        except Exception:
+            record.withdrawn_participant_ids = [
+                *record.withdrawn_participant_ids,
+                customer_id,
+            ]
+            record.updated_at = datetime.now(timezone.utc)
+            _save(record_id)
+            _sync_deduction(record, new_chargeable, old_chargeable)
+            raise
+
+    _refresh_affected_identities({customer_id})
+    return record, True
+
+
+def list_withdrawals() -> list[dict]:
+    """返回全部退课记录（每条 = 某课程 × 某已退课客户），按课程日期倒序。"""
+    with _record_lock:
+        records = list(_records.values())
+    result = []
+    for record in records:
+        if record.is_deleted:
+            continue
+        for customer_id in record.withdrawn_participant_ids or []:
+            result.append({
+                "record_id": record.id,
+                "customer_id": customer_id,
+                "activity_name": record.activity_name or record.course_name or "未命名课程",
+                "date": record.date,
+                "start_time": record.start_time or "",
+            })
+    result.sort(key=lambda item: (item["date"], item["start_time"]), reverse=True)
+    return result
+
+
 def _get_card_remaining(customer_id: str) -> int:
     """会员活动剩余次数：无卡=0，不限次=-1，有次数=具体数字"""
     cards = [c for c in membership_card_service.list_cards() if c.customer_id == customer_id]
