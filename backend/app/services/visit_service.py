@@ -337,6 +337,14 @@ def get_visit(visit_id: str) -> Optional[VisitRecord]:
     return r
 
 
+def get_visit_without_metrics(visit_id: str) -> Optional[VisitRecord]:
+    """返回邀约原始记录，供关联服务读取，避免重复计算活动和统计字段。"""
+    record = _visits.get(visit_id)
+    if record and not record.is_deleted:
+        return record
+    return None
+
+
 def get_date_counts(customer_ids: list[str] | None = None, start_date: str | None = None, end_date: str | None = None, space_id: str | None = None) -> dict[str, int]:
     """返回各日期的到场人数统计，不做活动计数。customer_ids 用于权限过滤"""
     allowed = set(customer_ids) if customer_ids else None
@@ -435,19 +443,16 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         print(f"[list_visits] _build_all_activities error: {e}", flush=True)
     print(f"[list_visits] date_filter={date}, records={len(records)}, dates={dates}, activity_keys={len(all_activities)}", flush=True)
 
-    # 批量构建所有客户的 remaining_count
-    all_cards_map: dict[str, list] = {}
-    for c in membership_card_service.list_cards():
-        if not c.is_deleted:
-            all_cards_map.setdefault(c.customer_id, []).append(c)
-
-    # 批量构建每个客户的到店次数、受邀次数和取消次数
+    # 批量构建每个客户的到店天数、到店次数、受邀次数和取消次数
+    all_visit_dates: dict[str, set[str]] = {}
     all_arrived_counts: dict[str, int] = {}
     all_invitation_counts: dict[str, int] = {}
     all_cancelled_counts: dict[str, int] = {}
     for v in _visits.values():
         if v.is_deleted:
             continue
+        if v.arrived:
+            all_visit_dates.setdefault(v.customer_id, set()).add(v.visit_date)
         if v.cancelled:
             all_cancelled_counts[v.customer_id] = all_cancelled_counts.get(v.customer_id, 0) + 1
         else:
@@ -455,8 +460,21 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
             if v.arrived:
                 all_arrived_counts[v.customer_id] = all_arrived_counts.get(v.customer_id, 0) + 1
 
+    customer_ids = {record.customer_id for record in records if record.customer_id}
+    remaining_map = membership_card_service.list_current_card_remaining(customer_ids)
+    from app.services import internal_course_service
+    today = datetime.now().strftime("%Y-%m-%d")
+    active_course_customer_ids = {
+        course.customer_id
+        for course in internal_course_service.list_courses()
+        if course.customer_id in customer_ids
+        and course.effective_date
+        and course.expiry_date
+        and course.effective_date <= today <= course.expiry_date
+    }
+
     for r in records:
-        r.visit_count = count_customer_visits(r.customer_id)
+        r.visit_count = len(all_visit_dates.get(r.customer_id, set()))
         r.arrived_count = all_arrived_counts.get(r.customer_id, 0)
         r.invitation_count = all_invitation_counts.get(r.customer_id, 0)
         r.cancelled_count = all_cancelled_counts.get(r.customer_id, 0)
@@ -467,10 +485,11 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         r.activity_count = all_activity_counts.get(r.customer_id, 0)
         r.welfare_count = all_welfare_counts.get(r.customer_id, 0)
         # 当前有效卡余量不扣除历史欠卡；会员卡耗尽后，内部课程权益仍按不限次展示。
-        current_remaining = membership_card_service.get_current_card_remaining(r.customer_id)
-        from app.services import internal_course_service
-        if current_remaining is None or (
-            current_remaining <= 0 and internal_course_service.has_active_course(r.customer_id)
+        current_remaining = remaining_map.get(r.customer_id, 0)
+        if current_remaining == "unlimited" or (
+            isinstance(current_remaining, int)
+            and current_remaining <= 0
+            and r.customer_id in active_course_customer_ids
         ):
             r.remaining_count = -999
         else:
@@ -513,12 +532,27 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
         all_activity_counts = {}
 
     all_arrived_counts: dict[str, int] = {}
+    all_visit_dates: dict[str, set[str]] = {}
     for visit in _visits.values():
+        if not visit.is_deleted and visit.arrived:
+            all_visit_dates.setdefault(visit.customer_id, set()).add(visit.visit_date)
         if not visit.is_deleted and not visit.cancelled and visit.arrived:
             all_arrived_counts[visit.customer_id] = all_arrived_counts.get(visit.customer_id, 0) + 1
 
-    result = []
+    customer_ids = {record.customer_id for record in records if record.customer_id}
+    remaining_map = membership_card_service.list_current_card_remaining(customer_ids)
+    from app.services import internal_course_service
     today = datetime.now().strftime("%Y-%m-%d")
+    active_course_customer_ids = {
+        course.customer_id
+        for course in internal_course_service.list_courses()
+        if course.customer_id in customer_ids
+        and course.effective_date
+        and course.expiry_date
+        and course.effective_date <= today <= course.expiry_date
+    }
+
+    result = []
     for r in sorted(records, key=lambda r: (r.cancelled, r.sort_order, -r.created_at.timestamp())):
         try:
             # 从客户表获取 member_type 和 nickname
@@ -528,10 +562,11 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 member_type = customer.member_type or ""
 
             # 当前有效卡余量不扣除历史欠卡；会员卡耗尽后，内部课程权益仍按不限次展示。
-            current_remaining = membership_card_service.get_current_card_remaining(r.customer_id, today)
-            from app.services import internal_course_service
-            if current_remaining is None or (
-                current_remaining <= 0 and internal_course_service.has_active_course(r.customer_id)
+            current_remaining = remaining_map.get(r.customer_id, 0)
+            if current_remaining == "unlimited" or (
+                isinstance(current_remaining, int)
+                and current_remaining <= 0
+                and r.customer_id in active_course_customer_ids
             ):
                 remaining_count = -999
             else:
@@ -555,7 +590,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "member_type": member_type,
                 "remaining_count": remaining_count,
                 "activity_count": all_activity_counts.get(r.customer_id, 0),
-                "visit_count": count_customer_visits(r.customer_id),
+                "visit_count": len(all_visit_dates.get(r.customer_id, set())),
                 "created_at": r.created_at.isoformat() if hasattr(r.created_at, 'isoformat') else str(r.created_at),
                 "created_by_id": r.created_by_id,
                 "created_by": r.created_by,
@@ -574,6 +609,13 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
         from app.services import customer_service
         if not customer_service.get_customer(data.customer_id):
             raise ValueError("客户不存在，无法创建到店记录")
+    if data.referrer_handler:
+        from app.services import customer_service
+
+        handler = customer_service.get_by_nickname(data.referrer_handler)
+        if not handler:
+            raise ValueError("邀约人必须选择客户资料中已有的昵称")
+        data = data.model_copy(update={"referrer_handler": handler.nickname})
     _invalidate_counts_cache()
     with _visit_lock:
         # 检查当天是否已到场（customer_id 为空时跳过检查）
@@ -638,6 +680,16 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
 
         if data.get("arrived") is True and (record.cancelled or requested_cancelled is True):
             raise ValueError("已取消的邀约不能确认到店")
+
+        if "referrer_handler" in data:
+            normalized_handler = str(data.get("referrer_handler") or "").strip()
+            if normalized_handler != record.referrer_handler:
+                from app.services import customer_service
+
+                handler = customer_service.get_by_nickname(normalized_handler) if normalized_handler else None
+                if normalized_handler and not handler:
+                    raise ValueError("邀约人必须选择客户资料中已有的昵称")
+                data["referrer_handler"] = handler.nickname if handler else ""
 
         old_arrived = record.arrived
         if requested_cancelled is True:

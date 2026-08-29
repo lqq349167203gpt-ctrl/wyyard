@@ -43,6 +43,8 @@ export interface CustomerSearchInputProps {
   warnLabelIds?: string[]
   /** Show clear X button in single-select mode (default true) */
   showClear?: boolean
+  /** Single-select mode only: allow values to be committed only by selecting an existing customer */
+  selectionOnly?: boolean
   /** Custom dropdown width (default: match input width) */
   dropdownWidth?: number
   /** Border radius override (default: "4px") */
@@ -68,6 +70,7 @@ export function CustomerSearchInput({
   rightLabelMap,
   warnLabelIds,
   showClear = true,
+  selectionOnly = false,
   dropdownWidth,
   rounded = "4px",
 }: CustomerSearchInputProps) {
@@ -269,20 +272,45 @@ export function CustomerSearchInput({
           <Input
             ref={inputRef}
             style={{ borderRadius: radiusValue }}
-            value={typeof value === "string" && value ? value : search}
+            value={selectionOnly && open ? search : (typeof value === "string" && value ? value : search)}
             onChange={(e) => {
               const v = e.target.value
               setSearch(v)
               calcPos()
               setOpen(true)
-              onChange(v)
+              if (!selectionOnly || !v) onChange(v)
             }}
-            onFocus={() => { calcPos(); setOpen(true) }}
-            onBlur={() => { setTimeout(() => onBlur?.(typeof value === "string" ? value : ""), 150) }}
+            onFocus={() => {
+              if (selectionOnly) setSearch(typeof value === "string" ? value : "")
+              calcPos()
+              setOpen(true)
+            }}
+            onBlur={() => {
+              setTimeout(() => {
+                if (selectionOnly) {
+                  const exactMatch = customers.find((customer) => customer.nickname === search.trim())
+                  if (exactMatch) onChange(exactMatch.nickname)
+                  setSearch("")
+                  setOpen(false)
+                  onBlur?.(exactMatch?.nickname || (typeof value === "string" ? value : ""))
+                  return
+                }
+                onBlur?.(typeof value === "string" ? value : "")
+              }, 150)
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 // 搜索框的 Enter 不参与 enterToNext 跳焦
+                e.preventDefault()
                 e.stopPropagation()
+                if (selectionOnly) {
+                  const exactMatch = customers.find((customer) => customer.nickname === search.trim())
+                  if (exactMatch) selectItem(exactMatch)
+                  else {
+                    setSearch("")
+                    setOpen(false)
+                  }
+                }
                 return
               }
               if (e.key === "Backspace" && !search && typeof value === "string" && value) {

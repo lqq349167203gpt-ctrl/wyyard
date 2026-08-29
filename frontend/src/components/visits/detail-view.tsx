@@ -15,7 +15,7 @@ import {
 import { visitApi, customerApi, accountApi, visitHistoryApi, type VisitRecord, type CustomerLight, type CustomerCreate, type VisitHistoryRecord } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
-import { BatchInputTable, type VisitHistoryEntry, type VisitChangedCell } from "./batch-input-table"
+import { BatchInputTable, type VisitHistoryEntry, type VisitChangedCell, type VisitRowSummary } from "./batch-input-table"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 // ===== 三级手风琴组件（天→小时→条目）=====
@@ -119,13 +119,14 @@ interface DetailViewProps {
   hideDateBar?: boolean
   onCustomerClick?: (customerId: string) => void
   onActivityClick?: (customerId: string) => void
-  onDataLoaded?: (visits: VisitRecord[]) => void
+  onDataLoaded?: (visits: VisitRowSummary[]) => void
+  onCountsRefresh?: () => void
   spaceId?: string
   onRequireSpaces?: () => void
   groups?: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, onCountsRefresh, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
   const editPermissions = useEditPermissions()
   const currentRole = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
@@ -143,7 +144,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   }
   const [dateRangeStart, setDateRangeStart] = useState(formatDate(addDays(new Date(), -7)))
   const [visits, setVisits] = useState<VisitRecord[]>([])
-  const [loading, setLoading] = useState(false)
+  const [visitRows, setVisitRows] = useState<VisitRowSummary[]>([])
   const [dailyCounts, setDailyCounts] = useState<Record<string, number>>({})
 
   // 新增表单状态
@@ -356,59 +357,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [customerListReady, setCustomerListReady] = useState(false)
 
   const visibleIds = useMemo(() => new Set(customerList.map(c => c.id)), [customerList])
-  const _addedCustomerIds = useMemo(() => visits.map(v => v.customer_id), [visits])
   const filteredVisits = useMemo(() => {
     if (!customerListReady) return []
-    return visits.filter(v => visibleIds.has(v.customer_id))
-  }, [visits, visibleIds, customerListReady])
-
-  const [visibleCount, setVisibleCount] = useState(40)
-  const sentinelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel || visibleCount >= filteredVisits.length) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisibleCount(prev => Math.min(prev + 40, filteredVisits.length))
-        }
-      },
-      { rootMargin: "200px" }
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [visibleCount, filteredVisits.length])
+    return visitRows.filter(v => visibleIds.has(v.customer_id))
+  }, [visitRows, visibleIds, customerListReady])
 
   const dateRange = Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i)))
-
-  // 加载当日数据
-  const visitsRetryRef = useRef(0)
-  useEffect(() => {
-    if (!customerListReady) return
-    let cancelled = false
-    setLoading(true)
-    const load = () => {
-      visitApi.list(selectedDate, undefined, spaceId)
-        .then((data) => { if (!cancelled) setVisits(data) })
-        .catch(() => {
-          if (!cancelled && visitsRetryRef.current < 2) {
-            visitsRetryRef.current++
-            load()
-          }
-        })
-        .finally(() => { if (!cancelled) setLoading(false) })
-    }
-    load()
-    return () => { cancelled = true }
-  }, [selectedDate, customerListReady, spaceId])
-
-  // 通知父组件已加载的到访数据
-  useEffect(() => {
-    if (onDataLoaded && visits.length >= 0 && customerListReady) {
-      onDataLoaded(visits.filter(visit => !visit.cancelled))
-    }
-  }, [visits, onDataLoaded, customerListReady])
 
   // 加载每日到场人数
   const countsRetryRef = useRef(0)
@@ -425,14 +379,19 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         })
     }
     load()
-    // 重新加载当日数据，确保导出时使用最新数据
-    if (customerListReady) {
-      visitApi.list(selectedDate, undefined, spaceId)
-        .then(setVisits)
-        .catch(() => {})
-    }
   }
-  useEffect(() => { refreshCounts() }, [dateRangeStart, spaceId])
+  useEffect(() => {
+    if (!hideDateBar) refreshCounts()
+  }, [dateRangeStart, spaceId, hideDateBar])
+
+  const handleTableDataLoaded = useCallback((data: VisitRecord[]) => {
+    setVisits(data)
+  }, [])
+
+  const handleTableRowsChange = useCallback((rows: VisitRowSummary[]) => {
+    setVisitRows(rows)
+    onDataLoaded?.(rows.filter((visit) => !visit.cancelled))
+  }, [onDataLoaded])
 
   // 加载客户列表供搜索组件使用
   const customerRetryRef = useRef(0)
@@ -466,7 +425,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       return
     }
     // 检查是否已存在该客户的到场记录
-    if (visits.some(v => v.customer_id === selectedCustomer.id)) {
+    if (visitRows.some(v => v.customer_id === selectedCustomer.id)) {
       setErrorMessage("该客户今日已到场")
       return
     }
@@ -549,7 +508,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
 
   const handleExport = async () => {
     // 直接从 API 读取最新数据，不依赖状态，确保导出内容是最新的
-    const freshVisits = await visitApi.list(selectedDate, undefined, spaceId).catch(() => filteredVisits)
+    const freshVisits = await visitApi.list(selectedDate, undefined, spaceId).catch(() => visits)
     const visibleIdSet = new Set(customerList.map(c => c.id))
     const latestVisits = freshVisits.filter(v => visibleIdSet.has(v.customer_id) && !v.cancelled)
 
@@ -684,7 +643,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           customers={customerList}
           spaceId={spaceId}
           refreshKey={tableRefreshKey}
-          onSaved={() => refreshCounts()}
+          onSaved={() => {
+            if (hideDateBar) onCountsRefresh?.()
+            else refreshCounts()
+          }}
           onSavedCountChange={setTableSavedCount}
           onSavingCountChange={setSavingCount}
           onCustomerClick={onCustomerClick}
@@ -753,6 +715,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               </div>
             </>
           )}
+          onDataLoaded={handleTableDataLoaded}
+          onRowsChange={handleTableRowsChange}
         />
       </div>
 

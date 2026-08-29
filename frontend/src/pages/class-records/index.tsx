@@ -8,7 +8,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { customerApi, visitApi, dailyGroupingApi, spaceApi, type Customer, type VisitRecord, type Space } from "@/lib/api"
+import { customerApi, visitApi, dailyGroupingApi, spaceApi, type CustomerLight, type Space } from "@/lib/api"
+import type { VisitRowSummary } from "@/components/visits/batch-input-table"
 
 import CustomerDetailView from "@/pages/healing-records/components/detail-view"
 import { SpaceDropdown } from "@/components/space-dropdown"
@@ -28,7 +29,7 @@ function getWeekday(d: string): string {
 
 export default function ClassRecordsPage() {
   const navigate = useNavigate()
-  const [allCustomers, setAllCustomers] = useState<Customer[]>([])
+  const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
   const [spaces, setSpaces] = useState<Space[]>([])
   const [spacesLoaded, setSpacesLoaded] = useState(false)
   const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
@@ -62,11 +63,11 @@ export default function ClassRecordsPage() {
   const [noSpacesDialogOpen, setNoSpacesDialogOpen] = useState(false)
 
   const load = () => {
-    customerApi.list()
+    customerApi.light()
       .then((customers) => {
         setAllCustomers(customers)
       })
-      .catch((e) => { console.error("customerApi.list failed:", e) })
+      .catch((e) => { console.error("customerApi.light failed:", e) })
     spaceApi.list()
       .then((data) => {
         setSpaces(data)
@@ -116,20 +117,17 @@ export default function ClassRecordsPage() {
   }, [detailDate, dayVisits, groups])
 
   // 加载日期范围内的到场人数（轻量 API，日期滑块需要）
-  useEffect(() => {
+  const refreshVisitCounts = useCallback(() => {
     if (!spacesLoaded || !selectedSpaceId) {
       setVisitCounts({})
       return
     }
-    let cancelled = false
     const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
     visitApi.counts({ startDate: dateRangeStart, endDate, spaceId: selectedSpaceId })
-      .then((counts) => {
-        if (!cancelled) setVisitCounts(counts)
-      })
+      .then(setVisitCounts)
       .catch(() => {})
-    return () => { cancelled = true }
   }, [dateRangeStart, selectedSpaceId, spacesLoaded])
+  useEffect(() => { refreshVisitCounts() }, [refreshVisitCounts])
 
   const handleSpaceSelect = useCallback((id: string) => {
     startTransition(() => {
@@ -157,7 +155,7 @@ export default function ClassRecordsPage() {
   const isSuperAdmin = currentUser?.role === "超级管理员"
   const hasPerm = (key: string) => isSuperAdmin || userPermissions.includes(key) || userPermissions.includes("class-records")
 
-  const handleVisitsDataLoaded = useCallback((visits: VisitRecord[]) => {
+  const handleVisitsDataLoaded = useCallback((visits: VisitRowSummary[]) => {
     setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
   }, [])
 
@@ -229,6 +227,7 @@ export default function ClassRecordsPage() {
               })
             }}
             onDataLoaded={handleVisitsDataLoaded}
+            onCountsRefresh={refreshVisitCounts}
             spaceId={selectedSpaceId}
             onRequireSpaces={spaces.length === 0 ? () => setNoSpacesDialogOpen(true) : undefined}
             groups={groups}

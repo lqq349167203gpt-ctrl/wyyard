@@ -11,6 +11,12 @@ from app.utils.record_ownership import ensure_creator_for_changed_fields, ensure
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
+VISIT_NOTE_CATEGORY_LABELS = {
+    "visit_need": "来访需求",
+    "customer_info": "客户信息",
+    "follow_up": "跟进点",
+}
+
 
 def _visible_customer_ids(request: Request | None) -> set[str] | None:
     if request is None:
@@ -57,6 +63,44 @@ def _private_need_map(request: Request | None, visit_ids: list[str]) -> dict[str
         creator = note.created_by or "历史记录"
         result.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
     return {visit_id: "\n".join(lines) for visit_id, lines in result.items()}
+
+
+def _visit_note_maps(request: Request | None, visit_ids: list[str]) -> tuple[dict[str, str], dict[str, list[dict]]]:
+    """一次读取可见信息，同时生成兼容需求文本和表格所需的信息列表。"""
+    if request is None or not visit_ids:
+        return {}, {}
+    from app.services import visit_note_service
+
+    account_id = getattr(request.state, "user_id", "") or ""
+    owner_name = getattr(request.state, "user_owner", "") or ""
+    username = getattr(request.state, "user_name", "") or ""
+    notes = visit_note_service.list_visible_notes(
+        visit_ids,
+        account_id,
+        owner_name,
+        username,
+    )
+    need_lines: dict[str, list[str]] = {}
+    note_map: dict[str, list[dict]] = {}
+    for note in notes:
+        can_manage = visit_note_service.can_manage_note(
+            note,
+            account_id,
+            owner_name,
+            username,
+        )
+        item = note.model_dump(mode="json")
+        item["category_label"] = VISIT_NOTE_CATEGORY_LABELS[note.category]
+        item["can_edit"] = can_manage
+        item["can_delete"] = can_manage
+        note_map.setdefault(note.visit_id, []).append(item)
+        if note.category == "visit_need":
+            creator = note.created_by or "历史记录"
+            need_lines.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
+    return (
+        {visit_id: "\n".join(lines) for visit_id, lines in need_lines.items()},
+        note_map,
+    )
 
 
 def _fill_daily_amount(items: list, date: str):
@@ -126,8 +170,12 @@ async def list_visits(
         request,
         visit_service.list_visits(date, customer_id, space_id),
     )
-    need_map = _private_need_map(request, [record.id for record in records])
-    items = [_fill_member_type(r, need_map.get(r.id, "")) for r in records]
+    need_map, note_map = _visit_note_maps(request, [record.id for record in records])
+    items = []
+    for record in records:
+        item = _fill_member_type(record, need_map.get(record.id, ""))
+        item["visit_notes"] = note_map.get(record.id, [])
+        items.append(item)
     role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
     if date and customer_access_service.can_view_transaction_summary(role):
         _fill_daily_amount(items, date)
@@ -319,8 +367,10 @@ async def get_visit(visit_id: str, request: Request):
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
     customer_access_service.require_customer_scope(request, record.customer_id)
-    need_map = _private_need_map(request, [record.id])
-    return _fill_member_type(record, need_map.get(record.id, ""))
+    need_map, note_map = _visit_note_maps(request, [record.id])
+    item = _fill_member_type(record, need_map.get(record.id, ""))
+    item["visit_notes"] = note_map.get(record.id, [])
+    return item
 
 
 @router.post("")

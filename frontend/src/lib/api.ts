@@ -374,6 +374,7 @@ export interface DisabledCustomer {
 
 let _customerLightCache: CustomerLight[] | null = null
 let _customerLightCachedAt = 0
+let _customerLightPromise: Promise<CustomerLight[]> | null = null
 const CUSTOMER_LIGHT_CACHE_TTL = 30_000
 
 export const customerApi = {
@@ -382,11 +383,18 @@ export const customerApi = {
     if (!forceRefresh && _customerLightCache && Date.now() - _customerLightCachedAt < CUSTOMER_LIGHT_CACHE_TTL) {
       return Promise.resolve(_customerLightCache)
     }
-    return request<CustomerLight[]>("/api/customers/light").then(data => {
-      _customerLightCache = data
-      _customerLightCachedAt = Date.now()
-      return data
-    })
+    if (!forceRefresh && _customerLightPromise) return _customerLightPromise
+    const pending = request<CustomerLight[]>("/api/customers/light")
+      .then(data => {
+        _customerLightCache = data
+        _customerLightCachedAt = Date.now()
+        return data
+      })
+      .finally(() => {
+        if (_customerLightPromise === pending) _customerLightPromise = null
+      })
+    _customerLightPromise = pending
+    return pending
   },
   batch: (ids: string[]) => request<CustomerLight[]>("/api/customers/batch", { method: "POST", body: JSON.stringify({ ids }) }),
   listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
@@ -404,7 +412,7 @@ export const customerApi = {
     if (filters?.sort_order) params.set("sort_order", filters.sort_order)
     return request<PaginatedResponse<Customer>>(`/api/customers?${params.toString()}`)
   },
-  clearLightCache: () => { _customerLightCache = null; _customerLightCachedAt = 0 },
+  clearLightCache: () => { _customerLightCache = null; _customerLightCachedAt = 0; _customerLightPromise = null },
 	  get: (id: string) => request<Customer>(`/api/customers/${id}`),
   accessContact: (id: string, field: ContactField, action: "view" | "copy") =>
     request<{ field: ContactField; value: string }>(`/api/customers/${id}/contact-access`, {
@@ -604,7 +612,7 @@ export interface VisitRecord {
   experience: string
   feedback: string
   healing_notes: string
-  visit_notes?: VisitNoteSummary[]
+  visit_notes?: VisitNote[]
   daily_amount: number
   created_at: string
   updated_at: string

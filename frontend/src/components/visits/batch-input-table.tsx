@@ -6,7 +6,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { visitApi, visitNoteApi, membershipCardApi, consumptionRecordsApi, type CustomerLight, type MembershipCard, type VisitNote } from "@/lib/api"
+import { visitApi, visitNoteApi, membershipCardApi, consumptionRecordsApi, type CustomerLight, type MembershipCard, type VisitNote, type VisitRecord } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -57,6 +57,14 @@ export interface VisitHistoryEntry {
   changedCells?: VisitChangedCell[]
 }
 
+export interface VisitRowSummary {
+  id: string
+  customer_id: string
+  nickname: string
+  member_type: string
+  cancelled: boolean
+}
+
 function initRows(): Row[] {
   return Array.from({ length: 1 }, () => emptyRow())
 }
@@ -86,6 +94,8 @@ interface BatchInputTableProps {
   onClosePreview?: () => void
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
+  onDataLoaded?: (visits: VisitRecord[]) => void
+  onRowsChange?: (rows: VisitRowSummary[]) => void
 }
 
 function getRemainingCount(cards: MembershipCard[], customerId: string): number | null {
@@ -113,7 +123,7 @@ const VISIT_CREATOR_ONLY_FIELDS = new Set<keyof Row>([
 
 const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 78, 80, 64, 207, 203, 203, 60, 60, 74, 74, 76, 76] as const
 
-export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview, toolbarLeading, toolbarTrailing }: BatchInputTableProps) {
+export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview, toolbarLeading, toolbarTrailing, onDataLoaded, onRowsChange }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
@@ -380,6 +390,20 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const savedVisitIds = useRef<Record<number, string>>({})
   const saveRowRef = useRef<(row: Row) => Promise<void>>(() => Promise.resolve())
 
+  useEffect(() => {
+    onRowsChange?.(
+      rows
+        .filter((row) => row.visit_id)
+        .map((row) => ({
+          id: row.visit_id,
+          customer_id: row.customer_id,
+          nickname: row.nickname,
+          member_type: row.member_type,
+          cancelled: row.cancelled,
+        })),
+    )
+  }, [rows, onRowsChange])
+
   // 加载会员卡数据
   useEffect(() => {
     membershipCardApi.list().then(cards => { cardsRef.current = cards }).catch(() => {})
@@ -405,6 +429,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         savedVisitIds.current = {}
         setRowStatus({})
         setSavedCount(0)
+        onDataLoaded?.([])
         return
       }
       // visits 已按后端 sort_order 排序，直接使用
@@ -440,18 +465,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       savedVisitIds.current = ids
       setRowStatus(statuses)
       setSavedCount(visits.length)
-      visitNoteApi.listByVisits(visits.map((visit) => visit.id)).then((notes) => {
-        if (cancelled) return
-        const grouped: Record<string, VisitNote[]> = {}
-        for (const note of notes) {
-          if (!grouped[note.visit_id]) grouped[note.visit_id] = []
-          grouped[note.visit_id].push(note)
-        }
-        setNotesByVisitId(grouped)
-      }).catch(() => {})
+      const grouped: Record<string, VisitNote[]> = {}
+      for (const visit of visits) {
+        grouped[visit.id] = visit.visit_notes || []
+      }
+      setNotesByVisitId(grouped)
+      onDataLoaded?.(visits)
     }).catch((err) => { console.error("[BATCH] 加载失败:", err) })
     return () => { cancelled = true }
-  }, [date, spaceId])
+  }, [date, spaceId, refreshKey, onDataLoaded])
 
   const saveRow = useCallback(async (row: Row) => {
     const existingId = savedVisitIds.current[row.key]
@@ -995,17 +1017,12 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       </span>
                     ) : (
                       <CustomerSearchInput rounded="2px"
-                        customers={customers as any[]}
+                        customers={customers}
                         value={row.referrer_handler}
                         disabled={row.cancelled || isViewOnly}
                         showClear={false}
+                        selectionOnly
                         onChange={(v) => updateRow(row.key, "referrer_handler", typeof v === "string" ? v : v[0] || "")}
-                        onSelectItem={(c) => updateRow(row.key, "referrer_handler", c.nickname)}
-                        onBlur={(v) => {
-                          if (v && !customers.some(c => c.nickname === v)) {
-                            updateRow(row.key, "referrer_handler", "")
-                          }
-                        }}
                         placeholder=""
                         className="h-7 [&]:border-[0.5px]"
                       />

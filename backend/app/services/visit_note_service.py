@@ -49,32 +49,39 @@ def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
     """把多人记录汇总回旧字段，兼容统计、详情和导出等既有读取入口。"""
     from app.services import visit_service
 
-    record = visit_service.get_visit(visit_id)
+    record = visit_service.get_visit_without_metrics(visit_id)
     if not record:
         return
     lines = []
     for note in _active_notes(visit_id, category):
         creator = note.created_by or "历史记录"
         lines.append(f"{creator}：{note.content}")
-    visit_service.update_collaboration_summary(
-        visit_id, _legacy_field(category), "\n".join(lines)
-    )
+    field = _legacy_field(category)
+    value = "\n".join(lines)
+    if str(getattr(record, field, "") or "") != value:
+        visit_service.update_collaboration_summary(visit_id, field, value)
 
 
 def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
     """首次读取时，把旧的单字段内容转换成可追溯的独立记录。"""
     from app.services import visit_service
 
+    ids = {value for value in visit_ids if value}
+    if not ids:
+        return
     with _note_lock:
-        for visit_id in {value for value in visit_ids if value}:
-            visit = visit_service.get_visit(visit_id)
+        existing_categories = {
+            (note.visit_id, note.category)
+            for note in _notes.values()
+            if note.visit_id in ids and not note.is_deleted
+        }
+        for visit_id in ids:
+            visit = visit_service.get_visit_without_metrics(visit_id)
             if not visit:
                 continue
             for category in ("visit_need", "customer_info", "follow_up"):
                 typed_category: VisitNoteCategory = category
-                if _active_notes(visit_id, typed_category):
-                    if typed_category == "visit_need" and visit.needs:
-                        _sync_visit_cache(visit_id, typed_category)
+                if (visit_id, typed_category) in existing_categories:
                     continue
                 content = str(getattr(visit, _legacy_field(typed_category), "") or "").strip()
                 if not content:
@@ -91,6 +98,7 @@ def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
                 )
                 _notes[note.id] = note
                 _save(note)
+                existing_categories.add((visit_id, typed_category))
                 if typed_category == "visit_need":
                     _sync_visit_cache(visit_id, typed_category)
 
