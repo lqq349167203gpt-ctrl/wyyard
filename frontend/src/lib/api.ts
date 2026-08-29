@@ -676,7 +676,7 @@ export const visitApi = {
     const str = qs.toString()
     return request<Record<string, number>>(`/api/visits/counts${str ? `?${str}` : ""}`)
   },
-  reorder: (ids: string[], movement?: { movedName: string; fromPosition: number; toPosition: number }) =>
+  reorder: (ids: string[], movement?: { movedName: string; fromPosition: number; toPosition: number; date?: string; spaceId?: string }) =>
     request<{ message: string }>("/api/visits/reorder", {
       method: "POST",
       body: JSON.stringify({
@@ -684,6 +684,8 @@ export const visitApi = {
         moved_name: movement?.movedName,
         from_position: movement?.fromPosition,
         to_position: movement?.toPosition,
+        date: movement?.date,
+        space_id: movement?.spaceId,
       }),
     }),
 }
@@ -3117,6 +3119,7 @@ export interface AnalysisLog {
     筛选条件数?: number
     列表字段?: string[]
     标题?: string
+    分析模式?: string
     时间范围?: string
     条件关系?: string
     筛选条件?: Array<{ 字段: string; 规则: string; 值: unknown }>
@@ -3127,6 +3130,15 @@ export interface AnalysisLog {
     显示字段?: string[]
     排序方式?: string
     结果人数?: number
+    对比组?: Array<string | {
+      名称: string
+      时间范围?: string
+      条件关系?: string
+      条件数?: number
+      筛选条件?: Array<{ 字段: string; 规则: string; 值: unknown }>
+      结果人数?: number
+    }>
+    各组人数合计?: number
   }
   created_at: string
 }

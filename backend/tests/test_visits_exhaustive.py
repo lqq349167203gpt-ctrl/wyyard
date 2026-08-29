@@ -374,6 +374,7 @@ class TestVisitReorderOperationLog:
                 "moved_name": "小林",
                 "from_position": 3,
                 "to_position": 1,
+                "date": "2026-08-20",
             },
         )
         assert response.status_code == 200
@@ -384,7 +385,7 @@ class TestVisitReorderOperationLog:
         ).json()
         log = next(item for item in logs if item["path"] == "/api/visits/reorder")
 
-        assert log["content"] == "调整邀约排序：将“小林”从第3位移动到第1位"
+        assert log["content"] == "调整邀约排序：2026-08-20，将“小林”从第3位移动到第1位"
         assert log["after_data"] is None
 
 
@@ -411,7 +412,7 @@ class TestActivityOrderOperationLog:
         ).json()
         log = next(item for item in logs if item["path"] == "/api/activity-orders")
 
-        assert log["content"] == "调整课表排序：将“读书会”从第1位移动到第2位"
+        assert log["content"] == "调整课表排序：2026-08-20，将“读书会”从第1位移动到第2位"
         assert log["after_data"] is None
 
 

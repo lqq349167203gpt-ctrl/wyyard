@@ -62,8 +62,11 @@ def test_visit_notes_are_collaborative_but_only_creator_can_manage(
         ).json()
         assert create_logs
         assert "新增客户信息" in create_logs[0]["content"]
+        assert "日期：2026-08-23" in create_logs[0]["content"]
         assert "客户最近睡眠不稳定" in create_logs[0]["content"]
         assert create_logs[0]["after_data"]["category_label"] == "客户信息"
+        assert create_logs[0]["after_data"]["visit_date"] == "2026-08-23"
+        assert create_logs[0]["after_data"]["customer_nickname"] == created_customer["nickname"]
 
         other_list = client.get(
             f"/api/visit-notes?visit_id={visit['id']}", headers=other_headers
@@ -141,6 +144,7 @@ def test_visit_notes_are_collaborative_but_only_creator_can_manage(
         ).json()
         assert delete_logs
         assert "删除客户信息" in delete_logs[0]["content"]
+        assert "日期：2026-08-23" in delete_logs[0]["content"]
         assert "已建议观察一周并记录睡眠" in delete_logs[0]["before_data"]["content"]
         remaining = client.get(f"/api/visit-notes?visit_id={visit['id']}").json()
         assert [item["id"] for item in remaining] == [first["id"]]

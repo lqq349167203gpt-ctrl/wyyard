@@ -46,6 +46,21 @@ def _actor(request: Request) -> tuple[str, str, bool]:
     return actor_id, actor_name, is_super_admin
 
 
+def _condition_snapshot(condition) -> dict:
+    value = "跟随统计周期" if condition.inherit_period else condition.value
+    if not condition.inherit_period and condition.operator == "between" and isinstance(value, list):
+        value = " 至 ".join(str(item) for item in value)
+    elif isinstance(value, list):
+        value = "、".join(str(item) for item in value)
+    elif value is None:
+        value = "—"
+    return {
+        "字段": custom_analysis_service.FIELD_LABELS[condition.field],
+        "规则": custom_analysis_service.OPERATOR_LABELS[condition.operator],
+        "值": value,
+    }
+
+
 def _template_snapshot(template) -> dict:
     comparison_groups = template.plan.comparison_groups if template.plan.analysis_mode == "comparison" else []
     return {
@@ -66,8 +81,18 @@ def _template_snapshot(template) -> dict:
     }
 
 
-def _plan_snapshot(plan, result_total: int) -> dict:
+def _plan_snapshot(plan, result: dict) -> dict:
+    result_total = int(result.get("total") or 0)
     if plan.analysis_mode == "comparison":
+        result_groups = {
+            str(group.get("id") or ""): group
+            for group in result.get("comparison_groups", [])
+        }
+        def group_date_range(group) -> str:
+            if not group.date_from and not group.date_to:
+                return "全部时间"
+            return f"{group.date_from or '最早'} 至 {group.date_to or '至今'}"
+
         return {
             "标题": plan.title,
             "分析模式": "方案对比",
@@ -75,28 +100,20 @@ def _plan_snapshot(plan, result_total: int) -> dict:
             "对比组": [
                 {
                     "名称": group.name,
-                    "时间范围": f"{group.date_from or '最早'} 至 {group.date_to or '至今'}",
+                    "时间范围": group_date_range(group),
                     "条件关系": "全部符合" if group.condition_logic == "all" else "任意一条符合",
-                    "条件数": len(group.conditions),
+                    "筛选条件": [_condition_snapshot(condition) for condition in group.conditions],
+                    "结果人数": int(result_groups.get(group.id, {}).get("total") or 0),
                 }
                 for group in plan.comparison_groups
             ],
+            "拆分指标": custom_analysis_service.METRIC_LABELS[plan.card_metric][0],
+            "拆分维度": custom_analysis_service.CARD_DIMENSION_LABELS[plan.card_dimension],
+            "显示字段": [custom_analysis_service.FIELD_LABELS[item] for item in plan.columns],
+            "排序方式": f"{custom_analysis_service.FIELD_LABELS[plan.sort_by]}（{'升序' if plan.sort_order == 'asc' else '降序'}）",
             "各组人数合计": result_total,
         }
-    conditions = []
-    for condition in plan.conditions:
-        value = "跟随统计周期" if condition.inherit_period else condition.value
-        if not condition.inherit_period and condition.operator == "between" and isinstance(value, list):
-            value = " 至 ".join(str(item) for item in value)
-        elif isinstance(value, list):
-            value = "、".join(str(item) for item in value)
-        elif value is None:
-            value = "—"
-        conditions.append({
-            "字段": custom_analysis_service.FIELD_LABELS[condition.field],
-            "规则": custom_analysis_service.OPERATOR_LABELS[condition.operator],
-            "值": value,
-        })
+    conditions = [_condition_snapshot(condition) for condition in plan.conditions]
     date_range = "全部时间"
     if plan.date_from or plan.date_to:
         date_range = f"{plan.date_from or '最早'} 至 {plan.date_to or '至今'}"
@@ -246,14 +263,18 @@ async def execute_query(data: AnalysisExecuteRequest, request: Request):
         allowed_customer_ids,
     )
     if data.page == 1:
-        comparison_count = len(result.get("comparison_groups", []))
+        comparison_groups = result.get("comparison_groups", [])
+        comparison_summary = "、".join(
+            f"{group.get('name') or '未命名组'} {int(group.get('total') or 0)}人"
+            for group in comparison_groups
+        )
         request.state.operation_log_context = {
             "content": (
-                f"执行方案对比“{data.plan.title}”：完成 {comparison_count} 个对比组"
-                if comparison_count
+                f"执行方案对比“{data.plan.title}”：{comparison_summary}"
+                if comparison_groups
                 else f"执行自定义筛选“{data.plan.title}”：筛选出 {result['total']} 人"
             ),
-            "after_data": _plan_snapshot(data.plan, result["total"]),
+            "after_data": _plan_snapshot(data.plan, result),
         }
     else:
         request.state.skip_operation_log = True

@@ -40,16 +40,88 @@ function isTemplateLog(log: AnalysisLog) {
   return log.log_type !== "analysis_executed"
 }
 
+interface ComparisonGroupLog {
+  名称: string
+  时间范围?: string
+  条件关系?: string
+  条件数?: number
+  筛选条件?: Array<{ 字段: string; 规则: string; 值: unknown }>
+  结果人数?: number
+}
+
+function comparisonGroups(log: AnalysisLog): ComparisonGroupLog[] {
+  return (log.config.对比组 ?? []).map(group => (
+    typeof group === "string" ? { 名称: group } : group
+  ))
+}
+
+function isComparisonLog(log: AnalysisLog) {
+  return log.config.分析模式 === "方案对比" || comparisonGroups(log).length > 0
+}
+
 function recordSummary(log: AnalysisLog) {
   if (isTemplateLog(log)) {
     const description = log.config.模板简介
     return description && description !== "—" ? description : "未填写模板简介"
   }
+  if (isComparisonLog(log)) {
+    const names = comparisonGroups(log).map(group => group.名称).filter(Boolean)
+    return `方案对比 · ${names.join(" vs ") || "未命名对比组"}`
+  }
   return `${log.config.时间范围 || "全部时间"} · ${conditionSummary(log)}`
 }
 
 function recordResult(log: AnalysisLog) {
-  return isTemplateLog(log) ? (log.config.模板名称 || "-") : `${log.config.结果人数 ?? 0} 人`
+  if (isTemplateLog(log)) return log.config.模板名称 || "-"
+  if (isComparisonLog(log)) {
+    const groups = comparisonGroups(log)
+    const total = log.config.各组人数合计 ?? groups.reduce((sum, group) => sum + (group.结果人数 ?? 0), 0)
+    return `${groups.length} 组 · 合计 ${total} 人`
+  }
+  return `${log.config.结果人数 ?? 0} 人`
+}
+
+function ComparisonLogDetail({ log }: { log: AnalysisLog }) {
+  const groups = comparisonGroups(log)
+  const total = log.config.各组人数合计 ?? groups.reduce((sum, group) => sum + (group.结果人数 ?? 0), 0)
+  return <>
+    <div className="grid grid-cols-[72px_1fr_72px_1fr] gap-x-3 gap-y-2 border-t border-[#f0f0f0] pt-3">
+      <span className="text-[#8f959e]">分析模式</span><span className="text-[#2b2f36]">方案对比</span>
+      <span className="text-[#8f959e]">对比结果</span><span className="tabular-nums text-[#2b2f36]">{groups.length} 组 · 合计 {total} 人</span>
+    </div>
+    <div>
+      <div className="mb-2 font-medium text-[#2b2f36]">对比组明细</div>
+      <div className="space-y-2">
+        {groups.map((group, groupIndex) => {
+          const conditions = group.筛选条件 ?? []
+          return <div key={`${group.名称}-${groupIndex}`} className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
+            <div className="flex items-center justify-between bg-[#f7f8fa] px-3 py-2">
+              <span className="font-medium text-[#2b2f36]">{group.名称 || `对比组 ${groupIndex + 1}`}</span>
+              <span className="tabular-nums text-[#2b2f36]">{group.结果人数 ?? 0} 人</span>
+            </div>
+            <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 border-t border-[#f0f0f0] px-3 py-2">
+              <span className="text-[#8f959e]">时间范围</span><span className="text-[#4e535a]">{group.时间范围 || "未记录"}</span>
+              <span className="text-[#8f959e]">条件关系</span><span className="text-[#4e535a]">{group.条件关系 || "未记录"}</span>
+            </div>
+            {conditions.length > 0 ? <div className="border-t border-[#f0f0f0]">
+              {conditions.map((item, index) => <div key={`${item.字段}-${index}`} className="grid grid-cols-[110px_90px_1fr] border-b border-[#f0f0f0] px-3 py-2 last:border-b-0">
+                <span className="text-[#2b2f36]">{item.字段}</span><span className="text-[#8f959e]">{item.规则}</span><span className="break-all text-[#4e535a]">{String(item.值 ?? "-")}</span>
+              </div>)}
+            </div> : <div className="border-t border-[#f0f0f0] px-3 py-2 text-[#8f959e]">
+              {group.条件数 ? `已配置 ${group.条件数} 个条件（旧日志未保存条件明细）` : "未设置条件，查询全部客户"}
+            </div>}
+          </div>
+        })}
+      </div>
+    </div>
+    <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 border-t border-[#f0f0f0] pt-3">
+      <span className="text-[#8f959e]">统计指标</span><span>{(log.config.统计指标 ?? []).join("、") || "-"}</span>
+      <span className="text-[#8f959e]">拆分指标</span><span>{log.config.拆分指标 || "符合条件人数"}</span>
+      <span className="text-[#8f959e]">拆分维度</span><span>{log.config.拆分维度 || log.config.拆分方式 || "-"}</span>
+      <span className="text-[#8f959e]">显示字段</span><span>{(log.config.显示字段 ?? []).join("、") || "-"}</span>
+      <span className="text-[#8f959e]">排序方式</span><span>{log.config.排序方式 || "-"}</span>
+    </div>
+  </>
 }
 
 export default function AnalysisLogsPage() {
@@ -154,7 +226,7 @@ export default function AnalysisLogsPage() {
           <DialogHeader className="border-b border-[#f0f0f0] px-6 pb-2 pt-3"><DialogTitle className="text-[14px] font-normal">分析记录详情</DialogTitle></DialogHeader>
           {selectedLog && <div className="space-y-4 overflow-y-auto px-6 py-4 text-[12px]">
             <div className="grid grid-cols-[72px_1fr_72px_1fr] gap-x-3 gap-y-2"><span className="text-[#8f959e]">使用者</span><span className="text-[#2b2f36]">{selectedLog.operator || "-"}</span><span className="text-[#8f959e]">使用端</span><span className="text-[#2b2f36]">{SOURCE_LABELS[selectedLog.source] || selectedLog.source}</span><span className="text-[#8f959e]">记录时间</span><span className="text-[#2b2f36]">{formatDate(selectedLog.created_at)}</span><span className="text-[#8f959e]">记录类型</span><span className="text-[#2b2f36]">{LOG_TYPE_LABELS[selectedLog.log_type]}</span></div>
-            {isTemplateLog(selectedLog) ? <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 border-t border-[#f0f0f0] pt-3"><span className="text-[#8f959e]">模板名称</span><span className="text-[#2b2f36]">{selectedLog.config.模板名称 || "-"}</span><span className="text-[#8f959e]">模板简介</span><span className="break-words text-[#4e535a]">{selectedLog.config.模板简介 && selectedLog.config.模板简介 !== "—" ? selectedLog.config.模板简介 : "未填写"}</span><span className="text-[#8f959e]">可见范围</span><span className="text-[#2b2f36]">{selectedLog.config.可见范围 || "-"}</span><span className="text-[#8f959e]">筛选条件</span><span className="text-[#2b2f36] tabular-nums">{selectedLog.config.筛选条件数 ?? 0} 个</span><span className="text-[#8f959e]">统计指标</span><span className="text-[#4e535a]">{(selectedLog.config.统计指标 ?? []).join("、") || "-"}</span><span className="text-[#8f959e]">拆分指标</span><span className="text-[#4e535a]">{selectedLog.config.拆分指标 || "符合条件人数"}</span><span className="text-[#8f959e]">拆分维度</span><span className="text-[#4e535a]">{selectedLog.config.拆分维度 || selectedLog.config.拆分方式 || "-"}</span><span className="text-[#8f959e]">列表字段</span><span className="text-[#4e535a]">{(selectedLog.config.列表字段 ?? []).join("、") || "-"}</span></div> : <>
+            {isTemplateLog(selectedLog) ? <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 border-t border-[#f0f0f0] pt-3"><span className="text-[#8f959e]">模板名称</span><span className="text-[#2b2f36]">{selectedLog.config.模板名称 || "-"}</span><span className="text-[#8f959e]">模板简介</span><span className="break-words text-[#4e535a]">{selectedLog.config.模板简介 && selectedLog.config.模板简介 !== "—" ? selectedLog.config.模板简介 : "未填写"}</span><span className="text-[#8f959e]">可见范围</span><span className="text-[#2b2f36]">{selectedLog.config.可见范围 || "-"}</span><span className="text-[#8f959e]">筛选条件</span><span className="text-[#2b2f36] tabular-nums">{selectedLog.config.筛选条件数 ?? 0} 个</span><span className="text-[#8f959e]">统计指标</span><span className="text-[#4e535a]">{(selectedLog.config.统计指标 ?? []).join("、") || "-"}</span><span className="text-[#8f959e]">拆分指标</span><span className="text-[#4e535a]">{selectedLog.config.拆分指标 || "符合条件人数"}</span><span className="text-[#8f959e]">拆分维度</span><span className="text-[#4e535a]">{selectedLog.config.拆分维度 || selectedLog.config.拆分方式 || "-"}</span><span className="text-[#8f959e]">列表字段</span><span className="text-[#4e535a]">{(selectedLog.config.列表字段 ?? []).join("、") || "-"}</span></div> : isComparisonLog(selectedLog) ? <ComparisonLogDetail log={selectedLog} /> : <>
               <div className="border-t border-[#f0f0f0] pt-3"><div className="mb-2 font-medium text-[#2b2f36]">筛选范围</div><div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2"><span className="text-[#8f959e]">时间范围</span><span>{selectedLog.config.时间范围 || "全部时间"}</span><span className="text-[#8f959e]">条件关系</span><span>{selectedLog.config.条件关系 || "全部符合"}</span><span className="text-[#8f959e]">结果人数</span><span className="tabular-nums">{selectedLog.config.结果人数 ?? 0} 人</span></div></div>
               <div><div className="mb-2 font-medium text-[#2b2f36]">筛选条件</div>{(selectedLog.config.筛选条件 ?? []).length ? <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">{(selectedLog.config.筛选条件 ?? []).map((item, index) => <div key={`${item.字段}-${index}`} className="grid grid-cols-[110px_90px_1fr] border-b border-[#f0f0f0] px-3 py-2 last:border-b-0"><span className="text-[#2b2f36]">{item.字段}</span><span className="text-[#8f959e]">{item.规则}</span><span className="break-all text-[#4e535a]">{String(item.值 ?? "-")}</span></div>)}</div> : <div className="text-[#8f959e]">未设置条件，查询全部客户</div>}</div>
               <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 border-t border-[#f0f0f0] pt-3"><span className="text-[#8f959e]">统计指标</span><span>{(selectedLog.config.统计指标 ?? []).join("、") || "-"}</span><span className="text-[#8f959e]">拆分指标</span><span>{selectedLog.config.拆分指标 || "符合条件人数"}</span><span className="text-[#8f959e]">拆分维度</span><span>{selectedLog.config.拆分维度 || selectedLog.config.拆分方式 || "-"}</span><span className="text-[#8f959e]">显示字段</span><span>{(selectedLog.config.显示字段 ?? []).join("、") || "-"}</span><span className="text-[#8f959e]">排序方式</span><span>{selectedLog.config.排序方式 || "-"}</span></div>

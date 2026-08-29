@@ -116,7 +116,7 @@ const FIELD_CN: Record<string, string> = {
   closer_name: "成交人", closer_id: "成交人", closers: "成交人",
   price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
   sort_order: "排序", is_public_welfare: "公益", category: "分类",
-  arrived: "到店", arrival_time: "到店时间", experience: "客户反馈", feedback: "客户信息",
+  arrived: "到店", cancelled: "邀约状态", arrival_time: "到店时间", experience: "客户反馈", feedback: "客户信息",
   needs: "来访需求",
   visit_date: "到访日期", visit_time: "预计时间", visit_count: "到店次数",
   referrer: "引流人", referral_date: "引流日期", traffic_source: "流量来源", paid_content: "付费内容",
@@ -144,6 +144,7 @@ const FIELD_CN: Record<string, string> = {
   effective_date: "生效日期", deal_date: "成交日期", themes: "主题",
   duration_type: "时长类型", duration_value: "时长", expiry_date: "到期日期",
   fee: "费用金额", refund_amount: "退费金额", project_name: "项目名称", payment_method: "支付方式",
+  diagnosis_duration: "诊断时长", quantity: "数量",
   expense_time: "支出时间", purchase_content: "支出项", platform: "平台", notes: "备注",
   requires_customer: "需要用户昵称", requires_platform: "需要平台",
   cost_category: "成本分类", expense_type: "支出类型", month: "月份",
@@ -624,6 +625,11 @@ export default function OperationLogsPage() {
 
   const formatCellValue = (val: unknown, key?: string): string => {
     if (val === null || val === undefined) return ""
+    if (key === "diagnosis_duration") {
+      const halfHours = Number(val)
+      return Number.isFinite(halfHours) ? `${halfHours * 0.5}小时` : String(val)
+    }
+    if (key === "cancelled" && typeof val === "boolean") return val ? "已取消" : "正常邀约"
     if (typeof val === "boolean") return val ? "是" : "否"
     if (Array.isArray(val)) {
       if (val.length === 0) return "（空）"

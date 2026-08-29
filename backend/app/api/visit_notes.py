@@ -56,21 +56,29 @@ def _response(note, request: Request) -> dict:
     return result
 
 
+def _visit_context(visit_id: str) -> tuple[str, str]:
+    """返回日志所需的客户昵称和邀约日期。"""
+    visit = visit_service.get_visit(visit_id)
+    if not visit:
+        return "未知客户", ""
+    from app.services import customer_service
+
+    customer = customer_service.get_customer(visit.customer_id)
+    return (customer.nickname if customer else "未知客户", visit.visit_date or "")
+
+
 def _snapshot(note) -> dict:
     data = note.model_dump(mode="json")
     data.pop("category", None)
     data["category_label"] = CATEGORY_LABELS[note.category]
+    customer, visit_date = _visit_context(note.visit_id)
+    data["customer_nickname"] = customer
+    data["visit_date"] = visit_date
     return data
 
 
 def _subject(visit_id: str) -> str:
-    visit = visit_service.get_visit(visit_id)
-    if not visit:
-        return "未知客户"
-    from app.services import customer_service
-
-    customer = customer_service.get_customer(visit.customer_id)
-    return customer.nickname if customer else "未知客户"
+    return _visit_context(visit_id)[0]
 
 
 def _require_visit_customer_scope(request: Request, visit_id: str, *, action: str = "查看"):
@@ -83,10 +91,11 @@ def _require_visit_customer_scope(request: Request, visit_id: str, *, action: st
 
 def _log_content(action: str, note, previous: str | None = None) -> str:
     category = CATEGORY_LABELS[note.category]
-    customer = _subject(note.visit_id)
+    customer, visit_date = _visit_context(note.visit_id)
+    date_part = f"日期：{visit_date}｜" if visit_date else ""
     if previous is not None:
-        return f"{action}{category}：客户：{customer}｜内容：{previous} → {note.content}"
-    return f"{action}{category}：客户：{customer}｜内容：{note.content}"
+        return f"{action}{category}：{date_part}客户：{customer}｜内容：{previous} → {note.content}"
+    return f"{action}{category}：{date_part}客户：{customer}｜内容：{note.content}"
 
 
 @router.get("")

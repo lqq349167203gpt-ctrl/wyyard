@@ -734,6 +734,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           movedName: subject,
           fromPosition: sourceIndex + 1,
           toPosition: targetIndex + 1,
+          date,
+          spaceId: spaceId || "",
         }).catch(e => console.error("保存排序失败:", e))
       }
       return next

@@ -463,6 +463,75 @@ def test_execute_endpoint_returns_matching_customer(client, sample_customer):
         client.delete(f"/api/customers/{created['id']}")
 
 
+def test_comparison_execute_log_keeps_each_group_conditions_and_result(client, sample_customer):
+    created = client.post("/api/customers", json=sample_customer).json()
+    try:
+        response = client.post("/api/custom-analysis/execute", json={
+            "plan": {
+                "title": "客户方案对比日志",
+                "analysis_mode": "comparison",
+                "metrics": ["total_customers"],
+                "card_metric": "total_customers",
+                "card_dimension": "none",
+                "columns": ["nickname"],
+                "sort_by": "nickname",
+                "sort_order": "asc",
+                "comparison_groups": [
+                    {
+                        "id": "group-a",
+                        "name": "符合昵称",
+                        "date_from": "2026-08-01",
+                        "date_to": "2026-08-31",
+                        "condition_logic": "all",
+                        "conditions": [
+                            {"field": "nickname", "operator": "eq", "value": created["nickname"]},
+                        ],
+                    },
+                    {
+                        "id": "group-b",
+                        "name": "不符合昵称",
+                        "condition_logic": "any",
+                        "conditions": [
+                            {"field": "nickname", "operator": "eq", "value": "不存在的客户"},
+                        ],
+                    },
+                ],
+            },
+            "page": 1,
+            "page_size": 20,
+        })
+        assert response.status_code == 200, response.text
+
+        logs_response = client.get("/api/analysis-logs?record_type=analysis")
+        assert logs_response.status_code == 200
+        log = next(
+            item for item in logs_response.json()["items"]
+            if item["config"].get("标题") == "客户方案对比日志"
+        )
+        assert "符合昵称 1人" in log["content"]
+        assert "不符合昵称 0人" in log["content"]
+        assert log["config"]["分析模式"] == "方案对比"
+        assert log["config"]["各组人数合计"] == 1
+        assert log["config"]["对比组"] == [
+            {
+                "名称": "符合昵称",
+                "时间范围": "2026-08-01 至 2026-08-31",
+                "条件关系": "全部符合",
+                "筛选条件": [{"字段": "昵称", "规则": "等于", "值": created["nickname"]}],
+                "结果人数": 1,
+            },
+            {
+                "名称": "不符合昵称",
+                "时间范围": "全部时间",
+                "条件关系": "任意一条符合",
+                "筛选条件": [{"字段": "昵称", "规则": "等于", "值": "不存在的客户"}],
+                "结果人数": 0,
+            },
+        ]
+    finally:
+        client.delete(f"/api/customers/{created['id']}")
+
+
 def test_analysis_template_crud(client):
     payload = {
         "name": "本月引流测试模板",

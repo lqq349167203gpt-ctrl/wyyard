@@ -248,7 +248,7 @@ FIELD_NAMES = {
     "cost_category": "成本分类", "expense_type": "支出类型", "month": "分成月份",
     "person_name": "人员", "benefit_date": "福利日期",
     "sort_order": "排序", "is_public_welfare": "公益",
-    "arrived": "到店状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "客户信息",
+    "arrived": "到店状态", "cancelled": "邀约状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "客户信息",
     "needs": "来访需求", "visit_date": "到访日期",
     "visit_time": "预计时间", "customer_id": "客户",
     "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "角色", "permissions": "权限",
@@ -292,6 +292,7 @@ FIELD_NAMES = {
     "system_prompt": "系统提示词", "temperature": "温度", "max_tokens": "最大Token数",
     "project_name": "项目名称",
     "fee": "费用", "refund_amount": "退费金额", "payment_method": "支付方式",
+    "diagnosis_duration": "诊断时长", "quantity": "数量",
     "duration_type": "时长类型", "duration_value": "时长值",
     "record_date": "上课日期", "teacher": "课程老师", "result": "课程结果",
     "validity_value": "有效期", "validity_unit": "有效期单位",
@@ -577,6 +578,11 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
 def _format_value(val, field_name: str = "") -> str:
     if val is None or val == "" or val == []:
         return ""
+    if field_name == "diagnosis_duration":
+        try:
+            return f"{float(val) * 0.5:g}小时"
+        except (TypeError, ValueError):
+            return str(val)[:30]
     if isinstance(val, bool):
         return "是" if val else "否"
     if isinstance(val, str) and val in VALUE_LABELS:
@@ -703,6 +709,9 @@ def _build_set_summary(after: dict) -> str:
             if changes:
                 parts.extend(changes)
             continue
+        if key == "cancelled":
+            parts.append(f"邀约状态设为{'已取消' if new_val else '正常邀约'}")
+            continue
         field_name = FIELD_NAMES.get(key, key)
         if isinstance(new_val, dict) and any(isinstance(v, dict) for v in new_val.values()):
             # 活动权限格式：{member_type: {activity_type: {view, participate}}}
@@ -741,6 +750,11 @@ def build_change_description(before: dict, after: dict) -> str:
             continue
         if key == "edit_permissions" and isinstance(new_val, dict):
             changes.extend(_format_edit_permission_changes(old_val, new_val))
+            continue
+        if key == "cancelled":
+            old_status = "已取消" if old_val else "正常邀约"
+            new_status = "已取消" if new_val else "正常邀约"
+            changes.append(f"邀约状态({old_status}→{new_status})")
             continue
         if key == "groups" and isinstance(old_val, list) and isinstance(new_val, list):
             diff = _diff_groups(old_val, new_val)
@@ -832,7 +846,12 @@ def build_change_description(before: dict, after: dict) -> str:
 def _build_create_summary(body: dict) -> str:
     """为 POST 请求生成简洁描述"""
     parts = []
-    for key in ["member_type", "card_type", "course_type", "purchase_count", "amount", "price", "closer_name", "role", "username", "referrer", "positions"]:
+    for key in [
+        "member_type", "card_type", "course_type", "purchase_count",
+        "diagnosis_duration", "quantity", "amount", "price", "closer_name",
+        "deal_date", "effective_date", "record_date",
+        "role", "username", "referrer", "positions",
+    ]:
         val = body.get(key)
         if val is not None and val != "" and val != []:
             label = FIELD_NAMES.get(key, key)
@@ -887,10 +906,12 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     if reorder_path in ("/api/visits/reorder", "/api/activity-orders"):
         section = "邀约" if reorder_path == "/api/visits/reorder" else "课表"
         moved_name = str(body.get("moved_name") or "").strip() if isinstance(body, dict) else ""
+        record_date = str(body.get("date") or body.get("visit_date") or "").strip() if isinstance(body, dict) else ""
         from_position = body.get("from_position") if isinstance(body, dict) else None
         to_position = body.get("to_position") if isinstance(body, dict) else None
         if moved_name and from_position is not None and to_position is not None:
-            return f"调整{section}排序：将“{moved_name}”从第{from_position}位移动到第{to_position}位"
+            date_prefix = f"{record_date}，" if record_date else ""
+            return f"调整{section}排序：{date_prefix}将“{moved_name}”从第{from_position}位移动到第{to_position}位"
         item_ids = body.get("ids", []) if isinstance(body, dict) else []
         item_order = body.get("order", []) if isinstance(body, dict) else []
         count = len(item_ids or item_order)
@@ -1147,6 +1168,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         nickname = (body.get("nickname") or "").strip()
         fee = body.get("fee")
         remaining = body.get("remaining_count")
+        record_date = body.get("deal_date") or body.get("effective_date") or ""
         parts = []
         if nickname:
             parts.append(nickname)
@@ -1157,6 +1179,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             detail_parts.append(f"¥{fee}")
         if remaining is not None:
             detail_parts.append(f"{remaining}次")
+        if record_date:
+            detail_parts.append(f"成交日期：{record_date}")
         if detail_parts:
             return f"{' · '.join(parts)}（{'，'.join(detail_parts)}）" if parts else f"新增其他项目（{'，'.join(detail_parts)}）"
         return f"新增其他项目：{' · '.join(parts)}" if parts else "新增其他项目"
