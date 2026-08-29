@@ -248,6 +248,40 @@ const compactLogText = (value: unknown, limit = 80) => {
   return text.length <= limit ? text : `${text.slice(0, limit)}…`
 }
 
+const translateLegacyLogContent = (content: string) => content
+  .replace(/diagnosis_duration设为(-?\d+(?:\.\d+)?)/g, (_, value: string) => `诊断时长设为${Number(value) * 0.5}小时`)
+  .replace(/diagnosis_duration\((-?\d+(?:\.\d+)?)→(-?\d+(?:\.\d+)?)\)/g, (_, oldValue: string, newValue: string) => `诊断时长(${Number(oldValue) * 0.5}小时→${Number(newValue) * 0.5}小时)`)
+  .replaceAll("diagnosis_duration", "诊断时长")
+  .replaceAll("quantity", "数量")
+  .replaceAll("cancelled(否→是)", "邀约状态(正常邀约→已取消)")
+  .replaceAll("cancelled(是→否)", "邀约状态(已取消→正常邀约)")
+  .replaceAll("cancelled设为是", "邀约状态设为已取消")
+  .replaceAll("cancelled设为否", "邀约状态设为正常邀约")
+  .replaceAll("cancelled", "邀约状态")
+
+const PAID_PROJECT_PATHS = [
+  "/api/membership-cards",
+  "/api/group-cases",
+  "/api/emotional-releases",
+  "/api/oh-card-readings",
+  "/api/energy-knots",
+  "/api/internal-courses",
+  "/api/tea-seat-fees",
+  "/api/offline-courses",
+  "/api/other-projects",
+]
+
+const getPaidProjectLogDisplayContent = (log: OperationLog) => {
+  if (log.method !== "POST" || !PAID_PROJECT_PATHS.some(path => log.path.startsWith(path))) return ""
+  const content = translateLegacyLogContent(log.content)
+  if (/成交日期|生效日期|记录日期/.test(content)) return content
+  const snapshot = log.after_data || {}
+  const date = snapshot.deal_date || snapshot.effective_date || snapshot.record_date
+  if (!date) return content
+  const label = snapshot.deal_date ? "成交日期" : snapshot.effective_date ? "生效日期" : "记录日期"
+  return `${content}（${label}：${date}）`
+}
+
 const formatLogAmount = (value: unknown) => {
   const amount = Number(value)
   return Number.isFinite(amount) ? `¥${amount.toLocaleString()}` : ""
@@ -360,7 +394,7 @@ const getPermissionLogDisplayContent = (log: OperationLog) => {
 
 const getLogDisplayContent = (log: OperationLog) => {
   if (isReorderLog(log)) {
-    if (log.content) return log.content
+    if (log.content) return translateLegacyLogContent(log.content)
     return log.path.replace(/\/+$/, "") === "/api/activity-orders"
       ? "调整课表排序"
       : "调整邀约排序"
@@ -369,7 +403,9 @@ const getLogDisplayContent = (log: OperationLog) => {
   if (financialContent) return financialContent
   const permissionContent = getPermissionLogDisplayContent(log)
   if (permissionContent) return permissionContent
-  if (!log.path.startsWith("/api/communication-records")) return log.content
+  const paidProjectContent = getPaidProjectLogDisplayContent(log)
+  if (paidProjectContent) return paidProjectContent
+  if (!log.path.startsWith("/api/communication-records")) return translateLegacyLogContent(log.content)
 
   const snapshot = log.method === "DELETE"
     ? log.before_data
@@ -393,7 +429,7 @@ const getLogDisplayContent = (log: OperationLog) => {
   if (log.method === "DELETE" && !log.before_data) {
     return "删除沟通记录（历史记录未保存删除前内容）"
   }
-  return log.content
+  return translateLegacyLogContent(log.content)
 }
 
 export default function OperationLogsPage() {
