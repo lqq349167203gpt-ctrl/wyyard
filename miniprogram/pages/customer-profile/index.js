@@ -1,4 +1,5 @@
 const { customerApi, customerTagApi, communicationRecordApi } = require('../../utils/api')
+const { isAreaViewOnly } = require('../../utils/record-ownership')
 
 function formatMoney(value) {
   return '¥' + String(Math.round(value || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
@@ -104,10 +105,12 @@ Page({
       { key: 'offline_course', label: '课程', count: 0 },
       { key: 'payment', label: '交易', count: 0 },
     ],
+    isViewOnly: false,
   },
 
   onLoad(options) {
     if (!getApp().checkLogin()) return
+    this.setData({ isViewOnly: isAreaViewOnly('customers') })
     if (options.id) {
       this.setData({ customerId: options.id })
       this.loadData(options.id)

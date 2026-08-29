@@ -125,7 +125,7 @@ Page({
     wx.setStorageSync('auth_token', data.token)
     wx.setStorageSync('currentUser', data.account)
     wx.setStorageSync('userPermissions', data.permissions)
-    wx.setStorageSync('userEditPermissions', data.edit_permissions || { visits: 'own', activities: 'own' })
+    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own' })
 
     // 保存/清除账号
     if (this.data.saveAccount) {
@@ -139,7 +139,7 @@ Page({
       app.globalData.token = data.token
       app.globalData.currentUser = data.account
       app.globalData.permissions = data.permissions || []
-      app.globalData.editPermissions = data.edit_permissions || { visits: 'own', activities: 'own' }
+      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own' }
       if (app.scheduleUsageTracking) app.scheduleUsageTracking()
       else if (app.startUsageTracking) app.startUsageTracking()
     }

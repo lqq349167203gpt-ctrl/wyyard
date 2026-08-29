@@ -835,6 +835,7 @@ export interface ClassRecord {
   teacher_ids: string[]
   participant_ids: string[]
   withdrawn_participant_ids: string[]
+  withdrawal_records: CourseWithdrawalEntry[]
   materials: Material[]
   groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]
   is_public_welfare: boolean
@@ -889,20 +890,52 @@ export const classRecordApi = {
   updateParticipants: (id: string, participantIds: string[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/participants`, { method: "PATCH", body: JSON.stringify({ participant_ids: participantIds }) }),
   withdrawParticipant: (id: string, customerId: string) => request<ClassRecord>(`/api/class-records/${id}/withdrawals`, { method: "POST", body: JSON.stringify({ customer_id: customerId }) }),
   cancelWithdrawal: (id: string, customerId: string) => request<ClassRecord>(`/api/class-records/${id}/withdrawals/${customerId}`, { method: "DELETE" }),
-  listWithdrawals: () => request<WithdrawalRecord[]>("/api/class-records/withdrawals"),
+  listWithdrawalsPaginated: (page: number, pageSize: number, params?: { nickname?: string; status?: string; start_date?: string; end_date?: string }) => {
+    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params?.nickname) query.set("nickname", params.nickname)
+    if (params?.status && params.status !== "all") query.set("status", params.status)
+    if (params?.start_date) query.set("start_date", params.start_date)
+    if (params?.end_date) query.set("end_date", params.end_date)
+    return request<PaginatedResponse<WithdrawalRecord>>(`/api/class-records/withdrawals?${query.toString()}`)
+  },
   updateGroups: (id: string, groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/groups`, { method: "PATCH", body: JSON.stringify({ groups }) }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/class-records/search-customers?q=${encodeURIComponent(keyword)}`),
   calendarCounts: () => request<Record<string, number>>("/api/class-records/calendar-counts"),
   dashboard: (date: string, spaceId?: string) => request<DashboardData>(`/api/class-records/dashboard?date=${date}${spaceId ? `&space_id=${spaceId}` : ""}`),
 }
 
+export interface CourseWithdrawalEntry {
+  id: string
+  customer_id: string
+  restored_count: number
+  status: "active" | "cancelled"
+  withdrawn_at: string
+  withdrawn_by_id: string
+  withdrawn_by: string
+  cancelled_at?: string | null
+  cancelled_by_id: string
+  cancelled_by: string
+}
+
 export interface WithdrawalRecord {
+  id: string
   record_id: string
   customer_id: string
   nickname: string
   activity_name: string
-  date: string
+  course_type: string
+  course_date: string
   start_time: string
+  end_time: string
+  space_name: string
+  room_name: string
+  restored_count: number
+  status: "active" | "cancelled"
+  withdrawn_at: string
+  withdrawn_by: string
+  cancelled_at?: string | null
+  cancelled_by: string
+  course_deleted: boolean
 }
 
 export interface DashboardData {
@@ -2466,7 +2499,7 @@ export const accountApi = {
 }
 
 // Position Permissions
-export type PositionEditScope = "own" | "all"
+export type PositionEditScope = "view" | "own" | "all"
 export type ContactField = "phone" | "wechat"
 export type ContactAction = "view" | "copy" | "edit"
 export interface ContactActionPermissions {
@@ -2504,6 +2537,7 @@ export interface CustomerAccessPermissions {
   transaction_access: TransactionAccess
 }
 export interface PositionEditPermissions {
+  customers: "view" | "all"
   visits: PositionEditScope
   activities: PositionEditScope
   contacts: ContactPermissions

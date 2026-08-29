@@ -4,7 +4,7 @@
   <view class="hero">
     <view class="hero-top">
       <text class="hero-name">{{customer.nickname || '-'}}</text>
-      <view class="hero-edit" bindtap="onEditTap">编辑</view>
+      <view class="hero-edit" wx:if="{{!isViewOnly}}" bindtap="onEditTap">编辑</view>
     </view>
     <view class="hero-sub" wx:if="{{customer.name || genderAgeText}}">
       <text wx:if="{{customer.name}}">{{customer.name}}</text>
@@ -178,7 +178,7 @@
 
     <!-- 沟通记录 -->
     <view wx:if="{{activeTab === 'communication'}}">
-      <view class="comm-compose">
+      <view class="comm-compose" wx:if="{{!isViewOnly}}">
         <input
           class="comm-input"
           value="{{commContent}}"
@@ -203,7 +203,7 @@
             <text class="rec-date">{{item._dateStr}}</text>
             <view class="comm-meta">
               <text class="comm-creator">{{item.creator || ''}}</text>
-              <text wx:if="{{item.can_delete}}" class="comm-delete" data-id="{{item.id}}" catchtap="onDeleteCommunication">删除</text>
+              <text wx:if="{{item.can_delete && !isViewOnly}}" class="comm-delete" data-id="{{item.id}}" catchtap="onDeleteCommunication">删除</text>
             </view>
           </view>
           <view class="rec-body">{{item.content}}</view>

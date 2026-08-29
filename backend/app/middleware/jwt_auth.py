@@ -43,6 +43,37 @@ ADMIN_PATHS = (
     "/api/uploads",
 )
 
+READ_ONLY_AREA_LABELS = {
+    "customers": "客户资料",
+    "visits": "邀约",
+    "activities": "课表",
+}
+
+READ_ONLY_AREA_PATHS = {
+    "customers": (
+        "/api/customers",
+        "/api/healing-records",
+        "/api/communication-records",
+        "/api/customer-tags/customers",
+    ),
+    "visits": (
+        "/api/visits",
+        "/api/visit-notes",
+        "/api/daily-groupings",
+        "/api/visit-history",
+    ),
+    "activities": (
+        "/api/class-records",
+        "/api/group-case-sessions",
+        "/api/emotional-release-sessions",
+        "/api/energy-knot-sessions",
+        "/api/internal-course-sessions",
+        "/api/activity-orders",
+        "/api/activity-history",
+        "/api/activity-themes",
+    ),
+}
+
 # 允许系统 API Key 访问的路径（仅限系统级操作）
 SYSTEM_KEY_PATHS = (
     "/api/system-logs",
@@ -200,6 +231,18 @@ def _client_ip(scope) -> str:
     return client[0] if client else ""
 
 
+def _get_read_only_area(path: str, method: str) -> str:
+    """返回当前写请求所属的仅浏览业务域；读式 POST 明确放行。"""
+    if method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return ""
+    if path == "/api/customers/batch" or path.endswith("/contact-access"):
+        return ""
+    for area, prefixes in READ_ONLY_AREA_PATHS.items():
+        if any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes):
+            return area
+    return ""
+
+
 def _record_page_view(scope, account, source: str):
     if _parse_header(scope, b"x-page-view") != "1":
         return
@@ -343,6 +386,16 @@ class AuthMiddleware:
                     for admin_path in ADMIN_PATHS:
                         if (path == admin_path or path.startswith(admin_path + "/")) and account.role != "超级管理员":
                             response = _json_response(403, "权限不足")
+                            await response(scope, receive, send)
+                            return
+
+                    read_only_area = _get_read_only_area(path, method)
+                    if read_only_area and account.role != "超级管理员":
+                        from app.services import position_edit_permission_service
+                        edit_permissions = position_edit_permission_service.get_permissions(account.role)
+                        if edit_permissions[read_only_area] == "view":
+                            label = READ_ONLY_AREA_LABELS[read_only_area]
+                            response = _json_response(403, f"当前账号对{label}仅有浏览权限")
                             await response(scope, receive, send)
                             return
 

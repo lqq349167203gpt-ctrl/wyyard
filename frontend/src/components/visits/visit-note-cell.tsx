@@ -37,6 +37,11 @@ function authorKey(note: VisitNote): string {
   return note.created_by_id || note.created_by || note.id
 }
 
+function authorName(note: VisitNote): string {
+  const name = (note.created_by || "").trim()
+  return name && name !== "历史记录" ? name : "未知"
+}
+
 export function VisitNoteCell({ visitId, nickname, title, category, notes, disabled, expanded = false, privateToCreator = false, onNotesChange }: VisitNoteCellProps) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState("")
@@ -134,11 +139,11 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
       <span className={`min-w-0 flex-1 ${expanded ? "flex flex-col gap-1" : "truncate"} ${latest ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}>
         {latest ? expanded ? categoryNotes.map((note) => (
           <span key={note.id} className="whitespace-pre-wrap break-words leading-5">
-            {privateToCreator ? note.content : <><span>{note.created_by || "历史记录"}</span><span>：{note.content}</span></>}
+            {privateToCreator ? note.content : <><span>{authorName(note)}</span><span>：{note.content}</span></>}
           </span>
         )) : (
           privateToCreator ? compactText(latest.content) : <>
-            <span>{latest.created_by || "历史记录"}</span>
+            <span>{authorName(latest)}</span>
             <span>：{compactText(latest.content)}</span>
           </>
         ) : ""}
@@ -163,7 +168,7 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
             <div className="mb-1.5 text-[11px] text-[#8f959e]">{title} · {categoryNotes.length} 人已填写 · 点击编辑</div>
             {categoryNotes.map((note) => (
               <div key={note.id} className="flex items-baseline gap-2 border-b border-[#f0f0f0] py-1 last:border-b-0">
-                <span className="max-w-[64px] shrink-0 truncate text-[12px] text-[#2b2f36]">{note.created_by || "历史记录"}</span>
+                <span className="max-w-[64px] shrink-0 truncate text-[12px] text-[#2b2f36]">{authorName(note)}</span>
                 <span className="min-w-0 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#2b2f36]">{note.content}</span>
               </div>
             ))}
@@ -225,7 +230,7 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
                   {colleagueNotes.map((note) => (
                     <div key={note.id} className="border-b border-[#f0f0f0] py-2 last:border-b-0">
                       <div className="flex items-baseline gap-2">
-                        <span className="max-w-[120px] truncate text-[12px] text-[#2b2f36]">{note.created_by || "历史记录"}</span>
+                        <span className="max-w-[120px] truncate text-[12px] text-[#2b2f36]">{authorName(note)}</span>
                         <span className="text-[11px] tabular-nums text-[#8f959e]">{formatTime(note.updated_at || note.created_at)}</span>
                       </div>
                       <div className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-[#2b2f36]">{note.content}</div>

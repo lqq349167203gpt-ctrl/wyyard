@@ -7,7 +7,7 @@ const {
   BADGE_COLORS, ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
   SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
 } = require('../../utils/activity-constants')
-const { canEditRecord } = require('../../utils/record-ownership')
+const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const SOURCE_TO_TYPE = {
   class_record: 'class',
@@ -76,6 +76,7 @@ Page({
     saving: false,
     deleting: false,
     readOnly: false,
+    viewOnly: false,
     createdBy: '',
     _recordId: '',
     _source: '',
@@ -104,6 +105,7 @@ Page({
 
     const initData = {
       readOnly: !canEditRecord(raw, 'activities'),
+      viewOnly: isAreaViewOnly('activities'),
       createdBy: raw.created_by || '',
       activityType,
       typeLabel,

@@ -29,6 +29,7 @@ import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { ActivityBatchTable, type HistoryEntry } from "./activity-batch-table"
 import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
 import { POSITION_ENERGY_TEACHER, POSITION_COURSE_TEACHER } from "@/lib/positions"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 // ===== Date utilities =====
 
@@ -1648,6 +1649,12 @@ function HistoryDayGroup({ day, defaultExpanded, previewEntry, onSelectEntry }: 
 
 export default function DailyActivitiesPage() {
   const navigate = useNavigate()
+  const editPermissions = useEditPermissions()
+  const currentRole = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
+    catch { return "" }
+  }, [])
+  const isViewOnly = currentRole !== "超级管理员" && editPermissions.activities === "view"
   const today = useMemo(() => formatDate(new Date()), [])
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(() => {
@@ -2544,9 +2551,9 @@ export default function DailyActivitiesPage() {
                 return (
                   <tr key={`week-${wi}`}>
                     <td
-                      className="px-2 text-center text-[12px] text-[#2b2f36] cursor-pointer hover:bg-[#f0f5ff] overflow-hidden text-ellipsis whitespace-nowrap"
+                      className={`px-2 text-center text-[12px] text-[#2b2f36] overflow-hidden text-ellipsis whitespace-nowrap ${isViewOnly ? "cursor-default" : "cursor-pointer hover:bg-[#f0f5ff]"}`}
                       style={{ height: "22px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
-                      onClick={() => { if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
+                      onClick={() => { if (isViewOnly) return; if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
                     >
                       {weekThemeText}
                     </td>
@@ -2632,7 +2639,7 @@ export default function DailyActivitiesPage() {
               )}
               toolbarTrailing={(
                 <>
-                  <button
+                  {!isViewOnly && <button
                     type="button"
                     onClick={openWithdrawalDialog}
                     disabled={withdrawalCourses.length === 0 || !!previewEntry}
@@ -2641,7 +2648,7 @@ export default function DailyActivitiesPage() {
                   >
                     <UserMinus className="h-3.5 w-3.5" />
                     退课
-                  </button>
+                  </button>}
                   <button
                     onClick={() => {
                       if (previewEntry) { setPreviewEntry(null); setHistoryPanelOpen(false) }
@@ -2652,22 +2659,22 @@ export default function DailyActivitiesPage() {
                   >
                     <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
                   </button>
-                  <button
+                  {!isViewOnly && <button
                     onClick={undo}
                     disabled={!canUndo || !!previewEntry}
                     className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
                     title="撤回 (Ctrl+Z)"
                   >
                     <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-                  </button>
-                  <button
+                  </button>}
+                  {!isViewOnly && <button
                     onClick={redo}
                     disabled={!canRedo || !!previewEntry}
                     className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
                     title="重做 (Ctrl+Shift+Z)"
                   >
                     <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-                  </button>
+                  </button>}
                 </>
               )}
               toolbarSupplement={dayParticipants.length > 0 ? (
@@ -2675,12 +2682,13 @@ export default function DailyActivitiesPage() {
                   {dayParticipants.map(p => (
                     <span
                       key={p.id}
-                      draggable
+                      draggable={!isViewOnly}
                       onDragStart={(e) => {
+                        if (isViewOnly) return
                         e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: p.id, nickname: p.nickname }))
                         e.dataTransfer.effectAllowed = "copy"
                       }}
-                      className="inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[12px] text-[#3370ff] cursor-grab active:cursor-grabbing hover:bg-[#e0edff] transition-colors"
+                      className={`inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[12px] text-[#3370ff] transition-colors ${isViewOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing hover:bg-[#e0edff]"}`}
                     >
                       {p.nickname}
                     </span>

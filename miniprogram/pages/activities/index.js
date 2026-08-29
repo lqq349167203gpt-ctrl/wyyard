@@ -1,7 +1,7 @@
 const { classRecordApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
-const { canEditRecord } = require('../../utils/record-ownership')
+const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -92,6 +92,7 @@ Page({
     showWithdrawal: false,
     withdrawing: false,
     loading: true,
+    isViewOnly: false,
   },
 
   async onLoad(options) {
@@ -100,6 +101,7 @@ Page({
       this.setData({ hasPagePermission: false })
       return
     }
+    this.setData({ isViewOnly: isAreaViewOnly('activities') })
     const date = options.date || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
     const d = new Date(date)
     this.setData({

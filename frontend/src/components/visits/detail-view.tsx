@@ -16,6 +16,7 @@ import { visitApi, customerApi, accountApi, visitHistoryApi, type VisitRecord, t
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { BatchInputTable, type VisitHistoryEntry, type VisitChangedCell } from "./batch-input-table"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 // ===== 三级手风琴组件（天→小时→条目）=====
 type VisitHourGroup = { hour: string; entries: VisitHistoryEntry[] }
@@ -125,6 +126,13 @@ interface DetailViewProps {
 }
 
 export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
+  const editPermissions = useEditPermissions()
+  const currentRole = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
+    catch { return "" }
+  }, [])
+  const isViewOnly = currentRole !== "超级管理员" && editPermissions.visits === "view"
+  const canCreateCustomer = currentRole === "超级管理员" || editPermissions.customers !== "view"
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
   const [internalDate, setInternalDate] = useState(today)
@@ -681,7 +689,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           onSavingCountChange={setSavingCount}
           onCustomerClick={onCustomerClick}
           onActivityClick={onActivityClick}
-          onCreateCustomer={(nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }}
+          onCreateCustomer={isViewOnly || !canCreateCustomer ? undefined : (nickname) => { setCustomerForm({ nickname }); setAgeRange(""); setShowAddUserDialog(true) }}
           onUndoRedoChange={handleUndoRedoChange}
           onRestoreRef={(fn) => { restoreRef.current = fn }}
           onCaptureRef={(fn) => { captureRef.current = fn }}
@@ -726,22 +734,22 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 >
                   <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
                 </button>
-                <button
+                {!isViewOnly && <button
                   onClick={undo}
                   disabled={!canUndo || !!previewEntry}
                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
                   title="撤回 (Ctrl+Z)"
                 >
                   <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-                </button>
-                <button
+                </button>}
+                {!isViewOnly && <button
                   onClick={redo}
                   disabled={!canRedo || !!previewEntry}
                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
                   title="重做 (Ctrl+Shift+Z)"
                 >
                   <Redo2 className="h-3.5 w-3.5 text-[#4e535a]" />
-                </button>
+                </button>}
               </div>
             </>
           )}

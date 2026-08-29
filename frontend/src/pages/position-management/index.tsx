@@ -17,7 +17,6 @@ import type {
   Position,
   Account,
   PositionEditPermissions,
-  PositionEditScope,
   TransactionAccess,
 } from "@/lib/api"
 import { normalizePagePermissions, removePagePermissions } from "@/lib/page-permissions"
@@ -86,6 +85,7 @@ const PERMISSION_GROUPS = [
 ]
 
 const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
+  customers: "all",
   visits: "own",
   activities: "own",
   contacts: {
@@ -115,6 +115,7 @@ const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
 }
 
 const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
+  customers: "all",
   visits: "all",
   activities: "all",
   contacts: {
@@ -322,6 +323,9 @@ export default function PositionManagementPage() {
     setFormPermissions(prev => {
       const next = prev.includes(pageKey) ? removePagePermissions(prev, [pageKey]) : [...prev, pageKey]
       if (!next.includes(pageKey)) {
+        if (pageKey === "healing-records") {
+          setFormEditPermissions(current => ({ ...current, customers: "all" }))
+        }
         if (pageKey === "class-records") {
           setFormEditPermissions(current => ({ ...current, visits: "own" }))
         }
@@ -691,6 +695,9 @@ export default function PositionManagementPage() {
                                       if (group.keys.includes("daily-activities")) {
                                         setFormEditPermissions(current => ({ ...current, activities: "own" }))
                                       }
+                                      if (group.keys.includes("healing-records")) {
+                                        setFormEditPermissions(current => ({ ...current, customers: "all" }))
+                                      }
                                     }
                                   }}
                                   className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
@@ -725,71 +732,6 @@ export default function PositionManagementPage() {
 
                 {permissionSection === "edit" && (
                   <div className="max-w-[860px] space-y-7">
-                    <section>
-                      <div className="mb-3 flex items-end justify-between gap-4">
-                        <div>
-                          <div className="text-[14px] font-medium text-[#1f2329]">业务编辑范围</div>
-                          <div className="mt-1 text-[12px] text-[#8f959e]">设置该角色能否修改其他人录入的受保护信息。</div>
-                        </div>
-                        <span className="shrink-0 text-[12px] text-[#8f959e]">未开放时按创建人规则处理</span>
-                      </div>
-                      <div className="divide-y divide-[#f0f0f0] overflow-hidden rounded-[4px] border border-[#f0f0f0]">
-                        {([
-                          {
-                            key: "visits" as const,
-                            pageKey: "class-records",
-                            label: "邀约",
-                            description: "客户、邀约人、时间、取消及删除；来访需求由每人独立维护",
-                          },
-                          {
-                            key: "activities" as const,
-                            pageKey: "daily-activities",
-                            label: "课表",
-                            description: "课程、老师、时间、扣卡、案主、简介及删除",
-                          },
-                        ]).map((item) => {
-                          const pageEnabled = formPermissions.includes(item.pageKey)
-                          return (
-                            <div key={item.key} className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
-                              <div className="min-w-0">
-                                <div className="text-[13px] font-medium text-[#2b2f36]">{item.label}</div>
-                                <div className="mt-1 text-[12px] text-[#8f959e]">{item.description}</div>
-                                {!pageEnabled && (
-                                  <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“{item.label}”页面权限</div>
-                                )}
-                              </div>
-                              <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
-                                {([
-                                  { value: "own" as PositionEditScope, label: "仅本人录入" },
-                                  { value: "all" as PositionEditScope, label: "全部记录" },
-                                ]).map((option) => {
-                                  const selected = formEditPermissions[item.key] === option.value
-                                  return (
-                                    <button
-                                      key={option.value}
-                                      type="button"
-                                      disabled={isSystemRole || !pageEnabled}
-                                      onClick={() => setFormEditPermissions(current => ({ ...current, [item.key]: option.value }))}
-                                      className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors disabled:cursor-default ${
-                                        selected
-                                          ? "bg-[#1f2329] text-white"
-                                          : "text-[#646a73] hover:bg-[#f5f6f7] disabled:text-[#c9cdd4] disabled:hover:bg-transparent"
-                                      }`}
-                                    >
-                                      {option.label}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                      <p className="mt-2.5 text-[12px] text-[#8f959e]">
-                        客户信息和跟进点仍按每条内容的填写人分别控制，不受此设置影响。
-                      </p>
-                    </section>
-
                     <section>
                       <div className="mb-3">
                         <div className="text-[14px] font-medium text-[#1f2329]">客户资料可见范围</div>
@@ -842,6 +784,86 @@ export default function PositionManagementPage() {
                           </div>
                         )}
                       </div>
+                    </section>
+
+                    <section>
+                      <div className="mb-3 flex items-end justify-between gap-4">
+                        <div>
+                          <div className="text-[14px] font-medium text-[#1f2329]">业务操作范围</div>
+                          <div className="mt-1 text-[12px] text-[#8f959e]">分别设置客户资料、邀约和课表能否操作；仅浏览时所有写入入口都会关闭。</div>
+                        </div>
+                        <span className="shrink-0 text-[12px] text-[#8f959e]">页面权限控制入口，操作范围控制写入</span>
+                      </div>
+                      <div className="divide-y divide-[#f0f0f0] overflow-hidden rounded-[4px] border border-[#f0f0f0]">
+                        {([
+                          {
+                            key: "customers" as const,
+                            pageKey: "healing-records",
+                            label: "客户资料",
+                            description: "新增、编辑、停用、标签、跟进点及沟通记录",
+                            options: [
+                              { value: "view" as const, label: "仅浏览" },
+                              { value: "all" as const, label: "可编辑" },
+                            ],
+                          },
+                          {
+                            key: "visits" as const,
+                            pageKey: "class-records",
+                            label: "邀约",
+                            description: "客户、邀约人、时间及删除受创建人限制；取消/恢复可由非只读员工操作",
+                            options: [
+                              { value: "view" as const, label: "仅浏览" },
+                              { value: "own" as const, label: "仅本人录入" },
+                              { value: "all" as const, label: "全部记录" },
+                            ],
+                          },
+                          {
+                            key: "activities" as const,
+                            pageKey: "daily-activities",
+                            label: "课表",
+                            description: "课程、老师、时间、扣卡、案主、简介及删除",
+                            options: [
+                              { value: "view" as const, label: "仅浏览" },
+                              { value: "own" as const, label: "仅本人录入" },
+                              { value: "all" as const, label: "全部记录" },
+                            ],
+                          },
+                        ]).map((item) => {
+                          const pageEnabled = formPermissions.includes(item.pageKey)
+                          return (
+                            <div key={item.key} className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
+                              <div className="min-w-0">
+                                <div className="text-[13px] font-medium text-[#2b2f36]">{item.label}</div>
+                                <div className="mt-1 text-[12px] text-[#8f959e]">{item.description}</div>
+                                {!pageEnabled && (
+                                  <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“{item.label}”页面权限</div>
+                                )}
+                              </div>
+                              <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
+                                {item.options.map((option) => {
+                                  const selected = formEditPermissions[item.key] === option.value
+                                  return (
+                                    <button
+                                      key={option.value}
+                                      type="button"
+                                      disabled={isSystemRole || !pageEnabled}
+                                      onClick={() => setFormEditPermissions(current => ({ ...current, [item.key]: option.value }))}
+                                      className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors disabled:cursor-default ${
+                                        selected
+                                          ? "bg-[#1f2329] text-white"
+                                          : "text-[#646a73] hover:bg-[#f5f6f7] disabled:text-[#c9cdd4] disabled:hover:bg-transparent"
+                                      }`}
+                                    >
+                                      {option.label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="mt-2.5 text-[12px] text-[#8f959e]">“仅浏览”会同时由后端拦截写操作；邀约和课表的“仅本人录入”仍按创建人控制受保护内容。</p>
                     </section>
 
                     <section>

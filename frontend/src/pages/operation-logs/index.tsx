@@ -111,7 +111,10 @@ const FIELD_CN: Record<string, string> = {
   scope: "可见范围", customer_tags: "客户标签",
   teacher_ids: "老师", teachers: "老师", course_name: "沙龙名称", course_type: "课程类型", course_description: "沙龙描述",
   owner_name: "案主", owner_id: "案主", host_name: "主持人", host_names: "主持人", host_id: "主持人", host_ids: "主持人",
-  participant_ids: "参与者", achiever_name: "成就君", achiever_id: "成就君",
+  participant_ids: "参与者", withdrawn_participant_ids: "退课人员", withdrawal_records: "退课记录",
+  restored_count: "退回卡次", withdrawn_at: "退课办理时间", withdrawn_by: "退课办理人",
+  cancelled_at: "取消退课时间", cancelled_by: "取消退课人",
+  achiever_name: "成就君", achiever_id: "成就君",
   leader_id: "组长", deputy_id: "副组长", member_ids: "成员",
   closer_name: "成交人", closer_id: "成交人", closers: "成交人",
   price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
@@ -137,7 +140,7 @@ const FIELD_CN: Record<string, string> = {
   pages: "页面权限", page_permissions: "页面权限", member_types: "历史用户信息权限",
   edit_permissions: "信息编辑范围", contacts: "客户联系方式权限", visits: "邀约",
   operator: "匹配方式", conditions: "匹配条件",
-  customers: "客户信息可见身份", class_records: "人员安排可见身份", payment: "付费项目可见身份",
+  customers: "客户资料可见范围", class_records: "人员安排可见身份", payment: "付费项目可见身份",
   referrer_handler: "引流处理人", traffic_source_detail: "流量来源详情",
   total_payment: "累计付费",
   activity_mode: "活动模式", course_id: "课程",
@@ -224,9 +227,10 @@ const SECTION_OPTIONS = [
 
 const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
 
-const getOperationLocation = (path: string, section: string) => (
-  API_PATH_LABELS.find(([prefix]) => path.startsWith(prefix))?.[1] || formatSectionLabel(section)
-)
+const getOperationLocation = (path: string, section: string) => {
+  if (path.includes("/withdrawals")) return "退课"
+  return API_PATH_LABELS.find(([prefix]) => path.startsWith(prefix))?.[1] || formatSectionLabel(section)
+}
 
 const isReorderLog = (log: Pick<OperationLog, "path">) => (
   ["/api/visits/reorder", "/api/activity-orders"].includes(log.path.replace(/\/+$/, ""))
@@ -321,9 +325,14 @@ const getFinancialLogDisplayContent = (log: OperationLog) => {
 }
 
 const EDIT_SCOPE_LABELS: Record<string, string> = {
+  view: "仅浏览",
   own: "仅本人录入",
   all: "全部记录",
 }
+
+const getEditScopeLabel = (scope: string, area: string) => (
+  area === "customers" && scope === "all" ? "可编辑" : (EDIT_SCOPE_LABELS[scope] || scope)
+)
 
 const getPermissionLogDisplayContent = (log: OperationLog) => {
   if (!log.path.startsWith("/api/position-permissions/full")) return ""
@@ -350,13 +359,14 @@ const getPermissionLogDisplayContent = (log: OperationLog) => {
     ? after.edit_permissions as Record<string, unknown>
     : {}
   ;([
-    { key: "visits", label: "邀约编辑范围" },
-    { key: "activities", label: "课表编辑范围" },
-  ] as const).forEach(({ key, label }) => {
-    const oldScope = String(oldEdit[key] || "own")
-    const newScope = String(newEdit[key] || "own")
+    { key: "customers", label: "客户资料操作范围", defaultScope: "all" },
+    { key: "visits", label: "邀约编辑范围", defaultScope: "own" },
+    { key: "activities", label: "课表编辑范围", defaultScope: "own" },
+  ] as const).forEach(({ key, label, defaultScope }) => {
+    const oldScope = String(oldEdit[key] || defaultScope)
+    const newScope = String(newEdit[key] || defaultScope)
     if (oldScope !== newScope) {
-      changes.push(`${label}：${EDIT_SCOPE_LABELS[oldScope] || oldScope} → ${EDIT_SCOPE_LABELS[newScope] || newScope}`)
+      changes.push(`${label}：${getEditScopeLabel(oldScope, key)} → ${getEditScopeLabel(newScope, key)}`)
     }
   })
 
@@ -710,6 +720,7 @@ export default function OperationLogsPage() {
           ].filter(Boolean).join("、") || "无"
         }
         return [
+          `客户资料：${getEditScopeLabel(String(permissions.customers || "all"), "customers")}`,
           `邀约：${EDIT_SCOPE_LABELS[String(permissions.visits || "own")] || String(permissions.visits || "own")}`,
           `课表：${EDIT_SCOPE_LABELS[String(permissions.activities || "own")] || String(permissions.activities || "own")}`,
           `手机号：${formatActions("phone")}`,

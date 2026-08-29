@@ -6,8 +6,8 @@ from typing import Literal, TypedDict
 from app.services.storage import delete_item, load_data, save_item
 
 FILENAME = "position_edit_permissions.json"
-EditArea = Literal["visits", "activities"]
-EditScope = Literal["own", "all"]
+EditArea = Literal["customers", "visits", "activities"]
+EditScope = Literal["view", "own", "all"]
 ContactField = Literal["phone", "wechat"]
 ContactAction = Literal["view", "copy", "edit"]
 CustomerScope = Literal["none", "related", "all"]
@@ -56,6 +56,7 @@ class CustomerAccessPermissions(TypedDict):
 
 
 class PositionEditPermissions(TypedDict):
+    customers: EditScope
     visits: EditScope
     activities: EditScope
     contacts: ContactPermissions
@@ -123,12 +124,15 @@ def _full_customer_access() -> CustomerAccessPermissions:
 
 
 DEFAULT_PERMISSIONS: PositionEditPermissions = {
+    # 兼容已有角色：客户资料在新增“仅浏览”权限前默认可编辑。
+    "customers": "all",
     "visits": "own",
     "activities": "own",
     "contacts": _empty_contact_permissions(),
     "customer_access": _empty_customer_access(),
 }
 SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
+    "customers": "all",
     "visits": "all",
     "activities": "all",
     "contacts": _full_contact_permissions(),
@@ -139,7 +143,12 @@ _permissions: dict[str, PositionEditPermissions] = {}
 
 
 def _normalize_scope(value: object) -> EditScope:
-    return "all" if value == "all" else "own"
+    return value if value in {"view", "own", "all"} else "own"
+
+
+def _normalize_customer_edit_scope(value: object) -> EditScope:
+    # 客户资料不区分创建人；旧数据缺少此字段时保持可编辑。
+    return "view" if value == "view" else "all"
 
 
 def _normalize_contact_actions(value: object) -> ContactActionPermissions:
@@ -197,6 +206,7 @@ def _normalize_customer_access(value: object, *, legacy_default: bool = False) -
 def _normalize_permissions(value: object) -> PositionEditPermissions:
     raw = value if isinstance(value, dict) else {}
     return {
+        "customers": _normalize_customer_edit_scope(raw.get("customers")),
         "visits": _normalize_scope(raw.get("visits")),
         "activities": _normalize_scope(raw.get("activities")),
         "contacts": _normalize_contacts(raw.get("contacts")),

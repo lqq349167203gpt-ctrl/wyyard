@@ -411,8 +411,15 @@ def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: 
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
     before_data = record.model_dump(mode="json")
+    operator_id = getattr(request.state, "user_id", "") or ""
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "") or ""
     try:
-        updated, changed = class_record_service.withdraw_participant(record_id, data.customer_id)
+        updated, changed = class_record_service.withdraw_participant(
+            record_id,
+            data.customer_id,
+            operator_id,
+            operator,
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if not updated:
@@ -441,7 +448,6 @@ def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: 
                 save_item("client_signups.json", signup_id, retained)
 
     if changed:
-        operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
         from app.services import client_notification_service
         client_notification_service.create_notification(
             customer_id=data.customer_id,
@@ -463,12 +469,39 @@ def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: 
 
 
 @router.get("/withdrawals")
-def list_withdrawals():
+def list_withdrawals(
+    request: Request,
+    page: int | None = Query(None, ge=1),
+    page_size: int | None = Query(None, ge=1, le=100),
+    nickname: str | None = None,
+    status: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
     items = class_record_service.list_withdrawals()
+    visible_ids = _visible_customer_ids(request)
+    filtered = []
     for item in items:
+        if visible_ids is not None and item["customer_id"] not in visible_ids:
+            continue
         customer = get_customer(item["customer_id"]) if item["customer_id"] else None
-        item["nickname"] = (customer.nickname or customer.name) if customer else ""
-    return items
+        item["nickname"] = (
+            (customer.nickname or customer.name)
+            if customer
+            else item.get("customer_name") or "已删除客户"
+        )
+        if nickname and nickname.strip() not in item["nickname"]:
+            continue
+        if status and status != "all" and item["status"] != status:
+            continue
+        if start_date and item["course_date"] < start_date:
+            continue
+        if end_date and item["course_date"] > end_date:
+            continue
+        filtered.append(item)
+    if page is not None:
+        return paginate(filtered, page, page_size or 20)
+    return filtered
 
 
 @router.delete("/{record_id}/withdrawals/{customer_id}")
@@ -479,9 +512,21 @@ def cancel_withdrawal(record_id: str, customer_id: str, request: Request):
     customer = get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
+    customer_access_service.require_new_customer_ids(
+        request,
+        [customer_id],
+        action="取消退课",
+    )
     before_data = record.model_dump(mode="json")
+    operator_id = getattr(request.state, "user_id", "") or ""
+    operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "") or ""
     try:
-        updated, changed = class_record_service.cancel_withdrawal(record_id, customer_id)
+        updated, changed = class_record_service.cancel_withdrawal(
+            record_id,
+            customer_id,
+            operator_id,
+            operator,
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if not updated:

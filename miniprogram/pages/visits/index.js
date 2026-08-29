@@ -1,6 +1,6 @@
 const { visitApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
-const { canEditRecord } = require('../../utils/record-ownership')
+const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -68,6 +68,7 @@ Page({
     editMode: false,
     todayVisitCount: 0,
     todayArrivedCount: 0,
+    isViewOnly: false,
   },
 
   async onLoad() {
@@ -76,6 +77,7 @@ Page({
       this.setData({ hasPagePermission: false })
       return
     }
+    this.setData({ isViewOnly: isAreaViewOnly('visits') })
     const now = new Date()
     const savedDate = wx.getStorageSync('visit_selected_date')
     const date = savedDate || formatDate(now)
@@ -423,7 +425,7 @@ Page({
 
   onCancelVisitTap(e) {
     const visit = e.detail.visit
-    if (!visit.can_edit) return
+    if (!visit || this.data.isViewOnly) return
     const cancelled = !visit.cancelled
 
     visitApi.update(visit.id, { cancelled }).then(() => {

@@ -1,5 +1,5 @@
 const { visitApi, spaceApi, customerApi } = require('../../utils/api')
-const { canEditRecord } = require('../../utils/record-ownership')
+const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 Page({
   data: {
@@ -7,6 +7,8 @@ Page({
     loading: true,
     saving: false,
     readOnly: false,
+    viewOnly: false,
+    customerViewOnly: false,
     createdBy: '',
     spaceName: '',
     visitDate: '',
@@ -70,6 +72,8 @@ Page({
       this.setData({
         visit,
         readOnly: !canEditRecord(visit, 'visits'),
+        viewOnly: isAreaViewOnly('visits'),
+        customerViewOnly: isAreaViewOnly('customers'),
         createdBy: visit.created_by || '',
         spaceName,
         loading: false,
@@ -109,10 +113,12 @@ Page({
   },
 
   onLeaderChange(e) {
+    if (this.data.viewOnly) return
     this.setData({ isLeader: e.detail.value })
   },
 
   async onArrivedChange(e) {
+    if (this.data.viewOnly) return
     const previousArrived = this.data.arrived
     const previousArrivalTime = this.data.arrivalTime
     const arrived = e.detail.value
@@ -136,6 +142,7 @@ Page({
   },
 
   async onArrivalTimeChange(e) {
+    if (this.data.viewOnly) return
     const previousArrivalTime = this.data.arrivalTime
     const arrivalTime = e.detail.value
     this.setData({ arrivalTime })

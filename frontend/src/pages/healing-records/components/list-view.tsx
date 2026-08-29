@@ -34,9 +34,10 @@ interface Props {
   filterTagMatch: "any" | "all"
   refreshKey?: number
   summary?: import("@/lib/api").DashboardSummary | null
+  readOnly?: boolean
 }
 
-export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, refreshKey = 0, summary = null }: Props) {
+export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, refreshKey = 0, summary = null, readOnly = false }: Props) {
   // 排序状态
   const [sortState, setSortState] = useState<{
     field: SortField | null
@@ -132,7 +133,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                   </span>
                 </TableHead>
                 <TableHead style={{ width: "7%" }}>创建人</TableHead>
-                <TableHead className="text-right pr-4" style={{ width: "9%" }}>操作</TableHead>
+                {!readOnly && <TableHead className="text-right pr-4" style={{ width: "9%" }}>操作</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -201,7 +202,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                 <TableCell className="text-[11px] text-[#a8b1bd]">
                   {c.created_by || <EmptyValue />}
                 </TableCell>
-                <TableCell className="text-right pr-4">
+                {!readOnly && <TableCell className="text-right pr-4">
                   <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[12px] font-normal text-[#3370ff]" onClick={() => onInviteCustomer(c)}>
@@ -215,7 +216,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                     </Button>
                     </div>
                   </div>
-                </TableCell>
+                </TableCell>}
                 </TableRow>
               ))}
             </TableBody>

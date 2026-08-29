@@ -4,6 +4,7 @@ Component({
     leaderName: { type: String, value: '' },
     editMode: { type: Boolean, value: false },
     editable: { type: Boolean, value: true },
+    cancelable: { type: Boolean, value: true },
     sortable: { type: Boolean, value: true },
     arrivalEditable: { type: Boolean, value: true },
     canMoveUp: { type: Boolean, value: false },
@@ -68,7 +69,7 @@ Component({
     },
 
     onCancelVisitTap() {
-      if (!this.data.editable) return
+      if (!this.data.cancelable) return
       this.triggerEvent('cancelvisit', { visit: this.data.visit })
     },
   },

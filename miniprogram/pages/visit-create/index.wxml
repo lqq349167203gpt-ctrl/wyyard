@@ -95,7 +95,7 @@
       <view class="picker-empty" wx:if="{{pickerList.length === 0 && !(pickerKeyword && pickerField === 'customer')}}">
         <text>无匹配用户</text>
       </view>
-      <view class="picker-create" wx:if="{{pickerList.length === 0 && pickerKeyword && pickerField === 'customer'}}" bindtap="onCreateCustomer">
+      <view class="picker-create" wx:if="{{pickerList.length === 0 && pickerKeyword && pickerField === 'customer' && !customerViewOnly}}" bindtap="onCreateCustomer">
         <text class="picker-create-text">未找到，新建客户</text>
       </view>
     </scroll-view>

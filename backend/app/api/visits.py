@@ -50,11 +50,13 @@ def _private_need_map(request: Request | None, visit_ids: list[str]) -> dict[str
         getattr(request.state, "user_owner", "") or "",
         getattr(request.state, "user_name", "") or "",
     )
-    return {
-        note.visit_id: note.content
-        for note in notes
-        if note.category == "visit_need"
-    }
+    result: dict[str, list[str]] = {}
+    for note in notes:
+        if note.category != "visit_need":
+            continue
+        creator = note.created_by or "历史记录"
+        result.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
+    return {visit_id: "\n".join(lines) for visit_id, lines in result.items()}
 
 
 def _fill_daily_amount(items: list, date: str):
@@ -367,9 +369,8 @@ async def update_visit(visit_id: str, data: dict, request: Request):
             "visit_time",
             "customer_id",
             "referrer_handler",
-            "cancelled",
         },
-        "邀约的客户、邀约人、时间或取消状态",
+        "邀约的客户、邀约人或时间",
         "visits",
     )
     old_arrived = old_record.arrived if old_record else False

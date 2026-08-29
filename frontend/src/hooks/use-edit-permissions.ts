@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { positionPermissionApi, type PositionEditPermissions } from "@/lib/api"
 
 const DEFAULT_PERMISSIONS: PositionEditPermissions = {
+  customers: "all",
   visits: "own",
   activities: "own",
   contacts: {
@@ -33,8 +34,9 @@ const DEFAULT_PERMISSIONS: PositionEditPermissions = {
 
 function normalizeEditPermissions(permissions?: Partial<PositionEditPermissions>): PositionEditPermissions {
   return {
-    visits: permissions?.visits === "all" ? "all" : "own",
-    activities: permissions?.activities === "all" ? "all" : "own",
+    customers: permissions?.customers === "view" ? "view" : "all",
+    visits: ["view", "own", "all"].includes(permissions?.visits || "") ? permissions!.visits! : "own",
+    activities: ["view", "own", "all"].includes(permissions?.activities || "") ? permissions!.activities! : "own",
     contacts: {
       phone: {
         view: permissions?.contacts?.phone?.view === true,

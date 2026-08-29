@@ -1,4 +1,5 @@
 const { customerApi, customerTagApi } = require('../../utils/api')
+const { isAreaViewOnly } = require('../../utils/record-ownership')
 
 const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
 const TRAFFIC_NEED_LINK = ['小红书', '抖音', '公众号', '视频号']
@@ -82,6 +83,11 @@ Page({
 
   onLoad(options) {
     if (!getApp().checkLogin()) return
+    if (isAreaViewOnly('customers')) {
+      wx.showToast({ title: '当前账号仅可浏览客户资料', icon: 'none' })
+      wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/customers/index' }) })
+      return
+    }
     if (options.id) {
       this.setData({ id: options.id, isEdit: true })
       wx.setNavigationBarTitle({ title: '编辑客户' })

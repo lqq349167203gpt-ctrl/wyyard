@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.middleware.jwt_auth import _get_read_only_area
 from app.services import (
     customer_access_service,
     customer_service,
@@ -61,6 +62,43 @@ def _permissions(
         },
         "transaction_access": transaction_access,
     }
+
+
+def test_edit_scope_normalization_keeps_legacy_roles_editable_and_accepts_view_only():
+    legacy = position_edit_permission_service._normalize_permissions({
+        "visits": "own",
+        "activities": "all",
+    })
+    assert legacy["customers"] == "all"
+    assert legacy["visits"] == "own"
+    assert legacy["activities"] == "all"
+
+    view_only = position_edit_permission_service._normalize_permissions({
+        "customers": "view",
+        "visits": "view",
+        "activities": "view",
+    })
+    assert view_only["customers"] == "view"
+    assert view_only["visits"] == "view"
+    assert view_only["activities"] == "view"
+
+
+@pytest.mark.parametrize(("path", "area"), [
+    ("/api/customers/customer-id", "customers"),
+    ("/api/customer-tags/customers/customer-id", "customers"),
+    ("/api/visits/visit-id", "visits"),
+    ("/api/visit-notes", "visits"),
+    ("/api/class-records/record-id/withdrawals", "activities"),
+    ("/api/activity-themes", "activities"),
+])
+def test_write_routes_are_mapped_to_read_only_area(path, area):
+    assert _get_read_only_area(path, "POST") == area
+
+
+def test_read_like_customer_posts_remain_available_in_view_only_mode():
+    assert _get_read_only_area("/api/customers/batch", "POST") == ""
+    assert _get_read_only_area("/api/customers/customer-id/contact-access", "POST") == ""
+    assert _get_read_only_area("/api/customers/customer-id", "GET") == ""
 
 
 def test_related_scope_can_be_configured_by_referrer_or_handler(monkeypatch):

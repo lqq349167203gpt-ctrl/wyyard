@@ -12,11 +12,13 @@ import DetailView from "./components/detail-view"
 import { customerApi, customerTagApi, memberIdentityApi, spaceApi, statisticsApi, visitApi, type Customer, type CustomerLight, type CustomerTag, type DashboardSummary, type Space } from "@/lib/api"
 import { hasPagePermission } from "@/lib/page-permissions"
 import { usePagePermissions } from "@/hooks/use-page-permissions"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 export default function HealingRecordsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const permissions = usePagePermissions()
+  const editPermissions = useEditPermissions()
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -49,6 +51,7 @@ export default function HealingRecordsPage() {
     catch { return "" }
   })()
   const canManageTags = currentRole === "超级管理员" || hasPagePermission(permissions, "customer-tags")
+  const isViewOnly = currentRole !== "超级管理员" && editPermissions.customers === "view"
 
   // 统计摘要
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -266,14 +269,16 @@ export default function HealingRecordsPage() {
             清空
           </button>
           <div className="flex-1" />
-          {canManageTags && (
+          {canManageTags && !isViewOnly && (
             <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => navigate("/config/customer-tags")}>
               <Tags className="mr-1 h-3.5 w-3.5" /> 标签管理
             </Button>
           )}
-          <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleAddNew}>
-            <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新建客户
-          </Button>
+          {!isViewOnly && (
+            <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleAddNew}>
+              <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新建客户
+            </Button>
+          )}
         </div>
 
         <ListView
@@ -289,6 +294,7 @@ export default function HealingRecordsPage() {
           filterTagIds={searchTagIds}
           filterTagMatch={tagMatch}
           summary={summary}
+          readOnly={isViewOnly}
         />
       </div>
 

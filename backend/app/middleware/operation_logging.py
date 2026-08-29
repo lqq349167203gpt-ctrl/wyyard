@@ -116,7 +116,6 @@ PAGE_LABELS: dict[str, str] = {
     "tea-guest-expenses": "茶客业务 · 支出",
     "dashboard": "工作台",
     "custom-analysis": "自定义筛选",
-    "customers": "客户资料",
     "healing-records": "客户资料",
     "activity-records": "数据记录",
     "traffic-records": "数据记录",
@@ -239,6 +238,13 @@ FIELD_NAMES = {
     "course_type": "课程类型", "course_description": "课程描述",
     "owner_name": "案主", "host_name": "主持人",
     "participant_ids": "参与者",
+    "withdrawn_participant_ids": "退课人员",
+    "withdrawal_records": "退课记录",
+    "restored_count": "退回卡次",
+    "withdrawn_at": "退课办理时间",
+    "withdrawn_by": "退课办理人",
+    "cancelled_at": "取消退课时间",
+    "cancelled_by": "取消退课人",
     "host_id": "主持人", "leader_id": "组长", "deputy_id": "副组长",
     "member_ids": "成员", "teacher_ids": "老师",
     "price": "价格", "amount": "金额", "count": "次数", "total": "总计",
@@ -275,7 +281,7 @@ FIELD_NAMES = {
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
     "edit_permissions": "信息权限", "contacts": "客户联系方式权限", "customer_access": "客户数据权限",
     "operator": "匹配方式", "conditions": "匹配条件",
-    "customers": "客户信息可见身份", "class_records": "人员安排可见身份", "payment": "付费项目可见身份",
+    "customers": "客户资料可见范围", "class_records": "人员安排可见身份", "payment": "付费项目可见身份",
     "purchase_count": "购买次数", "closer_name": "成交人", "closer_id": "成交人", "closers": "成交人", "category": "分类",
     "referrer_handler": "引流处理人", "traffic_source_detail": "流量来源详情",
     "total_payment": "累计付费",
@@ -503,10 +509,11 @@ VALUE_LABELS = {
     "True": "是", "False": "否",
     "true": "是", "false": "否",
     "offline": "线下", "online": "线上",
-    "own": "仅本人录入", "all": "全部记录",
+    "view": "仅浏览", "own": "仅本人录入", "all": "全部记录",
 }
 
 EDIT_PERMISSION_LABELS = {
+    "customers": "客户资料操作范围",
     "visits": "邀约编辑范围",
     "activities": "课表编辑范围",
 }
@@ -517,8 +524,11 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
     new_permissions = new_value if isinstance(new_value, dict) else {}
     changes = []
     for key, label in EDIT_PERMISSION_LABELS.items():
-        old_scope = VALUE_LABELS.get(str(old_permissions.get(key, "own")), "仅本人录入")
-        new_scope = VALUE_LABELS.get(str(new_permissions.get(key, "own")), "仅本人录入")
+        default_scope = "all" if key == "customers" else "own"
+        old_value = str(old_permissions.get(key, default_scope))
+        new_value = str(new_permissions.get(key, default_scope))
+        old_scope = "可编辑" if key == "customers" and old_value == "all" else VALUE_LABELS.get(old_value, VALUE_LABELS[default_scope])
+        new_scope = "可编辑" if key == "customers" and new_value == "all" else VALUE_LABELS.get(new_value, VALUE_LABELS[default_scope])
         if old_scope != new_scope:
             changes.append(f"{label}({old_scope}→{new_scope})")
     old_contacts = old_permissions.get("contacts") if isinstance(old_permissions.get("contacts"), dict) else {}

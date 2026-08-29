@@ -7,10 +7,10 @@
   <!-- 我填写的 -->
   <view class="section-label">
     <text class="section-label-text">我填写的</text>
-    <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}} 更新 · <text class="clear-btn" bindtap="onClearMine">清空</text></text>
+    <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}} 更新<text wx:if="{{!readOnly}}"> · <text class="clear-btn" bindtap="onClearMine">清空</text></text></text>
   </view>
   <view class="mine-box" bindtap="onAdd">
-    <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.content : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…')}}</text>
+    <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.content : (readOnly ? '暂无记录' : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'))}}</text>
   </view>
 
   <!-- 别人填写的 -->
@@ -20,7 +20,7 @@
     </view>
     <view class="note-item" wx:for="{{otherNotes}}" wx:key="id">
       <view class="note-meta">
-        <text class="note-creator">{{item.created_by || '历史记录'}}</text>
+        <text class="note-creator">{{item.creatorText}}</text>
         <text class="note-time">{{item.timeText}}</text>
       </view>
       <text class="note-content">{{item.content}}</text>
@@ -31,8 +31,8 @@
 </view>
 
 <!-- 编辑底部弹层 -->
-<view class="editor-mask" wx:if="{{editorOpen}}" bindtap="onEditorClose" catchtouchmove="noop"></view>
-<view class="editor-panel" wx:if="{{editorOpen}}">
+<view class="editor-mask" wx:if="{{editorOpen && !readOnly}}" bindtap="onEditorClose" catchtouchmove="noop"></view>
+<view class="editor-panel" wx:if="{{editorOpen && !readOnly}}">
   <view class="editor-header">
     <text class="editor-title">我填写的{{title}}</text>
     <text class="editor-close" bindtap="onEditorClose">取消</text>

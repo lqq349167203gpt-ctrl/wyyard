@@ -139,6 +139,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const currentActorId = String(currentUser.id || "")
   const currentActorName = String(currentUser.owner || currentUser.username || "")
   const editPermissions = useEditPermissions()
+  const isViewOnly = currentUser.role !== "超级管理员" && editPermissions.visits === "view"
   const canEditAllVisits = currentUser.role === "超级管理员" || editPermissions.visits === "all"
   const [viewSegment, setViewSegment] = useState<ViewSegment>(() => {
     try { return localStorage.getItem("visit_view_segment") === "mine" ? "mine" : "all" }
@@ -151,11 +152,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     return Boolean(row.created_by && currentActorName && row.created_by === currentActorName)
   }, [currentActorId, currentActorName])
   const canEditRow = useCallback((row: Row) => (
-    canEditAllVisits || isOwnRow(row)
-  ), [canEditAllVisits, isOwnRow])
+    !isViewOnly && (canEditAllVisits || isOwnRow(row))
+  ), [canEditAllVisits, isOwnRow, isViewOnly])
   const canEditField = useCallback((row: Row, field: keyof Row) => (
-    canEditRow(row) || !VISIT_CREATOR_ONLY_FIELDS.has(field)
-  ), [canEditRow])
+    !isViewOnly && (canEditRow(row) || !VISIT_CREATOR_ONLY_FIELDS.has(field))
+  ), [canEditRow, isViewOnly])
 
   // 撤回/重做历史栈
   const [undoStack, setUndoStack] = useState<VisitHistoryEntry[]>([])
@@ -559,7 +560,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   const cancelVisit = useCallback(async (row: Row) => {
     const visitId = savedVisitIds.current[row.key]
-    if (!visitId || row.arrived || row.cancelled || !canEditRow(row)) return
+    if (!visitId || row.arrived || row.cancelled || isViewOnly) return
     if (timersRef.current[row.key]) {
       clearTimeout(timersRef.current[row.key])
       delete timersRef.current[row.key]
@@ -581,11 +582,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       window.alert(error instanceof Error ? error.message : "取消邀约失败")
     }
-  }, [onSaved, pushHistory, canEditRow])
+  }, [onSaved, pushHistory, isViewOnly])
 
   const restoreVisit = useCallback(async (row: Row) => {
     const visitId = savedVisitIds.current[row.key]
-    if (!visitId || !row.cancelled || !canEditRow(row)) return
+    if (!visitId || !row.cancelled || isViewOnly) return
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       await visitApi.update(visitId, { cancelled: false })
@@ -603,7 +604,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       window.alert(error instanceof Error ? error.message : "恢复邀约失败")
     }
-  }, [onSaved, pushHistory, canEditRow])
+  }, [onSaved, pushHistory, isViewOnly])
 
   const removeRow = useCallback(async (key: number) => {
     const row = rowsRef.current.find(r => r.key === key)
@@ -783,12 +784,12 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           <TooltipTrigger
             render={
               <button type="button" className="hidden shrink-0 items-center gap-1 text-[12px] text-[#8f959e] min-[1100px]:inline-flex">
-                仅创建人可编辑
+                {isViewOnly ? "仅浏览" : "受保护内容仅创建人可编辑"}
                 <Info className="h-3.5 w-3.5" />
               </button>
             }
           />
-          <TooltipContent>昵称、邀约人、时间及取消/删除仅创建人可操作；来访需求由每人独立填写</TooltipContent>
+          <TooltipContent>{isViewOnly ? "当前账号可查看邀约，但不能新增、修改、排序、取消或删除" : "昵称、邀约人、时间及删除仅创建人可操作；取消/恢复可由非只读员工协作"}</TooltipContent>
         </Tooltip>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <button
@@ -857,7 +858,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                 >
                   <td
                     className={`px-0.5 py-1.5 text-center ${row.cancelled ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"}`}
-                    draggable={!row.cancelled}
+                    draggable={!row.cancelled && !isViewOnly}
                     onDragStart={(e) => handleDragStart(e, row.key)}
                     onDragEnd={handleDragEnd}
                   >
@@ -867,7 +868,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <input
                       type="checkbox"
                       checked={row.arrived}
-                      disabled={row.cancelled}
+                      disabled={row.cancelled || isViewOnly}
                       onChange={(e) => updateRow(row.key, "arrived", e.target.checked)}
                       aria-label={`${row.nickname || "客户"}是否到店`}
                       className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer disabled:cursor-not-allowed"
@@ -879,7 +880,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       value={row.is_leader ? "1" : "0"}
                       options={[{ value: "0", label: "-" }, { value: "1", label: "组长" }]}
                       onChange={(v) => updateRow(row.key, "is_leader", v === "1")}
-                      disabled={row.cancelled}
+                      disabled={row.cancelled || isViewOnly}
                       placeholder="-"
                       hideChevron
                       className="[&_button]:border-[0.5px] [&_button]:text-[12px]"
@@ -895,7 +896,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       <input
                         type="time"
                         value={row.visit_time}
-                        disabled={row.cancelled}
+                        disabled={row.cancelled || isViewOnly}
                         onChange={(e) => updateRow(row.key, "visit_time", e.target.value)}
                         className={`h-7 text-[12px] w-[56px] time-no-icon rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent px-2 outline-none focus:border-[#3370ff] ${!row.visit_time ? "text-[#c9cdd4]" : "text-[#2b2f36]"}`}
                       />
@@ -910,7 +911,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       <CustomerSearchInput rounded="2px"
                         customers={customers as any[]}
                         value={row.nickname}
-                        disabled={row.cancelled}
+                        disabled={row.cancelled || isViewOnly}
                         showClear={false}
                         excludeIds={rows.filter(r => r.key !== row.key && r.customer_id).map(r => r.customer_id)}
                         onChange={(v) => {
@@ -943,9 +944,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       title="来访需求"
                       category="visit_need"
                       notes={notesByVisitId[row.visit_id] || []}
-                      disabled={row.cancelled}
+                      disabled={row.cancelled || isViewOnly}
                       expanded={needsExpanded}
-                      privateToCreator
                       onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
                     />
                   </td>
@@ -956,7 +956,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       title="客户信息"
                       category="customer_info"
                       notes={notesByVisitId[row.visit_id] || []}
-                      disabled={row.cancelled}
+                      disabled={row.cancelled || isViewOnly}
                       expanded={needsExpanded}
                       onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
                     />
@@ -968,7 +968,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       title="跟进点"
                       category="follow_up"
                       notes={notesByVisitId[row.visit_id] || []}
-                      disabled={row.cancelled}
+                      disabled={row.cancelled || isViewOnly}
                       expanded={needsExpanded}
                       onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
                     />
@@ -997,7 +997,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       <CustomerSearchInput rounded="2px"
                         customers={customers as any[]}
                         value={row.referrer_handler}
-                        disabled={row.cancelled}
+                        disabled={row.cancelled || isViewOnly}
                         showClear={false}
                         onChange={(v) => updateRow(row.key, "referrer_handler", typeof v === "string" ? v : v[0] || "")}
                         onSelectItem={(c) => updateRow(row.key, "referrer_handler", c.nickname)}
@@ -1024,7 +1024,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   </td>
                   <td className="sticky right-0 z-20 bg-white px-1.5 py-1.5 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      {!rowReadOnly && (row.cancelled || (!row.arrived && Boolean(row.visit_id))) && (
+                      {!isViewOnly && (row.cancelled || (!row.arrived && Boolean(row.visit_id))) && (
                         <>
                           <Tooltip>
                             <TooltipTrigger
@@ -1098,7 +1098,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
       <HorizontalScrollbar scrollRef={scrollRef} />
 
-      <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
+      {!isViewOnly && <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
         <button
           onClick={addRow}
           className="flex items-center gap-1 text-[12px] text-[#3370ff] hover:text-[#2860e1]"
@@ -1106,7 +1106,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           <Plus className="h-3.5 w-3.5" />
           添加一行
         </button>
-      </div>
+      </div>}
 
       <AlertDialog open={deleteKey !== null} onOpenChange={(open) => !open && setDeleteKey(null)}>
         <AlertDialogContent>

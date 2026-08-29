@@ -8,6 +8,7 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { customerApi, customerTagApi, type ContactPermissions, type CustomerAccessPermissions, type CustomerCreate, type CustomerLight, type CustomerTag } from "@/lib/api"
 import { CustomerTagField } from "@/components/customer-tag-editor"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
@@ -58,6 +59,16 @@ export default function CustomerFormPage() {
   const backPath = searchParams.get("back") || "/healing-records"
   const isEdit = !!id
   const enterToNext = useEnterToNext()
+  const editPermissions = useEditPermissions()
+  const currentRole = (() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
+    catch { return "" }
+  })()
+  const isViewOnly = currentRole !== "超级管理员" && editPermissions.customers === "view"
+
+  useEffect(() => {
+    if (isViewOnly) navigate(backPath, { replace: true })
+  }, [backPath, isViewOnly, navigate])
 
   const [form, setForm] = useState<Record<string, any>>(() => ({
     ...emptyCustomer,

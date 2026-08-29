@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import Field
 
@@ -11,6 +11,29 @@ class GroupMember(SafeBaseModel):
     member_ids: List[str] = []
     leader_id: str = ""
     deputy_id: str = ""
+
+
+class CourseWithdrawalEntry(SafeBaseModel):
+    """课程退课流水；取消退课后仍保留历史。"""
+
+    id: str
+    customer_id: str
+    customer_name: str = ""
+    activity_name: str = ""
+    course_type: str = ""
+    course_date: str = ""
+    start_time: str = ""
+    end_time: str = ""
+    space_name: str = ""
+    room_name: str = ""
+    restored_count: int = 0
+    status: Literal["active", "cancelled"] = "active"
+    withdrawn_at: datetime
+    withdrawn_by_id: str = ""
+    withdrawn_by: str = ""
+    cancelled_at: Optional[datetime] = None
+    cancelled_by_id: str = ""
+    cancelled_by: str = ""
 
 
 class ClassRecordBase(SafeBaseModel):
@@ -25,6 +48,7 @@ class ClassRecordBase(SafeBaseModel):
     teacher_ids: List[str] = []
     participant_ids: List[str] = []
     withdrawn_participant_ids: List[str] = []
+    withdrawal_records: List[CourseWithdrawalEntry] = []
     materials: List[dict] = []
     groups: List[GroupMember] = []
     is_public_welfare: bool = False

@@ -4,9 +4,10 @@ function getCurrentUser() {
 }
 
 function canEditRecord(record, area) {
-  if (!record || !record.id) return true
   const user = getCurrentUser()
   const editPermissions = wx.getStorageSync('userEditPermissions') || {}
+  if (user.role !== '超级管理员' && editPermissions[area] === 'view') return false
+  if (!record || !record.id) return true
   if (user.role === '超级管理员' || editPermissions[area] === 'all') return true
   const actorId = String(user.id || '')
   const actorName = String(user.owner || user.username || '')
@@ -16,4 +17,10 @@ function canEditRecord(record, area) {
   return Boolean(creatorName && actorName && creatorName === actorName)
 }
 
-module.exports = { canEditRecord }
+function isAreaViewOnly(area) {
+  const user = getCurrentUser()
+  const editPermissions = wx.getStorageSync('userEditPermissions') || {}
+  return user.role !== '超级管理员' && editPermissions[area] === 'view'
+}
+
+module.exports = { canEditRecord, isAreaViewOnly }

@@ -558,6 +558,42 @@ def test_course_withdrawal_keeps_participant_history_and_restores_card_usage(cli
     assert changed_count.status_code == 200
     assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 5
 
+    withdrawal_history = client.get(
+        "/api/class-records/withdrawals",
+        params={"page": 1, "page_size": 20, "nickname": created_customer["nickname"]},
+    )
+    assert withdrawal_history.status_code == 200
+    history_item = next(
+        item
+        for item in withdrawal_history.json()["items"]
+        if item["record_id"] == activity_id
+    )
+    assert history_item["status"] == "active"
+    assert history_item["restored_count"] == 2
+    assert history_item["withdrawn_by"] == "不闹"
+    assert history_item["course_date"] == activity_date
+
+    cancelled = client.delete(
+        f"/api/class-records/{activity_id}/withdrawals/{created_customer['id']}"
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.json()["withdrawn_participant_ids"] == []
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 2
+
+    cancelled_history = client.get(
+        "/api/class-records/withdrawals",
+        params={"page": 1, "page_size": 20, "status": "cancelled"},
+    )
+    assert cancelled_history.status_code == 200
+    cancelled_item = next(
+        item
+        for item in cancelled_history.json()["items"]
+        if item["record_id"] == activity_id
+    )
+    assert cancelled_item["status"] == "cancelled"
+    assert cancelled_item["cancelled_by"] == "不闹"
+    assert cancelled_item["cancelled_at"]
+
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
     client.delete(f"/api/class-records/{activity_id}")
     client.delete(f"/api/membership-cards/{card['id']}")

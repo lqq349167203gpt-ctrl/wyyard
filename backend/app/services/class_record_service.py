@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-from app.models.class_record import ClassRecord, ClassRecordCreate
+from app.models.class_record import ClassRecord, ClassRecordCreate, CourseWithdrawalEntry
 from app.services import customer_service, membership_card_service
 from app.services.storage import load_data, save_data, save_item
 
@@ -319,7 +319,100 @@ def update_groups(record_id: str, groups: list):
     return record, []
 
 
-def withdraw_participant(record_id: str, customer_id: str) -> tuple[Optional[ClassRecord], bool]:
+def _withdrawal_restored_count(record: ClassRecord, customer_id: str) -> int:
+    """返回办理退课时实际恢复的会员卡次数。"""
+    if record.is_public_welfare:
+        return 0
+    arrived_ids = membership_card_service.filter_arrived_customer_ids(
+        record.date,
+        {customer_id},
+    )
+    if customer_id not in arrived_ids:
+        return 0
+    return membership_card_service.get_activity_deduction_count(record)
+
+
+def _withdrawal_entry(
+    record: ClassRecord,
+    customer_id: str,
+    *,
+    entry_id: str,
+    withdrawn_at: datetime,
+    withdrawn_by_id: str = "",
+    withdrawn_by: str = "",
+) -> CourseWithdrawalEntry:
+    customer = customer_service.get_customer(customer_id)
+    return CourseWithdrawalEntry(
+        id=entry_id,
+        customer_id=customer_id,
+        customer_name=(customer.nickname or customer.name) if customer else "",
+        activity_name=record.activity_name or record.course_name or "未命名课程",
+        course_type=record.course_type or "",
+        course_date=record.date,
+        start_time=record.start_time or "",
+        end_time=record.end_time or "",
+        space_name=record.space_name or "",
+        room_name=record.room_name or "",
+        restored_count=_withdrawal_restored_count(record, customer_id),
+        withdrawn_at=withdrawn_at,
+        withdrawn_by_id=withdrawn_by_id,
+        withdrawn_by=withdrawn_by,
+    )
+
+
+def _ensure_legacy_withdrawal_records(record: ClassRecord) -> bool:
+    """为旧版只有退课人员 ID 的数据补一条可展示的历史流水。"""
+    changed = False
+    for entry in record.withdrawal_records:
+        customer = customer_service.get_customer(entry.customer_id)
+        needs_customer_name = not entry.customer_name and customer is not None
+        if entry.course_date and entry.activity_name and not needs_customer_name:
+            continue
+        snapshot = _withdrawal_entry(
+            record,
+            entry.customer_id,
+            entry_id=entry.id,
+            withdrawn_at=entry.withdrawn_at,
+            withdrawn_by_id=entry.withdrawn_by_id,
+            withdrawn_by=entry.withdrawn_by,
+        )
+        entry.customer_name = entry.customer_name or snapshot.customer_name
+        entry.activity_name = entry.activity_name or snapshot.activity_name
+        entry.course_type = entry.course_type or snapshot.course_type
+        entry.course_date = entry.course_date or snapshot.course_date
+        entry.start_time = entry.start_time or snapshot.start_time
+        entry.end_time = entry.end_time or snapshot.end_time
+        entry.space_name = entry.space_name or snapshot.space_name
+        entry.room_name = entry.room_name or snapshot.room_name
+        changed = True
+
+    active_customer_ids = {
+        entry.customer_id
+        for entry in record.withdrawal_records
+        if entry.status == "active"
+    }
+    for customer_id in record.withdrawn_participant_ids or []:
+        if customer_id in active_customer_ids:
+            continue
+        record.withdrawal_records.append(_withdrawal_entry(
+            record,
+            customer_id,
+            entry_id=f"legacy-{record.id}-{customer_id}",
+            withdrawn_at=record.updated_at,
+            # 旧数据没有保存办理人，不能用课程创建人冒充。
+            withdrawn_by="历史记录",
+        ))
+        active_customer_ids.add(customer_id)
+        changed = True
+    return changed
+
+
+def withdraw_participant(
+    record_id: str,
+    customer_id: str,
+    operator_id: str = "",
+    operator: str = "",
+) -> tuple[Optional[ClassRecord], bool]:
     """办理退课：保留参与人历史，但停止该客户在本课程中的扣卡。"""
     with _record_lock:
         record = _records.get(record_id)
@@ -331,10 +424,19 @@ def withdraw_participant(record_id: str, customer_id: str) -> tuple[Optional[Cla
             return record, False
 
         old_chargeable = _get_group_member_ids(record)
+        withdrawal_entry = _withdrawal_entry(
+            record,
+            customer_id,
+            entry_id=str(uuid.uuid4())[:12],
+            withdrawn_at=datetime.now(timezone.utc),
+            withdrawn_by_id=operator_id,
+            withdrawn_by=operator,
+        )
         record.withdrawn_participant_ids = [
             *record.withdrawn_participant_ids,
             customer_id,
         ]
+        record.withdrawal_records = [*record.withdrawal_records, withdrawal_entry]
         new_chargeable = _get_group_member_ids(record)
         record.updated_at = datetime.now(timezone.utc)
         _records[record_id] = record
@@ -347,40 +449,10 @@ def withdraw_participant(record_id: str, customer_id: str) -> tuple[Optional[Cla
                 for participant_id in record.withdrawn_participant_ids
                 if participant_id != customer_id
             ]
-            record.updated_at = datetime.now(timezone.utc)
-            _save(record_id)
-            _sync_deduction(record, new_chargeable, old_chargeable)
-            raise
-
-    _refresh_affected_identities({customer_id})
-    return record, True
-
-
-def cancel_withdrawal(record_id: str, customer_id: str) -> tuple[Optional[ClassRecord], bool]:
-    """取消退课：从退课名单移除该客户，恢复其在本课程中的扣卡。"""
-    with _record_lock:
-        record = _records.get(record_id)
-        if not record or record.is_deleted:
-            return None, False
-        if customer_id not in set(record.withdrawn_participant_ids or []):
-            return record, False
-
-        old_chargeable = _get_group_member_ids(record)
-        record.withdrawn_participant_ids = [
-            participant_id
-            for participant_id in record.withdrawn_participant_ids
-            if participant_id != customer_id
-        ]
-        new_chargeable = _get_group_member_ids(record)
-        record.updated_at = datetime.now(timezone.utc)
-        _records[record_id] = record
-        _save(record_id)
-        try:
-            _sync_deduction(record, old_chargeable, new_chargeable)
-        except Exception:
-            record.withdrawn_participant_ids = [
-                *record.withdrawn_participant_ids,
-                customer_id,
+            record.withdrawal_records = [
+                entry
+                for entry in record.withdrawal_records
+                if entry.id != withdrawal_entry.id
             ]
             record.updated_at = datetime.now(timezone.utc)
             _save(record_id)
@@ -391,23 +463,96 @@ def cancel_withdrawal(record_id: str, customer_id: str) -> tuple[Optional[ClassR
     return record, True
 
 
+def cancel_withdrawal(
+    record_id: str,
+    customer_id: str,
+    operator_id: str = "",
+    operator: str = "",
+) -> tuple[Optional[ClassRecord], bool]:
+    """取消退课：从退课名单移除该客户，恢复其在本课程中的扣卡。"""
+    with _record_lock:
+        record = _records.get(record_id)
+        if not record or record.is_deleted:
+            return None, False
+        if customer_id not in set(record.withdrawn_participant_ids or []):
+            return record, False
+
+        _ensure_legacy_withdrawal_records(record)
+        active_entry = next(
+            (
+                entry
+                for entry in reversed(record.withdrawal_records)
+                if entry.customer_id == customer_id and entry.status == "active"
+            ),
+            None,
+        )
+        old_chargeable = _get_group_member_ids(record)
+        record.withdrawn_participant_ids = [
+            participant_id
+            for participant_id in record.withdrawn_participant_ids
+            if participant_id != customer_id
+        ]
+        now = datetime.now(timezone.utc)
+        if active_entry:
+            active_entry.status = "cancelled"
+            active_entry.cancelled_at = now
+            active_entry.cancelled_by_id = operator_id
+            active_entry.cancelled_by = operator
+        new_chargeable = _get_group_member_ids(record)
+        record.updated_at = now
+        _records[record_id] = record
+        _save(record_id)
+        try:
+            _sync_deduction(record, old_chargeable, new_chargeable)
+        except Exception:
+            record.withdrawn_participant_ids = [
+                *record.withdrawn_participant_ids,
+                customer_id,
+            ]
+            if active_entry:
+                active_entry.status = "active"
+                active_entry.cancelled_at = None
+                active_entry.cancelled_by_id = ""
+                active_entry.cancelled_by = ""
+            record.updated_at = datetime.now(timezone.utc)
+            _save(record_id)
+            _sync_deduction(record, new_chargeable, old_chargeable)
+            raise
+
+    _refresh_affected_identities({customer_id})
+    return record, True
+
+
 def list_withdrawals() -> list[dict]:
-    """返回全部退课记录（每条 = 某课程 × 某已退课客户），按课程日期倒序。"""
+    """返回全部退课历史；已取消记录仍保留。"""
     with _record_lock:
         records = list(_records.values())
     result = []
     for record in records:
-        if record.is_deleted:
-            continue
-        for customer_id in record.withdrawn_participant_ids or []:
+        if _ensure_legacy_withdrawal_records(record):
+            _save(record.id)
+        for entry in record.withdrawal_records:
             result.append({
+                "id": entry.id,
                 "record_id": record.id,
-                "customer_id": customer_id,
-                "activity_name": record.activity_name or record.course_name or "未命名课程",
-                "date": record.date,
-                "start_time": record.start_time or "",
+                "customer_id": entry.customer_id,
+                "customer_name": entry.customer_name,
+                "activity_name": entry.activity_name or record.activity_name or record.course_name or "未命名课程",
+                "course_type": entry.course_type or record.course_type or "",
+                "course_date": entry.course_date or record.date,
+                "start_time": entry.start_time,
+                "end_time": entry.end_time,
+                "space_name": entry.space_name,
+                "room_name": entry.room_name,
+                "restored_count": entry.restored_count,
+                "status": entry.status,
+                "withdrawn_at": entry.withdrawn_at.isoformat(),
+                "withdrawn_by": entry.withdrawn_by or "",
+                "cancelled_at": entry.cancelled_at.isoformat() if entry.cancelled_at else None,
+                "cancelled_by": entry.cancelled_by or "",
+                "course_deleted": record.is_deleted,
             })
-    result.sort(key=lambda item: (item["date"], item["start_time"]), reverse=True)
+    result.sort(key=lambda item: item["withdrawn_at"], reverse=True)
     return result
 
 

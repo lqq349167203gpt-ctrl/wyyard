@@ -14,6 +14,7 @@ Component({
     category: { type: String, value: '' },
     title: { type: String, value: '' },
     privateToCreator: { type: Boolean, value: false },
+    readOnly: { type: Boolean, value: false },
   },
 
   data: {
@@ -41,7 +42,13 @@ Component({
         const categoryNotes = (notes || [])
           .filter((note) => note.category === this.properties.category)
           .filter((note) => !this.properties.privateToCreator || note.can_edit)
-          .map((note) => Object.assign({}, note, { timeText: formatTime(note.created_at) }))
+          .map((note) => {
+            const creator = String(note.created_by || '').trim()
+            return Object.assign({}, note, {
+              timeText: formatTime(note.created_at),
+              creatorText: creator && creator !== '历史记录' ? creator : '未知',
+            })
+          })
         // 每人一条：按创建人归并取最新；可编辑的那条视为"我填写的"
         const byCreator = new Map()
         for (const note of categoryNotes) {
@@ -69,6 +76,7 @@ Component({
     },
 
     onAdd() {
+      if (this.properties.readOnly) return
       this.setData({ editorOpen: true, editorValue: this.data.myNote ? this.data.myNote.content : '' })
     },
 
@@ -82,6 +90,7 @@ Component({
     },
 
     async onSubmit() {
+      if (this.properties.readOnly) return
       const content = (this.data.editorValue || '').trim()
       if (!content || this.data.saving) return
       const wasEditing = !!this.data.myNote
@@ -109,6 +118,7 @@ Component({
     noop() {},
 
     onClearMine() {
+      if (this.properties.readOnly) return
       if (!this.data.myNote) return
       wx.showModal({
         title: '确认清空',

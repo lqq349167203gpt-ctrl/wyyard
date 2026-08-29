@@ -39,7 +39,7 @@
       <view class="card-actions">
         <text class="creator-text">创建人 {{visit.created_by || '未记录'}}</text>
         <view class="action-list" wx:if="{{!editMode}}">
-          <text class="action-btn" wx:if="{{editable && !visit.arrived}}" catchtap="onCancelVisitTap">{{visit.cancelled ? '恢复' : '取消'}}</text>
+          <text class="action-btn" wx:if="{{cancelable && !visit.arrived}}" catchtap="onCancelVisitTap">{{visit.cancelled ? '恢复' : '取消'}}</text>
           <text class="action-btn" catchtap="onProfileTap">资料</text>
           <text class="action-btn delete-btn" wx:if="{{editable && !visit.cancelled}}" catchtap="onDeleteTap">删除</text>
         </view>

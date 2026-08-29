@@ -1,14 +1,14 @@
 <view class="container {{readOnly ? 'read-only' : ''}}" wx:if="{{!loading}}">
   <view class="record-meta">
     <text>创建人 · {{createdBy || '未记录'}}</text>
-    <text class="readonly-text" wx:if="{{readOnly}}">部分信息仅创建人可改</text>
+    <text class="readonly-text" wx:if="{{readOnly}}">{{viewOnly ? '当前账号仅可浏览' : '部分信息仅创建人可改'}}</text>
   </view>
   <!-- 是否组长 -->
   <view class="form-card">
     <view class="form-item last compact-row">
       <text class="form-label">是否组长</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{isLeader}}" bindchange="onLeaderChange" color="#3370ff" />
+        <switch checked="{{isLeader}}" disabled="{{viewOnly}}" bindchange="onLeaderChange" color="#3370ff" />
       </view>
     </view>
   </view>
@@ -36,12 +36,12 @@
     <view class="form-item switch-row {{arrived ? '' : 'last'}}">
       <text class="form-label">到店</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{arrived}}" bindchange="onArrivedChange" color="#3370ff" />
+        <switch checked="{{arrived}}" disabled="{{viewOnly}}" bindchange="onArrivedChange" color="#3370ff" />
       </view>
     </view>
     <view class="form-item last" wx:if="{{arrived}}">
       <text class="form-label">到达时间</text>
-      <picker class="form-picker" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
+      <picker class="form-picker" disabled="{{viewOnly}}" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
         <view class="picker-display">{{arrivalTime || '选择时间'}}</view>
       </picker>
     </view>
@@ -65,9 +65,9 @@
     </view>
   </view>
 
-  <visit-note-section visit-id="{{visit.id}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" />
-  <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" />
-  <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" />
+  <visit-note-section visit-id="{{visit.id}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" read-only="{{viewOnly}}" />
+  <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" read-only="{{viewOnly}}" />
+  <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" read-only="{{viewOnly}}" />
 
   <!-- 搜索选择弹窗 -->
   <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
@@ -87,7 +87,7 @@
       <view class="picker-empty" wx:if="{{pickerList.length === 0 && !(pickerKeyword && pickerField === 'customer')}}">
         <text>无匹配用户</text>
       </view>
-      <view class="picker-create" wx:if="{{pickerList.length === 0 && pickerKeyword && pickerField === 'customer'}}" bindtap="onCreateCustomer">
+      <view class="picker-create" wx:if="{{pickerList.length === 0 && pickerKeyword && pickerField === 'customer' && !customerViewOnly}}" bindtap="onCreateCustomer">
         <text class="picker-create-text">未找到，新建客户</text>
       </view>
     </scroll-view>
@@ -95,7 +95,7 @@
 
   <view class="actions">
     <button class="btn-secondary" bindtap="onBack">返    回</button>
-    <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    <button wx:if="{{!viewOnly}}" class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
 </view>
 

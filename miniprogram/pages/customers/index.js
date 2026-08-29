@@ -1,4 +1,5 @@
 const { customerApi, customerTagApi, memberIdentityApi } = require('../../utils/api')
+const { isAreaViewOnly } = require('../../utils/record-ownership')
 
 Page({
   data: {
@@ -36,6 +37,7 @@ Page({
     pageSize: 100,
     total: 0,
     hasMore: true,
+    isViewOnly: false,
   },
 
   onLoad() {
@@ -44,6 +46,7 @@ Page({
       this.setData({ hasPagePermission: false })
       return
     }
+    this.setData({ isViewOnly: isAreaViewOnly('customers') })
     this.loadMemberTypes()
     this.loadCustomerTags()
     this.loadActiveCustomerNames()

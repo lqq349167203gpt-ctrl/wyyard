@@ -7,7 +7,7 @@
   <block wx:if="{{!loading}}">
   <view class="record-meta">
     <text>创建人 · {{createdBy || '未记录'}}</text>
-    <text class="readonly-text" wx:if="{{readOnly}}">部分信息仅创建人可改</text>
+    <text class="readonly-text" wx:if="{{readOnly}}">{{viewOnly ? '当前账号仅可浏览' : '部分信息仅创建人可改'}}</text>
   </view>
   <!-- 参与者 -->
   <view class="form-card">
@@ -240,7 +240,7 @@
   <!-- 操作按钮 -->
   <view class="actions">
     <button class="btn-danger" wx:if="{{!readOnly}}" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
-    <button class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    <button wx:if="{{!readOnly}}" class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
   </block>
 </view>

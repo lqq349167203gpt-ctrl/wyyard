@@ -12,6 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { X, Upload, Copy, Edit, Eye, Inbox, Trash2 } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 interface HealingRec {
   id: string
@@ -31,6 +32,11 @@ const DvEmpty = ({ className = "" }: { className?: string }) => (
   <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className}`} />
 )
 
+function visitNoteAuthorName(note: VisitNoteSummary): string {
+  const creator = (note.created_by || "").trim()
+  return creator && creator !== "历史记录" ? creator : "未知"
+}
+
 function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
   const seenAuthors = new Set<string>()
   const uniqueNotes = notes.filter((note) => {
@@ -44,8 +50,11 @@ function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
     <div className="flex min-w-0 flex-col gap-1">
       {uniqueNotes.map((note) => (
         <div key={note.id} className="flex min-w-0 items-baseline gap-2 leading-[1.6]">
-          <span className="max-w-[88px] shrink-0 truncate text-[12px] text-[#3370ff]" title={note.created_by || "历史记录"}>
-            {note.created_by || "历史记录"}
+          <span
+            className="max-w-[88px] shrink-0 truncate text-[12px] text-[#8f959e]"
+            title={visitNoteAuthorName(note)}
+          >
+            {visitNoteAuthorName(note)}
           </span>
           <span className="min-w-0 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{note.content}</span>
         </div>
@@ -68,6 +77,12 @@ export default function DetailView({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const editPermissions = useEditPermissions()
+  const currentRole = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
+    catch { return "" }
+  }, [])
+  const isViewOnly = currentRole !== "超级管理员" && editPermissions.customers === "view"
   const [customerList, setCustomerList] = useState<CustomerLight[]>([])
   const [searchValue, setSearchValue] = useState("")
   const [detail, setDetail] = useState<CustomerDetail | null>(null)
@@ -379,7 +394,7 @@ export default function DetailView({
                   })()}
                 </div>
               </div>
-              <button
+              {!isViewOnly && <button
                 type="button"
                 onClick={() => {
                   const backPath = `${location.pathname}${location.search}`
@@ -390,7 +405,7 @@ export default function DetailView({
               >
                 <Edit className="h-3 w-3" />
                 编辑
-              </button>
+              </button>}
             </div>
             <div className="mt-3 border-t border-[#f0f0f0] pt-1">
               <div className="flex items-center gap-2.5 border-b border-[#f3f4f5] py-[7px]">
@@ -668,7 +683,7 @@ export default function DetailView({
                           邀约人：{v.referrer_handler}
                         </span>
                       )}
-                      {canEditVisits && (
+                      {canEditVisits && !isViewOnly && (
                         <button
                           type="button"
                           className="ml-auto text-[11px] text-[#3370ff] hover:underline"
@@ -706,7 +721,7 @@ export default function DetailView({
             const paginatedRecords = sorted.slice((commPage - 1) * pageSize, commPage * pageSize)
             return (
               <div>
-                <div className="flex items-center gap-2 px-1 pb-3">
+                {!isViewOnly && <div className="flex items-center gap-2 px-1 pb-3">
                   <Input
                     value={commContent}
                     onChange={(event) => setCommContent(event.target.value)}
@@ -723,7 +738,7 @@ export default function DetailView({
                   <Button size="sm" className="h-8 shrink-0 text-xs" onClick={saveCommunicationRecord} disabled={!c.nickname || !commContent.trim() || commSaving}>
                     {commSaving ? "新增中..." : "新增"}
                   </Button>
-                </div>
+                </div>}
                 {sorted.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
                 ) : (
@@ -741,7 +756,7 @@ export default function DetailView({
                       <div className="flex-1 min-w-0">
                         <p className="text-[12px] leading-[1.6] text-[#3a4150] whitespace-pre-wrap">{r.content}</p>
                       </div>
-                      {r.can_delete && (
+                      {r.can_delete && !isViewOnly && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1320,7 +1335,7 @@ export default function DetailView({
       </div>
 
       {/* 弹窗 */}
-      <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec} customers={customerList} saving={saving}/>
+      {!isViewOnly && <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec} customers={customerList} saving={saving}/>}
 
       <Dialog open={!!commDeleteTarget} onOpenChange={(open) => { if (!open) setCommDeleteTarget(null) }}>
         <DialogContent className="w-[380px] max-w-[90vw] p-0 gap-0">

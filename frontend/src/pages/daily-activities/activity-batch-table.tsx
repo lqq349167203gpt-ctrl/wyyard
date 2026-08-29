@@ -318,6 +318,7 @@ export function ActivityBatchTable({
   const currentActorId = String(currentUser.id || "")
   const currentActorName = String(currentUser.owner || currentUser.username || "")
   const editPermissions = useEditPermissions()
+  const isViewOnly = currentUser.role !== "超级管理员" && editPermissions.activities === "view"
   const canEditAllActivities = currentUser.role === "超级管理员" || editPermissions.activities === "all"
   const [viewSegment, setViewSegment] = useState<ViewSegment>(() => {
     try { return localStorage.getItem("activity_view_segment") === "mine" ? "mine" : "all" }
@@ -329,16 +330,16 @@ export function ActivityBatchTable({
     return Boolean(row.created_by && currentActorName && row.created_by === currentActorName)
   }, [currentActorId, currentActorName])
   const canEditRow = useCallback((row: ActivityRow) => (
-    canEditAllActivities || isOwnRow(row)
-  ), [canEditAllActivities, isOwnRow])
+    !isViewOnly && (canEditAllActivities || isOwnRow(row))
+  ), [canEditAllActivities, isOwnRow, isViewOnly])
   const canEditField = useCallback((row: ActivityRow, field: keyof ActivityRow) => (
-    canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field)
-  ), [canEditRow])
+    !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field))
+  ), [canEditRow, isViewOnly])
   const canEditChanges = useCallback((row: ActivityRow, changes: Partial<ActivityRow>) => (
-    canEditRow(row) || Object.keys(changes).every(field => (
+    !isViewOnly && (canEditRow(row) || Object.keys(changes).every(field => (
       !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow)
-    ))
-  ), [canEditRow])
+    )))
+  ), [canEditRow, isViewOnly])
   const invitedOwnerCustomers = useMemo(() => {
     // 邀约名单加载完成前保持为空，避免短暂暴露全部客户作为案主候选。
     if (!invitedCustomerIds) return []
@@ -1366,12 +1367,12 @@ export function ActivityBatchTable({
           <TooltipTrigger
             render={
               <button type="button" className="hidden shrink-0 items-center gap-1 text-[12px] text-[#8f959e] min-[1100px]:inline-flex">
-                仅创建人可编辑
+                {isViewOnly ? "仅浏览" : "仅创建人可编辑"}
                 <Info className="h-3.5 w-3.5" />
               </button>
             }
           />
-          <TooltipContent>公益、时间、类型、名称、老师、方式、扣卡、案主、部位、简介及删除仅创建人可操作</TooltipContent>
+          <TooltipContent>{isViewOnly ? "当前账号可查看课表，但不能新增、修改、排序、发布、退课或删除" : "公益、时间、类型、名称、老师、方式、扣卡、案主、部位、简介及删除仅创建人可操作"}</TooltipContent>
         </Tooltip>
         <div className="ml-auto flex shrink-0 items-center gap-1">{toolbarTrailing}</div>
       </div>
@@ -1441,7 +1442,7 @@ export function ActivityBatchTable({
                   {/* 拖动 */}
                   <td
                     className="px-1 py-0.5 cursor-grab active:cursor-grabbing text-center align-top"
-                    draggable
+                    draggable={!isViewOnly}
                     onDragStart={(e) => handleDragStart(e, row.key)}
                     onDragEnd={handleDragEnd}
                   >
@@ -1886,7 +1887,7 @@ export function ActivityBatchTable({
 
       <HorizontalScrollbar scrollRef={scrollRef} />
 
-      {!isPreview && (
+      {!isPreview && !isViewOnly && (
         <div className="px-3 py-2.5 border-t border-[#f0f1f2] flex items-center">
           <button
             onClick={() => handleCreate("class", courseTypes.length > 0 ? courseTypes[0].name : "")}

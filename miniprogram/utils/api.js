@@ -8,7 +8,7 @@ let _silentLoginPromise = null
 let _logoutScheduled = false
 let _lastTrackedPagePath = ''
 const DEVICE_ID_KEY = 'wyyard_device_id'
-const DEFAULT_EDIT_PERMISSIONS = { visits: 'own', activities: 'own' }
+const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own' }
 const SECURITY_AUTH_REASONS = ['disabled', 'password_changed', 'kicked']
 
 function _getDeviceId() {

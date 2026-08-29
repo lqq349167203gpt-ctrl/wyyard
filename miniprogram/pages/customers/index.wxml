@@ -172,7 +172,7 @@
       <text class="empty-char">空</text>
     </view>
     <text class="empty-text">暂无客户</text>
-    <text class="empty-hint">点击右下角 + 添加</text>
+    <text class="empty-hint">{{isViewOnly ? '当前账号仅可浏览' : '点击右下角 + 添加'}}</text>
   </view>
 
   <!-- 加载更多 -->
@@ -184,7 +184,7 @@
   </view>
 
   <!-- 浮动添加按钮 -->
-  <view class="fab" bindtap="onAddTap" bindlongpress="onFabLongPress">
+  <view class="fab" wx:if="{{!isViewOnly}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
   </view>
   </block>

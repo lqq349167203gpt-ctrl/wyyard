@@ -1,13 +1,16 @@
 const { visitApi } = require('../../utils/api')
+const { isAreaViewOnly } = require('../../utils/record-ownership')
 
 Page({
   data: {
     visit: null,
     loading: true,
+    viewOnly: false,
   },
 
   onLoad(options) {
     if (!getApp().checkLogin()) return
+    this.setData({ viewOnly: isAreaViewOnly('visits') })
     if (options.id) {
       this.loadVisit(options.id)
     }
@@ -31,6 +34,7 @@ Page({
   },
 
   onArrivalToggle() {
+    if (this.data.viewOnly) return
     if (!this.data.visit) return
     const arrived = !this.data.visit.arrived
     const arrivalTime = arrived ? (() => {
@@ -57,6 +61,7 @@ Page({
   },
 
   onEditTap() {
+    if (this.data.viewOnly) return
     wx.navigateTo({ url: `/pages/visit-edit/index?id=${this.data.visit.id}` })
   },
 

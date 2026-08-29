@@ -21,7 +21,7 @@
         今日 <text class="summary-count">{{todayVisitCount}}</text> 位邀约 · <text class="summary-count">{{todayArrivedCount}}</text> 已到店
       </view>
       <view class="head-actions">
-        <view class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
+        <view wx:if="{{!isViewOnly}}" class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
           <text>{{editMode ? '完成' : '排序'}}</text>
         </view>
         <view class="export-btn" catchtap="onExportTap">
@@ -66,8 +66,9 @@
       leader-name="{{leaderMap[item.customer_id] || ''}}"
       edit-mode="{{editMode}}"
       editable="{{item.can_edit}}"
-      sortable="{{true}}"
-      arrival-editable="{{!item.cancelled}}"
+      cancelable="{{!isViewOnly}}"
+      sortable="{{!isViewOnly}}"
+      arrival-editable="{{!isViewOnly && !item.cancelled}}"
       can-move-up="{{index > 0}}"
       can-move-down="{{index < visits.length - 1}}"
       bind:cardtap="onVisitTap"
@@ -86,7 +87,7 @@
   <view class="empty-state" wx:if="{{!loading && visits.length === 0}}">
     <text class="empty-icon">📋</text>
     <text class="empty-text">暂无邀约记录</text>
-    <text class="empty-hint">点击右下角 + 添加</text>
+    <text class="empty-hint">{{isViewOnly ? '当前账号仅可浏览' : '点击右下角 + 添加'}}</text>
   </view>
 
   <!-- 加载中 -->
@@ -95,7 +96,7 @@
   </view>
 
   <!-- 浮动添加按钮 -->
-  <view class="fab" wx:if="{{!editMode}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
+  <view class="fab" wx:if="{{!editMode && !isViewOnly}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
   </view>
   </block>

@@ -120,7 +120,6 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             {"visit_time": "15:00"},
             {"customer_id": "other-customer"},
             {"referrer_handler": "其他邀约人"},
-            {"cancelled": True},
         ):
             forbidden_visit_update = client.patch(
                 f"/api/visits/{visit_id}",
@@ -128,6 +127,20 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
                 headers=other_headers,
             )
             assert forbidden_visit_update.status_code == 403
+        cancel_visit = client.patch(
+            f"/api/visits/{visit_id}",
+            json={"cancelled": True},
+            headers=other_headers,
+        )
+        assert cancel_visit.status_code == 200
+        assert cancel_visit.json()["cancelled"] is True
+        restore_visit = client.patch(
+            f"/api/visits/{visit_id}",
+            json={"cancelled": False},
+            headers=other_headers,
+        )
+        assert restore_visit.status_code == 200
+        assert restore_visit.json()["cancelled"] is False
         forbidden_visit_delete = client.delete(
             f"/api/visits/{visit_id}", headers=other_headers
         )

@@ -1,5 +1,6 @@
 const { visitApi, visitNoteApi, spaceApi, customerApi } = require('../../utils/api')
 const { formatDate, formatTime } = require('../../utils/util')
+const { isAreaViewOnly } = require('../../utils/record-ownership')
 
 Page({
   data: {
@@ -25,10 +26,17 @@ Page({
     pickerTitle: '',
     pickerKeyword: '',
     pickerList: [],
+    customerViewOnly: false,
   },
 
   onLoad(options) {
     if (!getApp().checkLogin()) return
+    if (isAreaViewOnly('visits')) {
+      wx.showToast({ title: '当前账号仅可浏览邀约', icon: 'none' })
+      wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/visits/index' }) })
+      return
+    }
+    this.setData({ customerViewOnly: isAreaViewOnly('customers') })
     if (options.date) this.setData({ date: options.date })
     if (options.spaceId) this.setData({ _spaceId: options.spaceId })
     this.loadSpaces()

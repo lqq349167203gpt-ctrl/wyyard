@@ -23,9 +23,10 @@
 
   <!-- 到店确认 -->
   <view class="section">
-    <button class="arrival-btn {{visit.arrived ? 'arrived-btn' : ''}}" bindtap="onArrivalToggle">
+    <button wx:if="{{!viewOnly}}" class="arrival-btn {{visit.arrived ? 'arrived-btn' : ''}}" bindtap="onArrivalToggle">
       {{visit.arrived ? '已到店' : '确认到店'}}
     </button>
+    <text wx:else class="arrival-time">{{visit.arrived ? '已到店' : '未到店'}}</text>
     <text class="arrival-time" wx:if="{{visit.arrived && visit.arrival_time}}">
       到达时间: {{visit.arrival_time}}
     </text>
@@ -42,12 +43,12 @@
     </view>
   </view>
 
-  <visit-note-section visit-id="{{visit.id}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" />
-  <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" />
-  <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" />
+  <visit-note-section visit-id="{{visit.id}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" read-only="{{viewOnly}}" />
+  <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" read-only="{{viewOnly}}" />
+  <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" read-only="{{viewOnly}}" />
 
   <!-- 编辑按钮 -->
-  <view class="bottom-bar">
+  <view class="bottom-bar" wx:if="{{!viewOnly}}">
     <button class="edit-btn" bindtap="onEditTap">编辑记录</button>
   </view>
 </view>

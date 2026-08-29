@@ -52,10 +52,6 @@ def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
     record = visit_service.get_visit(visit_id)
     if not record:
         return
-    if category == "visit_need":
-        # 来访需求属于账号私有信息，不能汇总回所有人都能读取的旧字段。
-        visit_service.update_collaboration_summary(visit_id, "needs", "")
-        return
     lines = []
     for note in _active_notes(visit_id, category):
         creator = note.created_by or "历史记录"
@@ -115,17 +111,12 @@ def list_notes(visit_ids: Iterable[str]) -> list[VisitNote]:
 
 def list_visible_notes(
     visit_ids: Iterable[str],
-    account_id: str,
+    account_id: str = "",
     owner_name: str = "",
     username: str = "",
 ) -> list[VisitNote]:
-    """来访需求仅返回当前账号自己的记录，其余协作内容保持原有可见规则。"""
-    return [
-        note
-        for note in list_notes(visit_ids)
-        if note.category != "visit_need"
-        or can_manage_note(note, account_id, owner_name, username)
-    ]
+    """所有协作内容（含来访需求）共享可见。"""
+    return list_notes(visit_ids)
 
 
 def get_note(note_id: str) -> VisitNote | None:
