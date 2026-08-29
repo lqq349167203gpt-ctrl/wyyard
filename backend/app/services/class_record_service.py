@@ -68,8 +68,8 @@ def get_record(record_id: str) -> Optional[ClassRecord]:
     return record
 
 
-def _get_group_member_ids(record) -> set:
-    """从 groups 和 participant_ids 中提取所有可扣费人员 ID（不含 teacher_ids）"""
+def _get_registered_participant_ids(record) -> set[str]:
+    """返回课程中登记过的全部参与人；退课人员仍保留在名单内。"""
     ids = set(record.participant_ids)
     for g in record.groups:
         if g.leader_id:
@@ -77,9 +77,34 @@ def _get_group_member_ids(record) -> set:
         if g.deputy_id:
             ids.add(g.deputy_id)
         ids.update(g.member_ids)
-    # 排除课程老师
-    ids -= set(record.teacher_ids)
+    return ids - set(record.teacher_ids)
+
+
+def _get_group_member_ids(record) -> set:
+    """返回当前实际参与且需要参与扣卡计算的人员。"""
+    ids = _get_registered_participant_ids(record)
+    ids -= set(record.withdrawn_participant_ids or [])
     return ids
+
+
+def _ensure_withdrawn_participants_retained(
+    record: ClassRecord,
+    participant_ids: List[str],
+    groups=None,
+) -> None:
+    withdrawn_ids = set(record.withdrawn_participant_ids or [])
+    if not withdrawn_ids:
+        return
+    registered_ids = set(participant_ids or [])
+    for group in record.groups if groups is None else groups:
+        if isinstance(group, dict):
+            registered_ids.update(filter(None, [group.get("leader_id", ""), group.get("deputy_id", "")]))
+            registered_ids.update(group.get("member_ids", []) or [])
+        else:
+            registered_ids.update(filter(None, [group.leader_id, group.deputy_id]))
+            registered_ids.update(group.member_ids or [])
+    if not withdrawn_ids.issubset(registered_ids):
+        raise ValueError("已退课人员必须保留在参与人名单中，不能直接取消")
 
 
 def _deduct_for_record(record):
@@ -180,8 +205,23 @@ def update_record(
         # 获取旧状态
         old_chargeable = _get_group_member_ids(record)
 
+        if "participant_ids" in data or "groups" in data:
+            _ensure_withdrawn_participants_retained(
+                record,
+                data.get("participant_ids", record.participant_ids) or [],
+                data.get("groups", record.groups),
+            )
+
         for key, value in data.items():
-            if hasattr(record, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
+            if hasattr(record, key) and key not in (
+                "id",
+                "created_at",
+                "created_by_id",
+                "created_by",
+                "withdrawn_participant_ids",
+                "is_deleted",
+                "deleted_at",
+            ):
                 setattr(record, key, value)
         record.membership_deduction_count = (
             0
@@ -207,6 +247,7 @@ def update_participants(record_id: str, participant_ids: List[str]):
     record = _records.get(record_id)
     if not record or record.is_deleted:
         return None, []
+    _ensure_withdrawn_participants_retained(record, participant_ids)
     old_chargeable = _get_group_member_ids(record)
     old_ids = _get_all_member_ids(record)
     record.participant_ids = participant_ids
@@ -242,6 +283,8 @@ def update_groups(record_id: str, groups: list):
     if not record or record.is_deleted:
         return None, []
 
+    _ensure_withdrawn_participants_retained(record, [], groups)
+
     # 校验成员必须在当日到场名单中，自动过滤已删除的人员
     visits = visit_service.list_visits(record.date)
     visit_ids = {v.customer_id for v in visits}
@@ -274,6 +317,43 @@ def update_groups(record_id: str, groups: list):
     _save(record_id)
     _refresh_affected_identities(old_ids | _get_all_member_ids(record))
     return record, []
+
+
+def withdraw_participant(record_id: str, customer_id: str) -> tuple[Optional[ClassRecord], bool]:
+    """办理退课：保留参与人历史，但停止该客户在本课程中的扣卡。"""
+    with _record_lock:
+        record = _records.get(record_id)
+        if not record or record.is_deleted:
+            return None, False
+        if customer_id not in _get_registered_participant_ids(record):
+            raise ValueError("所选客户不在该课程的参与人名单中")
+        if customer_id in set(record.withdrawn_participant_ids or []):
+            return record, False
+
+        old_chargeable = _get_group_member_ids(record)
+        record.withdrawn_participant_ids = [
+            *record.withdrawn_participant_ids,
+            customer_id,
+        ]
+        new_chargeable = _get_group_member_ids(record)
+        record.updated_at = datetime.now(timezone.utc)
+        _records[record_id] = record
+        _save(record_id)
+        try:
+            _sync_deduction(record, old_chargeable, new_chargeable)
+        except Exception:
+            record.withdrawn_participant_ids = [
+                participant_id
+                for participant_id in record.withdrawn_participant_ids
+                if participant_id != customer_id
+            ]
+            record.updated_at = datetime.now(timezone.utc)
+            _save(record_id)
+            _sync_deduction(record, new_chargeable, old_chargeable)
+            raise
+
+    _refresh_affected_identities({customer_id})
+    return record, True
 
 
 def _get_card_remaining(customer_id: str) -> int:

@@ -56,11 +56,6 @@
         <text class="picker-clear" wx:if="{{nickname && !readOnly}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
-    <view class="form-item">
-      <text class="form-label">来访需求</text>
-      <input wx:if="{{!readOnly}}" class="form-input" value="{{needs}}" bindinput="onNeedsInput" placeholder="请输入来访需求" placeholder-class="form-input-placeholder" />
-      <text wx:else class="protected-value protected-value-wrap">{{needs || '-'}}</text>
-    </view>
     <view class="form-item last" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>
       <view class="picker-value-wrap">
@@ -70,6 +65,7 @@
     </view>
   </view>
 
+  <visit-note-section visit-id="{{visit.id}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" />
   <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" />
   <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" />
 

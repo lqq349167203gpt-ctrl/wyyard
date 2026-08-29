@@ -12,9 +12,12 @@
         <text class="wk">{{currentWeekday}}</text>
         <text class="drop">{{calendarExpanded ? '▴' : '▾'}}</text>
       </view>
-      <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-        <text>{{currentSpaceName}} ▾</text>
-      </picker>
+      <view class="head-tools">
+        <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
+          <text>{{currentSpaceName}} ▾</text>
+        </picker>
+        <view class="withdraw-entry {{withdrawalCourses.length ? '' : 'disabled'}}" bindtap="onWithdrawalOpen">退课</view>
+      </view>
     </view>
     <view class="head-parti">今日 <text class="cnt">{{participants.length}}</text> 位参与者</view>
     <!-- 下拉日历 -->
@@ -95,6 +98,33 @@
   <!-- 添加按钮 -->
   <view class="fab" bindtap="onCreateTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
+  </view>
+
+  <view class="withdraw-mask" wx:if="{{showWithdrawal}}" bindtap="onWithdrawalClose"></view>
+  <view class="withdraw-sheet" wx:if="{{showWithdrawal}}">
+    <view class="withdraw-head">
+      <text class="withdraw-title">办理退课</text>
+      <text class="withdraw-close" bindtap="onWithdrawalClose">关闭</text>
+    </view>
+    <view class="withdraw-body">
+      <view class="withdraw-row">
+        <text class="withdraw-label">课程</text>
+        <picker class="withdraw-picker" mode="selector" range="{{withdrawalCourses}}" range-key="label" value="{{withdrawalCourseIndex}}" bindchange="onWithdrawalCourseChange">
+          <view class="withdraw-value">{{withdrawalCourses[withdrawalCourseIndex].label}}<text>⌄</text></view>
+        </picker>
+      </view>
+      <view class="withdraw-row">
+        <text class="withdraw-label">参与人</text>
+        <picker class="withdraw-picker" mode="selector" range="{{withdrawalParticipants}}" range-key="nickname" value="{{withdrawalParticipantIndex}}" bindchange="onWithdrawalParticipantChange">
+          <view class="withdraw-value">{{withdrawalParticipants[withdrawalParticipantIndex].nickname}}<text>⌄</text></view>
+        </picker>
+      </view>
+      <text class="withdraw-note">退课后保留参与人记录并标记“已退课”，本课程已扣卡次会恢复为 0。</text>
+    </view>
+    <view class="withdraw-actions">
+      <button class="withdraw-cancel" bindtap="onWithdrawalClose" disabled="{{withdrawing}}">取消</button>
+      <button class="withdraw-confirm" bindtap="onWithdrawalConfirm" loading="{{withdrawing}}" disabled="{{withdrawing}}">确认退课</button>
+    </view>
   </view>
   </block>
 </view>

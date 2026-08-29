@@ -1,7 +1,7 @@
 <view class="note-card">
   <view class="note-header">
     <text class="note-title">{{title}}</text>
-    <text class="note-count" wx:if="{{personCount}}">{{personCount}}人已填写</text>
+    <text class="note-count" wx:if="{{personCount && !privateToCreator}}">{{personCount}}人已填写</text>
   </view>
 
   <!-- 我填写的 -->
@@ -10,11 +10,11 @@
     <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}} 更新 · <text class="clear-btn" bindtap="onClearMine">清空</text></text>
   </view>
   <view class="mine-box" bindtap="onAdd">
-    <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.content : '写下你观察到的' + title + '…'}}</text>
+    <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.content : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…')}}</text>
   </view>
 
   <!-- 别人填写的 -->
-  <block wx:if="{{otherNotes.length}}">
+  <block wx:if="{{otherNotes.length && !privateToCreator}}">
     <view class="section-label others">
       <text class="section-label-text">别人填写的</text>
     </view>
@@ -40,7 +40,7 @@
   <textarea
     class="editor-input"
     value="{{editorValue}}"
-    placeholder="写下你观察到的{{title}}…"
+    placeholder="{{privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'}}"
     placeholder-style="color:#c0c4cc"
     maxlength="5000"
     focus="{{editorOpen}}"

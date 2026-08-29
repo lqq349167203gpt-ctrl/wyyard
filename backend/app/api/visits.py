@@ -28,14 +28,33 @@ def _filter_visible_visits(request: Request | None, records: list) -> list:
     return [record for record in records if record.customer_id in visible_ids]
 
 
-def _fill_member_type(record):
+def _fill_member_type(record, private_need: str = ""):
     """从客户信息实时填充会员身份、昵称和引流来源"""
     data = record.model_dump(mode="json")
     customer = get_customer(record.customer_id)
     data["member_type"] = customer.member_type if customer else ""
     data["nickname"] = customer.nickname if customer else ""
     data["referrer"] = customer.referrer if customer else ""
+    data["needs"] = private_need
     return data
+
+
+def _private_need_map(request: Request | None, visit_ids: list[str]) -> dict[str, str]:
+    if request is None or not visit_ids:
+        return {}
+    from app.services import visit_note_service
+
+    notes = visit_note_service.list_visible_notes(
+        visit_ids,
+        getattr(request.state, "user_id", "") or "",
+        getattr(request.state, "user_owner", "") or "",
+        getattr(request.state, "user_name", "") or "",
+    )
+    return {
+        note.visit_id: note.content
+        for note in notes
+        if note.category == "visit_need"
+    }
 
 
 def _fill_daily_amount(items: list, date: str):
@@ -105,7 +124,8 @@ async def list_visits(
         request,
         visit_service.list_visits(date, customer_id, space_id),
     )
-    items = [_fill_member_type(r) for r in records]
+    need_map = _private_need_map(request, [record.id for record in records])
+    items = [_fill_member_type(r, need_map.get(r.id, "")) for r in records]
     role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
     if date and customer_access_service.can_view_transaction_summary(role):
         _fill_daily_amount(items, date)
@@ -123,6 +143,9 @@ async def list_visits_light(
     """轻量版列表，不计算活动详情，适用于主页快速加载"""
     try:
         items = visit_service.list_visits_light(date, space_id)
+        need_map = _private_need_map(request, [str(item.get("id") or "") for item in items])
+        for item in items:
+            item["needs"] = need_map.get(str(item.get("id") or ""), "")
         visible_ids = _visible_customer_ids(request)
         if visible_ids is None:
             return items
@@ -202,7 +225,9 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
         request,
         visit_service.list_visits(date, space_id=space_id),
     )
-    items = [_fill_member_type(r) for r in records if not r.cancelled]
+    active_records = [record for record in records if not record.cancelled]
+    need_map = _private_need_map(request, [record.id for record in active_records])
+    items = [_fill_member_type(record, need_map.get(record.id, "")) for record in active_records]
 
     # 构建组长映射（复用 PC 端逻辑）
     role_map = {}
@@ -292,15 +317,32 @@ async def get_visit(visit_id: str, request: Request):
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
     customer_access_service.require_customer_scope(request, record.customer_id)
-    return _fill_member_type(record)
+    need_map = _private_need_map(request, [record.id])
+    return _fill_member_type(record, need_map.get(record.id, ""))
 
 
 @router.post("")
 async def create_visit(data: VisitRecordCreate, request: Request):
     customer_access_service.require_customer_scope(request, data.customer_id, action="邀约")
     try:
-        record = visit_service.create_visit(stamp_creator(data, request))
-        return _fill_member_type(record)
+        initial_need = str(data.needs or "").strip()
+        create_data = data.model_copy(update={"needs": ""}) if initial_need else data
+        record = visit_service.create_visit(stamp_creator(create_data, request))
+        if initial_need:
+            from app.services import visit_note_service
+
+            visit_note_service.create_note(
+                record.id,
+                "visit_need",
+                initial_need,
+                creator_id=getattr(request.state, "user_id", "") or "",
+                creator=(
+                    getattr(request.state, "user_owner", "")
+                    or getattr(request.state, "user_name", "")
+                    or ""
+                ),
+            )
+        return _fill_member_type(record, initial_need)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -314,6 +356,8 @@ async def update_visit(visit_id: str, data: dict, request: Request):
     customer_access_service.require_customer_scope(request, old_record.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != old_record.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="邀约")
+    if "needs" in data and (old_record.cancelled or "cancelled" in data):
+        raise HTTPException(status_code=400, detail="取消或恢复邀约时不能同时修改来访需求")
     ensure_creator_for_changed_fields(
         request,
         old_record,
@@ -322,17 +366,17 @@ async def update_visit(visit_id: str, data: dict, request: Request):
             "visit_date",
             "visit_time",
             "customer_id",
-            "needs",
             "referrer_handler",
             "cancelled",
         },
-        "邀约的邀约人、时间、来访需求或取消状态",
+        "邀约的客户、邀约人、时间或取消状态",
         "visits",
     )
     old_arrived = old_record.arrived if old_record else False
 
     # 兼容旧客户端：客户信息/跟进点不再覆盖整段文本，而是按当前账号追加为独立记录。
     collaboration_fields = {
+        "needs": "visit_need",
         "feedback": "customer_info",
         "healing_notes": "follow_up",
     }
@@ -387,7 +431,8 @@ async def update_visit(visit_id: str, data: dict, request: Request):
                 operator="管理员",
             )
 
-    return _fill_member_type(record)
+    need_map = _private_need_map(request, [record.id])
+    return _fill_member_type(record, need_map.get(record.id, ""))
 
 
 @router.delete("/{visit_id}")

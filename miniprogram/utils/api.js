@@ -417,6 +417,7 @@ const classRecordApi = {
   create: (data) => request('/api/class-records', { method: 'POST', data }),
   update: (id, data) => request(`/api/class-records/${id}`, { method: 'PATCH', data }),
   delete: (id) => request(`/api/class-records/${id}`, { method: 'DELETE' }),
+  withdrawParticipant: (id, customerId) => request(`/api/class-records/${id}/withdrawals`, { method: 'POST', data: { customer_id: customerId } }),
 }
 
 // 课程类型 API

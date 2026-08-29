@@ -239,6 +239,8 @@ def record_customer_needs(customer_name: str, needs: str) -> str:
     """
     date = _ctx_var.get()["date"]
     space_id = _ctx_var.get()["space_id"]
+    operator = _ctx_var.get().get("operator", "")
+    account_id = _ctx_var.get().get("account_id", "")
 
     customer = _find_customer_from_instruction(customer_name)
     if not customer:
@@ -250,15 +252,34 @@ def record_customer_needs(customer_name: str, needs: str) -> str:
 
     visit = _find_visit(customer["nickname"], date, space_id)
     if not visit:
-        visit_service.create_visit(VisitRecordCreate(
+        visit = visit_service.create_visit(VisitRecordCreate(
             visit_date=date, visit_time=_now_hm(),
             customer_id=customer["id"],
-            space_id=space_id, needs=needs,
+            space_id=space_id,
+            created_by_id=account_id,
+            created_by=operator,
         ))
+        from app.services import visit_note_service
+
+        visit_note_service.create_note(
+            visit.id,
+            "visit_need",
+            needs,
+            creator_id=account_id,
+            creator=operator or "AI 助手",
+        )
         _log_visit(f"新增邀约 {customer['nickname']}（{date}）并记录来访需求：{needs}")
         return json.dumps({"ok": True, "action": "needs", "name": customer["nickname"], "needs": needs, "auto_added": True}, ensure_ascii=False)
 
-    visit_service.update_visit(visit.id, {"needs": needs})
+    from app.services import visit_note_service
+
+    visit_note_service.create_note(
+        visit.id,
+        "visit_need",
+        needs,
+        creator_id=account_id,
+        creator=operator or "AI 助手",
+    )
     _log_visit(f"{customer['nickname']}记录来访需求：{needs}", method="PATCH")
     return json.dumps({"ok": True, "action": "needs", "name": customer["nickname"], "needs": needs}, ensure_ascii=False)
 
@@ -443,10 +464,22 @@ def query_visit_list(visit_date: str = "") -> str:
     space_id = _ctx_var.get()["space_id"]
 
     visits = visit_service.list_visits(date=date, space_id=space_id)
+    from app.services import visit_note_service
+
+    context = _ctx_var.get()
+    own_needs = {
+        note.visit_id: note.content
+        for note in visit_note_service.list_visible_notes(
+            [visit.id for visit in visits],
+            context.get("account_id", ""),
+            context.get("operator", ""),
+        )
+        if note.category == "visit_need"
+    }
     def _nick(v):
         c = customer_service.get_customer(v.customer_id) if v.customer_id else None
         return c.nickname if c else ""
-    arrived = [{"name": _nick(v), "time": v.arrival_time, "leader": v.is_leader, "needs": v.needs}
+    arrived = [{"name": _nick(v), "time": v.arrival_time, "leader": v.is_leader, "needs": own_needs.get(v.id, "")}
                for v in visits if v.arrived and not v.is_deleted]
     not_arrived = [{"name": _nick(v), "visit_time": v.visit_time, "leader": v.is_leader}
                    for v in visits if not v.arrived and not v.is_deleted]
@@ -457,14 +490,29 @@ TOOLS = [add_to_visit_list, set_arrival, remove_from_visit_list, record_customer
 TOOL_MAP = {t.name: t for t in TOOLS}
 
 # 运行时上下文，每次调用 visit_chat 时设置（async-safe）
-_ctx_var = contextvars.ContextVar("visit_chat_ctx", default={"date": "", "space_id": "", "operator": ""})
+_ctx_var = contextvars.ContextVar(
+    "visit_chat_ctx",
+    default={"date": "", "space_id": "", "operator": "", "account_id": ""},
+)
 
 
-async def visit_chat(message: str, history: list, date: str, space_id: str, operator: str = "") -> dict:
+async def visit_chat(
+    message: str,
+    history: list,
+    date: str,
+    space_id: str,
+    operator: str = "",
+    account_id: str = "",
+) -> dict:
     """邀约对话主入口。使用 LLM tool calling 理解意图并执行操作。"""
     anchor = parse_anchor(date)
     anchor_iso = anchor.isoformat()
-    _ctx_var.set({"date": anchor_iso, "space_id": space_id, "operator": operator})
+    _ctx_var.set({
+        "date": anchor_iso,
+        "space_id": space_id,
+        "operator": operator,
+        "account_id": account_id,
+    })
 
     prompt_config = get_visit_ai_config()
     model_config = get_miniapp_ai_config()

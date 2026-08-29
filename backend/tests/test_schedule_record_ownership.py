@@ -119,7 +119,6 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             {"visit_date": "2026-08-21"},
             {"visit_time": "15:00"},
             {"customer_id": "other-customer"},
-            {"needs": "不能修改"},
             {"referrer_handler": "其他邀约人"},
             {"cancelled": True},
         ):
@@ -156,12 +155,22 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             f"{account['owner']}：他人可补充跟进点"
         )
 
-        mixed_visit_update = client.patch(
+        other_private_need = client.patch(
             f"/api/visits/{visit_id}",
-            json={"arrived": False, "needs": "不能夹带修改"},
+            json={"needs": "其他员工自己的来访需求"},
             headers=other_headers,
         )
-        assert mixed_visit_update.status_code == 403
+        assert other_private_need.status_code == 200
+        assert other_private_need.json()["needs"] == "其他员工自己的来访需求"
+        assert client.get(f"/api/visits/{visit_id}").json()["needs"] == "睡眠调理"
+
+        mixed_visit_update = client.patch(
+            f"/api/visits/{visit_id}",
+            json={"arrived": False, "needs": "其他员工更新自己的需求"},
+            headers=other_headers,
+        )
+        assert mixed_visit_update.status_code == 200
+        assert mixed_visit_update.json()["needs"] == "其他员工更新自己的需求"
 
         other_reorder = client.post(
             "/api/visits/reorder",
@@ -259,6 +268,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
         )
         assert allowed_visit_update.status_code == 200
         assert allowed_visit_update.json()["needs"] == "全量权限可以修改"
+        assert client.get(f"/api/visits/{visit_id}").json()["needs"] == "本人可以修改"
 
         for path, record_id, protected_update in created_records:
             allowed_update = client.patch(
@@ -275,7 +285,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
         client.delete(f"/api/positions/{position['id']}")
 
 
-def test_super_admin_can_edit_other_creators_schedule_content(client, created_customer):
+def test_super_admin_schedule_permission_does_not_merge_private_visit_needs(client, created_customer):
     date = "2026-08-21"
     visit = client.post("/api/visits", json={
         "visit_date": date,
@@ -311,6 +321,7 @@ def test_super_admin_can_edit_other_creators_schedule_content(client, created_cu
         )
         assert updated.status_code == 200
         assert updated.json()["needs"] == "超级管理员修改"
+        assert client.get(f"/api/visits/{visit.json()['id']}").json()["needs"] == "原始需求"
     finally:
         client.delete(f"/api/visits/{visit.json()['id']}")
         client.delete(f"/api/accounts/{account['id']}")

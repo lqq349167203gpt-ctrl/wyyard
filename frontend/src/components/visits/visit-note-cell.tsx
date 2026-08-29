@@ -12,6 +12,7 @@ interface VisitNoteCellProps {
   notes: VisitNote[]
   disabled?: boolean
   expanded?: boolean
+  privateToCreator?: boolean
   onNotesChange: (notes: VisitNote[]) => void
 }
 
@@ -36,7 +37,7 @@ function authorKey(note: VisitNote): string {
   return note.created_by_id || note.created_by || note.id
 }
 
-export function VisitNoteCell({ visitId, nickname, title, category, notes, disabled, expanded = false, onNotesChange }: VisitNoteCellProps) {
+export function VisitNoteCell({ visitId, nickname, title, category, notes, disabled, expanded = false, privateToCreator = false, onNotesChange }: VisitNoteCellProps) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState("")
   const [savedValue, setSavedValue] = useState("")
@@ -48,12 +49,13 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
     const seenAuthors = new Set<string>()
     return notes.filter((note) => {
       if (note.category !== category) return false
+      if (privateToCreator && !note.can_edit) return false
       const key = authorKey(note)
       if (seenAuthors.has(key)) return false
       seenAuthors.add(key)
       return true
     })
-  }, [category, notes])
+  }, [category, notes, privateToCreator])
   const latest = categoryNotes[0]
   const myNote = categoryNotes.find((note) => note.can_edit)
   const colleagueNotes = categoryNotes.filter((note) => !note.can_edit)
@@ -132,17 +134,16 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
       <span className={`min-w-0 flex-1 ${expanded ? "flex flex-col gap-1" : "truncate"} ${latest ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}>
         {latest ? expanded ? categoryNotes.map((note) => (
           <span key={note.id} className="whitespace-pre-wrap break-words leading-5">
-            <span>{note.created_by || "历史记录"}</span>
-            <span>：{note.content}</span>
+            {privateToCreator ? note.content : <><span>{note.created_by || "历史记录"}</span><span>：{note.content}</span></>}
           </span>
         )) : (
-          <>
+          privateToCreator ? compactText(latest.content) : <>
             <span>{latest.created_by || "历史记录"}</span>
             <span>：{compactText(latest.content)}</span>
           </>
         ) : ""}
       </span>
-      {categoryNotes.length > 0 && (
+      {!privateToCreator && categoryNotes.length > 0 && (
         <span className={`shrink-0 text-[11px] tabular-nums text-[#8f959e] ${expanded ? "mt-0.5" : ""}`}>{categoryNotes.length}人</span>
       )}
     </button>
@@ -150,7 +151,7 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
 
   return (
     <>
-      {categoryNotes.length > 0 && !disabled ? (
+      {categoryNotes.length > 0 && !disabled && !privateToCreator ? (
         <Tooltip>
           <TooltipTrigger render={cell} />
           <TooltipContent
@@ -213,7 +214,7 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
                 }
               }}
               className="min-h-[64px] w-full resize-none rounded-[4px] border-[0.5px] border-[#d3d6db] bg-white px-2.5 py-2 text-[13px] leading-5 text-[#2b2f36] outline-none placeholder:text-[#c0c4cc] focus:border-[#3370ff]"
-              placeholder={`写下你观察到的${title}…`}
+              placeholder={privateToCreator ? `填写${title}…` : `写下你观察到的${title}…`}
             />
             {error && <div className="mt-1.5 text-[11px] text-[#c4506a]">{error}</div>}
 

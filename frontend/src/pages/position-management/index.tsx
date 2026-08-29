@@ -739,7 +739,7 @@ export default function PositionManagementPage() {
                             key: "visits" as const,
                             pageKey: "class-records",
                             label: "邀约",
-                            description: "邀约人、时间、来访需求、取消及删除",
+                            description: "客户、邀约人、时间、取消及删除；来访需求由每人独立维护",
                           },
                           {
                             key: "activities" as const,

@@ -294,6 +294,17 @@ def _activity_role_label(role: str) -> str:
     return {"owner": "案主", "teacher": "老师"}.get(role, "")
 
 
+def _withdrawn_participant_ids(item: dict) -> set[str]:
+    """仅标准课表支持退课；退课人员保留历史，但不再属于当前参与名单。"""
+    if item.get("type") != "class":
+        return set()
+    return {
+        customer_id
+        for customer_id in (item["data"].get("withdrawn_participant_ids") or [])
+        if customer_id
+    }
+
+
 def _customer_participates_in_activity(item: dict, customer_id: str) -> bool:
     """判断客户是否属于活动名单；用于本人访问未发布活动。"""
     if not customer_id:
@@ -315,16 +326,20 @@ def _customer_participates_in_activity(item: dict, customer_id: str) -> bool:
 
 def _activity_signup_count(item: dict, signups: list[dict]) -> int:
     """合并固定身份、后台参与者、分组成员和小程序报名并去重。"""
+    withdrawn_ids = _withdrawn_participant_ids(item)
     seen = {cid for cid in (item["data"].get("participant_ids") or []) if cid}
     role_ids = _activity_role_ids(item)
     seen.update(role_ids["owner"])
     seen.update(role_ids["teacher"])
     for group in (item["data"].get("groups") or []):
         seen.update(cid for cid in (group.get("member_ids") or []) if cid)
+    seen -= withdrawn_ids
 
     anonymous_count = 0
     for signup in signups:
         customer_id = signup.get("customer_id", "")
+        if customer_id in withdrawn_ids:
+            continue
         if customer_id:
             seen.add(customer_id)
         else:
@@ -470,6 +485,7 @@ def get_activity(activity_id: str, request: Request):
     customer_map = _build_customer_map()
     space_map, room_map = _get_space_map()
     result = _format_activity(item, customer_map, space_map, room_map)
+    withdrawn_ids = _withdrawn_participant_ids(item)
 
     # 参与者 = 案主/老师 ∪ 后台维护的 participant_ids(+分组成员) ∪ 小程序报名记录
     # 当前用户(若已登录)排最前并标记 is_me
@@ -483,12 +499,12 @@ def get_activity(activity_id: str, request: Request):
                 seen.add(cid)
                 member_ids.append(cid)
     for cid in (item["data"].get("participant_ids") or []):
-        if cid and cid not in seen:
+        if cid and cid not in withdrawn_ids and cid not in seen:
             seen.add(cid)
             member_ids.append(cid)
     for g in (item["data"].get("groups") or []):
         for cid in (g.get("member_ids") or []):
-            if cid and cid not in seen:
+            if cid and cid not in withdrawn_ids and cid not in seen:
                 seen.add(cid)
                 member_ids.append(cid)
     participants = []
@@ -501,6 +517,8 @@ def get_activity(activity_id: str, request: Request):
         })
     for s in _load_signups(activity_id):
         cid = s.get("customer_id", "")
+        if cid in withdrawn_ids:
+            continue
         if cid and cid in seen:
             continue  # 已在后台名单中
         if cid:
@@ -514,7 +532,8 @@ def get_activity(activity_id: str, request: Request):
     participation_role = _activity_role_for_customer(item, customer_id)
     result["signup_count"] = len(participants)
     result["participants"] = participants
-    result["signed_up"] = any(p["is_me"] for p in participants)
+    result["withdrawn"] = bool(customer_id) and customer_id in withdrawn_ids
+    result["signed_up"] = not result["withdrawn"] and any(p["is_me"] for p in participants)
     result["participation_locked"] = bool(participation_role)
     result["participation_role"] = participation_role
     result["participation_role_label"] = _activity_role_label(participation_role)
@@ -535,6 +554,9 @@ def signup_activity(activity_id: str, request: Request):
     customer_id = getattr(request.state, "customer_id", "") or getattr(request.state, "user_id", "")
     if not customer_id:
         raise HTTPException(status_code=401, detail="请先登录")
+
+    if customer_id in _withdrawn_participant_ids(item):
+        raise HTTPException(status_code=409, detail="该课程已办理退课，无法重新报名")
 
     participation_role = _activity_role_for_customer(item, customer_id)
     if participation_role:
@@ -629,6 +651,9 @@ def cancel_signup(activity_id: str, request: Request):
     item = _find_activity(activity_id)
     if not item:
         raise HTTPException(status_code=404, detail="活动不存在")
+
+    if customer_id in _withdrawn_participant_ids(item):
+        raise HTTPException(status_code=409, detail="该课程已办理退课")
 
     participation_role = _activity_role_for_customer(item, customer_id)
     if participation_role:
@@ -746,7 +771,7 @@ def get_activity_records(request: Request):
 
     # 补充到场状态和活动时间
     for act in activities:
-        act["arrived"] = act.get("date", "") in visit_dates
+        act["arrived"] = not act.get("withdrawn", False) and act.get("date", "") in visit_dates
         _enrich_activity_time(act)
         followup = followups.get(act["activity_key"])
         act["has_followup"] = followup is not None

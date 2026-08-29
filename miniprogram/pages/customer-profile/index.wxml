@@ -219,7 +219,8 @@
           <view class="rec-head">
             <text class="rec-sub-date">{{item.date}}</text>
             <view class="rec-head-meta">
-              <text class="pill pill-warn" wx:if="{{item.notArrived}}">未参与</text>
+              <text class="pill pill-withdrawn" wx:if="{{item.withdrawn}}">已退课</text>
+              <text class="pill pill-warn" wx:elif="{{item.notArrived}}">未参与</text>
               <text class="rec-deduct" wx:if="{{item.deduction_summary && !item.notArrived}}">{{item.deduction_summary}}</text>
             </view>
           </view>

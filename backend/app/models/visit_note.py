@@ -5,7 +5,7 @@ from pydantic import Field
 
 from app.models.base import SafeBaseModel, StrictBaseModel
 
-VisitNoteCategory = Literal["customer_info", "follow_up"]
+VisitNoteCategory = Literal["visit_need", "customer_info", "follow_up"]
 
 
 class VisitNoteCreate(StrictBaseModel):

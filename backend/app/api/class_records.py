@@ -239,12 +239,15 @@ def update_record(record_id: str, data: dict, request: Request, conversion: bool
     old_activity_name = old_record.activity_name if old_record else ""
     old_description = old_record.course_description if old_record else ""
 
-    record = class_record_service.update_record(
-        record_id,
-        data,
-        refresh_identities=not conversion,
-        sync_deductions=not conversion,
-    )
+    try:
+        record = class_record_service.update_record(
+            record_id,
+            data,
+            refresh_identities=not conversion,
+            sync_deductions=not conversion,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
 
@@ -340,7 +343,10 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
     )
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
-    record, warnings = class_record_service.update_participants(record_id, data.participant_ids)
+    try:
+        record, warnings = class_record_service.update_participants(record_id, data.participant_ids)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     if not record:
         if warnings:
             raise HTTPException(status_code=422, detail="; ".join(warnings))
@@ -385,6 +391,75 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
     result = record.model_dump(mode="json")
     result["warnings"] = warnings
     return result
+
+
+class CourseWithdrawalCreate(StrictBaseModel):
+    customer_id: str
+
+
+@router.post("/{record_id}/withdrawals")
+def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: Request):
+    record = class_record_service.get_record(record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="课程记录不存在")
+    customer_access_service.require_new_customer_ids(
+        request,
+        [data.customer_id],
+        action="办理退课",
+    )
+    customer = get_customer(data.customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="客户不存在")
+    before_data = record.model_dump(mode="json")
+    try:
+        updated, changed = class_record_service.withdraw_participant(record_id, data.customer_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not updated:
+        raise HTTPException(status_code=404, detail="课程记录不存在")
+    activity_name = updated.activity_name or updated.course_name or "未命名课程"
+    customer_name = customer.nickname or customer.name or "未命名客户"
+
+    # 同步客户端小程序报名状态。参与人历史保留在课表中，但客户端不再显示为已报名。
+    from app.services.storage import delete_item, load_data, save_item
+    signups_data = load_data("client_signups.json")
+    for signup_id, signup in signups_data.items():
+        if isinstance(signup, dict):
+            if signup.get("activity_id") == record_id and signup.get("customer_id") == data.customer_id:
+                delete_item("client_signups.json", signup_id)
+        elif isinstance(signup, list):
+            retained = [
+                item
+                for item in signup
+                if not (
+                    isinstance(item, dict)
+                    and item.get("activity_id") == record_id
+                    and item.get("customer_id") == data.customer_id
+                )
+            ]
+            if len(retained) != len(signup):
+                save_item("client_signups.json", signup_id, retained)
+
+    if changed:
+        operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
+        from app.services import client_notification_service
+        client_notification_service.create_notification(
+            customer_id=data.customer_id,
+            type="signup_cancelled",
+            title="退课已办理",
+            content=f'您在"{activity_name}"（{updated.date}）的退课已办理',
+            activity_name=activity_name,
+            activity_date=updated.date,
+            operator=operator,
+        )
+
+    request.state.operation_log_context = {
+        "content": f"退课：{customer_name} · {activity_name}（{updated.date}）",
+        "entity_id": record_id,
+        "before_data": before_data,
+        "after_data": updated.model_dump(mode="json"),
+    }
+    return updated
 
 
 @router.patch("/{record_id}/groups")
@@ -661,12 +736,27 @@ def dashboard(
                 if participant_id in visible_ids and participant_id not in ids
             )
         )
+        withdrawn_participant_ids = set(d.get("withdrawn_participant_ids", []) or [])
+        d["participants"] = [
+            {
+                "id": participant_id,
+                "nickname": customer_map.get(participant_id, ""),
+                "withdrawn": participant_id in withdrawn_participant_ids,
+            }
+            for participant_id in visible_participant_ids
+            if customer_map.get(participant_id)
+        ]
+        active_participant_ids = [
+            participant_id
+            for participant_id in visible_participant_ids
+            if participant_id not in withdrawn_participant_ids
+        ]
         d["participant_names"] = [
             customer_map.get(pid, "")
-            for pid in visible_participant_ids
+            for pid in active_participant_ids
             if customer_map.get(pid)
         ]
-        d["visible_participant_count"] = len(visible_participant_ids)
+        d["visible_participant_count"] = len(active_participant_ids)
         owner_id = d.get("owner_id", "")
         if owner_id and owner_id not in visible_ids:
             d["owner_name"] = ""

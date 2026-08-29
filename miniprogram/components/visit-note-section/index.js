@@ -13,6 +13,7 @@ Component({
     visitId: { type: String, value: '' },
     category: { type: String, value: '' },
     title: { type: String, value: '' },
+    privateToCreator: { type: Boolean, value: false },
   },
 
   data: {
@@ -39,6 +40,7 @@ Component({
         const notes = await visitNoteApi.list(this.properties.visitId)
         const categoryNotes = (notes || [])
           .filter((note) => note.category === this.properties.category)
+          .filter((note) => !this.properties.privateToCreator || note.can_edit)
           .map((note) => Object.assign({}, note, { timeText: formatTime(note.created_at) }))
         // 每人一条：按创建人归并取最新；可编辑的那条视为"我填写的"
         const byCreator = new Map()
@@ -51,7 +53,7 @@ Component({
         }
         const merged = Array.from(byCreator.values())
         const myNote = merged.find((note) => note.can_edit) || null
-        const otherNotes = merged
+        const otherNotes = (this.properties.privateToCreator ? [] : merged)
           .filter((note) => note !== myNote)
           .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
         this.setData({

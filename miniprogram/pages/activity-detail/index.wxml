@@ -15,12 +15,13 @@
       <view
         wx:for="{{participantList}}"
         wx:key="id"
-        class="participant-item {{item.selected ? 'selected' : ''}}"
+        class="participant-item {{item.selected ? 'selected' : ''}} {{item.withdrawn ? 'withdrawn' : ''}}"
         bindtap="onParticipantToggle"
         data-id="{{item.id}}"
       >
         <text class="participant-name">{{item.nickname}}</text>
-        <view class="participant-check" wx:if="{{item.selected}}">✓</view>
+        <text class="participant-withdrawn" wx:if="{{item.withdrawn}}">已退课</text>
+        <view class="participant-check" wx:elif="{{item.selected}}">✓</view>
       </view>
     </view>
     <view class="participant-empty" wx:if="{{participantList.length === 0}}">

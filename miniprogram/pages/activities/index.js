@@ -85,6 +85,12 @@ Page({
     timeGroups: [],
     participants: [],
     participantText: '',
+    withdrawalCourses: [],
+    withdrawalCourseIndex: 0,
+    withdrawalParticipants: [],
+    withdrawalParticipantIndex: 0,
+    showWithdrawal: false,
+    withdrawing: false,
     loading: true,
   },
 
@@ -357,10 +363,32 @@ Page({
       const participants = []
       participantSet.forEach(function(v) { participants.push(v) })
 
+      const withdrawalCourses = (dashboard.class_records || []).map(function(record) {
+        const availableParticipants = (record.participants || []).filter(function(participant) {
+          return participant.id && !participant.withdrawn
+        })
+        return {
+          id: record.id,
+          label: `${record.start_time ? record.start_time + ' ' : ''}${record.activity_name || record.course_name || '未命名课程'}`,
+          participants: availableParticipants,
+        }
+      }).filter(function(course) { return course.participants.length > 0 })
+      const withdrawalParticipants = withdrawalCourses.length > 0 ? withdrawalCourses[0].participants : []
+
       // 保存日历计数，供展开时使用
       this._calendarCounts = dashboard.calendar_counts || {}
       this._rawMap = rawMap
-      this.setData({ records, timeGroups, participants, participantText: participants.join('、'), loading: false })
+      this.setData({
+        records,
+        timeGroups,
+        participants,
+        participantText: participants.join('、'),
+        withdrawalCourses,
+        withdrawalCourseIndex: 0,
+        withdrawalParticipants,
+        withdrawalParticipantIndex: 0,
+        loading: false,
+      })
     } catch (e) {
       console.error('加载活动失败:', e)
       if (requestSeq === this._loadSeq) this.setData({ loading: false })
@@ -376,6 +404,48 @@ Page({
     getApp().globalData._selectedActivity = raw || record
     getApp().globalData._selectedActivitySource = record.source
     wx.navigateTo({ url: '/pages/activity-detail/index' })
+  },
+
+  onWithdrawalOpen() {
+    if (!this.data.withdrawalCourses.length) {
+      wx.showToast({ title: '当日没有可办理退课的课程参与人', icon: 'none' })
+      return
+    }
+    this.setData({ showWithdrawal: true, withdrawalCourseIndex: 0, withdrawalParticipantIndex: 0, withdrawalParticipants: this.data.withdrawalCourses[0].participants })
+  },
+
+  onWithdrawalClose() {
+    if (this.data.withdrawing) return
+    this.setData({ showWithdrawal: false })
+  },
+
+  onWithdrawalCourseChange(e) {
+    const withdrawalCourseIndex = Number(e.detail.value)
+    const course = this.data.withdrawalCourses[withdrawalCourseIndex]
+    this.setData({
+      withdrawalCourseIndex,
+      withdrawalParticipants: course ? course.participants : [],
+      withdrawalParticipantIndex: 0,
+    })
+  },
+
+  onWithdrawalParticipantChange(e) {
+    this.setData({ withdrawalParticipantIndex: Number(e.detail.value) })
+  },
+
+  async onWithdrawalConfirm() {
+    const course = this.data.withdrawalCourses[this.data.withdrawalCourseIndex]
+    const participant = this.data.withdrawalParticipants[this.data.withdrawalParticipantIndex]
+    if (!course || !participant || this.data.withdrawing) return
+    this.setData({ withdrawing: true })
+    try {
+      await classRecordApi.withdrawParticipant(course.id, participant.id)
+      wx.showToast({ title: '已办理退课', icon: 'success' })
+      this.setData({ showWithdrawal: false, withdrawing: false })
+      await this.loadData()
+    } catch (e) {
+      this.setData({ withdrawing: false })
+    }
   },
 
   onCreateTap() {

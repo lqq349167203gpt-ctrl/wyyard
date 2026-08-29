@@ -16,7 +16,6 @@ Page({
     referrerHandler: '',
     referrerHandlerId: '',
     isLeader: false,
-    needs: '',
     arrived: false,
     arrivalTime: '',
     // 搜索选择弹窗
@@ -81,7 +80,6 @@ Page({
         referrerHandler: visit.referrer_handler || '',
         referrerHandlerId: visit.referrer_handler_id || '',
         isLeader: visit.is_leader || false,
-        needs: visit.needs || '',
         arrived: visit.arrived || false,
         arrivalTime: visit.arrival_time || '',
       })
@@ -113,8 +111,6 @@ Page({
   onLeaderChange(e) {
     this.setData({ isLeader: e.detail.value })
   },
-
-  onNeedsInput(e) { this.setData({ needs: e.detail.value }) },
 
   async onArrivedChange(e) {
     const previousArrived = this.data.arrived
@@ -223,7 +219,6 @@ Page({
           visit_time: this.data.visitTime,
           referrer_handler: this.data.referrerHandler,
           referrer_handler_id: this.data.referrerHandlerId || '',
-          needs: this.data.needs,
         }),
       })
       wx.showToast({ title: '已保存' })

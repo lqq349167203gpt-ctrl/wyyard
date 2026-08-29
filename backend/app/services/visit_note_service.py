@@ -38,7 +38,11 @@ def _active_notes(visit_id: str, category: VisitNoteCategory) -> list[VisitNote]
 
 
 def _legacy_field(category: VisitNoteCategory) -> str:
-    return "feedback" if category == "customer_info" else "healing_notes"
+    return {
+        "visit_need": "needs",
+        "customer_info": "feedback",
+        "follow_up": "healing_notes",
+    }[category]
 
 
 def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
@@ -47,6 +51,10 @@ def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
 
     record = visit_service.get_visit(visit_id)
     if not record:
+        return
+    if category == "visit_need":
+        # 来访需求属于账号私有信息，不能汇总回所有人都能读取的旧字段。
+        visit_service.update_collaboration_summary(visit_id, "needs", "")
         return
     lines = []
     for note in _active_notes(visit_id, category):
@@ -66,9 +74,11 @@ def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
             visit = visit_service.get_visit(visit_id)
             if not visit:
                 continue
-            for category in ("customer_info", "follow_up"):
+            for category in ("visit_need", "customer_info", "follow_up"):
                 typed_category: VisitNoteCategory = category
                 if _active_notes(visit_id, typed_category):
+                    if typed_category == "visit_need" and visit.needs:
+                        _sync_visit_cache(visit_id, typed_category)
                     continue
                 content = str(getattr(visit, _legacy_field(typed_category), "") or "").strip()
                 if not content:
@@ -85,6 +95,8 @@ def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
                 )
                 _notes[note.id] = note
                 _save(note)
+                if typed_category == "visit_need":
+                    _sync_visit_cache(visit_id, typed_category)
 
 
 def list_notes(visit_ids: Iterable[str]) -> list[VisitNote]:
@@ -99,6 +111,21 @@ def list_notes(visit_ids: Iterable[str]) -> list[VisitNote]:
         key=lambda note: (note.created_at, note.id),
         reverse=True,
     )
+
+
+def list_visible_notes(
+    visit_ids: Iterable[str],
+    account_id: str,
+    owner_name: str = "",
+    username: str = "",
+) -> list[VisitNote]:
+    """来访需求仅返回当前账号自己的记录，其余协作内容保持原有可见规则。"""
+    return [
+        note
+        for note in list_notes(visit_ids)
+        if note.category != "visit_need"
+        or can_manage_note(note, account_id, owner_name, username)
+    ]
 
 
 def get_note(note_id: str) -> VisitNote | None:

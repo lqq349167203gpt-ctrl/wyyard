@@ -342,6 +342,10 @@
   color: #c3c9cf;
 }
 
+.st-withdrawn {
+  color: #a14c5f;
+}
+
 /* ============ 查看全部 ============ */
 
 .all-link {

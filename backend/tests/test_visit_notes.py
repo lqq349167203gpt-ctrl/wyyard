@@ -159,6 +159,7 @@ def test_visit_note_list_migrates_legacy_fields(client, created_customer):
     visit = _create_visit(
         client,
         created_customer["id"],
+        needs="原来访需求",
         feedback="原客户信息",
         healing_notes="原跟进点",
     )
@@ -167,10 +168,12 @@ def test_visit_note_list_migrates_legacy_fields(client, created_customer):
         assert response.status_code == 200
         notes = response.json()
         assert {(item["category"], item["content"]) for item in notes} == {
+            ("visit_need", "原来访需求"),
             ("customer_info", "原客户信息"),
             ("follow_up", "原跟进点"),
         }
         assert all(item["created_by"] == "不闹" for item in notes)
+        assert client.get(f"/api/visits/{visit['id']}").json()["needs"] == "原来访需求"
     finally:
         client.delete(f"/api/visits/{visit['id']}")
 
@@ -211,3 +214,77 @@ def test_visit_note_create_upserts_same_creator(client, created_customer):
         if note_id:
             client.delete(f"/api/visit-notes/{note_id}")
         client.delete(f"/api/visits/{visit['id']}")
+
+
+def test_visit_need_is_private_to_each_account(client, created_customer):
+    visit = _create_visit(client, created_customer["id"], needs="创建人的私有需求")
+    account, other_headers = _create_other_headers(client)
+    other_note_id = ""
+    try:
+        creator_notes = client.get(
+            f"/api/visit-notes?visit_id={visit['id']}"
+        ).json()
+        creator_need = next(
+            item for item in creator_notes if item["category"] == "visit_need"
+        )
+        assert creator_need["content"] == "创建人的私有需求"
+
+        other_initial = client.get(
+            f"/api/visit-notes?visit_id={visit['id']}", headers=other_headers
+        )
+        assert other_initial.status_code == 200
+        assert not any(
+            item["category"] == "visit_need" for item in other_initial.json()
+        )
+        assert client.get(
+            f"/api/visits/{visit['id']}", headers=other_headers
+        ).json()["needs"] == ""
+
+        other_create = client.post(
+            "/api/visit-notes",
+            json={
+                "visit_id": visit["id"],
+                "category": "visit_need",
+                "content": "另一位员工自己的需求",
+            },
+            headers=other_headers,
+        )
+        assert other_create.status_code == 200, other_create.text
+        other_note_id = other_create.json()["id"]
+        assert client.get(
+            f"/api/visits/{visit['id']}", headers=other_headers
+        ).json()["needs"] == "另一位员工自己的需求"
+        assert client.get(f"/api/visits/{visit['id']}").json()["needs"] == "创建人的私有需求"
+
+        creator_visible = client.get(
+            f"/api/visit-notes?visit_id={visit['id']}"
+        ).json()
+        assert [
+            item["content"]
+            for item in creator_visible
+            if item["category"] == "visit_need"
+        ] == ["创建人的私有需求"]
+
+        forbidden_update = client.patch(
+            f"/api/visit-notes/{creator_need['id']}",
+            json={"content": "试图读取并覆盖别人的需求"},
+            headers=other_headers,
+        )
+        assert forbidden_update.status_code == 403
+        forbidden_delete = client.delete(
+            f"/api/visit-notes/{creator_need['id']}", headers=other_headers
+        )
+        assert forbidden_delete.status_code == 403
+
+        other_update = client.patch(
+            f"/api/visit-notes/{other_note_id}",
+            json={"content": "另一位员工更新后的需求"},
+            headers=other_headers,
+        )
+        assert other_update.status_code == 200
+        assert other_update.json()["content"] == "另一位员工更新后的需求"
+    finally:
+        if other_note_id:
+            client.delete(f"/api/visit-notes/{other_note_id}", headers=other_headers)
+        client.delete(f"/api/visits/{visit['id']}")
+        client.delete(f"/api/accounts/{account['id']}")

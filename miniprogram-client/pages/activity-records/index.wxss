@@ -353,6 +353,10 @@ page {
   color: #c3c9cf;
 }
 
+.st-withdrawn {
+  color: #a14c5f;
+}
+
 /* ===== 底部 ===== */
 .end-note {
   margin: 52rpx 0 60rpx;

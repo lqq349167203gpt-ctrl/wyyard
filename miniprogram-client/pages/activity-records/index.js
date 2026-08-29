@@ -66,7 +66,11 @@ Page({
         let badge = ''
         let badgeClass = ''
         let filterType = ''
-        if (isToday && status !== 'ended') {
+        if (a.withdrawn) {
+          badge = '已退课'
+          badgeClass = 'st-withdrawn'
+          filterType = 'withdrawn'
+        } else if (isToday && status !== 'ended') {
           badge = '今晚'
           badgeClass = 'st-up'
           filterType = 'signedup'

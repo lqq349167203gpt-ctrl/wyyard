@@ -31,6 +31,7 @@ router = APIRouter(
 )
 
 CATEGORY_LABELS = {
+    "visit_need": "来访需求",
     "customer_info": "客户信息",
     "follow_up": "跟进点",
 }
@@ -111,7 +112,9 @@ def list_visit_notes(
         raise HTTPException(status_code=400, detail="请指定邀约记录")
     for current_visit_id in set(ids):
         _require_visit_customer_scope(request, current_visit_id)
-    return [_response(note, request) for note in visit_note_service.list_notes(ids)]
+    account_id, owner_name, username = _actor(request)
+    notes = visit_note_service.list_visible_notes(ids, account_id, owner_name, username)
+    return [_response(note, request) for note in notes]
 
 
 @router.post("")

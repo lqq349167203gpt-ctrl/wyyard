@@ -24,6 +24,7 @@ class ClassRecordBase(SafeBaseModel):
     activity_name: str = ""  # 用户自定义活动名称（优先于 course_name 显示）
     teacher_ids: List[str] = []
     participant_ids: List[str] = []
+    withdrawn_participant_ids: List[str] = []
     materials: List[dict] = []
     groups: List[GroupMember] = []
     is_public_welfare: bool = False

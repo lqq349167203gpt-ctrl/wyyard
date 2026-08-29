@@ -461,6 +461,108 @@ def test_activity_supports_configurable_membership_deduction_count(client, creat
     client.delete(f"/api/membership-cards/{card['id']}")
 
 
+def test_course_withdrawal_keeps_participant_history_and_restores_card_usage(client, created_customer):
+    from app.middleware.jwt_auth import create_customer_token
+    from app.services import membership_card_service
+
+    card = _create_count_card(client, created_customer)
+    activity_date = "2099-07-25"
+    activity = client.post("/api/class-records", json={
+        "date": activity_date,
+        "course_id": "withdrawal-course",
+        "course_name": "退课测试课程",
+        "participant_ids": [created_customer["id"]],
+        "membership_deduction_count": 2,
+        "is_published": True,
+    })
+    assert activity.status_code == 200
+    activity_id = activity.json()["id"]
+    visit = client.post("/api/visits", json={
+        "visit_date": activity_date,
+        "customer_id": created_customer["id"],
+        "arrived": True,
+    })
+    assert visit.status_code == 200
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 3
+
+    token = create_customer_token(created_customer["id"], created_customer["nickname"])
+    customer_headers = {"Authorization": f"Bearer {token}"}
+    signup = client.post(
+        f"/api/client/activities/{activity_id}/signup",
+        headers=customer_headers,
+    )
+    assert signup.status_code == 200
+
+    withdrawn = client.post(
+        f"/api/class-records/{activity_id}/withdrawals",
+        json={"customer_id": created_customer["id"]},
+    )
+    assert withdrawn.status_code == 200
+    assert created_customer["id"] in withdrawn.json()["participant_ids"]
+    assert withdrawn.json()["withdrawn_participant_ids"] == [created_customer["id"]]
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 5
+    assert not any(
+        item["key"].startswith(f"class:{activity_id}")
+        for item in membership_card_service.list_activity_usage_records(created_customer["id"])
+    )
+
+    detail = client.get(f"/api/customer-detail/{created_customer['id']}")
+    activity_row = next(
+        item for item in detail.json()["activities"]
+        if item["activity_key"] == f"class:{activity_id}"
+    )
+    assert activity_row["withdrawn"] is True
+    assert activity_row["participated"] is False
+    assert activity_row["membership_deduction_count"] == 0
+    assert activity_row["deduction_summary"] == "已退课"
+
+    client_activity = client.get(
+        f"/api/client/activities/{activity_id}",
+        headers=customer_headers,
+    )
+    assert client_activity.status_code == 200
+    assert client_activity.json()["withdrawn"] is True
+    assert client_activity.json()["signed_up"] is False
+    assert not any(item["is_me"] for item in client_activity.json()["participants"])
+    signup_again = client.post(
+        f"/api/client/activities/{activity_id}/signup",
+        headers=customer_headers,
+    )
+    assert signup_again.status_code == 409
+    assert "已办理退课" in signup_again.json()["detail"]
+
+    removal = client.patch(
+        f"/api/class-records/{activity_id}/participants",
+        json={"participant_ids": []},
+    )
+    assert removal.status_code == 400
+    assert "已退课人员" in removal.json()["detail"]
+
+    direct_removal = client.patch(
+        f"/api/class-records/{activity_id}",
+        json={"participant_ids": [], "groups": []},
+    )
+    assert direct_removal.status_code == 400
+
+    status_override = client.patch(
+        f"/api/class-records/{activity_id}",
+        json={"withdrawn_participant_ids": []},
+    )
+    assert status_override.status_code == 200
+    assert status_override.json()["withdrawn_participant_ids"] == [created_customer["id"]]
+
+    changed_count = client.patch(
+        f"/api/class-records/{activity_id}",
+        json={"membership_deduction_count": 3},
+    )
+    assert changed_count.status_code == 200
+    assert client.get(f"/api/membership-cards/{card['id']}").json()["effective_remaining"] == 5
+
+    client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
+    client.delete(f"/api/class-records/{activity_id}")
+    client.delete(f"/api/membership-cards/{card['id']}")
+
+
 def test_activity_without_membership_card_keeps_negative_remaining(client, created_customer):
     from app.middleware.jwt_auth import create_customer_token
     from app.services import membership_card_service

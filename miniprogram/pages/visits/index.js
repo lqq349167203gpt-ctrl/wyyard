@@ -235,6 +235,8 @@ Page({
 
       const visibleVisits = (visits || []).map(v => Object.assign({}, v, {
         can_edit: canEditRecord(v, 'visits'),
+        // 轻量邀约接口已按当前账号返回本人填写的来访需求。
+        needs: v.needs || '',
       }))
       const leaderMap = this.buildLeaderMap(visibleVisits)
 

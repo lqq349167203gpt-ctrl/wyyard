@@ -89,6 +89,7 @@ interface ActivityRow {
   host_ids: string[]
   host_names: string[]
   participant_ids: string[]
+  withdrawn_participant_ids: string[]
   activity_mode: string
   is_public_welfare: boolean
   is_published: boolean
@@ -186,6 +187,7 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
     owner_id: ownerId, owner_name: ownerName,
     host_ids: hostIds, host_names: hostNames,
     participant_ids: participantIds,
+    withdrawn_participant_ids: data.withdrawn_participant_ids || [],
     activity_mode: data.activity_mode || "线下",
     is_public_welfare: data.is_public_welfare || false,
     is_published: data.is_published || false,
@@ -214,6 +216,7 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
     owner_id: "", owner_name: "",
     host_ids: [], host_names: [],
     participant_ids: [],
+    withdrawn_participant_ids: [],
     activity_mode: "线下",
     is_public_welfare: false,
     is_published: false,
@@ -874,6 +877,10 @@ export function ActivityBatchTable({
   const updateRow = useCallback((key: number, field: keyof ActivityRow, value: any) => {
     const editableRow = rowsRef.current.find(r => r.key === key)
     if (!editableRow || !canEditField(editableRow, field)) return
+    if (
+      field === "participant_ids"
+      && editableRow.withdrawn_participant_ids.some(id => !value.includes(id))
+    ) return
     // 首次编辑时记录历史
     if (rowStatus[key] === "saved" || rowStatus[key] === "error") {
       if (!historyPushedRef.current.has(key)) {
@@ -1413,6 +1420,7 @@ export function ActivityBatchTable({
               const rowChangedFields = changedCellMap.get(row.key)
               const hasCellChanges = !!rowChangedFields && rowChangedFields.size > 0
               const { oldMembers, newMembers } = splitParticipants(row.participant_ids)
+              const withdrawnParticipantIds = new Set(row.withdrawn_participant_ids)
               const rowReadOnly = !canEditRow(row)
               const creatorName = row.pendingCreate || !row.record_id
                 ? "待保存"
@@ -1787,13 +1795,15 @@ export function ActivityBatchTable({
                         <span key={m.id}>
                           {i > 0 && "、"}
                           <button
+                            disabled={withdrawnParticipantIds.has(m.id)}
                             onClick={() => {
                               const newIds = row.participant_ids.filter(id => id !== m.id)
                               updateRow(row.key, "participant_ids", newIds)
                             }}
-                            className="hover:text-[#e02020] cursor-pointer"
+                            className={withdrawnParticipantIds.has(m.id) ? "cursor-default text-[#8f959e]" : "cursor-pointer hover:text-[#e02020]"}
+                            title={withdrawnParticipantIds.has(m.id) ? "已退课，参与人记录已锁定" : "点击移除参与人"}
                           >
-                            {m.name}
+                            {m.name}{withdrawnParticipantIds.has(m.id) && <span className="ml-1 text-[11px] text-[#c4506a]">已退课</span>}
                           </button>
                         </span>
                       ))}
@@ -1807,13 +1817,15 @@ export function ActivityBatchTable({
                         <span key={m.id}>
                           {i > 0 && "、"}
                           <button
+                            disabled={withdrawnParticipantIds.has(m.id)}
                             onClick={() => {
                               const newIds = row.participant_ids.filter(id => id !== m.id)
                               updateRow(row.key, "participant_ids", newIds)
                             }}
-                            className="hover:text-[#e02020] cursor-pointer"
+                            className={withdrawnParticipantIds.has(m.id) ? "cursor-default text-[#8f959e]" : "cursor-pointer hover:text-[#e02020]"}
+                            title={withdrawnParticipantIds.has(m.id) ? "已退课，参与人记录已锁定" : "点击移除参与人"}
                           >
-                            {m.name}
+                            {m.name}{withdrawnParticipantIds.has(m.id) && <span className="ml-1 text-[11px] text-[#c4506a]">已退课</span>}
                           </button>
                         </span>
                       ))}

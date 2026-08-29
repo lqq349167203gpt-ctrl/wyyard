@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock } from "lucide-react"
+import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock, UserMinus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,6 +25,7 @@ import {
   type ActivityTheme, type MemberIdentity,
 } from "@/lib/api"
 import { SpaceDropdown } from "@/components/space-dropdown"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { ActivityBatchTable, type HistoryEntry } from "./activity-batch-table"
 import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
@@ -1669,6 +1670,10 @@ export default function DailyActivitiesPage() {
   const [spaces, setSpaces] = useState<Space[]>([])
   const [memberIdentities, setMemberIdentities] = useState<MemberIdentity[]>([])
   const [noSpacesDialogOpen, setNoSpacesDialogOpen] = useState(false)
+  const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false)
+  const [withdrawalCourseId, setWithdrawalCourseId] = useState("")
+  const [withdrawalCustomerId, setWithdrawalCustomerId] = useState("")
+  const [withdrawing, setWithdrawing] = useState(false)
   const [selectedSpaceId, setSelectedSpaceId] = useState(() => {
     try { return localStorage.getItem("selected-space-id") || "" } catch { return "" }
   })
@@ -2381,6 +2386,49 @@ export default function DailyActivitiesPage() {
     return c?.nickname || c?.name || ""
   }, [allCustomers])
 
+  const withdrawalCourses = useMemo(() => detailRecords.map(record => {
+    const groupParticipantIds = (record.groups || []).flatMap(group => [
+      group.leader_id,
+      group.deputy_id,
+      ...(group.member_ids || []),
+    ].filter(Boolean))
+    const participantIds = [...new Set([...(record.participant_ids || []), ...groupParticipantIds])]
+    const withdrawnIds = new Set(record.withdrawn_participant_ids || [])
+    const availableParticipantIds = participantIds.filter(id => (
+      !withdrawnIds.has(id) && allCustomers.some(customer => customer.id === id)
+    ))
+    return { record, availableParticipantIds }
+  }).filter(item => item.availableParticipantIds.length > 0), [detailRecords, allCustomers])
+
+  const selectedWithdrawalCourse = withdrawalCourses.find(item => item.record.id === withdrawalCourseId)
+  const withdrawalCustomers = (selectedWithdrawalCourse?.availableParticipantIds || [])
+    .map(id => allCustomers.find(customer => customer.id === id))
+    .filter((customer): customer is CustomerLight => Boolean(customer))
+  const withdrawalCustomerName = withdrawalCustomers.find(customer => customer.id === withdrawalCustomerId)?.nickname || ""
+
+  const openWithdrawalDialog = () => {
+    const firstCourse = withdrawalCourses[0]
+    setWithdrawalCourseId(firstCourse?.record.id || "")
+    setWithdrawalCustomerId("")
+    setWithdrawalDialogOpen(true)
+  }
+
+  const handleCourseWithdrawal = async () => {
+    if (!withdrawalCourseId || !withdrawalCustomerId || withdrawing) return
+    setWithdrawing(true)
+    try {
+      await classRecordApi.withdrawParticipant(withdrawalCourseId, withdrawalCustomerId)
+      setWithdrawalDialogOpen(false)
+      setWithdrawalCourseId("")
+      setWithdrawalCustomerId("")
+      await loadDateData(detailDate)
+    } catch (error) {
+      handleApiError(error)
+    } finally {
+      setWithdrawing(false)
+    }
+  }
+
   const cardCallbacks = useMemo(() => ({
     teachers,
     spaces,
@@ -2587,6 +2635,16 @@ export default function DailyActivitiesPage() {
               toolbarTrailing={(
                 <>
                   <button
+                    type="button"
+                    onClick={openWithdrawalDialog}
+                    disabled={withdrawalCourses.length === 0 || !!previewEntry}
+                    className="mr-1 flex h-7 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:opacity-40"
+                    title={withdrawalCourses.length === 0 ? "当前日期没有可办理退课的课程参与人" : "办理退课"}
+                  >
+                    <UserMinus className="h-3.5 w-3.5" />
+                    退课
+                  </button>
+                  <button
                     onClick={() => {
                       if (previewEntry) { setPreviewEntry(null); setHistoryPanelOpen(false) }
                       else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
@@ -2635,6 +2693,55 @@ export default function DailyActivitiesPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={withdrawalDialogOpen} onOpenChange={(open) => { if (!open && !withdrawing) setWithdrawalDialogOpen(false) }}>
+        <DialogContent className="w-[400px] max-w-[90vw] gap-0 p-0" initialFocus={false}>
+          <DialogHeader className="border-b border-[#f0f0f0] px-5 py-3">
+            <DialogTitle className="text-[14px] font-normal text-[#1f2329]">办理退课</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 px-5 py-5">
+            <div className="grid grid-cols-[64px_1fr] items-center gap-3">
+              <span className="text-right text-[12px] text-[#4e535a]">课程</span>
+              <SelectDropdown
+                value={withdrawalCourseId}
+                options={withdrawalCourses.map(({ record }) => ({
+                  value: record.id,
+                  label: `${record.start_time ? `${record.start_time} ` : ""}${record.activity_name || record.course_name || "未命名课程"}`,
+                }))}
+                onChange={value => {
+                  setWithdrawalCourseId(value)
+                  setWithdrawalCustomerId("")
+                }}
+                placeholder="选择课程"
+                className="w-full"
+                buttonClassName="!h-8 !rounded-[4px] !border !border-[#dee0e3] !bg-white !text-[12px] !shadow-none"
+              />
+            </div>
+            <div className="grid grid-cols-[64px_1fr] items-center gap-3">
+              <span className="text-right text-[12px] text-[#4e535a]">参与人</span>
+              <CustomerSearchInput
+                customers={withdrawalCustomers}
+                value={withdrawalCustomerName}
+                onChange={value => {
+                  if (!value) setWithdrawalCustomerId("")
+                }}
+                onSelectItem={customer => setWithdrawalCustomerId(customer.id)}
+                placeholder={withdrawalCourseId ? "搜索并选择参与人" : "请先选择课程"}
+                disabled={!withdrawalCourseId}
+                className="!h-8 !rounded-[4px] !border-[#dee0e3]"
+                dropdownWidth={280}
+              />
+            </div>
+            <div className="ml-[76px] text-[12px] leading-5 text-[#8f959e]">
+              退课后仍保留在课程参与人记录中并显示“已退课”，本课程已扣卡次会恢复为 0。
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setWithdrawalDialogOpen(false)} disabled={withdrawing}>取消</Button>
+            <Button size="sm" className="h-8 text-[12px]" onClick={handleCourseWithdrawal} disabled={!withdrawalCourseId || !withdrawalCustomerId || withdrawing}>{withdrawing ? "处理中..." : "确认退课"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== 历史记录面板（固定右侧） ===== */}
       {historyPanelOpen && (

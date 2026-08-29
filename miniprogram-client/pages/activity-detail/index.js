@@ -182,7 +182,7 @@ Page({
       previewImages,
       durationText,
       deductionSessions,
-      showDeductionNotice: deductionSessions > 0 && !participationLocked,
+      showDeductionNotice: deductionSessions > 0 && !participationLocked && !a.withdrawn,
       participationLocked,
       participationRoleLabel: a.participation_role_label || '',
     }

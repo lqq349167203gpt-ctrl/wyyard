@@ -27,6 +27,7 @@ from app.services import (
     oh_card_reading_service,
     organization_service,
     other_project_service,
+    visit_note_service,
     visit_service,
 )
 
@@ -1011,9 +1012,29 @@ def get_product_details(
             return False
         return _record_matches_teacher(record, teacher_filter, teacher_names)
 
+    # 来访需求按账号私有；统计明细也只能展示当前账号自己填写的内容。
+    visit_records = (
+        visit_service.list_visits(date=date)
+        if type in {"invited", "cancelled", "arrived"}
+        else []
+    )
+    actor_id = (getattr(request.state, "user_id", "") or "") if request else ""
+    actor_owner = (getattr(request.state, "user_owner", "") or "") if request else ""
+    actor_name = (getattr(request.state, "user_name", "") or "") if request else ""
+    visit_need_map = {
+        note.visit_id: note.content
+        for note in visit_note_service.list_visible_notes(
+            [record.id for record in visit_records],
+            actor_id,
+            actor_owner,
+            actor_name,
+        )
+        if note.category == "visit_need"
+    }
+
     if type == "invited":
         records = []
-        for v in visit_service.list_visits():
+        for v in visit_records:
             if v.visit_date == date and v.customer_id in visible_customer_ids:
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 activity_count = 0
@@ -1026,7 +1047,7 @@ def get_product_details(
                 records.append({
                     "nickname": c.nickname if c else (v.customer_id or "-"),
                     "referrer_handler": v.referrer_handler or "-",
-                    "needs": v.needs or "-",
+                    "needs": visit_need_map.get(v.id) or "-",
                     "arrived": v.arrived,
                     "cancelled": v.cancelled,
                     "activity_count": activity_count,
@@ -1035,13 +1056,13 @@ def get_product_details(
 
     if type == "cancelled":
         records = []
-        for v in visit_service.list_visits():
+        for v in visit_records:
             if v.visit_date == date and v.cancelled and v.customer_id in visible_customer_ids:
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 records.append({
                     "nickname": c.nickname if c else (v.customer_id or "-"),
                     "referrer_handler": v.referrer_handler or "-",
-                    "needs": v.needs or "-",
+                    "needs": visit_need_map.get(v.id) or "-",
                     "arrived": v.arrived,
                     "cancelled": v.cancelled,
                 })
@@ -1049,7 +1070,7 @@ def get_product_details(
 
     if type == "arrived":
         records = []
-        for v in visit_service.list_visits():
+        for v in visit_records:
             if v.visit_date == date and v.arrived and v.customer_id in visible_customer_ids:
                 c = customer_service.get_customer(v.customer_id) if v.customer_id else None
                 activity_count = 0
@@ -1062,7 +1083,7 @@ def get_product_details(
                 records.append({
                     "nickname": c.nickname if c else (v.customer_id or "-"),
                     "referrer_handler": v.referrer_handler or "-",
-                    "needs": v.needs or "-",
+                    "needs": visit_need_map.get(v.id) or "-",
                     "activity_count": activity_count,
                 })
         return {"data": records}

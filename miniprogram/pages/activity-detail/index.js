@@ -57,6 +57,7 @@ Page({
     deductionCount: 1,
     isPublished: false,
     participantIds: [],
+    withdrawnParticipantIds: [],
     participantList: [],
     dayVisitors: [],
     activityName: '',
@@ -126,6 +127,7 @@ Page({
       membershipDeductionCount: raw.membership_deduction_count != null ? raw.membership_deduction_count : 1,
       isPublished: raw.is_published || false,
       participantIds: raw.participant_ids || [],
+      withdrawnParticipantIds: raw.withdrawn_participant_ids || [],
       activityModeIndex: (raw.activity_mode === '线上') ? 1 : 0,
       icsCourseType: (activityType === 'ics') ? (raw.course_type || '') : '',
     }
@@ -399,13 +401,26 @@ Page({
   // ---------- 参与者 ----------
 
   updateParticipantList() {
-    const { dayVisitors, participantIds } = this.data
-    const participantList = dayVisitors.map(c => Object.assign({}, c, {selected: participantIds.includes(c.id),}))
+    const { dayVisitors, participantIds, withdrawnParticipantIds, allCustomers } = this.data
+    const visibleParticipants = dayVisitors.slice()
+    participantIds.forEach(id => {
+      if (visibleParticipants.some(customer => customer.id === id)) return
+      const customer = allCustomers.find(item => item.id === id)
+      visibleParticipants.push(customer || { id, nickname: '未记录客户' })
+    })
+    const participantList = visibleParticipants.map(c => Object.assign({}, c, {
+      selected: participantIds.includes(c.id),
+      withdrawn: withdrawnParticipantIds.includes(c.id),
+    }))
     this.setData({ participantList })
   },
 
   onParticipantToggle(e) {
     const id = e.currentTarget.dataset.id
+    if (this.data.withdrawnParticipantIds.includes(id)) {
+      wx.showToast({ title: '已退课人员不能取消', icon: 'none' })
+      return
+    }
     let participantIds = this.data.participantIds.slice()
     const idx = participantIds.indexOf(id)
     if (idx >= 0) {

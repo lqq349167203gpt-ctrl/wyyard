@@ -563,7 +563,7 @@ export interface ActivityInfo {
   is_welfare: boolean
 }
 
-export type VisitNoteCategory = "customer_info" | "follow_up"
+export type VisitNoteCategory = "visit_need" | "customer_info" | "follow_up"
 
 export interface VisitNoteSummary {
   id: string
@@ -830,9 +830,11 @@ export interface ClassRecord {
   course_id: string
   course_name: string
   course_type: string  // 活动类型（如：读书会、颂钵等）
+  activity_name: string
   course_description: string
   teacher_ids: string[]
   participant_ids: string[]
+  withdrawn_participant_ids: string[]
   materials: Material[]
   groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]
   is_public_welfare: boolean
@@ -854,6 +856,7 @@ export interface ClassRecordCreate {
   course_id: string
   course_name: string
   course_type?: string  // 活动类型（如：读书会、颂钵等）
+  activity_name?: string
   course_description?: string
   teacher_ids?: string[]
   participant_ids?: string[]
@@ -884,6 +887,7 @@ export const classRecordApi = {
   update: (id: string, data: Partial<ClassRecordCreate>, conversion = false) => request<ClassRecord>(`/api/class-records/${id}${conversion ? "?conversion=true" : ""}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string, conversion = false) => request<{ message: string }>(`/api/class-records/${id}${conversion ? "?conversion=true" : ""}`, { method: "DELETE" }),
   updateParticipants: (id: string, participantIds: string[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/participants`, { method: "PATCH", body: JSON.stringify({ participant_ids: participantIds }) }),
+  withdrawParticipant: (id: string, customerId: string) => request<ClassRecord>(`/api/class-records/${id}/withdrawals`, { method: "POST", body: JSON.stringify({ customer_id: customerId }) }),
   updateGroups: (id: string, groups: { name: string; member_ids: string[]; leader_id: string; deputy_id: string }[]) => request<ClassRecord & { warnings?: string[] }>(`/api/class-records/${id}/groups`, { method: "PATCH", body: JSON.stringify({ groups }) }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/class-records/search-customers?q=${encodeURIComponent(keyword)}`),
   calendarCounts: () => request<Record<string, number>>("/api/class-records/calendar-counts"),
@@ -2159,6 +2163,7 @@ export interface ActivityRecord {
   session_id: string
   is_public_welfare?: boolean
   participated?: boolean
+  withdrawn?: boolean
   membership_deduction_count?: number
   deduction_summary?: string
 }

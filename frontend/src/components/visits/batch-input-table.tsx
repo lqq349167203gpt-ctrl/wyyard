@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react"
-import { Plus, Trash2, FileText, GripVertical, Edit, CalendarX2, CalendarSync, ChevronDown, ChevronUp, Info } from "lucide-react"
+import { Plus, Trash2, FileText, GripVertical, CalendarX2, CalendarSync, ChevronDown, ChevronUp, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,7 +10,6 @@ import { visitApi, visitNoteApi, membershipCardApi, consumptionRecordsApi, type 
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
 import { VisitNoteCell } from "@/components/visits/visit-note-cell"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
@@ -105,19 +104,10 @@ function formatRemaining(count: number | null): string {
   return `${count} 次`
 }
 
-type LongTextField = "needs" | "feedback" | "healing_notes"
-
-const LONG_TEXT_LABELS: Record<LongTextField, string> = {
-  needs: "来访需求",
-  feedback: "客户信息",
-  healing_notes: "跟进点",
-}
-
 const VISIT_CREATOR_ONLY_FIELDS = new Set<keyof Row>([
   "customer_id",
   "nickname",
   "visit_time",
-  "needs",
   "referrer_handler",
 ])
 
@@ -137,8 +127,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pendingScrollToBottomRef = useRef(false)
-  const [editor, setEditor] = useState<{ key: number; field: LongTextField; label: string; nickname: string } | null>(null)
-  const [editorValue, setEditorValue] = useState("")
   const cardsRef = useRef<MembershipCard[]>([])
   useEffect(() => () => {
     dragPreviewRef.current?.remove()
@@ -480,7 +468,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           ...(canEditRow(row) ? {
             customer_id: row.customer_id,
             visit_time: row.visit_time || "",
-            needs: row.needs,
             referrer_handler: row.referrer_handler,
           } : {}),
         })
@@ -516,6 +503,9 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
             created_by_id: result.created_by_id || currentActorId,
             created_by: result.created_by || currentActorName,
           } : r))
+          visitNoteApi.list(result.id).then((notes) => {
+            setNotesByVisitId((previous) => ({ ...previous, [result.id]: notes }))
+          }).catch(() => {})
         }
         setSavedCount(c => c + 1)
       }
@@ -566,18 +556,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     }
     scheduleSave(key)
   }, [rowStatus, scheduleSave, pushEditHistory, canEditField])
-
-  const openEditor = (row: Row, field: LongTextField) => {
-    if (!canEditField(row, field)) return
-    setEditor({ key: row.key, field, label: LONG_TEXT_LABELS[field], nickname: row.nickname || "未命名" })
-    setEditorValue(row[field])
-  }
-
-  const saveEditor = () => {
-    if (!editor) return
-    updateRow(editor.key, editor.field, editorValue)
-    setEditor(null)
-  }
 
   const cancelVisit = useCallback(async (row: Row) => {
     const visitId = savedVisitIds.current[row.key]
@@ -810,7 +788,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               </button>
             }
           />
-          <TooltipContent>昵称、邀约人、时间、来访需求及取消/删除仅创建人可操作</TooltipContent>
+          <TooltipContent>昵称、邀约人、时间及取消/删除仅创建人可操作；来访需求由每人独立填写</TooltipContent>
         </Tooltip>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <button
@@ -959,33 +937,17 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     <span className={`text-[12px] ${row.remaining_count !== null && row.remaining_count < 0 && row.remaining_count !== -999 ? "text-[#e02020]" : "text-[#2b2f36]"}`}>{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {rowReadOnly ? (
-                      <span
-                        className={`flex min-h-7 w-full min-w-0 text-[12px] ${needsExpanded ? "items-start whitespace-pre-wrap break-words py-1" : "h-7 items-center"} ${row.needs ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
-                        title={needsExpanded ? undefined : row.needs}
-                      >
-                        {needsExpanded ? (
-                          row.needs || "-"
-                        ) : (
-                          <span className="block w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                            {row.needs.replace(/\s+/g, " ").trim() || "-"}
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={row.cancelled}
-                        onClick={() => openEditor(row, "needs")}
-                        className={`flex min-h-7 w-full gap-1 px-2 text-left text-[12px] border-[0.5px] border-[#e8eaed] rounded-[2px] ${needsExpanded ? "items-start py-1" : "h-7 items-center"} ${row.cancelled ? "cursor-not-allowed" : "cursor-pointer hover:border-[#3370ff]"} ${row.needs ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}
-                        title={needsExpanded ? undefined : row.needs}
-                      >
-                        <span className={`block min-w-0 flex-1 ${needsExpanded ? "whitespace-pre-wrap break-words" : "overflow-hidden text-ellipsis whitespace-nowrap"}`}>
-                          {needsExpanded ? row.needs : row.needs.replace(/\s+/g, " ").trim()}
-                        </span>
-                        <Edit className={`h-3 w-3 shrink-0 text-[#c9cdd4] ${needsExpanded ? "mt-0.5" : ""}`} />
-                      </button>
-                    )}
+                    <VisitNoteCell
+                      visitId={row.visit_id}
+                      nickname={row.nickname}
+                      title="来访需求"
+                      category="visit_need"
+                      notes={notesByVisitId[row.visit_id] || []}
+                      disabled={row.cancelled}
+                      expanded={needsExpanded}
+                      privateToCreator
+                      onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
+                    />
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <VisitNoteCell
@@ -1159,25 +1121,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={editor !== null} onOpenChange={(open) => { if (!open) setEditor(null) }}>
-        <DialogContent className="max-w-md p-0 gap-0" initialFocus={false}>
-          <DialogHeader className="px-6 pt-5 pb-4 border-b">
-            <DialogTitle className="text-[15px]">{editor ? `${editor.nickname} — ${editor.label}` : ""}</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-5">
-            <textarea
-              value={editorValue}
-              onChange={(e) => setEditorValue(e.target.value)}
-              className="w-full min-h-[200px] px-3 py-2 rounded-md border border-input text-[12px] resize-none"
-              placeholder={editor ? `输入${editor.label}...` : ""}
-            />
-          </div>
-          <div className="flex justify-end gap-2 px-6 pb-5 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setEditor(null)}>取消</Button>
-            <Button size="sm" onClick={saveEditor}>保存</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

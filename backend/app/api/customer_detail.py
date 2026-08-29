@@ -92,7 +92,20 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     offline_course_records = _build_offline_course_records(customer_id) if can_view_offline else []
     visits = visit_service.list_visits(customer_id=customer_id)
     notes_by_visit: dict[str, list[dict]] = {visit.id: [] for visit in visits}
-    for note in (visit_note_service.list_notes(notes_by_visit) if can_follow_up else []):
+    actor_id = getattr(request.state, "user_id", "") or ""
+    actor_owner = getattr(request.state, "user_owner", "") or ""
+    actor_username = getattr(request.state, "user_name", "") or ""
+    visible_visit_notes = (
+        visit_note_service.list_visible_notes(
+            notes_by_visit,
+            actor_id,
+            actor_owner,
+            actor_username,
+        )
+        if can_follow_up
+        else []
+    )
+    for note in visible_visit_notes:
         notes_by_visit.setdefault(note.visit_id, []).append(
             {
                 "id": note.id,
@@ -108,6 +121,14 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     for visit in (visits if can_follow_up else []):
         record = visit.model_dump(mode="json")
         record["visit_notes"] = notes_by_visit.get(visit.id, [])
+        record["needs"] = next(
+            (
+                note["content"]
+                for note in record["visit_notes"]
+                if note["category"] == "visit_need"
+            ),
+            "",
+        )
         visit_records.append(record)
 
     return {
@@ -587,7 +608,10 @@ def _build_activities(
         attended: bool,
         membership_count: int = 0,
         project_label: str = "",
+        withdrawn: bool = False,
     ) -> str:
+        if withdrawn:
+            return "已退课"
         if not attended:
             return "未参与"
         if project_label:
@@ -603,14 +627,16 @@ def _build_activities(
             t = customer_service.get_customer(tid)
             teacher_names.append(t.nickname or t.name if t else tid)
         host = ", ".join(teacher_names)
+        registered_participants = class_record_service._get_registered_participant_ids(r)
         chargeable = class_record_service._get_group_member_ids(r)
+        withdrawn = customer_id in set(r.withdrawn_participant_ids or [])
         role = _resolve_activity_role(
             customer_id,
             teacher_ids=r.teacher_ids,
-            participant_ids=chargeable,
+            participant_ids=registered_participants,
         )
         if role:
-            attended = r.date in arrived_dates
+            attended = r.date in arrived_dates and not withdrawn
             membership_count = r.membership_deduction_count if attended and customer_id in chargeable else 0
             activities.append({
                 "type": "沙龙类型",
@@ -622,10 +648,12 @@ def _build_activities(
                 "session_id": r.id,
                 "is_public_welfare": r.is_public_welfare,
                 "participated": attended,
+                "withdrawn": withdrawn,
                 "membership_deduction_count": membership_count,
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     membership_count=membership_count,
+                    withdrawn=withdrawn,
                 ),
             })
 

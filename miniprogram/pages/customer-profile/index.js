@@ -168,7 +168,11 @@ Page({
       // 跟进点
       const healingRecords = visitRecords.map(v => {
         const hr = (detail.healing_records || []).find(r => r.date === v.visit_date)
-        return Object.assign({}, v, { growth_record: (hr && hr.growth_record) || v.healing_notes || '' })
+        const ownVisitNeed = (v.visit_notes || []).find(note => note.category === 'visit_need')
+        return Object.assign({}, v, {
+          needs: ownVisitNeed ? ownVisitNeed.content : '',
+          growth_record: (hr && hr.growth_record) || v.healing_notes || '',
+        })
       })
       const arrivedCount = visitRecords.filter(v => v.arrived).length
       const cancelledCount = visitRecords.filter(v => v.cancelled).length

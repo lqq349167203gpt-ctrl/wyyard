@@ -313,7 +313,9 @@ export default function DetailView({
   const arrivedRecords = (detail?.visit_records || []).filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
   const firstVisit = arrivedRecords.length > 0 ? arrivedRecords[0].visit_date : ""
   // 指标：参与活动场数 = 活动日期属于已到店日期集合的场数；消费额 = 未退费交易求和
-  const arrivedActivityCount = (detail?.activities || []).filter(a => arrivedDates.has(a.date)).length
+  const arrivedActivityCount = (detail?.activities || []).filter(a => (
+    a.participated === undefined ? arrivedDates.has(a.date) : a.participated
+  )).length
   const totalSpend = c.total_payment ?? (access ? null : (detail?.payment_records || []).filter(g => !g.voided).reduce((sum, g) => sum + g.amount, 0))
   const workInfo = c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "")
   const archiveFields: [string, string][] = [
@@ -644,6 +646,7 @@ export default function DetailView({
                   <span className="text-[#79838f]">已取消 <b className="font-semibold text-[#c4506a] tabular-nums">{cancelledCount}</b> 次</span>
                 </div>
                 {paginatedRecords.map((v) => {
+                  const visitNeedNotes = (v.visit_notes || []).filter(note => note.category === "visit_need")
                   const followUpNotes = (v.visit_notes || []).filter(note => note.category === "follow_up")
                   const customerInfoNotes = (v.visit_notes || []).filter(note => note.category === "customer_info")
                   return (
@@ -677,7 +680,7 @@ export default function DetailView({
                     </div>
                     <div className="grid grid-cols-[64px_1fr] gap-x-3 gap-y-1.5">
                       <span className="text-[12px] text-[#a8b1bd] pt-px">来访需求</span>
-                      <p className="whitespace-pre-wrap text-[12px] leading-[1.6] text-[#3a4150]">{v.needs || <DvEmpty />}</p>
+                      <VisitNoteRows notes={visitNeedNotes} />
                       <span className="text-[12px] text-[#a8b1bd] pt-px">客户信息</span>
                       <VisitNoteRows notes={customerInfoNotes} />
                       <span className="pt-px text-[12px] text-[#a8b1bd]">跟进点</span>
@@ -854,7 +857,7 @@ export default function DetailView({
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className={`min-w-0 flex-1 text-[13.5px] font-bold ${notArrived ? "text-[#79838f]" : "text-[#212631]"}`}>{a.name || <span className="text-[#d0d3d6]">-</span>}</span>
                                   {a.deduction_summary && (
-                                    <span className={`ml-auto shrink-0 text-[11.5px] tabular-nums ${notArrived ? "text-[#9ba2aa]" : "text-[#5d6673]"}`}>{a.deduction_summary}</span>
+                                    <span className={`ml-auto shrink-0 text-[11.5px] tabular-nums ${a.withdrawn ? "text-[#c4506a]" : notArrived ? "text-[#9ba2aa]" : "text-[#5d6673]"}`}>{a.deduction_summary}</span>
                                   )}
                                   {a.is_public_welfare && <span className="whitespace-nowrap rounded-md bg-[#dcf5e4] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#157a3c]">公益</span>}
                                 </div>

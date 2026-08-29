@@ -175,8 +175,14 @@ async def visit_chat(req: VisitChatRequest, request: Request):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="消息为空")
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "") or ""
+    account_id = getattr(request.state, "user_id", "") or ""
     result = await visit_chat_service.visit_chat(
-        req.message, req.history, req.date, req.space_id, operator=operator
+        req.message,
+        req.history,
+        req.date,
+        req.space_id,
+        operator=operator,
+        account_id=account_id,
     )
 
     # 写入沟通记录

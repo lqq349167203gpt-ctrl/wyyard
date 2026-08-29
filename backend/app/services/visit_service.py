@@ -412,6 +412,13 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
     if space_id is not None:
         records = [r for r in records if r.space_id == space_id]
 
+    # 旧版来访需求曾直接存放在邀约主记录中。列表读取前迁移到录入人私有记录，
+    # 并清空公共字段，避免后续新增的统计或导出入口意外泄露他人内容。
+    if records:
+        from app.services import visit_note_service
+
+        visit_note_service.ensure_legacy_entries(record.id for record in records)
+
     # 批量构建所有客户的活动计数（一次扫描，O(total_records)）
     all_activity_counts = _build_customer_activity_counts()
     all_welfare_counts = _build_customer_welfare_counts()
@@ -494,6 +501,11 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
     if space_id is not None:
         records = [r for r in records if r.space_id == space_id]
 
+    if records:
+        from app.services import visit_note_service
+
+        visit_note_service.ensure_legacy_entries(record.id for record in records)
+
     try:
         all_activity_counts = _build_customer_activity_counts()
     except Exception as e:
@@ -532,7 +544,8 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "phone": getattr(r, 'phone', '') or "",
                 "visit_date": r.visit_date,
                 "visit_time": r.visit_time or "",
-                "needs": r.needs or "",
+                # 来访需求由 API 按当前账号单独注入，服务层不再暴露公共字段。
+                "needs": "",
                 "arrived": r.arrived,
                 "arrival_time": r.arrival_time or "",
                 "arrived_count": all_arrived_counts.get(r.customer_id, 0),
@@ -650,7 +663,7 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
 
 def update_collaboration_summary(visit_id: str, field: str, value: str) -> Optional[VisitRecord]:
     """更新多人协作记录的兼容汇总字段，不触发邀约业务状态校验。"""
-    if field not in {"feedback", "healing_notes"}:
+    if field not in {"needs", "feedback", "healing_notes"}:
         raise ValueError("不支持的协作汇总字段")
     with _visit_lock:
         record = _visits.get(visit_id)

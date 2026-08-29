@@ -42,12 +42,7 @@
     </view>
   </view>
 
-  <!-- 来访需求 & 反馈 -->
-  <view class="section" wx:if="{{visit.needs}}">
-    <text class="section-title">来访需求</text>
-    <text class="section-content">{{visit.needs}}</text>
-  </view>
-
+  <visit-note-section visit-id="{{visit.id}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" />
   <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" />
   <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" />
 

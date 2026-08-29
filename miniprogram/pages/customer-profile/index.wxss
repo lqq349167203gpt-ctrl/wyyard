@@ -115,6 +115,11 @@
   font-weight: 600;
 }
 
+.pill-withdrawn {
+  background: rgba(196, 80, 106, 0.1);
+  color: #c4506a;
+}
+
 /* ============ 信息区 ============ */
 .sec {
   margin-top: 20rpx;

@@ -349,6 +349,17 @@
   color: #3370ff;
 }
 
+.participant-item.withdrawn {
+  border-color: #e5e7ea;
+  background-color: #f7f8fa;
+  color: #8f959e;
+}
+
+.participant-withdrawn {
+  font-size: 20rpx;
+  color: #c4506a;
+}
+
 .participant-check {
   font-size: 22rpx;
   color: #3370ff;
