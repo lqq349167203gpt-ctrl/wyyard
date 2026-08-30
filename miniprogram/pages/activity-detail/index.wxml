@@ -91,7 +91,8 @@
       <text class="form-label">案主</text>
       <view class="picker-value-wrap">
         <text style="{{ownerName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{ownerName || '选择案主'}}</text>
-        <text class="picker-clear" wx:if="{{ownerId && !readOnly}}" catchtap="onOwnerClear">x</text>
+        <text class="participant-withdrawn" wx:if="{{ownerWithdrawn}}">已退课</text>
+        <text class="picker-clear" wx:if="{{ownerId && !readOnly && !ownerWithdrawn}}" catchtap="onOwnerClear">x</text>
       </view>
     </view>
 

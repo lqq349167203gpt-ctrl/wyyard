@@ -1,17 +1,18 @@
 .card {
   background-color: #ffffff;
-  border-radius: 8rpx;
-  margin: 0 24rpx 16rpx;
-  overflow: hidden;
-  border: 1rpx solid #ebedf0;
+  border-bottom: 1rpx solid #f1f2f4;
+}
+
+.card.last {
+  border-bottom: none;
 }
 
 .card.editing {
-  background-color: #fafbfc;
+  background-color: #f9fbff;
 }
 
 .card.read-only {
-  border-color: #ebedf0;
+  background-color: #fbfbfc;
 }
 
 .card.cancelled {
@@ -24,32 +25,36 @@
   color: #b0b5bb;
 }
 
+.card.read-only .nickname {
+  color: #8f959e;
+}
+
 .card-main {
   display: flex;
   align-items: flex-start;
-  padding: 24rpx 28rpx;
+  padding: 24rpx 28rpx 22rpx;
 }
 
 .move-btns {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  margin-right: 16rpx;
+  margin-right: 18rpx;
   flex-shrink: 0;
 }
 
 .move-btn {
-  width: 44rpx;
-  height: 38rpx;
+  width: 48rpx;
+  height: 42rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #f2f3f5;
-  border-radius: 6rpx;
+  border-radius: 12rpx;
 }
 
 .move-btn text {
-  font-size: 20rpx;
+  font-size: 18rpx;
   color: #4e535a;
   line-height: 1;
 }
@@ -65,7 +70,7 @@
 
 .row-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12rpx;
 }
@@ -74,7 +79,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8rpx;
+  gap: 10rpx;
   flex: 1;
   min-width: 0;
 }
@@ -83,7 +88,7 @@
   font-size: 30rpx;
   font-weight: 500;
   color: #1f2329;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .nickname.cancelled {
@@ -91,48 +96,53 @@
 }
 
 .leader-tag {
-  font-size: 21rpx;
+  font-size: 20rpx;
   color: #3370ff;
-  background-color: rgba(51, 112, 255, 0.09);
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-  line-height: 1.6;
+  background-color: #eef3ff;
+  padding: 2rpx 14rpx;
+  border-radius: 16rpx;
+  line-height: 30rpx;
+  font-weight: 500;
 }
 
 .member-tag {
-  font-size: 21rpx;
+  font-size: 20rpx;
   color: #646a73;
   background-color: #f2f3f5;
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-  line-height: 1.6;
+  padding: 2rpx 14rpx;
+  border-radius: 16rpx;
+  line-height: 30rpx;
 }
 
 .member-summary {
-  font-size: 21rpx;
-  color: #646a73;
+  max-width: 260rpx;
+  overflow: hidden;
+  padding: 2rpx 14rpx;
+  border-radius: 16rpx;
   background-color: #f2f3f5;
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-  line-height: 1.6;
+  color: #646a73;
+  font-size: 20rpx;
+  line-height: 30rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .readonly-mark {
-  font-size: 21rpx;
+  font-size: 20rpx;
   color: #8f959e;
-  border: 1rpx solid #dcdfe4;
-  padding: 1rpx 11rpx;
-  border-radius: 6rpx;
-  line-height: 1.6;
+  background-color: #f2f3f5;
+  padding: 2rpx 14rpx;
+  border-radius: 16rpx;
+  line-height: 30rpx;
 }
 
 .row-meta {
   display: flex;
   align-items: baseline;
   gap: 10rpx;
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #646a73;
+  margin-top: 10rpx;
+  color: #8f959e;
+  font-size: 23rpx;
 }
 
 .meta-sep {
@@ -142,8 +152,8 @@
 .needs-row {
   display: flex;
   align-items: flex-start;
-  margin-top: 10rpx;
-  font-size: 24rpx;
+  margin-top: 9rpx;
+  font-size: 23rpx;
   color: #646a73;
   line-height: 1.6;
 }
@@ -151,7 +161,7 @@
 .needs-label {
   color: #8f959e;
   flex-shrink: 0;
-  margin-right: 8rpx;
+  margin-right: 10rpx;
 }
 
 .needs-content {
@@ -162,11 +172,14 @@
 
 .arrival-badge {
   flex-shrink: 0;
-  font-size: 24rpx;
-  border-radius: 8rpx;
-  padding: 10rpx 28rpx;
+  min-width: 100rpx;
+  box-sizing: border-box;
+  padding: 10rpx 18rpx;
+  border-radius: 16rpx;
+  font-size: 22rpx;
   font-weight: 500;
-  line-height: 1.5;
+  line-height: 32rpx;
+  text-align: center;
 }
 
 .arrival-badge.todo {
@@ -176,7 +189,7 @@
 
 .arrival-badge.arrived {
   color: #3370ff;
-  background-color: rgba(51, 112, 255, 0.09);
+  background-color: #eef3ff;
   font-weight: 400;
 }
 
@@ -187,25 +200,29 @@
 
 .cancelled-tag {
   flex-shrink: 0;
-  font-size: 21rpx;
+  font-size: 20rpx;
   color: #8f959e;
   background-color: #f2f3f5;
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-  line-height: 1.6;
+  padding: 2rpx 14rpx;
+  border-radius: 16rpx;
+  line-height: 30rpx;
 }
 
 .card-actions {
   display: flex;
   align-items: center;
-  margin-top: 18rpx;
-  padding-top: 16rpx;
+  margin-top: 16rpx;
+  padding-top: 14rpx;
   border-top: 1rpx solid #f5f6f7;
 }
 
 .creator-text {
+  min-width: 0;
+  overflow: hidden;
   color: #8f959e;
-  font-size: 22rpx;
+  font-size: 21rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .action-list {
@@ -213,10 +230,12 @@
   align-items: center;
   gap: 28rpx;
   margin-left: auto;
+  padding-left: 18rpx;
+  flex-shrink: 0;
 }
 
 .action-btn {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #646a73;
   padding: 4rpx 0;
 }

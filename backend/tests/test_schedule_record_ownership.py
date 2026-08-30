@@ -62,6 +62,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
                 "date": date,
                 "course_id": "ownership-course",
                 "course_name": "归属测试沙龙",
+                "participant_ids": [created_customer["id"]],
             },
             {"course_name": "他人不能修改课程名称"},
         ),
@@ -98,6 +99,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
                 "date": date,
                 "course_type": "归属测试",
                 "course_name": "归属测试内部课",
+                "participant_ids": [created_customer["id"]],
             },
             {"course_name": "他人不能修改内部课程名称"},
         ),
@@ -111,6 +113,18 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
         assert body["created_by_id"]
         assert body["created_by"] == "不闹"
         created_records.append((path, body["id"], protected_update))
+
+    record_type_by_path = {
+        "/api/class-records": "class",
+        "/api/group-case-sessions": "gcs",
+        "/api/emotional-release-sessions": "ers",
+        "/api/energy-knot-sessions": "eks",
+        "/api/internal-course-sessions": "ics",
+    }
+    withdrawal_records = [
+        (record_type_by_path[path], record_id)
+        for path, record_id, _ in created_records
+    ]
 
     account, position, other_headers = _create_other_account_headers(client)
     try:
@@ -247,6 +261,31 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
         assert participant_update.status_code == 200, participant_update.text
         assert participant_update.json()["participant_ids"] == [created_customer["id"]]
 
+        for record_type, record_id in withdrawal_records:
+            forbidden_withdrawal = client.post(
+                f"/api/activity-withdrawals/{record_type}/{record_id}",
+                json={"customer_id": created_customer["id"]},
+                headers=other_headers,
+            )
+            assert forbidden_withdrawal.status_code == 403, forbidden_withdrawal.text
+
+            owner_withdrawal = client.post(
+                f"/api/activity-withdrawals/{record_type}/{record_id}",
+                json={"customer_id": created_customer["id"]},
+            )
+            assert owner_withdrawal.status_code == 200, owner_withdrawal.text
+            assert created_customer["id"] in owner_withdrawal.json()["withdrawn_participant_ids"]
+            forbidden_restore = client.delete(
+                f"/api/activity-withdrawals/{record_type}/{record_id}/{created_customer['id']}",
+                headers=other_headers,
+            )
+            assert forbidden_restore.status_code == 403, forbidden_restore.text
+            owner_restore = client.delete(
+                f"/api/activity-withdrawals/{record_type}/{record_id}/{created_customer['id']}"
+            )
+            assert owner_restore.status_code == 200, owner_restore.text
+            assert created_customer["id"] not in owner_restore.json()["withdrawn_participant_ids"]
+
         own_update = client.patch(
             f"/api/visits/{visit_id}", json={"needs": "本人可以修改"}
         )
@@ -273,6 +312,19 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
         assert "邀约编辑范围(仅本人录入→全部记录)" in permission_log["content"]
         assert "课表编辑范围(仅本人录入→全部记录)" in permission_log["content"]
         assert "edit_permissions" not in permission_log["content"]
+
+        for record_type, record_id in withdrawal_records:
+            allowed_withdrawal = client.post(
+                f"/api/activity-withdrawals/{record_type}/{record_id}",
+                json={"customer_id": created_customer["id"]},
+                headers=other_headers,
+            )
+            assert allowed_withdrawal.status_code == 200, allowed_withdrawal.text
+            allowed_restore = client.delete(
+                f"/api/activity-withdrawals/{record_type}/{record_id}/{created_customer['id']}",
+                headers=other_headers,
+            )
+            assert allowed_restore.status_code == 200, allowed_restore.text
 
         allowed_visit_update = client.patch(
             f"/api/visits/{visit_id}",

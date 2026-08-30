@@ -232,19 +232,27 @@ def _build_customer_activity_counts() -> dict[str, int]:
             if cid:
                 counts[cid] += 1
     for s in group_case_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
+        active_ids = set(s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids)
+        active_ids -= set(s.withdrawn_participant_ids or [])
+        for cid in active_ids:
             if cid:
                 counts[cid] += 1
     for s in emotional_release_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
+        active_ids = set(s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids)
+        active_ids -= set(s.withdrawn_participant_ids or [])
+        for cid in active_ids:
             if cid:
                 counts[cid] += 1
     for s in energy_knot_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id] + s.teacher_ids):
+        active_ids = set(s.participant_ids + [s.owner_id] + s.teacher_ids)
+        active_ids -= set(s.withdrawn_participant_ids or [])
+        for cid in active_ids:
             if cid:
                 counts[cid] += 1
     for s in internal_course_session_service.list_sessions():
-        for cid in (s.participant_ids + s.teacher_ids):
+        active_ids = set(s.participant_ids + s.teacher_ids)
+        active_ids -= set(s.withdrawn_participant_ids or [])
+        for cid in active_ids:
             if cid:
                 counts[cid] += 1
     result = dict(counts)
@@ -276,25 +284,33 @@ def _count_customer_activities_by_type(customer_id: str, activity_type: str) -> 
     if activity_type == "emotional_release":
         count = 0
         for s in emotional_release_session_service.list_sessions():
-            if customer_id in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
+            active_ids = set(s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids)
+            active_ids -= set(s.withdrawn_participant_ids or [])
+            if customer_id in active_ids:
                 count += 1
         return count
     if activity_type == "group_case":
         count = 0
         for s in group_case_session_service.list_sessions():
-            if customer_id in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
+            active_ids = set(s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids)
+            active_ids -= set(s.withdrawn_participant_ids or [])
+            if customer_id in active_ids:
                 count += 1
         return count
     if activity_type == "energy_knot":
         count = 0
         for s in energy_knot_session_service.list_sessions():
-            if customer_id in (s.participant_ids + [s.owner_id] + s.teacher_ids):
+            active_ids = set(s.participant_ids + [s.owner_id] + s.teacher_ids)
+            active_ids -= set(s.withdrawn_participant_ids or [])
+            if customer_id in active_ids:
                 count += 1
         return count
     if activity_type == "internal_course":
         count = 0
         for s in internal_course_session_service.list_sessions():
-            if customer_id in (s.participant_ids + s.teacher_ids):
+            active_ids = set(s.participant_ids + s.teacher_ids)
+            active_ids -= set(s.withdrawn_participant_ids or [])
+            if customer_id in active_ids:
                 count += 1
         return count
     return 0
@@ -313,7 +329,7 @@ def _build_customer_welfare_counts() -> dict[str, int]:
     counts: dict[str, int] = defaultdict(int)
     for cr in class_record_service.list_records():
         if cr.is_public_welfare:
-            for cid in cr.participant_ids:
+            for cid in set(cr.participant_ids) - set(cr.withdrawn_participant_ids or []):
                 counts[cid] += 1
     result = dict(counts)
     _welfare_counts_cache = result

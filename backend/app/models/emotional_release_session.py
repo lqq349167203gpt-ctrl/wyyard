@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import Field
 
 from app.models.base import SafeBaseModel
+from app.models.class_record import CourseWithdrawalEntry
 
 
 class EmotionalReleaseSessionBase(SafeBaseModel):
@@ -38,6 +39,8 @@ class EmotionalReleaseSessionCreate(EmotionalReleaseSessionBase):
 
 class EmotionalReleaseSession(EmotionalReleaseSessionBase):
     id: str
+    withdrawn_participant_ids: List[str] = []
+    withdrawal_records: List[CourseWithdrawalEntry] = []
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False

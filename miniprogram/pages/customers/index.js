@@ -164,7 +164,7 @@ Page({
   },
 
   onReachBottom() {
-    if (this.data.hasMore && !this.data.loading && !this.data.loadingMore) {
+    if (!this._restoringScroll && this.data.hasMore && !this.data.loading && !this.data.loadingMore) {
       this.loadData(false)
     }
   },
@@ -174,7 +174,8 @@ Page({
   },
 
   async loadData(reset) {
-    if (this.data.loading || this.data.loadingMore) return
+    if (this._loadingRequest || this.data.loading || this.data.loadingMore) return
+    this._loadingRequest = true
     const page = reset ? 1 : this.data.page + 1
     if (reset) {
       this.setData({ loading: true })
@@ -206,6 +207,7 @@ Page({
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       customers.forEach(c => {
+        c._rowDomId = `customer-row-${String(c.id || '').replace(/[^a-zA-Z0-9_-]/g, '-')}`
         if (c.last_visit_date) {
           const visitDate = new Date(c.last_visit_date)
           visitDate.setHours(0, 0, 0, 0)
@@ -215,23 +217,15 @@ Page({
         }
         const days = c.daysAgo
         if (days < 0) {
-          c.daysPillClass = 'pill-none'
           c.daysPillText = '未到店'
-        } else if (days <= 7) {
-          c.daysPillClass = 'pill-recent'
-          c.daysPillText = days + '天前'
-        } else if (days <= 30) {
-          c.daysPillClass = 'pill-mid'
-          c.daysPillText = days + '天前'
         } else {
-          c.daysPillClass = 'pill-over'
-          c.daysPillText = days + '天未到店'
+          c.daysPillText = days + ' 天'
         }
         c.isStale = days > 30
         if (c.card_remaining === 'unlimited') {
           c.cardRemainingText = '不限次'
         } else if (typeof c.card_remaining === 'number') {
-          c.cardRemainingText = '剩 ' + c.card_remaining + ' 次'
+          c.cardRemainingText = '次卡余 ' + c.card_remaining + ' 次'
         } else {
           c.cardRemainingText = ''
         }
@@ -239,15 +233,72 @@ Page({
 
       this.setData({ customers, page, total, hasMore: customers.length < total, initialized: true })
       this.updateReferrerList()
-      this.applyFilters()
+      // 下一页数据会被重新分配到各会员身份组，可能插入当前视口上方。
+      // 以当前第一条可见客户作为锚点，重排后恢复其屏幕位置，避免整页跳动。
+      const scrollAnchor = reset ? null : await this.captureScrollAnchor()
+      this.applyFilters(scrollAnchor)
     } catch (e) {
       console.error('[loadData] 加载客户失败:', e.message, e)
       this.setData({ loading: false, loadingMore: false, initialized: true })
       wx.showToast({ title: '加载失败', icon: 'none' })
+    } finally {
+      this._loadingRequest = false
     }
   },
 
-  applyFilters() {
+  captureScrollAnchor() {
+    return new Promise(resolve => {
+      const query = wx.createSelectorQuery()
+      query.select('.search-bar').boundingClientRect()
+      query.selectAll('.c-row').boundingClientRect()
+      query.selectViewport().scrollOffset()
+      query.exec(results => {
+        const searchRect = results && results[0]
+        const rows = (results && results[1]) || []
+        const viewport = (results && results[2]) || {}
+        const visibleTop = searchRect && typeof searchRect.bottom === 'number'
+          ? searchRect.bottom
+          : 0
+        const row = rows.find(item => item.bottom > visibleTop)
+        if (!row || !row.id) {
+          resolve(null)
+          return
+        }
+        resolve({ id: row.id, top: row.top, scrollTop: viewport.scrollTop || 0 })
+      })
+    })
+  },
+
+  restoreScrollAnchor(anchor) {
+    if (!anchor) {
+      this._restoringScroll = false
+      return
+    }
+    const query = wx.createSelectorQuery()
+    query.selectAll('.c-row').boundingClientRect()
+    query.selectViewport().scrollOffset()
+    query.exec(results => {
+      const rows = (results && results[0]) || []
+      const viewport = (results && results[1]) || {}
+      const row = rows.find(item => item.id === anchor.id)
+      if (!row) {
+        this._restoringScroll = false
+        return
+      }
+      const delta = row.top - anchor.top
+      if (Math.abs(delta) < 1) {
+        this._restoringScroll = false
+        return
+      }
+      wx.pageScrollTo({
+        scrollTop: Math.max(0, (viewport.scrollTop || anchor.scrollTop) + delta),
+        duration: 0,
+        complete: () => { this._restoringScroll = false },
+      })
+    })
+  },
+
+  applyFilters(scrollAnchor) {
     const filtered = this.data.customers || []
 
     // 按会员身份分组（反向排列）
@@ -265,12 +316,15 @@ Page({
     })
     const groupedCustomers = identities
       .filter(t => groupMap[t].length > 0)
-      .map(t => ({ type: t, list: groupMap[t] }))
+      .map(t => ({ type: t, list: groupMap[t], dotClass: 'member' }))
     if (groupMap['其他'].length > 0) {
-      groupedCustomers.push({ type: '其他', list: groupMap['其他'] })
+      groupedCustomers.push({ type: '其他', list: groupMap['其他'], dotClass: 'other' })
     }
 
-    this.setData({ groupedCustomers, loading: false, loadingMore: false })
+    this._restoringScroll = !!scrollAnchor
+    this.setData({ groupedCustomers, loading: false, loadingMore: false }, () => {
+      this.restoreScrollAnchor(scrollAnchor)
+    })
   },
 
   onSearchInput(e) {
@@ -288,18 +342,18 @@ Page({
 
   // 筛选面板
   onToggleFilterPanel() {
-    const show = !this.data.showFilterPanel
-    if (show) {
-      // 打开时保存当前状态快照
-      this._filterSnapshot = {
-        selectedMemberTypes: this.data.selectedMemberTypes.slice(),
-        selectedReferrers: this.data.selectedReferrers.slice(),
-        selectedTagIds: this.data.selectedTagIds.slice(),
-        rangeMin: this.data.rangeMin,
-        rangeMax: this.data.rangeMax,
-      }
+    if (this.data.showFilterPanel) {
+      this.onCloseFilterPanel()
+      return
     }
-    this.setData({ showFilterPanel: show })
+    this._filterSnapshot = {
+      selectedMemberTypes: this.data.selectedMemberTypes.slice(),
+      selectedReferrers: this.data.selectedReferrers.slice(),
+      selectedTagIds: this.data.selectedTagIds.slice(),
+      rangeMin: this.data.rangeMin,
+      rangeMax: this.data.rangeMax,
+    }
+    this.setData({ showFilterPanel: true })
   },
 
   onCloseFilterPanel() {
@@ -319,6 +373,7 @@ Page({
     } else {
       this.setData({ showFilterPanel: false })
     }
+    this._filterSnapshot = null
   },
 
   // 引流人选择
@@ -400,16 +455,12 @@ Page({
 
   // 重置筛选（清空所有条件，但保持面板打开，等用户点确定后再生效）
   onResetFilter() {
-    this._filterSnapshot = null
     this.setData({
       selectedMemberTypes: [],
       selectedReferrers: [],
       selectedTagIds: [],
       rangeMin: 0,
       rangeMax: 60,
-      daysFilterMin: 0,
-      daysFilterMax: 60,
-      filterCount: 0,
     })
     this.updateMemberTypeList()
     this.updateReferrerList()
@@ -424,9 +475,10 @@ Page({
       daysFilterMin: rangeMin,
       daysFilterMax: rangeMax,
       showFilterPanel: false,
+    }, () => {
+      this.checkActiveFilter()
+      this.loadData(true)
     })
-    this.checkActiveFilter()
-    this.loadData(true)
   },
 
   onCustomerTap(e) {
@@ -436,6 +488,10 @@ Page({
       return
     }
     wx.navigateTo({ url: `/pages/customer-profile/index?id=${id}` })
+  },
+
+  onSearchTap() {
+    wx.navigateTo({ url: '/pages/customer-search/index' })
   },
 
   onEditTap(e) {

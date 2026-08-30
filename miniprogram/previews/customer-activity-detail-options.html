@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>客户详情 · 活动记录两款方案</title>
+  <style>
+    :root {
+      --page: #eef1f5;
+      --phone: #f7f8fa;
+      --white: #fff;
+      --ink: #1f2329;
+      --text: #4e535a;
+      --muted: #8f959e;
+      --faint: #b0b5bb;
+      --line: #eef0f2;
+      --blue: #3370ff;
+      --blue-soft: #eef3ff;
+      --red: #c4506a;
+      --red-soft: #fbeff2;
+      --green: #2a8f72;
+      --green-soft: #edf7f3;
+      --yellow: #b9792d;
+      --yellow-soft: #fbf5e9;
+      --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 34px 26px 72px;
+      background: var(--page);
+      color: var(--ink);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+    .head { max-width: 980px; margin: 0 auto 28px; }
+    .head h1 { margin: 0; font-size: 22px; font-weight: 600; }
+    .head p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .compare {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 42px;
+      flex-wrap: wrap;
+    }
+    .proposal { width: 390px; }
+    .proposal-head { margin-bottom: 12px; }
+    .proposal-title { display: flex; align-items: baseline; gap: 9px; }
+    .proposal-code { color: var(--blue); font-size: 17px; font-weight: 600; }
+    .proposal-name { font-size: 16px; font-weight: 600; }
+    .proposal-desc { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+    .phone {
+      width: 390px;
+      height: 844px;
+      overflow: hidden;
+      border: 1px solid #dfe3e8;
+      border-radius: 28px;
+      background: var(--phone);
+      box-shadow: 0 12px 34px rgba(31, 35, 41, .08);
+    }
+    .status {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      background: var(--white);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .nav {
+      position: relative;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--white);
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .back { position: absolute; left: 18px; font-size: 25px; font-weight: 400; line-height: 1; }
+    .capsule {
+      position: absolute;
+      right: 12px;
+      width: 76px;
+      height: 28px;
+      border: 1px solid #e4e7eb;
+      border-radius: 15px;
+    }
+    .capsule::before { content: "•••"; position: absolute; left: 15px; top: 2px; letter-spacing: 1px; font-size: 11px; }
+    .capsule::after { content: "◉"; position: absolute; right: 13px; top: 5px; font-size: 10px; }
+
+    .mini-profile {
+      padding: 14px 20px 15px;
+      background: #f3f7ff;
+      border-bottom: 1px solid #edf0f4;
+    }
+    .profile-top { display: flex; align-items: center; gap: 8px; }
+    .profile-name { font-size: 20px; font-weight: 600; }
+    .profile-tag {
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.76);
+      color: var(--blue);
+      font-size: 10px;
+    }
+    .profile-edit { margin-left: auto; color: var(--blue); font-size: 12px; }
+    .profile-meta { margin-top: 5px; color: var(--muted); font-size: 11px; }
+
+    .tabs-wrap { padding: 13px 12px 10px; background: var(--phone); }
+    .tabs {
+      display: flex;
+      overflow: hidden;
+      padding: 3px;
+      border-radius: 18px;
+      background: #f2f3f5;
+    }
+    .tab {
+      flex: 0 0 auto;
+      padding: 7px 11px;
+      border-radius: 15px;
+      color: #646a73;
+      font-size: 11.5px;
+      white-space: nowrap;
+    }
+    .tab.active { background: #fff; color: var(--ink); font-weight: 500; }
+    .tab em { margin-left: 3px; color: var(--faint); font-size: 9px; font-style: normal; }
+    .tab.active em { color: var(--blue); }
+    .screen { height: 681px; overflow: hidden; }
+
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 15px;
+      padding: 2px 20px 12px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .summary span { white-space: nowrap; }
+    .summary b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .summary .withdraw, .summary .withdraw b { color: var(--red); }
+
+    /* A · timeline */
+    .timeline { position: relative; padding: 1px 14px 30px 18px; }
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 77px;
+      top: 20px;
+      bottom: 34px;
+      width: 1px;
+      background: #e8ebef;
+    }
+    .time-entry { position: relative; display: grid; grid-template-columns: 48px 18px 1fr; column-gap: 10px; margin-bottom: 11px; }
+    .date { padding-top: 10px; text-align: right; font-variant-numeric: tabular-nums; }
+    .date strong { display: block; font-size: 12px; font-weight: 600; }
+    .date small { color: var(--muted); font-size: 9.5px; }
+    .node { position: relative; z-index: 1; display: flex; justify-content: center; padding-top: 15px; }
+    .node i { width: 8px; height: 8px; border: 2px solid #fff; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+    .node.withdraw i { background: #fff; box-shadow: 0 0 0 1px var(--red); }
+    .activity-card {
+      padding: 11px 12px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .activity-card.withdrawn { border-style: dashed; background: #fcfafb; }
+    .card-top { display: flex; align-items: center; gap: 8px; }
+    .activity-name { min-width: 0; flex: 1; font-size: 13px; font-weight: 600; }
+    .badge { flex: 0 0 auto; padding: 2px 7px; border-radius: 4px; font-size: 9.5px; }
+    .badge.blue { background: var(--blue-soft); color: var(--blue); }
+    .badge.red { background: var(--red-soft); color: var(--red); }
+    .badge.green { background: var(--green-soft); color: var(--green); }
+    .badge.yellow { background: var(--yellow-soft); color: var(--yellow); }
+    .card-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 7px; color: var(--muted); font-size: 10.5px; }
+    .deduct { margin-top: 7px; padding-top: 7px; border-top: 1px solid #f1f2f4; color: var(--text); font-size: 10.5px; }
+
+    /* B · ledger */
+    .ledger { padding: 0 14px 28px; }
+    .month-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 3px 6px 8px;
+    }
+    .month-head strong { font-size: 12px; font-weight: 600; }
+    .month-head span { color: var(--muted); font-size: 10px; }
+    .ledger-group { overflow: hidden; border-radius: 12px; background: #fff; }
+    .ledger-row { display: flex; gap: 12px; padding: 12px 13px; }
+    .ledger-row + .ledger-row { border-top: 1px solid #f0f1f3; }
+    .day-box { width: 39px; flex: 0 0 auto; padding-top: 1px; text-align: center; }
+    .day-box strong { display: block; font-size: 17px; font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .day-box small { color: var(--muted); font-size: 9px; }
+    .ledger-main { min-width: 0; flex: 1; }
+    .ledger-title { display: flex; align-items: center; gap: 7px; }
+    .ledger-title strong { min-width: 0; flex: 1; overflow: hidden; font-size: 12.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .ledger-meta { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .ledger-deduct { margin-top: 3px; color: var(--text); font-size: 10px; }
+    .month-gap { height: 15px; }
+
+    .notes {
+      margin-top: 13px;
+      padding: 12px 14px;
+      border: 1px solid #e0e4e9;
+      border-radius: 6px;
+      background: rgba(255,255,255,.7);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.75;
+    }
+    .notes b { color: var(--ink); font-weight: 600; }
+    @media (max-width: 460px) {
+      body { padding: 22px 8px 54px; }
+      .proposal, .phone { width: min(390px, calc(100vw - 16px)); }
+      .phone { border-radius: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <h1>客户详情页 · 活动记录两款方案</h1>
+    <p>顶部资料和 Tab 保持现状，仅调整活动统计与记录列表。统计只显示大于 0 的项目；以下两款使用同一份示例数据。</p>
+  </div>
+
+  <main class="compare">
+    <section class="proposal">
+      <div class="proposal-head">
+        <div class="proposal-title"><span class="proposal-code">A</span><span class="proposal-name">轻量时间轴</span></div>
+        <div class="proposal-desc">日期、活动和扣卡关系最清楚；适合逐条回看一个客户的参与过程。</div>
+      </div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●●　▰</span></div>
+        <div class="nav"><span class="back">‹</span>客户详情<div class="capsule"></div></div>
+        <div class="mini-profile">
+          <div class="profile-top"><span class="profile-name">小林</span><span class="profile-tag">长期会员</span><span class="profile-edit">编辑</span></div>
+          <div class="profile-meta">女 · 服务老师 白鹭 · 前期沟通中</div>
+        </div>
+        <div class="screen">
+          <div class="tabs-wrap"><div class="tabs">
+            <span class="tab">跟进<em>9</em></span><span class="tab">沟通<em>3</em></span><span class="tab active">活动<em>8</em></span><span class="tab">回访</span><span class="tab">卡次</span><span class="tab">课程</span>
+          </div></div>
+          <div class="summary"><span>沙龙活动 <b>4</b> 次</span><span>觉醒游戏 <b>2</b> 次</span><span>能量结 <b>1</b> 次</span><span class="withdraw">退课 <b>1</b> 次</span></div>
+          <div class="timeline">
+            <div class="time-entry">
+              <div class="date"><strong>08/28</strong><small>周五</small></div><div class="node"><i></i></div>
+              <div class="activity-card"><div class="card-top"><span class="activity-name">觉醒游戏</span><span class="badge blue">已参与</span></div><div class="card-meta"><span>身份：案主</span><span>老师：婷婷</span></div><div class="deduct">觉醒游戏扣卡 1 次</div></div>
+            </div>
+            <div class="time-entry">
+              <div class="date"><strong>08/17</strong><small>周一</small></div><div class="node"><i></i></div>
+              <div class="activity-card"><div class="card-top"><span class="activity-name">颂钵疗愈</span><span class="badge green">公益</span></div><div class="card-meta"><span>身份：参与者</span><span>老师：白鹭</span></div><div class="deduct">公益活动 · 未扣卡</div></div>
+            </div>
+            <div class="time-entry">
+              <div class="date"><strong>08/03</strong><small>周一</small></div><div class="node"><i></i></div>
+              <div class="activity-card"><div class="card-top"><span class="activity-name">能量结</span><span class="badge blue">已参与</span></div><div class="card-meta"><span>身份：案主</span><span>老师：林老师</span></div><div class="deduct">能量结部位 2 个</div></div>
+            </div>
+            <div class="time-entry">
+              <div class="date"><strong>07/26</strong><small>周日</small></div><div class="node withdraw"><i></i></div>
+              <div class="activity-card withdrawn"><div class="card-top"><span class="activity-name">创业者 Talk</span><span class="badge red">已退课</span></div><div class="card-meta"><span>身份：参与者</span><span>老师：耀凯</span></div><div class="deduct">已恢复会员卡 1 次</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes"><b>优点：</b>状态和扣卡逻辑最直观，同一天多场也容易分辨。<br><b>取舍：</b>单条记录高度略高，一屏显示的数量少于方案 B。</div>
+    </section>
+
+    <section class="proposal">
+      <div class="proposal-head">
+        <div class="proposal-title"><span class="proposal-code">B</span><span class="proposal-name">月份分组清单</span></div>
+        <div class="proposal-desc">按月份归档、每条更紧凑；适合活动记录多时快速查找和对比。</div>
+      </div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●●　▰</span></div>
+        <div class="nav"><span class="back">‹</span>客户详情<div class="capsule"></div></div>
+        <div class="mini-profile">
+          <div class="profile-top"><span class="profile-name">小林</span><span class="profile-tag">长期会员</span><span class="profile-edit">编辑</span></div>
+          <div class="profile-meta">女 · 服务老师 白鹭 · 前期沟通中</div>
+        </div>
+        <div class="screen">
+          <div class="tabs-wrap"><div class="tabs">
+            <span class="tab">跟进<em>9</em></span><span class="tab">沟通<em>3</em></span><span class="tab active">活动<em>8</em></span><span class="tab">回访</span><span class="tab">卡次</span><span class="tab">课程</span>
+          </div></div>
+          <div class="summary"><span>沙龙活动 <b>4</b> 次</span><span>觉醒游戏 <b>2</b> 次</span><span>能量结 <b>1</b> 次</span><span class="withdraw">退课 <b>1</b> 次</span></div>
+          <div class="ledger">
+            <div class="month-head"><strong>2026 年 8 月</strong><span>共 3 场</span></div>
+            <div class="ledger-group">
+              <div class="ledger-row"><div class="day-box"><strong>28</strong><small>周五</small></div><div class="ledger-main"><div class="ledger-title"><strong>觉醒游戏</strong><span class="badge blue">已参与</span></div><div class="ledger-meta">案主 · 老师 婷婷</div><div class="ledger-deduct">觉醒游戏扣卡 1 次</div></div></div>
+              <div class="ledger-row"><div class="day-box"><strong>17</strong><small>周一</small></div><div class="ledger-main"><div class="ledger-title"><strong>颂钵疗愈</strong><span class="badge green">公益</span></div><div class="ledger-meta">参与者 · 老师 白鹭</div><div class="ledger-deduct">公益活动 · 未扣卡</div></div></div>
+              <div class="ledger-row"><div class="day-box"><strong>03</strong><small>周一</small></div><div class="ledger-main"><div class="ledger-title"><strong>能量结</strong><span class="badge blue">已参与</span></div><div class="ledger-meta">案主 · 老师 林老师</div><div class="ledger-deduct">能量结部位 2 个</div></div></div>
+            </div>
+            <div class="month-gap"></div>
+            <div class="month-head"><strong>2026 年 7 月</strong><span>共 2 场</span></div>
+            <div class="ledger-group">
+              <div class="ledger-row"><div class="day-box"><strong>26</strong><small>周日</small></div><div class="ledger-main"><div class="ledger-title"><strong>创业者 Talk</strong><span class="badge red">已退课</span></div><div class="ledger-meta">参与者 · 老师 耀凯</div><div class="ledger-deduct">已恢复会员卡 1 次</div></div></div>
+              <div class="ledger-row"><div class="day-box"><strong>12</strong><small>周日</small></div><div class="ledger-main"><div class="ledger-title"><strong>读书会</strong><span class="badge yellow">未参与</span></div><div class="ledger-meta">参与者 · 老师 婷婷</div><div class="ledger-deduct">未到店 · 未扣卡</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes"><b>优点：</b>密度高、月份层级清晰，一屏可以看到更多记录。<br><b>取舍：</b>时间过程感不如方案 A，单条记录的视觉重点更克制。</div>
+    </section>
+  </main>
+</body>
+</html>

@@ -51,39 +51,6 @@
   margin-top: 8rpx;
 }
 
-/* 信息列表 */
-.info-card {
-  background-color: #ffffff;
-  border-radius: 12rpx;
-  padding: 8rpx 32rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  padding: 28rpx 0;
-  border-bottom: 1rpx solid #f0f1f2;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-label {
-  font-size: 28rpx;
-  color: #8f959e;
-  width: 140rpx;
-  flex-shrink: 0;
-}
-
-.info-value {
-  font-size: 28rpx;
-  color: #1f2329;
-  flex: 1;
-}
-
 /* 功能入口 */
 .menu-card {
   background-color: #ffffff;

@@ -47,6 +47,7 @@ Page({
     activityModeIndex: 0,
     ownerId: '',
     ownerName: '',
+    ownerWithdrawn: false,
     teacherIds: [],
     teacherNames: [],
     teacherDisplay: '',
@@ -122,6 +123,7 @@ Page({
       deductionCount: this._parseEksDeductionCount(raw.description, activityType),
       ownerId: raw.owner_id || '',
       ownerName: raw.owner_name || '',
+      ownerWithdrawn: Boolean(raw.owner_id && (raw.withdrawn_participant_ids || []).includes(raw.owner_id)),
       teacherIds: raw.teacher_ids || [],
       achieverId: raw.achiever_id || raw.host_id || (raw.teacher_ids || [])[0] || '',
       achieverName: (raw.teacher_names || [])[0] || raw.achiever_name || raw.host_name || '',
@@ -444,6 +446,10 @@ Page({
 
   onOwnerPickerOpen() {
     if (this.data.readOnly) return
+    if (this.data.ownerWithdrawn) {
+      wx.showToast({ title: '已退课案主需先恢复退课', icon: 'none' })
+      return
+    }
     const list = this.data.dayVisitors.map(c => Object.assign({}, c, {_selected: c.id === this.data.ownerId,}))
     this.setData({
       showPicker: true, pickerTitle: '案主', pickerMode: 'owner',
@@ -515,6 +521,10 @@ Page({
 
   onOwnerClear() {
     if (this.data.readOnly) return
+    if (this.data.ownerWithdrawn) {
+      wx.showToast({ title: '已退课案主需先恢复退课', icon: 'none' })
+      return
+    }
     this.setData({ ownerId: '', ownerName: '' })
   },
 
@@ -638,7 +648,7 @@ Page({
       wx.showToast({ title: '已保存' })
       const pages = getCurrentPages()
       const prevPage = pages[pages.length - 2]
-      if (prevPage && prevPage.loadData) prevPage.loadData()
+      if (prevPage) prevPage._needRefresh = true
       wx.navigateBack()
     } catch (e) {
       this.setData({ saving: false })
@@ -673,7 +683,7 @@ Page({
           wx.showToast({ title: '已删除' })
           const pages = getCurrentPages()
           const prevPage = pages[pages.length - 2]
-          if (prevPage && prevPage.loadData) prevPage.loadData()
+          if (prevPage) prevPage._needRefresh = true
           wx.navigateBack()
         } catch (e) {
           this.setData({ deleting: false })

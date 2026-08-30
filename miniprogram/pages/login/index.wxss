@@ -2,305 +2,277 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  position: relative;
-  background-color: #e8f2fb;
-  overflow: hidden;
+  background-color: #ffffff;
+  box-sizing: border-box;
 }
 
-.bg-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-}
-
-.bg-mask {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 70%);
-  z-index: 1;
-  pointer-events: none;
-}
-
-/* 蓝色头部 */
-.header,
-.login-card,
-.dev-toggle {
-  position: relative;
-  z-index: 2;
-}
-
-.header {
-  padding: 200rpx 144rpx 120rpx;
-  margin-top: 360rpx;
-  margin-left: -100rpx;
-  margin-right: -100rpx;
+.page-content {
+  flex: 1;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  padding: 21vh 64rpx 0;
+  box-sizing: border-box;
 }
 
-.header-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-left: -12rpx;
-}
-
-.logo-circle {
-  width: 130rpx;
-  height: 130rpx;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(10px);
+/* 品牌区 */
+.brand-block {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-bottom: 28rpx;
-}
-
-.logo-char {
-  font-size: 56rpx;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.logo-text {
-  font-size: 44rpx;
-  font-weight: 700;
-  color: #1f2329;
-  letter-spacing: 2rpx;
+  gap: 22rpx;
 }
 
 .logo-icon {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 12rpx;
-  background-color: #4370F7;
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 22rpx;
+  background-color: #3370ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 16rpx;
 }
 
 .logo-w {
-  font-size: 28rpx;
-  font-weight: 600;
   color: #ffffff;
+  font-size: 36rpx;
+  font-weight: 500;
+  line-height: 1;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.logo-sub {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.75);
-  margin-top: 12rpx;
-  letter-spacing: 2rpx;
-}
-
-/* 登录卡 */
-.login-card {
-  margin: -40rpx -100rpx 0;
-  background: transparent;
-  padding: 52rpx 144rpx;
-}
-
-.phone-btn {
-  width: 650rpx;
-  height: 96rpx;
-  line-height: 96rpx;
-  font-size: 30rpx;
+.brand-name {
+  color: #1f2329;
+  font-size: 34rpx;
   font-weight: 500;
-  background: linear-gradient(135deg, #3370ff 0%, #5b8def 100%);
-  color: #ffffff;
-  border-radius: 16rpx;
-  border: none;
-  box-shadow: 0 8rpx 24rpx rgba(51, 112, 255, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 20rpx auto 0;
-  box-sizing: border-box;
+  letter-spacing: 1rpx;
+  line-height: 1;
 }
 
-.phone-btn::after {
-  border: none;
-}
-
-.sms-btn {
-  width: 650rpx;
-  height: 96rpx;
-  line-height: 96rpx;
-  font-size: 30rpx;
-  font-weight: 500;
-  background: #ffffff;
+.brand-badge {
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  background-color: #eef3ff;
   color: #3370ff;
-  border-radius: 16rpx;
-  border: 2rpx solid #3370ff;
-  margin-top: 32rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
+  font-size: 20rpx;
+  letter-spacing: 3rpx;
+  line-height: 1;
 }
 
-.sms-btn::after {
-  border: none;
-}
-
-.phone-btn[disabled] {
-  opacity: 0.5;
-  box-shadow: none;
-}
-
-/* 账号密码输入 */
-.login-input {
-  width: 550rpx;
-  height: 96rpx;
-  padding: 0 28rpx;
-  box-sizing: border-box;
-  background-color: #f7f8fa;
-  border-radius: 16rpx;
-  font-size: 28rpx;
+.welcome-title {
+  margin-top: 5vh;
   color: #1f2329;
-  margin: 0 auto 24rpx;
-  border: 2rpx solid #e8eaed;
-}
-
-.login-input:focus {
-  border-color: #3370ff;
-}
-
-/* 开发模式 */
-.dev-title {
-  display: block;
-  font-size: 26rpx;
-  color: #8f959e;
-  margin-bottom: 24rpx;
-  text-align: center;
-}
-
-.dev-picker {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  height: 96rpx;
-  padding: 0 28rpx;
-  box-sizing: border-box;
-  background-color: #f7f8fa;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #1f2329;
-  margin-bottom: 28rpx;
-}
-
-.picker-arrow {
-  font-size: 32rpx;
-  color: #b0b5bb;
-}
-
-.dev-btn {
-  width: 100%;
-  height: 96rpx;
-  line-height: 96rpx;
-  font-size: 30rpx;
+  font-size: 42rpx;
   font-weight: 500;
-  background: linear-gradient(135deg, #3370ff 0%, #5b8def 100%);
-  color: #ffffff;
-  border-radius: 16rpx;
-  border: none;
-  box-shadow: 0 8rpx 24rpx rgba(51, 112, 255, 0.25);
+  letter-spacing: 1rpx;
+  line-height: 1;
 }
 
-.dev-btn::after {
-  border: none;
+.welcome-subtitle {
+  margin-top: 14rpx;
+  color: #8f959e;
+  font-size: 24rpx;
+  line-height: 1.5;
 }
 
-.dev-btn[disabled] {
-  opacity: 0.5;
-  box-shadow: none;
+/* 登录表单 */
+.login-card {
+  width: 100%;
+  margin-top: 5vh;
 }
 
-/* 错误信息 */
-.error-msg {
-  margin-top: 28rpx;
-  padding: 20rpx 28rpx;
-  background-color: #fff0f0;
-  border-radius: 14rpx;
+.login-field {
+  width: 100%;
+  padding: 24rpx 0 22rpx;
+  border-bottom: 2rpx solid #eceef1;
+  box-sizing: border-box;
+  transition: border-color 160ms ease;
 }
 
-.error-text {
-  font-size: 26rpx;
-  color: #d94040;
+.login-field.is-focused {
+  border-bottom-color: #3370ff;
 }
 
-/* 记住账号 */
-.save-item {
-  width: 550rpx;
+.login-field.is-focused .field-label {
+  color: #3370ff;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 8rpx;
+  color: #9aa0a8;
+  font-size: 22rpx;
+  letter-spacing: 1rpx;
+  line-height: 1;
+}
+
+.field-input {
+  width: 100%;
+  height: 48rpx;
+  min-height: 48rpx;
+  color: #1f2329;
+  font-size: 30rpx;
+  line-height: 48rpx;
+  background-color: transparent;
+}
+
+/* 记住账号与密码 */
+.save-options {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10rpx;
-  margin: 4rpx auto 0;
+  justify-content: flex-start;
+  gap: 60rpx;
+  margin-top: 2.5vh;
+}
+
+.save-item {
+  min-height: 46rpx;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
 }
 
 .save-checkbox {
-  width: 32rpx;
-  height: 32rpx;
-  border: 2rpx solid #d0d3d6;
-  border-radius: 6rpx;
+  width: 30rpx;
+  height: 30rpx;
+  border: 3rpx solid #c9cdd4;
+  border-radius: 50%;
   background-color: #ffffff;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .save-checkbox.checked {
   background-color: #3370ff;
   border-color: #3370ff;
-  position: relative;
 }
 
-.save-checkbox.checked::after {
-  content: '';
-  position: absolute;
-  left: 8rpx;
-  top: 4rpx;
-  width: 10rpx;
-  height: 18rpx;
-  border: solid #ffffff;
-  border-width: 0 3rpx 3rpx 0;
-  transform: rotate(45deg);
+.save-checkmark {
+  width: 14rpx;
+  height: 8rpx;
+  border-left: 3rpx solid #ffffff;
+  border-bottom: 3rpx solid #ffffff;
+  border-radius: 1rpx;
+  box-sizing: border-box;
+  transform: translateY(-1rpx) rotate(-45deg);
 }
 
 .save-label {
+  color: #646a73;
   font-size: 24rpx;
-  color: #8f959e;
+  line-height: 1;
 }
 
-/* 开发模式切换 */
+.login-button {
+  width: 100%;
+  height: 96rpx;
+  margin-top: 5vh;
+  padding: 0;
+  border: none;
+  border-radius: 24rpx;
+  background-color: #3370ff;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+.login-button-text {
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 8rpx;
+}
+
+.login-button-hover {
+  background-color: #2f67eb;
+}
+
+.login-button.is-loading {
+  background-color: #8fb0ff;
+}
+
+/* 错误信息 */
+.error-msg {
+  width: 100%;
+  margin-top: 2.222vh;
+  padding: 20rpx 28rpx;
+  border-radius: 16rpx;
+  background-color: #faf1f0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.error-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background-color: #c45a5a;
+  flex: none;
+}
+
+.error-text {
+  color: #b74f4f;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+/* 开发模式 */
+.dev-title {
+  display: block;
+  margin-bottom: 28rpx;
+  color: #8f959e;
+  font-size: 24rpx;
+  text-align: left;
+}
+
+.dev-picker {
+  width: 100%;
+  height: 92rpx;
+  padding: 0 4rpx;
+  border-bottom: 2rpx solid #e5e8ec;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #1f2329;
+  font-size: 30rpx;
+  box-sizing: border-box;
+}
+
+.picker-arrow {
+  color: #b0b5bb;
+  font-size: 34rpx;
+}
+
+.dev-button {
+  margin-top: 48rpx;
+}
+
 .dev-toggle {
-  margin-top: 36rpx;
+  margin-top: 32rpx;
   text-align: center;
 }
 
 .dev-toggle-text {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.6);
+  color: #8f959e;
+  font-size: 22rpx;
 }
 
-/* 构建标记：固定在页面底部，浅色不抢视觉 */
-.version-tag {
-  margin-top: auto;
-  position: relative;
-  z-index: 2;
-  padding: 24rpx 0 40rpx;
+/* 页面归属 */
+.login-footer {
+  padding: 0 0 calc(3.333vh + env(safe-area-inset-bottom));
   text-align: center;
 }
 
-.version-tag-text {
+.system-tagline {
+  display: block;
+  color: #c9ced4;
   font-size: 20rpx;
-  color: #c0c4cc;
+  letter-spacing: 2rpx;
 }

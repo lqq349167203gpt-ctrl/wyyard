@@ -10,6 +10,7 @@ from app.api.activity_orders import router as activity_orders_router
 from app.api.activity_permissions import router as activity_permissions_router
 from app.api.activity_registrations import router as activity_registrations_router
 from app.api.activity_themes import router as activity_themes_router
+from app.api.activity_withdrawals import router as activity_withdrawals_router
 from app.api.agents import router as agents_router
 from app.api.ai_configs import router as ai_configs_router
 from app.api.analysis_logs import router as analysis_logs_router
@@ -143,6 +144,7 @@ app.include_router(reminders_router)
 app.include_router(business_reminders_router)
 app.include_router(organizations_router)
 app.include_router(activity_themes_router)
+app.include_router(activity_withdrawals_router)
 app.include_router(activity_orders_router)
 app.include_router(project_deductions_router)
 app.include_router(project_refunds_router)

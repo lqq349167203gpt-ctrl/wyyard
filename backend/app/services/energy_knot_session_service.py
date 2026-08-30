@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from app.models.energy_knot_session import EnergyKnotSession, EnergyKnotSessionCreate
 from app.services import customer_service, energy_knot_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.activity_withdrawal import ensure_withdrawn_customers_retained
 
 FILENAME = "energy_knot_sessions.json"
 _sessions: Dict[str, EnergyKnotSession] = {}
@@ -129,8 +130,17 @@ def update_session(session_id: str, data: dict) -> Optional[EnergyKnotSession]:
         visit_ids = {v.customer_id for v in visits}
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
+    ensure_withdrawn_customers_retained(
+        session,
+        data.get("participant_ids", session.participant_ids) or [],
+        owner_id=data.get("owner_id", session.owner_id) or "",
+    )
+
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
+        if hasattr(session, key) and key not in (
+            "id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at",
+            "withdrawn_participant_ids", "withdrawal_records",
+        ):
             setattr(session, key, value)
 
     if session.owner_id:
@@ -183,6 +193,8 @@ def search_customers(keyword: str, date: str = "") -> list:
 
 def get_session_deduction_count(session, customer_id: str | None = None) -> int:
     """读取单场能量结的实际销卡数，兼容历史记录中案主 ID 未写入详情的情况。"""
+    if customer_id and customer_id in set(session.withdrawn_participant_ids or []):
+        return 0
     try:
         descriptions = json.loads(session.description or "[]")
     except (json.JSONDecodeError, TypeError):
@@ -261,7 +273,12 @@ def get_debt_record(customer_id: str) -> dict:
     knots = energy_knot_service.list_knots()
     total = sum(knot.purchase_count for knot in knots if knot.customer_id == customer_id)
     sessions = sorted(
-        [s for s in _sessions.values() if not s.is_deleted and s.owner_id == customer_id],
+        [
+            s for s in _sessions.values()
+            if not s.is_deleted
+            and s.owner_id == customer_id
+            and customer_id not in set(s.withdrawn_participant_ids or [])
+        ],
         key=lambda s: s.date,
     )
     arrived_dates = {item["date"] for item in _get_session_deductions_for_customer(customer_id)}
@@ -316,7 +333,11 @@ def _get_session_deductions_for_customer(customer_id: str) -> list[dict]:
 
     result = []
     for s in _sessions.values():
-        if s.is_deleted or s.owner_id != customer_id:
+        if (
+            s.is_deleted
+            or s.owner_id != customer_id
+            or customer_id in set(s.withdrawn_participant_ids or [])
+        ):
             continue
         if not visit_service.is_customer_arrived(s.date, customer_id):
             continue

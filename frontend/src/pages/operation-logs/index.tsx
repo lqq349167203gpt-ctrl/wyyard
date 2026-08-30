@@ -109,11 +109,11 @@ const FIELD_CN: Record<string, string> = {
   status: "状态", type: "类型", date: "日期", start_time: "开始时间", end_time: "结束时间",
   enabled: "启用状态",
   scope: "可见范围", customer_tags: "客户标签",
-  teacher_ids: "老师", teachers: "老师", course_name: "沙龙名称", course_type: "课程类型", course_description: "沙龙描述",
+  teacher_ids: "老师", teachers: "老师", course_name: "沙龙名称", course_type: "课程类型", course_description: "沙龙描述", activity_name: "活动名称", course_date: "课程日期",
   owner_name: "案主", owner_id: "案主", host_name: "主持人", host_names: "主持人", host_id: "主持人", host_ids: "主持人",
-  participant_ids: "参与者", withdrawn_participant_ids: "退课人员", withdrawal_records: "退课记录",
-  restored_count: "退回卡次", withdrawn_at: "退课办理时间", withdrawn_by: "退课办理人",
-  cancelled_at: "取消退课时间", cancelled_by: "取消退课人",
+  participant_ids: "参与者", withdrawn_participant_ids: "退课人员", withdrawal_records: "退课记录", record_type: "活动类型",
+  restored_count: "退回卡次", withdrawn_at: "退课办理时间", withdrawn_by: "退课办理人", withdrawn_by_id: "退课办理账号编号",
+  cancelled_at: "恢复退课时间", cancelled_by: "恢复操作人", cancelled_by_id: "恢复操作账号编号",
   achiever_name: "成就君", achiever_id: "成就君",
   leader_id: "组长", deputy_id: "副组长", member_ids: "成员",
   closer_name: "成交人", closer_id: "成交人", closers: "成交人",
@@ -125,7 +125,7 @@ const FIELD_CN: Record<string, string> = {
   referrer: "引流人", referral_date: "引流日期", traffic_source: "流量来源", paid_content: "付费内容",
   basic_info: "基础信息", assessment: "客户评估", tags: "标签", self_tags: "个人标签",
   work_status: "工作状态", work_description: "工作描述",
-  positions: "疗愈老师", position: "职位", role: "角色", permissions: "权限",
+  positions: "疗愈老师", position: "职位", role: "角色", roles: "角色顺序", permissions: "权限",
   groups: "分组", materials: "资料", images: "图片", rooms: "房间",
   location: "地点", address: "地址",
   start_date: "开始日期", end_date: "结束日期",
@@ -181,6 +181,11 @@ const VALUE_CN: Record<string, string> = {
   year: "按年",
   own: "仅本人录入",
   all: "全部记录",
+  class: "沙龙",
+  gcs: "觉醒游戏",
+  ers: "情绪释放",
+  eks: "能量结",
+  ics: "内部课程",
   permanent: "永久",
   alipay: "支付宝",
   wechat: "微信支付",
@@ -201,6 +206,7 @@ const COUNT_FIELDS = new Set(["count", "total_count", "remaining_count", "purcha
 const DATE_TIME_FIELDS = new Set(["created_at", "updated_at", "deleted_at", "voided_at", "arrival_time"])
 
 const API_PATH_LABELS: Array<[string, string]> = [
+  ["/api/activity-withdrawals", "退课"],
   ["/api/activity-orders", "课表"],
   ["/api/project-refunds", "退费记录"],
   ["/api/membership-cards", "会员卡"],
@@ -228,7 +234,7 @@ const SECTION_OPTIONS = [
 const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
 
 const getOperationLocation = (path: string, section: string) => {
-  if (path.includes("/withdrawals")) return "退课"
+  if (path.includes("/withdrawals") || path.includes("/activity-withdrawals")) return "退课"
   return API_PATH_LABELS.find(([prefix]) => path.startsWith(prefix))?.[1] || formatSectionLabel(section)
 }
 
@@ -238,12 +244,19 @@ const isReorderLog = (log: Pick<OperationLog, "path">) => (
 
 const getMethodLabel = (log: Pick<OperationLog, "method" | "path">) => {
   if (isReorderLog(log)) return "排序"
+  if (log.path.includes("/withdrawals") || log.path.includes("/activity-withdrawals")) {
+    return log.method === "DELETE" ? "恢复退课" : "办理退课"
+  }
   if (log.method === "DELETE" && log.path.startsWith("/api/customer-tags/")) return "停用"
   return METHOD_LABELS[log.method] || log.method
 }
 
 const getMethodColor = (log: Pick<OperationLog, "method" | "path">) => {
   if (isReorderLog(log)) return METHOD_COLORS.PATCH
+  if (
+    log.method === "DELETE"
+    && (log.path.includes("/withdrawals") || log.path.includes("/activity-withdrawals"))
+  ) return METHOD_COLORS.PATCH
   return METHOD_COLORS[log.method] || "bg-gray-50 text-gray-600"
 }
 

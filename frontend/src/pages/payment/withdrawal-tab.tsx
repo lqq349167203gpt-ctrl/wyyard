@@ -13,7 +13,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { useServerPagination } from "@/hooks/use-server-pagination"
-import { classRecordApi, customerApi, type CustomerLight, type WithdrawalRecord } from "@/lib/api"
+import { activityWithdrawalApi, classRecordApi, customerApi, type CustomerLight, type WithdrawalRecord } from "@/lib/api"
 
 const STATUS_OPTIONS = [
   { value: "all", label: "全部状态" },
@@ -97,7 +97,11 @@ export function WithdrawalTab() {
     if (!cancelTarget || cancelling) return
     setCancelling(true)
     try {
-      await classRecordApi.cancelWithdrawal(cancelTarget.record_id, cancelTarget.customer_id)
+      await activityWithdrawalApi.restore(
+        cancelTarget.record_type || "class",
+        cancelTarget.record_id,
+        cancelTarget.customer_id,
+      )
       setCancelTarget(null)
       refresh()
     } catch (reason) {

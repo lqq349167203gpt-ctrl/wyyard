@@ -125,6 +125,9 @@ function _clearAuthAndGoLogin(reason) {
   wx.removeStorageSync('currentUser')
   wx.removeStorageSync('userPermissions')
   wx.removeStorageSync('userEditPermissions')
+  if (reason === 'password_changed') {
+    wx.removeStorageSync('login_save_password')
+  }
 
   const app = getApp()
   if (app) {
@@ -418,6 +421,21 @@ const classRecordApi = {
   update: (id, data) => request(`/api/class-records/${id}`, { method: 'PATCH', data }),
   delete: (id) => request(`/api/class-records/${id}`, { method: 'DELETE' }),
   withdrawParticipant: (id, customerId) => request(`/api/class-records/${id}/withdrawals`, { method: 'POST', data: { customer_id: customerId } }),
+  cancelWithdrawal: (id, customerId) => request(`/api/class-records/${id}/withdrawals/${customerId}`, { method: 'DELETE' }),
+}
+
+const activityWithdrawalApi = {
+  withdraw: (recordType, recordId, customerId) => recordType === 'class'
+    ? classRecordApi.withdrawParticipant(recordId, customerId)
+    : request(`/api/activity-withdrawals/${recordType}/${recordId}`, {
+      method: 'POST',
+      data: { customer_id: customerId },
+    }),
+  restore: (recordType, recordId, customerId) => recordType === 'class'
+    ? classRecordApi.cancelWithdrawal(recordId, customerId)
+    : request(`/api/activity-withdrawals/${recordType}/${recordId}/${customerId}`, {
+      method: 'DELETE',
+    }),
 }
 
 // 课程类型 API
@@ -709,6 +727,7 @@ module.exports = {
   visitApi,
   visitNoteApi,
   classRecordApi,
+  activityWithdrawalApi,
   customerApi,
   customerTagApi,
   positionPermissionApi,

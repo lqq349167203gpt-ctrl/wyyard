@@ -842,6 +842,7 @@ export interface ClassRecord {
   course_description: string
   teacher_ids: string[]
   participant_ids: string[]
+  participants?: ActivityDashboardParticipant[]
   withdrawn_participant_ids: string[]
   withdrawal_records: CourseWithdrawalEntry[]
   materials: Material[]
@@ -856,6 +857,12 @@ export interface ClassRecord {
   space_name: string
   created_at: string
   updated_at: string
+}
+
+export interface ActivityDashboardParticipant {
+  id: string
+  nickname: string
+  withdrawn: boolean
 }
 
 export interface ClassRecordCreate {
@@ -912,8 +919,27 @@ export const classRecordApi = {
   dashboard: (date: string, spaceId?: string) => request<DashboardData>(`/api/class-records/dashboard?date=${date}${spaceId ? `&space_id=${spaceId}` : ""}`),
 }
 
+export type ActivityRecordType = "class" | "gcs" | "ers" | "eks" | "ics"
+
+export const activityWithdrawalApi = {
+  withdraw: (recordType: ActivityRecordType, recordId: string, customerId: string) =>
+    recordType === "class"
+      ? classRecordApi.withdrawParticipant(recordId, customerId)
+      : request<Record<string, unknown>>(`/api/activity-withdrawals/${recordType}/${recordId}`, {
+        method: "POST",
+        body: JSON.stringify({ customer_id: customerId }),
+      }),
+  restore: (recordType: ActivityRecordType, recordId: string, customerId: string) =>
+    recordType === "class"
+      ? classRecordApi.cancelWithdrawal(recordId, customerId)
+      : request<Record<string, unknown>>(`/api/activity-withdrawals/${recordType}/${recordId}/${customerId}`, {
+        method: "DELETE",
+      }),
+}
+
 export interface CourseWithdrawalEntry {
   id: string
+  record_type: ActivityRecordType
   customer_id: string
   restored_count: number
   status: "active" | "cancelled"
@@ -927,6 +953,7 @@ export interface CourseWithdrawalEntry {
 
 export interface WithdrawalRecord {
   id: string
+  record_type: ActivityRecordType
   record_id: string
   customer_id: string
   nickname: string
@@ -1021,6 +1048,9 @@ export interface GroupCaseSession {
   owner_name: string
   description: string
   participant_ids: string[]
+  participants?: ActivityDashboardParticipant[]
+  withdrawn_participant_ids: string[]
+  withdrawal_records: CourseWithdrawalEntry[]
   teacher_ids: string[]
   host_id: string
   host_name: string
@@ -1309,6 +1339,9 @@ export interface EmotionalReleaseSession {
   owner_name: string
   description: string
   participant_ids: string[]
+  participants?: ActivityDashboardParticipant[]
+  withdrawn_participant_ids: string[]
+  withdrawal_records: CourseWithdrawalEntry[]
   teacher_ids: string[]
   host_id: string
   host_name: string
@@ -1377,6 +1410,9 @@ export interface EnergyKnotSession {
   description: string | null
   course_description: string
   participant_ids: string[]
+  participants?: ActivityDashboardParticipant[]
+  withdrawn_participant_ids: string[]
+  withdrawal_records: CourseWithdrawalEntry[]
   teacher_ids: string[]
   host_id: string
   host_name: string
@@ -1445,6 +1481,9 @@ export interface InternalCourseSession {
   host_id: string
   host_name: string
   participant_ids: string[]
+  participants?: ActivityDashboardParticipant[]
+  withdrawn_participant_ids: string[]
+  withdrawal_records: CourseWithdrawalEntry[]
   materials: Material[]
   is_published: boolean
   activity_mode?: string
@@ -2220,6 +2259,12 @@ export interface ActivityRecord {
   deduction_summary?: string
 }
 
+export interface ActivitySummaryItem {
+  key: "class" | "gcs" | "ers" | "eks" | "ics" | "withdrawn"
+  label: string
+  count: number
+}
+
 export interface ActivityFollowup {
   id: string
   customer_id: string
@@ -2256,6 +2301,7 @@ export interface CustomerDetail {
   customer: Customer
   purchase_summary: PurchaseSummaryItem[]
   activities: ActivityRecord[]
+  activity_summary: ActivitySummaryItem[]
   activity_followups: ActivityFollowup[]
   healing_records: HealingRecord[]
   payment_records: PaymentRecord[]
@@ -2579,6 +2625,7 @@ export interface Position {
   name: string
   description: string
   icon: string
+  sort_order: number
   created_at: string
   is_system?: boolean
 }
@@ -2592,6 +2639,15 @@ export interface PositionCreate {
 export const positionApi = {
   list: () => request<Position[]>("/api/positions"),
   create: (data: PositionCreate) => request<Position>("/api/positions", { method: "POST", body: JSON.stringify(data) }),
+  reorder: (ids: string[], movement: { movedId: string; fromPosition: number; toPosition: number }) => request<Position[]>("/api/positions/reorder", {
+    method: "PUT",
+    body: JSON.stringify({
+      ids,
+      moved_id: movement.movedId,
+      from_position: movement.fromPosition,
+      to_position: movement.toPosition,
+    }),
+  }),
   update: (id: string, data: Partial<PositionCreate>) => request<Position>(`/api/positions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/positions/${id}`, { method: "DELETE" }),
 }

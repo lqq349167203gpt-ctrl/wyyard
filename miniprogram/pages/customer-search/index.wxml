@@ -1,0 +1,158 @@
+<page-meta page-style="{{showFilterPanel ? 'overflow:hidden;height:100vh;' : ''}}" />
+<view class="page search-page">
+  <view class="no-permission" wx:if="{{!hasPagePermission}}">
+    <text class="no-permission-text">无权限访问此页面</text>
+  </view>
+
+  <block wx:else>
+    <view class="search-bar search-screen-bar">
+      <view class="search-input-wrap">
+        <view class="search-symbol"></view>
+        <input
+          class="search-input"
+          placeholder="搜索客户昵称"
+          placeholder-class="placeholder"
+          value="{{keyword}}"
+          focus="{{true}}"
+          bindinput="onSearchInput"
+          bindconfirm="onSearchConfirm"
+          confirm-type="search"
+        />
+        <view class="search-clear" wx:if="{{keyword}}" bindtap="onClearKeyword"></view>
+      </view>
+      <view class="filter-btn {{showFilterPanel ? 'active' : ''}}" bindtap="onToggleFilterPanel">
+        <text>筛选</text>
+        <text class="filter-count" wx:if="{{filterCount > 0}}">{{filterCount}}</text>
+        <view class="filter-toggle-arrow {{showFilterPanel ? 'open' : ''}}"></view>
+      </view>
+    </view>
+
+    <view class="dropdown-panel" wx:if="{{showFilterPanel}}">
+      <view class="dropdown-mask" bindtap="onCloseFilterPanel"></view>
+      <view class="dropdown-content filter-dropdown">
+        <scroll-view class="filter-scroll" scroll-y="{{true}}" enable-flex="{{true}}" show-scrollbar="{{false}}">
+          <view class="filter-body">
+          <view class="filter-section">
+          <view class="filter-section-title">到店间隔</view>
+          <view class="range-panel-content">
+            <view class="range-values">
+              <text class="range-val">{{rangeMin}}天</text>
+              <text class="range-val">{{rangeMax >= 60 ? '60天往上' : rangeMax + '天'}}</text>
+            </view>
+            <view class="range-track-wrap">
+              <view class="range-track">
+                <view class="range-filled" style="left:{{rangeMin / 60 * 100}}%;right:{{(60 - rangeMax) / 60 * 100}}%"></view>
+              </view>
+              <view
+                class="range-thumb"
+                style="left:{{rangeMin / 60 * 100}}%"
+                data-type="min"
+                catchtouchstart="onRangeTouchStart"
+                catchtouchmove="onRangeTouchMove"
+                catchtouchend="onRangeTouchEnd"
+              ></view>
+              <view
+                class="range-thumb"
+                style="left:{{rangeMax / 60 * 100}}%"
+                data-type="max"
+                catchtouchstart="onRangeTouchStart"
+                catchtouchmove="onRangeTouchMove"
+                catchtouchend="onRangeTouchEnd"
+              ></view>
+            </view>
+          </view>
+        </view>
+
+        <view class="filter-section">
+          <view class="filter-section-title">身份</view>
+          <view class="tags-wrap">
+            <view
+              class="tag-item {{item.selected ? 'active' : ''}}"
+              wx:for="{{memberTypeList}}"
+              wx:key="name"
+              bindtap="onToggleMemberType"
+              data-type="{{item.name}}"
+            >{{item.name}}</view>
+          </view>
+        </view>
+
+        <view class="filter-section">
+          <view class="filter-title-row">
+            <view class="filter-section-title">客户标签</view>
+            <text class="filter-section-hint" wx:if="{{selectedTagIds.length > 1}}">匹配任一标签</text>
+          </view>
+          <view class="tags-wrap">
+            <view
+              class="tag-item customer-filter-tag {{item.selected ? 'active' : ''}}"
+              wx:for="{{customerTagList}}"
+              wx:key="id"
+              bindtap="onToggleCustomerTag"
+              data-id="{{item.id}}"
+            >
+              <text class="customer-filter-tag-name">{{item.name}}</text>
+              <text class="customer-filter-tag-scope" wx:if="{{item.scope === 'private'}}">仅自己</text>
+            </view>
+          </view>
+          <view class="filter-section-empty" wx:if="{{!filterOptionsLoading && customerTagList.length === 0}}">暂无可用标签</view>
+        </view>
+
+        <view class="filter-section">
+          <view class="filter-section-title">引流人</view>
+          <view class="tags-wrap">
+            <view
+              class="tag-item {{item.selected ? 'active' : ''}}"
+              wx:for="{{referrerList}}"
+              wx:key="name"
+              bindtap="onToggleReferrer"
+              data-name="{{item.name}}"
+            >{{item.name}}</view>
+          </view>
+          <view class="filter-section-empty" wx:if="{{!filterOptionsLoading && referrerList.length === 0}}">暂无引流人数据</view>
+        </view>
+          </view>
+        </scroll-view>
+
+        <view class="filter-actions">
+          <text class="filter-reset" bindtap="onResetFilter">重置</text>
+          <text class="filter-confirm" bindtap="onConfirmFilter">确定</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="search-welcome" wx:if="{{!hasSearched && !loading}}">
+      <view class="search-welcome-icon"><view class="search-symbol large"></view></view>
+      <text class="search-welcome-title">搜索客户</text>
+      <text class="search-welcome-hint">输入昵称，或点击右上角按身份、标签、引流人和到店间隔筛选</text>
+    </view>
+
+    <view class="search-result-summary" wx:if="{{hasSearched && !loading}}">
+      <text class="search-result-title">搜索结果</text>
+      <text class="search-result-count">共 {{total}} 人</text>
+    </view>
+
+    <view class="c-group-card search-results-card" wx:if="{{customers.length > 0}}">
+      <view class="c-row" wx:for="{{customers}}" wx:key="id" bindtap="onCustomerTap" data-id="{{item.id}}">
+        <view class="c-line1">
+          <view class="c-stale-dot" wx:if="{{item.isStale}}"></view>
+          <text class="c-name">{{item.nickname}}</text>
+          <text class="c-tag" wx:if="{{item.customer_tags && item.customer_tags.length}}">{{item.customer_tags[0].name}}</text>
+          <text class="c-days {{item.isStale ? 'hot' : ''}}">{{item.daysPillText}}</text>
+        </view>
+        <view class="c-line2">
+          <text>到店 {{item.visit_count}} 次</text>
+          <block wx:if="{{item.referrer}}"><text class="c-sep">·</text><text>引流 {{item.referrer}}</text></block>
+          <block wx:if="{{item.cardRemainingText}}"><text class="c-sep">·</text><text>{{item.cardRemainingText}}</text></block>
+        </view>
+      </view>
+    </view>
+
+    <view class="loading" wx:if="{{loading}}">搜索中...</view>
+    <view class="empty-state search-empty" wx:if="{{hasSearched && !loading && customers.length === 0}}">
+      <view class="empty-circle"><text class="empty-char">空</text></view>
+      <text class="empty-text">没有找到匹配的客户</text>
+      <text class="empty-hint">试试更短的昵称或调整筛选条件</text>
+    </view>
+    <view class="load-more" wx:if="{{loadingMore}}">加载中...</view>
+    <view class="load-more" wx:if="{{hasSearched && !loadingMore && !loading && !hasMore && customers.length > 0}}">已加载全部</view>
+  </block>
+</view>

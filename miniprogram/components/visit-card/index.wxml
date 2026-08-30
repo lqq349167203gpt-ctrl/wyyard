@@ -1,4 +1,4 @@
-<view class="card {{editMode ? 'editing' : ''}} {{editable ? '' : 'read-only'}} {{visit.cancelled ? 'cancelled' : ''}}" bindtap="onCardTap" bindlongpress="onCardLongPress">
+<view class="card {{editMode ? 'editing' : ''}} {{editable ? '' : 'read-only'}} {{visit.cancelled ? 'cancelled' : ''}} {{isLast ? 'last' : ''}}" bindtap="onCardTap" bindlongpress="onCardLongPress">
   <view class="card-main">
     <!-- 编辑模式：上下移动按钮 -->
     <view class="move-btns" wx:if="{{editMode && sortable}}">

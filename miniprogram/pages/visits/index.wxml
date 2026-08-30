@@ -8,27 +8,43 @@
   <view class="head">
     <view class="head-row">
       <view class="head-date" bindtap="onCalendarToggle">
-        <text>{{currentDateShort}}</text>
+        <text class="date-main">{{currentDateShort}}</text>
         <text class="wk">{{currentWeekday}}</text>
         <text class="drop">{{calendarExpanded ? '▴' : '▾'}}</text>
       </view>
       <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-        <text>{{currentSpaceName}} ▾</text>
+        <view class="space-content">
+          <text>{{currentSpaceName}}</text>
+        </view>
       </picker>
     </view>
-    <view class="head-row2">
-      <view class="head-summary">
-        今日 <text class="summary-count">{{todayVisitCount}}</text> 位邀约 · <text class="summary-count">{{todayArrivedCount}}</text> 已到店
-      </view>
-      <view class="head-actions">
-        <view wx:if="{{!isViewOnly}}" class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
-          <text>{{editMode ? '完成' : '排序'}}</text>
+    <!-- 三槽位周轮播：滑动完成后无感回中，避免循环克隆长期滑动后出现空白 -->
+    <swiper
+      wx:if="{{!calendarExpanded}}"
+      class="week-swiper"
+      current="{{weekSwiperCurrent}}"
+      duration="{{weekSwiperDuration}}"
+      easing-function="easeOutCubic"
+      bindchange="onWeekSwiperChange"
+    >
+      <swiper-item wx:for="{{weekPages}}" wx:key="key" wx:for-item="weekPage">
+        <view class="week-strip">
+          <view
+            wx:for="{{weekPage.days}}"
+            wx:key="date"
+            wx:for-item="day"
+            class="week-day {{day.isSelected ? 'selected' : ''}}"
+            catchtap="onCalendarDayTap"
+            data-date="{{day.date}}"
+          >
+            <text class="week-label">{{day.weekday}}</text>
+            <text class="week-number">{{day.day}}</text>
+            <view class="week-count-dot {{day.count > 0 ? 'visible' : ''}}"></view>
+          </view>
         </view>
-        <view class="export-btn" catchtap="onExportTap">
-          <text>导出</text>
-        </view>
-      </view>
-    </view>
+      </swiper-item>
+    </swiper>
+
     <!-- 下拉日历 -->
     <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
       <view class="calendar-nav">
@@ -58,29 +74,48 @@
   <view class="calendar-mask" wx:if="{{calendarExpanded}}" bindtap="onCalendarClose"></view>
 
   <!-- 访客列表 -->
-  <view class="visit-list" wx:if="{{!loading && visits.length > 0}}">
-    <visit-card
-      wx:for="{{visits}}"
-      wx:key="id"
-      visit="{{item}}"
-      leader-name="{{leaderMap[item.customer_id] || ''}}"
-      edit-mode="{{editMode}}"
-      editable="{{item.can_edit}}"
-      cancelable="{{!isViewOnly}}"
-      sortable="{{!isViewOnly}}"
-      arrival-editable="{{!isViewOnly && !item.cancelled}}"
-      can-move-up="{{index > 0}}"
-      can-move-down="{{index < visits.length - 1}}"
-      bind:cardtap="onVisitTap"
-      data-visit="{{item}}"
+  <view class="visit-section" wx:if="{{!loading && visits.length > 0}}">
+    <view class="list-heading">
+      <view class="list-heading-dot"></view>
+      <text class="list-heading-title">邀约名单</text>
+      <text class="list-heading-count">{{dateSwitching ? '…' : todayVisitCount}} 人</text>
+      <view class="list-heading-actions">
+        <view wx:if="{{!isViewOnly}}" class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
+          <text>{{editMode ? '完成' : '排序'}}</text>
+        </view>
+        <view class="export-btn" catchtap="onExportTap">
+          <text>导出</text>
+        </view>
+      </view>
+    </view>
+    <view class="visit-list">
+      <view class="switching-line" wx:if="{{dateSwitching}}"></view>
+      <view class="visit-items {{dateSwitching ? 'switching' : ''}}">
+        <visit-card
+          wx:for="{{visits}}"
+          wx:key="id"
+          visit="{{item}}"
+          leader-name="{{leaderMap[item.customer_id] || ''}}"
+          edit-mode="{{editMode}}"
+          editable="{{item.can_edit}}"
+          cancelable="{{!isViewOnly}}"
+          sortable="{{!isViewOnly}}"
+          arrival-editable="{{!isViewOnly && !item.cancelled}}"
+          can-move-up="{{index > 0}}"
+          can-move-down="{{index < visits.length - 1}}"
+          is-last="{{index === visits.length - 1}}"
+          bind:cardtap="onVisitTap"
+          data-visit="{{item}}"
 
-      bind:delete="onDeleteTap"
-      bind:profile="onProfileTap"
-      bind:arrival="onArrivalTap"
-      bind:cancelvisit="onCancelVisitTap"
-      bind:moveup="onMoveUp"
-      bind:movedown="onMoveDown"
-    />
+          bind:delete="onDeleteTap"
+          bind:profile="onProfileTap"
+          bind:arrival="onArrivalTap"
+          bind:cancelvisit="onCancelVisitTap"
+          bind:moveup="onMoveUp"
+          bind:movedown="onMoveDown"
+        />
+      </view>
+    </view>
   </view>
 
   <!-- 空状态 -->

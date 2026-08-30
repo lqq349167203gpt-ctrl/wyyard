@@ -4,6 +4,7 @@
   <view class="hero">
     <view class="hero-top">
       <text class="hero-name">{{customer.nickname || '-'}}</text>
+      <text class="hero-tag" wx:if="{{heroTag}}">{{heroTag}}</text>
       <view class="hero-edit" wx:if="{{!isViewOnly}}" bindtap="onEditTap">编辑</view>
     </view>
     <view class="hero-sub" wx:if="{{customer.name || genderAgeText}}">
@@ -30,103 +31,112 @@
 
   <!-- 身份与状态 -->
   <view class="sec identity-sec">
-    <view class="sec-title">身份与状态</view>
-    <view class="kv">
-      <text class="k">会员身份</text>
-      <text class="v identity-value">{{customer.member_type || ''}}</text>
-      <text class="mechanism">系统判定</text>
-    </view>
-    <view class="kv">
-      <text class="k">服务老师</text>
-      <text class="v identity-value">{{healerText || ''}}</text>
-      <text class="mechanism">人工分配</text>
-    </view>
-    <view class="kv">
-      <text class="k">跟进阶段</text>
-      <text class="v identity-value">{{customer.follow_up_status || '未配置'}}</text>
-      <text class="mechanism">人工设置</text>
-    </view>
-    <view class="tag-zone">
-      <text class="tag-zone-label">客户标签</text>
-      <view class="identity-tags" wx:if="{{customerTags.length > 0}}">
-        <text class="identity-tag" wx:for="{{customerTags}}" wx:key="id">{{item.name}}</text>
+    <view class="sec-title"><text class="group-dot"></text><text>身份与状态</text></view>
+    <view class="group-card">
+      <view class="kv">
+        <text class="k">会员身份</text>
+        <text class="v identity-value">{{customer.member_type || ''}}</text>
+        <text class="mechanism">系统判定</text>
+      </view>
+      <view class="kv">
+        <text class="k">服务老师</text>
+        <text class="v identity-value">{{healerText || ''}}</text>
+        <text class="mechanism">人工分配</text>
+      </view>
+      <view class="kv">
+        <text class="k">跟进阶段</text>
+        <text class="v identity-value">{{customer.follow_up_status || '未配置'}}</text>
+        <text class="mechanism">人工设置</text>
+      </view>
+      <view class="tag-zone">
+        <text class="tag-zone-label">客户标签</text>
+        <view class="identity-tags" wx:if="{{customerTags.length > 0}}">
+          <text class="identity-tag" wx:for="{{customerTags}}" wx:key="id">{{item.name}}</text>
+        </view>
       </view>
     </view>
   </view>
 
   <!-- 基本信息 -->
   <view class="sec">
-    <view class="sec-title">基本信息</view>
-    <view class="kv">
-      <text class="k">电话</text>
-      <text class="v">{{customer.phone}}</text>
-      <view class="contact-actions" wx:if="{{customer.phone}}">
-        <text class="contact-action" wx:if="{{customer.contact_permissions.phone.view && !revealedContacts.phone}}" bindtap="onContactView" data-field="phone">查看</text>
-        <text class="contact-action" wx:if="{{customer.contact_permissions.phone.copy}}" bindtap="onContactCopy" data-field="phone">复制</text>
+    <view class="sec-title"><text class="group-dot"></text><text>基本信息</text></view>
+    <view class="group-card">
+      <view class="kv">
+        <text class="k">电话</text>
+        <text class="v">{{customer.phone}}</text>
+        <view class="contact-actions" wx:if="{{customer.phone}}">
+          <text class="contact-action" wx:if="{{customer.contact_permissions.phone.view && !revealedContacts.phone}}" bindtap="onContactView" data-field="phone">查看</text>
+          <text class="contact-action" wx:if="{{customer.contact_permissions.phone.copy}}" bindtap="onContactCopy" data-field="phone">复制</text>
+        </view>
       </view>
-    </view>
-    <view class="kv">
-      <text class="k">微信</text>
-      <text class="v">{{customer.wechat}}</text>
-      <view class="contact-actions" wx:if="{{customer.wechat}}">
-        <text class="contact-action" wx:if="{{customer.contact_permissions.wechat.view && !revealedContacts.wechat}}" bindtap="onContactView" data-field="wechat">查看</text>
-        <text class="contact-action" wx:if="{{customer.contact_permissions.wechat.copy}}" bindtap="onContactCopy" data-field="wechat">复制</text>
+      <view class="kv">
+        <text class="k">微信</text>
+        <text class="v">{{customer.wechat}}</text>
+        <view class="contact-actions" wx:if="{{customer.wechat}}">
+          <text class="contact-action" wx:if="{{customer.contact_permissions.wechat.view && !revealedContacts.wechat}}" bindtap="onContactView" data-field="wechat">查看</text>
+          <text class="contact-action" wx:if="{{customer.contact_permissions.wechat.copy}}" bindtap="onContactCopy" data-field="wechat">复制</text>
+        </view>
       </view>
-    </view>
-    <view class="kv" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.work_info}}">
-      <text class="k">工作</text>
-      <text class="v">{{workText}}</text>
+      <view class="kv" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.work_info}}">
+        <text class="k">工作</text>
+        <text class="v">{{workText}}</text>
+      </view>
     </view>
   </view>
 
   <!-- 来源归属 -->
   <view class="sec">
-    <view class="sec-title">来源归属</view>
-    <view class="kv">
-      <text class="k">引流人</text>
-      <text class="v">{{customer.referrer}}</text>
-    </view>
-    <view class="kv">
-      <text class="k">引流日期</text>
-      <text class="v">{{customer.referral_date}}</text>
-    </view>
-    <view class="kv">
-      <text class="k">承接人</text>
-      <text class="v">{{customer.referrer_handler}}</text>
-    </view>
-    <view class="kv">
-      <text class="k">流量来源</text>
-      <text class="v">{{customer.traffic_source}}</text>
-    </view>
-    <view class="kv">
-      <text class="k">{{trafficDetailLabel}}</text>
-      <text class="v">{{customer.traffic_source_detail}}</text>
+    <view class="sec-title"><text class="group-dot"></text><text>来源归属</text></view>
+    <view class="group-card">
+      <view class="kv">
+        <text class="k">引流人</text>
+        <text class="v">{{customer.referrer}}</text>
+      </view>
+      <view class="kv">
+        <text class="k">引流日期</text>
+        <text class="v">{{customer.referral_date}}</text>
+      </view>
+      <view class="kv">
+        <text class="k">承接人</text>
+        <text class="v">{{customer.referrer_handler}}</text>
+      </view>
+      <view class="kv">
+        <text class="k">流量来源</text>
+        <text class="v">{{customer.traffic_source}}</text>
+      </view>
+      <view class="kv">
+        <text class="k">{{trafficDetailLabel}}</text>
+        <text class="v">{{customer.traffic_source_detail}}</text>
+      </view>
     </view>
   </view>
 
   <!-- 疗愈信息 -->
   <view class="sec" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.visit_purpose || customerAccessPermissions.sensitive_fields.trauma_history || customerAccessPermissions.sensitive_fields.current_block || customerAccessPermissions.sensitive_fields.other_info}}">
-    <view class="sec-title">疗愈信息</view>
-    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.visit_purpose}}">
-      <text class="k">到访目的</text>
-      <text class="v">{{customer.tags}}</text>
-    </view>
-    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.trauma_history}}">
-      <text class="k">创伤经历</text>
-      <text class="v">{{customer.basic_info}}</text>
-    </view>
-    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.current_block}}">
-      <text class="k">当下卡点</text>
-      <text class="v">{{customer.assessment || customer.core_situation}}</text>
-    </view>
-    <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.other_info}}">
-      <text class="k">其他信息</text>
-      <text class="v">{{customer.other_info}}</text>
+    <view class="sec-title"><text class="group-dot"></text><text>疗愈信息</text></view>
+    <view class="group-card">
+      <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.visit_purpose}}">
+        <text class="k">到访目的</text>
+        <text class="v">{{customer.tags}}</text>
+      </view>
+      <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.trauma_history}}">
+        <text class="k">创伤经历</text>
+        <text class="v">{{customer.basic_info}}</text>
+      </view>
+      <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.current_block}}">
+        <text class="k">当下卡点</text>
+        <text class="v">{{customer.assessment || customer.core_situation}}</text>
+      </view>
+      <view class="blk" wx:if="{{!customerAccessPermissions || customerAccessPermissions.sensitive_fields.other_info}}">
+        <text class="k">其他信息</text>
+        <text class="v">{{customer.other_info}}</text>
+      </view>
     </view>
   </view>
 
   <!-- 记录区 -->
   <view class="record-section">
+    <view id="record-tabs-anchor" class="record-tabs-anchor"></view>
     <!-- 分段控件 -->
     <view class="seg-wrap">
       <view class="seg">
@@ -144,7 +154,7 @@
     </view>
 
     <!-- 跟进点 -->
-    <view wx:if="{{activeTab === 'healing'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'healing'}}">
       <view wx:if="{{healingRecords.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="rec-summary" wx:if="{{healingRecords.length > 0}}">
         <text><text class="dot dot-blue"></text>已到店 {{arrivedCount}}</text>
@@ -177,7 +187,7 @@
     </view>
 
     <!-- 沟通记录 -->
-    <view wx:if="{{activeTab === 'communication'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'communication'}}">
       <view class="comm-compose" wx:if="{{!isViewOnly}}">
         <input
           class="comm-input"
@@ -212,7 +222,12 @@
     </view>
 
     <!-- 活动记录 -->
-    <view wx:if="{{activeTab === 'activities'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'activities'}}">
+      <view class="rec-summary activity-rec-summary" wx:if="{{activitySummary.length > 0}}">
+        <text wx:for="{{activitySummary}}" wx:key="key" class="activity-summary-text {{item.key === 'withdrawn' ? 'withdrawn' : ''}}">
+          {{item.label}} <text class="activity-summary-count">{{item.count}}</text> 次
+        </text>
+      </view>
       <view wx:if="{{activities.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="rec-list" wx:if="{{activities.length > 0}}">
         <view class="rec" wx:for="{{activities}}" wx:key="index">
@@ -238,7 +253,7 @@
     </view>
 
     <!-- 卡次统计 -->
-    <view wx:if="{{activeTab === 'purchase'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'purchase'}}">
       <view wx:if="{{purchaseSummary.length === 0}}" class="empty-hint">暂无记录</view>
       <block wx:else>
         <view class="sec-label">卡次统计</view>
@@ -274,7 +289,7 @@
     </view>
 
     <!-- 客户回访 -->
-    <view wx:if="{{activeTab === 'followups'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'followups'}}">
       <view wx:if="{{activityFollowups.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="rec-list" wx:if="{{activityFollowups.length > 0}}">
         <view class="rec" wx:for="{{activityFollowups}}" wx:key="id">
@@ -293,7 +308,7 @@
     </view>
 
     <!-- 线下落地课程 -->
-    <view wx:if="{{activeTab === 'offline_course'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'offline_course'}}">
       <view wx:if="{{offlineCourseRecords.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="rec-list" wx:if="{{offlineCourseRecords.length > 0}}">
         <view class="rec" wx:for="{{offlineCourseRecords}}" wx:key="id">
@@ -314,7 +329,7 @@
     </view>
 
     <!-- 交易记录 -->
-    <view wx:if="{{activeTab === 'payment'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'payment'}}">
       <view wx:if="{{paymentRecords.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="rec-list" wx:if="{{paymentRecords.length > 0}}">
         <view class="rec" wx:for="{{paymentRecords}}" wx:key="index">

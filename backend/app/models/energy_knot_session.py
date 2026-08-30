@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import Field
 
 from app.models.base import SafeBaseModel
+from app.models.class_record import CourseWithdrawalEntry
 
 
 class EnergyKnotSessionBase(SafeBaseModel):
@@ -36,6 +37,8 @@ class EnergyKnotSessionCreate(EnergyKnotSessionBase):
 
 class EnergyKnotSession(EnergyKnotSessionBase):
     id: str
+    withdrawn_participant_ids: List[str] = []
+    withdrawal_records: List[CourseWithdrawalEntry] = []
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False

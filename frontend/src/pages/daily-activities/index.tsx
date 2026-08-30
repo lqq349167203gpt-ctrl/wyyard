@@ -12,7 +12,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  classRecordApi, groupCaseSessionApi,
+  activityWithdrawalApi, classRecordApi, groupCaseSessionApi,
   emotionalReleaseSessionApi,
   energyKnotSessionApi, energyKnotApi,
   internalCourseSessionApi, courseTypeApi, customerApi, uploadApi, spaceApi,
@@ -22,7 +22,7 @@ import {
   type CourseType, type CustomerLight, type Space,
   type InternalCourseSessionCustomerSearchResult,
   type GroupCaseCustomerSearchResult,
-  type ActivityTheme, type MemberIdentity,
+  type ActivityRecordType, type ActivityTheme, type MemberIdentity,
 } from "@/lib/api"
 import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
@@ -1650,11 +1650,18 @@ function HistoryDayGroup({ day, defaultExpanded, previewEntry, onSelectEntry }: 
 export default function DailyActivitiesPage() {
   const navigate = useNavigate()
   const editPermissions = useEditPermissions()
-  const currentRole = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
-    catch { return "" }
+  const currentUser = useMemo<{
+    id?: string
+    owner?: string
+    username?: string
+    role?: string
+  }>(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}") }
+    catch { return {} }
   }, [])
+  const currentRole = currentUser.role || ""
   const isViewOnly = currentRole !== "超级管理员" && editPermissions.activities === "view"
+  const canUseHistoryRestore = currentRole === "超级管理员" || editPermissions.activities === "all"
   const today = useMemo(() => formatDate(new Date()), [])
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(() => {
@@ -1677,6 +1684,7 @@ export default function DailyActivitiesPage() {
   const [memberIdentities, setMemberIdentities] = useState<MemberIdentity[]>([])
   const [noSpacesDialogOpen, setNoSpacesDialogOpen] = useState(false)
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false)
+  const [withdrawalMode, setWithdrawalMode] = useState<"withdraw" | "restore">("withdraw")
   const [withdrawalCourseId, setWithdrawalCourseId] = useState("")
   const [withdrawalCustomerId, setWithdrawalCustomerId] = useState("")
   const [withdrawing, setWithdrawing] = useState(false)
@@ -1752,12 +1760,21 @@ export default function DailyActivitiesPage() {
     setHistoryEntries(history)
   }, [])
 
-  const undo = useCallback(() => { undoRef.current(); setPreviewEntry(null) }, [])
-  const redo = useCallback(() => { redoRef.current(); setPreviewEntry(null) }, [])
+  const undo = useCallback(() => {
+    if (!canUseHistoryRestore) return
+    undoRef.current()
+    setPreviewEntry(null)
+  }, [canUseHistoryRestore])
+  const redo = useCallback(() => {
+    if (!canUseHistoryRestore) return
+    redoRef.current()
+    setPreviewEntry(null)
+  }, [canUseHistoryRestore])
 
   // 键盘快捷键 Ctrl+Z / Ctrl+Shift+Z
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!canUseHistoryRestore) return
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
         e.preventDefault()
         if (e.shiftKey) redo()
@@ -1766,7 +1783,7 @@ export default function DailyActivitiesPage() {
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [undo, redo])
+  }, [canUseHistoryRestore, undo, redo])
 
   // 从云端加载历史记录
   useEffect(() => {
@@ -1986,9 +2003,6 @@ export default function DailyActivitiesPage() {
   const userPermissions = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("userPermissions") || "[]") } catch { return [] }
   }, [])
-  const currentUser = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("currentUser") || "{}") } catch { return {} }
-  }, [])
   const isSuperAdmin = currentUser?.role === "超级管理员"
 
   // ===== Derived data =====
@@ -2159,6 +2173,27 @@ export default function DailyActivitiesPage() {
       return exists ? prev.map(r => r.id === record.id ? record : r) : [record, ...prev]
     })
     setIcsDialogOpen(false)
+  }, [])
+
+  const handleInlineParticipantsSaved = useCallback((
+    recordType: ActivityRecordType,
+    recordId: string,
+    participantIds: string[],
+    participants: { id: string; nickname: string; withdrawn: boolean }[],
+  ) => {
+    const updateRecord = <T extends { id: string; participant_ids: string[]; participants?: typeof participants }>(record: T): T => {
+      if (record.id !== recordId) return record
+      if (
+        record.participant_ids.length === participantIds.length
+        && record.participant_ids.every((id, index) => id === participantIds[index])
+      ) return record
+      return { ...record, participant_ids: participantIds, participants }
+    }
+    if (recordType === "class") setDetailRecords(current => current.map(updateRecord))
+    else if (recordType === "gcs") setDetailGcsSessions(current => current.map(updateRecord))
+    else if (recordType === "ers") setDetailErsSessions(current => current.map(updateRecord))
+    else if (recordType === "eks") setDetailEksSessions(current => current.map(updateRecord))
+    else setDetailIcsSessions(current => current.map(updateRecord))
   }, [])
   const load = () => {
     courseTypeApi.list().then(data => setCourses(data.filter(t => t.category !== "other").map(t => ({ id: t.name, name: t.name })))).catch(() => {})
@@ -2392,37 +2427,190 @@ export default function DailyActivitiesPage() {
     return c?.nickname || c?.name || ""
   }, [allCustomers])
 
-  const withdrawalCourses = useMemo(() => detailRecords.map(record => {
-    const groupParticipantIds = (record.groups || []).flatMap(group => [
-      group.leader_id,
-      group.deputy_id,
-      ...(group.member_ids || []),
-    ].filter(Boolean))
-    const participantIds = [...new Set([...(record.participant_ids || []), ...groupParticipantIds])]
-    const withdrawnIds = new Set(record.withdrawn_participant_ids || [])
-    const availableParticipantIds = participantIds.filter(id => (
-      !withdrawnIds.has(id) && allCustomers.some(customer => customer.id === id)
-    ))
-    return { record, availableParticipantIds }
-  }).filter(item => item.availableParticipantIds.length > 0), [detailRecords, allCustomers])
+  const canWithdrawRecord = useCallback((record: { created_by_id: string; created_by: string }): boolean => {
+    if (isViewOnly) return false
+    if (currentRole === "超级管理员" || editPermissions.activities === "all") return true
+    const actorId = String(currentUser.id || "")
+    const actorName = String(currentUser.owner || currentUser.username || "")
+    const creatorId = String(record.created_by_id || "")
+    const creatorName = String(record.created_by || "")
+    if (creatorId) return Boolean(actorId && actorId === creatorId)
+    return Boolean(creatorName && actorName && creatorName === actorName)
+  }, [currentRole, currentUser, editPermissions.activities, isViewOnly])
 
-  const selectedWithdrawalCourse = withdrawalCourses.find(item => item.record.id === withdrawalCourseId)
-  const withdrawalCustomers = (selectedWithdrawalCourse?.availableParticipantIds || [])
-    .map(id => allCustomers.find(customer => customer.id === id))
-    .filter((customer): customer is CustomerLight => Boolean(customer))
+  const withdrawalCustomerMap = useMemo(() => {
+    type WithdrawalCustomer = Pick<CustomerLight, "id" | "nickname" | "name">
+    type DashboardRecord = {
+      participants?: { id: string; nickname: string }[]
+      owner_id?: string
+      owner_name?: string
+    }
+    const customers = new Map<string, WithdrawalCustomer>()
+    allCustomers.forEach(customer => {
+      customers.set(customer.id, {
+        id: customer.id,
+        nickname: customer.nickname,
+        name: customer.name,
+      })
+    })
+    const addRecordCustomers = (record: DashboardRecord) => {
+      for (const participant of record.participants || []) {
+        if (participant.id && participant.nickname) {
+          customers.set(participant.id, {
+            id: participant.id,
+            nickname: participant.nickname,
+            name: "",
+          })
+        }
+      }
+      if (record.owner_id && record.owner_name) {
+        customers.set(record.owner_id, {
+          id: record.owner_id,
+          nickname: record.owner_name,
+          name: "",
+        })
+      }
+    }
+    const dashboardRecords: DashboardRecord[] = [
+      ...detailRecords,
+      ...detailGcsSessions,
+      ...detailErsSessions,
+      ...detailEksSessions,
+      ...detailIcsSessions,
+    ]
+    dashboardRecords.forEach(addRecordCustomers)
+    return customers
+  }, [allCustomers, detailEksSessions, detailErsSessions, detailGcsSessions, detailIcsSessions, detailRecords])
+
+  const withdrawalCourses = useMemo(() => {
+    type WithdrawableRecord = {
+      id: string
+      start_time: string | null
+      participant_ids: string[]
+      withdrawn_participant_ids: string[]
+      created_by_id: string
+      created_by: string
+    }
+    const options: {
+      key: string
+      recordType: ActivityRecordType
+      recordId: string
+      label: string
+      availableParticipantIds: string[]
+      withdrawnParticipantIds: string[]
+    }[] = []
+
+    const append = (
+      recordType: ActivityRecordType,
+      typeLabel: string,
+      record: WithdrawableRecord,
+      name: string,
+      registeredIds: string[],
+    ) => {
+      if (!canWithdrawRecord(record)) return
+      const participantIds = [...new Set(registeredIds.filter(Boolean))]
+        .filter(id => withdrawalCustomerMap.has(id))
+      const withdrawnIds = new Set(record.withdrawn_participant_ids || [])
+      const availableParticipantIds = participantIds.filter(id => !withdrawnIds.has(id))
+      const withdrawnParticipantIds = participantIds.filter(id => withdrawnIds.has(id))
+      if (!availableParticipantIds.length && !withdrawnParticipantIds.length) return
+      options.push({
+        key: `${recordType}:${record.id}`,
+        recordType,
+        recordId: record.id,
+        label: `${record.start_time ? `${record.start_time} ` : ""}${typeLabel} · ${name}`,
+        availableParticipantIds,
+        withdrawnParticipantIds,
+      })
+    }
+
+    detailRecords.forEach(record => {
+      const groupParticipantIds = (record.groups || []).flatMap(group => [
+        group.leader_id,
+        group.deputy_id,
+        ...(group.member_ids || []),
+      ].filter(Boolean))
+      append(
+        "class",
+        record.course_type || "沙龙",
+        record,
+        record.activity_name || record.course_name || "未命名课程",
+        [...(record.participant_ids || []), ...groupParticipantIds],
+      )
+    })
+    detailGcsSessions.forEach(record => append(
+      "gcs", "觉醒游戏", record, record.name || "觉醒游戏", [record.owner_id, ...(record.participant_ids || [])],
+    ))
+    detailErsSessions.forEach(record => append(
+      "ers", "情绪释放", record, record.name || "情绪释放", [record.owner_id, ...(record.participant_ids || [])],
+    ))
+    detailEksSessions.forEach(record => append(
+      "eks", "能量结", record, record.name || "能量结", [record.owner_id, ...(record.participant_ids || [])],
+    ))
+    detailIcsSessions.forEach(record => append(
+      "ics", "内部课程", record, record.course_name || "内部课程", record.participant_ids || [],
+    ))
+    return options
+  }, [
+    canWithdrawRecord,
+    detailEksSessions,
+    detailErsSessions,
+    detailGcsSessions,
+    detailIcsSessions,
+    detailRecords,
+    withdrawalCustomerMap,
+  ])
+
+  const modeWithdrawalCourses = withdrawalCourses.filter(item => (
+    withdrawalMode === "withdraw"
+      ? item.availableParticipantIds.length > 0
+      : item.withdrawnParticipantIds.length > 0
+  ))
+  const selectedWithdrawalCourse = modeWithdrawalCourses.find(item => item.key === withdrawalCourseId)
+  const selectedWithdrawalCustomerIds = withdrawalMode === "withdraw"
+    ? selectedWithdrawalCourse?.availableParticipantIds
+    : selectedWithdrawalCourse?.withdrawnParticipantIds
+  const withdrawalCustomers = (selectedWithdrawalCustomerIds || [])
+    .map(id => withdrawalCustomerMap.get(id))
+    .filter((customer): customer is Pick<CustomerLight, "id" | "nickname" | "name"> => Boolean(customer))
 
   const openWithdrawalDialog = () => {
-    const firstCourse = withdrawalCourses[0]
-    setWithdrawalCourseId(firstCourse?.record.id || "")
+    const mode = withdrawalCourses.some(item => item.availableParticipantIds.length > 0) ? "withdraw" : "restore"
+    const firstCourse = withdrawalCourses.find(item => (
+      mode === "withdraw" ? item.availableParticipantIds.length > 0 : item.withdrawnParticipantIds.length > 0
+    ))
+    setWithdrawalMode(mode)
+    setWithdrawalCourseId(firstCourse?.key || "")
     setWithdrawalCustomerId("")
     setWithdrawalDialogOpen(true)
   }
 
+  const changeWithdrawalMode = (mode: "withdraw" | "restore") => {
+    const firstCourse = withdrawalCourses.find(item => (
+      mode === "withdraw" ? item.availableParticipantIds.length > 0 : item.withdrawnParticipantIds.length > 0
+    ))
+    setWithdrawalMode(mode)
+    setWithdrawalCourseId(firstCourse?.key || "")
+    setWithdrawalCustomerId("")
+  }
+
   const handleCourseWithdrawal = async () => {
-    if (!withdrawalCourseId || !withdrawalCustomerId || withdrawing) return
+    if (!selectedWithdrawalCourse || !withdrawalCustomerId || withdrawing) return
     setWithdrawing(true)
     try {
-      await classRecordApi.withdrawParticipant(withdrawalCourseId, withdrawalCustomerId)
+      if (withdrawalMode === "withdraw") {
+        await activityWithdrawalApi.withdraw(
+          selectedWithdrawalCourse.recordType,
+          selectedWithdrawalCourse.recordId,
+          withdrawalCustomerId,
+        )
+      } else {
+        await activityWithdrawalApi.restore(
+          selectedWithdrawalCourse.recordType,
+          selectedWithdrawalCourse.recordId,
+          withdrawalCustomerId,
+        )
+      }
       setWithdrawalDialogOpen(false)
       setWithdrawalCourseId("")
       setWithdrawalCustomerId("")
@@ -2605,6 +2793,7 @@ export default function DailyActivitiesPage() {
               spaceId={selectedSpaceId}
               records={unifiedDetailRecords}
               onReload={() => loadDateData(detailDate)}
+              onParticipantsSaved={handleInlineParticipantsSaved}
               callbacks={cardCallbacks}
               getMemberName={getMemberName}
               memberIdentities={memberIdentities}
@@ -2659,7 +2848,7 @@ export default function DailyActivitiesPage() {
                   >
                     <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
                   </button>
-                  {!isViewOnly && <button
+                  {canUseHistoryRestore && <button
                     onClick={undo}
                     disabled={!canUndo || !!previewEntry}
                     className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
@@ -2667,7 +2856,7 @@ export default function DailyActivitiesPage() {
                   >
                     <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
                   </button>}
-                  {!isViewOnly && <button
+                  {canUseHistoryRestore && <button
                     onClick={redo}
                     disabled={!canRedo || !!previewEntry}
                     className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
@@ -2685,10 +2874,12 @@ export default function DailyActivitiesPage() {
                       draggable={!isViewOnly}
                       onDragStart={(e) => {
                         if (isViewOnly) return
-                        e.dataTransfer.setData("text/plain", JSON.stringify({ customer_id: p.id, nickname: p.nickname }))
+                        const payload = JSON.stringify({ customer_id: p.id, nickname: p.nickname })
+                        e.dataTransfer.setData("application/x-wyyard-participant", payload)
+                        e.dataTransfer.setData("text/plain", payload)
                         e.dataTransfer.effectAllowed = "copy"
                       }}
-                      className={`inline-flex items-center px-2 py-[3px] rounded-sm bg-[#f0f5ff] text-[12px] text-[#3370ff] transition-colors ${isViewOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing hover:bg-[#e0edff]"}`}
+                      className={`inline-flex items-center rounded-sm px-2 py-[3px] text-[12px] transition-colors ${isViewOnly ? "cursor-default bg-[#f5f6f7] text-[#8f959e]" : "cursor-grab bg-[#f0f5ff] text-[#3370ff] hover:bg-[#e0edff] active:cursor-grabbing"}`}
                     >
                       {p.nickname}
                     </span>
@@ -2703,16 +2894,31 @@ export default function DailyActivitiesPage() {
       <Dialog open={withdrawalDialogOpen} onOpenChange={(open) => { if (!open && !withdrawing) setWithdrawalDialogOpen(false) }}>
         <DialogContent className="w-[400px] max-w-[90vw] gap-0 p-0" initialFocus={false}>
           <DialogHeader className="border-b border-[#f0f0f0] px-5 py-3">
-            <DialogTitle className="text-[14px] font-normal text-[#1f2329]">办理退课</DialogTitle>
+            <DialogTitle className="text-[14px] font-normal text-[#1f2329]">退课管理</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 px-5 py-5">
+            <div className="ml-[76px] grid grid-cols-2 rounded-[4px] bg-[#f5f6f7] p-0.5">
+              {(["withdraw", "restore"] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => changeWithdrawalMode(mode)}
+                  disabled={!withdrawalCourses.some(item => (
+                    mode === "withdraw" ? item.availableParticipantIds.length > 0 : item.withdrawnParticipantIds.length > 0
+                  ))}
+                  className={`h-7 rounded-[3px] text-[12px] transition-colors disabled:cursor-not-allowed disabled:text-[#c9cdd4] ${withdrawalMode === mode ? "bg-white text-[#1f2329] shadow-sm" : "text-[#8f959e] hover:text-[#4e535a]"}`}
+                >
+                  {mode === "withdraw" ? "办理退课" : "恢复退课"}
+                </button>
+              ))}
+            </div>
             <div className="grid grid-cols-[64px_1fr] items-center gap-3">
               <span className="text-right text-[12px] text-[#4e535a]">课程</span>
               <SelectDropdown
                 value={withdrawalCourseId}
-                options={withdrawalCourses.map(({ record }) => ({
-                  value: record.id,
-                  label: `${record.start_time ? `${record.start_time} ` : ""}${record.activity_name || record.course_name || "未命名课程"}`,
+                options={modeWithdrawalCourses.map(course => ({
+                  value: course.key,
+                  label: course.label,
                 }))}
                 onChange={value => {
                   setWithdrawalCourseId(value)
@@ -2724,7 +2930,7 @@ export default function DailyActivitiesPage() {
               />
             </div>
             <div className="grid grid-cols-[64px_1fr] items-center gap-3">
-              <span className="text-right text-[12px] text-[#4e535a]">参与人</span>
+              <span className="text-right text-[12px] text-[#4e535a]">{withdrawalMode === "withdraw" ? "参与人" : "已退课"}</span>
               <SelectDropdown
                 value={withdrawalCustomerId}
                 options={withdrawalCustomers.map(customer => ({
@@ -2739,12 +2945,14 @@ export default function DailyActivitiesPage() {
               />
             </div>
             <div className="ml-[76px] text-[12px] leading-5 text-[#8f959e]">
-              退课后仍保留在课程参与人记录中并显示“已退课”，本课程已扣卡次会恢复为 0。
+              {withdrawalMode === "withdraw"
+                ? "退课后保留参与记录并标记为“已退课”，本场已扣卡次恢复为 0。"
+                : "恢复后重新计入参与状态，并按本场原有规则恢复扣卡。"}
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
             <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setWithdrawalDialogOpen(false)} disabled={withdrawing}>取消</Button>
-            <Button size="sm" className="h-8 text-[12px]" onClick={handleCourseWithdrawal} disabled={!withdrawalCourseId || !withdrawalCustomerId || withdrawing}>{withdrawing ? "处理中..." : "确认退课"}</Button>
+            <Button size="sm" className="h-8 text-[12px]" onClick={handleCourseWithdrawal} disabled={!withdrawalCourseId || !withdrawalCustomerId || withdrawing}>{withdrawing ? "处理中..." : (withdrawalMode === "withdraw" ? "确认退课" : "确认恢复")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -2817,7 +3025,7 @@ export default function DailyActivitiesPage() {
               >
                 返回编辑
               </Button>
-              <Button
+              {canUseHistoryRestore && <Button
                 size="sm"
                 className="flex-1 h-8 text-[12px]"
                 disabled={restoring}
@@ -2835,7 +3043,7 @@ export default function DailyActivitiesPage() {
                 }}
               >
                 {restoring ? "恢复中..." : "恢复此版本"}
-              </Button>
+              </Button>}
             </div>
           )}
         </div>

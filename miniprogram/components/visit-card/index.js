@@ -9,6 +9,7 @@ Component({
     arrivalEditable: { type: Boolean, value: true },
     canMoveUp: { type: Boolean, value: false },
     canMoveDown: { type: Boolean, value: false },
+    isLast: { type: Boolean, value: false },
   },
 
   data: {

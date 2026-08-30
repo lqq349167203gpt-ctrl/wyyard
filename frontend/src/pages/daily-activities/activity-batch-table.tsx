@@ -21,6 +21,8 @@ import { createTableDragPreview } from "@/lib/table-drag-preview"
 
 type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics"
 
+const PARTICIPANT_DRAG_TYPE = "application/x-wyyard-participant"
+
 const TYPE_NAMES: Record<ActivityType, string> = {
   class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "内部课程",
 }
@@ -260,6 +262,12 @@ interface ActivityBatchTableProps {
   spaceId?: string
   records: { type: "class" | "gcs" | "ers" | "eks" | "ics"; data: any }[]
   onReload: () => void
+  onParticipantsSaved?: (
+    recordType: ActivityType,
+    recordId: string,
+    participantIds: string[],
+    participants: { id: string; nickname: string; withdrawn: boolean }[],
+  ) => void
   callbacks: CardCallbacks
   getMemberName: (id: string) => string
   memberIdentities?: MemberIdentity[]
@@ -281,7 +289,7 @@ interface ActivityBatchTableProps {
 
 export function ActivityBatchTable({
   date, courses, customers, invitedCustomerIds, teachers, spaces, spaceId,
-  records, onReload, callbacks, getMemberName, memberIdentities,
+  records, onReload, onParticipantsSaved, callbacks, getMemberName, memberIdentities,
   onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed,
   previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview,
   toolbarLeading, toolbarTrailing, toolbarSupplement,
@@ -291,6 +299,7 @@ export function ActivityBatchTable({
   const rowStatusRef = useRef(rowStatus)
   rowStatusRef.current = rowStatus
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
+  const [participantDropKey, setParticipantDropKey] = useState<number | null>(null)
   const [draggingKey, setDraggingKey] = useState<number | null>(null)
   const dragKeyRef = useRef<number | null>(null)
   const dragPreviewRef = useRef<HTMLDivElement | null>(null)
@@ -737,6 +746,7 @@ export function ActivityBatchTable({
           // 余额列表数据量较大，不阻塞场次创建和旧类型清理。
           void fetchRemaining(row.record_type, "all")
         }
+        onReload()
         return result
       } else {
         // 更新已有记录
@@ -812,6 +822,19 @@ export function ActivityBatchTable({
 
       rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saved" }
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+      onParticipantsSaved?.(
+        row.record_type,
+        row.record_id,
+        [...row.participant_ids],
+        row.participant_ids.map(id => {
+          const customer = customers.find(item => item.id === id)
+          return {
+            id,
+            nickname: customer?.nickname || customer?.name || id,
+            withdrawn: row.withdrawn_participant_ids.includes(id),
+          }
+        }),
+      )
       historyPushedRef.current.delete(row.key)
       if (row.record_type === "eks" && row.record_id) eksEditsRef.current.delete(row.record_id)
       // 保存后刷新剩余次数（fetchRemaining 会获取该类型所有客户，调一次即可）
@@ -833,7 +856,7 @@ export function ActivityBatchTable({
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       throw e
     }
-  }, [courses, spaceId, spaces, date, fetchRemaining, canEditRow, currentActorId, currentActorName])
+  }, [courses, spaceId, spaces, date, fetchRemaining, canEditRow, currentActorId, currentActorName, customers, onParticipantsSaved, onReload])
 
   // saveRow 包装：加 15 秒超时，防止 API 挂起时 status 永远停在 "saving"
   const saveRow = useCallback(async (row: ActivityRow, conversion = false): Promise<any> => {
@@ -1070,6 +1093,7 @@ export function ActivityBatchTable({
     dragKeyRef.current = null
     setDraggingKey(null)
     setDragOverKey(null)
+    setParticipantDropKey(null)
     dragPreviewRef.current?.remove()
     dragPreviewRef.current = null
   }, [])
@@ -1096,7 +1120,20 @@ export function ActivityBatchTable({
   }, [])
   const handleDragOver = useCallback((e: React.DragEvent, key: number) => {
     e.preventDefault()
+    const isParticipantDrag = Array.from(e.dataTransfer.types || []).includes(PARTICIPANT_DRAG_TYPE)
+    if (dragKeyRef.current === null && isParticipantDrag) {
+      e.dataTransfer.dropEffect = "copy"
+      setDragOverKey(null)
+      setParticipantDropKey(key)
+      return
+    }
+    setParticipantDropKey(null)
     if (dragKeyRef.current !== key) setDragOverKey(key)
+  }, [])
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLTableRowElement>, key: number) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+    setParticipantDropKey(current => current === key ? null : current)
+    setDragOverKey(current => current === key ? null : current)
   }, [])
   const handleDragEnd = useCallback(() => { resetDragState() }, [resetDragState])
   const handleDrop = useCallback((targetKey: number, e?: React.DragEvent) => {
@@ -1104,10 +1141,11 @@ export function ActivityBatchTable({
     // 外部拖入（添加参与者）
     if (sourceKey === null && e) {
       try {
-        const data = JSON.parse(e.dataTransfer.getData("text/plain"))
+        const payload = e.dataTransfer.getData(PARTICIPANT_DRAG_TYPE) || e.dataTransfer.getData("text/plain")
+        const data = JSON.parse(payload)
         if (data.customer_id) {
           const targetRow = rowsRef.current.find(r => r.key === targetKey)
-          if (!targetRow || !canEditField(targetRow, "participant_ids")) { setDragOverKey(null); return }
+          if (!targetRow || !canEditField(targetRow, "participant_ids")) { resetDragState(); return }
           const alreadyInRow = targetRow.owner_id === data.customer_id || targetRow.host_ids.includes(data.customer_id) || targetRow.participant_ids.includes(data.customer_id)
           if (!alreadyInRow) {
             const newParticipantIds = [...targetRow.participant_ids, data.customer_id]
@@ -1115,7 +1153,7 @@ export function ActivityBatchTable({
           }
         }
       } catch {}
-      setDragOverKey(null)
+      resetDragState()
       return
     }
     // 内部排序
@@ -1422,6 +1460,7 @@ export function ActivityBatchTable({
               const hasCellChanges = !!rowChangedFields && rowChangedFields.size > 0
               const { oldMembers, newMembers } = splitParticipants(row.participant_ids)
               const withdrawnParticipantIds = new Set(row.withdrawn_participant_ids)
+              const ownerWithdrawn = Boolean(row.owner_id && withdrawnParticipantIds.has(row.owner_id))
               const rowReadOnly = !canEditRow(row)
               const creatorName = row.pendingCreate || !row.record_id
                 ? "待保存"
@@ -1435,8 +1474,9 @@ export function ActivityBatchTable({
               return (
                 <tr
                   key={row.key}
-                  className={`${isChanged && !hasCellChanges ? "bg-[#f5eeff]" : "hover:bg-[#fafbfc]"} ${dragOverKey === row.key ? "[&>td]:shadow-[inset_0_2px_0_#3370ff]" : ""} ${draggingKey === row.key ? "bg-[#f7f8fa] opacity-60" : ""} transition-opacity`}
+                  className={`${isChanged && !hasCellChanges ? "bg-[#f5eeff]" : "hover:bg-[#fafbfc]"} ${dragOverKey === row.key ? "[&>td]:shadow-[inset_0_2px_0_#3370ff]" : ""} ${participantDropKey === row.key ? "bg-[#f5f8ff] outline outline-1 outline-offset-[-1px] outline-[#3370ff]" : ""} ${draggingKey === row.key ? "bg-[#f7f8fa] opacity-60" : ""} transition-[background-color,opacity]`}
                   onDragOver={(e) => handleDragOver(e, row.key)}
+                  onDragLeave={(e) => handleDragLeave(e, row.key)}
                   onDrop={(e) => handleDrop(row.key, e)}
                 >
                   {/* 拖动 */}
@@ -1546,9 +1586,9 @@ export function ActivityBatchTable({
 
                   {/* 案主 */}
                   {hasOwnerType && <td className={`pl-1.5 pr-0 py-0.5 w-[60px] align-top ${isCellChanged(row.key, "owner_name") || isCellChanged(row.key, "owner_id") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {rowReadOnly ? (
+                    {rowReadOnly || ownerWithdrawn ? (
                       <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.owner_name ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.owner_name}>
-                        {row.owner_name || "-"}
+                        {row.owner_name || "-"}{ownerWithdrawn && <span className="ml-1 text-[11px] text-[#c4506a]">已退课</span>}
                       </span>
                     ) : (row.record_type === "gcs" || row.record_type === "ers") ? (
                       <CustomerSearchInput rounded="2px"

@@ -247,6 +247,7 @@ def _count_activity_days(customer_id: str, all_class_records, all_group_cases,
         if s.host_id:
             ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
+        ids -= set(s.withdrawn_participant_ids or [])
         if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_emotional_releases:
@@ -256,6 +257,7 @@ def _count_activity_days(customer_id: str, all_class_records, all_group_cases,
         if s.host_id:
             ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
+        ids -= set(s.withdrawn_participant_ids or [])
         if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_energy_knots:
@@ -265,11 +267,13 @@ def _count_activity_days(customer_id: str, all_class_records, all_group_cases,
         if s.host_id:
             ids.add(s.host_id)
         ids.update(s.teacher_ids or [])
+        ids -= set(s.withdrawn_participant_ids or [])
         if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     for s in all_internal_courses:
         ids = set(s.participant_ids or [])
         ids.update(s.teacher_ids or [])
+        ids -= set(s.withdrawn_participant_ids or [])
         if customer_id in ids and s.date and (not customer_visits or s.date in arrived_dates):
             active_dates.add(s.date)
     return len(active_dates)

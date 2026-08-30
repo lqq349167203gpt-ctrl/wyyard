@@ -5,6 +5,38 @@ function formatMoney(value) {
   return '¥' + String(Math.round(value || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+const ACTIVITY_SUMMARY_TYPES = [
+  { key: 'class', label: '沙龙活动' },
+  { key: 'gcs', label: '觉醒游戏' },
+  { key: 'ers', label: '情绪释放' },
+  { key: 'eks', label: '能量结' },
+  { key: 'ics', label: '内部课程' },
+]
+
+function buildActivitySummary(activities, serverSummary) {
+  const serverItems = Array.isArray(serverSummary) ? serverSummary : []
+  const items = ACTIVITY_SUMMARY_TYPES.map(item => {
+    const serverItem = serverItems.find(summary => summary.key === item.key)
+    const count = serverItem
+      ? Number(serverItem.count || 0)
+      : activities.filter(activity => (
+        activity.activity_type === item.key
+        && activity.participated === true
+        && !activity.withdrawn
+      )).length
+    return Object.assign({}, item, { count })
+  })
+  const serverWithdrawn = serverItems.find(summary => summary.key === 'withdrawn')
+  items.push({
+    key: 'withdrawn',
+    label: '退课',
+    count: serverWithdrawn
+      ? Number(serverWithdrawn.count || 0)
+      : activities.filter(activity => activity.withdrawn).length,
+  })
+  return items.filter(item => item.count > 0)
+}
+
 function normalizePurchaseItem(item, key) {
   const isOfflineCourse = item.type === '线下落地课程'
   const remaining = item.remaining
@@ -75,6 +107,7 @@ Page({
     customerAccessPermissions: null,
     revealedContacts: { phone: false, wechat: false },
     customerTags: [],
+    heroTag: '',
     loading: true,
     loadError: '',
     healerText: '',
@@ -84,6 +117,7 @@ Page({
     genderAgeText: '',
     workText: '',
     activities: [],
+    activitySummary: buildActivitySummary([], []),
     commRecords: [],
     commContent: '',
     commSaving: false,
@@ -98,7 +132,7 @@ Page({
     trafficDetailLabel: '流量链接',
     activeTab: 'healing',
     tabs: [
-      { key: 'healing', label: '跟进点', count: 0 },
+      { key: 'healing', label: '跟进', count: 0 },
       { key: 'communication', label: '沟通', count: 0 },
       { key: 'activities', label: '活动', count: 0 },
       { key: 'purchase', label: '卡次', count: 0 },
@@ -167,6 +201,7 @@ Page({
           notArrived: a.participated === undefined ? !arrived.some(v => v.visit_date === a.date) : !a.participated,
         })
       })
+      const activitySummary = buildActivitySummary(activities, detail.activity_summary)
 
       // 跟进点
       const healingRecords = visitRecords.map(v => {
@@ -202,6 +237,7 @@ Page({
         customer: c,
         customerAccessPermissions,
         customerTags,
+        heroTag: (customerTags[0] && customerTags[0].name) || '',
         healerText,
         firstVisit,
         totalPayment,
@@ -209,6 +245,7 @@ Page({
         genderAgeText,
         workText,
         activities,
+        activitySummary,
         healingRecords,
         arrivedCount,
         cancelledCount,
@@ -239,7 +276,7 @@ Page({
     const { healingRecords, commRecords, activities, activityFollowups, purchaseSummary, offlineCourseRecords, paymentRecords, customerAccessPermissions } = this.data
     const access = customerAccessPermissions
     const tabs = [
-      (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进点', count: healingRecords.length },
+      (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进', count: healingRecords.length },
       (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: commRecords.length },
       (!access || access.detail_tabs.activities) && { key: 'activities', label: '活动', count: activities.length },
       (!access || access.detail_tabs.customer_followups) && { key: 'followups', label: '回访', count: activityFollowups.length },
@@ -261,7 +298,39 @@ Page({
   },
 
   onTabChange(e) {
-    this.setData({ activeTab: e.currentTarget.dataset.key })
+    const key = e.currentTarget.dataset.key
+    if (!key || key === this.data.activeTab || this._tabSwitching) return
+
+    const targetTab = this.data.tabs.find(tab => tab.key === key)
+    const currentTab = this.data.tabs.find(tab => tab.key === this.data.activeTab)
+    const shouldStabilize = targetTab && currentTab && targetTab.count === 0 && currentTab.count > 0
+    const applyTab = () => {
+      this.setData({ activeTab: key })
+      this._tabSwitching = false
+    }
+
+    if (!shouldStabilize) {
+      applyTab()
+      return
+    }
+
+    this._tabSwitching = true
+    const query = wx.createSelectorQuery()
+    query.select('#record-tabs-anchor').boundingClientRect()
+    query.selectViewport().scrollOffset()
+    query.exec(result => {
+      const anchorRect = result && result[0]
+      const viewport = result && result[1]
+      if (!anchorRect || !viewport || anchorRect.top >= -2) {
+        applyTab()
+        return
+      }
+      wx.pageScrollTo({
+        scrollTop: Math.max(0, viewport.scrollTop + anchorRect.top),
+        duration: 120,
+        complete: applyTab,
+      })
+    })
   },
 
   onEditTap() {

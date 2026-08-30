@@ -1,4 +1,4 @@
-const { classRecordApi, spaceApi } = require('../../utils/api')
+const { activityWithdrawalApi, classRecordApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
@@ -47,6 +47,39 @@ function buildCalendar(year, month, selectedDate, calendarCounts) {
   return days
 }
 
+function parseLocalDate(date) {
+  const parts = String(date || '').split('-').map(Number)
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null
+
+  return new Date(parts[0], parts[1] - 1, parts[2])
+}
+
+function buildWeekPages(selectedDate, calendarCounts) {
+  const selected = parseLocalDate(selectedDate)
+  if (!selected) return []
+
+  const mondayOffset = (selected.getDay() + 6) % 7
+  const monday = new Date(selected)
+  monday.setDate(selected.getDate() - mondayOffset)
+  const selectedWeekdayIndex = mondayOffset
+
+  return [-1, 0, 1].map(weekOffset => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const dateValue = new Date(monday)
+      dateValue.setDate(monday.getDate() + weekOffset * 7 + index)
+      const date = formatDate(dateValue)
+      return {
+        date,
+        day: dateValue.getDate(),
+        weekday: WEEKDAYS[dateValue.getDay()],
+        count: (calendarCounts || {})[date] || 0,
+        isSelected: index === selectedWeekdayIndex,
+      }
+    })
+    return { key: `week-slot-${weekOffset + 1}`, days }
+  })
+}
+
 // 按时段分组：上午 <12:00 / 下午 12:00-18:00 / 晚上 >=18:00 / 其他（无时间）
 function groupByTimeSlot(records) {
   const slots = [
@@ -76,6 +109,10 @@ Page({
     calYear: 0,
     calMonth: 0,
     calendarDays: [],
+    weekPages: [],
+    weekSwiperCurrent: 1,
+    weekSwiperDuration: 260,
+    dateSwitching: false,
     weekdays: WEEKDAYS,
     spaces: [],
     spaceIndex: 0,
@@ -86,6 +123,7 @@ Page({
     participants: [],
     participantText: '',
     withdrawalCourses: [],
+    withdrawalMode: 'withdraw',
     withdrawalCourseIndex: 0,
     withdrawalParticipants: [],
     withdrawalParticipantIndex: 0,
@@ -103,13 +141,14 @@ Page({
     }
     this.setData({ isViewOnly: isAreaViewOnly('activities') })
     const date = options.date || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
-    const d = new Date(date)
+    const d = parseLocalDate(date) || new Date()
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
       currentWeekday: '周' + WEEKDAYS[d.getDay()],
       calYear: d.getFullYear(),
       calMonth: d.getMonth(),
+      weekPages: buildWeekPages(date, {}),
     })
     await this.loadSpaces()
     this.loadData()
@@ -128,7 +167,7 @@ Page({
   },
 
   _formatDateShort(date) {
-    const d = new Date(date)
+    const d = parseLocalDate(date) || new Date()
     return `${d.getMonth() + 1}月${d.getDate()}日`
   },
 
@@ -174,8 +213,14 @@ Page({
 
   onCalendarDayTap(e) {
     const date = e.currentTarget.dataset.date
-    const d = new Date(date)
+    this._selectDate(date)
+  },
+
+  _selectDate(date, fromWeekSwipe = false) {
+    const d = parseLocalDate(date)
+    if (!d) return
     const counts = this._calendarCounts || {}
+    const useSoftTransition = fromWeekSwipe && !this.data.loading && this.data.records.length > 0
     wx.setStorageSync('activity_selected_date', date)
     this.setData({
       currentDate: date,
@@ -185,8 +230,36 @@ Page({
       calMonth: d.getMonth(),
       calendarExpanded: false,
       calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts),
+      weekPages: buildWeekPages(date, counts),
+      weekSwiperCurrent: 1,
+      dateSwitching: useSoftTransition,
+    }, () => {
+      if (!fromWeekSwipe) return
+      wx.nextTick(() => {
+        this._weekSwiperRecentering = false
+        this.setData({ weekSwiperDuration: 260 })
+      })
     })
-    this.loadData()
+    this.loadData(undefined, { silent: useSoftTransition })
+  },
+
+  onWeekSwiperChange(e) {
+    const current = Number(e.detail.current)
+    if (this._weekSwiperRecentering || current === 1) {
+      if (this.data.weekSwiperCurrent !== current) {
+        this.setData({ weekSwiperCurrent: current })
+      }
+      return
+    }
+
+    const selected = parseLocalDate(this.data.currentDate)
+    if (!selected) return
+    selected.setDate(selected.getDate() + (current === 0 ? -7 : 7))
+
+    this._weekSwiperRecentering = true
+    this.setData({ weekSwiperCurrent: current, weekSwiperDuration: 0 }, () => {
+      this._selectDate(formatDate(selected), true)
+    })
   },
 
   // ---------- 空间 ----------
@@ -222,15 +295,15 @@ Page({
 
   // ---------- 数据 ----------
 
-  async loadData(spaceId) {
+  async loadData(spaceId, options = {}) {
     const requestSeq = (this._loadSeq || 0) + 1
     this._loadSeq = requestSeq
     const requestedDate = this.data.currentDate
-    this.setData({ loading: true })
+    if (!options.silent) this.setData({ loading: true })
     try {
       const sid = spaceId !== undefined ? spaceId : this.data.spaceId
       const dashboard = await classRecordApi.dashboard(requestedDate, sid || undefined)
-      if (requestSeq !== this._loadSeq || requestedDate !== this.data.currentDate || sid !== this.data.spaceId) return
+      if (requestSeq !== this._loadSeq || requestedDate !== this.data.currentDate || String(sid || '') !== String(this.data.spaceId || '')) return
       const records = []
       const rawMap = {}
 
@@ -249,6 +322,7 @@ Page({
             space: r.space_name || '',
             source: 'class_record',
             isPublicWelfare: r.is_public_welfare || false,
+            isBookClubWelfare: badge === '读书会' && !!r.is_public_welfare,
             isPublished: r.is_published || false,
           })
         })
@@ -259,9 +333,9 @@ Page({
           const owner = r.owner_name || ''
           rawMap[`group_case_${r.id}`] = r
           records.push({
-            id: r.id, badge: '觉醒',
+            id: r.id, badge: '觉醒游戏',
             name: r.name || (owner ? `觉醒游戏·${owner}` : '觉醒游戏'),
-            color: BADGE_COLORS['觉醒'],
+            color: BADGE_COLORS['觉醒游戏'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || [])[0] || r.achiever_name || r.host_name || '',
             deductionCount: r.membership_deduction_count,
@@ -343,7 +417,7 @@ Page({
         r.displayName = r.name || r.badge
         const typeParts = []
         if (r.name) typeParts.push(r.badge)
-        if (r.isPublicWelfare) typeParts.push('公益')
+        if (r.isPublicWelfare && !r.isBookClubWelfare) typeParts.push('公益')
         r.typeText = typeParts.join(' · ')
         const metaParts = []
         if (r.teacher) metaParts.push(r.teacher)
@@ -365,17 +439,52 @@ Page({
       const participants = []
       participantSet.forEach(function(v) { participants.push(v) })
 
-      const withdrawalCourses = (dashboard.class_records || []).map(function(record) {
-        const availableParticipants = (record.participants || []).filter(function(participant) {
-          return participant.id && !participant.withdrawn
+      const withdrawalCourses = []
+      const withdrawalSources = [
+        { recordType: 'class', typeLabel: '沙龙', records: dashboard.class_records || [], owner: false },
+        { recordType: 'gcs', typeLabel: '觉醒游戏', records: dashboard.gcs_sessions || [], owner: true },
+        { recordType: 'ers', typeLabel: '情绪释放', records: dashboard.ers_sessions || [], owner: true },
+        { recordType: 'eks', typeLabel: '能量结', records: dashboard.eks_sessions || [], owner: true },
+        { recordType: 'ics', typeLabel: '内部课程', records: dashboard.ics_sessions || [], owner: false },
+      ]
+      withdrawalSources.forEach(function(source) {
+        source.records.filter(function(record) {
+          return canEditRecord(record, 'activities')
+        }).forEach(function(record) {
+          const withdrawnIds = new Set(record.withdrawn_participant_ids || [])
+          const registered = (record.participants || []).slice()
+          if (source.owner && record.owner_id && record.owner_name && !registered.some(function(item) { return item.id === record.owner_id })) {
+            registered.unshift({
+              id: record.owner_id,
+              nickname: record.owner_name || '案主',
+              withdrawn: withdrawnIds.has(record.owner_id),
+            })
+          }
+          const activeParticipants = registered.filter(function(participant) {
+            return participant.id && !participant.withdrawn
+          })
+          const withdrawnParticipants = registered.filter(function(participant) {
+            return participant.id && participant.withdrawn
+          })
+          if (!activeParticipants.length && !withdrawnParticipants.length) return
+          const name = record.activity_name || record.course_name || record.name || source.typeLabel
+          withdrawalCourses.push({
+            id: record.id,
+            recordType: source.recordType,
+            label: `${record.start_time ? record.start_time + ' ' : ''}${source.typeLabel} · ${name}`,
+            activeParticipants,
+            withdrawnParticipants,
+          })
         })
-        return {
-          id: record.id,
-          label: `${record.start_time ? record.start_time + ' ' : ''}${record.activity_name || record.course_name || '未命名课程'}`,
-          participants: availableParticipants,
-        }
-      }).filter(function(course) { return course.participants.length > 0 })
-      const withdrawalParticipants = withdrawalCourses.length > 0 ? withdrawalCourses[0].participants : []
+      })
+      this._allWithdrawalCourses = withdrawalCourses
+      const withdrawalMode = withdrawalCourses.some(function(course) { return course.activeParticipants.length > 0 }) ? 'withdraw' : 'restore'
+      const visibleWithdrawalCourses = withdrawalCourses.filter(function(course) {
+        return withdrawalMode === 'withdraw' ? course.activeParticipants.length > 0 : course.withdrawnParticipants.length > 0
+      })
+      const withdrawalParticipants = visibleWithdrawalCourses.length > 0
+        ? (withdrawalMode === 'withdraw' ? visibleWithdrawalCourses[0].activeParticipants : visibleWithdrawalCourses[0].withdrawnParticipants)
+        : []
 
       // 保存日历计数，供展开时使用
       this._calendarCounts = dashboard.calendar_counts || {}
@@ -385,15 +494,18 @@ Page({
         timeGroups,
         participants,
         participantText: participants.join('、'),
-        withdrawalCourses,
+        withdrawalCourses: visibleWithdrawalCourses,
+        withdrawalMode,
         withdrawalCourseIndex: 0,
         withdrawalParticipants,
         withdrawalParticipantIndex: 0,
+        weekPages: buildWeekPages(requestedDate, dashboard.calendar_counts || {}),
         loading: false,
+        dateSwitching: false,
       })
     } catch (e) {
       console.error('加载活动失败:', e)
-      if (requestSeq === this._loadSeq) this.setData({ loading: false })
+      if (requestSeq === this._loadSeq) this.setData({ loading: false, dateSwitching: false })
     }
   },
 
@@ -410,10 +522,40 @@ Page({
 
   onWithdrawalOpen() {
     if (!this.data.withdrawalCourses.length) {
-      wx.showToast({ title: '当日没有可办理退课的课程参与人', icon: 'none' })
+      wx.showToast({ title: '当日没有可办理的退课记录', icon: 'none' })
       return
     }
-    this.setData({ showWithdrawal: true, withdrawalCourseIndex: 0, withdrawalParticipantIndex: 0, withdrawalParticipants: this.data.withdrawalCourses[0].participants })
+    const firstCourse = this.data.withdrawalCourses[0]
+    this.setData({
+      showWithdrawal: true,
+      withdrawalCourseIndex: 0,
+      withdrawalParticipantIndex: 0,
+      withdrawalParticipants: this.data.withdrawalMode === 'withdraw'
+        ? firstCourse.activeParticipants
+        : firstCourse.withdrawnParticipants,
+    })
+  },
+
+  onWithdrawalModeChange(e) {
+    if (this.data.withdrawing) return
+    const withdrawalMode = e.currentTarget.dataset.mode
+    const withdrawalCourses = (this._allWithdrawalCourses || []).filter(function(course) {
+      return withdrawalMode === 'withdraw' ? course.activeParticipants.length > 0 : course.withdrawnParticipants.length > 0
+    })
+    if (!withdrawalCourses.length) {
+      wx.showToast({ title: withdrawalMode === 'withdraw' ? '没有可退课人员' : '没有可恢复人员', icon: 'none' })
+      return
+    }
+    const firstCourse = withdrawalCourses[0]
+    this.setData({
+      withdrawalMode,
+      withdrawalCourses,
+      withdrawalCourseIndex: 0,
+      withdrawalParticipants: firstCourse
+        ? (withdrawalMode === 'withdraw' ? firstCourse.activeParticipants : firstCourse.withdrawnParticipants)
+        : [],
+      withdrawalParticipantIndex: 0,
+    })
   },
 
   onWithdrawalClose() {
@@ -426,7 +568,9 @@ Page({
     const course = this.data.withdrawalCourses[withdrawalCourseIndex]
     this.setData({
       withdrawalCourseIndex,
-      withdrawalParticipants: course ? course.participants : [],
+      withdrawalParticipants: course
+        ? (this.data.withdrawalMode === 'withdraw' ? course.activeParticipants : course.withdrawnParticipants)
+        : [],
       withdrawalParticipantIndex: 0,
     })
   },
@@ -441,8 +585,12 @@ Page({
     if (!course || !participant || this.data.withdrawing) return
     this.setData({ withdrawing: true })
     try {
-      await classRecordApi.withdrawParticipant(course.id, participant.id)
-      wx.showToast({ title: '已办理退课', icon: 'success' })
+      if (this.data.withdrawalMode === 'withdraw') {
+        await activityWithdrawalApi.withdraw(course.recordType, course.id, participant.id)
+      } else {
+        await activityWithdrawalApi.restore(course.recordType, course.id, participant.id)
+      }
+      wx.showToast({ title: this.data.withdrawalMode === 'withdraw' ? '已办理退课' : '已恢复参与', icon: 'success' })
       this.setData({ showWithdrawal: false, withdrawing: false })
       await this.loadData()
     } catch (e) {

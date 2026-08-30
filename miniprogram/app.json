@@ -9,6 +9,7 @@
     "pages/activity-detail/index",
     "pages/activity-create/index",
     "pages/customers/index",
+    "pages/customer-search/index",
     "pages/customer-form/index",
     "pages/customer-profile/index",
     "pages/customer-tags/index",

@@ -1,5 +1,4 @@
 const { authApi } = require('../../utils/api')
-const { APP_VERSION, BUILD_TAG } = require('../../utils/version')
 const { DEV } = require('../../utils/config')
 
 const DEV_ACCOUNTS = [
@@ -14,20 +13,31 @@ Page({
     loginMode: 'password', // 'password' | 'dev'
     username: '',
     password: '',
+    focusedField: '',
+    dateSubtitle: '',
     saveAccount: false,
+    savePassword: false,
     devAccounts: DEV_ACCOUNTS,
     devIndex: 0,
     isDev: DEV, // 「开发模式」入口由 DEV 总开关控制，提审前切 false 自动隐藏
-    versionTag: `v${APP_VERSION} (${BUILD_TAG})`, // 构建标记，用于核对审核包内容
   },
 
   onLoad() {
-    // 恢复保存的账号
+    const now = new Date()
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+    this.setData({
+      dateSubtitle: `${now.getMonth() + 1}月${now.getDate()}日 周${weekdays[now.getDay()]} · 请使用内部账号登录`,
+    })
+
+    // 恢复仅保存在当前微信设备中的账号密码
     const savedAccount = wx.getStorageSync('login_save_account')
+    const savedPassword = savedAccount ? wx.getStorageSync('login_save_password') : ''
     if (savedAccount) {
       this.setData({
         username: savedAccount,
+        password: savedPassword || '',
         saveAccount: true,
+        savePassword: !!savedPassword,
       })
     }
   },
@@ -47,13 +57,38 @@ Page({
 
   onToggleSaveAccount() {
     const newVal = !this.data.saveAccount
-    this.setData({ saveAccount: newVal })
+    this.setData({
+      saveAccount: newVal,
+      savePassword: newVal ? this.data.savePassword : false,
+    })
     if (!newVal) {
       wx.removeStorageSync('login_save_account')
+      wx.removeStorageSync('login_save_password')
+    }
+  },
+
+  onToggleSavePassword() {
+    const newVal = !this.data.savePassword
+    this.setData({
+      savePassword: newVal,
+      saveAccount: newVal ? true : this.data.saveAccount,
+    })
+    if (!newVal) {
+      wx.removeStorageSync('login_save_password')
     }
   },
 
   // ---------- 输入 ----------
+
+  onFieldFocus(e) {
+    this.setData({ focusedField: e.currentTarget.dataset.field || '' })
+  },
+
+  onFieldBlur(e) {
+    if (this.data.focusedField === e.currentTarget.dataset.field) {
+      this.setData({ focusedField: '' })
+    }
+  },
 
   onUsernameInput(e) {
     this.setData({ username: e.detail.value })
@@ -66,6 +101,7 @@ Page({
   // ---------- 账号密码登录 ----------
 
   onPasswordLogin() {
+    if (this.data.loading) return
     const { username, password } = this.data
     if (!username || !password) {
       this.setData({ error: '请输入用户名和密码' })
@@ -106,6 +142,7 @@ Page({
   },
 
   onDevLogin() {
+    if (this.data.loading) return
     const account = DEV_ACCOUNTS[this.data.devIndex]
     this.setData({ loading: true, error: '' })
 
@@ -127,11 +164,18 @@ Page({
     wx.setStorageSync('userPermissions', data.permissions)
     wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own' })
 
-    // 保存/清除账号
-    if (this.data.saveAccount) {
-      wx.setStorageSync('login_save_account', this.data.username)
-    } else {
-      wx.removeStorageSync('login_save_account')
+    // 开发模式登录不改动用户保存的账号密码
+    if (this.data.loginMode === 'password') {
+      if (this.data.saveAccount) {
+        wx.setStorageSync('login_save_account', this.data.username)
+      } else {
+        wx.removeStorageSync('login_save_account')
+      }
+      if (this.data.savePassword) {
+        wx.setStorageSync('login_save_password', this.data.password)
+      } else {
+        wx.removeStorageSync('login_save_password')
+      }
     }
 
     const app = getApp()

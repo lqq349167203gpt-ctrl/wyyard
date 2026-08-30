@@ -63,6 +63,7 @@ READ_ONLY_AREA_PATHS = {
         "/api/visit-history",
     ),
     "activities": (
+        "/api/activity-withdrawals",
         "/api/class-records",
         "/api/group-case-sessions",
         "/api/emotional-release-sessions",

@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class PositionBase(SafeBaseModel):
@@ -22,5 +23,6 @@ class PositionUpdate(StrictBaseModel):
 class Position(PositionBase):
     id: str
     created_at: datetime
+    sort_order: int = 0
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None

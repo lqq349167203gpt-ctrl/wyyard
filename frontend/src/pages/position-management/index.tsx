@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { Edit, Trash2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Edit, GripVertical, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -200,6 +200,10 @@ export default function PositionManagementPage() {
   const [editingPosition, setEditingPosition] = useState<Position | null>(null)
   const [editName, setEditName] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [reorderingPositions, setReorderingPositions] = useState(false)
+  const [draggingPositionId, setDraggingPositionId] = useState<string | null>(null)
+  const [positionDropTarget, setPositionDropTarget] = useState<{ id: string; edge: "before" | "after" } | null>(null)
+  const draggingPositionIdRef = useRef<string | null>(null)
 
   const loadData = async () => {
     try {
@@ -507,6 +511,80 @@ export default function PositionManagementPage() {
     }
   }
 
+  const resetPositionDrag = () => {
+    draggingPositionIdRef.current = null
+    setDraggingPositionId(null)
+    setPositionDropTarget(null)
+  }
+
+  const handlePositionDragStart = (event: React.DragEvent, positionId: string) => {
+    if (reorderingPositions) {
+      event.preventDefault()
+      return
+    }
+    draggingPositionIdRef.current = positionId
+    setDraggingPositionId(positionId)
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", `position:${positionId}`)
+  }
+
+  const handlePositionDragOver = (event: React.DragEvent<HTMLDivElement>, positionId: string) => {
+    const sourceId = draggingPositionIdRef.current
+    if (!sourceId || sourceId === positionId) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+    const rect = event.currentTarget.getBoundingClientRect()
+    const edge = event.clientY < rect.top + rect.height / 2 ? "before" : "after"
+    setPositionDropTarget({ id: positionId, edge })
+  }
+
+  const handlePositionDrop = async (event: React.DragEvent<HTMLDivElement>, targetId: string) => {
+    event.preventDefault()
+    const sourceId = draggingPositionIdRef.current
+    const edge = positionDropTarget?.id === targetId ? positionDropTarget.edge : "before"
+    if (!sourceId || sourceId === targetId) {
+      resetPositionDrag()
+      return
+    }
+
+    const previous = positions
+    const sourceIndex = previous.findIndex(position => position.id === sourceId)
+    if (sourceIndex < 0) {
+      resetPositionDrag()
+      return
+    }
+    const next = [...previous]
+    const [moved] = next.splice(sourceIndex, 1)
+    const targetIndex = next.findIndex(position => position.id === targetId)
+    if (targetIndex < 0) {
+      resetPositionDrag()
+      return
+    }
+    next.splice(targetIndex + (edge === "after" ? 1 : 0), 0, moved)
+    const toPosition = next.findIndex(position => position.id === sourceId) + 1
+    if (toPosition === sourceIndex + 1) {
+      resetPositionDrag()
+      return
+    }
+
+    setPositions(next)
+    setReorderingPositions(true)
+    resetPositionDrag()
+    try {
+      const saved = await positionApi.reorder(next.map(position => position.id), {
+        movedId: sourceId,
+        fromPosition: sourceIndex + 1,
+        toPosition,
+      })
+      setPositions(saved)
+    } catch (error) {
+      setPositions(previous)
+      alert(error instanceof Error ? error.message : "角色排序保存失败")
+    } finally {
+      setReorderingPositions(false)
+    }
+  }
+
   return (
     <div className="px-6 pt-4 pb-6 space-y-3">
       {/* Tab 切换 */}
@@ -560,12 +638,31 @@ export default function PositionManagementPage() {
                   return (
                     <div
                       key={pos.id}
-                      className={`group flex h-12 cursor-pointer items-center justify-between border-l-2 px-3.5 transition-colors ${
+                      className={`group flex h-12 cursor-pointer items-center justify-between border-l-2 px-2.5 transition-colors ${
                         isSelected ? "bg-[#f7f8fa] text-[#1f2329]" : "text-[#2b2f36] hover:bg-[#f7f8fa]"
-                      } ${isSelected ? "border-l-[#3370ff]" : "border-l-transparent"}`}
+                      } ${isSelected ? "border-l-[#3370ff]" : "border-l-transparent"} ${
+                        positionDropTarget?.id === pos.id && positionDropTarget.edge === "before" ? "shadow-[inset_0_2px_0_#3370ff]" : ""
+                      } ${positionDropTarget?.id === pos.id && positionDropTarget.edge === "after" ? "shadow-[inset_0_-2px_0_#3370ff]" : ""} ${
+                        draggingPositionId === pos.id ? "opacity-50" : ""
+                      }`}
                       onClick={() => handlePositionChange(pos.id)}
+                      onDragOver={(event) => handlePositionDragOver(event, pos.id)}
+                      onDrop={(event) => void handlePositionDrop(event, pos.id)}
                     >
-                      <div className={`min-w-0 truncate text-[13px] ${isSelected ? "font-medium" : ""}`}>{pos.name}</div>
+                      <div className="flex min-w-0 items-center">
+                        <button
+                          type="button"
+                          draggable={!reorderingPositions}
+                          className="mr-1 flex h-7 w-6 shrink-0 cursor-grab items-center justify-center rounded-[4px] text-[#c9cdd4] hover:bg-[#f0f1f2] hover:text-[#8f959e] active:cursor-grabbing"
+                          onClick={(event) => event.stopPropagation()}
+                          onDragStart={(event) => handlePositionDragStart(event, pos.id)}
+                          onDragEnd={resetPositionDrag}
+                          title="拖动调整角色顺序"
+                        >
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </button>
+                        <div className={`min-w-0 truncate text-[13px] ${isSelected ? "font-medium" : ""}`}>{pos.name}</div>
+                      </div>
                       <div className="flex shrink-0 items-center gap-0.5">
                         <span className={`mr-1 text-[12px] text-[#8f959e] ${!pos.is_system ? "group-hover:hidden" : ""}`}>
                           {getPersonCount(pos.name)} 人

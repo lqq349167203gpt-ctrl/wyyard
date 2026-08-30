@@ -37,6 +37,8 @@ def get_member_ids(activity) -> set[str]:
             if customer_id:
                 member_ids.add(customer_id)
 
+    member_ids -= set(_value(activity, "withdrawn_participant_ids", []) or [])
+
     return {customer_id for customer_id in member_ids if customer_id}
 
 

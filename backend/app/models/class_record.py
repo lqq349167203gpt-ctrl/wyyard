@@ -17,6 +17,7 @@ class CourseWithdrawalEntry(SafeBaseModel):
     """课程退课流水；取消退课后仍保留历史。"""
 
     id: str
+    record_type: Literal["class", "gcs", "ers", "eks", "ics"] = "class"
     customer_id: str
     customer_name: str = ""
     activity_name: str = ""

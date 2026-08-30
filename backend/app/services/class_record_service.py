@@ -534,6 +534,7 @@ def list_withdrawals() -> list[dict]:
         for entry in record.withdrawal_records:
             result.append({
                 "id": entry.id,
+                "record_type": "class",
                 "record_id": record.id,
                 "customer_id": entry.customer_id,
                 "customer_name": entry.customer_name,

@@ -14,16 +14,36 @@
       </view>
       <view class="head-tools">
         <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-          <text>{{currentSpaceName}} ▾</text>
+          <text>{{currentSpaceName}}</text>
         </picker>
       </view>
     </view>
-    <view class="head-row2">
-      <view class="head-parti">今日 <text class="cnt">{{participants.length}}</text> 位参与者</view>
-      <view class="head-actions" wx:if="{{!isViewOnly}}">
-        <view class="withdraw-entry {{withdrawalCourses.length ? '' : 'disabled'}}" bindtap="onWithdrawalOpen">退课</view>
-      </view>
-    </view>
+    <!-- 三槽位周轮播：滑动完成后无感回中，可稳定连续切换前后周 -->
+    <swiper
+      wx:if="{{!calendarExpanded}}"
+      class="week-swiper"
+      current="{{weekSwiperCurrent}}"
+      duration="{{weekSwiperDuration}}"
+      easing-function="easeOutCubic"
+      bindchange="onWeekSwiperChange"
+    >
+      <swiper-item wx:for="{{weekPages}}" wx:key="key" wx:for-item="weekPage">
+        <view class="week-strip">
+          <view
+            wx:for="{{weekPage.days}}"
+            wx:key="date"
+            wx:for-item="day"
+            class="week-day {{day.isSelected ? 'selected' : ''}}"
+            catchtap="onCalendarDayTap"
+            data-date="{{day.date}}"
+          >
+            <text class="week-label">{{day.weekday}}</text>
+            <text class="week-number">{{day.day}}</text>
+            <view class="week-count-dot {{day.count > 0 ? 'visible' : ''}}"></view>
+          </view>
+        </view>
+      </swiper-item>
+    </swiper>
     <!-- 下拉日历 -->
     <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
       <view class="calendar-nav">
@@ -53,36 +73,44 @@
   <view class="calendar-mask" wx:if="{{calendarExpanded}}" bindtap="onCalendarClose"></view>
 
   <!-- 活动列表（按时段分组） -->
-  <view class="list" wx:if="{{!loading && records.length > 0}}">
+  <view class="list {{dateSwitching ? 'date-switching' : ''}}" wx:if="{{!loading && records.length > 0}}">
+    <view class="schedule-switching-line" wx:if="{{dateSwitching}}"></view>
     <view class="group" wx:for="{{timeGroups}}" wx:key="label" wx:for-item="group">
-      <view class="group-label">{{group.label}}</view>
-      <view
-        class="card {{item.canEdit ? '' : 'read-only'}}"
-        wx:for="{{group.items}}"
-        wx:key="key"
-        wx:for-item="item"
-        bindtap="onActivityTap"
-        data-record="{{item}}"
-      >
-        <view class="card-time">
-          <text class="t1">{{item.startTime || '--'}}</text>
-          <text class="t2">{{item.endTime}}</text>
-        </view>
-        <view class="card-mid">
-          <view class="card-line1">
-            <view class="dot" style="background-color: {{item.color}};"></view>
-            <text class="name">{{item.displayName}}</text>
-            <text class="type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
+      <view class="group-heading">
+        <view class="group-heading-dot"></view>
+        <text class="group-label">{{group.label}}</text>
+        <text class="group-count">{{group.items.length}} 场</text>
+        <view wx:if="{{index === 0 && !isViewOnly}}" class="withdraw-entry {{withdrawalCourses.length ? '' : 'disabled'}}" bindtap="onWithdrawalOpen">退课</view>
+      </view>
+      <view class="group-card">
+        <view
+          class="card {{item.canEdit ? '' : 'read-only'}}"
+          wx:for="{{group.items}}"
+          wx:key="key"
+          wx:for-item="item"
+          bindtap="onActivityTap"
+          data-record="{{item}}"
+        >
+          <view class="card-time">
+            <text class="t1">{{item.startTime || '--'}}</text>
+            <text class="t2">{{item.endTime}}</text>
           </view>
-          <view class="card-line2">
-            <text wx:if="{{item.metaText}}">{{item.metaText}}</text>
-            <text class="creator-text">创建人 · {{item.createdBy || '未记录'}}</text>
+          <view class="card-mid">
+            <view class="card-line1">
+              <text class="welfare-tag" wx:if="{{item.isBookClubWelfare}}">公益</text>
+              <text class="name">{{item.displayName}}</text>
+              <text class="type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
+            </view>
+            <view class="card-line2">
+              <text wx:if="{{item.metaText}}">{{item.metaText}}</text>
+              <text class="creator-text">创建人 · {{item.createdBy || '未记录'}}</text>
+            </view>
           </view>
-        </view>
-        <view class="card-right">
-          <text class="readonly-status" wx:if="{{!item.canEdit}}">{{isViewOnly ? '仅浏览' : '部分只读'}}</text>
-          <text class="ppl" wx:if="{{item.participants > 0}}">{{item.participants}} 人</text>
-          <text class="status" wx:if="{{item.isPublished}}">已发布</text>
+          <view class="card-right">
+            <text class="readonly-status" wx:if="{{!item.canEdit}}">{{isViewOnly ? '仅浏览' : '部分只读'}}</text>
+            <text class="ppl" wx:if="{{item.participants > 0}}">{{item.participants}} 人</text>
+            <text class="status" wx:if="{{item.isPublished}}">已发布</text>
+          </view>
         </view>
       </view>
     </view>
@@ -109,12 +137,16 @@
     <view class="withdraw-handle"></view>
     <view class="withdraw-head">
       <view class="withdraw-heading">
-        <text class="withdraw-title">办理退课</text>
-        <text class="withdraw-subtitle">选择需要退出的课程与参与人</text>
+        <text class="withdraw-title">退课管理</text>
+        <text class="withdraw-subtitle">办理退课后也可以恢复参与</text>
       </view>
       <view class="withdraw-close" bindtap="onWithdrawalClose" aria-label="关闭">×</view>
     </view>
     <view class="withdraw-body">
+      <view class="withdraw-mode">
+        <view class="withdraw-mode-item {{withdrawalMode === 'withdraw' ? 'active' : ''}}" data-mode="withdraw" bindtap="onWithdrawalModeChange">办理退课</view>
+        <view class="withdraw-mode-item {{withdrawalMode === 'restore' ? 'active' : ''}}" data-mode="restore" bindtap="onWithdrawalModeChange">恢复退课</view>
+      </view>
       <view class="withdraw-field">
         <text class="withdraw-label">课程</text>
         <picker class="withdraw-picker" mode="selector" range="{{withdrawalCourses}}" range-key="label" value="{{withdrawalCourseIndex}}" bindchange="onWithdrawalCourseChange">
@@ -125,7 +157,7 @@
         </picker>
       </view>
       <view class="withdraw-field">
-        <text class="withdraw-label">退课人员</text>
+        <text class="withdraw-label">{{withdrawalMode === 'withdraw' ? '参与人' : '已退课人员'}}</text>
         <picker class="withdraw-picker" mode="selector" range="{{withdrawalParticipants}}" range-key="nickname" value="{{withdrawalParticipantIndex}}" bindchange="onWithdrawalParticipantChange">
           <view class="withdraw-value">
             <text class="withdraw-value-text">{{withdrawalParticipants[withdrawalParticipantIndex].nickname}}</text>
@@ -135,12 +167,12 @@
       </view>
       <view class="withdraw-note">
         <text class="withdraw-note-icon">!</text>
-        <text class="withdraw-note-text">退课后仍会保留参与记录并标记为“已退课”，本课程已扣卡次将恢复为 0。</text>
+        <text class="withdraw-note-text">{{withdrawalMode === 'withdraw' ? '退课后保留参与记录并标记为“已退课”，本场已扣卡次恢复为 0。' : '恢复后重新计入参与状态，并按本场原有规则恢复扣卡。'}}</text>
       </view>
     </view>
     <view class="withdraw-actions">
       <button class="withdraw-cancel" bindtap="onWithdrawalClose" disabled="{{withdrawing}}">取消</button>
-      <button class="withdraw-confirm" bindtap="onWithdrawalConfirm" loading="{{withdrawing}}" disabled="{{withdrawing}}">确认退课</button>
+      <button class="withdraw-confirm" bindtap="onWithdrawalConfirm" loading="{{withdrawing}}" disabled="{{withdrawing}}">{{withdrawalMode === 'withdraw' ? '确认退课' : '确认恢复'}}</button>
     </view>
   </view>
   </block>

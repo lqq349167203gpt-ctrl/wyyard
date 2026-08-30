@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from app.models.internal_course_session import InternalCourseSession, InternalCourseSessionCreate
 from app.services import customer_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.activity_withdrawal import ensure_withdrawn_customers_retained
 
 FILENAME = "internal_course_sessions.json"
 _sessions: Dict[str, InternalCourseSession] = {}
@@ -124,8 +125,16 @@ def update_session(
         visit_ids = {v.customer_id for v in visits}
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
+    ensure_withdrawn_customers_retained(
+        session,
+        data.get("participant_ids", session.participant_ids) or [],
+    )
+
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
+        if hasattr(session, key) and key not in (
+            "id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at",
+            "withdrawn_participant_ids", "withdrawal_records",
+        ):
             setattr(session, key, value)
     session.updated_at = datetime.now(timezone.utc)
     _sessions[session_id] = session

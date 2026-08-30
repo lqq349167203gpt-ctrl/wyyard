@@ -1,9 +1,9 @@
 import threading
-from datetime import datetime, timezone, date
-from typing import List, Dict, Any, Optional
+from datetime import date, datetime, timezone
+from typing import Any, Dict, List, Optional
 
+from app.services import customer_service, membership_card_service, reminder_service, visit_service
 from app.services.storage import load_data, save_data, save_item
-from app.services import reminder_service, customer_service, visit_service, membership_card_service
 
 STATUS_FILE = "business_reminder_statuses.json"
 _statuses: Dict[str, Dict[str, Any]] = {}
@@ -136,13 +136,13 @@ def _format_condition(condition) -> str:
 def _precompute_metrics(customer_ids: set) -> Dict[str, Dict[str, Any]]:
     """批量预计算所有客户的指标，避免重复遍历"""
     from app.services import (
-        visit_service,
-        membership_card_service,
         class_record_service,
-        group_case_session_service,
         emotional_release_session_service,
         energy_knot_session_service,
+        group_case_session_service,
         internal_course_session_service,
+        membership_card_service,
+        visit_service,
     )
 
     metrics: Dict[str, Dict[str, Any]] = {cid: {} for cid in customer_ids}
@@ -159,27 +159,31 @@ def _precompute_metrics(customer_ids: set) -> Dict[str, Dict[str, Any]]:
     activity_counts: Dict[str, Dict[str, int]] = {cid: {} for cid in customer_ids}
 
     for cr in class_record_service.list_records():
-        for cid in cr.participant_ids:
+        for cid in set(cr.participant_ids) - set(cr.withdrawn_participant_ids or []):
             if cid in customer_ids:
                 activity_counts[cid]["membership"] = activity_counts[cid].get("membership", 0) + 1
 
     for s in emotional_release_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
+        active_ids = set(s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids)
+        for cid in active_ids - set(s.withdrawn_participant_ids or []):
             if cid and cid in customer_ids:
                 activity_counts[cid]["emotional_release"] = activity_counts[cid].get("emotional_release", 0) + 1
 
     for s in group_case_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
+        active_ids = set(s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids)
+        for cid in active_ids - set(s.withdrawn_participant_ids or []):
             if cid and cid in customer_ids:
                 activity_counts[cid]["group_case"] = activity_counts[cid].get("group_case", 0) + 1
 
     for s in energy_knot_session_service.list_sessions():
-        for cid in (s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids):
+        active_ids = set(s.participant_ids + [s.owner_id, s.host_id] + s.teacher_ids)
+        for cid in active_ids - set(s.withdrawn_participant_ids or []):
             if cid and cid in customer_ids:
                 activity_counts[cid]["energy_knot"] = activity_counts[cid].get("energy_knot", 0) + 1
 
     for s in internal_course_session_service.list_sessions():
-        for cid in (s.participant_ids + s.teacher_ids):
+        active_ids = set(s.participant_ids + s.teacher_ids)
+        for cid in active_ids - set(s.withdrawn_participant_ids or []):
             if cid and cid in customer_ids:
                 activity_counts[cid]["internal_course"] = activity_counts[cid].get("internal_course", 0) + 1
 

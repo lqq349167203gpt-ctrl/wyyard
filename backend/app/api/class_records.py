@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.base import StrictBaseModel
 from app.services import (
     activity_assignment_notification_service,
+    activity_withdrawal_service,
     class_record_service,
     customer_access_service,
 )
@@ -402,6 +403,7 @@ def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: 
     record = class_record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="课程记录不存在")
+    ensure_record_creator(request, record, "课程", "activities")
     customer_access_service.require_new_customer_ids(
         request,
         [data.customer_id],
@@ -478,7 +480,7 @@ def list_withdrawals(
     start_date: str | None = None,
     end_date: str | None = None,
 ):
-    items = class_record_service.list_withdrawals()
+    items = activity_withdrawal_service.list_withdrawals()
     visible_ids = _visible_customer_ids(request)
     filtered = []
     for item in items:
@@ -509,13 +511,14 @@ def cancel_withdrawal(record_id: str, customer_id: str, request: Request):
     record = class_record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="课程记录不存在")
+    ensure_record_creator(request, record, "课程", "activities")
     customer = get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
     customer_access_service.require_new_customer_ids(
         request,
         [customer_id],
-        action="取消退课",
+        action="恢复退课",
     )
     before_data = record.model_dump(mode="json")
     operator_id = getattr(request.state, "user_id", "") or ""
@@ -536,7 +539,7 @@ def cancel_withdrawal(record_id: str, customer_id: str, request: Request):
     activity_name = updated.activity_name or updated.course_name or "未命名课程"
     customer_name = customer.nickname or customer.name or "未命名客户"
     request.state.operation_log_context = {
-        "content": f"取消退课：{customer_name} · {activity_name}（{updated.date}）",
+        "content": f"恢复退课：{customer_name} · {activity_name}（{updated.date}）",
         "entity_id": record_id,
         "before_data": before_data,
         "after_data": updated.model_dump(mode="json"),

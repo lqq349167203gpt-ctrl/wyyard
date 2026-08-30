@@ -46,6 +46,39 @@ function buildCalendar(year, month, selectedDate, calendarCounts) {
   return days
 }
 
+function parseLocalDate(date) {
+  const parts = String(date || '').split('-').map(Number)
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null
+  return new Date(parts[0], parts[1] - 1, parts[2])
+}
+
+function buildWeekPages(selectedDate, calendarCounts) {
+  const selected = parseLocalDate(selectedDate)
+  if (!selected) return []
+  const mondayOffset = (selected.getDay() + 6) % 7
+  const monday = new Date(selected)
+  monday.setDate(selected.getDate() - mondayOffset)
+  const selectedWeekdayIndex = mondayOffset
+
+  return [-1, 0, 1].map(weekOffset => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const dateValue = new Date(monday)
+      dateValue.setDate(monday.getDate() + weekOffset * 7 + index)
+      const date = formatDate(dateValue)
+      return {
+        date,
+        day: dateValue.getDate(),
+        weekday: WEEKDAYS[dateValue.getDay()],
+        count: (calendarCounts || {})[date] || 0,
+        // 前后周也预先标记同一星期，滑动过程中选中态不会突然消失。
+        isSelected: index === selectedWeekdayIndex,
+      }
+    })
+    // 槽位 key 保持固定，复位时只更新内容，避免 swiper 反复销毁页面后出现白屏。
+    return { key: `week-slot-${weekOffset + 1}`, days }
+  })
+}
+
 Page({
   data: {
     hasPagePermission: true,
@@ -56,6 +89,10 @@ Page({
     calYear: 0,
     calMonth: 0,
     calendarDays: [],
+    weekPages: [],
+    weekSwiperCurrent: 1,
+    weekSwiperDuration: 260,
+    dateSwitching: false,
     weekdays: WEEKDAYS,
     visits: [],
     visitCounts: {},
@@ -88,6 +125,7 @@ Page({
       currentWeekday: '周' + WEEKDAYS[d.getDay()],
       calYear: d.getFullYear(),
       calMonth: d.getMonth(),
+      weekPages: buildWeekPages(date, {}),
     })
     await this.loadSpaces()
     await this.loadData()
@@ -120,7 +158,7 @@ Page({
   },
 
   _formatDateShort(date) {
-    const d = new Date(date)
+    const d = parseLocalDate(date) || new Date()
     return `${d.getMonth() + 1}月${d.getDate()}日`
   },
 
@@ -166,8 +204,14 @@ Page({
 
   onCalendarDayTap(e) {
     const date = e.currentTarget.dataset.date
-    const d = new Date(date)
+    this._selectDate(date)
+  },
+
+  _selectDate(date, fromWeekSwipe = false) {
+    const d = parseLocalDate(date)
+    if (!d) return
     const counts = this._calendarCounts || {}
+    const useSoftTransition = fromWeekSwipe && !this.data.loading && this.data.visits.length > 0
     wx.setStorageSync('visit_selected_date', date)
     this.setData({
       currentDate: date,
@@ -177,9 +221,38 @@ Page({
       calMonth: d.getMonth(),
       calendarExpanded: false,
       calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts),
+      weekPages: buildWeekPages(date, counts),
+      weekSwiperCurrent: 1,
       editMode: false,
+      dateSwitching: useSoftTransition,
+    }, () => {
+      if (!fromWeekSwipe) return
+      wx.nextTick(() => {
+        this._weekSwiperRecentering = false
+        this.setData({ weekSwiperDuration: 260 })
+      })
     })
-    this.loadData()
+    this.loadData(undefined, { silent: useSoftTransition })
+  },
+
+  onWeekSwiperChange(e) {
+    const current = Number(e.detail.current)
+    if (this._weekSwiperRecentering || current === 1) {
+      if (this.data.weekSwiperCurrent !== current) {
+        this.setData({ weekSwiperCurrent: current })
+      }
+      return
+    }
+
+    const selected = parseLocalDate(this.data.currentDate)
+    if (!selected) return
+    selected.setDate(selected.getDate() + (current === 0 ? -7 : 7))
+
+    this._weekSwiperRecentering = true
+    // 先同步真实页码，再无动画回到中间槽位；否则 current 一直保留 1，连续滑动后不会真正复位。
+    this.setData({ weekSwiperCurrent: current, weekSwiperDuration: 0 }, () => {
+      this._selectDate(formatDate(selected), true)
+    })
   },
 
   // ---------- 空间 ----------
@@ -217,7 +290,10 @@ Page({
   // ---------- 数据 ----------
 
   async loadData(spaceId, options = {}) {
-    if (this._loading) return
+    if (this._loading) {
+      this._pendingLoad = { spaceId, options }
+      return
+    }
     this._loading = true
     const silent = Boolean(options.silent)
     if (!silent) this.setData({ loading: true })
@@ -227,11 +303,13 @@ Page({
       const [visits, counts] = await Promise.all([
         visitApi.listLight(reqDate, sid || undefined),
         visitApi.counts({
-          start_date: this._monthStart(),
-          end_date: this._monthEnd(),
+          start_date: this._countRangeStart(),
+          end_date: this._countRangeEnd(),
           space_id: sid || undefined,
         }),
       ])
+      const currentSpaceId = this.data.spaceId || ''
+      if (reqDate !== this.data.currentDate || String(sid || '') !== String(currentSpaceId)) return
       // 迁移 localStorage 排序到后端 sort_order
       await this._migrateLocalOrder(visits || [])
 
@@ -246,16 +324,21 @@ Page({
       this.setData({
         visits: visibleVisits,
         visitCounts: counts || {},
+        weekPages: buildWeekPages(reqDate, counts || {}),
         leaderMap,
         todayVisitCount: visibleVisits.length,
         todayArrivedCount: visibleVisits.filter(v => v.arrived && !v.cancelled).length,
         loading: false,
+        dateSwitching: false,
       })
     } catch (e) {
       console.error('加载数据失败:', e)
-      this.setData({ loading: false })
+      if (!this._pendingLoad) this.setData({ loading: false, dateSwitching: false })
     } finally {
       this._loading = false
+      const pendingLoad = this._pendingLoad
+      this._pendingLoad = null
+      if (pendingLoad) this.loadData(pendingLoad.spaceId, pendingLoad.options)
     }
   },
 
@@ -286,6 +369,18 @@ Page({
     const { calYear, calMonth } = this.data
     const lastDay = new Date(calYear, calMonth + 1, 0).getDate()
     return `${calYear}-${pad(calMonth + 1)}-${pad(lastDay)}`
+  },
+
+  _countRangeStart() {
+    const date = parseLocalDate(this._monthStart())
+    date.setDate(date.getDate() - 14)
+    return formatDate(date)
+  },
+
+  _countRangeEnd() {
+    const date = parseLocalDate(this._monthEnd())
+    date.setDate(date.getDate() + 14)
+    return formatDate(date)
   },
 
   // ---- 排序存储 ----
@@ -441,6 +536,7 @@ Page({
       const date = visit.visit_date || this.data.currentDate
       counts[date] = Math.max(0, (counts[date] || 0) + (cancelled ? -1 : 1))
       this._calendarCounts = counts
+      this.setData({ weekPages: buildWeekPages(this.data.currentDate, counts) })
     }).catch(() => {
       wx.showToast({ title: '操作失败', icon: 'none' })
     })

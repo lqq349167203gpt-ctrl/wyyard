@@ -295,9 +295,7 @@ def _activity_role_label(role: str) -> str:
 
 
 def _withdrawn_participant_ids(item: dict) -> set[str]:
-    """仅标准课表支持退课；退课人员保留历史，但不再属于当前参与名单。"""
-    if item.get("type") != "class":
-        return set()
+    """退课人员保留历史，但不再属于当前参与名单。"""
     return {
         customer_id
         for customer_id in (item["data"].get("withdrawn_participant_ids") or [])
@@ -495,7 +493,7 @@ def get_activity(activity_id: str, request: Request):
     role_ids = _activity_role_ids(item)
     for role in ("owner", "teacher"):
         for cid in sorted(role_ids[role]):
-            if cid and cid not in seen:
+            if cid and cid not in withdrawn_ids and cid not in seen:
                 seen.add(cid)
                 member_ids.append(cid)
     for cid in (item["data"].get("participant_ids") or []):

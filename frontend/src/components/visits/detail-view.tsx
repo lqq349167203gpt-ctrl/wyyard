@@ -133,6 +133,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     catch { return "" }
   }, [])
   const isViewOnly = currentRole !== "超级管理员" && editPermissions.visits === "view"
+  const canUseHistoryRestore = currentRole === "超级管理员" || editPermissions.visits === "all"
   const canCreateCustomer = currentRole === "超级管理员" || editPermissions.customers !== "view"
   const enterToNext = useEnterToNext()
   const today = formatDate(new Date())
@@ -198,19 +199,32 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     setHistoryEntries(history)
   }, [])
 
-  const undo = useCallback(() => { undoRef.current(); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]) }, [])
-  const redo = useCallback(() => { redoRef.current(); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]) }, [])
+  const undo = useCallback(() => {
+    if (!canUseHistoryRestore) return
+    undoRef.current()
+    setPreviewEntry(null)
+    setPreviewRows(undefined)
+    setPreviewChangedKeys([])
+  }, [canUseHistoryRestore])
+  const redo = useCallback(() => {
+    if (!canUseHistoryRestore) return
+    redoRef.current()
+    setPreviewEntry(null)
+    setPreviewRows(undefined)
+    setPreviewChangedKeys([])
+  }, [canUseHistoryRestore])
 
   // 快捷键
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!canUseHistoryRestore) return
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); if (canUndo) undo() }
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) { e.preventDefault(); if (canRedo) redo() }
       if ((e.ctrlKey || e.metaKey) && e.key === "y") { e.preventDefault(); if (canRedo) redo() }
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [canUndo, canRedo, undo, redo])
+  }, [canRedo, canUndo, canUseHistoryRestore, redo, undo])
 
   // 预览历史版本
   const handleSelectHistoryEntry = useCallback((entry: VisitHistoryEntry) => {
@@ -696,7 +710,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 >
                   <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
                 </button>
-                {!isViewOnly && <button
+                {canUseHistoryRestore && <button
                   onClick={undo}
                   disabled={!canUndo || !!previewEntry}
                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
@@ -704,7 +718,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 >
                   <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
                 </button>}
-                {!isViewOnly && <button
+                {canUseHistoryRestore && <button
                   onClick={redo}
                   disabled={!canRedo || !!previewEntry}
                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
@@ -769,7 +783,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           {previewEntry && (
             <div className="border-t border-[#f0f1f2] p-3 shrink-0 flex gap-2">
               <Button size="sm" variant="outline" className="flex-1 h-8 text-[12px]" onClick={() => { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>返回编辑</Button>
-              <Button size="sm" className="flex-1 h-8 text-[12px]" onClick={async () => { await restoreRef.current?.(previewEntry); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>恢复此版本</Button>
+              {canUseHistoryRestore && <Button size="sm" className="flex-1 h-8 text-[12px]" onClick={async () => { await restoreRef.current?.(previewEntry); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>恢复此版本</Button>}
             </div>
           )}
         </div>

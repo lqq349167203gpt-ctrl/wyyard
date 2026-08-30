@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from app.models.emotional_release_session import EmotionalReleaseSession, EmotionalReleaseSessionCreate
 from app.services import customer_service, emotional_release_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.activity_withdrawal import ensure_withdrawn_customers_retained
 
 FILENAME = "emotional_release_sessions.json"
 _sessions: Dict[str, EmotionalReleaseSession] = {}
@@ -54,6 +55,7 @@ def _get_chargeable_ids(session) -> set:
     """需要扣费的人员：参与者 + 老师（不含案主）—— 供 visit 到店扣费使用"""
     ids = set(session.participant_ids)
     ids.discard(session.owner_id)
+    ids -= set(session.withdrawn_participant_ids or [])
     return ids
 
 
@@ -158,8 +160,17 @@ def update_session(session_id: str, data: dict):
         visit_ids = {v.customer_id for v in visits}
         data["participant_ids"] = [pid for pid in data["participant_ids"] if pid in visit_ids]
 
+    ensure_withdrawn_customers_retained(
+        session,
+        data.get("participant_ids", session.participant_ids) or [],
+        owner_id=data.get("owner_id", session.owner_id) or "",
+    )
+
     for key, value in data.items():
-        if hasattr(session, key) and key not in ("id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at"):
+        if hasattr(session, key) and key not in (
+            "id", "created_at", "created_by_id", "created_by", "is_deleted", "deleted_at",
+            "withdrawn_participant_ids", "withdrawal_records",
+        ):
             setattr(session, key, value)
 
     # 案主不能同时是参与者
@@ -266,7 +277,13 @@ def get_debt_record(customer_id: str) -> dict:
     total = sum(release.purchase_count for release in releases if release.customer_id == customer_id)
     arrived_dates = {item["date"] for item in _get_session_deductions_for_customer(customer_id)}
     sessions = sorted(
-        [s for s in _sessions.values() if not s.is_deleted and s.owner_id == customer_id and s.date in arrived_dates],
+        [
+            s for s in _sessions.values()
+            if not s.is_deleted
+            and s.owner_id == customer_id
+            and customer_id not in set(s.withdrawn_participant_ids or [])
+            and s.date in arrived_dates
+        ],
         key=lambda s: s.date,
     )
     used = len(sessions)
@@ -309,6 +326,7 @@ def _get_session_deductions_for_customer(customer_id: str) -> list[dict]:
         for session in _sessions.values()
         if not session.is_deleted
         and session.owner_id == customer_id
+        and customer_id not in set(session.withdrawn_participant_ids or [])
         and visit_service.is_customer_arrived(session.date, customer_id)
     ]
 

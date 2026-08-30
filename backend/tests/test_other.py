@@ -1,5 +1,4 @@
 """权限 + 提醒 + 课程类型 API 测试"""
-import pytest
 import uuid
 
 
@@ -36,6 +35,30 @@ class TestPositions:
         pid = resp.json()["id"]
         resp = client.delete(f"/api/positions/{pid}")
         assert resp.status_code == 200
+
+    def test_reorder(self, client):
+        first = client.post("/api/positions", json={"name": f"排序角色A_{_u()}"}).json()
+        second = client.post("/api/positions", json={"name": f"排序角色B_{_u()}"}).json()
+        try:
+            positions = client.get("/api/positions").json()
+            ids = [position["id"] for position in positions]
+            first_index = ids.index(first["id"])
+            second_index = ids.index(second["id"])
+            assert second_index == first_index + 1
+            ids[first_index], ids[second_index] = ids[second_index], ids[first_index]
+
+            response = client.put("/api/positions/reorder", json={
+                "ids": ids,
+                "moved_id": second["id"],
+                "from_position": second_index + 1,
+                "to_position": first_index + 1,
+            })
+            assert response.status_code == 200
+            reordered_ids = [position["id"] for position in response.json()]
+            assert reordered_ids[first_index:first_index + 2] == [second["id"], first["id"]]
+        finally:
+            client.delete(f"/api/positions/{first['id']}")
+            client.delete(f"/api/positions/{second['id']}")
 
 
 # ===== 角色权限 (Position Permissions) =====

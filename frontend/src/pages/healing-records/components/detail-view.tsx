@@ -592,7 +592,7 @@ export default function DetailView({
           {/* 记录区 */}
           <div className="flex-1 min-h-0 bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-5 pb-2.5 flex flex-col overflow-hidden">
             {/* 标签页按钮：选中态青柠下划线 */}
-            <div className="flex gap-[2px] border-b border-[#eef0f1] shrink-0">
+            <div className="dv-scroll flex min-w-0 shrink-0 gap-[2px] overflow-x-auto border-b border-[#eef0f1]">
               {[
                 { key: "healing" as const, label: "跟进点", cnt: (detail?.visit_records || []).length },
                 { key: "communication" as const, label: "沟通记录", cnt: commRecords.length },
@@ -624,8 +624,8 @@ export default function DetailView({
                   }}
                   className={`relative px-3.5 pt-3 pb-2.5 text-[13px] whitespace-nowrap transition-colors ${
                     activeTab === tab.key
-                      ? "text-[#212631] font-bold"
-                      : "text-[#79838f] font-semibold hover:text-[#212631]"
+                      ? "text-[#212631] font-medium"
+                      : "text-[#79838f] font-normal hover:text-[#212631]"
                   }`}
                 >
                   {tab.label}
@@ -784,6 +784,27 @@ export default function DetailView({
           {/* 活动记录：V2 时间线卡片（按天分组，同日多场在同一日期节点下纵向堆叠） */}
           {activeTab === "activities" && (() => {
             const activities = detail?.activities || []
+            const summaryDefaults = [
+              { key: "class", label: "沙龙活动" },
+              { key: "gcs", label: "觉醒游戏" },
+              { key: "ers", label: "情绪释放" },
+              { key: "eks", label: "能量结" },
+              { key: "ics", label: "内部课程" },
+              { key: "withdrawn", label: "退课" },
+            ]
+            const activitySummary = summaryDefaults.map(item => {
+              const serverItem = detail.activity_summary?.find(summary => summary.key === item.key)
+              if (serverItem) return serverItem
+              const count = item.key === "withdrawn"
+                ? activities.filter(activity => activity.withdrawn).length
+                : activities.filter(activity => (
+                    activity.activity_type === item.key
+                    && activity.participated === true
+                    && !activity.withdrawn
+                  )).length
+              return { ...item, count }
+            })
+            const visibleActivitySummary = activitySummary.filter(item => item.count > 0)
             // 筛选
             const allTypes = [...new Set(activities.map(a => a.type).filter(Boolean))]
             const allRoles = [...new Set(activities.map(a => a.role).filter(Boolean))]
@@ -816,8 +837,22 @@ export default function DetailView({
                 {label}
               </button>
             )
-            return activities.length===0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
+            return (
               <div>
+                {visibleActivitySummary.length > 0 && (
+                  <div className="mb-[9px] flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[4px] border border-[#eef0f1] bg-[#fafbfc] px-3.5 py-2.5 text-[12px]">
+                    <span className="font-medium text-[#2b2f36]">参与统计</span>
+                    {visibleActivitySummary.map(item => (
+                      <span key={item.key} className={item.key === "withdrawn" ? "text-[#c4506a]" : "text-[#646a73]"}>
+                        {item.label} <span className="font-medium tabular-nums">{item.count}</span> 次
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {activities.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
+                ) : (
+                  <>
                 {/* 筛选栏 */}
                 {(allTypes.length > 1 || allRoles.length > 1) && (
                   <div className="flex items-center gap-3 px-4 pt-2 pb-1 flex-wrap">
@@ -901,6 +936,8 @@ export default function DetailView({
                   <div className="px-4 py-2 border-t border-[#f0f0f0]">
                     <PaginationBar currentPage={activitiesPage} totalPages={totalPages} totalItems={dayGroups.length} unit="天" startIndex={(activitiesPage-1)*pageSize+1} endIndex={Math.min(activitiesPage*pageSize, dayGroups.length)} onPageChange={setActivitiesPage} />
                   </div>
+                )}
+                  </>
                 )}
               </div>
             )

@@ -34,6 +34,38 @@ from app.services import (
 
 router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
 
+ACTIVITY_SUMMARY_TYPES = (
+    ("class", "沙龙活动"),
+    ("gcs", "觉醒游戏"),
+    ("ers", "情绪释放"),
+    ("eks", "能量结"),
+    ("ics", "内部课程"),
+)
+
+
+def _build_activity_summary(activities: list[dict]) -> list[dict]:
+    """按统一口径统计实际参与场次，并把当前退课记录单独列出。"""
+    summary = [
+        {
+            "key": key,
+            "label": label,
+            "count": sum(
+                1
+                for activity in activities
+                if activity.get("activity_type") == key
+                and activity.get("participated") is True
+                and not activity.get("withdrawn")
+            ),
+        }
+        for key, label in ACTIVITY_SUMMARY_TYPES
+    ]
+    summary.append({
+        "key": "withdrawn",
+        "label": "退课",
+        "count": sum(1 for activity in activities if activity.get("withdrawn")),
+    })
+    return summary
+
 
 @router.get("/{customer_id}")
 def get_customer_detail(customer_id: str, request: Request, date: str | None = None):
@@ -135,6 +167,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
         "customer": basic,
         "purchase_summary": purchase_summary,
         "activities": activities,
+        "activity_summary": _build_activity_summary(activities),
         "activity_followups": [
             record.model_dump(mode="json")
             for record in activity_followup_service.list_followups(customer_id)
@@ -672,8 +705,9 @@ def _build_activities(
             participant_ids=s.participant_ids,
         )
         if role:
-            attended = s.date in arrived_dates
-            chargeable = set(s.participant_ids) - {s.owner_id}
+            withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
+            attended = s.date in arrived_dates and not withdrawn
+            chargeable = group_case_session_service._get_chargeable_ids(s)
             membership_count = s.membership_deduction_count if attended and customer_id in chargeable else 0
             activities.append({
                 "type": "觉醒游戏",
@@ -684,11 +718,13 @@ def _build_activities(
                 "session_id": s.id,
                 "is_public_welfare": False,
                 "participated": attended,
+                "withdrawn": withdrawn,
                 "membership_deduction_count": membership_count,
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     membership_count=membership_count,
                     project_label="觉醒游戏扣卡1次" if role == "案主" else "",
+                    withdrawn=withdrawn,
                 ),
             })
 
@@ -707,8 +743,9 @@ def _build_activities(
             participant_ids=s.participant_ids,
         )
         if role:
-            attended = s.date in arrived_dates
-            chargeable = set(s.participant_ids) - {s.owner_id}
+            withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
+            attended = s.date in arrived_dates and not withdrawn
+            chargeable = emotional_release_session_service._get_chargeable_ids(s)
             membership_count = s.membership_deduction_count if attended and customer_id in chargeable else 0
             activities.append({
                 "type": "情绪释放",
@@ -719,11 +756,13 @@ def _build_activities(
                 "session_id": s.id,
                 "is_public_welfare": False,
                 "participated": attended,
+                "withdrawn": withdrawn,
                 "membership_deduction_count": membership_count,
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     membership_count=membership_count,
                     project_label="情绪释放扣卡1次" if role == "案主" else "",
+                    withdrawn=withdrawn,
                 ),
             })
 
@@ -741,7 +780,8 @@ def _build_activities(
             participant_ids=s.participant_ids,
         )
         if role:
-            attended = s.date in arrived_dates
+            withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
+            attended = s.date in arrived_dates and not withdrawn
             project_count = energy_knot_session_service.get_session_deduction_count(s, customer_id) if role == "案主" else 0
             activities.append({
                 "type": "能量结",
@@ -752,10 +792,12 @@ def _build_activities(
                 "session_id": s.id,
                 "is_public_welfare": False,
                 "participated": attended,
+                "withdrawn": withdrawn,
                 "membership_deduction_count": 0,
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     project_label=f"能量结部位{project_count}个" if role == "案主" else "",
+                    withdrawn=withdrawn,
                 ),
             })
 
@@ -770,7 +812,8 @@ def _build_activities(
             participant_ids=s.participant_ids,
         )
         if role:
-            attended = s.date in arrived_dates
+            withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
+            attended = s.date in arrived_dates and not withdrawn
             activities.append({
                 "type": "内部课程",
                 "date": s.date,
@@ -781,8 +824,9 @@ def _build_activities(
                 "session_id": s.id,
                 "is_public_welfare": False,
                 "participated": attended,
+                "withdrawn": withdrawn,
                 "membership_deduction_count": 0,
-                "deduction_summary": deduction_summary(attended=attended),
+                "deduction_summary": deduction_summary(attended=attended, withdrawn=withdrawn),
             })
 
     activity_type_codes = {

@@ -551,9 +551,7 @@ Page({
       wx.showToast({ title: '已创建' })
       const pages = getCurrentPages()
       const prevPage = pages[pages.length - 2]
-      if (prevPage && prevPage.loadData) {
-        prevPage.loadData()
-      }
+      if (prevPage) prevPage._needRefresh = true
       wx.navigateBack()
     } catch (e) {
       this.setData({ saving: false })

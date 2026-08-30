@@ -1,77 +1,106 @@
 <view class="page">
-  <!-- 底图 -->
-  <image class="bg-image" src="/images/3.jpg" mode="aspectFill" />
-  <view class="bg-mask"></view>
-
-  <!-- 蓝色头部 -->
-  <view class="header">
-    <view class="header-row">
+  <view class="page-content">
+    <!-- 品牌区 -->
+    <view class="brand-block">
       <view class="logo-icon">
         <text class="logo-w">W</text>
       </view>
-      <text class="logo-text">无忧茶院管理端</text>
+      <text class="brand-name">无忧茶院</text>
+      <text class="brand-badge">管理端</text>
     </view>
-  </view>
 
-  <!-- 登录卡 -->
-  <view class="login-card">
-    <!-- 账号密码登录 -->
-    <block wx:if="{{loginMode === 'password'}}">
-      <input
-        class="login-input"
-        placeholder="用户名"
-        placeholder-style="color: #b0b5bb;"
-        value="{{username}}"
-        bindinput="onUsernameInput"
-      />
-      <input
-        class="login-input"
-        placeholder="密码"
-        placeholder-style="color: #b0b5bb;"
-        password="true"
-        value="{{password}}"
-        bindinput="onPasswordInput"
-      />
-      <view class="save-item" bindtap="onToggleSaveAccount">
-        <view class="save-checkbox {{saveAccount ? 'checked' : ''}}"></view>
-        <text class="save-label">记住账号</text>
-      </view>
-      <button
-        class="phone-btn"
-        style="width: 550rpx;"
-        bindtap="onPasswordLogin"
-        loading="{{loading}}"
-        disabled="{{loading}}"
-      >
-        登录
-      </button>
-    </block>
+    <text class="welcome-title">欢迎回来</text>
+    <text class="welcome-subtitle">{{dateSubtitle}}</text>
 
-    <!-- 开发模式 -->
-    <block wx:if="{{loginMode === 'dev'}}">
-      <text class="dev-title">选择账号登录</text>
-      <picker mode="selector" range="{{devAccounts}}" range-key="label" value="{{devIndex}}" bindchange="onDevAccountChange">
-        <view class="dev-picker">
-          <text>{{devAccounts[devIndex].label}}</text>
-          <text class="picker-arrow">›</text>
+    <!-- 登录表单 -->
+    <view class="login-card">
+      <block wx:if="{{loginMode === 'password'}}">
+        <view class="login-field {{focusedField === 'username' ? 'is-focused' : ''}}">
+          <text class="field-label">用户名</text>
+          <input
+            class="field-input"
+            placeholder="请输入用户名"
+            placeholder-style="color: #b0b5bb;"
+            value="{{username}}"
+            data-field="username"
+            bindfocus="onFieldFocus"
+            bindblur="onFieldBlur"
+            bindinput="onUsernameInput"
+          />
         </view>
-      </picker>
-      <button class="dev-btn" bindtap="onDevLogin" loading="{{loading}}" disabled="{{loading}}">
-        登录
-      </button>
-    </block>
+        <view class="login-field {{focusedField === 'password' ? 'is-focused' : ''}}">
+          <text class="field-label">密码</text>
+          <input
+            class="field-input"
+            placeholder="请输入密码"
+            placeholder-style="color: #b0b5bb;"
+            password="true"
+            value="{{password}}"
+            data-field="password"
+            bindfocus="onFieldFocus"
+            bindblur="onFieldBlur"
+            bindinput="onPasswordInput"
+          />
+        </view>
 
-    <view class="error-msg" wx:if="{{error}}">
-      <text class="error-text">{{error}}</text>
+        <view class="save-options">
+          <view class="save-item {{saveAccount ? 'is-checked' : ''}}" bindtap="onToggleSaveAccount">
+            <view class="save-checkbox {{saveAccount ? 'checked' : ''}}">
+              <view class="save-checkmark" wx:if="{{saveAccount}}"></view>
+            </view>
+            <text class="save-label">记住账号</text>
+          </view>
+          <view class="save-item {{savePassword ? 'is-checked' : ''}}" bindtap="onToggleSavePassword">
+            <view class="save-checkbox {{savePassword ? 'checked' : ''}}">
+              <view class="save-checkmark" wx:if="{{savePassword}}"></view>
+            </view>
+            <text class="save-label">记住密码</text>
+          </view>
+        </view>
+
+        <view
+          class="login-button {{loading ? 'is-loading' : ''}}"
+          bindtap="onPasswordLogin"
+          hover-class="login-button-hover"
+          aria-role="button"
+          aria-disabled="{{loading}}"
+        >
+          <text class="login-button-text">{{loading ? '登录中' : '登 录'}}</text>
+        </view>
+      </block>
+
+      <!-- 开发模式 -->
+      <block wx:if="{{loginMode === 'dev'}}">
+        <text class="dev-title">选择账号登录</text>
+        <picker mode="selector" range="{{devAccounts}}" range-key="label" value="{{devIndex}}" bindchange="onDevAccountChange">
+          <view class="dev-picker">
+            <text>{{devAccounts[devIndex].label}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+        <view
+          class="login-button dev-button {{loading ? 'is-loading' : ''}}"
+          bindtap="onDevLogin"
+          hover-class="login-button-hover"
+          aria-role="button"
+          aria-disabled="{{loading}}"
+        >
+          <text class="login-button-text">{{loading ? '登录中' : '登 录'}}</text>
+        </view>
+      </block>
+
+      <view class="error-msg" wx:if="{{error}}">
+        <view class="error-dot"></view>
+        <text class="error-text">{{error}}</text>
+      </view>
+    </view>
+
+    <view class="dev-toggle" wx:if="{{isDev}}" bindtap="onToggleDev">
+      <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回登录' : '开发模式'}}</text>
     </view>
   </view>
 
-  <view class="dev-toggle" wx:if="{{isDev}}" bindtap="onToggleDev">
-    <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回登录' : '开发模式'}}</text>
-  </view>
-
-  <!-- 构建标记：核对当前包版本，排查提审包是否为最新代码 -->
-  <view class="version-tag">
-    <text class="version-tag-text">{{versionTag}}</text>
+  <view class="login-footer">
+    <text class="system-tagline">无忧茶院 · 内部管理系统</text>
   </view>
 </view>

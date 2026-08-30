@@ -5,49 +5,49 @@
 
 /* 头部 */
 .head {
-  background-color: #ffffff;
+  background-color: #f3f7ff;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 101;
-  padding: 24rpx 32rpx 20rpx;
-  border-bottom: 1rpx solid #ebedf0;
+  padding: 20rpx 32rpx 28rpx;
 }
 
 .head-row {
   display: flex;
   align-items: center;
+  min-height: 72rpx;
 }
 
 .head-date {
   display: flex;
-  align-items: baseline;
-  font-size: 30rpx;
-  font-weight: 600;
+  align-items: center;
+  font-size: 42rpx;
+  font-weight: 500;
   color: #1f2329;
 }
 
 .head-date .wk {
-  font-size: 26rpx;
+  margin-left: 14rpx;
+  color: #8f959e;
+  font-size: 24rpx;
   font-weight: 400;
-  color: #646a73;
-  margin-left: 10rpx;
 }
 
 .head-date .drop {
-  font-size: 22rpx;
+  margin-left: 12rpx;
   color: #8f959e;
-  margin-left: 8rpx;
+  font-size: 22rpx;
 }
 
 .head-space {
   margin-left: auto;
-  font-size: 24rpx;
+  padding: 14rpx 22rpx;
+  border-radius: 20rpx;
+  background-color: #ffffff;
   color: #646a73;
-  background-color: #f2f3f5;
-  padding: 8rpx 18rpx;
-  border-radius: 6rpx;
+  font-size: 24rpx;
 }
 
 .head-row2 {
@@ -76,11 +76,92 @@
   flex-shrink: 0;
 }
 
+/* 当前周日期条 */
+.week-swiper {
+  width: 100%;
+  height: 142rpx;
+  margin-top: 12rpx;
+  border-radius: 28rpx;
+  background-color: rgba(255, 255, 255, 0.78);
+  overflow: hidden;
+}
+
+.week-strip {
+  display: flex;
+  width: 100%;
+  height: 142rpx;
+  box-sizing: border-box;
+  padding: 20rpx 14rpx 14rpx;
+}
+
+.week-day {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.week-label {
+  color: #8f959e;
+  font-size: 20rpx;
+}
+
+.week-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  margin-top: 8rpx;
+  border-radius: 18rpx;
+  color: #646a73;
+  font-size: 24rpx;
+  font-weight: 500;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.week-day:active .week-number {
+  background-color: #f1f4f9;
+  transform: scale(0.94);
+}
+
+.week-count-dot {
+  width: 7rpx;
+  height: 7rpx;
+  margin-top: 8rpx;
+  border-radius: 50%;
+  background-color: #b9c8e7;
+  opacity: 0;
+}
+
+.week-count-dot.visible {
+  opacity: 1;
+}
+
+.week-day.selected .week-label {
+  color: #3370ff;
+}
+
+.week-day.selected .week-number {
+  background-color: #3370ff;
+  color: #ffffff;
+}
+
+.week-day.selected:active .week-number {
+  background-color: #2f68eb;
+}
+
+.week-day.selected .week-count-dot {
+  background-color: #3370ff;
+}
+
 /* 下拉日历 */
 .calendar-dropdown {
-  margin: 20rpx -32rpx -20rpx;
-  padding: 24rpx 32rpx;
-  border-top: 1rpx solid #f0f1f2;
+  margin: 16rpx -32rpx -28rpx;
+  padding: 26rpx 32rpx 30rpx;
+  border-top: 1rpx solid #edf1f7;
+  border-radius: 0 0 32rpx 32rpx;
   background-color: #ffffff;
 }
 
@@ -174,34 +255,107 @@
   margin-top: 4rpx;
 }
 
-/* 活动列表 */
+/* 活动列表：B 方案，按时段一组一卡 */
 .list {
-  padding: 152rpx 0 20rpx;
+  position: relative;
+  padding: 270rpx 0 20rpx;
+}
+
+.group-card {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.list.date-switching .group-card {
+  opacity: 0.42;
+  pointer-events: none;
+  transform: translateY(3rpx);
+}
+
+.schedule-switching-line {
+  position: absolute;
+  top: 270rpx;
+  left: 24rpx;
+  z-index: 2;
+  width: 34%;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background-color: #3370ff;
+  animation: schedule-switching-slide 900ms ease-in-out infinite;
+}
+
+@keyframes schedule-switching-slide {
+  0% {
+    opacity: 0.35;
+    transform: translateX(-100%);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+    transform: translateX(395%);
+  }
+}
+
+.group {
+  margin-bottom: 16rpx;
+}
+
+.group-heading {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 20rpx 40rpx 20rpx;
+}
+
+.group-heading-dot {
+  width: 12rpx;
+  height: 12rpx;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: #f4dc84;
 }
 
 .group-label {
+  color: #646a73;
+  font-size: 24rpx;
+  font-weight: 500;
+  letter-spacing: 1rpx;
+}
+
+.group-count {
+  color: #b0b5bb;
   font-size: 22rpx;
-  color: #8f959e;
-  padding: 0 32rpx 10rpx;
 }
 
-.group:first-child .group-label {
-  padding-top: 0;
+.group-heading .withdraw-entry {
+  margin-left: auto;
 }
 
-.card {
+.group-card {
+  overflow: hidden;
+  margin: 0 24rpx;
+  border-radius: 24rpx;
   background-color: #ffffff;
-  border-radius: 8rpx;
-  margin: 0 24rpx 16rpx;
-  padding: 22rpx 24rpx;
+}
+
+.group-card .card {
   display: flex;
   align-items: center;
-  min-height: 100rpx;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  min-height: 112rpx;
+  margin-bottom: 0;
+  padding: 16rpx 28rpx;
+  border-radius: 0;
+  background-color: #ffffff;
+  box-shadow: none;
 }
 
-.card.read-only {
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+.group-card .card + .card {
+  border-top: 1rpx solid #f1f2f4;
+}
+
+.group-card .card:last-child {
+  border-bottom: none;
 }
 
 .readonly-status {
@@ -258,18 +412,18 @@
   align-items: center;
 }
 
-.dot {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
+.welfare-tag {
   flex-shrink: 0;
+  margin-right: 8rpx;
+  color: #157a3c;
+  font-size: 22rpx;
+  font-weight: 400;
 }
 
 .name {
   font-size: 28rpx;
   font-weight: 600;
   color: #1f2329;
-  margin-left: 12rpx;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -317,7 +471,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 200rpx 0 0;
+  padding: 406rpx 0 0;
 }
 
 .empty-icon {
@@ -333,7 +487,7 @@
 .loading {
   display: flex;
   justify-content: center;
-  padding: 200rpx 0 0;
+  padding: 406rpx 0 0;
   color: #8f959e;
   font-size: 28rpx;
 }
@@ -373,15 +527,17 @@
 }
 
 .withdraw-entry {
-  height: 44rpx;
-  padding: 0 20rpx;
-  border: 1rpx solid #ebedf0;
-  border-radius: 6rpx;
   display: flex;
   align-items: center;
+  justify-content: center;
+  height: 48rpx;
+  padding: 0 20rpx;
+  border-radius: 8rpx;
+  background-color: #f2f3f5;
   flex-shrink: 0;
-  font-size: 23rpx;
-  color: #646a73;
+  color: #4e535a;
+  font-size: 22rpx;
+  font-weight: 500;
 }
 
 .withdraw-entry.disabled {
@@ -466,6 +622,31 @@
 
 .withdraw-body {
   padding: 2rpx 32rpx 30rpx;
+}
+
+.withdraw-mode {
+  display: flex;
+  gap: 4rpx;
+  margin-bottom: 26rpx;
+  padding: 4rpx;
+  border-radius: 10rpx;
+  background: #f2f3f5;
+}
+
+.withdraw-mode-item {
+  flex: 1;
+  height: 58rpx;
+  border-radius: 8rpx;
+  font-size: 23rpx;
+  line-height: 58rpx;
+  text-align: center;
+  color: #8f959e;
+}
+
+.withdraw-mode-item.active {
+  background: #ffffff;
+  color: #2b2f36;
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.06);
 }
 
 .withdraw-field {

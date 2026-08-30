@@ -18,6 +18,7 @@ class PositionBase(StrictBaseModel):
     name: str
     description: str = ""
     icon: str = "Users"
+    sort_order: int = 0
 
 
 class PositionCreate(PositionBase):
@@ -37,8 +38,22 @@ _positions: Dict[str, Position] = {}
 
 def _load():
     global _positions
-    data = load_data(FILENAME)
+    data = load_data(FILENAME) or {}
     _positions = {k: Position(**v) for k, v in data.items()}
+    active_positions = sorted(
+        [item for item in _positions.values() if not item.is_deleted],
+        key=lambda item: item.created_at,
+    )
+    next_sort_order = max((item.sort_order for item in active_positions), default=0)
+    changed = False
+    for item in active_positions:
+        if item.sort_order > 0:
+            continue
+        next_sort_order += 1
+        item.sort_order = next_sort_order
+        changed = True
+    if changed:
+        save_data(FILENAME, {key: value.model_dump(mode="json") for key, value in _positions.items()})
 
 
 def _save(item_id: str = ""):
@@ -54,7 +69,14 @@ _load()
 
 
 def list_positions() -> List[Position]:
-    return sorted([v for v in _positions.values() if not v.is_deleted], key=lambda x: x.created_at)
+    return sorted(
+        [v for v in _positions.values() if not v.is_deleted],
+        key=lambda item: (
+            item.sort_order <= 0,
+            item.sort_order if item.sort_order > 0 else 0,
+            item.created_at,
+        ),
+    )
 
 
 def get_position(position_id: str) -> Optional[Position]:
@@ -73,7 +95,18 @@ def create_position(data: PositionCreate) -> Position:
             if not other.is_deleted and other.name == data.name:
                 raise ValueError(f"身份名称「{data.name}」已存在")
         now = datetime.now(timezone.utc)
-        position = Position(id=str(uuid.uuid4())[:12], created_at=now, **data.model_dump())
+        next_sort_order = max(
+            (item.sort_order for item in _positions.values() if not item.is_deleted),
+            default=0,
+        ) + 1
+        position_data = data.model_dump()
+        position_data.pop("sort_order", None)
+        position = Position(
+            id=str(uuid.uuid4())[:12],
+            created_at=now,
+            sort_order=next_sort_order,
+            **position_data,
+        )
         _positions[position.id] = position
         _save(position.id)
         return position
@@ -139,3 +172,15 @@ def delete_position(position_id: str) -> bool:
     from app.services.position_edit_permission_service import remove_position_from_permissions
     remove_position_from_permissions(position.name)
     return True
+
+
+def reorder_positions(position_ids: List[str]) -> List[Position]:
+    """按完整角色 ID 列表保存显示顺序。"""
+    with _position_lock:
+        active_ids = [item.id for item in _positions.values() if not item.is_deleted]
+        if len(position_ids) != len(active_ids) or set(position_ids) != set(active_ids):
+            raise ValueError("角色列表已发生变化，请刷新后重试")
+        for index, position_id in enumerate(position_ids, start=1):
+            _positions[position_id].sort_order = index
+        _save()
+    return list_positions()

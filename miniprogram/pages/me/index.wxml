@@ -10,22 +10,6 @@
     </view>
   </view>
 
-  <!-- 信息列表 -->
-  <view class="info-card">
-    <view class="info-row">
-      <text class="info-label">账号</text>
-      <text class="info-value">{{user.username}}</text>
-    </view>
-    <view class="info-row">
-      <text class="info-label">归属人</text>
-      <text class="info-value">{{user.owner}}</text>
-    </view>
-    <view class="info-row">
-      <text class="info-label">角色</text>
-      <text class="info-value">{{role}}</text>
-    </view>
-  </view>
-
   <!-- 功能入口 -->
   <view class="menu-card">
     <view class="menu-item" bindtap="onPaymentTap" wx:if="{{canPayment}}">
