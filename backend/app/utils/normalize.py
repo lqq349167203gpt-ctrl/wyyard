@@ -14,7 +14,7 @@ GENDER_MAP = {
 
 TRAFFIC_SOURCES = ["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐"]
 
-WORK_STATUSES = ["在职", "离职", "自由职业"]
+WORK_STATUSES = ["在职", "离职", "自由职业", "全职带孩子"]
 
 
 def normalize_gender(value: str) -> tuple[str | None, str | None]:

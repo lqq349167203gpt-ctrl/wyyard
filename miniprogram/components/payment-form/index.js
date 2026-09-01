@@ -1,8 +1,8 @@
 const { paymentApi, customerApi, organizationApi } = require('../../utils/api')
 
 const CARD_TYPES = [
-  { key: '次卡', label: '次卡', price: 198, count: 1, duration_type: 'month', duration_value: 12 },
-  { key: '体验会员', label: '体验会员', price: 398, count: 4, duration_type: 'month', duration_value: 12 },
+  { key: '次卡', label: '次卡', price: 198, count: 1, duration_type: 'month', duration_value: 1 },
+  { key: '体验会员', label: '体验会员', price: 398, count: 4, duration_type: 'month', duration_value: 1 },
   { key: '月卡', label: '月卡', price: 1999, count: null, duration_type: 'month', duration_value: 1 },
   { key: '12次卡', label: '12次卡', price: 1800, count: 12, duration_type: 'month', duration_value: 12 },
   { key: '3月卡', label: '3月卡', price: 3999, count: null, duration_type: 'month', duration_value: 3 },
@@ -46,6 +46,77 @@ function today() {
   return `${y}-${m < 10 ? '0' + m : m}-${dd < 10 ? '0' + dd : dd}`
 }
 
+function formatMoney(value) {
+  const amount = Number(value) || 0
+  const text = Number.isInteger(amount) ? String(amount) : amount.toFixed(2).replace(/\.?0+$/, '')
+  return text.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+function addMonthsClamped(date, months) {
+  const sourceDay = date.getDate()
+  const targetMonth = date.getMonth() + months
+  const targetYear = date.getFullYear() + Math.floor(targetMonth / 12)
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12
+  const lastDay = new Date(targetYear, normalizedMonth + 1, 0).getDate()
+  return new Date(targetYear, normalizedMonth, Math.min(sourceDay, lastDay))
+}
+
+function formatLocalDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function calculateExpiryDate(effectiveDate, durationType, durationValue) {
+  const value = parseInt(durationValue)
+  if (!effectiveDate || !durationType || !Number.isFinite(value) || value <= 0) return ''
+  const parts = String(effectiveDate).slice(0, 10).split('-').map(Number)
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return ''
+  let expiry = new Date(parts[0], parts[1] - 1, parts[2])
+  if (durationType === 'month') {
+    expiry = addMonthsClamped(expiry, value)
+    expiry.setDate(expiry.getDate() - 1)
+  } else if (durationType === 'day') {
+    expiry.setDate(expiry.getDate() + value - 1)
+  } else {
+    return ''
+  }
+  return formatLocalDate(expiry)
+}
+
+function getValidityDetails(type, formData) {
+  let durationType = formData.duration_type || ''
+  let durationValue = formData.duration_value
+
+  if (type === 'membership_card' && (!durationType || !durationValue)) {
+    const card = CARD_TYPES.find(item => item.key === formData.card_type)
+    if (card) {
+      durationType = card.duration_type
+      durationValue = card.duration_value
+    }
+  } else if (type === 'internal_course') {
+    const course = COURSE_TYPES.find(item => item.key === formData.course_type)
+    if (course) {
+      durationType = course.duration_type
+      durationValue = course.duration_value
+    }
+  } else if (type === 'offline_course') {
+    durationType = formData.validity_unit || 'month'
+    durationValue = formData.validity_value || 1
+  }
+
+  const numericValue = parseInt(durationValue)
+  if (!durationType || !Number.isFinite(numericValue) || numericValue <= 0) {
+    return { label: '-', expiryDate: '-' }
+  }
+  const unit = durationType === 'month' ? '个月' : '天'
+  return {
+    label: `${numericValue}${unit}`,
+    expiryDate: calculateExpiryDate(formData.effective_date, durationType, numericValue) || '-',
+  }
+}
+
 Component({
   properties: {
     type: { type: String, value: '' },
@@ -78,6 +149,8 @@ Component({
     diagnosisTeachers: [],
     diagnosisTeacherIndex: -1,
     submitting: false,
+    confirmVisible: false,
+    confirmRows: [],
     allCustomers: [],
     organizations: [],
     orgIndex: 0,
@@ -90,46 +163,101 @@ Component({
       }
     },
     'type': function(type) {
-      if (!type || this.data.isEdit) return
-      const isSession = type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'
-      if (!isSession) return
-      if (this.data.durationTypeIndex >= 0) return // 已初始化过
-      const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === 'day')
-      if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx, 'formData.duration_type': 'day' })
+      this._applyTypeDefaults(type)
     },
   },
 
   lifetimes: {
     attached() {
-      if (!this.data.isEdit) {
-        const type = this.data.type
-        const initData = { deal_date: today() }
-        if (type === 'oh_card_reading') {
-          initData.amount = '298'
-          initData.diagnosis_duration = 1
-        } else if (type === 'tea_seat_fee') {
-          initData.quantity = '1'
-          initData.amount = '68'
-        } else if (type === 'offline_course') {
-          initData.effective_date = today()
-          initData.validity_value = '1'
-        } else {
-          initData.effective_date = today()
-        }
-        // session 类型默认有效期单位设为天
-        if (type === 'group_case' || type === 'emotional_release' || type === 'energy_knot') {
-          initData.duration_type = 'day'
-          const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === 'day')
-          if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx })
-        }
-        this.setData({ formData: initData })
-      }
+      this._applyTypeDefaults(this.data.type)
       this._loadCustomers()
       this._loadOrganizations()
     },
   },
 
   methods: {
+    _applyTypeDefaults(type) {
+      if (!type || this.data.isEdit || this._defaultTypeInitialized === type) return
+      this._defaultTypeInitialized = type
+      const initData = Object.assign({}, this.data.formData || {})
+      if (!initData.deal_date) initData.deal_date = today()
+      if (type === 'oh_card_reading') {
+        if (initData.amount === undefined || initData.amount === '') initData.amount = '298'
+        if (!initData.diagnosis_duration) initData.diagnosis_duration = 1
+      } else if (type === 'tea_seat_fee') {
+        if (!initData.quantity) initData.quantity = '1'
+        if (initData.amount === undefined || initData.amount === '') initData.amount = '68'
+      } else if (type === 'offline_course') {
+        if (!initData.effective_date) initData.effective_date = today()
+        if (!initData.validity_value) initData.validity_value = '1'
+      } else if (!initData.effective_date) {
+        initData.effective_date = today()
+      }
+      const updates = { formData: initData }
+      if (type === 'group_case' || type === 'emotional_release' || type === 'energy_knot') {
+        if (!initData.duration_type) initData.duration_type = 'day'
+        const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === initData.duration_type)
+        if (dtIdx >= 0) updates.durationTypeIndex = dtIdx
+      }
+      this.setData(updates)
+    },
+
+    _getFeeAmount() {
+      const { type, formData } = this.data
+      const field = type === 'other'
+        ? 'fee'
+        : (type === 'membership_card' || type === 'internal_course' ? 'price' : 'amount')
+      return parseFloat(formData[field]) || 0
+    },
+
+    _buildConfirmRows() {
+      const { type, formData, selectedCustomer, closers, organizations, orgIndex } = this.data
+      const rows = [
+        { label: '成交日期', value: formData.deal_date || '-' },
+        { label: '用户', value: selectedCustomer ? selectedCustomer.nickname : '-' },
+      ]
+      let amountRow = { label: '付费金额', value: '¥' + formatMoney(this._getFeeAmount()) }
+      if (type === 'membership_card') {
+        rows.push({ label: '生效日期', value: formData.effective_date || '-' })
+        rows.push({ label: '会员卡', value: formData.card_type || '-' })
+        amountRow = { label: '费用金额', value: '¥' + formatMoney(formData.price) }
+      } else if (type === 'internal_course') {
+        rows.push({ label: '生效日期', value: formData.effective_date || '-' })
+        rows.push({ label: '课程类型', value: formData.course_type || '-' })
+        amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.price) }
+      } else if (type === 'other') {
+        rows.push({ label: '项目名称', value: formData.project_name || '-' })
+        rows.push({ label: '生效日期', value: formData.effective_date || '-' })
+        amountRow = { label: '费用', value: '¥' + formatMoney(formData.fee) }
+      } else if (type === 'oh_card_reading') {
+        const teacher = this.data.diagnosisTeachers[this.data.diagnosisTeacherIndex]
+        rows.push({ label: '诊断老师', value: teacher ? teacher.nickname : '-' })
+        rows.push({ label: '诊断时长', value: ((Number(formData.diagnosis_duration) || 1) * 0.5) + '小时' })
+        amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
+      } else if (type === 'tea_seat_fee') {
+        rows.push({ label: '数量', value: (formData.quantity || '1') + ' 位' })
+        amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
+      } else if (type === 'offline_course') {
+        rows.push({ label: '生效日期', value: formData.effective_date || '-' })
+        amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
+      } else {
+        rows.push({ label: type === 'energy_knot' ? '购买部位' : '购买场次', value: (formData.purchase_count || '0') + (type === 'energy_knot' ? ' 个' : ' 次') })
+        rows.push({ label: '生效日期', value: formData.effective_date || '-' })
+        amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
+      }
+      const validity = getValidityDetails(type, formData)
+      rows.push({ label: '有效期', value: validity.label })
+      rows.push({ label: '结束日期', value: validity.expiryDate })
+      rows.push(amountRow)
+      const organization = organizations[orgIndex]
+      rows.push({ label: '所属组织', value: organization ? organization.name : '-' })
+      rows.push({ label: '成交人', value: closers.map(c => `${c.nickname} ¥${formatMoney(c.amount)}`).join('、') || '-' })
+      rows.push({ label: '成交人合计', value: '¥' + formatMoney(closers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0)) })
+      rows.push({ label: '支付方式', value: formData.payment_method || '-' })
+      rows.push({ label: '备注', value: formData.notes || '-' })
+      return rows
+    },
+
     _loadCustomers() {
       customerApi.light(200).then(res => {
         const customers = res || []
@@ -299,7 +427,8 @@ Component({
           wx.showToast({ title: '已选择该成交人', icon: 'none' })
           return
         }
-        const newClosers = closers.concat([{ id, nickname, amount: 0 }])
+        const defaultAmount = closers.length === 0 ? this._getFeeAmount() : 0
+        const newClosers = closers.concat([{ id, nickname, amount: defaultAmount }])
         const closerIdMap = {}
         newClosers.forEach(c => { closerIdMap[c.id] = true })
         this.setData({
@@ -445,33 +574,19 @@ Component({
       // session 类型: 从 effective_date + duration 计算 expiry_date
       const isSession = type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'
       if (isSession && payload.effective_date && payload.duration_value) {
-        const eff = new Date(payload.effective_date)
-        const val = parseInt(payload.duration_value)
-        if (!isNaN(val) && val > 0) {
-          if (payload.duration_type === 'month') {
-            eff.setMonth(eff.getMonth() + val)
-            eff.setDate(eff.getDate() - 1)
-          } else {
-            eff.setDate(eff.getDate() + val)
-          }
-          const y = eff.getFullYear()
-          const m = String(eff.getMonth() + 1).padStart(2, '0')
-          const dd = String(eff.getDate()).padStart(2, '0')
-          payload.expiry_date = `${y}-${m}-${dd}`
-        }
+        payload.expiry_date = calculateExpiryDate(
+          payload.effective_date,
+          payload.duration_type,
+          payload.duration_value,
+        ) || undefined
       }
       // 线下课程: 从 effective_date + validity_value 计算 expiry_date（固定月）
       if (type === 'offline_course' && payload.effective_date && payload.validity_value) {
-        const eff = new Date(payload.effective_date)
-        const val = parseInt(payload.validity_value)
-        if (!isNaN(val) && val > 0) {
-          eff.setMonth(eff.getMonth() + val)
-          eff.setDate(eff.getDate() - 1)
-          const y = eff.getFullYear()
-          const m = String(eff.getMonth() + 1).padStart(2, '0')
-          const dd = String(eff.getDate()).padStart(2, '0')
-          payload.expiry_date = `${y}-${m}-${dd}`
-        }
+        payload.expiry_date = calculateExpiryDate(
+          payload.effective_date,
+          payload.validity_unit || 'month',
+          payload.validity_value,
+        ) || undefined
       }
       if (isEdit) {
         if (type === 'membership_card' || type === 'other') {
@@ -531,21 +646,30 @@ Component({
         if (!formData.effective_date) { wx.showToast({ title: '请选择生效日期', icon: 'none' }); return }
         if (!formData.duration_value || !formData.duration_type) { wx.showToast({ title: '请填写有效期', icon: 'none' }); return }
       }
-      const { closerTotal } = this.data
-      const feeField = type === 'other' ? 'fee' : (type === 'group_case' || type === 'emotional_release' || type === 'oh_card_reading' || type === 'energy_knot' || type === 'tea_seat_fee' || type === 'offline_course') ? 'amount' : 'price'
-      const fee = parseFloat(formData[feeField]) || 0
-      if (closers.length > 0 && fee > 0 && closerTotal !== fee) {
-        wx.showModal({
-          title: '金额不一致',
-          content: `费用金额 ${fee} 元，成交人总额 ${closerTotal} 元，是否继续提交？`,
-          success: (res) => {
-            if (res.confirm) this._doSubmit()
-          },
-        })
+      const fee = this._getFeeAmount()
+      const closerTotal = closers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0)
+      if (Math.abs(closerTotal - fee) > 0.01) {
+        wx.showToast({ title: '成交人总金额必须与费用金额一致', icon: 'none' })
         return
       }
+      this.setData({ confirmVisible: true, confirmRows: this._buildConfirmRows() })
+      this.triggerEvent('pickerstate', { open: true })
+    },
+
+    onConfirmClose() {
+      if (this.data.submitting) return
+      this.setData({ confirmVisible: false })
+      this.triggerEvent('pickerstate', { open: false })
+    },
+
+    onConfirmSubmit() {
+      if (this._submitting) return
+      this.setData({ confirmVisible: false })
+      this.triggerEvent('pickerstate', { open: false })
       this._doSubmit()
     },
+
+    stopPropagation() {},
 
     _doSubmit() {
       if (this._submitting) return

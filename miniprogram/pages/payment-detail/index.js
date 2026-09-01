@@ -37,6 +37,7 @@ Page({
     item: null,
     loading: true,
     organizations: [],
+    canEdit: false,
   },
 
   onLoad(options) {
@@ -109,7 +110,17 @@ Page({
         const org = orgs.find(o => o.id === item.organization_id)
         item._orgName = org ? org.name : ''
       }
-      this.setData({ item, loading: false })
+      const app = getApp()
+      const user = app.globalData.currentUser || wx.getStorageSync('currentUser') || {}
+      const permissions = app.globalData.editPermissions || wx.getStorageSync('userEditPermissions') || {}
+      const actorName = user.owner || user.username || ''
+      const actorId = user.id || ''
+      const canEdit = user.role === '超级管理员'
+        || permissions.payments === 'all'
+        || (item.created_by_id
+          ? Boolean(actorId && item.created_by_id === actorId)
+          : Boolean(item.created_by && actorName && item.created_by === actorName))
+      this.setData({ item, canEdit, loading: false })
     } catch (e) {
       console.error('加载详情失败:', e)
       wx.showToast({ title: '加载失败', icon: 'none' })
@@ -119,6 +130,10 @@ Page({
 
   onEditTap() {
     const { item, type } = this.data
+    if (!this.data.canEdit) {
+      wx.showToast({ title: '只能修改自己创建的付费记录', icon: 'none' })
+      return
+    }
     wx.navigateTo({ url: `/pages/payment-edit/index?type=${type}&id=${item.id}` })
   },
 

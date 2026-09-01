@@ -387,7 +387,7 @@ async def modify_customer_data(current_data: dict, instruction: str) -> dict:
 - gender 只能是 "男" / "女" / "其他"
 - phone 只保留数字
 - traffic_source 只能是：小红书/抖音/公众号/视频号/朋友圈/美团/大众点评/好友推荐
-- work_status 只能是：在职/离职/自由职业
+- work_status 只能是：在职/离职/自由职业/全职带孩子
 - 只返回 JSON，不要其他内容"""
 
     user_message = (

@@ -23,6 +23,7 @@
     "pages/me/index",
     "pages/daily-report/index",
     "pages/communication-records/index",
+    "pages/communication-records/search",
     "pages/communication-records/form",
     "pages/voice-chat/index",
     "pages/text-editor/index"

@@ -100,6 +100,7 @@ interface ActivityRow {
   space_id: string
   room_id: string
   description: string
+  course_review: string
   billing_description: string
   pendingCreate: boolean
   raw: any
@@ -122,6 +123,7 @@ const ACTIVITY_CREATOR_ONLY_FIELDS = new Set<keyof ActivityRow>([
   "membership_deduction_count",
   "deduction_count",
   "description",
+  "course_review",
   "billing_description",
 ])
 
@@ -199,6 +201,7 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
     deduction_count: type === "eks" ? parseEksDescription(data.description || "").count : (data.is_public_welfare ? 0 : 1),
     space_id: sid, room_id: rid,
     description: desc,
+    course_review: data.course_review || "",
     billing_description: type === "eks" ? (data.description || "") : "",
     pendingCreate: false,
     raw: data,
@@ -226,6 +229,7 @@ function createFreshRow(type: ActivityType, defaultSpaceId: string, spaces: Spac
     deduction_count: 1,
     space_id: sid, room_id: rid,
     description: "",
+    course_review: "",
     billing_description: "",
     pendingCreate: true,
     raw: {},
@@ -316,6 +320,8 @@ export function ActivityBatchTable({
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
   const [editingDescriptionKey, setEditingDescriptionKey] = useState<number | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState("")
+  const [editingReviewKey, setEditingReviewKey] = useState<number | null>(null)
+  const [reviewDraft, setReviewDraft] = useState("")
   useEffect(() => () => {
     dragPreviewRef.current?.remove()
     dragPreviewRef.current = null
@@ -341,14 +347,23 @@ export function ActivityBatchTable({
   const canEditRow = useCallback((row: ActivityRow) => (
     !isViewOnly && (canEditAllActivities || isOwnRow(row))
   ), [canEditAllActivities, isOwnRow, isViewOnly])
+  const canEditParticipants = useCallback((row: ActivityRow) => {
+    if (currentUser.role === "超级管理员") return true
+    if (editPermissions.activity_participants === "view") return false
+    return editPermissions.activity_participants === "all" || isOwnRow(row)
+  }, [currentUser.role, editPermissions.activity_participants, isOwnRow])
   const canEditField = useCallback((row: ActivityRow, field: keyof ActivityRow) => (
-    !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field))
-  ), [canEditRow, isViewOnly])
+    field === "participant_ids"
+      ? canEditParticipants(row)
+      : !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field))
+  ), [canEditParticipants, canEditRow, isViewOnly])
   const canEditChanges = useCallback((row: ActivityRow, changes: Partial<ActivityRow>) => (
-    !isViewOnly && (canEditRow(row) || Object.keys(changes).every(field => (
-      !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow)
-    )))
-  ), [canEditRow, isViewOnly])
+    Object.keys(changes).every(field => (
+      field === "participant_ids"
+        ? canEditParticipants(row)
+        : !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow))
+    ))
+  ), [canEditParticipants, canEditRow, isViewOnly])
   const invitedOwnerCustomers = useMemo(() => {
     // 邀约名单加载完成前保持为空，避免短暂暴露全部客户作为案主候选。
     if (!invitedCustomerIds) return []
@@ -674,6 +689,7 @@ export function ActivityBatchTable({
         room_name: room?.name || undefined,
         ...(canEditRow(row) ? {
           activity_mode: row.activity_mode,
+          course_review: row.course_review,
           membership_deduction_count: type === "eks" || type === "ics" || row.is_public_welfare
             ? 0
             : row.membership_deduction_count,
@@ -751,70 +767,62 @@ export function ActivityBatchTable({
       } else {
         // 更新已有记录
         const id = row.record_id
+        const participantOnly = !canEditRow(row)
+        const participantUpdate = { participant_ids: row.participant_ids }
         if (type === "class") {
           const course = courses.find(c => c.id === row.course_id)
-          await classRecordApi.update(id, {
+          await classRecordApi.update(id, participantOnly ? participantUpdate : {
             ...common,
-            ...(canEditRow(row) ? {
-              course_id: row.course_id,
-              course_name: course?.name || row.name,
-              course_type: row.class_course_type || "",
-              course_description: row.description,
-              teacher_ids: row.host_ids,
-            } : {}),
+            course_id: row.course_id,
+            course_name: course?.name || row.name,
+            course_type: row.class_course_type || "",
+            course_description: row.description,
+            teacher_ids: row.host_ids,
             is_public_welfare: row.is_public_welfare,
             participant_ids: row.participant_ids,
           }, conversion)
         } else if (type === "gcs") {
-          await groupCaseSessionApi.update(id, {
+          await groupCaseSessionApi.update(id, participantOnly ? participantUpdate : {
             ...common,
-            ...(canEditRow(row) ? {
-              name: row.name,
-              owner_id: row.owner_id || "",
-              owner_name: row.owner_name || "",
-              teacher_ids: row.host_ids,
-              description: row.description,
-            } : {}),
+            name: row.name,
+            owner_id: row.owner_id || "",
+            owner_name: row.owner_name || "",
+            teacher_ids: row.host_ids,
+            description: row.description,
             participant_ids: row.participant_ids,
           })
         } else if (type === "ers") {
-          await emotionalReleaseSessionApi.update(id, {
+          await emotionalReleaseSessionApi.update(id, participantOnly ? participantUpdate : {
             ...common,
-            ...(canEditRow(row) ? {
-              name: row.name,
-              owner_id: row.owner_id || "",
-              owner_name: row.owner_name || "",
-              teacher_ids: row.host_ids,
-              description: row.description,
-            } : {}),
+            name: row.name,
+            owner_id: row.owner_id || "",
+            owner_name: row.owner_name || "",
+            teacher_ids: row.host_ids,
+            description: row.description,
             participant_ids: row.participant_ids,
           })
         } else if (type === "eks") {
-          await energyKnotSessionApi.update(id, {
+          await energyKnotSessionApi.update(id, participantOnly ? participantUpdate : {
             ...common,
-            ...(canEditRow(row) ? {
-              owner_id: row.owner_id || "",
-              owner_name: row.owner_name || "",
-              name: row.name || "",
-              teacher_ids: row.host_ids,
-              description: serializeEksDescription(
-                row.owner_id,
-                row.owner_name,
-                Math.max(1, Number(row.deduction_count) || 1),
-              ),
-              course_description: row.description,
-            } : {}),
+            owner_id: row.owner_id || "",
+            owner_name: row.owner_name || "",
+            name: row.name || "",
+            teacher_ids: row.host_ids,
+            description: serializeEksDescription(
+              row.owner_id,
+              row.owner_name,
+              Math.max(1, Number(row.deduction_count) || 1),
+            ),
+            course_description: row.description,
             participant_ids: row.participant_ids,
           })
         } else if (type === "ics") {
-          await internalCourseSessionApi.update(id, {
+          await internalCourseSessionApi.update(id, participantOnly ? participantUpdate : {
             ...common,
-            ...(canEditRow(row) ? {
-              course_type: row.ics_course_key?.replace("ics:", "") || "",
-              course_name: row.name,
-              course_description: row.description,
-              teacher_ids: row.host_ids,
-            } : {}),
+            course_type: row.ics_course_key?.replace("ics:", "") || "",
+            course_name: row.name,
+            course_description: row.description,
+            teacher_ids: row.host_ids,
             participant_ids: row.participant_ids,
           }, conversion)
         }
@@ -889,7 +897,7 @@ export function ActivityBatchTable({
 
   const FIELD_LABELS: Record<string, string> = {
     name: "名称", start_time: "时间", end_time: "时间",
-    activity_mode: "活动方式", description: "简介", is_published: "发布",
+    activity_mode: "活动方式", description: "简介", course_review: "课程复盘", is_published: "发布",
     is_public_welfare: "公益", participant_ids: "参与人",
     membership_deduction_count: "扣卡次数",
     host_ids: "老师", host_names: "老师",
@@ -1278,7 +1286,7 @@ export function ActivityBatchTable({
     }
     // 先捕获 pre-change 快照（与 updateRow/handleTypeChange 一致）
     const preRows = rowsRef.current.map(r => ({ ...r }))
-    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "membership_deduction_count", "description", "host_names", "owner_name", "participant_ids", "is_public_welfare", "is_published", "space_id"]
+    const allFields = ["name", "record_type", "start_time", "end_time", "activity_mode", "membership_deduction_count", "description", "course_review", "host_names", "owner_name", "participant_ids", "is_public_welfare", "is_published", "space_id"]
     pushHistory("新增了活动", [fresh.key], `新增了「${newName}」`, preRows, [{ rowKey: fresh.key, fields: allFields }])
     pendingScrollToBottomRef.current = true
     setRows(prev => [...prev, fresh])
@@ -1296,14 +1304,14 @@ export function ActivityBatchTable({
 
   const hasEks = rows.some(r => r.record_type === "eks")
   const hasOwnerType = rows.some(r => r.record_type !== "class" && r.record_type !== "ics")
-  const tableMinWidth = hasOwnerType ? 1471 : 1315
-  const fixedColumnWidth = 925 + (hasOwnerType ? 86 : 0) + (hasEks ? 40 : 0)
+  const tableMinWidth = hasOwnerType ? 1651 : 1495
+  const fixedColumnWidth = 1105 + (hasOwnerType ? 86 : 0) + (hasEks ? 40 : 0)
   const participantColumnWidth = (tableMinWidth - fixedColumnWidth) / 2
   const columnWidths = [
     24, 46, 122, 80, 126,
     ...(hasOwnerType ? [86] : []),
     ...(hasEks ? [40] : []),
-    57, 62, 80, 160, participantColumnWidth, participantColumnWidth, 76, 40, 52,
+    57, 62, 80, 160, 180, participantColumnWidth, participantColumnWidth, 76, 40, 52,
   ]
 
   const handleTableScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -1353,6 +1361,20 @@ export function ActivityBatchTable({
       updateRow(editingDescriptionKey, "description", descriptionDraft)
     }
     closeDescriptionDialog()
+  }
+
+  const closeReviewDialog = () => {
+    setEditingReviewKey(null)
+    setReviewDraft("")
+  }
+
+  const saveReview = () => {
+    if (editingReviewKey === null) return
+    const editingRow = rows.find(row => row.key === editingReviewKey)
+    if (editingRow && editingRow.course_review !== reviewDraft) {
+      updateRow(editingReviewKey, "course_review", reviewDraft)
+    }
+    closeReviewDialog()
   }
 
   return (
@@ -1435,6 +1457,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-center font-normal">扣卡次数</th>
               <th className="px-1 py-2 text-left font-normal">老师</th>
               <th className="px-1 py-2 text-left font-normal">简介</th>
+              <th className="px-1 py-2 text-left font-normal">课程复盘</th>
               <th className="px-1 py-2 text-left font-normal">老人</th>
               <th className="px-1 py-2 text-left font-normal">新人</th>
               <th className="px-1 py-2 text-left font-normal">创建人</th>
@@ -1829,6 +1852,32 @@ export function ActivityBatchTable({
                     )}
                   </td>
 
+                  {/* 课程复盘 */}
+                  <td
+                    className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "course_review") ? "bg-[#f5eeff] rounded" : ""}`}
+                    style={{ verticalAlign: "top" }}
+                  >
+                    {rowReadOnly ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.course_review ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.course_review}>
+                        {row.course_review.replace(/\s+/g, " ").trim() || "-"}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReviewDraft(row.course_review)
+                          setEditingReviewKey(row.key)
+                        }}
+                        title={row.course_review}
+                        className="flex h-7 w-full items-center overflow-hidden rounded-[2px] border-[0.5px] border-input bg-transparent px-2 text-left text-[12px] text-[#2b2f36] outline-none hover:border-[#c9cdd4] focus:border-[#3370ff]"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {row.course_review.replace(/\s+/g, " ").trim()}
+                        </span>
+                      </button>
+                    )}
+                  </td>
+
                   {/* 老人 */}
                   <td className={`px-1 py-0.5 ${isCellChanged(row.key, "participant_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <span className="text-[#4e535a]">
@@ -1836,13 +1885,13 @@ export function ActivityBatchTable({
                         <span key={m.id}>
                           {i > 0 && "、"}
                           <button
-                            disabled={withdrawnParticipantIds.has(m.id)}
+                            disabled={withdrawnParticipantIds.has(m.id) || !canEditParticipants(row)}
                             onClick={() => {
                               const newIds = row.participant_ids.filter(id => id !== m.id)
                               updateRow(row.key, "participant_ids", newIds)
                             }}
-                            className={withdrawnParticipantIds.has(m.id) ? "cursor-default text-[#8f959e]" : "cursor-pointer hover:text-[#e02020]"}
-                            title={withdrawnParticipantIds.has(m.id) ? "已退课，参与人记录已锁定" : "点击移除参与人"}
+                            className={withdrawnParticipantIds.has(m.id) || !canEditParticipants(row) ? "cursor-default text-[#8f959e]" : "cursor-pointer hover:text-[#e02020]"}
+                            title={withdrawnParticipantIds.has(m.id) ? "已退课，参与人记录已锁定" : canEditParticipants(row) ? "点击移除参与人" : "没有配置该课表参与人的权限"}
                           >
                             {m.name}{withdrawnParticipantIds.has(m.id) && <span className="ml-1 text-[11px] text-[#c4506a]">已退课</span>}
                           </button>
@@ -1858,13 +1907,13 @@ export function ActivityBatchTable({
                         <span key={m.id}>
                           {i > 0 && "、"}
                           <button
-                            disabled={withdrawnParticipantIds.has(m.id)}
+                            disabled={withdrawnParticipantIds.has(m.id) || !canEditParticipants(row)}
                             onClick={() => {
                               const newIds = row.participant_ids.filter(id => id !== m.id)
                               updateRow(row.key, "participant_ids", newIds)
                             }}
-                            className={withdrawnParticipantIds.has(m.id) ? "cursor-default text-[#8f959e]" : "cursor-pointer hover:text-[#e02020]"}
-                            title={withdrawnParticipantIds.has(m.id) ? "已退课，参与人记录已锁定" : "点击移除参与人"}
+                            className={withdrawnParticipantIds.has(m.id) || !canEditParticipants(row) ? "cursor-default text-[#8f959e]" : "cursor-pointer hover:text-[#e02020]"}
+                            title={withdrawnParticipantIds.has(m.id) ? "已退课，参与人记录已锁定" : canEditParticipants(row) ? "点击移除参与人" : "没有配置该课表参与人的权限"}
                           >
                             {m.name}{withdrawnParticipantIds.has(m.id) && <span className="ml-1 text-[11px] text-[#c4506a]">已退课</span>}
                           </button>
@@ -1966,6 +2015,26 @@ export function ActivityBatchTable({
           <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
             <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={closeDescriptionDialog}>取消</Button>
             <Button size="sm" className="h-8 text-[12px]" onClick={saveDescription}>保存</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editingReviewKey !== null} onOpenChange={(open) => { if (!open) closeReviewDialog() }}>
+        <DialogContent initialFocus={false} className="w-[520px] max-w-[90vw] gap-0 p-0">
+          <DialogHeader className="border-b border-[#f0f0f0] px-5 pb-3 pt-4">
+            <DialogTitle className="text-[14px] font-medium">课程复盘</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 py-4">
+            <textarea
+              value={reviewDraft}
+              onChange={(event) => setReviewDraft(event.target.value)}
+              placeholder="输入当天课程的复盘内容"
+              className="min-h-[220px] w-full resize-y rounded-[2px] border-[0.5px] border-[#dfe2e6] bg-[#fafbfc] px-3 py-2.5 text-[13px] font-normal leading-6 text-[#2b2f36] outline-none placeholder:text-[#b0b5bb] focus:border-[#3370ff]"
+            />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={closeReviewDialog}>取消</Button>
+            <Button size="sm" className="h-8 text-[12px]" onClick={saveReview}>保存</Button>
           </div>
         </DialogContent>
       </Dialog>

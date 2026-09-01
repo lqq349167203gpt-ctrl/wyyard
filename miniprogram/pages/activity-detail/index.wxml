@@ -7,11 +7,11 @@
   <block wx:if="{{!loading}}">
   <view class="record-meta">
     <text>创建人 · {{createdBy || '未记录'}}</text>
-    <text class="readonly-text" wx:if="{{readOnly}}">{{viewOnly ? '当前账号仅可浏览' : '部分信息仅创建人可改'}}</text>
+    <text class="readonly-text" wx:if="{{readOnly}}">{{viewOnly ? (canEditParticipants ? '课程内容仅浏览，可配置参与人' : '当前账号仅可浏览') : '部分信息仅创建人可改'}}</text>
   </view>
   <!-- 参与者 -->
   <view class="form-card">
-    <view class="participant-grid" wx:if="{{participantList.length > 0}}">
+    <view class="participant-grid" wx:if="{{canEditParticipants && participantList.length > 0}}">
       <view
         wx:for="{{participantList}}"
         wx:key="id"
@@ -24,7 +24,8 @@
         <view class="participant-check" wx:elif="{{item.selected}}">✓</view>
       </view>
     </view>
-    <view class="participant-empty" wx:if="{{participantList.length === 0}}">
+    <text class="participant-readonly-names" wx:elif="{{participantReadonlyText}}">{{participantReadonlyText}}</text>
+    <view class="participant-empty" wx:else>
       <text>当日暂无参与者</text>
     </view>
   </view>
@@ -33,9 +34,10 @@
   <view class="form-card">
     <view class="form-item">
       <text class="form-label">日期</text>
-      <picker class="form-picker" mode="date" value="{{date}}" bindchange="onDateChange">
+      <picker wx:if="{{!readOnly}}" class="form-picker" mode="date" value="{{date}}" bindchange="onDateChange">
         <view class="picker-display">{{date}}</view>
       </picker>
+      <text wx:else class="protected-value">{{date}}</text>
     </view>
     <view class="form-item last">
       <text class="form-label">时间</text>
@@ -90,7 +92,7 @@
     <view class="form-item" wx:if="{{activityType === 'gcs' || activityType === 'ers' || activityType === 'eks'}}" bindtap="onOwnerPickerOpen">
       <text class="form-label">案主</text>
       <view class="picker-value-wrap">
-        <text style="{{ownerName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{ownerName || '选择案主'}}</text>
+        <text style="{{ownerName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{ownerName || (readOnly ? '' : '选择案主')}}</text>
         <text class="participant-withdrawn" wx:if="{{ownerWithdrawn}}">已退课</text>
         <text class="picker-clear" wx:if="{{ownerId && !readOnly && !ownerWithdrawn}}" catchtap="onOwnerClear">x</text>
       </view>
@@ -114,7 +116,7 @@
     <view class="form-item last" wx:if="{{activityType === 'class' || activityType === 'eks' || activityType === 'ics'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
-        <text style="{{teacherDisplay ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{teacherDisplay || '选择老师'}}</text>
+        <text style="{{teacherDisplay ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{teacherDisplay || (readOnly ? '' : '选择老师')}}</text>
         <text class="picker-clear" wx:if="{{teacherIds.length > 0 && !readOnly}}" catchtap="onTeacherClear">x</text>
       </view>
     </view>
@@ -123,7 +125,7 @@
     <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
-        <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || '选择老师'}}</text>
+        <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || (readOnly ? '' : '选择老师')}}</text>
         <text class="picker-clear" wx:if="{{achieverId && !readOnly}}" catchtap="onAchieverClear">x</text>
       </view>
     </view>
@@ -134,16 +136,26 @@
     <view class="form-item last switch-row">
       <text class="form-label">发布</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{isPublished}}" bindchange="onPublishedChange" color="#3370ff" />
+        <switch class="publish-switch" checked="{{isPublished}}" bindchange="onPublishedChange" disabled="{{readOnly}}" color="#3370ff" />
       </view>
     </view>
   </view>
 
   <!-- 描述 -->
   <view class="form-card">
-    <view class="form-item column last">
+    <view class="form-card-title detail-section-title">活动简介</view>
+    <view class="form-item column last" style="padding-top: 14rpx;">
       <textarea wx:if="{{!readOnly}}" class="form-textarea" style="height: 160rpx;" placeholder="输入活动简介..." placeholder-class="form-textarea-placeholder" value="{{description}}" bindinput="onDescriptionInput" />
-      <text wx:else class="protected-description">{{description || '-'}}</text>
+      <text wx:else class="protected-description {{description ? '' : 'empty'}}">{{description}}</text>
+    </view>
+  </view>
+
+  <!-- 课程复盘 -->
+  <view class="form-card">
+    <view class="form-card-title detail-section-title">课程复盘</view>
+    <view class="form-item column last review-form-item">
+      <textarea wx:if="{{!readOnly}}" class="form-textarea review-textarea" placeholder="输入当天课程的复盘内容..." placeholder-class="form-textarea-placeholder" value="{{courseReview}}" bindinput="onCourseReviewInput" maxlength="-1" />
+      <text wx:else class="protected-description {{courseReview ? '' : 'empty'}}">{{courseReview}}</text>
     </view>
   </view>
 
@@ -241,7 +253,7 @@
   <!-- 操作按钮 -->
   <view class="actions">
     <button class="btn-danger" wx:if="{{!readOnly}}" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
-    <button wx:if="{{!readOnly}}" class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    <button wx:if="{{!readOnly || canEditParticipants}}" class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
   </block>
 </view>

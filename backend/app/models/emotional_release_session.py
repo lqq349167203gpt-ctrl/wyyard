@@ -21,6 +21,7 @@ class EmotionalReleaseSessionBase(SafeBaseModel):
     achiever_id: str = ""  # 成就君
     achiever_name: str = ""
     description: str = ""
+    course_review: str = ""  # 当天课程复盘
     materials: List[dict] = []
     is_published: bool = False
     activity_mode: str = "线下"

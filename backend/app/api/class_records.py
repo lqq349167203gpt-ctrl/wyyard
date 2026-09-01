@@ -14,6 +14,8 @@ from app.services.customer_service import get_customer, list_all_customers
 from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
+    ensure_activity_participant_access,
+    ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
     stamp_creator,
@@ -40,6 +42,27 @@ def _fill_visit_nicknames(visits, visible_ids: set[str] | None = None):
         data["member_type"] = customer.member_type if customer else ""
         result.append(data)
     return result
+
+
+def _private_visit_need_map(request: Request | None, visit_ids: list[str]) -> dict[str, str]:
+    """按当前账号的邀约信息可见范围返回来访需求，口径与邀约页一致。"""
+    if request is None or not visit_ids:
+        return {}
+    from app.services import visit_note_service
+
+    notes = visit_note_service.list_visible_notes(
+        visit_ids,
+        getattr(request.state, "user_id", "") or "",
+        getattr(request.state, "user_owner", "") or "",
+        getattr(request.state, "user_name", "") or "",
+    )
+    result: dict[str, list[str]] = {}
+    for note in notes:
+        if note.category != "visit_need":
+            continue
+        creator = note.created_by or "未知"
+        result.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
+    return {visit_id: "\n".join(lines) for visit_id, lines in result.items()}
 
 
 def _fill_names(items: list, visible_ids: set[str] | None = None) -> list:
@@ -201,6 +224,8 @@ def create_record(data: dict, request: Request, conversion: bool = False):
         record = stamp_creator(ClassRecordCreate(**data), request)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if record.participant_ids and not conversion:
+        ensure_activity_participant_access(request)
     customer_access_service.require_new_customer_ids(
         request,
         record.participant_ids,
@@ -222,7 +247,10 @@ def update_record(record_id: str, data: dict, request: Request, conversion: bool
     old_record = class_record_service.get_record(record_id)
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_activity_update_access(request, data)
     if "participant_ids" in data:
+        if list(data.get("participant_ids") or []) != list(old_record.participant_ids):
+            ensure_activity_participant_access(request, old_record)
         customer_access_service.require_new_customer_ids(
             request,
             data.get("participant_ids") or [],
@@ -335,6 +363,8 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
     old_record = class_record_service.get_record(record_id)
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    if list(data.participant_ids) != list(old_record.participant_ids):
+        ensure_activity_participant_access(request, old_record)
     old_ids = set(old_record.participant_ids) if old_record else set()
     customer_access_service.require_new_customer_ids(
         request,
@@ -857,6 +887,19 @@ def dashboard(
         if visible_visit_ids
         else {}
     )
+    dashboard_visits = visit_service.list_visits_light(
+        date,
+        space_id if space_id else None,
+    )
+    need_map = _private_visit_need_map(
+        request,
+        [str(item.get("id") or "") for item in dashboard_visits],
+    )
+    for item in dashboard_visits:
+        item["needs"] = need_map.get(str(item.get("id") or ""), "")
+    dashboard_visits = [
+        item for item in dashboard_visits if item.get("customer_id") in visible_ids
+    ]
 
     return {
         "class_records": cr_dicts,
@@ -864,10 +907,7 @@ def dashboard(
         "ers_sessions": ers_dicts,
         "eks_sessions": eks_dicts,
         "ics_sessions": ics_dicts,
-        "visits": _fill_visit_nicknames(
-            visit_service.list_visits(date, space_id=space_id if space_id else None),
-            visible_ids,
-        ),
+        "visits": dashboard_visits,
         "visit_counts": visit_counts,
         "calendar_counts": dict(cal_counts),
         "groupings": daily_grouping_service.get_grouping(date) or {"date": date, "groups": []},

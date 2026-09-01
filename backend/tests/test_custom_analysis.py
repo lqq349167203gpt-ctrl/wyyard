@@ -22,6 +22,7 @@ def _row(customer_id: str, **overrides):
         "service_teacher": "老师A",
         "referral_date": "2026-08-01",
         "created_at": "2026-08-01",
+        "invitation_dates": [],
         "first_visit_date": "",
         "last_visit_date": "",
         "invitation_count": 0,
@@ -90,6 +91,30 @@ def test_execute_plan_keeps_empty_values_at_end_when_descending(monkeypatch):
     result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
 
     assert [item["id"] for item in result["items"]] == ["c2", "c3", "c1"]
+
+
+def test_execute_plan_filters_by_any_invitation_date(monkeypatch):
+    rows = [
+        _row("c1", invitation_dates=["2026-08-01", "2026-08-05"]),
+        _row("c2", invitation_dates=["2026-08-10"]),
+        _row("c3", invitation_dates=[]),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[
+            AnalysisCondition(
+                field="invitation_dates",
+                operator="between",
+                value=["2026-08-03", "2026-08-06"],
+            ),
+        ],
+        columns=["nickname", "invitation_dates"],
+        sort_by="invitation_dates",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert [item["id"] for item in result["items"]] == ["c1"]
 
 
 def test_execute_plan_supports_any_logic_and_selected_metrics(monkeypatch):
@@ -421,6 +446,11 @@ def test_metadata_endpoint(client):
     metadata = response.json()
     assert any(item["value"] == "follow_up_status" for item in metadata["fields"])
     assert any(item["value"] == "payment_dates" and item["label"] == "成交日期" for item in metadata["fields"])
+    invitation_date = next(item for item in metadata["fields"] if item["value"] == "invitation_dates")
+    assert invitation_date["label"] == "邀约日期"
+    assert invitation_date["group"] == "日期信息"
+    assert invitation_date["value_type"] == "date"
+    assert "between" in invitation_date["operators"]
     assert not any(item["value"] == "created_customers" for item in metadata["metrics"])
     assert any(item["value"] == "referred_customers" and item["label"] == "新引流客户数" for item in metadata["metrics"])
 

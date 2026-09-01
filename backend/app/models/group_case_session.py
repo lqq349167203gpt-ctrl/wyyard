@@ -15,6 +15,7 @@ class GroupCaseSessionBase(SafeBaseModel):
     owner_id: str  # 案主
     owner_name: str
     description: str = ""  # 个案详情
+    course_review: str = ""  # 当天课程复盘
     participant_ids: List[str] = []  # 参与者
     teacher_ids: List[str] = []  # 老师
     host_id: str = ""  # 主持人

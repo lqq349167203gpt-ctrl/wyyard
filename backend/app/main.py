@@ -37,6 +37,7 @@ from app.api.energy_knot_sessions import router as energy_knot_sessions_router
 from app.api.energy_knots import router as energy_knots_router
 from app.api.expenses import router as expenses_router
 from app.api.financial import router as financial_router
+from app.api.follow_up_statuses import router as follow_up_statuses_router
 from app.api.followup_records import router as followup_records_router
 from app.api.group_case_sessions import router as group_case_sessions_router
 from app.api.group_cases import router as group_cases_router
@@ -104,6 +105,7 @@ app.include_router(customers_router)
 app.include_router(custom_analysis_router)
 app.include_router(analysis_logs_router)
 app.include_router(customer_tags_router)
+app.include_router(follow_up_statuses_router)
 app.include_router(ai_configs_router)
 app.include_router(customer_ai_config_router)
 app.include_router(visit_ai_config_router)

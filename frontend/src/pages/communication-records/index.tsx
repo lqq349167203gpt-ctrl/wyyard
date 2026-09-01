@@ -32,6 +32,13 @@ export default function CommunicationRecordsPage() {
   // 搜索状态
   const [searchNickname, setSearchNickname] = useState("")
   const [searchIdentity, setSearchIdentity] = useState("")
+  const [searchCreator, setSearchCreator] = useState("")
+
+  const creatorOptions = useMemo(() => (
+    [...new Set(records.map(record => record.creator?.trim()).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, "zh-CN"))
+      .map(name => ({ value: name, label: name }))
+  ), [records])
 
   // 客户昵称→身份映射
   const nicknameToIdentity = useMemo(() => {
@@ -76,15 +83,17 @@ export default function CommunicationRecordsPage() {
         const identity = nicknameToIdentity[r.customer_nickname] || ""
         if (identity !== searchIdentity) return false
       }
+      if (searchCreator && r.creator !== searchCreator) return false
       return true
     })
-  }, [records, searchNickname, searchIdentity, nicknameToIdentity])
+  }, [records, searchNickname, searchIdentity, searchCreator, nicknameToIdentity])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredRecords, { pageSize: 10 })
 
   const handleClear = () => {
     setSearchNickname("")
     setSearchIdentity("")
+    setSearchCreator("")
   }
 
   // 新增
@@ -169,6 +178,16 @@ export default function CommunicationRecordsPage() {
             placeholder="全部身份"
             textColor={searchIdentity ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
             onChange={(v) => { setSearchIdentity(v) }}
+          />
+          <SelectDropdown
+            className="w-[138px]"
+            buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+            rounded="7px"
+            value={searchCreator}
+            options={[{ value: "", label: "全部创建人" }, ...creatorOptions]}
+            placeholder="全部创建人"
+            textColor={searchCreator ? "text-[#2b2f36]" : "text-[#8f959e]"}
+            onChange={setSearchCreator}
           />
           <button
             onClick={handleClear}

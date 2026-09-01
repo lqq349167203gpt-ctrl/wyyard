@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
+from app.models.base import SafeBaseModel
 
 
 class OfflineCourseBase(SafeBaseModel):
@@ -18,6 +19,7 @@ class OfflineCourseBase(SafeBaseModel):
     organization_id: Optional[str] = None
     deal_date: Optional[str] = None
     created_by: str = ""
+    created_by_id: str = ""
 
 
 class OfflineCourseCreate(OfflineCourseBase):

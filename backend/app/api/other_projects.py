@@ -4,6 +4,8 @@ from app.models.other_project import OtherProjectCreate
 from app.models.other_project_deduction import OtherProjectDeductionCreate
 from app.services import customer_access_service, other_project_deduction_service, other_project_service
 from app.utils.pagination import paginate
+from app.utils.payment_validation import ensure_payment_closer_total
+from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
 router = APIRouter(prefix="/api/other-projects", tags=["other-projects"])
 
@@ -67,7 +69,8 @@ def get_project(project_id: str, request: Request):
 def create_project(data: OtherProjectCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
-    return other_project_service.create_project(data)
+    ensure_payment_closer_total(data, "fee", request=request)
+    return other_project_service.create_project(stamp_payment_creator(data, request))
 
 
 @router.patch("/{project_id}")
@@ -76,9 +79,13 @@ def update_project(project_id: str, data: dict, request: Request):
     existing = other_project_service.get_project(project_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
+    data.pop("created_by", None)
+    data.pop("created_by_id", None)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
+    ensure_payment_closer_total(data, "fee", existing, request)
     project = other_project_service.update_project(project_id, data)
     if not project:
         raise HTTPException(status_code=404, detail="记录不存在")
@@ -91,6 +98,7 @@ def delete_project(project_id: str, request: Request):
     existing = other_project_service.get_project(project_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     if not other_project_service.delete_project(project_id):
         raise HTTPException(status_code=404, detail="记录不存在")

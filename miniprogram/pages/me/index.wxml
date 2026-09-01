@@ -1,45 +1,58 @@
 <view class="page" wx:if="{{user}}">
-  <!-- 用户信息卡 -->
-  <view class="profile-card">
-    <view class="avatar">
-      <text class="avatar-text">{{user.owner[0] || '?'}}</text>
-    </view>
-    <view class="profile-info">
-      <text class="profile-name">{{user.owner}}</text>
-      <text class="profile-role">{{role}}</text>
+  <!-- 头部：纯白 + 蓝底白字头像 + 名字 + 角色副标题 -->
+  <view class="head">
+    <view class="id-row">
+      <view class="avatar">
+        <text class="avatar-text">{{user.owner[0] || '?'}}</text>
+      </view>
+      <view class="id-text">
+        <text class="id-name">{{user.owner}}</text>
+        <text class="id-slogan" wx:if="{{role}}">{{role}}</text>
+      </view>
     </view>
   </view>
 
   <!-- 功能入口 -->
   <view class="menu-card">
-    <view class="menu-item" bindtap="onPaymentTap" wx:if="{{canPayment}}">
-      <text class="menu-label">付费项目</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onExpensesTap" wx:if="{{canExpenses}}">
-      <text class="menu-label">支出</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onCommRecordsTap" wx:if="{{canCommRecords}}">
-      <text class="menu-label">沟通记录</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onDailyReportTap" wx:if="{{canDailyReport}}">
-      <text class="menu-label">每日报表</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onCustomerTagsTap" wx:if="{{canCustomerTags}}">
-      <text class="menu-label">客户标签</text>
-      <text class="menu-arrow">›</text>
-    </view>
     <view class="menu-item" bindtap="onCustomAnalysisTap" wx:if="{{canCustomAnalysis}}">
+      <image class="menu-icon" src="{{icons.customAnalysis}}" mode="aspectFit" />
       <text class="menu-label">自定义筛选</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>
 
-  <!-- 退出按钮 -->
-  <view class="logout-area">
-    <view class="logout-btn" bindtap="onLogout">退出登录</view>
+  <view class="menu-card">
+    <view class="menu-item" bindtap="onDailyReportTap" wx:if="{{canDailyReport}}">
+      <image class="menu-icon" src="{{icons.dailyReport}}" mode="aspectFit" />
+      <text class="menu-label">每日报表</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="onCommRecordsTap" wx:if="{{canCommRecords}}">
+      <image class="menu-icon" src="{{icons.commRecords}}" mode="aspectFit" />
+      <text class="menu-label">沟通记录</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="onCustomerTagsTap" wx:if="{{canCustomerTags}}">
+      <image class="menu-icon" src="{{icons.customerTags}}" mode="aspectFit" />
+      <text class="menu-label">客户标签</text>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
+
+  <!-- 付费板块 -->
+  <view class="menu-card">
+    <view class="menu-item" bindtap="onPaymentTap" wx:if="{{canPayment}}">
+      <image class="menu-icon" src="{{icons.payment}}" mode="aspectFit" />
+      <text class="menu-label">付费项目</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="onExpensesTap" wx:if="{{canExpenses}}">
+      <image class="menu-icon" src="{{icons.expenses}}" mode="aspectFit" />
+      <text class="menu-label">支出</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 退出按钮 -->
+  <view class="logout-btn" bindtap="onLogout">退出登录</view>
 </view>

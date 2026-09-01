@@ -6,6 +6,8 @@ const DEFAULT_PERMISSIONS: PositionEditPermissions = {
   customers: "all",
   visits: "own",
   activities: "own",
+  activity_participants: "all",
+  payments: "all",
   contacts: {
     phone: { view: false, copy: false, edit: false },
     wechat: { view: false, copy: false, edit: false },
@@ -37,6 +39,10 @@ function normalizeEditPermissions(permissions?: Partial<PositionEditPermissions>
     customers: permissions?.customers === "view" ? "view" : "all",
     visits: ["view", "own", "all"].includes(permissions?.visits || "") ? permissions!.visits! : "own",
     activities: ["view", "own", "all"].includes(permissions?.activities || "") ? permissions!.activities! : "own",
+    activity_participants: ["view", "own", "all"].includes(permissions?.activity_participants || "")
+      ? permissions!.activity_participants!
+      : "all",
+    payments: ["own", "all"].includes(permissions?.payments || "") ? permissions!.payments! : "all",
     contacts: {
       phone: {
         view: permissions?.contacts?.phone?.view === true,

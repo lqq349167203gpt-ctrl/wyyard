@@ -19,9 +19,12 @@ function decorateRecords(items) {
 Page({
   data: {
     hasPagePermission: true,
+    keyword: '',
     records: [],
     filtered: [],
+    recordsReady: false,
     loading: false,
+    hasSearched: false,
     showFilterPanel: false,
     filterCount: 0,
     creatorNames: [],
@@ -33,24 +36,28 @@ Page({
     if (!getApp().checkLogin()) return
     if (!getApp().checkPagePermission('communication-records')) {
       this.setData({ hasPagePermission: false })
+      return
     }
+    this.loadRecords()
   },
 
   onShow() {
     if (!getApp().checkLogin()) return
-    if (!getApp().checkPagePermission('communication-records')) {
-      this.setData({ hasPagePermission: false })
-      return
+    if (this._needRefresh) {
+      this._needRefresh = false
+      this.loadRecords()
     }
-    this.setData({ hasPagePermission: true })
-    this.loadList()
   },
 
-  async loadList() {
-    this.setData({ loading: true })
+  onUnload() {
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+  },
+
+  async loadRecords() {
+    if (this.hasActiveCriteria()) this.setData({ loading: true, hasSearched: true })
     try {
-      const res = await communicationRecordApi.list()
-      const records = decorateRecords(Array.isArray(res) ? res : [])
+      const result = await communicationRecordApi.list()
+      const records = decorateRecords(Array.isArray(result) ? result : [])
       const creatorCounts = {}
       records.forEach(record => {
         const creator = (record.creator || '').trim()
@@ -61,25 +68,38 @@ Page({
       ))
       const visibleCreators = new Set(creatorNames)
       const selectedCreators = this.data.selectedCreators.filter(name => visibleCreators.has(name))
-      this.setData({ records, creatorNames, selectedCreators })
+      this.setData({ records, recordsReady: true, creatorNames, selectedCreators })
       this.updateCreatorList()
       this.updateFilterCount()
-      this.applyFilter()
-    } catch (err) {
-      console.error('[communication-records] 加载失败:', err)
-      this.setData({ records: [], filtered: [] })
+      this.applySearch()
+    } catch (error) {
+      this.setData({ records: [], filtered: [], recordsReady: true, loading: false })
+      wx.showToast({ title: (error && error.message) || '加载失败', icon: 'none' })
     }
-    this.setData({ loading: false })
   },
 
-  applyFilter() {
-    const { records, selectedCreators } = this.data
-    const selected = new Set(selectedCreators)
+  hasActiveCriteria() {
+    return Boolean(this.data.keyword.trim() || this.data.selectedCreators.length)
+  },
+
+  applySearch() {
+    if (!this.hasActiveCriteria()) {
+      this.setData({ filtered: [], hasSearched: false, loading: false })
+      return
+    }
+    if (!this.data.recordsReady) {
+      this.setData({ hasSearched: true, loading: true })
+      return
+    }
+    const keyword = this.data.keyword.trim().toLowerCase()
+    const selected = new Set(this.data.selectedCreators)
     const hasCreatorFilter = selected.size > 0
-    const filtered = records.filter(r => {
-      return !hasCreatorFilter || selected.has((r.creator || '').trim())
+    const filtered = this.data.records.filter(record => {
+      if (keyword && !(record.customer_nickname || '').toLowerCase().includes(keyword)) return false
+      if (hasCreatorFilter && !selected.has((record.creator || '').trim())) return false
+      return true
     })
-    this.setData({ filtered })
+    this.setData({ filtered, hasSearched: true, loading: false })
   },
 
   updateCreatorList() {
@@ -93,8 +113,20 @@ Page({
     this.setData({ filterCount: this.data.selectedCreators.length > 0 ? 1 : 0 })
   },
 
-  onSearchTap() {
-    wx.navigateTo({ url: '/pages/communication-records/search' })
+  onSearchInput(e) {
+    this.setData({ keyword: e.detail.value })
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    this._searchTimer = setTimeout(() => this.applySearch(), 300)
+  },
+
+  onSearchConfirm() {
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    this.applySearch()
+  },
+
+  onClearKeyword() {
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    this.setData({ keyword: '' }, () => this.applySearch())
   },
 
   onToggleFilterPanel() {
@@ -134,12 +166,8 @@ Page({
     this._filterSnapshot = null
     this.setData({ showFilterPanel: false }, () => {
       this.updateFilterCount()
-      this.applyFilter()
+      this.applySearch()
     })
-  },
-
-  onCreate() {
-    wx.navigateTo({ url: '/pages/communication-records/form' })
   },
 
   onEdit(e) {
@@ -155,23 +183,21 @@ Page({
     if (!record || !record.can_delete) return
     wx.showActionSheet({
       itemList: ['删除'],
-      success: (res) => {
-        if (res.tapIndex === 0) {
-          wx.showModal({
-            title: '确认删除',
-            content: '删除后不可恢复，确定删除？',
-            success: (modalRes) => {
-              if (modalRes.confirm) {
-                communicationRecordApi.delete(id).then(() => {
-                  wx.showToast({ title: '已删除', icon: 'success' })
-                  this.loadList()
-                }).catch(err => {
-                  wx.showToast({ title: err.message || '删除失败', icon: 'none' })
-                })
-              }
-            },
-          })
-        }
+      success: (result) => {
+        if (result.tapIndex !== 0) return
+        wx.showModal({
+          title: '确认删除',
+          content: '删除后不可恢复，确定删除？',
+          success: (modalResult) => {
+            if (!modalResult.confirm) return
+            communicationRecordApi.delete(id).then(() => {
+              wx.showToast({ title: '已删除', icon: 'success' })
+              this.loadRecords()
+            }).catch(error => {
+              wx.showToast({ title: error.message || '删除失败', icon: 'none' })
+            })
+          },
+        })
       },
     })
   },

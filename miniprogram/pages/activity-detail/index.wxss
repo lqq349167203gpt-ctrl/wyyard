@@ -37,6 +37,10 @@
   word-break: break-all;
 }
 
+.protected-description.empty {
+  min-height: 0;
+}
+
 .container.no-scroll {
   overflow: hidden;
   height: 100vh;
@@ -131,11 +135,30 @@
   border-bottom: none;
 }
 
+.detail-section-title {
+  padding-bottom: 2rpx;
+  color: #4e535a;
+  font-size: 28rpx;
+}
+
+.review-form-item {
+  padding-top: 14rpx;
+}
+
+.review-textarea {
+  min-height: 220rpx;
+  background-color: #f7f8fa;
+}
+
 /* switch */
 .form-item switch {
   transform: scale(0.75);
   transform-origin: left center;
   margin-right: -10rpx;
+}
+
+.publish-switch[disabled] {
+  opacity: 0.55;
 }
 
 .form-item.switch-row {
@@ -329,6 +352,14 @@
   flex-wrap: wrap;
   gap: 16rpx;
   padding: 8rpx 0 16rpx;
+}
+
+.participant-readonly-names {
+  display: block;
+  padding: 8rpx 0 16rpx;
+  color: #4e535a;
+  font-size: 26rpx;
+  line-height: 1.7;
 }
 
 .participant-item {

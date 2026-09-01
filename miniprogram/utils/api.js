@@ -8,7 +8,7 @@ let _silentLoginPromise = null
 let _logoutScheduled = false
 let _lastTrackedPagePath = ''
 const DEVICE_ID_KEY = 'wyyard_device_id'
-const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own' }
+const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
 const SECURITY_AUTH_REASONS = ['disabled', 'password_changed', 'kicked']
 
 function _getDeviceId() {
@@ -514,6 +514,12 @@ const customerTagApi = {
   }),
 }
 
+const followUpStatusApi = {
+  list: (includeDisabled) => request(`/api/follow-up-statuses${includeDisabled ? '?include_disabled=true' : ''}`),
+  create: (data) => request('/api/follow-up-statuses', { method: 'POST', data }),
+  update: (statusId, data) => request(`/api/follow-up-statuses/${statusId}`, { method: 'PUT', data }),
+}
+
 // 角色页面权限 API（用于同步 PC 端角色权限配置）
 const positionPermissionApi = {
   get: (position) => request(`/api/position-permissions/${encodeURIComponent(position)}`, { silent: true }),
@@ -730,6 +736,7 @@ module.exports = {
   activityWithdrawalApi,
   customerApi,
   customerTagApi,
+  followUpStatusApi,
   positionPermissionApi,
   usageTrackingApi,
   spaceApi,

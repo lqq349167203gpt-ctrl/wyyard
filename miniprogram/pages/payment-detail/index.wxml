@@ -200,7 +200,7 @@
   <!-- 底部按钮 -->
   <view class="pd-bottom">
     <button class="pd-btn-back" bindtap="onBack">返    回</button>
-    <button class="pd-btn-edit" bindtap="onEditTap">编    辑</button>
+    <button wx:if="{{canEdit}}" class="pd-btn-edit" bindtap="onEditTap">编    辑</button>
   </view>
 </view>
 

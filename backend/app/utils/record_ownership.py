@@ -29,6 +29,7 @@ ACTIVITY_CREATOR_ONLY_FIELDS = {
     "owner_name",
     "description",
     "course_description",
+    "course_review",
 }
 
 
@@ -97,3 +98,51 @@ def ensure_creator_for_changed_fields(
     }
     if changed_protected_fields:
         ensure_record_creator(request, record, label, edit_area)
+
+
+def ensure_activity_participant_access(request: Request, record=None) -> None:
+    """校验课表老人/新人参与名单的配置范围。新建课表时“仅本人”视为本人记录。"""
+    role = str(getattr(request.state, "user_role", "") or "")
+    scope = position_edit_permission_service.get_permissions(role)["activity_participants"]
+    if role == "超级管理员" or scope == "all":
+        return
+    if scope == "view":
+        raise HTTPException(status_code=403, detail="当前账号没有配置课表参与人的权限")
+    if record is not None:
+        ensure_record_creator(request, record, "课表参与人", "activity_participants")
+
+
+def ensure_activity_update_access(request: Request, data: dict) -> None:
+    """课表仅浏览时只放行参与人名单，课程内容仍保持只读。"""
+    role = str(getattr(request.state, "user_role", "") or "")
+    if role == "超级管理员":
+        return
+    permissions = position_edit_permission_service.get_permissions(role)
+    if permissions["activities"] != "view":
+        return
+    if set(data) - {"participant_ids"}:
+        raise HTTPException(status_code=403, detail="当前账号对课表内容仅有浏览权限")
+
+
+def stamp_payment_creator(data, request: Request):
+    """付费项目创建人始终由服务端按当前账号写入。"""
+    actor_id, actor_name = get_request_actor(request)
+    return data.model_copy(update={"created_by_id": actor_id, "created_by": actor_name})
+
+
+def ensure_payment_record_manager(request: Request, record) -> None:
+    """按角色配置限制付费记录的修改与删除范围。"""
+    if record is None:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    role = str(getattr(request.state, "user_role", "") or "")
+    scope = position_edit_permission_service.get_permissions(role)["payments"]
+    if role == "超级管理员" or scope == "all":
+        return
+    actor_id, actor_name = get_request_actor(request)
+    created_by_id = str(getattr(record, "created_by_id", "") or "")
+    created_by = str(getattr(record, "created_by", "") or "")
+    allowed = bool(actor_id and actor_id == created_by_id) if created_by_id else bool(
+        actor_name and created_by and actor_name == created_by
+    )
+    if not allowed:
+        raise HTTPException(status_code=403, detail="只能修改或删除自己创建的付费记录")

@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.internal_course import InternalCourseCreate
 from app.services import customer_access_service, internal_course_service
 from app.utils.pagination import paginate
+from app.utils.payment_validation import ensure_payment_closer_total
+from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
 router = APIRouter(prefix="/api/internal-courses", tags=["internal-courses"])
 
@@ -50,7 +52,8 @@ def get_course(course_id: str, request: Request):
 def create_course(data: InternalCourseCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
-    return internal_course_service.create_course(data)
+    ensure_payment_closer_total(data, "price", request=request)
+    return internal_course_service.create_course(stamp_payment_creator(data, request))
 
 
 @router.patch("/{course_id}")
@@ -59,9 +62,13 @@ def update_course(course_id: str, data: dict, request: Request):
     existing = internal_course_service.get_course(course_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
+    data.pop("created_by", None)
+    data.pop("created_by_id", None)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
+    ensure_payment_closer_total(data, "price", existing, request)
     course = internal_course_service.update_course(course_id, data)
     if not course:
         raise HTTPException(status_code=404, detail="记录不存在")
@@ -74,6 +81,7 @@ def delete_course(course_id: str, request: Request):
     existing = internal_course_service.get_course(course_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     if not internal_course_service.delete_course(course_id):
         raise HTTPException(status_code=404, detail="记录不存在")

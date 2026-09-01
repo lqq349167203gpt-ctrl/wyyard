@@ -19,7 +19,7 @@ App({
     token: '',
     currentUser: null,
     permissions: [],
-    editPermissions: { customers: 'all', visits: 'own', activities: 'own' },
+    editPermissions: { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' },
     // 开发模式开关：手动维护，提审前必须为 false（check-release.sh 强制拦截）
     devMode: DEV,
     _selectedActivity: null,
@@ -42,7 +42,7 @@ App({
         this.globalData.token = token
         this.globalData.currentUser = user
         this.globalData.permissions = wx.getStorageSync('userPermissions') || []
-        this.globalData.editPermissions = wx.getStorageSync('userEditPermissions') || { customers: 'all', visits: 'own', activities: 'own' }
+        this.globalData.editPermissions = wx.getStorageSync('userEditPermissions') || { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
       }
       this.globalData._loginReady = Promise.resolve()
     }
@@ -142,7 +142,7 @@ App({
     const { positionPermissionApi } = require('./utils/api')
     const result = await positionPermissionApi.get(user.role)
     const permissions = (result && result.pages) || []
-    const editPermissions = (result && result.edit_permissions) || { customers: 'all', visits: 'own', activities: 'own' }
+    const editPermissions = (result && result.edit_permissions) || { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
     this.globalData.permissions = permissions
     this.globalData.editPermissions = editPermissions
     wx.setStorageSync('userPermissions', permissions)
@@ -168,7 +168,7 @@ App({
       this.globalData.token = data.token
       this.globalData.currentUser = data.account
       this.globalData.permissions = data.permissions || []
-      this.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own' }
+      this.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
       wx.setStorageSync('auth_token', data.token)
       wx.setStorageSync('currentUser', data.account)
       wx.setStorageSync('userPermissions', data.permissions)
@@ -217,7 +217,7 @@ App({
     this.globalData.token = ''
     this.globalData.currentUser = null
     this.globalData.permissions = []
-    this.globalData.editPermissions = { customers: 'all', visits: 'own', activities: 'own' }
+    this.globalData.editPermissions = { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
     wx.reLaunch({ url: '/pages/login/index' })
   },
 })

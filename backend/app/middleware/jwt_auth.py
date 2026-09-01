@@ -244,6 +244,28 @@ def _get_read_only_area(path: str, method: str) -> str:
     return ""
 
 
+def _is_activity_participant_patch(path: str, method: str) -> bool:
+    """识别课表参与人更新；它使用独立于课表内容的权限。"""
+    if method != "PATCH":
+        return False
+    prefixes = (
+        "/api/class-records",
+        "/api/group-case-sessions",
+        "/api/emotional-release-sessions",
+        "/api/energy-knot-sessions",
+        "/api/internal-course-sessions",
+    )
+    for prefix in prefixes:
+        if not path.startswith(prefix + "/"):
+            continue
+        suffix_parts = path[len(prefix):].strip("/").split("/")
+        if len(suffix_parts) == 1:
+            return True
+        if prefix == "/api/class-records" and len(suffix_parts) == 2:
+            return suffix_parts[1] == "participants"
+    return False
+
+
 def _record_page_view(scope, account, source: str):
     if _parse_header(scope, b"x-page-view") != "1":
         return
@@ -394,7 +416,12 @@ class AuthMiddleware:
                     if read_only_area and account.role != "超级管理员":
                         from app.services import position_edit_permission_service
                         edit_permissions = position_edit_permission_service.get_permissions(account.role)
-                        if edit_permissions[read_only_area] == "view":
+                        participant_patch_allowed = (
+                            read_only_area == "activities"
+                            and _is_activity_participant_patch(path, method)
+                            and edit_permissions["activity_participants"] != "view"
+                        )
+                        if edit_permissions[read_only_area] == "view" and not participant_patch_allowed:
                             label = READ_ONLY_AREA_LABELS[read_only_area]
                             response = _json_response(403, f"当前账号对{label}仅有浏览权限")
                             await response(scope, receive, send)

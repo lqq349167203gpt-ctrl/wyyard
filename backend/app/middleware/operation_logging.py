@@ -24,6 +24,7 @@ SECTION_MAP = {
     "/api/spaces": "空间配置",
     "/api/member-identities": "会员身份",
     "/api/customer-tags": "客户标签",
+    "/api/follow-up-statuses": "跟进状态配置",
     "/api/activity-permissions": "课表",
     "/api/activity-withdrawals": "课表",
     "/api/activity-orders": "课表",
@@ -236,7 +237,7 @@ FIELD_NAMES = {
     "note": "备注", "description": "描述", "content": "内容", "section": "板块",
     "status": "状态", "type": "类型", "date": "日期", "start_time": "开始时间",
     "end_time": "结束时间", "teacher_ids": "课程老师", "course_name": "沙龙名称",
-    "course_type": "课程类型", "course_description": "课程描述", "activity_name": "活动名称", "course_date": "课程日期",
+    "course_type": "课程类型", "course_description": "课程描述", "course_review": "课程复盘", "activity_name": "活动名称", "course_date": "课程日期",
     "owner_name": "案主", "host_name": "主持人",
     "participant_ids": "参与者",
     "withdrawn_participant_ids": "退课人员",
@@ -519,6 +520,8 @@ EDIT_PERMISSION_LABELS = {
     "customers": "客户资料操作范围",
     "visits": "邀约编辑范围",
     "activities": "课表编辑范围",
+    "activity_participants": "课表人员配置范围",
+    "payments": "付费项目修改删除范围",
 }
 
 
@@ -527,7 +530,7 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
     new_permissions = new_value if isinstance(new_value, dict) else {}
     changes = []
     for key, label in EDIT_PERMISSION_LABELS.items():
-        default_scope = "all" if key == "customers" else "own"
+        default_scope = "all" if key in {"customers", "activity_participants", "payments"} else "own"
         old_value = str(old_permissions.get(key, default_scope))
         new_value = str(new_permissions.get(key, default_scope))
         old_scope = "可编辑" if key == "customers" and old_value == "all" else VALUE_LABELS.get(old_value, VALUE_LABELS[default_scope])

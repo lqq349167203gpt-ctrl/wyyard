@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.membership_card import MembershipCardCreate
 from app.services import customer_access_service, membership_card_service
 from app.utils.pagination import paginate
+from app.utils.payment_validation import ensure_payment_closer_total
+from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
 router = APIRouter(prefix="/api/membership-cards", tags=["membership-cards"])
 
@@ -58,7 +60,8 @@ def get_card(card_id: str, request: Request):
 def create_card(data: MembershipCardCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
-    return membership_card_service.create_card(data)
+    ensure_payment_closer_total(data, "price", request=request)
+    return membership_card_service.create_card(stamp_payment_creator(data, request))
 
 
 @router.patch("/{card_id}")
@@ -69,9 +72,13 @@ def update_card(card_id: str, data: dict, request: Request):
     old_card = membership_card_service.get_card(card_id)
     if not old_card:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, old_card)
+    data.pop("created_by", None)
+    data.pop("created_by_id", None)
     customer_access_service.require_customer_scope(request, old_card.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != old_card.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
+    ensure_payment_closer_total(data, "price", old_card, request)
     card_type_changed = "card_type" in data and old_card and data["card_type"] != old_card.card_type
     if not card_type_changed:
         forbidden = {"remaining_count"}
@@ -93,6 +100,7 @@ def delete_card(card_id: str, request: Request):
     card = membership_card_service.get_card(card_id)
     if not card:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, card)
     customer_access_service.require_customer_scope(request, card.customer_id, action="删除")
     if not membership_card_service.delete_card(card_id):
         raise HTTPException(status_code=404, detail="记录不存在")

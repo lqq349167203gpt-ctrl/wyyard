@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.oh_card_reading import OhCardReadingCreate
 from app.services import customer_access_service, oh_card_reading_service
 from app.utils.pagination import paginate
+from app.utils.payment_validation import ensure_payment_closer_total
+from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
 router = APIRouter(prefix="/api/oh-card-readings", tags=["oh-card-readings"])
 
@@ -50,7 +52,8 @@ def get_reading(reading_id: str, request: Request):
 def create_reading(data: OhCardReadingCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
-    return oh_card_reading_service.create_reading(data)
+    ensure_payment_closer_total(data, "amount", request=request)
+    return oh_card_reading_service.create_reading(stamp_payment_creator(data, request))
 
 
 @router.patch("/{reading_id}")
@@ -59,9 +62,13 @@ def update_reading(reading_id: str, data: dict, request: Request):
     existing = oh_card_reading_service.get_reading(reading_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
+    data.pop("created_by", None)
+    data.pop("created_by_id", None)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
+    ensure_payment_closer_total(data, "amount", existing, request)
     # diagnosis_duration 必须是正整数
     if "diagnosis_duration" in data:
         dd = data["diagnosis_duration"]
@@ -80,6 +87,7 @@ def delete_reading(reading_id: str, request: Request):
     existing = oh_card_reading_service.get_reading(reading_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     success, message = oh_card_reading_service.delete_reading(reading_id)
     if not success:

@@ -28,6 +28,7 @@ import { POSITION_COURSE_TEACHER } from "@/lib/positions"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 /* ========== 常量 ========== */
 
@@ -107,6 +108,7 @@ interface UnifiedItem {
   duration_type?: string | null
   duration_value?: number | null
   created_by?: string
+  created_by_id?: string
   voided?: boolean
   // 内部课程专属
   course_type?: string
@@ -151,6 +153,8 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
     closers: item.closers || [],
     payment_method: item.payment_method,
     organization_id: item.organization_id,
+    created_by: item.created_by,
+    created_by_id: item.created_by_id,
     _raw: item,
   }
   switch (type) {
@@ -199,6 +203,20 @@ interface UnifiedPaymentContentProps {
 export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentContentProps) {
   const enterToNext = useEnterToNext()
   const navigate = useNavigate()
+  const editPermissions = useEditPermissions()
+  const currentUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("currentUser") || "{}") }
+    catch { return {} }
+  }, [])
+  const currentActorName = String(currentUser.owner || currentUser.username || "")
+  const currentActorId = String(currentUser.id || "")
+  const canManagePayment = useCallback((item: UnifiedItem) => (
+    currentUser.role === "超级管理员"
+    || editPermissions.payments === "all"
+    || (item.created_by_id
+      ? Boolean(currentActorId && item.created_by_id === currentActorId)
+      : Boolean(item.created_by && currentActorName && item.created_by === currentActorName))
+  ), [currentActorId, currentActorName, currentUser.role, editPermissions.payments])
 
   // 筛选
   const isMembershipOnly = filterTypes?.length === 1 && filterTypes[0] === "membership_card"
@@ -542,6 +560,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
 
   // 打开编辑弹窗
   const handleOpenEdit = (item: UnifiedItem) => {
+    if (!canManagePayment(item)) return
     setEditingItem(item)
     setFormType(item.type)
     setFormCustomerId(item.customer_id)
@@ -643,10 +662,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   // 保存
   const handleSave = () => {
     if (!formCustomerId) return
-    if (!editingItem && formClosers.length === 0) { setCloserError(true); return }
+    if (formClosers.length === 0) { setCloserError(true); return }
     setCloserError(false)
     const amt = getFormAmount()
-    if (formClosers.length > 0 && Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - amt) > 0.01) return
+    if (Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - amt) > 0.01) return
     if (formType === "membership_card" && !formCardType) return
     if (formType === "internal_course" && !formCourseType) return
     if (formType === "tea_seat_fee" && !parseInt(formTeaQuantity)) return
@@ -833,7 +852,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
 
   // 删除
   const handleDelete = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget || !canManagePayment(deleteTarget)) return
     try {
       await getApi(deleteTarget.type).delete(deleteTarget.id)
       setDeleteTarget(null)
@@ -1297,21 +1316,19 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "会员卡", value: formCardType || "-" })
       rows.push({ label: "费用金额", value: `¥${parseFloat(formPrice || "0").toLocaleString()}` })
-      const cardCfg = formCardType ? MEMBERSHIP_CARD_TYPES[formCardType] : null
-      const dv = mcShowDuration ? formDurationValue : (cardCfg?.duration || "")
-      const dt = mcShowDuration ? formDurationType : "month"
-      if (dv) {
+      const dv = parseInt(formDurationValue)
+      const dt = formDurationType === "day" ? "day" : "month"
+      if (!isNaN(dv) && dv > 0) {
         const unitName = dt === "month" ? "个月" : "天"
         rows.push({ label: "有效期", value: `${dv} ${unitName}` })
         if (formEffectiveDate) {
           const eff = new Date(formEffectiveDate)
-          const val = parseInt(dv)
-          if (!isNaN(eff.getTime()) && !isNaN(val) && val > 0) {
+          if (!isNaN(eff.getTime())) {
             if (dt === "month") {
-              eff.setMonth(eff.getMonth() + val)
+              eff.setMonth(eff.getMonth() + dv)
               eff.setDate(eff.getDate() - 1)
             } else {
-              eff.setDate(eff.getDate() + val)
+              eff.setDate(eff.getDate() + dv)
             }
             rows.push({ label: "结束日期", value: eff.toLocaleDateString("sv-SE") })
           }
@@ -1377,6 +1394,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     }
     rows.push({ label: "所属组织", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
     rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : "-" })
+    rows.push({ label: "成交人合计", value: `¥${formClosers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0).toLocaleString()}` })
+    if (!["oh_card_reading", "tea_seat_fee", "offline_course"].includes(formType)) {
+      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+    }
     rows.push({ label: "备注", value: formNotes || "-" })
     return rows
   }, [formType, formDealDate, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formOhAmount, formDiagnosisTeacher, formDiagnosisDuration, formTeaQuantity, formTeaAmount, formOfflineEffectiveDate, formOfflineValidityValue, formOfflineAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited, formNotes, formPaymentMethod, formProjectEffectiveDate, formProjectValidityValue, formProjectValidityUnit])
@@ -1553,14 +1574,14 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                     <TableCell className="text-[#2b2f36] truncate" title={item.notes}>{item.notes || <EmptyValue />}</TableCell>
                     <TableCell className="text-[#8f959e] truncate">{item.created_by || <EmptyValue />}</TableCell>
                     <TableCell className="text-right pr-4">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {canManagePayment(item) && <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(item)}>
                           <Edit className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(item)}>
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
-                      </div>
+                      </div>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1950,6 +1971,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
             <DialogTitle className="text-base">{editingItem ? "确认编辑" : "确认新增"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
+            <p className="text-[12px] text-[#8f959e]">成交人金额合计需与费用金额一致</p>
             {confirmContent.map((row, i) => (
               <div key={i} className="grid grid-cols-[70px_1fr] items-center gap-2">
                 <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">{row.label}</span>

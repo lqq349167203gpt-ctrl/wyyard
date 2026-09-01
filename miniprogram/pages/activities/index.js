@@ -4,6 +4,7 @@ const { BADGE_COLORS } = require('../../utils/activity-constants')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+const SHARED_SCHEDULE_DATE_KEY = 'schedule_selected_date'
 
 function pad(n) { return n < 10 ? '0' + n : '' + n }
 
@@ -99,6 +100,61 @@ function groupByTimeSlot(records) {
   return slots.filter(s => s.items.length > 0)
 }
 
+function formatRemainingCount(count) {
+  if (count === -999) return '不限次'
+  if (count === null || count === undefined || count === '') return '未记录'
+  return `剩 ${count} 次`
+}
+
+function buildParticipantList(raw, source, visitMap) {
+  if (!raw) return []
+  const withdrawnIds = new Set(raw.withdrawn_participant_ids || [])
+  const visits = visitMap || {}
+  const decorateParticipant = function(item) {
+    const visit = visits[item.id]
+    const memberType = visit && visit.member_type ? visit.member_type : '未记录'
+    const remainingText = visit ? formatRemainingCount(visit.remaining_count) : '未记录'
+    const inviter = visit && visit.referrer_handler ? visit.referrer_handler : '未记录'
+    const needs = visit && visit.needs ? visit.needs : '未填写'
+    const expectedTime = visit && visit.visit_time ? visit.visit_time : '未填写'
+    const metaItems = []
+    if (memberType !== '未记录') metaItems.push(memberType)
+    if (remainingText !== '未记录') metaItems.push(remainingText)
+    if (inviter !== '未记录') metaItems.push(`${inviter}邀约`)
+    if (expectedTime !== '未填写') metaItems.push(`预计 ${expectedTime}`)
+    return {
+      id: item.id,
+      nickname: item.nickname || item.name || '未命名客户',
+      avatar: (item.nickname || item.name || '客').slice(0, 1),
+      withdrawn: Boolean(item.withdrawn || withdrawnIds.has(item.id)),
+      memberType,
+      remainingText,
+      inviter,
+      needs,
+      expectedTime,
+      metaItems,
+      hasNeeds: needs !== '未填写',
+      hasVisitInfo: Boolean(visit),
+    }
+  }
+  // dashboard 的 participants 已按当前账号“资料可见范围”过滤，不能回退到原始 ID 列表。
+  const participants = (Array.isArray(raw.participants) ? raw.participants : [])
+    .filter(function(item) { return item && item.id })
+    .map(decorateParticipant)
+
+  if (['group_case', 'emotional_release', 'energy_knot'].includes(source)
+    && raw.owner_id
+    && raw.owner_name
+    && !participants.some(function(item) { return item.id === raw.owner_id })) {
+    participants.unshift(decorateParticipant({
+      id: raw.owner_id,
+      nickname: raw.owner_name,
+      withdrawn: withdrawnIds.has(raw.owner_id),
+    }))
+  }
+  return participants
+}
+
 Page({
   data: {
     hasPagePermission: true,
@@ -129,6 +185,10 @@ Page({
     withdrawalParticipantIndex: 0,
     showWithdrawal: false,
     withdrawing: false,
+    showParticipantSheet: false,
+    participantSheetTitle: '',
+    participantSheetMeta: '',
+    participantSheetList: [],
     loading: true,
     isViewOnly: false,
   },
@@ -140,8 +200,11 @@ Page({
       return
     }
     this.setData({ isViewOnly: isAreaViewOnly('activities') })
-    const date = options.date || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
+    const date = options.date || wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY) || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
     const d = parseLocalDate(date) || new Date()
+    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
+    wx.setStorageSync('visit_selected_date', date)
+    wx.setStorageSync('activity_selected_date', date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -156,6 +219,11 @@ Page({
 
   onShow() {
     if (!getApp().checkLogin()) return
+    const sharedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY)
+    if (sharedDate && this.data.currentDate && sharedDate !== this.data.currentDate && parseLocalDate(sharedDate)) {
+      this._selectDate(sharedDate)
+      return
+    }
     if (this._needRefresh) {
       this._needRefresh = false
       this.loadData()
@@ -221,7 +289,9 @@ Page({
     if (!d) return
     const counts = this._calendarCounts || {}
     const useSoftTransition = fromWeekSwipe && !this.data.loading && this.data.records.length > 0
+    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
     wx.setStorageSync('activity_selected_date', date)
+    wx.setStorageSync('visit_selected_date', date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -306,6 +376,12 @@ Page({
       if (requestSeq !== this._loadSeq || requestedDate !== this.data.currentDate || String(sid || '') !== String(this.data.spaceId || '')) return
       const records = []
       const rawMap = {}
+      const visitMap = {}
+      ;(dashboard.visits || []).forEach(function(visit) {
+        const customerId = visit.customer_id || ''
+        if (customerId && !visitMap[customerId]) visitMap[customerId] = visit
+      })
+      this._visitMap = visitMap
 
       if (dashboard.class_records) {
         dashboard.class_records.forEach(r => {
@@ -412,6 +488,7 @@ Page({
         r.endTime = parts.length > 1 ? parts[1] : ''
         r.key = `${r.source}_${r.id}`
         const rawRecord = rawMap[r.key] || {}
+        const rosterParticipants = buildParticipantList(rawRecord, r.source, visitMap)
         r.canEdit = canEditRecord(rawRecord, 'activities')
         r.createdBy = rawRecord.created_by || ''
         r.displayName = r.name || r.badge
@@ -423,6 +500,10 @@ Page({
         if (r.teacher) metaParts.push(r.teacher)
         if (r.deductionCount > 0) metaParts.push(`扣卡 ${r.deductionCount} 次`)
         r.metaText = metaParts.join(' · ')
+        r.rosterCount = rosterParticipants.length
+        r.participantRosterText = rosterParticipants.length
+          ? `${rosterParticipants.length} 人 · ${rosterParticipants.map(function(item) { return item.nickname }).join('、')}`
+          : '0 人'
       })
       const timeGroups = groupByTimeSlot(records)
 
@@ -518,6 +599,35 @@ Page({
     getApp().globalData._selectedActivity = raw || record
     getApp().globalData._selectedActivitySource = record.source
     wx.navigateTo({ url: '/pages/activity-detail/index' })
+  },
+
+  onParticipantsOpen(e) {
+    const record = e.currentTarget.dataset.record
+    if (!record || !record.id) return
+    const raw = this._rawMap && this._rawMap[`${record.source}_${record.id}`]
+    if (!raw) return
+
+    const participants = buildParticipantList(raw, record.source, this._visitMap)
+
+    this.setData({
+      showParticipantSheet: true,
+      participantSheetTitle: record.displayName || record.name || record.badge || '课程参与人员',
+      participantSheetMeta: [record.displayName || record.name || record.badge || '', (record.time || '').replace('-', '–')]
+        .filter(Boolean)
+        .join(' · '),
+      participantSheetList: participants,
+    })
+  },
+
+  onParticipantSheetClose() {
+    this.setData({ showParticipantSheet: false })
+  },
+
+  onParticipantProfileTap(e) {
+    const customerId = e.currentTarget.dataset.id
+    if (!customerId) return
+    this.setData({ showParticipantSheet: false })
+    wx.navigateTo({ url: `/pages/customer-profile/index?id=${customerId}` })
   },
 
   onWithdrawalOpen() {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { Plus, Tags, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -43,6 +43,7 @@ export default function HealingRecordsPage() {
   const [searchIdentity, setSearchIdentity] = useState("")
   const [searchReferrer, setSearchReferrer] = useState("")
   const [searchReferrerHandler, setSearchReferrerHandler] = useState("")
+  const [searchServiceTeacher, setSearchServiceTeacher] = useState("")
   const [searchTagIds, setSearchTagIds] = useState<string[]>([])
   const [tagMatch, setTagMatch] = useState<"any" | "all">("any")
 
@@ -52,6 +53,11 @@ export default function HealingRecordsPage() {
   })()
   const canManageTags = currentRole === "超级管理员" || hasPagePermission(permissions, "customer-tags")
   const isViewOnly = currentRole !== "超级管理员" && editPermissions.customers === "view"
+  const serviceTeacherOptions = useMemo(() => (
+    [...new Set(customers.map(customer => customer.service_teacher?.trim()).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, "zh-CN"))
+      .map(name => ({ value: name, label: name }))
+  ), [customers])
 
   // 统计摘要
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -89,6 +95,7 @@ export default function HealingRecordsPage() {
     setSearchIdentity("")
     setSearchReferrer("")
     setSearchReferrerHandler("")
+    setSearchServiceTeacher("")
     setSearchTagIds([])
     setTagMatch("any")
   }
@@ -230,6 +237,16 @@ export default function HealingRecordsPage() {
             />
           </div>
           <SelectDropdown
+            className="w-[138px]"
+            buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+            rounded="7px"
+            value={searchServiceTeacher}
+            options={[{ value: "", label: "全部服务老师" }, ...serviceTeacherOptions]}
+            placeholder="全部服务老师"
+            textColor={searchServiceTeacher ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+            onChange={setSearchServiceTeacher}
+          />
+          <SelectDropdown
             multi
             className="w-[148px]"
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
@@ -291,6 +308,7 @@ export default function HealingRecordsPage() {
           filterIdentity={searchIdentity}
           filterReferrer={searchReferrer}
           filterReferrerHandler={searchReferrerHandler}
+          filterServiceTeacher={searchServiceTeacher}
           filterTagIds={searchTagIds}
           filterTagMatch={tagMatch}
           summary={summary}

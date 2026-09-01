@@ -3,6 +3,7 @@ const { formatDate } = require('../../utils/util')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+const SHARED_SCHEDULE_DATE_KEY = 'schedule_selected_date'
 
 function pad(n) { return n < 10 ? '0' + n : '' + n }
 
@@ -116,9 +117,12 @@ Page({
     }
     this.setData({ isViewOnly: isAreaViewOnly('visits') })
     const now = new Date()
-    const savedDate = wx.getStorageSync('visit_selected_date')
+    const savedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY) || wx.getStorageSync('visit_selected_date')
     const date = savedDate || formatDate(now)
-    const d = savedDate ? new Date(savedDate) : now
+    const d = parseLocalDate(date) || now
+    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
+    wx.setStorageSync('visit_selected_date', date)
+    wx.setStorageSync('activity_selected_date', date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -130,24 +134,29 @@ Page({
     await this.loadSpaces()
     await this.loadData()
     this._initialized = true
-    if (this._pendingShowLoad) {
-      this._pendingShowLoad = false
-      this.loadData()
-    }
   },
 
   onShow() {
     if (!getApp().checkLogin()) return
-    if (this._needRefresh) {
-      this._needRefresh = false
-      this.loadData()
+    if (!this._initialized) return
+
+    const sharedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY)
+    if (sharedDate && sharedDate !== this.data.currentDate && parseLocalDate(sharedDate)) {
+      this._selectDate(sharedDate)
       return
     }
-    if (!this._initialized) {
-      this._pendingShowLoad = true
-      return
-    }
-    this.loadData()
+
+    const restoreScrollTop = this._returningFromChild
+      ? Number(this._returnScrollTop || 0)
+      : undefined
+    this._returningFromChild = false
+    this._needRefresh = false
+    // 返回页面时保留现有列表，仅在后台同步数据，避免列表卸载导致闪屏和回到顶部。
+    this.loadData(undefined, { silent: true, restoreScrollTop })
+  },
+
+  onPageScroll(e) {
+    this._lastScrollTop = Number(e.scrollTop) || 0
   },
 
   onPullDownRefresh() {
@@ -212,7 +221,9 @@ Page({
     if (!d) return
     const counts = this._calendarCounts || {}
     const useSoftTransition = fromWeekSwipe && !this.data.loading && this.data.visits.length > 0
+    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
     wx.setStorageSync('visit_selected_date', date)
+    wx.setStorageSync('activity_selected_date', date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -321,7 +332,7 @@ Page({
       const leaderMap = this.buildLeaderMap(visibleVisits)
 
       this._calendarCounts = counts || {}
-      this.setData({
+      const nextData = {
         visits: visibleVisits,
         visitCounts: counts || {},
         weekPages: buildWeekPages(reqDate, counts || {}),
@@ -330,6 +341,13 @@ Page({
         todayArrivedCount: visibleVisits.filter(v => v.arrived && !v.cancelled).length,
         loading: false,
         dateSwitching: false,
+      }
+      this.setData(nextData, () => {
+        if (Number.isFinite(options.restoreScrollTop)) {
+          wx.nextTick(() => {
+            wx.pageScrollTo({ scrollTop: options.restoreScrollTop, duration: 0 })
+          })
+        }
       })
     } catch (e) {
       console.error('加载数据失败:', e)
@@ -436,11 +454,18 @@ Page({
 
   // ---- 导航 ----
 
+  _markChildNavigation() {
+    this._returningFromChild = true
+    this._returnScrollTop = Number(this._lastScrollTop) || 0
+  },
+
   onAddTap() {
+    this._markChildNavigation()
     wx.navigateTo({ url: `/pages/visit-create/index?date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
   },
 
   onFabLongPress() {
+    this._markChildNavigation()
     wx.navigateTo({ url: `/pages/voice-chat/index?mode=visit&date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
   },
 
@@ -448,12 +473,14 @@ Page({
     if (this.data.editMode) return
     const visit = e.detail.visit || e.currentTarget.dataset.visit
     if (!visit || visit.cancelled) return
+    this._markChildNavigation()
     wx.navigateTo({ url: `/pages/visit-edit/index?id=${visit.id}` })
   },
 
   onProfileTap(e) {
     const visit = e.detail.visit
     if (visit.customer_id) {
+      this._markChildNavigation()
       wx.navigateTo({ url: `/pages/customer-profile/index?id=${visit.customer_id}` })
     }
   },

@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
+from app.models.base import SafeBaseModel
 
 
 class TeaSeatFeeBase(SafeBaseModel):
@@ -16,6 +17,7 @@ class TeaSeatFeeBase(SafeBaseModel):
     organization_id: Optional[str] = None
     deal_date: Optional[str] = None
     created_by: str = ""
+    created_by_id: str = ""
 
 
 class TeaSeatFeeCreate(TeaSeatFeeBase):

@@ -278,7 +278,18 @@ export interface PaidContentItem {
   salesperson: string
 }
 
-export type CustomerFollowUpStatus = "新添加" | "前期沟通中" | "已邀约未到店" | "已到店" | "已成交" | "沉默/流失" | "未配置"
+export type CustomerFollowUpStatus = string
+
+export interface FollowUpStatusConfig {
+  id: string
+  name: string
+  description: string
+  sort_order: number
+  enabled: boolean
+  usage_count: number
+  created_at: string
+  updated_at: string
+}
 
 export type CustomerTagScope = "public" | "private"
 
@@ -358,6 +369,7 @@ export interface CustomerLight {
   traffic_source: string
   traffic_source_detail: string
   referrer: string
+  service_teacher?: string
   referral_date: string
   space_id: string
 }
@@ -397,7 +409,7 @@ export const customerApi = {
     return pending
   },
   batch: (ids: string[]) => request<CustomerLight[]>("/api/customers/batch", { method: "POST", body: JSON.stringify({ ids }) }),
-  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
+  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; service_teacher?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
     const params = new URLSearchParams()
     params.set("page", String(page))
     params.set("page_size", String(pageSize))
@@ -405,6 +417,7 @@ export const customerApi = {
     if (filters?.member_type) params.set("member_type", filters.member_type)
     if (filters?.referrer) params.set("referrer", filters.referrer)
     if (filters?.referrer_handler) params.set("referrer_handler", filters.referrer_handler)
+    if (filters?.service_teacher) params.set("service_teacher", filters.service_teacher)
     if (filters?.member_types) params.set("member_types", filters.member_types)
     if (filters?.tag_ids) params.set("tag_ids", filters.tag_ids)
     if (filters?.tag_match) params.set("tag_match", filters.tag_match)
@@ -435,6 +448,12 @@ export const customerTagApi = {
   delete: (id: string) => request<{ message: string }>(`/api/customer-tags/${id}`, { method: "DELETE" }),
   listForCustomer: (customerId: string) => request<CustomerTag[]>(`/api/customer-tags/customers/${customerId}`),
   setForCustomer: (customerId: string, tagIds: string[]) => request<CustomerTag[]>(`/api/customer-tags/customers/${customerId}`, { method: "PUT", body: JSON.stringify({ tag_ids: tagIds }) }),
+}
+
+export const followUpStatusApi = {
+  list: (includeDisabled = false) => request<FollowUpStatusConfig[]>(`/api/follow-up-statuses${includeDisabled ? "?include_disabled=true" : ""}`),
+  create: (data: { name: string; description: string }) => request<FollowUpStatusConfig>("/api/follow-up-statuses", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<{ name: string; description: string; enabled: boolean }>) => request<FollowUpStatusConfig>(`/api/follow-up-statuses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 }
 
 // AI Config
@@ -840,6 +859,7 @@ export interface ClassRecord {
   course_type: string  // 活动类型（如：读书会、颂钵等）
   activity_name: string
   course_description: string
+  course_review: string
   teacher_ids: string[]
   participant_ids: string[]
   participants?: ActivityDashboardParticipant[]
@@ -874,6 +894,7 @@ export interface ClassRecordCreate {
   course_type?: string  // 活动类型（如：读书会、颂钵等）
   activity_name?: string
   course_description?: string
+  course_review?: string
   teacher_ids?: string[]
   participant_ids?: string[]
   is_public_welfare?: boolean
@@ -1047,6 +1068,7 @@ export interface GroupCaseSession {
   owner_id: string
   owner_name: string
   description: string
+  course_review: string
   participant_ids: string[]
   participants?: ActivityDashboardParticipant[]
   withdrawn_participant_ids: string[]
@@ -1074,6 +1096,7 @@ export interface GroupCaseSessionCreate {
   owner_id: string
   owner_name: string
   description?: string
+  course_review?: string
   participant_ids?: string[]
   teacher_ids?: string[]
   host_id?: string
@@ -1338,6 +1361,7 @@ export interface EmotionalReleaseSession {
   owner_id: string
   owner_name: string
   description: string
+  course_review: string
   participant_ids: string[]
   participants?: ActivityDashboardParticipant[]
   withdrawn_participant_ids: string[]
@@ -1365,6 +1389,7 @@ export interface EmotionalReleaseSessionCreate {
   owner_id: string
   owner_name: string
   description?: string
+  course_review?: string
   participant_ids?: string[]
   teacher_ids?: string[]
   host_id?: string
@@ -1409,6 +1434,7 @@ export interface EnergyKnotSession {
   name: string
   description: string | null
   course_description: string
+  course_review: string
   participant_ids: string[]
   participants?: ActivityDashboardParticipant[]
   withdrawn_participant_ids: string[]
@@ -1436,6 +1462,7 @@ export interface EnergyKnotSessionCreate {
   name?: string
   description?: string
   course_description?: string
+  course_review?: string
   participant_ids?: string[]
   teacher_ids?: string[]
   host_id?: string
@@ -1477,6 +1504,7 @@ export interface InternalCourseSession {
   course_type: string
   course_name: string
   course_description: string
+  course_review: string
   teacher_ids: string[]
   host_id: string
   host_name: string
@@ -1503,6 +1531,7 @@ export interface InternalCourseSessionCreate {
   course_type?: string
   course_name: string
   course_description?: string
+  course_review?: string
   teacher_ids?: string[]
   host_id?: string
   host_name?: string
@@ -2594,6 +2623,8 @@ export interface PositionEditPermissions {
   customers: "view" | "all"
   visits: PositionEditScope
   activities: PositionEditScope
+  activity_participants: PositionEditScope
+  payments: "own" | "all"
   contacts: ContactPermissions
   customer_access: CustomerAccessPermissions
 }
@@ -3100,6 +3131,7 @@ export type AnalysisField =
   | "service_teacher"
   | "referral_date"
   | "created_at"
+  | "invitation_dates"
   | "first_visit_date"
   | "last_visit_date"
   | "invitation_count"

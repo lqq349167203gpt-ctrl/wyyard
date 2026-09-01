@@ -6,7 +6,7 @@ from typing import Literal, TypedDict
 from app.services.storage import delete_item, load_data, save_item
 
 FILENAME = "position_edit_permissions.json"
-EditArea = Literal["customers", "visits", "activities"]
+EditArea = Literal["customers", "visits", "activities", "activity_participants", "payments"]
 EditScope = Literal["view", "own", "all"]
 ContactField = Literal["phone", "wechat"]
 ContactAction = Literal["view", "copy", "edit"]
@@ -59,6 +59,8 @@ class PositionEditPermissions(TypedDict):
     customers: EditScope
     visits: EditScope
     activities: EditScope
+    activity_participants: EditScope
+    payments: EditScope
     contacts: ContactPermissions
     customer_access: CustomerAccessPermissions
 
@@ -128,6 +130,9 @@ DEFAULT_PERMISSIONS: PositionEditPermissions = {
     "customers": "all",
     "visits": "own",
     "activities": "own",
+    # 新权限上线前所有可进入课表/付费页面的角色均可操作全部记录，保持既有行为。
+    "activity_participants": "all",
+    "payments": "all",
     "contacts": _empty_contact_permissions(),
     "customer_access": _empty_customer_access(),
 }
@@ -135,6 +140,8 @@ SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
     "customers": "all",
     "visits": "all",
     "activities": "all",
+    "activity_participants": "all",
+    "payments": "all",
     "contacts": _full_contact_permissions(),
     "customer_access": _full_customer_access(),
 }
@@ -209,6 +216,8 @@ def _normalize_permissions(value: object) -> PositionEditPermissions:
         "customers": _normalize_customer_edit_scope(raw.get("customers")),
         "visits": _normalize_scope(raw.get("visits")),
         "activities": _normalize_scope(raw.get("activities")),
+        "activity_participants": _normalize_scope(raw.get("activity_participants", "all")),
+        "payments": _normalize_scope(raw.get("payments", "all")),
         "contacts": _normalize_contacts(raw.get("contacts")),
         # 兼容上线前的已有角色：旧数据没有 customer_access 时保留原来的完整可见能力。
         "customer_access": _normalize_customer_access(

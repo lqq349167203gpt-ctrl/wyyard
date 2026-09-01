@@ -14,7 +14,6 @@ Page({
     username: '',
     password: '',
     focusedField: '',
-    dateSubtitle: '',
     saveAccount: false,
     savePassword: false,
     devAccounts: DEV_ACCOUNTS,
@@ -23,12 +22,6 @@ Page({
   },
 
   onLoad() {
-    const now = new Date()
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-    this.setData({
-      dateSubtitle: `${now.getMonth() + 1}月${now.getDate()}日 周${weekdays[now.getDay()]} · 请使用内部账号登录`,
-    })
-
     // 恢复仅保存在当前微信设备中的账号密码
     const savedAccount = wx.getStorageSync('login_save_account')
     const savedPassword = savedAccount ? wx.getStorageSync('login_save_password') : ''
@@ -162,7 +155,7 @@ Page({
     wx.setStorageSync('auth_token', data.token)
     wx.setStorageSync('currentUser', data.account)
     wx.setStorageSync('userPermissions', data.permissions)
-    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own' })
+    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' })
 
     // 开发模式登录不改动用户保存的账号密码
     if (this.data.loginMode === 'password') {
@@ -183,7 +176,7 @@ Page({
       app.globalData.token = data.token
       app.globalData.currentUser = data.account
       app.globalData.permissions = data.permissions || []
-      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own' }
+      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
       if (app.scheduleUsageTracking) app.scheduleUsageTracking()
       else if (app.startUsageTracking) app.startUsageTracking()
     }

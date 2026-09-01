@@ -124,8 +124,17 @@
 
   <!-- 描述 -->
   <view class="form-card">
-    <view class="form-item column last">
+    <view class="form-card-title">活动简介</view>
+    <view class="form-item column last" style="padding-top: 14rpx;">
       <textarea class="form-textarea" style="height: 160rpx;" placeholder="输入活动简介..." placeholder-class="form-textarea-placeholder" value="{{description}}" bindinput="onDescriptionInput" />
+    </view>
+  </view>
+
+  <!-- 课程复盘 -->
+  <view class="form-card">
+    <view class="form-card-title">课程复盘</view>
+    <view class="form-item column last" style="padding-top: 14rpx;">
+      <textarea class="form-textarea" style="min-height: 220rpx; background-color: #f7f8fa;" placeholder="输入当天课程的复盘内容..." placeholder-class="form-textarea-placeholder" value="{{courseReview}}" bindinput="onCourseReviewInput" maxlength="-1" />
     </view>
   </view>
 

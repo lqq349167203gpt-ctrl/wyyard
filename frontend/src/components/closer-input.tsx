@@ -25,7 +25,7 @@ export function CloserInput({ customers, value, onChange, disabled, defaultAmoun
 
   const handleSelect = useCallback((customer: Customer) => {
     if (value.some(c => c.id === customer.id)) return
-    onChange([...value, { id: customer.id, name: customer.nickname, amount: defaultAmount ?? 0 }])
+    onChange([...value, { id: customer.id, name: customer.nickname, amount: value.length === 0 ? (defaultAmount ?? 0) : 0 }])
     setSearchValue("")
   }, [value, onChange, defaultAmount])
 
@@ -76,7 +76,7 @@ export function CloserInput({ customers, value, onChange, disabled, defaultAmoun
               </button>
             </div>
           ))}
-          {value.length > 1 && (
+          {value.length > 0 && (
             <div className="text-[11px] text-[#8f959e]">
               总金额: <span className="text-[#2b2f36] font-medium">{total}</span> 元
             </div>

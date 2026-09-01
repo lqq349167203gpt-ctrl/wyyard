@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "付费项目",
+  "navigationBarBackgroundColor": "#f3f7ff",
+  "backgroundColor": "#f7f8fa",
   "usingComponents": {}
 }

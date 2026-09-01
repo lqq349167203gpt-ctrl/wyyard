@@ -2871,15 +2871,15 @@ export default function DailyActivitiesPage() {
                   {dayParticipants.map(p => (
                     <span
                       key={p.id}
-                      draggable={!isViewOnly}
+                      draggable={editPermissions.activity_participants !== "view"}
                       onDragStart={(e) => {
-                        if (isViewOnly) return
+                        if (editPermissions.activity_participants === "view") return
                         const payload = JSON.stringify({ customer_id: p.id, nickname: p.nickname })
                         e.dataTransfer.setData("application/x-wyyard-participant", payload)
                         e.dataTransfer.setData("text/plain", payload)
                         e.dataTransfer.effectAllowed = "copy"
                       }}
-                      className={`inline-flex items-center rounded-sm px-2 py-[3px] text-[12px] transition-colors ${isViewOnly ? "cursor-default bg-[#f5f6f7] text-[#8f959e]" : "cursor-grab bg-[#f0f5ff] text-[#3370ff] hover:bg-[#e0edff] active:cursor-grabbing"}`}
+                      className={`inline-flex items-center rounded-sm px-2 py-[3px] text-[12px] transition-colors ${editPermissions.activity_participants === "view" ? "cursor-default bg-[#f5f6f7] text-[#8f959e]" : "cursor-grab bg-[#f0f5ff] text-[#3370ff] hover:bg-[#e0edff] active:cursor-grabbing"}`}
                     >
                       {p.nickname}
                     </span>

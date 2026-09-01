@@ -109,7 +109,7 @@ const FIELD_CN: Record<string, string> = {
   status: "状态", type: "类型", date: "日期", start_time: "开始时间", end_time: "结束时间",
   enabled: "启用状态",
   scope: "可见范围", customer_tags: "客户标签",
-  teacher_ids: "老师", teachers: "老师", course_name: "沙龙名称", course_type: "课程类型", course_description: "沙龙描述", activity_name: "活动名称", course_date: "课程日期",
+  teacher_ids: "老师", teachers: "老师", course_name: "沙龙名称", course_type: "课程类型", course_description: "沙龙描述", course_review: "课程复盘", activity_name: "活动名称", course_date: "课程日期",
   owner_name: "案主", owner_id: "案主", host_name: "主持人", host_names: "主持人", host_id: "主持人", host_ids: "主持人",
   participant_ids: "参与者", withdrawn_participant_ids: "退课人员", withdrawal_records: "退课记录", record_type: "活动类型",
   restored_count: "退回卡次", withdrawn_at: "退课办理时间", withdrawn_by: "退课办理人", withdrawn_by_id: "退课办理账号编号",

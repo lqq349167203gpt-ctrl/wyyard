@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.emotional_release import EmotionalReleaseCreate
 from app.services import customer_access_service, emotional_release_service, emotional_release_session_service
 from app.utils.pagination import paginate
+from app.utils.payment_validation import ensure_payment_closer_total
+from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
 router = APIRouter(prefix="/api/emotional-releases", tags=["emotional-releases"])
 
@@ -55,7 +57,8 @@ def get_release(release_id: str, request: Request):
 def create_release(data: EmotionalReleaseCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
-    return emotional_release_service.create_release(data)
+    ensure_payment_closer_total(data, "amount", request=request)
+    return emotional_release_service.create_release(stamp_payment_creator(data, request))
 
 
 @router.patch("/{release_id}")
@@ -64,9 +67,13 @@ def update_release(release_id: str, data: dict, request: Request):
     existing = emotional_release_service.get_release(release_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
+    data.pop("created_by", None)
+    data.pop("created_by_id", None)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
+    ensure_payment_closer_total(data, "amount", existing, request)
     # purchase_count 允许修正：剩余次数由「购买 - 已使用 - 销卡」实时派生，修改总数不破坏恒等式
     if "purchase_count" in data:
         pc = data["purchase_count"]
@@ -85,6 +92,7 @@ def delete_release(release_id: str, request: Request):
     existing = emotional_release_service.get_release(release_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     success, message = emotional_release_service.delete_release(release_id)
     if not success:

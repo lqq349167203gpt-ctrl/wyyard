@@ -9,7 +9,6 @@ from langchain_openai import ChatOpenAI
 
 from app.config.settings import settings
 from app.models.custom_analysis import AnalysisCondition, AnalysisPlan
-from app.models.customer import FollowUpStatus
 from app.services import (
     class_record_service,
     communication_record_service,
@@ -19,6 +18,7 @@ from app.services import (
     emotional_release_session_service,
     energy_knot_service,
     energy_knot_session_service,
+    follow_up_status_service,
     group_case_service,
     group_case_session_service,
     internal_course_service,
@@ -47,6 +47,7 @@ FIELD_LABELS = {
     "service_teacher": "服务老师",
     "referral_date": "引流日期",
     "created_at": "创建日期",
+    "invitation_dates": "邀约日期",
     "first_visit_date": "首次到访",
     "last_visit_date": "最近到访",
     "invitation_count": "受邀次数",
@@ -82,7 +83,7 @@ FIELD_GROUPS = {
         "service_teacher", "created_by",
     ],
     "日期信息": [
-        "referral_date", "created_at", "first_visit_date", "last_visit_date",
+        "referral_date", "created_at", "invitation_dates", "first_visit_date", "last_visit_date",
         "last_communication_date", "payment_dates",
     ],
     "邀约行为": [
@@ -100,11 +101,11 @@ FIELD_GROUPS = {
 }
 
 DATE_FIELDS = {
-    "referral_date", "created_at", "first_visit_date", "last_visit_date",
+    "referral_date", "created_at", "invitation_dates", "first_visit_date", "last_visit_date",
     "last_communication_date", "payment_dates", "latest_payment_date",
 }
 
-MULTI_DATE_FIELDS = {"payment_dates"}
+MULTI_DATE_FIELDS = {"invitation_dates", "payment_dates"}
 
 PAYMENT_EVENT_FIELDS = {
     "purchased_projects",
@@ -180,9 +181,7 @@ NUMERIC_FIELDS = {
     "payment_amount_period",
 }
 
-DIMENSION_ORDERS = {
-    "follow_up_status": [status.value for status in FollowUpStatus],
-}
+DIMENSION_ORDERS = {}
 
 DEFAULT_COLUMNS = [
     "nickname",
@@ -349,6 +348,7 @@ def build_customer_dataset(
     ]
     visible_tags = customer_tag_service.visible_tags_by_customer(actor_id)
 
+    invitation_dates: dict[str, set[str]] = defaultdict(set)
     visit_dates: dict[str, set[str]] = defaultdict(set)
     invitation_counts: dict[str, int] = defaultdict(int)
     period_invitation_counts: dict[str, int] = defaultdict(int)
@@ -361,6 +361,8 @@ def build_customer_dataset(
         if getattr(visit, "is_deleted", False):
             continue
         customer_id = visit.customer_id
+        if visit.visit_date:
+            invitation_dates[customer_id].add(visit.visit_date)
         if not visit.cancelled:
             invitation_counts[customer_id] += 1
         if visit.arrived:
@@ -472,7 +474,7 @@ def build_customer_dataset(
             "gender": customer.gender or "",
             "age": customer.age or "",
             "member_type": customer.member_type or "",
-            "follow_up_status": _enum_value(customer.follow_up_status) or FollowUpStatus.UNCONFIGURED.value,
+            "follow_up_status": _enum_value(customer.follow_up_status) or follow_up_status_service.UNCONFIGURED,
             "customer_tags": [str(tag.get("name") or "") for tag in tags if tag.get("name")],
             "traffic_source": customer.traffic_source or "",
             "referrer": customer.referrer or "",
@@ -481,6 +483,7 @@ def build_customer_dataset(
             "created_by": customer.created_by or "",
             "referral_date": customer.referral_date or "",
             "created_at": created_at,
+            "invitation_dates": sorted(invitation_dates.get(customer.id, set())),
             "first_visit_date": dates[0] if dates else "",
             "last_visit_date": dates[-1] if dates else "",
             "invitation_count": invitation_counts.get(customer.id, 0),
@@ -849,7 +852,11 @@ def _build_cards(rows: list[dict[str, Any]], plan: AnalysisPlan) -> list[dict[st
 
     configured = [(name, value) for name, value in dimension_values.items() if name != "未配置"]
     configured.sort(key=lambda item: (-item[1], item[0]))
-    preferred_order = DIMENSION_ORDERS.get(plan.card_dimension, [])
+    preferred_order = (
+        follow_up_status_service.reporting_names()
+        if plan.card_dimension == "follow_up_status"
+        else DIMENSION_ORDERS.get(plan.card_dimension, [])
+    )
     if preferred_order:
         order_map = {name: index for index, name in enumerate(preferred_order)}
         configured.sort(key=lambda item: (order_map.get(item[0], len(order_map)), -item[1], item[0]))
@@ -1026,7 +1033,7 @@ def _llm_plan(query: str) -> AnalysisPlan | None:
 允许运算符：{json.dumps(OPERATOR_LABELS, ensure_ascii=False)}
 允许统计指标：{json.dumps({key: METRIC_LABELS[key][0] for key in VISIBLE_METRICS}, ensure_ascii=False)}
 允许卡片维度：{json.dumps(CARD_DIMENSION_LABELS, ensure_ascii=False)}
-跟进阶段：{json.dumps([status.value for status in FollowUpStatus], ensure_ascii=False)}
+跟进阶段：{json.dumps(follow_up_status_service.reporting_names(), ensure_ascii=False)}
 
 输出结构：
 {{
@@ -1074,15 +1081,25 @@ def _add_condition(conditions: list[AnalysisCondition], field: str, operator: st
         conditions.append(candidate)
 
 
+def _date_field_from_query(query: str) -> str:
+    if "邀约" in query:
+        return "invitation_dates"
+    if "引流" in query:
+        return "referral_date"
+    if "到店" in query:
+        return "last_visit_date"
+    return "created_at"
+
+
 def _local_plan(query: str, actor_id: str) -> AnalysisPlan:
     conditions: list[AnalysisCondition] = []
     normalized_query = query.replace(" ", "")
 
     if "已邀约未到店" in normalized_query:
         _add_condition(conditions, "follow_up_status", "eq", "已邀约未到店")
-    for status in FollowUpStatus:
-        if status.value in normalized_query and status.value != "已邀约未到店":
-            _add_condition(conditions, "follow_up_status", "eq", status.value)
+    for status in follow_up_status_service.reporting_names():
+        if status in normalized_query and status != "已邀约未到店":
+            _add_condition(conditions, "follow_up_status", "eq", status)
     if "沟通中" in normalized_query and "前期沟通中" not in normalized_query:
         _add_condition(conditions, "follow_up_status", "eq", "前期沟通中")
 
@@ -1112,15 +1129,15 @@ def _local_plan(query: str, actor_id: str) -> AnalysisPlan:
         amount = int(range_match.group(1))
         unit = range_match.group(2)
         days = amount if unit == "天" else amount * (365 if unit == "年" else 30)
-        date_field = "referral_date" if "引流" in normalized_query else "last_visit_date" if "到店" in normalized_query else "created_at"
+        date_field = _date_field_from_query(normalized_query)
         _add_condition(conditions, date_field, "between", [(today - timedelta(days=days)).isoformat(), today.isoformat()])
     elif "本月" in normalized_query:
         month_start = today.replace(day=1)
-        date_field = "referral_date" if "引流" in normalized_query else "last_visit_date" if "到店" in normalized_query else "created_at"
+        date_field = _date_field_from_query(normalized_query)
         _add_condition(conditions, date_field, "between", [month_start.isoformat(), today.isoformat()])
     elif "今年" in normalized_query:
         year_start = today.replace(month=1, day=1)
-        date_field = "referral_date" if "引流" in normalized_query else "last_visit_date" if "到店" in normalized_query else "created_at"
+        date_field = _date_field_from_query(normalized_query)
         _add_condition(conditions, date_field, "between", [year_start.isoformat(), today.isoformat()])
 
     known_fields = {
@@ -1275,7 +1292,11 @@ def metadata(
                 operators = ["eq", "contains", "in", "is_empty", "is_not_empty"]
                 options = sorted({str(item) for row in rows for item in (row.get(field_name) or []) if item})
             else:
-                values = sorted({str(row.get(field_name) or "") for row in rows if row.get(field_name)})
+                values = (
+                    follow_up_status_service.reporting_names()
+                    if field_name == "follow_up_status"
+                    else sorted({str(row.get(field_name) or "") for row in rows if row.get(field_name)})
+                )
                 value_type = "select" if values and len(values) <= 500 else "text"
                 operators = ["eq", "ne", "contains", "in", "is_empty", "is_not_empty"]
                 options = values[:500]

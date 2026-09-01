@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { customerApi, customerTagApi, type ContactPermissions, type CustomerAccessPermissions, type CustomerCreate, type CustomerLight, type CustomerTag } from "@/lib/api"
+import { customerApi, customerTagApi, followUpStatusApi, type ContactPermissions, type CustomerAccessPermissions, type CustomerCreate, type CustomerLight, type CustomerTag, type FollowUpStatusConfig } from "@/lib/api"
 import { CustomerTagField } from "@/components/customer-tag-editor"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
@@ -80,6 +80,7 @@ export default function CustomerFormPage() {
   const [loading, setLoading] = useState(false)
   const [entityId, setEntityId] = useState<string | null>(id || null)
   const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
+  const [followUpStatuses, setFollowUpStatuses] = useState<FollowUpStatusConfig[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [tagsLoaded, setTagsLoaded] = useState(false)
   const [tagsLoading, setTagsLoading] = useState(true)
@@ -95,6 +96,7 @@ export default function CustomerFormPage() {
   // 加载客户列表（供搜索输入用）
   useEffect(() => {
     customerApi.light(true).then(setCustomers).catch(() => {})
+    followUpStatusApi.list().then(setFollowUpStatuses).catch(() => setFollowUpStatuses([]))
   }, [])
 
   // 加载草稿或客户数据
@@ -386,7 +388,7 @@ export default function CustomerFormPage() {
             </div>
             {(!isEdit || customerAccessPermissions?.sensitive_fields.work_info !== false) && <div className="flex items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">工作情况</label>
-              <SelectDropdown value={form.work_status || ""} options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }]} placeholder="是否在职" onChange={(v) => setField("work_status", v)} className="w-[100px]" />
+              <SelectDropdown value={form.work_status || ""} options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }, { value: "全职带孩子", label: "全职带孩子" }]} placeholder="是否在职" onChange={(v) => setField("work_status", v)} className="w-[120px]" />
               <Input value={form.work_description || ""} onChange={(e) => setField("work_description", e.target.value)} placeholder="工作情况详情..." className="flex-1 mr-[96px]" />
             </div>}
           </div>
@@ -463,10 +465,7 @@ export default function CustomerFormPage() {
               <label className="w-12 flex-shrink-0 text-right text-[12px] font-normal text-[#4e535a]">跟进阶段</label>
               <SelectDropdown
                 value={form.follow_up_status || "未配置"}
-                options={["新添加", "前期沟通中", "已邀约未到店", "已到店", "已成交", "沉默/流失", "未配置"].map(value => ({
-                  value,
-                  label: value,
-                }))}
+                options={followUpStatuses.map(status => ({ value: status.name, label: status.name }))}
                 onChange={(value) => setField("follow_up_status", value)}
                 className="w-[200px]"
               />

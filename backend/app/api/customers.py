@@ -17,6 +17,7 @@ from app.services import (
     customer_tag_service,
     emotional_release_service,
     energy_knot_service,
+    follow_up_status_service,
     group_case_service,
     internal_course_service,
     member_identity_service,
@@ -35,6 +36,11 @@ from app.utils.request_context import get_client_ip
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/customers", tags=["customers"])
+
+
+def _validate_follow_up_status(value: str | None) -> None:
+    if value is not None and value != follow_up_status_service.UNCONFIGURED and not follow_up_status_service.is_active(value):
+        raise HTTPException(status_code=422, detail="跟进状态不存在或已停用")
 
 
 class TagsGenerateRequest(StrictBaseModel):
@@ -190,6 +196,7 @@ async def list_customers(
     member_type: str | None = Query(None),
     referrer: str | None = Query(None),
     referrer_handler: str | None = Query(None),
+    service_teacher: str | None = Query(None),
     member_types: str | None = Query(None),
     tag_ids: str | None = Query(None),
     tag_match: str = Query("any", pattern="^(any|all)$"),
@@ -211,6 +218,8 @@ async def list_customers(
         items = [c for c in items if referrer.lower() in (c.get("referrer", "") or "").lower()]
     if referrer_handler:
         items = [c for c in items if referrer_handler.lower() in (c.get("referrer_handler", "") or "").lower()]
+    if service_teacher:
+        items = [c for c in items if service_teacher.lower() in (c.get("service_teacher", "") or "").lower()]
     if member_types:
         allowed = [m.strip() for m in member_types.split(",") if m.strip()]
         if allowed:
@@ -275,6 +284,7 @@ async def list_customers(
 
 @router.post("")
 async def create_customer(data: CustomerCreate, request: Request):
+    _validate_follow_up_status(data.follow_up_status)
     # 强制从 JWT 派生 created_by，忽略客户端传入值
     account_id = getattr(request.state, "user_id", "")
     if account_id:
@@ -312,6 +322,7 @@ async def list_customers_light(request: Request):
             "traffic_source": c.traffic_source or "",
             "traffic_source_detail": c.traffic_source_detail or "",
             "referrer": c.referrer or "",
+            "service_teacher": c.service_teacher or "",
             "referral_date": c.referral_date or "",
             "position_sort_orders": c.position_sort_orders or {},
             "space_id": c.space_id or "",
@@ -418,6 +429,7 @@ async def update_customer(customer_id: str, data: CustomerUpdate, request: Reque
     if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
     update_data = data.model_dump(exclude_unset=True)
+    _validate_follow_up_status(update_data.get("follow_up_status"))
     role = getattr(request.state, "user_role", "")
     if not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有修改该客户的权限")

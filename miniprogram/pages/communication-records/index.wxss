@@ -1,106 +1,5 @@
-.page {
-  min-height: 100vh;
-  background-color: #f7f8fa;
-  padding: 24rpx 32rpx;
-  display: flex;
-  flex-direction: column;
-}
-
 .placeholder {
   color: #b0b5bb;
-}
-
-/* 搜索栏 */
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  margin-bottom: 20rpx;
-}
-
-.search-input-wrap {
-  flex: 1;
-  background-color: #fff;
-  border-radius: 12rpx;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
-}
-
-.filter-btn {
-  display: flex;
-  align-items: center;
-  gap: 4rpx;
-  height: 72rpx;
-  padding: 0 24rpx;
-  background-color: #fff;
-  border-radius: 12rpx;
-  font-size: 26rpx;
-  color: #8f959e;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
-  flex-shrink: 0;
-}
-
-.filter-btn.active {
-  color: #3370ff;
-}
-
-.filter-arrow {
-  font-size: 20rpx;
-}
-
-/* 下拉面板 */
-.dropdown-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 99;
-}
-
-.dropdown-panel {
-  position: fixed;
-  top: 130rpx;
-  right: 32rpx;
-  background-color: #fff;
-  border-radius: 12rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.12);
-  z-index: 100;
-  min-width: 240rpx;
-  max-height: 480rpx;
-  overflow-y: auto;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 32rpx;
-  font-size: 28rpx;
-  color: #1f2329;
-  border-bottom: 1rpx solid #f5f6f7;
-}
-
-.dropdown-item:last-child {
-  border-bottom: none;
-}
-
-.dropdown-item:active {
-  background-color: #f7f8fa;
-}
-
-.dropdown-item.active {
-  color: #3370ff;
-}
-
-.check {
-  font-size: 28rpx;
-  color: #3370ff;
-}
-
-.search-input {
-  height: 72rpx;
-  padding: 0 28rpx;
-  font-size: 28rpx;
 }
 
 /* 列表 */
@@ -211,4 +110,271 @@
   font-size: 48rpx;
   color: #fff;
   line-height: 1;
+}
+
+/* 搜索与筛选统一使用客户页样式 */
+.page {
+  min-height: 100vh;
+  padding: 0 0 140rpx;
+  background-color: #f7f8fa;
+  display: block;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 16rpx;
+  margin-bottom: 0;
+  padding: 16rpx 32rpx 28rpx;
+  background-color: #f3f7ff;
+}
+
+.search-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 72rpx;
+  padding: 0 28rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-shadow: none;
+}
+
+.search-entry {
+  gap: 18rpx;
+}
+
+.search-entry-active {
+  background-color: #f9fbff;
+}
+
+.search-symbol {
+  position: relative;
+  width: 32rpx;
+  height: 32rpx;
+  flex-shrink: 0;
+}
+
+.search-symbol::before {
+  position: absolute;
+  top: 3rpx;
+  left: 3rpx;
+  width: 20rpx;
+  height: 20rpx;
+  box-sizing: border-box;
+  border: 3rpx solid #a8aeb6;
+  border-radius: 50%;
+  content: '';
+}
+
+.search-symbol::after {
+  position: absolute;
+  top: 21rpx;
+  left: 20rpx;
+  width: 12rpx;
+  height: 3rpx;
+  border-radius: 2rpx;
+  background-color: #a8aeb6;
+  content: '';
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.search-entry-text {
+  flex: 1;
+  color: #8f959e;
+  font-size: 28rpx;
+  line-height: 72rpx;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  height: 72rpx;
+  gap: 10rpx;
+  padding: 0 24rpx;
+  border-radius: 20rpx;
+  background-color: #fff;
+  box-shadow: none;
+  color: #4e535a;
+  flex-shrink: 0;
+}
+
+.filter-btn text {
+  color: #4e535a;
+  font-size: 26rpx;
+}
+
+.filter-btn.active text {
+  color: #3370ff;
+  font-weight: 500;
+}
+
+.filter-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32rpx;
+  height: 32rpx;
+  box-sizing: border-box;
+  padding: 0 8rpx;
+  border-radius: 16rpx;
+  background-color: #3370ff;
+  color: #fff !important;
+  font-size: 20rpx !important;
+}
+
+.filter-toggle-arrow {
+  width: 10rpx;
+  height: 10rpx;
+  margin-left: 2rpx;
+  box-sizing: border-box;
+  border-right: 2rpx solid #8f959e;
+  border-bottom: 2rpx solid #8f959e;
+  transform: rotate(45deg) translateY(-2rpx);
+  transform-origin: center;
+}
+
+.filter-toggle-arrow.open {
+  border-color: #3370ff;
+  transform: rotate(225deg) translate(-2rpx, -2rpx);
+}
+
+.dropdown-panel {
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: 40;
+  min-width: 0;
+  max-height: none;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dropdown-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 40;
+}
+
+.dropdown-content {
+  position: fixed;
+  top: 114rpx;
+  left: 0;
+  right: 0;
+  z-index: 41;
+  box-sizing: border-box;
+  background-color: #fff;
+}
+
+.filter-dropdown {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 114rpx);
+  max-height: 1060rpx;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0 0 32rpx 32rpx;
+}
+
+.filter-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.filter-body {
+  padding: 12rpx 32rpx 16rpx;
+}
+
+.filter-section {
+  margin: 0;
+  padding: 24rpx 0 8rpx;
+}
+
+.filter-section-title {
+  margin-bottom: 22rpx;
+  color: #646a73;
+  font-size: 24rpx;
+  font-weight: 500;
+  letter-spacing: 1rpx;
+}
+
+.filter-section-empty {
+  padding: 8rpx 0;
+  color: #b0b5bb;
+  font-size: 24rpx;
+}
+
+.tags-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+
+.tag-item {
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background-color: #f4f6f8;
+  color: #4e535a;
+  font-size: 23rpx;
+  line-height: 1.4;
+}
+
+.tag-item.active {
+  background-color: #eef3ff;
+  color: #3370ff;
+  font-weight: 500;
+}
+
+.filter-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 20rpx;
+  padding: 20rpx 32rpx 28rpx;
+  border-top: 1rpx solid #f1f2f4;
+  background-color: #fff;
+}
+
+.filter-reset,
+.filter-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 80rpx;
+  padding: 0;
+  border-radius: 20rpx;
+  font-size: 26rpx;
+}
+
+.filter-reset {
+  width: 192rpx;
+  flex: none;
+  background-color: #f4f6f8;
+  color: #646a73;
+}
+
+.filter-confirm {
+  flex: 1;
+  background-color: #3370ff;
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.list-area {
+  margin: 24rpx 32rpx 0;
 }

@@ -1,3 +1,4 @@
+<page-meta page-style="{{showWithdrawal || showParticipantSheet ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
   <!-- 无权限 -->
   <view class="no-permission" wx:if="{{!hasPagePermission}}">
@@ -84,32 +85,39 @@
       </view>
       <view class="group-card">
         <view
-          class="card {{item.canEdit ? '' : 'read-only'}}"
+          class="card roster-card {{item.canEdit ? '' : 'read-only'}}"
           wx:for="{{group.items}}"
           wx:key="key"
           wx:for-item="item"
           bindtap="onActivityTap"
           data-record="{{item}}"
         >
-          <view class="card-time">
-            <text class="t1">{{item.startTime || '--'}}</text>
-            <text class="t2">{{item.endTime}}</text>
-          </view>
-          <view class="card-mid">
-            <view class="card-line1">
-              <text class="welfare-tag" wx:if="{{item.isBookClubWelfare}}">公益</text>
-              <text class="name">{{item.displayName}}</text>
-              <text class="type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
+          <view class="card-top">
+            <view class="card-time">
+              <text class="t1">{{item.startTime || '--'}}</text>
+              <text class="t2">{{item.endTime}}</text>
             </view>
-            <view class="card-line2">
-              <text wx:if="{{item.metaText}}">{{item.metaText}}</text>
-              <text class="creator-text">创建人 · {{item.createdBy || '未记录'}}</text>
+            <view class="card-mid">
+              <view class="card-line1">
+                <text class="welfare-tag" wx:if="{{item.isBookClubWelfare}}">公益</text>
+                <text class="name">{{item.displayName}}</text>
+                <text class="type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
+              </view>
+              <view class="card-line2">
+                <text wx:if="{{item.metaText}}">{{item.metaText}}</text>
+                <text class="creator-text">创建人 · {{item.createdBy || '未记录'}}</text>
+              </view>
+            </view>
+            <view class="card-right">
+              <view class="card-status-row" wx:if="{{!item.canEdit || item.isPublished}}">
+                <text class="readonly-status" wx:if="{{!item.canEdit}}">{{isViewOnly ? '仅浏览' : '部分只读'}}</text>
+                <text class="status" wx:if="{{item.isPublished}}">已发布</text>
+              </view>
             </view>
           </view>
-          <view class="card-right">
-            <text class="readonly-status" wx:if="{{!item.canEdit}}">{{isViewOnly ? '仅浏览' : '部分只读'}}</text>
-            <text class="ppl" wx:if="{{item.participants > 0}}">{{item.participants}} 人</text>
-            <text class="status" wx:if="{{item.isPublished}}">已发布</text>
+          <view class="card-roster-strip">
+            <text class="card-roster-names">{{item.participantRosterText}}</text>
+            <text class="card-roster-entry" catchtap="onParticipantsOpen" data-record="{{item}}">名单 ›</text>
           </view>
         </view>
       </view>
@@ -174,6 +182,47 @@
       <button class="withdraw-cancel" bindtap="onWithdrawalClose" disabled="{{withdrawing}}">取消</button>
       <button class="withdraw-confirm" bindtap="onWithdrawalConfirm" loading="{{withdrawing}}" disabled="{{withdrawing}}">{{withdrawalMode === 'withdraw' ? '确认退课' : '确认恢复'}}</button>
     </view>
+  </view>
+
+  <view class="participant-mask" wx:if="{{showParticipantSheet}}" bindtap="onParticipantSheetClose"></view>
+  <view class="participant-sheet" wx:if="{{showParticipantSheet}}">
+    <view class="participant-sheet-handle"></view>
+    <view class="participant-sheet-head">
+      <view class="participant-sheet-heading">
+        <view class="participant-sheet-title-row">
+          <text class="participant-sheet-title">参与人员</text>
+          <text class="participant-sheet-count">{{participantSheetList.length}}</text>
+        </view>
+        <text class="participant-sheet-subtitle">{{participantSheetMeta || participantSheetTitle}}</text>
+      </view>
+      <view class="participant-sheet-close" bindtap="onParticipantSheetClose" aria-label="关闭">×</view>
+    </view>
+    <scroll-view class="participant-sheet-list" scroll-y>
+      <view class="participant-sheet-empty" wx:if="{{participantSheetList.length === 0}}">暂无参与人员</view>
+      <view class="participant-sheet-item" wx:for="{{participantSheetList}}" wx:key="id" catchtap="onParticipantProfileTap" data-id="{{item.id}}">
+        <view class="participant-sheet-avatar">{{item.avatar}}</view>
+        <view class="participant-sheet-content">
+          <view class="participant-sheet-name-line">
+            <view class="participant-sheet-name-wrap">
+              <text class="participant-sheet-name">{{item.nickname}}</text>
+              <text class="participant-sheet-withdrawn" wx:if="{{item.withdrawn}}">已退课</text>
+              <text class="participant-no-visit" wx:if="{{!item.hasVisitInfo}}">当日无邀约</text>
+            </view>
+            <text class="participant-sheet-link">资料 ›</text>
+          </view>
+          <view class="participant-meta-line" wx:if="{{item.metaItems.length > 0}}">
+            <block wx:for="{{item.metaItems}}" wx:key="*this" wx:for-item="metaItem" wx:for-index="metaIndex">
+              <text class="participant-meta-separator" wx:if="{{metaIndex > 0}}">·</text>
+              <text class="participant-meta-value">{{metaItem}}</text>
+            </block>
+          </view>
+          <view class="participant-needs-row" wx:if="{{item.hasNeeds}}">
+            <text class="participant-needs-label">需求：</text>
+            <text class="participant-needs-value">{{item.needs}}</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
   </view>
   </block>
 </view>

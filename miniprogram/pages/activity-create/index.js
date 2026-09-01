@@ -58,6 +58,8 @@ Page({
     activityName: '',
     // 描述
     description: '',
+    // 当天课程复盘
+    courseReview: '',
     // 销卡次数（eks）
     deductionCount: 1,
     // 客户数据
@@ -105,7 +107,7 @@ Page({
   async loadCourses() {
     try {
       const types = await courseTypeApi.list()
-      const courses = types.map(t => ({ id: t.name, name: t.name }))
+      const courses = types.filter(t => t.category !== 'other').map(t => ({ id: t.name, name: t.name }))
       const defaultIndex = courses.findIndex(c => c.name === '读书会')
       const courseIndex = defaultIndex >= 0 ? defaultIndex : -1
 
@@ -270,6 +272,10 @@ Page({
   // 描述
   onDescriptionInput(e) {
     this.setData({ description: e.detail.value })
+  },
+
+  onCourseReviewInput(e) {
+    this.setData({ courseReview: e.detail.value })
   },
 
   // ---------- 统一搜索弹窗 ----------
@@ -474,6 +480,7 @@ Page({
       space_name: space?.name || '',
       activity_mode: this.data.activityModes[this.data.activityModeIndex],
       participant_ids: this.data.participantIds,
+      course_review: this.data.courseReview,
     }
 
     this.setData({ saving: true })

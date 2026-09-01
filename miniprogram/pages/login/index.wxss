@@ -14,49 +14,6 @@
   box-sizing: border-box;
 }
 
-/* 品牌区 */
-.brand-block {
-  display: flex;
-  align-items: center;
-  gap: 22rpx;
-}
-
-.logo-icon {
-  width: 76rpx;
-  height: 76rpx;
-  border-radius: 22rpx;
-  background-color: #3370ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logo-w {
-  color: #ffffff;
-  font-size: 36rpx;
-  font-weight: 500;
-  line-height: 1;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-.brand-name {
-  color: #1f2329;
-  font-size: 34rpx;
-  font-weight: 500;
-  letter-spacing: 1rpx;
-  line-height: 1;
-}
-
-.brand-badge {
-  padding: 6rpx 18rpx;
-  border-radius: 999rpx;
-  background-color: #eef3ff;
-  color: #3370ff;
-  font-size: 20rpx;
-  letter-spacing: 3rpx;
-  line-height: 1;
-}
-
 .welcome-title {
   margin-top: 5vh;
   color: #1f2329;
@@ -67,7 +24,7 @@
 }
 
 .welcome-subtitle {
-  margin-top: 14rpx;
+  margin-top: 22rpx;
   color: #8f959e;
   font-size: 24rpx;
   line-height: 1.5;

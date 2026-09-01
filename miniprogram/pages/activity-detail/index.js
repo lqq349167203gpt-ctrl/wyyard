@@ -60,9 +60,11 @@ Page({
     participantIds: [],
     withdrawnParticipantIds: [],
     participantList: [],
+    participantReadonlyText: '',
     dayVisitors: [],
     activityName: '',
     description: '',
+    courseReview: '',
     allCustomers: [],
     showPicker: false,
     pickerTitle: '',
@@ -78,6 +80,7 @@ Page({
     deleting: false,
     readOnly: false,
     viewOnly: false,
+    canEditParticipants: true,
     createdBy: '',
     _recordId: '',
     _source: '',
@@ -107,6 +110,7 @@ Page({
     const initData = {
       readOnly: !canEditRecord(raw, 'activities'),
       viewOnly: isAreaViewOnly('activities'),
+      canEditParticipants: canEditRecord(raw, 'activity_participants'),
       createdBy: raw.created_by || '',
       activityType,
       typeLabel,
@@ -120,6 +124,7 @@ Page({
       description: activityType === 'eks'
         ? (raw.course_description || '')
         : (raw.description || raw.course_description || ''),
+      courseReview: raw.course_review || '',
       deductionCount: this._parseEksDeductionCount(raw.description, activityType),
       ownerId: raw.owner_id || '',
       ownerName: raw.owner_name || '',
@@ -196,7 +201,7 @@ Page({
   async loadCourses(courseType) {
     try {
       const types = await courseTypeApi.list()
-      const courses = types.map(t => ({ id: t.name, name: t.name }))
+      const courses = types.filter(t => t.category !== 'other').map(t => ({ id: t.name, name: t.name }))
       const courseIndex = courseType
         ? Math.max(-1, courses.findIndex(c => c.name === courseType))
         : -1
@@ -242,6 +247,7 @@ Page({
   },
 
   onDateChange(e) {
+    if (this.data.readOnly) return
     this.setData({ date: e.detail.value })
     this.loadDayVisitors(e.detail.value)
   },
@@ -255,6 +261,7 @@ Page({
   },
 
   onSpaceChange(e) {
+    if (this.data.readOnly) return
     const spaceIndex = e.detail.value
     const space = this.data.spaces[spaceIndex]
     const rooms = space?.rooms || []
@@ -262,6 +269,7 @@ Page({
   },
 
   onRoomChange(e) {
+    if (this.data.readOnly) return
     this.setData({ roomIndex: e.detail.value })
   },
 
@@ -281,6 +289,7 @@ Page({
   },
 
   onTypeSelect(e) {
+    if (this.data.readOnly) return
     const value = e.currentTarget.dataset.value
     if (value === 'class' || value === 'ics') {
       const pendingName = value === 'class'
@@ -294,6 +303,7 @@ Page({
   },
 
   onCourseSelect(e) {
+    if (this.data.readOnly) return
     const name = e.currentTarget.dataset.name
     const pendingType = this.data._pendingType
     if (pendingType === 'class') {
@@ -358,6 +368,7 @@ Page({
   },
 
   onActivityModeChange(e) {
+    if (this.data.readOnly) return
     this.setData({ activityModeIndex: e.detail.value })
   },
 
@@ -367,10 +378,12 @@ Page({
   },
 
   onDeductionCountInput(e) {
+    if (this.data.readOnly) return
     this.setData({ membershipDeductionCount: e.detail.value })
   },
 
   onEksDeductionInput(e) {
+    if (this.data.readOnly) return
     this.setData({ deductionCount: e.detail.value })
   },
 
@@ -391,15 +404,23 @@ Page({
   },
 
   onPublishedChange(e) {
+    if (this.data.readOnly) return
     this.setData({ isPublished: e.detail.value })
   },
 
   onNameInput(e) {
+    if (this.data.readOnly) return
     this.setData({ activityName: e.detail.value })
   },
 
   onDescriptionInput(e) {
+    if (this.data.readOnly) return
     this.setData({ description: e.detail.value })
+  },
+
+  onCourseReviewInput(e) {
+    if (this.data.readOnly) return
+    this.setData({ courseReview: e.detail.value })
   },
 
   // ---------- 参与者 ----------
@@ -416,10 +437,16 @@ Page({
       selected: participantIds.includes(c.id),
       withdrawn: withdrawnParticipantIds.includes(c.id),
     }))
-    this.setData({ participantList })
+    const participantReadonlyText = participantList
+      .filter(item => item.selected)
+      .map(item => item.nickname)
+      .filter(Boolean)
+      .join('、')
+    this.setData({ participantList, participantReadonlyText })
   },
 
   onParticipantToggle(e) {
+    if (!this.data.canEditParticipants) return
     const id = e.currentTarget.dataset.id
     if (this.data.withdrawnParticipantIds.includes(id)) {
       wx.showToast({ title: '已退课人员不能取消', icon: 'none' })
@@ -498,6 +525,7 @@ Page({
   },
 
   onPickerSelect(e) {
+    if (this.data.readOnly) return
     const { id, nickname } = e.currentTarget.dataset
     if (this.data.pickerMode === 'owner') {
       this.setData({ ownerId: id, ownerName: nickname, showPicker: false, pickerKeyword: '' })
@@ -543,6 +571,8 @@ Page({
   async onSave() {
     const { activityType } = this.data
 
+    if (this.data.readOnly && !this.data.canEditParticipants) return
+
     if (!this.data.readOnly && activityType === 'class' && this.data.courseIndex < 0) {
       wx.showToast({ title: '请选择课程', icon: 'none' })
       return
@@ -551,84 +581,87 @@ Page({
       wx.showToast({ title: '请选择案主', icon: 'none' })
       return
     }
-    if (this.data.startTime && this.data.endTime && this.data.endTime <= this.data.startTime) {
+    if (!this.data.readOnly && this.data.startTime && this.data.endTime && this.data.endTime <= this.data.startTime) {
       wx.showToast({ title: '结束时间需晚于开始时间', icon: 'none' })
       return
     }
 
-    const space = this.data.spaces[this.data.spaceIndex]
-    const room = this.data.rooms[this.data.roomIndex]
-    const baseFields = {
-      date: this.data.date,
-      space_id: space?.id || '',
-      room_id: room?.id || '',
-      room_name: room?.name || '',
-      space_name: space?.name || '',
-      participant_ids: this.data.participantIds,
-      ...(this.data.readOnly ? {} : {
+    let payload
+    if (this.data.readOnly) {
+      // 课程内容仅浏览但有参与人配置权限时，只提交参与人字段。
+      payload = { participant_ids: this.data.participantIds }
+    } else {
+      const space = this.data.spaces[this.data.spaceIndex]
+      const room = this.data.rooms[this.data.roomIndex]
+      const baseFields = {
+        date: this.data.date,
+        space_id: space?.id || '',
+        room_id: room?.id || '',
+        room_name: room?.name || '',
+        space_name: space?.name || '',
+        ...(this.data.canEditParticipants ? { participant_ids: this.data.participantIds } : {}),
         start_time: this.data.startTime || null,
         end_time: this.data.endTime || null,
         activity_mode: this.data.activityModes[this.data.activityModeIndex],
-      }),
-    }
-
-    let payload
-    switch (activityType) {
-      case 'class': {
-        const course = this.data.courses[this.data.courseIndex]
-        payload = Object.assign({}, baseFields, {
-          is_published: this.data.isPublished,
-        }, this.data.readOnly ? {} : {
-          is_public_welfare: this.data.isPublicWelfare,
-          course_id: '',
-          course_name: course.name,
-          activity_name: this.data.activityName || '',
-          course_type: course.name,
-          course_description: this.data.description,
-          teacher_ids: this.data.teacherIds,
-          membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
-        })
-        break
       }
-      case 'gcs':
-      case 'ers':
-        payload = Object.assign({}, baseFields, {
-          is_published: this.data.isPublished,
-        }, this.data.readOnly ? {} : {
-          owner_id: this.data.ownerId,
-          owner_name: this.data.ownerName,
-          name: this.data.activityName,
-          description: this.data.description,
-          achiever_id: this.data.achieverId,
-          achiever_name: this.data.achieverName,
-          teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
-          membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
-        })
-        break
-      case 'eks':
-        payload = Object.assign({}, baseFields, {
-          is_published: this.data.isPublished,
-        }, this.data.readOnly ? {} : {
-          owner_id: this.data.ownerId,
-          owner_name: this.data.ownerName,
-          name: this.data.activityName,
-          description: this._serializeEksDescription(this.data.deductionCount),
-          course_description: this.data.description,
-          teacher_ids: this.data.teacherIds,
-          membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
-        })
-        break
-      case 'ics':
-        payload = Object.assign({}, baseFields, {
-          is_published: this.data.isPublished,
-        }, this.data.readOnly ? {} : {
-          course_name: this.data.activityName || this.data.icsCourseType || '',
-          course_type: this.data.icsCourseType || '',
-          course_description: this.data.description,
-          teacher_ids: this.data.teacherIds,
-          membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
-        })
-        break
+
+      switch (activityType) {
+        case 'class': {
+          const course = this.data.courses[this.data.courseIndex]
+          payload = Object.assign({}, baseFields, {
+            is_published: this.data.isPublished,
+            is_public_welfare: this.data.isPublicWelfare,
+            course_id: '',
+            course_name: course.name,
+            activity_name: this.data.activityName || '',
+            course_type: course.name,
+            course_description: this.data.description,
+            course_review: this.data.courseReview,
+            teacher_ids: this.data.teacherIds,
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+          })
+          break
+        }
+        case 'gcs':
+        case 'ers':
+          payload = Object.assign({}, baseFields, {
+            is_published: this.data.isPublished,
+            owner_id: this.data.ownerId,
+            owner_name: this.data.ownerName,
+            name: this.data.activityName,
+            description: this.data.description,
+            course_review: this.data.courseReview,
+            achiever_id: this.data.achieverId,
+            achiever_name: this.data.achieverName,
+            teacher_ids: this.data.achieverId ? [this.data.achieverId] : [],
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+          })
+          break
+        case 'eks':
+          payload = Object.assign({}, baseFields, {
+            is_published: this.data.isPublished,
+            owner_id: this.data.ownerId,
+            owner_name: this.data.ownerName,
+            name: this.data.activityName,
+            description: this._serializeEksDescription(this.data.deductionCount),
+            course_description: this.data.description,
+            course_review: this.data.courseReview,
+            teacher_ids: this.data.teacherIds,
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
+          })
+          break
+        case 'ics':
+          payload = Object.assign({}, baseFields, {
+            is_published: this.data.isPublished,
+            course_name: this.data.activityName || this.data.icsCourseType || '',
+            course_type: this.data.icsCourseType || '',
+            course_description: this.data.description,
+            course_review: this.data.courseReview,
+            teacher_ids: this.data.teacherIds,
+            membership_deduction_count: Number(this.data.membershipDeductionCount) || 0,
+          })
+          break
+      }
     }
 
     const api = API_MAP[activityType]

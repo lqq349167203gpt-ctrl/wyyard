@@ -151,7 +151,7 @@
   <view class="form-card">
     <view class="form-item" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.work_info}}">
       <text class="form-label">工作情况</text>
-      <picker class="form-picker" mode="selector" range="{{['在职', '离职', '自由职业']}}" bindchange="onWorkStatusChange">
+      <picker class="form-picker" mode="selector" range="{{['在职', '离职', '自由职业', '全职带孩子']}}" bindchange="onWorkStatusChange">
         <view class="picker-display {{work_status ? '' : 'placeholder'}}">{{work_status || '选择状态'}}</view>
       </picker>
     </view>

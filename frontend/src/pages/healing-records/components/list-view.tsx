@@ -30,6 +30,7 @@ interface Props {
   filterIdentity: string
   filterReferrer: string
   filterReferrerHandler: string
+  filterServiceTeacher: string
   filterTagIds: string[]
   filterTagMatch: "any" | "all"
   refreshKey?: number
@@ -37,7 +38,7 @@ interface Props {
   readOnly?: boolean
 }
 
-export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, refreshKey = 0, summary = null, readOnly = false }: Props) {
+export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, refreshKey = 0, summary = null, readOnly = false }: Props) {
   // 排序状态
   const [sortState, setSortState] = useState<{
     field: SortField | null
@@ -58,12 +59,13 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
       member_type: filterIdentity || undefined,
       referrer: filterReferrer || undefined,
       referrer_handler: filterReferrerHandler || undefined,
+      service_teacher: filterServiceTeacher || undefined,
       tag_ids: filterTagIds.length ? filterTagIds.join(",") : undefined,
       tag_match: filterTagMatch,
       sort_by: sortField || undefined,
       sort_order: sortOrder,
     })
-  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, sortField, sortOrder])
+  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, sortField, sortOrder])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, resetPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
 
@@ -81,7 +83,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
   useEffect(() => {
     if (filterInitRef.current) { filterInitRef.current = false; return }
     resetPage()
-  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterTagIds, filterTagMatch, resetPage])
+  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, resetPage])
 
   // 排序变化时回到第一页
   useEffect(() => {

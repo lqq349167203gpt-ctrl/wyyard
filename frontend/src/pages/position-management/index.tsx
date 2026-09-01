@@ -88,6 +88,8 @@ const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
   customers: "all",
   visits: "own",
   activities: "own",
+  activity_participants: "all",
+  payments: "all",
   contacts: {
     phone: { view: false, copy: false, edit: false },
     wechat: { view: false, copy: false, edit: false },
@@ -118,6 +120,8 @@ const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
   customers: "all",
   visits: "all",
   activities: "all",
+  activity_participants: "all",
+  payments: "all",
   contacts: {
     phone: { view: true, copy: true, edit: true },
     wechat: { view: true, copy: true, edit: true },
@@ -334,7 +338,10 @@ export default function PositionManagementPage() {
           setFormEditPermissions(current => ({ ...current, visits: "own" }))
         }
         if (pageKey === "daily-activities") {
-          setFormEditPermissions(current => ({ ...current, activities: "own" }))
+          setFormEditPermissions(current => ({ ...current, activities: "own", activity_participants: "view" }))
+        }
+        if (pageKey === "payment") {
+          setFormEditPermissions(current => ({ ...current, payments: "own" }))
         }
       }
       return next
@@ -790,7 +797,10 @@ export default function PositionManagementPage() {
                                         setFormEditPermissions(current => ({ ...current, visits: "own" }))
                                       }
                                       if (group.keys.includes("daily-activities")) {
-                                        setFormEditPermissions(current => ({ ...current, activities: "own" }))
+                                        setFormEditPermissions(current => ({ ...current, activities: "own", activity_participants: "view" }))
+                                      }
+                                      if (group.keys.includes("payment")) {
+                                        setFormEditPermissions(current => ({ ...current, payments: "own" }))
                                       }
                                       if (group.keys.includes("healing-records")) {
                                         setFormEditPermissions(current => ({ ...current, customers: "all" }))
@@ -921,6 +931,27 @@ export default function PositionManagementPage() {
                             description: "课程、老师、时间、扣卡、案主、简介及删除",
                             options: [
                               { value: "view" as const, label: "仅浏览" },
+                              { value: "own" as const, label: "仅本人录入" },
+                              { value: "all" as const, label: "全部记录" },
+                            ],
+                          },
+                          {
+                            key: "activity_participants" as const,
+                            pageKey: "daily-activities",
+                            label: "课表人员配置",
+                            description: "控制老人、新人参与名单的拖入与移除，不影响课程内容编辑权限",
+                            options: [
+                              { value: "view" as const, label: "不可配置" },
+                              { value: "own" as const, label: "仅本人课表" },
+                              { value: "all" as const, label: "全部课表" },
+                            ],
+                          },
+                          {
+                            key: "payments" as const,
+                            pageKey: "payment",
+                            label: "付费项目",
+                            description: "控制已有付费记录的修改和删除；新增记录不受此项限制",
+                            options: [
                               { value: "own" as const, label: "仅本人录入" },
                               { value: "all" as const, label: "全部记录" },
                             ],

@@ -10,6 +10,8 @@ from app.services.customer_service import list_all_customers
 from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
+    ensure_activity_participant_access,
+    ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
     stamp_creator,
@@ -50,6 +52,8 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 @router.post("")
 def create_session(data: InternalCourseSessionCreate, request: Request, conversion: bool = False):
+    if data.participant_ids and not conversion:
+        ensure_activity_participant_access(request)
     customer_access_service.require_new_customer_ids(request, data.participant_ids, action="添加")
     session = internal_course_session_service.create_session(
         stamp_creator(data, request), refresh_identities=not conversion
@@ -69,7 +73,10 @@ def update_session(session_id: str, data: dict, request: Request, conversion: bo
     old_session = internal_course_session_service.get_session(session_id)
     if not old_session:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_activity_update_access(request, data)
     if "participant_ids" in data:
+        if list(data.get("participant_ids") or []) != list(old_session.participant_ids):
+            ensure_activity_participant_access(request, old_session)
         customer_access_service.require_new_customer_ids(
             request,
             data.get("participant_ids") or [],

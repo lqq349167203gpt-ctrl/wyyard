@@ -9,34 +9,44 @@
   <block wx:else>
     <view class="header-card">
       <view class="header-copy">
-        <text class="header-title">客户标签</text>
-        <text class="header-hint">公共标签团队共享，我的标签仅自己可见</text>
+        <text class="header-title">{{scopeFilter === 'follow-up' ? '跟进状态配置' : '客户标签'}}</text>
+        <text class="header-hint">{{scopeFilter === 'follow-up' ? '配置客户跟进状态及必填描述' : '公共标签团队共享，我的标签仅自己可见'}}</text>
       </view>
-      <button class="create-button" bindtap="onCreate">新建标签</button>
+      <button class="create-button" bindtap="onCreate">新建{{scopeFilter === 'follow-up' ? '状态' : '标签'}}</button>
     </view>
 
     <view class="filter-card">
       <view class="filter-item {{scopeFilter === 'all' ? 'active' : ''}}" data-scope="all" bindtap="onFilterChange">全部</view>
       <view class="filter-item {{scopeFilter === 'public' ? 'active' : ''}}" data-scope="public" bindtap="onFilterChange">公共标签</view>
       <view class="filter-item {{scopeFilter === 'private' ? 'active' : ''}}" data-scope="private" bindtap="onFilterChange">我的标签</view>
+      <view class="filter-item {{scopeFilter === 'follow-up' ? 'active' : ''}}" data-scope="follow-up" bindtap="onFilterChange">跟进状态</view>
     </view>
 
     <view class="tag-list" wx:if="{{!loading && filteredTags.length}}">
       <view class="tag-card" wx:for="{{filteredTags}}" wx:key="id">
         <view class="tag-main">
-          <view class="tag-heading">
+          <view class="tag-heading" wx:if="{{scopeFilter !== 'follow-up'}}">
             <text class="tag-name">{{item.name}}</text>
             <text class="scope-badge">{{item.scope === 'public' ? '团队共享' : '仅自己'}}</text>
           </view>
-          <text class="tag-description" wx:if="{{item.description}}">{{item.description}}</text>
-          <view class="tag-meta">
+          <view class="tag-heading" wx:else>
+            <text class="tag-name">{{item.name}}</text>
+            <text class="scope-badge">{{item.enabled ? '启用' : '停用'}}</text>
+          </view>
+          <text class="tag-description">{{item.description}}</text>
+          <view class="tag-meta" wx:if="{{scopeFilter !== 'follow-up'}}">
             <text>使用 {{item.usage_count || 0}} 人</text>
             <text>{{item.created_by_name || '-'}}</text>
           </view>
+          <view class="tag-meta" wx:else><text>使用 {{item.usage_count || 0}} 人</text></view>
         </view>
-        <view class="tag-actions">
+        <view class="tag-actions" wx:if="{{scopeFilter !== 'follow-up'}}">
           <text class="action-edit" bindtap="onEdit" data-tag="{{item}}">编辑</text>
           <text class="action-archive" bindtap="onArchive" data-id="{{item.id}}" data-name="{{item.name}}">停用</text>
+        </view>
+        <view class="tag-actions" wx:else>
+          <text class="action-edit" bindtap="onEditStatus" data-status="{{item}}">编辑</text>
+          <text class="action-archive" bindtap="onToggleStatus" data-status="{{item}}">{{item.enabled ? '停用' : '启用'}}</text>
         </view>
       </view>
     </view>
@@ -44,22 +54,22 @@
     <view class="loading" wx:if="{{loading}}">加载中...</view>
     <view class="empty-state" wx:if="{{!loading && !filteredTags.length}}">
       <view class="empty-line"></view>
-      <text>暂无标签</text>
+      <text>暂无{{scopeFilter === 'follow-up' ? '跟进状态' : '标签'}}</text>
     </view>
   </block>
 
   <view class="editor-mask" wx:if="{{showEditor}}" bindtap="onCloseEditor"></view>
   <view class="editor-popup" wx:if="{{showEditor}}">
     <view class="editor-header">
-      <text class="editor-title">{{editingId ? '编辑标签' : '新建标签'}}</text>
+      <text class="editor-title">{{editingId ? '编辑' : '新建'}}{{scopeFilter === 'follow-up' ? '跟进状态' : '标签'}}</text>
       <text class="editor-close" bindtap="onCloseEditor">关闭</text>
     </view>
     <view class="editor-body">
       <view class="form-group">
-        <text class="form-label">标签名称</text>
-        <input class="form-input" maxlength="30" placeholder="例如：高意向、亲子需求" value="{{formName}}" bindinput="onNameInput" />
+        <text class="form-label">{{scopeFilter === 'follow-up' ? '状态名称' : '标签名称'}}</text>
+        <input class="form-input" maxlength="30" placeholder="{{scopeFilter === 'follow-up' ? '例如：重点跟进' : '例如：高意向、亲子需求'}}" value="{{formName}}" bindinput="onNameInput" />
       </view>
-      <view class="form-group" wx:if="{{!editingId}}">
+      <view class="form-group" wx:if="{{scopeFilter !== 'follow-up' && !editingId}}">
         <text class="form-label">可见范围</text>
         <view class="scope-options">
           <view class="scope-option {{formScope === 'public' ? 'active' : ''}}" data-scope="public" bindtap="onScopeChange">
@@ -73,8 +83,8 @@
         </view>
       </view>
       <view class="form-group">
-        <text class="form-label">说明（选填）</text>
-        <textarea class="form-textarea" maxlength="200" placeholder="说明这个标签适合标记哪类客户" value="{{formDescription}}" bindinput="onDescriptionInput"></textarea>
+        <text class="form-label">说明{{scopeFilter === 'follow-up' ? '（必填）' : '（选填）'}}</text>
+        <textarea class="form-textarea" maxlength="200" placeholder="{{scopeFilter === 'follow-up' ? '说明此状态适用于哪类客户' : '说明这个标签适合标记哪类客户'}}" value="{{formDescription}}" bindinput="onDescriptionInput"></textarea>
       </view>
     </view>
     <view class="editor-footer">

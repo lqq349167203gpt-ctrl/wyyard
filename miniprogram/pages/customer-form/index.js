@@ -1,4 +1,4 @@
-const { customerApi, customerTagApi } = require('../../utils/api')
+const { customerApi, customerTagApi, followUpStatusApi } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 
 const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
@@ -62,7 +62,7 @@ Page({
     tags: '',
     other_info: '',
     trafficSources: TRAFFIC_SOURCES,
-    followUpStatuses: ['新添加', '前期沟通中', '已邀约未到店', '已到店', '已成交', '沉默/流失', '未配置'],
+    followUpStatuses: [],
     customerTags: [],
     selectedTagIds: [],
     selectedTagText: '',
@@ -97,6 +97,7 @@ Page({
       wx.setNavigationBarTitle({ title: '新增客户' })
     }
     this.loadCustomerTags(options.id || '')
+    this.loadFollowUpStatuses()
     this.loadCustomers()
 
     // 语音录入预填
@@ -115,6 +116,15 @@ Page({
         }
         getApp().globalData._voicePrefill = null
       }
+    }
+  },
+
+  async loadFollowUpStatuses() {
+    try {
+      const statuses = await followUpStatusApi.list()
+      this.setData({ followUpStatuses: (statuses || []).map(item => item.name) })
+    } catch (e) {
+      this.setData({ followUpStatuses: [this.data.follow_up_status || '未配置'] })
     }
   },
 
@@ -310,8 +320,7 @@ Page({
   },
 
   onFollowUpStatusChange(e) {
-    const statuses = ['新添加', '前期沟通中', '已邀约未到店', '已到店', '已成交', '沉默/流失', '未配置']
-    this.setData({ follow_up_status: statuses[e.detail.value] })
+    this.setData({ follow_up_status: this.data.followUpStatuses[e.detail.value] })
   },
 
   onReferralDateChange(e) {
@@ -319,7 +328,7 @@ Page({
   },
 
   onWorkStatusChange(e) {
-    const statuses = ['在职', '离职', '自由职业']
+    const statuses = ['在职', '离职', '自由职业', '全职带孩子']
     this.setData({ work_status: statuses[e.detail.value], work_description: '' })
   },
 

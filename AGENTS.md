@@ -139,23 +139,16 @@ wyyard/
 <claude-mem-context>
 # Memory Context
 
-# [wyyard] recent context, 2026-08-16 10:55pm GMT+8
+# [wyyard] recent context, 2026-08-24 7:40am GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (8,921t read) | 1,161,699t work | 99% savings
+Stats: 50 obs (9,041t read) | 1,210,685t work | 99% savings
 
-### Aug 12, 2026
-263 12:27p 🔵 Member identity config applied but dev service serves stale in-memory value
-265 12:59p 🔴 PC端客户详情卡次统计修复：逐张展示所有有效会员卡
-266 " 🔄 删除单卡标记冗余代码：移除 is_current 字段与 get_current_card_id
-267 " 🔵 API 实测确认两卡并存与欠卡分离语义
-268 " ⚖️ Git 提交范围界定：仅项目代码，排除设计预览文件
 ### Aug 13, 2026
 288 3:38p 🔴 会员卡余量与多卡展示逻辑修正
-289 " 🔵 生产部署架构：全部流量经 HTTPS 443 的 www.wyteahouse.cn
 290 4:42p 🟣 New financial overview module (财务数据) added to wyyard
 291 " 🟣 Expense records now support cost categories and configurable expense types
 292 " ✅ New financial pages synced into account permissions and operation logging
@@ -201,6 +194,13 @@ Stats: 50 obs (8,921t read) | 1,161,699t work | 99% savings
 333 " 🟣 新增财务数据报表：营收/支出/退费/分成/人员福利核算与构成分析
 334 " ✅ 支出模块增强：自定义支出类型、成本归属二选一、可配置可选字段
 335 " ⚖️ 多分店架构需求被识别但暂缓：数据仍按当前空间维度，未拉高到系统级
+### Aug 20, 2026
+338 10:06p 🟣 课表和邀约记录增加创建人归属权限，仅创建者可编辑/删除
+339 " 🟣 小程序非创建人记录显示只读态，输入框置灰且隐藏操作按钮
+340 " 🔵 后端测试环境依赖本机 PostgreSQL 隔离库，ruff 需通过 venv 调用
+341 10:22p 🔵 wyyard backend startup blocked by local PostgreSQL connection at import time
+342 10:51p ✅ 课表与邀约记录的排序权限放开给所有员工，内容编辑仍限创建人
+343 " ✅ PC 端邀约与课表表格新增权限提示文字
 
-Access 1162k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 1211k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

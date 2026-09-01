@@ -244,7 +244,7 @@
       <text class="pf-closer-unit">元</text>
       <text class="pf-closer-del" bindtap="onRemoveCloser" data-id="{{item.id}}">x</text>
     </view>
-    <view class="pf-closer-total" wx:if="{{closers.length > 1}}">
+    <view class="pf-closer-total" wx:if="{{closers.length > 0}}">
       <text>总金额: {{closerTotal}} 元</text>
     </view>
     <view class="pf-row">
@@ -278,6 +278,26 @@
         <text>无匹配用户</text>
       </view>
     </scroll-view>
+  </view>
+
+  <!-- 新增/编辑二次确认 -->
+  <view class="pf-confirm-mask" wx:if="{{confirmVisible}}" catchtap="onConfirmClose">
+    <view class="pf-confirm-panel" catchtap="stopPropagation">
+      <view class="pf-confirm-header">
+        <text class="pf-confirm-title">{{isEdit ? '确认编辑' : '确认新增'}}</text>
+        <text class="pf-confirm-rule">成交人金额合计需与费用金额一致</text>
+      </view>
+      <scroll-view class="pf-confirm-body" scroll-y>
+        <view class="pf-confirm-row" wx:for="{{confirmRows}}" wx:key="label">
+          <text class="pf-confirm-label">{{item.label}}</text>
+          <text class="pf-confirm-value {{item.value === '-' ? 'is-empty' : ''}}">{{item.value}}</text>
+        </view>
+      </scroll-view>
+      <view class="pf-confirm-footer">
+        <button class="pf-confirm-button secondary" bindtap="onConfirmClose" disabled="{{submitting}}">修改</button>
+        <button class="pf-confirm-button primary" bindtap="onConfirmSubmit" loading="{{submitting}}" disabled="{{submitting}}">确认</button>
+      </view>
+    </view>
   </view>
 
   <view class="pf-btns" wx:if="{{!hideBtn}}">

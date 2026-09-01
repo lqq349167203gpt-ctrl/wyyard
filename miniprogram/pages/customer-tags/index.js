@@ -1,4 +1,4 @@
-const { customerTagApi } = require('../../utils/api')
+const { customerTagApi, followUpStatusApi } = require('../../utils/api')
 
 Page({
   data: {
@@ -6,6 +6,7 @@ Page({
     hasPermission: false,
     loading: true,
     tags: [],
+    statuses: [],
     filteredTags: [],
     scopeFilter: 'all',
     showEditor: false,
@@ -57,8 +58,8 @@ Page({
   async loadData() {
     this.setData({ loading: true })
     try {
-      const tags = await customerTagApi.list()
-      this.setData({ tags: tags || [], loading: false })
+      const [tags, statuses] = await Promise.all([customerTagApi.list(), followUpStatusApi.list(true)])
+      this.setData({ tags: tags || [], statuses: statuses || [], loading: false })
       this.applyFilter()
     } catch (e) {
       this.setData({ loading: false })
@@ -75,15 +76,16 @@ Page({
 
   applyFilter() {
     const filter = this.data.scopeFilter
-    const filteredTags = filter === 'all'
+    const filteredTags = filter === 'follow-up'
+      ? this.data.statuses
+      : filter === 'all'
       ? this.data.tags
       : this.data.tags.filter(tag => tag.scope === filter)
     this.setData({ filteredTags })
   },
 
   onFilterChange(e) {
-    this.setData({ scopeFilter: e.currentTarget.dataset.scope })
-    this.applyFilter()
+    this.setData({ scopeFilter: e.currentTarget.dataset.scope }, () => this.applyFilter())
   },
 
   onCreate() {
@@ -104,6 +106,16 @@ Page({
       formName: tag.name,
       formScope: tag.scope,
       formDescription: tag.description || '',
+    })
+  },
+
+  onEditStatus(e) {
+    const status = e.currentTarget.dataset.status
+    this.setData({
+      showEditor: true,
+      editingId: status.id,
+      formName: status.name,
+      formDescription: status.description || '',
     })
   },
 
@@ -128,14 +140,22 @@ Page({
   async onSave() {
     const name = (this.data.formName || '').trim()
     if (!name) {
-      wx.showToast({ title: '请输入标签名称', icon: 'none' })
+      wx.showToast({ title: `请输入${this.data.scopeFilter === 'follow-up' ? '状态' : '标签'}名称`, icon: 'none' })
+      return
+    }
+    const description = (this.data.formDescription || '').trim()
+    if (this.data.scopeFilter === 'follow-up' && !description) {
+      wx.showToast({ title: '请输入状态描述', icon: 'none' })
       return
     }
     if (this.data.saving) return
     this.setData({ saving: true })
     try {
-      const description = (this.data.formDescription || '').trim()
-      if (this.data.editingId) {
+      if (this.data.scopeFilter === 'follow-up' && this.data.editingId) {
+        await followUpStatusApi.update(this.data.editingId, { name, description })
+      } else if (this.data.scopeFilter === 'follow-up') {
+        await followUpStatusApi.create({ name, description })
+      } else if (this.data.editingId) {
         await customerTagApi.update(this.data.editingId, { name, description })
       } else {
         await customerTagApi.create({ name, scope: this.data.formScope, description })
@@ -147,6 +167,17 @@ Page({
       // request 已统一展示后端错误信息
     } finally {
       this.setData({ saving: false })
+    }
+  },
+
+  async onToggleStatus(e) {
+    const status = e.currentTarget.dataset.status
+    try {
+      await followUpStatusApi.update(status.id, { enabled: !status.enabled })
+      wx.showToast({ title: status.enabled ? '已停用' : '已启用' })
+      await this.loadData()
+    } catch (error) {
+      // request 已统一展示后端错误信息
     }
   },
 

@@ -962,7 +962,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 <div className="flex gap-2">
                   <SelectDropdown rounded="[2px]"
                     value={customerForm.work_status || ""}
-                    options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }]}
+                    options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }, { value: "全职带孩子", label: "全职带孩子" }]}
                     placeholder="是否在职"
                     onChange={(v) => setCustomerForm({ ...customerForm, work_status: v })}
                     className="w-[100px]"

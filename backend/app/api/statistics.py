@@ -5,7 +5,6 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.api.customer_detail import _build_activities, _build_payment_records
-from app.models.customer import FollowUpStatus
 from app.services import (
     class_record_service,
     course_service,
@@ -17,6 +16,7 @@ from app.services import (
     emotional_release_session_service,
     energy_knot_service,
     energy_knot_session_service,
+    follow_up_status_service,
     group_case_service,
     group_case_session_service,
     internal_course_service,
@@ -2254,7 +2254,7 @@ def get_referral_statistics(
     """获取引流统计：跟进阶段分布、变化趋势和人员明细。"""
     date_from, date_to = _get_date_range(date_from, date_to)
     type_filter = _parse_member_types(member_types)
-    status_names = [status.value for status in FollowUpStatus]
+    status_names = follow_up_status_service.reporting_names()
     status_filter = follow_up_status if isinstance(follow_up_status, str) and follow_up_status else None
     traffic_source_filter = traffic_source if isinstance(traffic_source, str) and traffic_source else None
     if status_filter and status_filter not in status_names:
@@ -2325,7 +2325,7 @@ def get_referral_statistics(
             continue
         customer_status = (
             getattr(customer.follow_up_status, "value", customer.follow_up_status)
-            or FollowUpStatus.UNCONFIGURED.value
+            or follow_up_status_service.UNCONFIGURED
         )
         if status_filter and customer_status != status_filter:
             continue
@@ -2352,10 +2352,10 @@ def get_referral_statistics(
             continue
         customer_status = (
             getattr(customer.follow_up_status, "value", customer.follow_up_status)
-            or FollowUpStatus.UNCONFIGURED.value
+            or follow_up_status_service.UNCONFIGURED
         )
         if customer_status not in status_names:
-            customer_status = FollowUpStatus.UNCONFIGURED.value
+            customer_status = follow_up_status_service.UNCONFIGURED
         summary_status_totals[customer_status] += 1
 
     summary_traffic_source_totals: dict[str, int] = defaultdict(int)
@@ -2365,7 +2365,7 @@ def get_referral_statistics(
             continue
         customer_status = (
             getattr(customer.follow_up_status, "value", customer.follow_up_status)
-            or FollowUpStatus.UNCONFIGURED.value
+            or follow_up_status_service.UNCONFIGURED
         )
         if status_filter and customer_status != status_filter:
             continue
@@ -2377,7 +2377,7 @@ def get_referral_statistics(
         for customer in tag_filtered_customers
         if (
             not status_filter
-            or (getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.UNCONFIGURED.value) == status_filter
+            or (getattr(customer.follow_up_status, "value", customer.follow_up_status) or follow_up_status_service.UNCONFIGURED) == status_filter
         )
         and (
             not traffic_source_filter
@@ -2389,9 +2389,9 @@ def get_referral_statistics(
         lambda: {status: 0 for status in status_names}
     )
     for customer in customers:
-        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.UNCONFIGURED.value
+        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or follow_up_status_service.UNCONFIGURED
         if status not in status_names:
-            status = FollowUpStatus.UNCONFIGURED.value
+            status = follow_up_status_service.UNCONFIGURED
         referral_date = (customer.referral_date or "").strip()
         if not referral_date:
             continue
@@ -2424,7 +2424,7 @@ def get_referral_statistics(
         if not referral_date or not (date_from <= referral_date <= date_to):
             continue
         stats = _get_customer_stats(customer.id, None, None)
-        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or FollowUpStatus.UNCONFIGURED.value
+        status = getattr(customer.follow_up_status, "value", customer.follow_up_status) or follow_up_status_service.UNCONFIGURED
         members.append({
             "id": customer.id,
             "nickname": customer.nickname or "",

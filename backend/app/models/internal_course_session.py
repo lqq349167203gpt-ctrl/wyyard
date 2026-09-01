@@ -14,6 +14,7 @@ class InternalCourseSessionBase(SafeBaseModel):
     course_type: str = ""  # 课程类型
     course_name: str  # 课程名称
     course_description: str = ""
+    course_review: str = ""  # 当天课程复盘
     teacher_ids: List[str] = []  # 老师（多选）
     host_id: str = ""  # 主持人
     host_name: str = ""

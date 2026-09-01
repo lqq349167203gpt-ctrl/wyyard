@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.group_case import GroupCaseCreate
 from app.services import customer_access_service, group_case_service, group_case_session_service
 from app.utils.pagination import paginate
+from app.utils.payment_validation import ensure_payment_closer_total
+from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
 router = APIRouter(prefix="/api/group-cases", tags=["group-cases"])
 
@@ -55,7 +57,8 @@ def get_case(case_id: str, request: Request):
 def create_case(data: GroupCaseCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
-    return group_case_service.create_case(data)
+    ensure_payment_closer_total(data, "amount", request=request)
+    return group_case_service.create_case(stamp_payment_creator(data, request))
 
 
 @router.patch("/{case_id}")
@@ -64,9 +67,13 @@ def update_case(case_id: str, data: dict, request: Request):
     existing = group_case_service.get_case(case_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
+    data.pop("created_by", None)
+    data.pop("created_by_id", None)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
+    ensure_payment_closer_total(data, "amount", existing, request)
     # purchase_count 允许修正：剩余次数由「购买 - 已使用 - 销卡」实时派生，修改总数不破坏恒等式
     if "purchase_count" in data:
         pc = data["purchase_count"]
@@ -85,6 +92,7 @@ def delete_case(case_id: str, request: Request):
     existing = group_case_service.get_case(case_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     success, message = group_case_service.delete_case(case_id)
     if not success:

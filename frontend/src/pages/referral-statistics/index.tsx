@@ -51,21 +51,6 @@ function generateColors(count: number, hueStart = 0): string[] {
   })
 }
 
-const STATUS_COLORS = generateColors(6, 0)
-
-const STATUS_META: Array<{
-  name: CustomerFollowUpStatus
-  color: string
-}> = [
-  { name: "新添加", color: STATUS_COLORS[0] },
-  { name: "前期沟通中", color: STATUS_COLORS[1] },
-  { name: "已邀约未到店", color: STATUS_COLORS[2] },
-  { name: "已到店", color: STATUS_COLORS[3] },
-  { name: "已成交", color: STATUS_COLORS[4] },
-  { name: "沉默/流失", color: STATUS_COLORS[5] },
-  { name: "未配置", color: "#b7bdc6" },
-]
-
 type Member = ReferralStatistics["members"][number]
 type BarDataType = "follow_up_status" | "referrer" | "traffic_source" | "referrer_handler"
 
@@ -123,9 +108,7 @@ export default function ReferralStatisticsPage() {
   const [detailType, setDetailType] = useState<"invited" | "cancelled" | "arrived" | "activity" | "payment" | null>(null)
   const [detailRecords, setDetailRecords] = useState<Array<Record<string, unknown>>>([])
   const [detailLoading, setDetailLoading] = useState(false)
-  const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(STATUS_META.map(status => [status.name, true])),
-  )
+  const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({})
   const [savingStatusCustomerId, setSavingStatusCustomerId] = useState<string | null>(null)
   const [statusError, setStatusError] = useState("")
 
@@ -149,6 +132,20 @@ export default function ReferralStatisticsPage() {
     () => data?.traffic_source_names ?? persistedTrafficSourceNames,
     [data?.traffic_source_names, persistedTrafficSourceNames],
   )
+  const statusMeta = useMemo(() => {
+    const names = data?.status_names ?? []
+    const colors = generateColors(Math.max(names.length - 1, 1), 0)
+    return names.map((name, index) => ({
+      name,
+      color: name === "未配置" ? "#b7bdc6" : colors[index % colors.length],
+    }))
+  }, [data?.status_names])
+
+  useEffect(() => {
+    if (statusMeta.length > 0) {
+      setVisibleLines(current => Object.fromEntries(statusMeta.map(status => [status.name, current[status.name] ?? true])))
+    }
+  }, [statusMeta])
 
   // 数据加载后初始化选中所有类型
   const typesInitializedRef = useRef(false)
@@ -303,9 +300,9 @@ export default function ReferralStatisticsPage() {
 
   const displayedStatusMeta = useMemo(
     () => selectedFollowUpStatus
-      ? STATUS_META.filter(status => status.name === selectedFollowUpStatus)
-      : STATUS_META,
-    [selectedFollowUpStatus],
+      ? statusMeta.filter(status => status.name === selectedFollowUpStatus)
+      : statusMeta,
+    [selectedFollowUpStatus, statusMeta],
   )
 
   const distributionData = useMemo(() => {
@@ -700,7 +697,7 @@ export default function ReferralStatisticsPage() {
               <span className="ml-1 text-[12px] font-normal text-[#8f959e]">人</span>
             </span>
           </button>
-          {STATUS_META.map(status => (
+          {statusMeta.map(status => (
             <button
               type="button"
               key={status.name}
@@ -883,7 +880,7 @@ export default function ReferralStatisticsPage() {
                           const key = String(item.dataKey)
                           if (seen.has(key)) return null
                           seen.add(key)
-                          const status = STATUS_META.find(option => option.name === key)
+                          const status = statusMeta.find(option => option.name === key)
                           if (!status || !visibleLines[key]) return null
                           return (
                             <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
@@ -1123,7 +1120,7 @@ export default function ReferralStatisticsPage() {
                       <TableCell className="h-11 overflow-hidden px-3 py-0 pr-4 text-[12px]">
                         <SelectDropdown
                           value={member.follow_up_status}
-                          options={STATUS_META.map(status => ({ value: status.name, label: status.name }))}
+                          options={statusMeta.map(status => ({ value: status.name, label: status.name }))}
                           onChange={value => updateFollowUpStatus(member, value as CustomerFollowUpStatus)}
                           disabled={savingStatusCustomerId !== null}
                           size="sm"

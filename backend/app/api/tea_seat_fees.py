@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.tea_seat_fee import TeaSeatFeeCreate
 from app.services import customer_access_service, tea_seat_fee_service
 from app.utils.pagination import paginate
+from app.utils.payment_validation import ensure_payment_closer_total
+from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
 router = APIRouter(prefix="/api/tea-seat-fees", tags=["tea-seat-fees"])
 
@@ -50,7 +52,8 @@ def get_fee(fee_id: str, request: Request):
 def create_fee(data: TeaSeatFeeCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
-    return tea_seat_fee_service.create_fee(data)
+    ensure_payment_closer_total(data, "amount", request=request)
+    return tea_seat_fee_service.create_fee(stamp_payment_creator(data, request))
 
 
 @router.patch("/{fee_id}")
@@ -59,9 +62,13 @@ def update_fee(fee_id: str, data: dict, request: Request):
     existing = tea_seat_fee_service.get_fee(fee_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
+    data.pop("created_by", None)
+    data.pop("created_by_id", None)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
+    ensure_payment_closer_total(data, "amount", existing, request)
     fee = tea_seat_fee_service.update_fee(fee_id, data)
     if not fee:
         raise HTTPException(status_code=404, detail="记录不存在")
@@ -74,6 +81,7 @@ def delete_fee(fee_id: str, request: Request):
     existing = tea_seat_fee_service.get_fee(fee_id)
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     success, message = tea_seat_fee_service.delete_fee(fee_id)
     if not success:

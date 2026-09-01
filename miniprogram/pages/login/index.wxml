@@ -1,16 +1,7 @@
 <view class="page">
   <view class="page-content">
-    <!-- 品牌区 -->
-    <view class="brand-block">
-      <view class="logo-icon">
-        <text class="logo-w">W</text>
-      </view>
-      <text class="brand-name">无忧茶院</text>
-      <text class="brand-badge">管理端</text>
-    </view>
-
-    <text class="welcome-title">欢迎回来</text>
-    <text class="welcome-subtitle">{{dateSubtitle}}</text>
+    <text class="welcome-title">无忧茶院</text>
+    <text class="welcome-subtitle">欢迎回来 · 请使用内部账号登录</text>
 
     <!-- 登录表单 -->
     <view class="login-card">

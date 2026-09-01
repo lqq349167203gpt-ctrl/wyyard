@@ -597,6 +597,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "visit_time": r.visit_time or "",
                 # 来访需求由 API 按当前账号单独注入，服务层不再暴露公共字段。
                 "needs": "",
+                "referrer_handler": r.referrer_handler or "",
                 "arrived": r.arrived,
                 "arrival_time": r.arrival_time or "",
                 "arrived_count": all_arrived_counts.get(r.customer_id, 0),

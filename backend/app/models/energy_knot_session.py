@@ -16,6 +16,7 @@ class EnergyKnotSessionBase(SafeBaseModel):
     name: str = ""  # 活动名称
     description: Optional[str] = None  # 个案详情（JSON 格式）
     course_description: str = ""  # 小程序端活动简介
+    course_review: str = ""  # 当天课程复盘
     participant_ids: List[str] = []  # 参与者
     teacher_ids: List[str] = []  # 老师（多选）
     host_id: str = ""  # 主持人

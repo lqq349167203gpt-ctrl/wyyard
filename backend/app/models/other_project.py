@@ -1,6 +1,7 @@
-from app.models.base import SafeBaseModel
 from datetime import datetime
 from typing import List, Optional
+
+from app.models.base import SafeBaseModel
 
 
 class OtherProjectBase(SafeBaseModel):
@@ -24,6 +25,7 @@ class OtherProjectBase(SafeBaseModel):
     deal_date: Optional[str] = None
     notes: str = ""  # 注释
     created_by: str = ""
+    created_by_id: str = ""
 
 
 class OtherProjectCreate(OtherProjectBase):

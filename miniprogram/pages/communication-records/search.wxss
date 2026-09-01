@@ -1,0 +1,143 @@
+@import "./index.wxss";
+
+.search-page {
+  padding-bottom: 48rpx;
+}
+
+.search-screen-bar {
+  padding-bottom: 20rpx;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 72rpx;
+  padding: 0;
+  color: #1f2329;
+  font-size: 28rpx;
+}
+
+.search-clear {
+  position: relative;
+  flex-shrink: 0;
+  width: 36rpx;
+  height: 36rpx;
+  margin-left: 12rpx;
+  border-radius: 50%;
+  background-color: #eef0f3;
+}
+
+.search-clear::before,
+.search-clear::after {
+  position: absolute;
+  top: 17rpx;
+  left: 10rpx;
+  width: 16rpx;
+  height: 2rpx;
+  border-radius: 1rpx;
+  background-color: #8f959e;
+  content: '';
+}
+
+.search-clear::before {
+  transform: rotate(45deg);
+}
+
+.search-clear::after {
+  transform: rotate(-45deg);
+}
+
+.search-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 180rpx 80rpx 0;
+  text-align: center;
+}
+
+.search-welcome-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 112rpx;
+  height: 112rpx;
+  margin-bottom: 28rpx;
+  border-radius: 50%;
+  background-color: #eef3ff;
+}
+
+.search-symbol.large {
+  transform: scale(1.25);
+}
+
+.search-symbol.large::before {
+  border-color: #6f91df;
+}
+
+.search-symbol.large::after {
+  background-color: #6f91df;
+}
+
+.search-welcome-title {
+  color: #4e535a;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.search-welcome-hint {
+  margin-top: 14rpx;
+  color: #a8aeb6;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.search-result-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  padding: 32rpx 40rpx 16rpx;
+}
+
+.search-result-title {
+  color: #646a73;
+  font-size: 24rpx;
+  font-weight: 500;
+  letter-spacing: 1rpx;
+}
+
+.search-result-count {
+  color: #b0b5bb;
+  font-size: 22rpx;
+  font-variant-numeric: tabular-nums;
+}
+
+.search-results-card {
+  margin-top: 0;
+  margin-bottom: 24rpx;
+}
+
+.search-empty {
+  padding-top: 140rpx;
+}
+
+.empty-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  margin-bottom: 24rpx;
+  border-radius: 50%;
+  background-color: #eef0f3;
+}
+
+.empty-char {
+  color: #a8aeb6;
+  font-size: 28rpx;
+}
+
+.empty-hint {
+  margin-top: 12rpx;
+  color: #b0b5bb;
+  font-size: 23rpx;
+}

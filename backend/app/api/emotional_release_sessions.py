@@ -10,6 +10,8 @@ from app.services.customer_service import list_all_customers
 from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
+    ensure_activity_participant_access,
+    ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
     stamp_creator,
@@ -76,6 +78,8 @@ def list_sessions(
 
 @router.post("")
 def create_session(data: EmotionalReleaseSessionCreate, request: Request, conversion: bool = False):
+    if data.participant_ids and not conversion:
+        ensure_activity_participant_access(request)
     customer_access_service.require_customer_scope(request, data.owner_id, action="设置为案主")
     customer_access_service.require_new_customer_ids(request, data.participant_ids, action="添加")
     try:
@@ -99,9 +103,12 @@ def update_session(session_id: str, data: dict, request: Request):
     old_session = emotional_release_session_service.get_session(session_id)
     if not old_session:
         raise HTTPException(status_code=404, detail="记录不存在")
+    ensure_activity_update_access(request, data)
     if data.get("owner_id") and data["owner_id"] != old_session.owner_id:
         customer_access_service.require_customer_scope(request, data["owner_id"], action="设置为案主")
     if "participant_ids" in data:
+        if list(data.get("participant_ids") or []) != list(old_session.participant_ids):
+            ensure_activity_participant_access(request, old_session)
         customer_access_service.require_new_customer_ids(
             request,
             data.get("participant_ids") or [],

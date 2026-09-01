@@ -42,7 +42,13 @@ export default function LoginPage() {
         localStorage.setItem("authToken", result.token)
         localStorage.setItem("currentUser", JSON.stringify(result.account))
         storePagePermissions(permissions)
-        localStorage.setItem("userEditPermissions", JSON.stringify(result.edit_permissions || { customers: "all", visits: "own", activities: "own" }))
+        localStorage.setItem("userEditPermissions", JSON.stringify(result.edit_permissions || {
+          customers: "all",
+          visits: "own",
+          activities: "own",
+          activity_participants: "all",
+          payments: "all",
+        }))
         if (rememberAccount) {
           localStorage.setItem("rememberedUsername", username)
         } else {

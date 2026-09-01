@@ -19,6 +19,7 @@ AnalysisField = Literal[
     "service_teacher",
     "referral_date",
     "created_at",
+    "invitation_dates",
     "first_visit_date",
     "last_visit_date",
     "invitation_count",
@@ -90,6 +91,7 @@ AnalysisMetric = Literal[
 INHERITABLE_DATE_FIELDS = {
     "referral_date",
     "created_at",
+    "invitation_dates",
     "first_visit_date",
     "last_visit_date",
     "last_communication_date",

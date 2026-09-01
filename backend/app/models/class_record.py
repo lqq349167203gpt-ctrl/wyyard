@@ -45,6 +45,7 @@ class ClassRecordBase(SafeBaseModel):
     course_name: str
     course_type: str = ""  # 活动类型（如：读书会、颂钵等）
     course_description: str = ""
+    course_review: str = ""  # 当天课程复盘
     activity_name: str = ""  # 用户自定义活动名称（优先于 course_name 显示）
     teacher_ids: List[str] = []
     participant_ids: List[str] = []
@@ -73,6 +74,7 @@ class ClassRecordCreate(StrictBaseModel):
     course_type: str = ""  # 活动类型（如：读书会、颂钵等）
     activity_name: str = ""  # 用户自定义活动名称（优先于 course_name 显示）
     course_description: str = ""
+    course_review: str = ""
     teacher_ids: List[str] = []
     participant_ids: List[str] = []
     is_public_welfare: bool = False

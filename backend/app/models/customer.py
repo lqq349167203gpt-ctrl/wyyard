@@ -70,7 +70,7 @@ class CustomerBase(SafeBaseModel):
     referrer: str = Field(default="", max_length=50)
     referral_date: str = Field(default="", max_length=10)
     referrer_handler: str = Field(default="", max_length=50)
-    follow_up_status: FollowUpStatus = FollowUpStatus.UNCONFIGURED
+    follow_up_status: str = Field(default=FollowUpStatus.UNCONFIGURED.value, max_length=30)
     member_type: str = Field(default="", max_length=50)
     paid_content: List[PaidContentItem] = Field(default=[], max_length=20)
     visit_count: int = Field(default=0, ge=0)
@@ -161,7 +161,7 @@ class CustomerUpdate(StrictBaseModel):
     referrer: Optional[str] = Field(default=None, max_length=50)
     referral_date: Optional[str] = Field(default=None, max_length=10)
     referrer_handler: Optional[str] = Field(default=None, max_length=50)
-    follow_up_status: Optional[FollowUpStatus] = None
+    follow_up_status: Optional[str] = Field(default=None, max_length=30)
     member_type: Optional[str] = Field(default=None, max_length=50)
     paid_content: Optional[List[PaidContentItem]] = Field(default=None, max_length=20)
     visit_count: Optional[int] = Field(default=None, ge=0)

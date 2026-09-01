@@ -1,70 +1,73 @@
 .page {
   min-height: 100vh;
   background-color: #f7f8fa;
-  padding: 24rpx 32rpx;
   display: flex;
   flex-direction: column;
+  padding-bottom: 160rpx;
 }
 
-/* 用户信息卡 */
-.profile-card {
+/* 头部：纯白 + 蓝底白字头像 + 名字 + 角色副标题 */
+.head {
+  background-color: #ffffff;
+  padding: 52rpx 44rpx 48rpx;
+}
+
+.id-row {
   display: flex;
   align-items: center;
-  background-color: #ffffff;
-  border-radius: 12rpx;
-  padding: 36rpx 32rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
 .avatar {
-  width: 100rpx;
-  height: 100rpx;
+  width: 104rpx;
+  height: 104rpx;
   border-radius: 50%;
-  background-color: #f0f5ff;
+  background-color: #3370ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 28rpx;
+  flex-shrink: 0;
 }
 
 .avatar-text {
-  font-size: 44rpx;
-  font-weight: 600;
-  color: #3370ff;
+  font-size: 40rpx;
+  color: #ffffff;
+  font-weight: 800;
 }
 
-.profile-info {
+.id-text {
+  margin-left: 28rpx;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
-.profile-name {
-  font-size: 36rpx;
-  font-weight: 600;
+.id-name {
+  font-size: 38rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
   color: #1f2329;
 }
 
-.profile-role {
-  font-size: 26rpx;
-  color: #8f959e;
-  margin-top: 8rpx;
+.id-slogan {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #a8b1bd;
+  letter-spacing: 2rpx;
 }
 
 /* 功能入口 */
 .menu-card {
   background-color: #ffffff;
-  border-radius: 12rpx;
+  border-radius: 24rpx;
+  margin: 24rpx 24rpx 0;
   padding: 0 32rpx;
-  margin-bottom: 20rpx;
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 32rpx 0;
+  height: 100rpx;
   border-bottom: 1rpx solid #f0f1f2;
 }
 
@@ -72,29 +75,34 @@
   border-bottom: none;
 }
 
+.menu-icon {
+  width: 40rpx;
+  height: 40rpx;
+  flex-shrink: 0;
+  margin-right: 24rpx;
+}
+
 .menu-label {
+  flex: 1;
   font-size: 30rpx;
   color: #1f2329;
 }
 
 .menu-arrow {
-  font-size: 32rpx;
+  font-size: 36rpx;
   color: #c0c4cc;
+  flex-shrink: 0;
 }
 
 /* 退出按钮 */
-.logout-area {
-  margin-top: auto;
-  padding-bottom: 60rpx;
-}
-
 .logout-btn {
-  height: 108rpx;
+  margin: auto 24rpx 24rpx;
+  height: 104rpx;
   font-size: 30rpx;
   font-weight: 400;
   background-color: #ffffff;
   color: #1f2329;
-  border-radius: 12rpx;
+  border-radius: 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;

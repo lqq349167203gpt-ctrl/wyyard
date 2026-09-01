@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { uploadApi, customerApi, customerTagApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type CustomerTag, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord, type PurchaseSummaryItem, type VisitNoteSummary } from "@/lib/api"
+import { uploadApi, customerApi, customerTagApi, followUpStatusApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type CustomerTag, type FollowUpStatusConfig, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord, type PurchaseSummaryItem, type VisitNoteSummary } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -110,6 +110,7 @@ export default function DetailView({
   const [activityTypeFilter, setActivityTypeFilter] = useState<string>("全部")
   const [activityRoleFilter, setActivityRoleFilter] = useState<string>("全部")
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
+  const [followUpStatuses, setFollowUpStatuses] = useState<FollowUpStatusConfig[]>([])
   const loadSeqRef = useRef(0)
   const canEditVisits = useMemo(() => {
     try {
@@ -121,7 +122,11 @@ export default function DetailView({
     }
   }, [])
 
-  useEffect(() => { customerApi.clearLightCache(); customerApi.light().then(setCustomerList).catch(() => {}) }, [])
+  useEffect(() => {
+    customerApi.clearLightCache()
+    customerApi.light().then(setCustomerList).catch(() => {})
+    followUpStatusApi.list().then(setFollowUpStatuses).catch(() => setFollowUpStatuses([]))
+  }, [])
   // 客户到店日期集合（用于标记未参加活动）
   const arrivedDates = new Set((detail?.visit_records || []).filter(v => v.arrived).map(v => v.visit_date))
 
@@ -424,7 +429,7 @@ export default function DetailView({
               </div>
               <div className="flex items-center gap-2.5 pb-1 pt-[7px]">
                 <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">跟进阶段</span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={c.follow_up_status || undefined}>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={followUpStatuses.find(status => status.name === c.follow_up_status)?.description || c.follow_up_status || undefined}>
                   {c.follow_up_status || <DvEmpty />}
                 </span>
                 <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">人工设置</span>

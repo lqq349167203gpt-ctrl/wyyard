@@ -18,17 +18,19 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PaginationBar } from "@/components/pagination-bar"
 import { usePagination } from "@/hooks/use-pagination"
-import { customerTagApi, type CustomerTag, type CustomerTagScope } from "@/lib/api"
+import { customerTagApi, followUpStatusApi, type CustomerTag, type CustomerTagScope, type FollowUpStatusConfig } from "@/lib/api"
 
-type ScopeFilter = "all" | CustomerTagScope
+type ScopeFilter = "all" | CustomerTagScope | "follow-up"
 
 export default function CustomerTagsPage() {
   const navigate = useNavigate()
   const [tags, setTags] = useState<CustomerTag[]>([])
+  const [statuses, setStatuses] = useState<FollowUpStatusConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CustomerTag | null>(null)
+  const [editingStatus, setEditingStatus] = useState<FollowUpStatusConfig | null>(null)
   const [name, setName] = useState("")
   const [scope, setScope] = useState<CustomerTagScope>("public")
   const [description, setDescription] = useState("")
@@ -39,7 +41,9 @@ export default function CustomerTagsPage() {
   const load = async () => {
     setLoading(true)
     try {
-      setTags(await customerTagApi.list())
+      const [tagItems, statusItems] = await Promise.all([customerTagApi.list(), followUpStatusApi.list(true)])
+      setTags(tagItems)
+      setStatuses(statusItems)
     } catch (e) {
       setError(e instanceof Error ? e.message : "标签加载失败")
     } finally {
@@ -50,13 +54,14 @@ export default function CustomerTagsPage() {
   useEffect(() => { load() }, [])
 
   const filteredTags = useMemo(
-    () => tags.filter(tag => scopeFilter === "all" || tag.scope === scopeFilter),
+    () => tags.filter(tag => scopeFilter === "all" || (scopeFilter !== "follow-up" && tag.scope === scopeFilter)),
     [scopeFilter, tags],
   )
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredTags)
 
   const openCreate = () => {
     setEditing(null)
+    setEditingStatus(null)
     setName("")
     setScope("public")
     setDescription("")
@@ -66,6 +71,7 @@ export default function CustomerTagsPage() {
 
   const openEdit = (tag: CustomerTag) => {
     setEditing(tag)
+    setEditingStatus(null)
     setName(tag.name)
     setScope(tag.scope)
     setDescription(tag.description)
@@ -73,16 +79,35 @@ export default function CustomerTagsPage() {
     setDialogOpen(true)
   }
 
+  const openStatusEdit = (status: FollowUpStatusConfig) => {
+    setEditing(null)
+    setEditingStatus(status)
+    setName(status.name)
+    setDescription(status.description)
+    setError("")
+    setDialogOpen(true)
+  }
+
   const save = async () => {
     const normalizedName = name.trim()
     if (!normalizedName) {
-      setError("请输入标签名称")
+      setError(scopeFilter === "follow-up" ? "请输入状态名称" : "请输入标签名称")
       return
     }
     setSaving(true)
     setError("")
     try {
-      if (editing) {
+      if (scopeFilter === "follow-up") {
+        if (!description.trim()) {
+          setError("请输入状态描述")
+          return
+        }
+        if (editingStatus) {
+          await followUpStatusApi.update(editingStatus.id, { name: normalizedName, description: description.trim() })
+        } else {
+          await followUpStatusApi.create({ name: normalizedName, description: description.trim() })
+        }
+      } else if (editing) {
         await customerTagApi.update(editing.id, { name: normalizedName, description: description.trim() })
       } else {
         await customerTagApi.create({ name: normalizedName, scope, description: description.trim() })
@@ -93,6 +118,15 @@ export default function CustomerTagsPage() {
       setError(e instanceof Error ? e.message : "保存失败")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const toggleStatus = async (status: FollowUpStatusConfig) => {
+    try {
+      await followUpStatusApi.update(status.id, { enabled: !status.enabled })
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "更新失败")
     }
   }
 
@@ -123,11 +157,11 @@ export default function CustomerTagsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-[15px] font-medium text-[#212631]">客户标签</h1>
-            <p className="mt-0.5 text-[11px] text-[#8f959e]">公共标签团队共享，我的标签仅自己可见</p>
+            <h1 className="text-[15px] font-medium text-[#212631]">{scopeFilter === "follow-up" ? "跟进状态配置" : "客户标签"}</h1>
+            <p className="mt-0.5 text-[11px] text-[#8f959e]">{scopeFilter === "follow-up" ? "配置客户跟进状态及必填描述" : "公共标签团队共享，我的标签仅自己可见"}</p>
           </div>
           <Button className="ml-auto h-8 bg-[#212631] px-3 text-[12px] text-white hover:bg-[#303641]" onClick={openCreate}>
-            <Plus className="mr-1 h-3.5 w-3.5" />新建标签
+            <Plus className="mr-1 h-3.5 w-3.5" />{scopeFilter === "follow-up" ? "新建状态" : "新建标签"}
           </Button>
         </div>
 
@@ -136,6 +170,7 @@ export default function CustomerTagsPage() {
             ["all", "全部"],
             ["public", "公共标签"],
             ["private", "我的标签"],
+            ["follow-up", "跟进状态"],
           ] as [ScopeFilter, string][]).map(([value, label]) => (
             <button
               key={value}
@@ -151,6 +186,38 @@ export default function CustomerTagsPage() {
 
         {loading ? (
           <div className="py-16 text-center text-[12px] text-[#8f959e]">加载中...</div>
+        ) : scopeFilter === "follow-up" ? (
+          statuses.length === 0 ? (
+            <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无跟进状态</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-5">状态名称</TableHead>
+                  <TableHead>描述</TableHead>
+                  <TableHead className="text-right">使用人数</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead className="pr-5 text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {statuses.map(status => (
+                  <TableRow key={status.id} className="group">
+                    <TableCell className="pl-5 text-[13px] font-medium text-[#1f2329]">{status.name}</TableCell>
+                    <TableCell className="max-w-[420px] truncate text-[13px] text-[#4e535a]" title={status.description}>{status.description}</TableCell>
+                    <TableCell className="text-right tabular-nums text-[#2b2f36]">{status.usage_count} 人</TableCell>
+                    <TableCell className={status.enabled ? "text-[#3370ff]" : "text-[#8f959e]"}>{status.enabled ? "启用" : "停用"}</TableCell>
+                    <TableCell className="pr-5 text-right">
+                      <div className="flex justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100">
+                        <button type="button" className="text-[#3370ff]" onClick={() => openStatusEdit(status)}>编辑</button>
+                        <button type="button" className="text-[#8f959e] hover:text-[#c4506a]" onClick={() => toggleStatus(status)}>{status.enabled ? "停用" : "启用"}</button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )
         ) : paginatedItems.length === 0 ? (
           <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无标签</div>
         ) : (
@@ -197,18 +264,18 @@ export default function CustomerTagsPage() {
             </TableBody>
           </Table>
         )}
-        <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} startIndex={startIndex} endIndex={endIndex} onPageChange={goToPage} />
+        {scopeFilter !== "follow-up" && <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} startIndex={startIndex} endIndex={endIndex} onPageChange={goToPage} />}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[420px] max-w-[92vw]">
-          <DialogHeader><DialogTitle className="text-[14px] font-medium">{editing ? "编辑标签" : "新建标签"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-[14px] font-medium">{scopeFilter === "follow-up" ? (editingStatus ? "编辑跟进状态" : "新建跟进状态") : (editing ? "编辑标签" : "新建标签")}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-1">
             <div>
-              <label className="mb-1.5 block text-[12px] text-[#4e535a]">标签名称</label>
-              <Input value={name} maxLength={30} onChange={e => { setName(e.target.value); setError("") }} placeholder="例如：高意向、亲子需求" />
+              <label className="mb-1.5 block text-[12px] text-[#4e535a]">{scopeFilter === "follow-up" ? "状态名称" : "标签名称"}</label>
+              <Input value={name} maxLength={30} onChange={e => { setName(e.target.value); setError("") }} placeholder={scopeFilter === "follow-up" ? "例如：重点跟进" : "例如：高意向、亲子需求"} />
             </div>
-            {!editing && (
+            {scopeFilter !== "follow-up" && !editing && (
               <div>
                 <label className="mb-1.5 block text-[12px] text-[#4e535a]">可见范围</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -225,8 +292,8 @@ export default function CustomerTagsPage() {
               </div>
             )}
             <div>
-              <label className="mb-1.5 block text-[12px] text-[#4e535a]">说明 <span className="text-[#a8b1bd]">（选填）</span></label>
-              <Textarea value={description} maxLength={200} onChange={e => setDescription(e.target.value)} placeholder="说明这个标签适合标记哪类客户" className="min-h-[86px] resize-none" />
+              <label className="mb-1.5 block text-[12px] text-[#4e535a]">说明 {scopeFilter === "follow-up" && <span className="text-[#c4506a]">*</span>} {scopeFilter !== "follow-up" && <span className="text-[#a8b1bd]">（选填）</span>}</label>
+              <Textarea value={description} maxLength={200} onChange={e => { setDescription(e.target.value); setError("") }} placeholder={scopeFilter === "follow-up" ? "必填，说明此状态适用于哪类客户" : "说明这个标签适合标记哪类客户"} className="min-h-[86px] resize-none" />
             </div>
             {error && <p className="text-[11px] text-[#c4506a]">{error}</p>}
             <div className="flex justify-end gap-2 pt-1">
