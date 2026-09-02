@@ -263,7 +263,7 @@ export default function ClassRecordsPage() {
                     {getWeekday(d)}
                   </span>
                   <span className="text-[14px] font-medium leading-none h-4 flex items-center">{parseInt(d.split("-")[2])}</span>
-                  <span className={`text-[9px] leading-none h-3 flex items-center mt-0.5 ${isSelected ? "text-white/80" : dayCount > 0 ? "text-[#b0b5bb]" : "text-transparent"}`}>
+                  <span className={`text-[9px] leading-none h-3 flex items-center mt-0.5 ${isSelected ? "text-white/80" : "text-[#b0b5bb]"}`}>
                     {verificationMap[d]?.is_verified ? "已核对" : dayCount > 0 ? `${dayCount}人` : "未核对"}
                   </span>
                 </button>
