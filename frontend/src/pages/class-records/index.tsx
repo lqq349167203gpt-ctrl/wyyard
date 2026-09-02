@@ -60,6 +60,7 @@ export default function ClassRecordsPage() {
   const [verificationMap, setVerificationMap] = useState<Record<string, VisitVerification>>({})
   const [verificationSubmitting, setVerificationSubmitting] = useState(false)
   const [verificationConfirmOpen, setVerificationConfirmOpen] = useState(false)
+  const verificationFlushRef = useRef<(() => Promise<void>) | null>(null)
 
   // 人员分组
   const [groups, setGroups] = useState<{ name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]>([])
@@ -199,6 +200,7 @@ export default function ClassRecordsPage() {
     if (!selectedSpaceId || verificationSubmitting) return
     setVerificationSubmitting(true)
     try {
+      if (!isDayVerified) await verificationFlushRef.current?.()
       const result = isDayVerified
         ? await visitVerificationApi.unverify(detailDate, selectedSpaceId)
         : await visitVerificationApi.verify(detailDate, selectedSpaceId)
@@ -303,6 +305,7 @@ export default function ClassRecordsPage() {
             onRequireSpaces={spaces.length === 0 ? () => setNoSpacesDialogOpen(true) : undefined}
             groups={groups}
             verified={isDayVerified}
+            onFlushRef={(flush) => { verificationFlushRef.current = flush }}
           />
         </div>
       </div>

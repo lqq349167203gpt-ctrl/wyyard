@@ -97,6 +97,7 @@ interface BatchInputTableProps {
   toolbarTrailing?: React.ReactNode
   onDataLoaded?: (visits: VisitRecord[]) => void
   onRowsChange?: (rows: VisitRowSummary[]) => void
+  onFlushRef?: (flush: () => Promise<void>) => void
 }
 
 function getRemainingCount(cards: MembershipCard[], customerId: string): number | null {
@@ -124,7 +125,7 @@ const VISIT_CREATOR_ONLY_FIELDS = new Set<keyof Row>([
 
 const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 78, 80, 64, 207, 203, 203, 60, 60, 74, 74, 76, 76] as const
 
-export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, verified = false, onClosePreview, toolbarLeading, toolbarTrailing, onDataLoaded, onRowsChange }: BatchInputTableProps) {
+export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, verified = false, onClosePreview, toolbarLeading, toolbarTrailing, onDataLoaded, onRowsChange, onFlushRef }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
@@ -550,6 +551,24 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   // 同步 saveRow 到 ref，供 restoreFromHistory 使用
   useEffect(() => { saveRowRef.current = saveRow }, [saveRow])
+
+  const flushPendingSaves = useCallback(async () => {
+    const pendingKeys = Object.keys(timersRef.current).map(Number)
+    pendingKeys.forEach((key) => {
+      clearTimeout(timersRef.current[key])
+      delete timersRef.current[key]
+    })
+    await Promise.allSettled(
+      pendingKeys.map((key) => {
+        const row = rowsRef.current.find((item) => item.key === key)
+        return row ? saveRow(row) : Promise.resolve()
+      }),
+    )
+  }, [saveRow])
+
+  useEffect(() => {
+    onFlushRef?.(flushPendingSaves)
+  }, [flushPendingSaves, onFlushRef])
 
   const scheduleSave = useCallback((key: number) => {
     if (timersRef.current[key]) clearTimeout(timersRef.current[key])

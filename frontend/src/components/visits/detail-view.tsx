@@ -125,9 +125,10 @@ interface DetailViewProps {
   onRequireSpaces?: () => void
   groups?: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
   verified?: boolean
+  onFlushRef?: (flush: () => Promise<void>) => void
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, onCountsRefresh, spaceId, onRequireSpaces, groups = [], verified = false }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, onCountsRefresh, spaceId, onRequireSpaces, groups = [], verified = false, onFlushRef }: DetailViewProps = {}) {
   const editPermissions = useEditPermissions()
   const currentRole = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
@@ -733,6 +734,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           )}
           onDataLoaded={handleTableDataLoaded}
           onRowsChange={handleTableRowsChange}
+          onFlushRef={onFlushRef}
         />
       </div>
 
