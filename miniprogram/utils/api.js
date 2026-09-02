@@ -8,7 +8,7 @@ let _silentLoginPromise = null
 let _logoutScheduled = false
 let _lastTrackedPagePath = ''
 const DEVICE_ID_KEY = 'wyyard_device_id'
-const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, payments: 'all' }
+const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
 const SECURITY_AUTH_REASONS = ['disabled', 'password_changed', 'kicked']
 
 function _getDeviceId() {
@@ -410,6 +410,19 @@ const visitNoteApi = {
   delete: (id) => request(`/api/visit-notes/${id}`, { method: 'DELETE' }),
 }
 
+const visitVerificationApi = {
+  list: (startDate, endDate, spaceId) => {
+    const params = []
+    if (startDate) params.push(`start_date=${encodeURIComponent(startDate)}`)
+    if (endDate) params.push(`end_date=${encodeURIComponent(endDate)}`)
+    if (spaceId !== undefined) params.push(`space_id=${encodeURIComponent(spaceId || '')}`)
+    return request(`/api/visit-verifications${params.length ? '?' + params.join('&') : ''}`)
+  },
+  getStatus: (date, spaceId) => request(`/api/visit-verifications/status?date=${encodeURIComponent(date)}&space_id=${encodeURIComponent(spaceId || '')}`),
+  verify: (date, spaceId) => request('/api/visit-verifications/verify', { method: 'POST', data: { date, space_id: spaceId || '' } }),
+  unverify: (date, spaceId) => request('/api/visit-verifications/unverify', { method: 'POST', data: { date, space_id: spaceId || '' } }),
+}
+
 // 活动 API
 const classRecordApi = {
   dashboard: (date, spaceId) => {
@@ -745,6 +758,7 @@ module.exports = {
   request,
   visitApi,
   visitNoteApi,
+  visitVerificationApi,
   classRecordApi,
   activityWithdrawalApi,
   activityThemeApi,

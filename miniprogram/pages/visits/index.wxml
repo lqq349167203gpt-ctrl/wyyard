@@ -18,6 +18,16 @@
         </view>
       </picker>
     </view>
+    <view class="lock-bar {{isDayVerified ? 'locked' : ''}}">
+      <view class="lock-status">
+        <view class="lock-status-icon">{{isDayVerified ? '✓' : '○'}}</view>
+        <text>{{isDayVerified ? '已核对' : '未核对'}}</text>
+        <text class="lock-operator" wx:if="{{isDayVerified && verificationInfo.verified_by}}">· {{verificationInfo.verified_by}}</text>
+      </view>
+      <button class="lock-action" wx:if="{{canManageVisitVerification}}" bindtap="onVerificationToggle" loading="{{verificationSubmitting}}" disabled="{{verificationSubmitting || !spaceId}}">
+        {{isDayVerified ? '解锁' : '核对并锁定'}}
+      </button>
+    </view>
     <!-- 三槽位周轮播：滑动完成后无感回中，避免循环克隆长期滑动后出现空白 -->
     <swiper
       wx:if="{{!calendarExpanded}}"
@@ -39,7 +49,7 @@
           >
             <text class="week-label">{{day.weekday}}</text>
             <text class="week-number">{{day.day}}</text>
-            <view class="week-count-dot {{day.count > 0 ? 'visible' : ''}}"></view>
+            <view class="week-count-dot {{day.isVerified ? 'visible verified' : (day.count > 0 ? 'visible' : '')}}"></view>
           </view>
         </view>
       </swiper-item>
@@ -65,6 +75,7 @@
         >
           <text>{{item.day}}</text>
           <view class="day-dot" wx:if="{{item.count > 0}}"></view>
+          <view class="day-check-status {{item.isVerified ? 'verified' : ''}}" wx:if="{{item.isCurrent}}">{{item.isVerified ? '已核对' : '未核对'}}</view>
         </view>
       </view>
     </view>
@@ -80,7 +91,7 @@
       <text class="list-heading-title">邀约名单</text>
       <text class="list-heading-count">{{dateSwitching ? '…' : todayVisitCount}} 人</text>
       <view class="list-heading-actions">
-        <view wx:if="{{!isViewOnly}}" class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
+        <view wx:if="{{!isViewOnly && !isDayVerified}}" class="edit-toggle {{editMode ? 'active' : ''}}" catchtap="onToggleEditMode">
           <text>{{editMode ? '完成' : '排序'}}</text>
         </view>
         <view class="export-btn" catchtap="onExportTap">
@@ -97,10 +108,10 @@
           visit="{{item}}"
           leader-name="{{leaderMap[item.customer_id] || ''}}"
           edit-mode="{{editMode}}"
-          editable="{{item.can_edit}}"
-          cancelable="{{!isViewOnly}}"
-          sortable="{{!isViewOnly}}"
-          arrival-editable="{{!isViewOnly && !item.cancelled}}"
+          editable="{{item.can_edit && !isDayVerified}}"
+          cancelable="{{!isViewOnly && !isDayVerified}}"
+          sortable="{{!isViewOnly && !isDayVerified}}"
+          arrival-editable="{{!isViewOnly && !isDayVerified && !item.cancelled}}"
           can-move-up="{{index > 0}}"
           can-move-down="{{index < visits.length - 1}}"
           is-last="{{index === visits.length - 1}}"
@@ -122,7 +133,7 @@
   <view class="empty-state" wx:if="{{!loading && visits.length === 0}}">
     <text class="empty-icon">📋</text>
     <text class="empty-text">暂无邀约记录</text>
-    <text class="empty-hint">{{isViewOnly ? '当前账号仅可浏览' : '点击右下角 + 添加'}}</text>
+    <text class="empty-hint">{{isDayVerified ? '当天邀约已核对' : (isViewOnly ? '当前账号仅可浏览' : '点击右下角 + 添加')}}</text>
   </view>
 
   <!-- 加载中 -->
@@ -131,7 +142,7 @@
   </view>
 
   <!-- 浮动添加按钮 -->
-  <view class="fab" wx:if="{{!editMode && !isViewOnly}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
+  <view class="fab" wx:if="{{!editMode && !isViewOnly && !isDayVerified}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
   </view>
   </block>

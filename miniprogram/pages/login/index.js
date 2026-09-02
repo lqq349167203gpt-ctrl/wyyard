@@ -160,7 +160,7 @@ Page({
     wx.setStorageSync('auth_token', data.token)
     wx.setStorageSync('currentUser', data.account)
     wx.setStorageSync('userPermissions', data.permissions)
-    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, payments: 'all' })
+    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' })
 
     // 开发模式登录不改动用户保存的账号密码
     if (this.data.loginMode === 'password') {
@@ -181,7 +181,7 @@ Page({
       app.globalData.token = data.token
       app.globalData.currentUser = data.account
       app.globalData.permissions = data.permissions || []
-      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, payments: 'all' }
+      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
       if (app.scheduleUsageTracking) app.scheduleUsageTracking()
       else if (app.startUsageTracking) app.startUsageTracking()
     }

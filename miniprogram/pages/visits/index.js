@@ -1,4 +1,4 @@
-const { visitApi, spaceApi } = require('../../utils/api')
+const { visitApi, spaceApi, visitVerificationApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
@@ -7,7 +7,7 @@ const SHARED_SCHEDULE_DATE_KEY = 'schedule_selected_date'
 
 function pad(n) { return n < 10 ? '0' + n : '' + n }
 
-function buildCalendar(year, month, selectedDate, calendarCounts) {
+function buildCalendar(year, month, selectedDate, calendarCounts, verificationMap) {
   const today = formatDate(new Date())
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -42,6 +42,7 @@ function buildCalendar(year, month, selectedDate, calendarCounts) {
       isSelected: date === selectedDate,
       isToday: date === today,
       count: (calendarCounts || {})[date] || 0,
+      isVerified: Boolean((verificationMap || {})[date]),
     })
   }
   return days
@@ -53,7 +54,7 @@ function parseLocalDate(date) {
   return new Date(parts[0], parts[1] - 1, parts[2])
 }
 
-function buildWeekPages(selectedDate, calendarCounts) {
+function buildWeekPages(selectedDate, calendarCounts, verificationMap) {
   const selected = parseLocalDate(selectedDate)
   if (!selected) return []
   const mondayOffset = (selected.getDay() + 6) % 7
@@ -71,6 +72,7 @@ function buildWeekPages(selectedDate, calendarCounts) {
         day: dateValue.getDate(),
         weekday: WEEKDAYS[dateValue.getDay()],
         count: (calendarCounts || {})[date] || 0,
+        isVerified: Boolean((verificationMap || {})[date]),
         // 前后周也预先标记同一星期，滑动过程中选中态不会突然消失。
         isSelected: index === selectedWeekdayIndex,
       }
@@ -107,6 +109,10 @@ Page({
     todayVisitCount: 0,
     todayArrivedCount: 0,
     isViewOnly: false,
+    isDayVerified: false,
+    verificationInfo: {},
+    canManageVisitVerification: false,
+    verificationSubmitting: false,
   },
 
   async onLoad() {
@@ -115,7 +121,12 @@ Page({
       this.setData({ hasPagePermission: false })
       return
     }
-    this.setData({ isViewOnly: isAreaViewOnly('visits') })
+    const currentUser = wx.getStorageSync('currentUser') || getApp().globalData.currentUser || {}
+    const editPermissions = wx.getStorageSync('userEditPermissions') || getApp().globalData.editPermissions || {}
+    this.setData({
+      isViewOnly: isAreaViewOnly('visits'),
+      canManageVisitVerification: currentUser.role === '超级管理员' || editPermissions.visit_lock === true,
+    })
     const now = new Date()
     const savedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY) || wx.getStorageSync('visit_selected_date')
     const date = savedDate || formatDate(now)
@@ -129,7 +140,7 @@ Page({
       currentWeekday: '周' + WEEKDAYS[d.getDay()],
       calYear: d.getFullYear(),
       calMonth: d.getMonth(),
-      weekPages: buildWeekPages(date, {}),
+      weekPages: buildWeekPages(date, {}, {}),
     })
     await this.loadSpaces()
     await this.loadData()
@@ -180,7 +191,7 @@ Page({
       const counts = this._calendarCounts || {}
       this.setData({
         calendarExpanded: true,
-        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, this.data.currentDate, counts),
+        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, this.data.currentDate, counts, this._verificationMap || {}),
       })
     }
   },
@@ -196,8 +207,9 @@ Page({
     const counts = this._calendarCounts || {}
     this.setData({
       calYear, calMonth,
-      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
+      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts, this._verificationMap || {}),
     })
+    this._loadVerificationRange()
   },
 
   onNextMonth() {
@@ -207,8 +219,9 @@ Page({
     const counts = this._calendarCounts || {}
     this.setData({
       calYear, calMonth,
-      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
+      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts, this._verificationMap || {}),
     })
+    this._loadVerificationRange()
   },
 
   onCalendarDayTap(e) {
@@ -231,8 +244,8 @@ Page({
       calYear: d.getFullYear(),
       calMonth: d.getMonth(),
       calendarExpanded: false,
-      calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts),
-      weekPages: buildWeekPages(date, counts),
+      calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts, this._verificationMap || {}),
+      weekPages: buildWeekPages(date, counts, this._verificationMap || {}),
       weekSwiperCurrent: 1,
       editMode: false,
       dateSwitching: useSoftTransition,
@@ -311,18 +324,24 @@ Page({
     try {
       const sid = spaceId !== undefined ? spaceId : this.data.spaceId
       const reqDate = this.data.currentDate
-      const [visits, counts] = await Promise.all([
+      const [visits, counts, verifications] = await Promise.all([
         visitApi.listLight(reqDate, sid || undefined),
         visitApi.counts({
           start_date: this._countRangeStart(),
           end_date: this._countRangeEnd(),
           space_id: sid || undefined,
         }),
+        visitVerificationApi.list(this._countRangeStart(), this._countRangeEnd(), sid || ''),
       ])
       const currentSpaceId = this.data.spaceId || ''
       if (reqDate !== this.data.currentDate || String(sid || '') !== String(currentSpaceId)) return
-      // 迁移 localStorage 排序到后端 sort_order
-      await this._migrateLocalOrder(visits || [])
+      const verificationMap = {}
+      ;(verifications || []).forEach(item => { verificationMap[item.date] = Boolean(item.is_verified) })
+      this._verificationMap = verificationMap
+      const verificationInfo = (verifications || []).find(item => item.date === reqDate) || {}
+      const isDayVerified = Boolean(verificationMap[reqDate])
+      // 迁移 localStorage 排序到后端 sort_order；已核对日期不能再迁移历史排序。
+      if (!isDayVerified) await this._migrateLocalOrder(visits || [])
 
       const visibleVisits = (visits || []).map(v => Object.assign({}, v, {
         can_edit: canEditRecord(v, 'visits'),
@@ -335,12 +354,15 @@ Page({
       const nextData = {
         visits: visibleVisits,
         visitCounts: counts || {},
-        weekPages: buildWeekPages(reqDate, counts || {}),
+        weekPages: buildWeekPages(reqDate, counts || {}, verificationMap),
+        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, reqDate, counts || {}, verificationMap),
         leaderMap,
         todayVisitCount: visibleVisits.length,
         todayArrivedCount: visibleVisits.filter(v => v.arrived && !v.cancelled).length,
         loading: false,
         dateSwitching: false,
+        isDayVerified,
+        verificationInfo,
       }
       this.setData(nextData, () => {
         if (Number.isFinite(options.restoreScrollTop)) {
@@ -401,9 +423,30 @@ Page({
     return formatDate(date)
   },
 
+  async _loadVerificationRange() {
+    const spaceId = this.data.spaceId || ''
+    if (!spaceId) return
+    try {
+      const items = await visitVerificationApi.list(this._monthStart(), this._monthEnd(), spaceId)
+      const verificationMap = { ...(this._verificationMap || {}) }
+      ;(items || []).forEach(item => { verificationMap[item.date] = Boolean(item.is_verified) })
+      this._verificationMap = verificationMap
+      const currentInfo = (items || []).find(item => item.date === this.data.currentDate) || this.data.verificationInfo || {}
+      this.setData({
+        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, this.data.currentDate, this._calendarCounts || {}, verificationMap),
+        weekPages: buildWeekPages(this.data.currentDate, this._calendarCounts || {}, verificationMap),
+        isDayVerified: Boolean(verificationMap[this.data.currentDate]),
+        verificationInfo: currentInfo,
+      })
+    } catch (error) {
+      console.error('加载邀约核对状态失败:', error)
+    }
+  },
+
   // ---- 排序存储 ----
 
   saveOrder() {
+    if (this.data.isDayVerified) return
     const ids = this.data.visits.map(v => v.id)
     visitApi.reorder(ids).catch(e => console.error('保存排序失败:', e))
   },
@@ -427,10 +470,12 @@ Page({
   // ---- 编辑模式 ----
 
   onToggleEditMode() {
+    if (this.data.isDayVerified) return
     this.setData({ editMode: !this.data.editMode })
   },
 
   onMoveUp(e) {
+    if (this.data.isDayVerified) return
     const visit = e.detail.visit
     const visits = this.data.visits.slice()
     const idx = visits.findIndex(v => v.id === visit.id)
@@ -442,6 +487,7 @@ Page({
   },
 
   onMoveDown(e) {
+    if (this.data.isDayVerified) return
     const visit = e.detail.visit
     const visits = this.data.visits.slice()
     const idx = visits.findIndex(v => v.id === visit.id)
@@ -460,11 +506,16 @@ Page({
   },
 
   onAddTap() {
+    if (this.data.isDayVerified) {
+      wx.showToast({ title: '当天邀约已核对，请先解锁', icon: 'none' })
+      return
+    }
     this._markChildNavigation()
     wx.navigateTo({ url: `/pages/visit-create/index?date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
   },
 
   onFabLongPress() {
+    if (this.data.isDayVerified) return
     this._markChildNavigation()
     wx.navigateTo({ url: `/pages/voice-chat/index?mode=visit&date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
   },
@@ -474,7 +525,7 @@ Page({
     const visit = e.detail.visit || e.currentTarget.dataset.visit
     if (!visit || visit.cancelled) return
     this._markChildNavigation()
-    wx.navigateTo({ url: `/pages/visit-edit/index?id=${visit.id}` })
+    wx.navigateTo({ url: `/pages/visit-edit/index?id=${visit.id}&verified=${this.data.isDayVerified ? '1' : '0'}` })
   },
 
   onProfileTap(e) {
@@ -486,6 +537,7 @@ Page({
   },
 
   onArrivalTap(e) {
+    if (this.data.isDayVerified) return
     const { visit, arrived } = e.detail
     if (!visit || visit.cancelled) return
     if (!this._arrivalUpdating) this._arrivalUpdating = new Set()
@@ -547,7 +599,7 @@ Page({
 
   onCancelVisitTap(e) {
     const visit = e.detail.visit
-    if (!visit || this.data.isViewOnly) return
+    if (!visit || this.data.isViewOnly || this.data.isDayVerified) return
     const cancelled = !visit.cancelled
 
     visitApi.update(visit.id, { cancelled }).then(() => {
@@ -563,7 +615,7 @@ Page({
       const date = visit.visit_date || this.data.currentDate
       counts[date] = Math.max(0, (counts[date] || 0) + (cancelled ? -1 : 1))
       this._calendarCounts = counts
-      this.setData({ weekPages: buildWeekPages(this.data.currentDate, counts) })
+      this.setData({ weekPages: buildWeekPages(this.data.currentDate, counts, this._verificationMap || {}) })
     }).catch(() => {
       wx.showToast({ title: '操作失败', icon: 'none' })
     })
@@ -571,7 +623,7 @@ Page({
 
   onDeleteTap(e) {
     const visit = e.detail.visit || e.currentTarget.dataset.visit
-    if (!visit || !visit.can_edit) return
+    if (!visit || !visit.can_edit || this.data.isDayVerified) return
     wx.showModal({
       title: '确认删除',
       content: `确定删除 ${visit.nickname} 的邀约记录？`,
@@ -583,6 +635,30 @@ Page({
           }).catch(err => {
             wx.showToast({ title: '删除失败', icon: 'none' })
           })
+        }
+      },
+    })
+  },
+
+  onVerificationToggle() {
+    if (!this.data.canManageVisitVerification || this.data.verificationSubmitting || !this.data.spaceId) return
+    const willUnlock = this.data.isDayVerified
+    wx.showModal({
+      title: willUnlock ? '解锁当天邀约？' : '核对无误并锁定？',
+      content: willUnlock
+        ? '解锁后，拥有相应权限的员工可以继续修改当天全部邀约资料。'
+        : '锁定后，仅来访需求、客户信息和跟进点可继续填写；其他资料及操作需先解锁。',
+      confirmText: willUnlock ? '确认解锁' : '确认锁定',
+      success: async (result) => {
+        if (!result.confirm) return
+        this.setData({ verificationSubmitting: true })
+        try {
+          if (willUnlock) await visitVerificationApi.unverify(this.data.currentDate, this.data.spaceId)
+          else await visitVerificationApi.verify(this.data.currentDate, this.data.spaceId)
+          wx.showToast({ title: willUnlock ? '已解锁' : '已核对并锁定', icon: 'success' })
+          await this.loadData()
+        } finally {
+          this.setData({ verificationSubmitting: false })
         }
       },
     })
