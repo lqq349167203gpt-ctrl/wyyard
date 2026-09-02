@@ -355,9 +355,13 @@ def _execute_create_customer(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _execute_create_visit(data: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services import visit_verification_service
+
+    visit_date = data.get("visit_date", date.today().isoformat())
+    visit_verification_service.ensure_scope_unverified(visit_date, data.get("space_id", ""))
     create_data = VisitRecordCreate(
         customer_id=data["customer_id"],
-        visit_date=data.get("visit_date", date.today().isoformat()),
+        visit_date=visit_date,
         visit_time=data.get("visit_time", "09:00"),
         needs=data.get("needs", ""),
         arrived=data.get("arrived", True),

@@ -19,6 +19,16 @@
         </picker>
       </view>
     </view>
+    <view class="lock-bar {{isDayLocked ? 'locked' : ''}}">
+      <view class="lock-status">
+        <view class="lock-status-icon">{{isDayLocked ? '✓' : '○'}}</view>
+        <text>{{isDayLocked ? '已核对' : '未核对'}}</text>
+        <text class="lock-operator" wx:if="{{isDayLocked && lockInfo.locked_by}}">· {{lockInfo.locked_by}}</text>
+      </view>
+      <button class="lock-action" wx:if="{{canManageActivityLock}}" bindtap="onLockToggle" loading="{{lockSubmitting}}" disabled="{{lockSubmitting || !spaceId}}">
+        {{isDayLocked ? '解锁' : '核对并锁定'}}
+      </button>
+    </view>
     <!-- 三槽位周轮播：滑动完成后无感回中，可稳定连续切换前后周 -->
     <swiper
       wx:if="{{!calendarExpanded}}"
@@ -40,7 +50,7 @@
           >
             <text class="week-label">{{day.weekday}}</text>
             <text class="week-number">{{day.day}}</text>
-            <view class="week-count-dot {{day.count > 0 ? 'visible' : ''}}"></view>
+            <view class="week-count-dot {{day.count > 0 ? 'visible' : ''}} {{day.isLocked ? 'verified' : ''}}"></view>
           </view>
         </view>
       </swiper-item>
@@ -64,6 +74,7 @@
           data-date="{{item.date}}"
         >
           <text>{{item.day}}</text>
+          <view class="day-check-status {{item.isLocked ? 'verified' : ''}}" wx:if="{{item.isCurrent}}">{{item.isLocked ? '已核对' : '未核对'}}</view>
           <view class="day-dot" wx:if="{{item.count > 0}}"></view>
         </view>
       </view>
@@ -81,11 +92,11 @@
         <view class="group-heading-dot"></view>
         <text class="group-label">{{group.label}}</text>
         <text class="group-count">{{group.items.length}} 场</text>
-        <view wx:if="{{index === 0 && !isViewOnly}}" class="withdraw-entry {{withdrawalCourses.length ? '' : 'disabled'}}" bindtap="onWithdrawalOpen">退课</view>
+        <view wx:if="{{index === 0 && !isViewOnly && !isDayLocked}}" class="withdraw-entry {{withdrawalCourses.length ? '' : 'disabled'}}" bindtap="onWithdrawalOpen">退课</view>
       </view>
       <view class="group-card">
         <view
-          class="card roster-card {{item.canEdit ? '' : 'read-only'}}"
+          class="card roster-card {{item.canEdit && !isDayLocked ? '' : 'read-only'}}"
           wx:for="{{group.items}}"
           wx:key="key"
           wx:for-item="item"
@@ -110,7 +121,7 @@
             </view>
             <view class="card-right">
               <view class="card-status-row" wx:if="{{!item.canEdit || item.isPublished}}">
-                <text class="readonly-status" wx:if="{{!item.canEdit}}">{{isViewOnly ? '仅浏览' : '部分只读'}}</text>
+                <text class="readonly-status" wx:if="{{isDayLocked || !item.canEdit}}">{{isDayLocked ? ((lockInfo.locked_by || '未记录') + '锁定') : ((item.createdBy || '未记录') + '锁定')}}</text>
                 <text class="status" wx:if="{{item.isPublished}}">已发布</text>
               </view>
             </view>
@@ -136,7 +147,7 @@
   </view>
 
   <!-- 添加按钮 -->
-  <view class="fab" wx:if="{{!isViewOnly}}" bindtap="onCreateTap" bindlongpress="onFabLongPress">
+  <view class="fab" wx:if="{{!isViewOnly && !isDayLocked}}" bindtap="onCreateTap" bindlongpress="onFabLongPress">
     <text class="fab-icon">+</text>
   </view>
 

@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Query
 
 from app.models.base import StrictBaseModel
-from app.services import activity_order_service
+from app.services import activity_lock_service, activity_order_service
 
 router = APIRouter(prefix="/api/activity-orders", tags=["activity-orders"])
 
@@ -27,5 +27,6 @@ async def get_order(
 
 @router.post("")
 async def save_order(data: SaveOrderRequest):
+    activity_lock_service.ensure_scope_unlocked(data.date, data.space_id)
     activity_order_service.save_order(data.date, data.space_id, data.order)
     return {"ok": True}

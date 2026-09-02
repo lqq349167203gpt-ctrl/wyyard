@@ -7,7 +7,7 @@
   <block wx:if="{{!loading}}">
   <view class="record-meta">
     <text>创建人 · {{createdBy || '未记录'}}</text>
-    <text class="readonly-text" wx:if="{{readOnly}}">{{viewOnly ? (canEditParticipants ? '课程内容仅浏览，可配置参与人' : '当前账号仅可浏览') : '部分信息仅创建人可改'}}</text>
+    <text class="readonly-text" wx:if="{{readOnly}}">{{dayLocked ? ('已核对锁定 · ' + (lockedBy || '未记录')) : (viewOnly ? ((canEditParticipants || canEditTeachers) ? '课程内容仅浏览，可配置获权字段' : '当前账号仅可浏览') : '部分信息仅创建人可改')}}</text>
   </view>
   <!-- 参与者 -->
   <view class="form-card">
@@ -116,8 +116,8 @@
     <view class="form-item last" wx:if="{{activityType === 'class' || activityType === 'eks' || activityType === 'ics'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
-        <text style="{{teacherDisplay ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{teacherDisplay || (readOnly ? '' : '选择老师')}}</text>
-        <text class="picker-clear" wx:if="{{teacherIds.length > 0 && !readOnly}}" catchtap="onTeacherClear">x</text>
+        <text style="{{teacherDisplay ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{teacherDisplay || (canEditTeachers ? '选择老师' : '')}}</text>
+        <text class="picker-clear" wx:if="{{teacherIds.length > 0 && canEditTeachers}}" catchtap="onTeacherClear">x</text>
       </view>
     </view>
 
@@ -125,8 +125,8 @@
     <view class="form-item last" wx:if="{{activityType === 'gcs' || activityType === 'ers'}}" bindtap="onTeacherPickerOpen">
       <text class="form-label">老师</text>
       <view class="picker-value-wrap">
-        <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || (readOnly ? '' : '选择老师')}}</text>
-        <text class="picker-clear" wx:if="{{achieverId && !readOnly}}" catchtap="onAchieverClear">x</text>
+        <text style="{{achieverName ? 'color: #1f2329; font-size: 28rpx;' : 'color: #b0b5bb; font-size: 28rpx;'}}">{{achieverName || (canEditTeachers ? '选择老师' : '')}}</text>
+        <text class="picker-clear" wx:if="{{achieverId && canEditTeachers}}" catchtap="onAchieverClear">x</text>
       </view>
     </view>
   </view>
@@ -253,7 +253,7 @@
   <!-- 操作按钮 -->
   <view class="actions">
     <button class="btn-danger" wx:if="{{!readOnly}}" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
-    <button wx:if="{{!readOnly || canEditParticipants}}" class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    <button wx:if="{{!readOnly || canEditParticipants || canEditTeachers}}" class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
   </block>
 </view>

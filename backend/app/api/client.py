@@ -545,6 +545,11 @@ def signup_activity(activity_id: str, request: Request):
     if not item:
         raise HTTPException(status_code=404, detail="活动不存在")
 
+    from app.services import activity_lock_service
+    activity_lock_service.ensure_scope_unlocked(
+        item["data"].get("date", ""), item["data"].get("space_id", "")
+    )
+
     if not item["data"].get("is_published", False):
         raise HTTPException(status_code=404, detail="活动不存在")
 
@@ -609,7 +614,9 @@ def signup_activity(activity_id: str, request: Request):
     space_id = item["data"].get("space_id", "")
     if activity_date:
         from app.models.visit import VisitRecordCreate
-        from app.services import visit_service
+        from app.services import visit_service, visit_verification_service
+
+        visit_verification_service.ensure_scope_unverified(activity_date, space_id)
 
         existing = visit_service.list_visits(date=activity_date, customer_id=customer_id)
         if existing:
@@ -649,6 +656,11 @@ def cancel_signup(activity_id: str, request: Request):
     item = _find_activity(activity_id)
     if not item:
         raise HTTPException(status_code=404, detail="活动不存在")
+
+    from app.services import activity_lock_service
+    activity_lock_service.ensure_scope_unlocked(
+        item["data"].get("date", ""), item["data"].get("space_id", "")
+    )
 
     if customer_id in _withdrawn_participant_ids(item):
         raise HTTPException(status_code=409, detail="该课程已办理退课")

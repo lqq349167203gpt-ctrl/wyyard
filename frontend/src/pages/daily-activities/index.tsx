@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock, UserMinus } from "lucide-react"
+import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock, UserMinus, Lock, Unlock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -1662,6 +1662,7 @@ export default function DailyActivitiesPage() {
   const currentRole = currentUser.role || ""
   const isViewOnly = currentRole !== "超级管理员" && editPermissions.activities === "view"
   const canUseHistoryRestore = currentRole === "超级管理员" || editPermissions.activities === "all"
+  const canManageActivityLock = currentRole === "超级管理员" || editPermissions.activity_lock
   const today = useMemo(() => formatDate(new Date()), [])
   // ===== Core state =====
   const [detailDate, setDetailDate] = useState(() => {
@@ -1752,6 +1753,7 @@ export default function DailyActivitiesPage() {
   const [previewEntry, setPreviewEntry] = useState<HistoryEntry | null>(null)
   const restoreRef = useRef<((entry: HistoryEntry) => Promise<void>) | null>(null)
   const captureRef = useRef<(() => void) | null>(null)
+  const flushPendingSavesRef = useRef<(() => Promise<void>) | null>(null)
   const loadSeqRef = useRef(0)
 
   const handleUndoRedoChange = useCallback((cu: boolean, cr: boolean, u: () => void, r: () => void, history: HistoryEntry[]) => {
@@ -1888,6 +1890,8 @@ export default function DailyActivitiesPage() {
 
   // ===== Theme state =====
   const [themes, setThemes] = useState<ActivityTheme[]>([])
+  const [lockDialogOpen, setLockDialogOpen] = useState(false)
+  const [lockSubmitting, setLockSubmitting] = useState(false)
   const [themeEditWeekIndex, setThemeEditWeekIndex] = useState<number | null>(null)
   const [calendarVisible, setCalendarVisible] = useState(() => {
     try { return localStorage.getItem("daily-calendar-visible") !== "false" } catch { return true }
@@ -1924,8 +1928,31 @@ export default function DailyActivitiesPage() {
   }, [themes])
 
   const currentTheme = themeMap.get(detailDate)
+  const isDayLocked = currentTheme?.is_locked === true
   const weekThemeStr = currentTheme?.week_theme || ""
   const dayThemeStr = currentTheme?.day_theme || ""
+
+  const handleToggleDayLock = useCallback(async () => {
+    if (!selectedSpaceId || lockSubmitting) return
+    setLockSubmitting(true)
+    try {
+      if (!isDayLocked) await flushPendingSavesRef.current?.()
+      const result = isDayLocked
+        ? await activityThemeApi.unlock(detailDate, selectedSpaceId)
+        : await activityThemeApi.lock(detailDate, selectedSpaceId)
+      setThemes(current => [...current.filter(theme => theme.id !== result.id), result])
+      setPreviewEntry(null)
+      setHistoryPanelOpen(false)
+      setWithdrawalDialogOpen(false)
+      setThemeEditWeekIndex(null)
+      setLockDialogOpen(false)
+    } catch (error: any) {
+      setWarningMsg(error?.message || (isDayLocked ? "解锁失败" : "锁定失败"))
+      setWarningOpen(true)
+    } finally {
+      setLockSubmitting(false)
+    }
+  }, [detailDate, isDayLocked, lockSubmitting, selectedSpaceId])
 
   // 计算当前日期所在周在本月的周索引
   const themeWeeks = useMemo(() => {
@@ -2698,6 +2725,23 @@ export default function DailyActivitiesPage() {
             </button>
             <div className="ml-1.5"><SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} /></div>
           </div>
+          <div className={`ml-2 inline-flex h-7 items-center gap-1.5 rounded-[4px] border px-2 text-[12px] ${isDayLocked ? "border-[#b7d0ff] bg-[#f0f5ff] text-[#245bdb]" : "border-[#dee0e3] bg-white text-[#8f959e]"}`}>
+            <Lock className="h-3.5 w-3.5" />
+            <span>{isDayLocked ? "已核对" : "未核对"}</span>
+            {isDayLocked && currentTheme?.locked_by && <span className="text-[#8f959e]">· {currentTheme.locked_by}</span>}
+          </div>
+          {canManageActivityLock && (
+            <button
+              type="button"
+              disabled={!selectedSpaceId || savingCount > 0 || lockSubmitting}
+              onClick={() => setLockDialogOpen(true)}
+              className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] text-[#4e535a] transition-colors hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:opacity-40"
+              title={!selectedSpaceId ? "请先选择空间" : savingCount > 0 ? "请等待当前内容保存完成" : undefined}
+            >
+              {isDayLocked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+              {isDayLocked ? "解锁" : "核对并锁定"}
+            </button>
+          )}
           <div className="flex-1" />
           <button
             className="flex items-center gap-1 text-[11px] text-[#8f959e] hover:text-[#4e535a] cursor-pointer px-1 py-0.5"
@@ -2740,8 +2784,8 @@ export default function DailyActivitiesPage() {
                   <tr key={`week-${wi}`}>
                     <td
                       className={`px-2 text-center text-[12px] text-[#2b2f36] overflow-hidden text-ellipsis whitespace-nowrap ${isViewOnly ? "cursor-default" : "cursor-pointer hover:bg-[#f0f5ff]"}`}
-                      style={{ height: "22px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
-                      onClick={() => { if (isViewOnly) return; if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
+                      style={{ height: "38px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
+                      onClick={() => { if (isViewOnly || isDayLocked) return; if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
                     >
                       {weekThemeText}
                     </td>
@@ -2750,6 +2794,7 @@ export default function DailyActivitiesPage() {
                       const isSelected = day.date === detailDate
                       const isToday = day.date === today
                       const dayTheme = day.inMonth ? themeMap.get(day.date)?.day_theme || "" : ""
+                      const dayLocked = day.inMonth && themeMap.get(day.date)?.is_locked === true
                       const hasActivities = (calendarCounts[day.date] || 0) > 0
                       return (
                         <td
@@ -2757,7 +2802,7 @@ export default function DailyActivitiesPage() {
                           className={`cursor-pointer overflow-hidden px-1 text-center text-[12px] transition-colors ${
                             !day.inMonth ? "bg-[#fdfdfd] text-[#b0b5bb]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36]"
                           }`}
-                          style={{ height: "22px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
+                          style={{ height: "38px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
                           onClick={() => day.inMonth && setDetailDate(day.date)}
                         >
                           <div className="flex min-w-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap">
@@ -2766,6 +2811,11 @@ export default function DailyActivitiesPage() {
                             }`}>{dayNum}</span>
                             {dayTheme && <span className="min-w-0 truncate">{dayTheme}</span>}
                           </div>
+                          {day.inMonth && (
+                            <div className={`mt-0.5 text-[9px] leading-none ${dayLocked ? "text-[#3370ff]" : "text-[#b0b5bb]"}`}>
+                              {dayLocked ? "已核对" : "未核对"}
+                            </div>
+                          )}
                         </td>
                       )
                     })}
@@ -2802,11 +2852,12 @@ export default function DailyActivitiesPage() {
               onUndoRedoChange={handleUndoRedoChange}
               onRestoreRef={(fn) => { restoreRef.current = fn }}
               onCaptureRef={(fn) => { captureRef.current = fn }}
+              onFlushRef={(fn) => { flushPendingSavesRef.current = fn }}
               onHistoryPushed={handleHistoryPushed}
               previewRows={previewEntry?.rows}
               previewChangedKeys={previewEntry?.changedKeys}
               previewChangedCells={previewChangedCells}
-              locked={!!previewEntry}
+              locked={isDayLocked || !!previewEntry}
               onClosePreview={() => setPreviewEntry(null)}
               toolbarLeading={(
                 <>
@@ -2831,7 +2882,7 @@ export default function DailyActivitiesPage() {
                   {!isViewOnly && <button
                     type="button"
                     onClick={openWithdrawalDialog}
-                    disabled={withdrawalCourses.length === 0 || !!previewEntry}
+                    disabled={withdrawalCourses.length === 0 || !!previewEntry || isDayLocked}
                     className="mr-1 flex h-7 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:opacity-40"
                     title={withdrawalCourses.length === 0 ? "当前日期没有可办理退课的课程参与人" : "办理退课"}
                   >
@@ -2839,6 +2890,7 @@ export default function DailyActivitiesPage() {
                     退课
                   </button>}
                   <button
+                    data-lock-control
                     onClick={() => {
                       if (previewEntry) { setPreviewEntry(null); setHistoryPanelOpen(false) }
                       else { captureRef.current?.(); setHistoryPanelOpen(!historyPanelOpen) }
@@ -2850,7 +2902,7 @@ export default function DailyActivitiesPage() {
                   </button>
                   {canUseHistoryRestore && <button
                     onClick={undo}
-                    disabled={!canUndo || !!previewEntry}
+                    disabled={!canUndo || !!previewEntry || isDayLocked}
                     className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
                     title="撤回 (Ctrl+Z)"
                   >
@@ -2858,7 +2910,7 @@ export default function DailyActivitiesPage() {
                   </button>}
                   {canUseHistoryRestore && <button
                     onClick={redo}
-                    disabled={!canRedo || !!previewEntry}
+                    disabled={!canRedo || !!previewEntry || isDayLocked}
                     className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
                     title="重做 (Ctrl+Shift+Z)"
                   >
@@ -2871,15 +2923,15 @@ export default function DailyActivitiesPage() {
                   {dayParticipants.map(p => (
                     <span
                       key={p.id}
-                      draggable={editPermissions.activity_participants !== "view"}
+                      draggable={!isDayLocked && editPermissions.activity_participants !== "view"}
                       onDragStart={(e) => {
-                        if (editPermissions.activity_participants === "view") return
+                        if (isDayLocked || editPermissions.activity_participants === "view") return
                         const payload = JSON.stringify({ customer_id: p.id, nickname: p.nickname })
                         e.dataTransfer.setData("application/x-wyyard-participant", payload)
                         e.dataTransfer.setData("text/plain", payload)
                         e.dataTransfer.effectAllowed = "copy"
                       }}
-                      className={`inline-flex items-center rounded-sm px-2 py-[3px] text-[12px] transition-colors ${editPermissions.activity_participants === "view" ? "cursor-default bg-[#f5f6f7] text-[#8f959e]" : "cursor-grab bg-[#f0f5ff] text-[#3370ff] hover:bg-[#e0edff] active:cursor-grabbing"}`}
+                      className={`inline-flex items-center rounded-sm px-2 py-[3px] text-[12px] transition-colors ${isDayLocked || editPermissions.activity_participants === "view" ? "cursor-default bg-[#f5f6f7] text-[#8f959e]" : "cursor-grab bg-[#f0f5ff] text-[#3370ff] hover:bg-[#e0edff] active:cursor-grabbing"}`}
                     >
                       {p.nickname}
                     </span>
@@ -2890,6 +2942,25 @@ export default function DailyActivitiesPage() {
           )}
         </div>
       </div>
+
+      <AlertDialog open={lockDialogOpen} onOpenChange={(open) => { if (!lockSubmitting) setLockDialogOpen(open) }}>
+        <AlertDialogContent className="max-w-[420px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isDayLocked ? "解锁当天课表？" : "确认当天课表无误并锁定？"}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px] leading-6 text-[#646a73]">
+              {isDayLocked
+                ? "解锁后，拥有相应操作权限的员工可以继续修改课程内容、参与人、发布状态和退课记录。"
+                : `${formatDateChinese(detailDate)}的课程内容与参与人将被锁定，所有账号都不能再修改；需要调整时须由有权限的人员先解锁。`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={lockSubmitting}>取消</AlertDialogCancel>
+            <AlertDialogAction disabled={lockSubmitting} onClick={(event) => { event.preventDefault(); void handleToggleDayLock() }}>
+              {lockSubmitting ? "处理中..." : isDayLocked ? "确认解锁" : "确认并锁定"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={withdrawalDialogOpen} onOpenChange={(open) => { if (!open && !withdrawing) setWithdrawalDialogOpen(false) }}>
         <DialogContent className="w-[400px] max-w-[90vw] gap-0 p-0" initialFocus={false}>
@@ -3025,7 +3096,7 @@ export default function DailyActivitiesPage() {
               >
                 返回编辑
               </Button>
-              {canUseHistoryRestore && <Button
+              {canUseHistoryRestore && !isDayLocked && <Button
                 size="sm"
                 className="flex-1 h-8 text-[12px]"
                 disabled={restoring}

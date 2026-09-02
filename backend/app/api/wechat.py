@@ -31,18 +31,19 @@ def _build_login_response(account) -> dict:
     account_data = account.model_dump()
     account_data.pop("password", None)
 
-    if account.role == "超级管理员":
+    account_roles = account_service.normalize_roles(account.roles, account.role)
+    if "超级管理员" in account_roles:
         return {
             "account": account_data,
             "permissions": ALL_PAGE_KEYS,
-            "edit_permissions": position_edit_permission_service.get_permissions(account.role),
+            "edit_permissions": position_edit_permission_service.get_permissions(account_roles),
         }
 
-    permissions = position_permission_service.get_permissions(account.role)
+    permissions = position_permission_service.get_permissions(account_roles)
     return {
         "account": account_data,
         "permissions": permissions,
-        "edit_permissions": position_edit_permission_service.get_permissions(account.role),
+        "edit_permissions": position_edit_permission_service.get_permissions(account_roles),
     }
 
 

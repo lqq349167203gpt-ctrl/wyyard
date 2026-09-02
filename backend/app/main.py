@@ -52,6 +52,7 @@ from app.api.offline_course_records import router as offline_course_records_rout
 from app.api.offline_courses import router as offline_courses_router
 from app.api.oh_card_readings import router as oh_card_readings_router
 from app.api.operation_logs import router as operation_logs_router
+from app.api.visit_verifications import router as visit_verifications_router
 from app.api.organizations import router as organizations_router
 from app.api.other_projects import router as other_projects_router
 from app.api.payment_exports import router as payment_exports_router
@@ -112,6 +113,7 @@ app.include_router(visit_ai_config_router)
 app.include_router(activity_ai_config_router)
 app.include_router(miniapp_ai_config_router)
 app.include_router(visits_router)
+app.include_router(visit_verifications_router)
 app.include_router(courses_router)
 app.include_router(spaces_router)
 app.include_router(course_types_router)

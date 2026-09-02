@@ -11,6 +11,7 @@ from app.services import (
     payment_export_service,
     position_permission_service,
 )
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/payment-exports", tags=["payment-exports"])
 
@@ -83,7 +84,7 @@ def export_payment_records(
     if user_role in {"", "customer", "system"}:
         raise HTTPException(status_code=403, detail="无权导出付费记录")
     if user_role != "超级管理员":
-        page_permissions = position_permission_service.get_permissions(user_role)
+        page_permissions = position_permission_service.get_permissions(get_request_roles(request))
         if "payment" not in page_permissions:
             raise HTTPException(status_code=403, detail="无付费项目页面权限")
     customer_access_service.require_transaction_access(request, detail=True)

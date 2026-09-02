@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.communication_record import CommunicationRecordCreate
 from app.services import communication_record_service, customer_access_service, customer_service
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/communication-records", tags=["communication-records"])
 
@@ -49,7 +50,7 @@ def _require_customer_access(request: Request, nickname: str):
     customer = customer_service.get_by_nickname(nickname)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在或已停用")
-    role = getattr(request.state, "user_role", "") or ""
+    role = get_request_roles(request)
     if not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有查看该客户的权限")
     if not customer_access_service.can_view_detail_tab(role, "communication"):
@@ -64,7 +65,7 @@ def list_communication_records(request: Request, customer_nickname: str = Query(
         _require_customer_access(request, customer_nickname)
         records = [r for r in records if r.customer_nickname == customer_nickname]
     else:
-        role = getattr(request.state, "user_role", "") or ""
+        role = get_request_roles(request)
         if not customer_access_service.can_view_detail_tab(role, "communication"):
             raise HTTPException(status_code=403, detail="没有查看沟通记录的权限")
         visible_names = {

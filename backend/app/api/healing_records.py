@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.healing_record import HealingRecordCreate, HealingRecordUpdate
 from app.services import customer_access_service, customer_service, healing_record_service
 from app.utils.pagination import paginate
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/healing-records", tags=["healing-records"])
 
@@ -13,7 +14,7 @@ def _require_follow_up_access(request: Request, customer_id: str) -> None:
     customer = customer_service.get_customer(customer_id)
     if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
-    role = getattr(request.state, "user_role", "") or ""
+    role = get_request_roles(request)
     if not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有查看该客户的权限")
     if not customer_access_service.can_view_detail_tab(role, "follow_up"):
@@ -31,7 +32,7 @@ def list_records(
         _require_follow_up_access(request, customer_id)
         items = healing_record_service.list_records(customer_id)
     else:
-        role = getattr(request.state, "user_role", "") or ""
+        role = get_request_roles(request)
         if not customer_access_service.can_view_detail_tab(role, "follow_up"):
             raise HTTPException(status_code=403, detail="没有查看跟进点的权限")
         visible_ids = customer_access_service.visible_customer_ids(request, customer_service.list_customers())

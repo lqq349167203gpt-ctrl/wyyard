@@ -76,6 +76,48 @@
   flex-shrink: 0;
 }
 
+.lock-bar {
+  display: flex;
+  align-items: center;
+  min-height: 52rpx;
+  margin-top: 8rpx;
+  padding: 0 6rpx 0 14rpx;
+  border: 1rpx solid #dee0e3;
+  border-radius: 12rpx;
+  background-color: rgba(255, 255, 255, 0.82);
+}
+
+.lock-bar.locked {
+  border-color: #b7d0ff;
+  background-color: #f0f5ff;
+}
+
+.lock-status {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: #8f959e;
+  font-size: 22rpx;
+}
+
+.lock-bar.locked .lock-status { color: #245bdb; }
+.lock-status-icon { margin-right: 8rpx; font-size: 21rpx; }
+.lock-operator { overflow: hidden; margin-left: 5rpx; color: #8f959e; text-overflow: ellipsis; white-space: nowrap; }
+
+.lock-action {
+  height: 42rpx;
+  margin: 0 0 0 auto;
+  padding: 0 16rpx;
+  border: 0;
+  border-radius: 8rpx;
+  background-color: transparent;
+  color: #3370ff;
+  font-size: 21rpx;
+  line-height: 42rpx;
+}
+
+.lock-action::after { border: 0; }
+
 /* 当前周日期条 */
 .week-swiper {
   width: 100%;
@@ -137,6 +179,11 @@
 
 .week-count-dot.visible {
   opacity: 1;
+}
+
+.week-count-dot.verified {
+  opacity: 1;
+  background-color: #3370ff;
 }
 
 .week-day.selected .week-label {
@@ -217,48 +264,63 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 14rpx 0;
+  padding: 8rpx 0;
   position: relative;
 }
 
-.day-cell text {
+.day-cell > text {
   font-size: 28rpx;
   color: #1f2329;
-  width: 64rpx;
-  height: 64rpx;
+  width: 54rpx;
+  height: 54rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
 }
 
-.day-cell.other text {
+.day-cell.other > text {
   color: #d0d3d6;
 }
 
-.day-cell.today text {
+.day-cell.today > text {
   color: #3370ff;
   font-weight: 600;
 }
 
-.day-cell.selected text {
+.day-cell.selected > text {
   background-color: #3370ff;
   color: #ffffff;
   font-weight: 600;
 }
 
 .day-dot {
+  position: absolute;
+  top: 12rpx;
+  right: 18rpx;
   width: 8rpx;
   height: 8rpx;
   border-radius: 50%;
   background-color: #3370ff;
-  margin-top: 4rpx;
+}
+
+.day-check-status {
+  min-height: 22rpx;
+  margin-top: 2rpx;
+  color: #b0b5bb;
+  font-size: 18rpx;
+  line-height: 22rpx;
+}
+
+.day-check-status.verified,
+.day-cell.selected .day-check-status {
+  color: #3370ff;
 }
 
 /* 活动列表：B 方案，按时段一组一卡 */
 .list {
   position: relative;
-  padding: 270rpx 0 20rpx;
+  padding: 330rpx 0 20rpx;
 }
 
 .group-card {
@@ -273,7 +335,7 @@
 
 .schedule-switching-line {
   position: absolute;
-  top: 270rpx;
+  top: 330rpx;
   left: 24rpx;
   z-index: 2;
   width: 34%;
@@ -514,7 +576,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 406rpx 0 0;
+  padding: 466rpx 0 0;
 }
 
 .empty-icon {
@@ -530,7 +592,7 @@
 .loading {
   display: flex;
   justify-content: center;
-  padding: 406rpx 0 0;
+  padding: 466rpx 0 0;
   color: #8f959e;
   font-size: 28rpx;
 }

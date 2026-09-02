@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.group_case_session import GroupCaseSessionCreate
 from app.services import (
     activity_assignment_notification_service,
+    activity_lock_service,
     customer_access_service,
     group_case_session_service,
 )
@@ -13,6 +14,7 @@ from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
     ensure_activity_participant_access,
+    ensure_activity_teacher_access,
     ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
@@ -81,6 +83,9 @@ def list_sessions(
 
 @router.post("")
 def create_session(data: GroupCaseSessionCreate, request: Request, conversion: bool = False):
+    activity_lock_service.ensure_scope_unlocked(data.date, data.space_id)
+    if not conversion:
+        ensure_activity_teacher_access(request, None, data.model_dump(exclude_unset=True))
     if data.participant_ids and not conversion:
         ensure_activity_participant_access(request)
     customer_access_service.require_customer_scope(request, data.owner_id, action="设置为案主")
@@ -106,7 +111,9 @@ def update_session(session_id: str, data: dict, request: Request):
     old_session = group_case_session_service.get_session(session_id)
     if not old_session:
         raise HTTPException(status_code=404, detail="记录不存在")
+    activity_lock_service.ensure_update_unlocked(old_session, data)
     ensure_activity_update_access(request, data)
+    ensure_activity_teacher_access(request, old_session, data)
     if data.get("owner_id") and data["owner_id"] != old_session.owner_id:
         customer_access_service.require_customer_scope(request, data["owner_id"], action="设置为案主")
     if "participant_ids" in data:
@@ -144,8 +151,10 @@ def update_session(session_id: str, data: dict, request: Request):
 
 @router.delete("/{session_id}")
 def delete_session(session_id: str, request: Request, conversion: bool = False):
+    old_session = group_case_session_service.get_session(session_id)
+    activity_lock_service.ensure_record_unlocked(old_session)
     ensure_record_creator(
-        request, group_case_session_service.get_session(session_id), "课表内容", "activities"
+        request, old_session, "课表内容", "activities"
     )
     if not group_case_session_service.delete_session(session_id, refresh_identities=not conversion):
         raise HTTPException(status_code=404, detail="记录不存在")

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.services import position_permission_service
+from app.services import position_edit_permission_service, position_permission_service
 
 
 def _unique(suffix=""):
@@ -152,6 +152,46 @@ class TestLogin:
         assert resp.status_code == 200
         assert resp.json()["success"] is True
         assert "permissions" in resp.json()
+
+    def test_multiple_roles_merge_page_and_edit_permissions(self, client):
+        suffix = _unique()
+        role_a = f"多角色A_{suffix}"
+        role_b = f"多角色B_{suffix}"
+        password = _password(suffix)
+        position_permission_service.set_permissions(role_a, ["healing-records"])
+        position_permission_service.set_permissions(role_b, ["daily-activities"])
+        position_edit_permission_service.set_permissions(role_a, {
+            "activities": "view",
+            "activity_teachers": "view",
+            "activity_participants": "view",
+        })
+        position_edit_permission_service.set_permissions(role_b, {
+            "activities": "own",
+            "activity_teachers": "all",
+            "activity_participants": "own",
+        })
+
+        created = client.post("/api/accounts", json={
+            "owner": f"multi_owner_{suffix}",
+            "role": role_a,
+            "roles": [role_a, role_b],
+            "username": f"multi_user_{suffix}",
+            "password": password,
+            "enabled": True,
+        })
+        assert created.status_code == 200, created.text
+        account = created.json()
+        try:
+            assert account["roles"] == [role_a, role_b]
+            login = _login(client, account["username"], password)
+            assert login.status_code == 200
+            result = login.json()
+            assert set(result["permissions"]) == {"healing-records", "daily-activities"}
+            assert result["edit_permissions"]["activities"] == "own"
+            assert result["edit_permissions"]["activity_teachers"] == "all"
+            assert result["edit_permissions"]["activity_participants"] == "own"
+        finally:
+            client.delete(f"/api/accounts/{account['id']}")
 
     def test_login_wrong_password(self, client, make_account):
         account, u, _ = make_account()

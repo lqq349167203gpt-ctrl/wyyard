@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Edit, Trash2, KeyRound } from "lucide-react"
+import { Plus, Edit, Trash2, KeyRound, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -16,7 +16,6 @@ import {
 import { accountApi, positionApi, customerApi } from "@/lib/api"
 import type { Account, AccountCreate, Position, Customer } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
-import { SelectDropdown } from "@/components/select-dropdown"
 
 export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   const enterToNext = useEnterToNext()
@@ -25,7 +24,8 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [form, setForm] = useState<AccountCreate>({ owner: "", role: "", username: "", password: "", enabled: true })
+  const [form, setForm] = useState<AccountCreate>({ owner: "", role: "", roles: [], username: "", password: "", enabled: true })
+  const [showFormPassword, setShowFormPassword] = useState(false)
   const [isEditingSystem, setIsEditingSystem] = useState(false)
   const [formErrors, setFormErrors] = useState<{ owner?: string; role?: string; username?: string; password?: string }>({})
   const [customerList, setCustomerList] = useState<Customer[]>([])
@@ -51,7 +51,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     // 必填验证
     if (!form.owner.trim()) errors.owner = "归属人不能为空"
     else if (!customerList.some(c => c.nickname === form.owner.trim())) errors.owner = "归属人必须是客户列表中的昵称"
-    if (!form.role.trim()) errors.role = "角色不能为空"
+    if (!form.roles.length) errors.role = "至少选择一个角色"
     if (!form.username.trim()) errors.username = "账号不能为空"
     if (!editingId) {
       if (!form.password.trim()) errors.password = "密码不能为空"
@@ -77,13 +77,14 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
     try {
       if (editingId) {
         const { password, ...updateData } = form
-        await accountApi.update(editingId, updateData)
+        await accountApi.update(editingId, { ...updateData, role: form.roles[0] })
       } else {
-        await accountApi.create(form)
+        await accountApi.create({ ...form, role: form.roles[0] })
       }
       setShowForm(false)
       setEditingId(null)
-      setForm({ owner: "", role: "", username: "", password: "", enabled: true })
+      setForm({ owner: "", role: "", roles: [], username: "", password: "", enabled: true })
+      setShowFormPassword(false)
       loadData()
     } catch (error: any) {
       const message = error.message || "操作失败"
@@ -100,13 +101,15 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   const handleEdit = (a: Account) => {
     setEditingId(a.id)
     setIsEditingSystem(!!a.is_system)
-    setForm({ owner: a.owner, role: a.role, username: a.username, password: "", enabled: a.enabled })
+    const roles = a.roles?.length ? a.roles : [a.role]
+    setForm({ owner: a.owner, role: roles[0], roles, username: a.username, password: "", enabled: a.enabled })
+    setShowFormPassword(false)
     setFormErrors({})
     setShowForm(true)
   }
 
   const currentUser = (() => { try { return JSON.parse(localStorage.getItem("currentUser") || "{}") } catch { return {} } })()
-  const isSuperAdmin = currentUser.role === "超级管理员"
+  const isSuperAdmin = (currentUser.roles?.length ? currentUser.roles : [currentUser.role]).includes("超级管理员")
 
   const handleDelete = async () => {
     if (!deleteId || deleting) return
@@ -167,9 +170,9 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
         <div className="flex items-center justify-between pb-2">
           <div>
             <h1 className="text-lg font-semibold">账号管理</h1>
-            <p className="text-xs text-muted-foreground mt-1.5">管理系统登录账号，角色从角色权限中选择</p>
+            <p className="text-xs text-muted-foreground mt-1.5">一个账号可同时配置多个角色，权限自动合并</p>
           </div>
-          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setIsEditingSystem(false); setForm({ owner: "", role: "", username: "", password: "", enabled: true }); setShowForm(true) }}>
+          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setIsEditingSystem(false); setForm({ owner: "", role: "", roles: [], username: "", password: "", enabled: true }); setShowFormPassword(false); setShowForm(true) }}>
             <Plus className="h-3.5 w-3.5 mr-1" /> 新增账号
           </Button>
         </div>
@@ -177,8 +180,8 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
 
       {embedded && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">管理系统登录账号，角色从角色权限中选择</span>
-          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setIsEditingSystem(false); setForm({ owner: "", role: "", username: "", password: "", enabled: true }); setShowForm(true) }}>
+          <span className="text-xs text-muted-foreground">一个账号可同时配置多个角色，权限自动合并</span>
+          <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingId(null); setIsEditingSystem(false); setForm({ owner: "", role: "", roles: [], username: "", password: "", enabled: true }); setShowFormPassword(false); setShowForm(true) }}>
             <Plus className="h-3.5 w-3.5 mr-1" /> 新增账号
           </Button>
         </div>
@@ -192,7 +195,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4">归属人</TableHead>
-                <TableHead>角色</TableHead>
+                <TableHead>角色身份</TableHead>
                 <TableHead>账号</TableHead>
                 <TableHead>创建日期</TableHead>
                 <TableHead className="text-center">状态</TableHead>
@@ -206,7 +209,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                     <span className="text-[13px] text-[#2b2f36]">{a.owner}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-[#2b2f36]">{a.role}</span>
+                    <span className="text-[13px] text-[#2b2f36]">{(a.roles?.length ? a.roles : [a.role]).join("、")}</span>
                   </TableCell>
                   <TableCell>
                     <span className="text-[13px] text-[#4e535a]">{a.username}</span>
@@ -217,7 +220,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                   <TableCell className="text-center">
                     {a.is_system ? (
                       <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-50 text-green-600">永久</span>
-                    ) : !isSuperAdmin && a.role === "超级管理员" ? (
+                    ) : !isSuperAdmin && (a.roles?.length ? a.roles : [a.role]).includes("超级管理员") ? (
                       <span className={`text-[12px] ${a.enabled ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
                         {a.enabled ? "启用" : "禁用"}
                       </span>
@@ -232,7 +235,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                     )}
                   </TableCell>
                   <TableCell className="text-right pr-4">
-                    {(isSuperAdmin || (!a.is_system && a.role !== "超级管理员")) && (
+                    {(isSuperAdmin || (!a.is_system && !(a.roles?.length ? a.roles : [a.role]).includes("超级管理员"))) && (
                       <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(a)}>
                           <Edit className="h-3.5 w-3.5" />
@@ -276,17 +279,32 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
             </div>
             {!isEditingSystem && (
               <div className="flex items-start gap-3">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">角色</span>
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">角色身份</span>
                 <div className="relative flex-1">
-                  <SelectDropdown
-                    value={form.role}
-                    options={[
-                      ...(isSuperAdmin ? [{ value: "超级管理员", label: "超级管理员" }] : []),
-                      ...positions.map(p => ({ value: p.name, label: p.name })),
-                    ]}
-                    placeholder="选择角色"
-                    onChange={(v) => setForm({ ...form, role: v })}
-                  />
+                  <div className="grid max-h-[144px] grid-cols-2 gap-1 overflow-y-auto rounded-[4px] border border-[#dee0e3] bg-white p-1.5">
+                    {[
+                      ...(isSuperAdmin ? ["超级管理员"] : []),
+                      ...positions.map(position => position.name).filter(name => name !== "超级管理员"),
+                    ].map(roleName => {
+                      const checked = form.roles.includes(roleName)
+                      return (
+                        <label key={roleName} className={`flex h-8 cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[12px] ${checked ? "bg-[#f2f5ff] text-[#2b2f36]" : "text-[#646a73] hover:bg-[#f7f8fa]"}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              const roles = checked
+                                ? form.roles.filter(item => item !== roleName)
+                                : [...form.roles, roleName]
+                              setForm({ ...form, roles, role: roles[0] || "" })
+                            }}
+                            className="h-3.5 w-3.5 rounded border-[#c9cdd4] accent-[#3370ff]"
+                          />
+                          <span className="truncate">{roleName}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
                   {formErrors.role && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.role}</p>}
                 </div>
               </div>
@@ -301,8 +319,11 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
             {!editingId && (
               <div className="flex items-start gap-3">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest w-16 shrink-0 pt-2">密码</span>
-                <div className="flex-1">
-                  <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="至少8位，包含字母和数字" className="h-8" />
+                <div className="relative flex-1">
+                  <Input type={showFormPassword ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="至少8位，包含字母和数字" className="h-8 pr-9" />
+                  <button type="button" onClick={() => setShowFormPassword(value => !value)} className="absolute right-2.5 top-4 -translate-y-1/2 text-[#8f959e] hover:text-[#4e535a]" aria-label={showFormPassword ? "隐藏密码" : "显示密码"}>
+                    {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                   {formErrors.password && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.password}</p>}
                 </div>
               </div>

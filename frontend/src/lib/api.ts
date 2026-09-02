@@ -2531,6 +2531,7 @@ export interface Account {
   id: string
   owner: string
   role: string
+  roles: string[]
   username: string
   enabled: boolean
   created_at: string
@@ -2547,6 +2548,7 @@ export interface AccountLight {
 export interface AccountCreate {
   owner: string
   role: string
+  roles: string[]
   username: string
   password: string
   enabled?: boolean
@@ -2623,7 +2625,10 @@ export interface PositionEditPermissions {
   customers: "view" | "all"
   visits: PositionEditScope
   activities: PositionEditScope
+  activity_teachers: PositionEditScope
   activity_participants: PositionEditScope
+  activity_lock: boolean
+  visit_lock: boolean
   payments: "own" | "all"
   contacts: ContactPermissions
   customer_access: CustomerAccessPermissions
@@ -2741,6 +2746,10 @@ export interface ActivityTheme {
   week_theme_detail: string
   day_theme: string
   day_theme_detail: string
+  is_locked: boolean
+  locked_by_id: string
+  locked_by: string
+  locked_at: string | null
   created_at: string
   updated_at: string
 }
@@ -2776,6 +2785,54 @@ export const activityThemeApi = {
     request<ActivityTheme[]>(`/api/activity-themes/batch`, {
       method: "POST",
       body: JSON.stringify({ themes }),
+    }),
+  getLockStatus: (date: string, space_id: string = "") => {
+    const params = new URLSearchParams({ date, space_id })
+    return request<ActivityTheme & { can_manage: boolean }>(`/api/activity-themes/lock-status?${params.toString()}`)
+  },
+  lock: (date: string, space_id: string = "") =>
+    request<ActivityTheme & { can_manage: boolean }>(`/api/activity-themes/lock`, {
+      method: "POST",
+      body: JSON.stringify({ date, space_id }),
+    }),
+  unlock: (date: string, space_id: string = "") =>
+    request<ActivityTheme & { can_manage: boolean }>(`/api/activity-themes/unlock`, {
+      method: "POST",
+      body: JSON.stringify({ date, space_id }),
+    }),
+}
+
+export interface VisitVerification {
+  id?: string
+  date: string
+  space_id: string
+  is_verified: boolean
+  verified_by_id: string
+  verified_by: string
+  verified_at: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export const visitVerificationApi = {
+  list: (startDate?: string, endDate?: string, spaceId?: string) => {
+    const params = new URLSearchParams()
+    if (startDate) params.set("start_date", startDate)
+    if (endDate) params.set("end_date", endDate)
+    if (spaceId !== undefined) params.set("space_id", spaceId)
+    return request<VisitVerification[]>(`/api/visit-verifications?${params.toString()}`)
+  },
+  getStatus: (date: string, spaceId: string = "") =>
+    request<VisitVerification & { can_manage: boolean }>(`/api/visit-verifications/status?${new URLSearchParams({ date, space_id: spaceId }).toString()}`),
+  verify: (date: string, spaceId: string = "") =>
+    request<VisitVerification & { can_manage: boolean }>("/api/visit-verifications/verify", {
+      method: "POST",
+      body: JSON.stringify({ date, space_id: spaceId }),
+    }),
+  unverify: (date: string, spaceId: string = "") =>
+    request<VisitVerification & { can_manage: boolean }>("/api/visit-verifications/unverify", {
+      method: "POST",
+      body: JSON.stringify({ date, space_id: spaceId }),
     }),
 }
 

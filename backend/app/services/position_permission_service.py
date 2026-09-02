@@ -1,6 +1,8 @@
+from collections.abc import Iterable
 from typing import Dict, List
 
 from app.services.storage import load_data, save_data, save_item
+from app.utils.request_roles import normalize_roles
 
 FILENAME = "position_permissions.json"
 _permissions: Dict[str, List[str]] = {}
@@ -28,8 +30,15 @@ def _save(item_id: str = ""):
 _load()
 
 
-def get_permissions(position: str) -> List[str]:
-    return _active_pages(_permissions.get(position, []))
+def get_permissions(position: str | Iterable[str]) -> List[str]:
+    """返回一个或多个角色页面权限的并集。"""
+    roles = normalize_roles(position)
+    pages: list[str] = []
+    for role in roles:
+        for page in _active_pages(_permissions.get(role, [])):
+            if page not in pages:
+                pages.append(page)
+    return pages
 
 
 def set_permissions(position: str, pages: List[str]):

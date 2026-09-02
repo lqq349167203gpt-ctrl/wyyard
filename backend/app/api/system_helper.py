@@ -14,6 +14,7 @@ from app.models.chat_history import ChatRecordCreate
 from app.services import position_permission_service, system_helper_config_service
 from app.services.ai_entry_service import analyze_image_intent, execute_entry, parse_entry_intent
 from app.services.chat_history_service import save_message
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/system-helper", tags=["system-helper"])
 
@@ -118,8 +119,9 @@ async def chat(data: SystemHelperRequest, request: Request):
     user_id = getattr(request.state, "user_id", "")
     _check_rate_limit(user_id)
     user_name = getattr(request.state, "user_name", "")
-    user_role = getattr(request.state, "user_role", "")
-    permissions = position_permission_service.get_permissions(user_role)
+    user_roles = get_request_roles(request)
+    user_role = "、".join(user_roles)
+    permissions = position_permission_service.get_permissions(user_roles)
 
     config = system_helper_config_service.get_config()
 

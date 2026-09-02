@@ -7,6 +7,7 @@ from app.services import (
     customer_tag_service,
     position_permission_service,
 )
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/customer-tags", tags=["customer-tags"])
 
@@ -71,7 +72,7 @@ def _actor(request: Request) -> tuple[str, str, str, set[str]]:
     actor_id = getattr(request.state, "user_id", "")
     actor_name = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
     role = getattr(request.state, "user_role", "")
-    permissions = set(position_permission_service.get_permissions(role))
+    permissions = set(position_permission_service.get_permissions(get_request_roles(request)))
     return actor_id, actor_name, role, permissions
 
 

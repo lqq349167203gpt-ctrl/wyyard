@@ -18,6 +18,7 @@ SECTION_MAP = {
     "/api/customers": "客户资料",
     "/api/visits": "邀约",
     "/api/visit-notes": "邀约",
+    "/api/visit-verifications": "邀约",
     "/api/healing-records": "客户资料",
     "/api/courses": "活动配置",
     "/api/course-types": "活动配置",
@@ -260,7 +261,7 @@ FIELD_NAMES = {
     "arrived": "到店状态", "cancelled": "邀约状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "客户信息",
     "needs": "来访需求", "visit_date": "到访日期",
     "visit_time": "预计时间", "customer_id": "客户",
-    "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "角色", "roles": "角色顺序", "permissions": "权限",
+    "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "主要角色", "roles": "角色身份", "permissions": "权限",
     "groups": "分组", "materials": "资料", "images": "图片",
     "location": "地点", "address": "地址",
     "start_date": "开始日期", "end_date": "结束日期",
@@ -520,7 +521,18 @@ EDIT_PERMISSION_LABELS = {
     "customers": "客户资料操作范围",
     "visits": "邀约编辑范围",
     "activities": "课表编辑范围",
+    "activity_teachers": "课程老师配置范围",
     "activity_participants": "课表人员配置范围",
+    "activity_lock": "课表核对与锁定权限",
+    "visit_lock": "邀约核对与锁定权限",
+    "is_locked": "核对锁定状态",
+    "locked_by": "核对人",
+    "locked_by_id": "核对人账号",
+    "locked_at": "核对时间",
+    "is_verified": "邀约核对状态",
+    "verified_by": "邀约核对人",
+    "verified_by_id": "邀约核对人账号",
+    "verified_at": "邀约核对时间",
     "payments": "付费项目修改删除范围",
 }
 
@@ -1479,7 +1491,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                     account = account_service.get_account(user_id)
                     if account:
                         operator = account.owner or account.username
-                        operator_role = account.role
+                        operator_role = "、".join(account.roles or [account.role])
             except Exception:
                 operator = user_id[:8]
 

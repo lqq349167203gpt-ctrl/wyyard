@@ -37,6 +37,7 @@
 }
 
 .login-field {
+  position: relative;
   width: 100%;
   padding: 24rpx 0 22rpx;
   border-bottom: 2rpx solid #eceef1;
@@ -69,6 +70,47 @@
   font-size: 30rpx;
   line-height: 48rpx;
   background-color: transparent;
+  padding-right: 72rpx;
+  box-sizing: border-box;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0;
+  bottom: 22rpx;
+  width: 64rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eye-shape {
+  position: relative;
+  width: 32rpx;
+  height: 22rpx;
+  border: 3rpx solid #8f959e;
+  border-radius: 50% 50% 48% 48%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eye-pupil {
+  width: 7rpx;
+  height: 7rpx;
+  border-radius: 50%;
+  background-color: #8f959e;
+}
+
+.eye-slash {
+  position: absolute;
+  width: 38rpx;
+  height: 3rpx;
+  border-radius: 2rpx;
+  background-color: #8f959e;
+  transform: rotate(-42deg);
 }
 
 /* 记住账号与密码 */

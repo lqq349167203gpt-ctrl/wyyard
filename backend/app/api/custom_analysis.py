@@ -15,6 +15,7 @@ from app.services import (
     customer_access_service,
     customer_service,
 )
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(
     prefix="/api/custom-analysis",
@@ -26,7 +27,7 @@ router = APIRouter(
 @router.get("/metadata")
 async def get_metadata(request: Request):
     actor_id = getattr(request.state, "user_id", "")
-    role = getattr(request.state, "user_role", "") or ""
+    role = get_request_roles(request)
     allowed_customer_ids = customer_access_service.visible_customer_ids(
         request, customer_service.list_customers()
     )
@@ -229,7 +230,7 @@ async def parse_query(data: AnalysisParseRequest, request: Request):
 @router.post("/execute")
 async def execute_query(data: AnalysisExecuteRequest, request: Request):
     actor_id = getattr(request.state, "user_id", "")
-    role = getattr(request.state, "user_role", "") or ""
+    role = get_request_roles(request)
     allow_payment_details = customer_access_service.transaction_access(role) == "detail"
     allow_communication = customer_access_service.can_view_detail_tab(role, "communication")
     payment_fields = set(custom_analysis_service.FIELD_GROUPS["付费行为"])

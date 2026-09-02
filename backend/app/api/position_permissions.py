@@ -65,7 +65,11 @@ class EditPermissionUpdate(StrictBaseModel):
     customers: Literal["view", "all"] = "all"
     visits: Literal["view", "own", "all"] = "own"
     activities: Literal["view", "own", "all"] = "own"
+    # 旧客户端未提交时交给服务层继承 activities，避免保存后意外降权。
+    activity_teachers: Literal["view", "own", "all"] | None = None
     activity_participants: Literal["view", "own", "all"] = "all"
+    activity_lock: bool = False
+    visit_lock: bool = False
     payments: Literal["own", "all"] = "all"
     contacts: ContactPermissionUpdate = Field(default_factory=ContactPermissionUpdate)
     # 兼容尚未升级的 PC/小程序：未提交该字段时由服务层按旧角色的完整可见能力处理。
@@ -121,9 +125,12 @@ async def set_full_permissions(data: FullPermissionUpdate, _manager_role: str = 
     edit_permissions = data.edit_permissions.model_dump(by_alias=True, exclude_none=True)
     if "class-records" not in data.pages:
         edit_permissions["visits"] = "own"
+        edit_permissions["visit_lock"] = False
     if "daily-activities" not in data.pages:
         edit_permissions["activities"] = "own"
+        edit_permissions["activity_teachers"] = "view"
         edit_permissions["activity_participants"] = "view"
+        edit_permissions["activity_lock"] = False
     if "payment" not in data.pages:
         edit_permissions["payments"] = "own"
     if "healing-records" not in data.pages:

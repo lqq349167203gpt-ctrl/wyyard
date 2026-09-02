@@ -124,9 +124,10 @@ interface DetailViewProps {
   spaceId?: string
   onRequireSpaces?: () => void
   groups?: { name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]
+  verified?: boolean
 }
 
-export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, onCountsRefresh, spaceId, onRequireSpaces, groups = [] }: DetailViewProps = {}) {
+export default function DetailView({ externalDate, onExternalDateChange, hideDateBar, onCustomerClick, onActivityClick, onDataLoaded, onCountsRefresh, spaceId, onRequireSpaces, groups = [], verified = false }: DetailViewProps = {}) {
   const editPermissions = useEditPermissions()
   const currentRole = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}").role || "" }
@@ -200,31 +201,31 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   }, [])
 
   const undo = useCallback(() => {
-    if (!canUseHistoryRestore) return
+    if (!canUseHistoryRestore || verified) return
     undoRef.current()
     setPreviewEntry(null)
     setPreviewRows(undefined)
     setPreviewChangedKeys([])
-  }, [canUseHistoryRestore])
+  }, [canUseHistoryRestore, verified])
   const redo = useCallback(() => {
-    if (!canUseHistoryRestore) return
+    if (!canUseHistoryRestore || verified) return
     redoRef.current()
     setPreviewEntry(null)
     setPreviewRows(undefined)
     setPreviewChangedKeys([])
-  }, [canUseHistoryRestore])
+  }, [canUseHistoryRestore, verified])
 
   // 快捷键
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!canUseHistoryRestore) return
+      if (!canUseHistoryRestore || verified) return
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); if (canUndo) undo() }
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) { e.preventDefault(); if (canRedo) redo() }
       if ((e.ctrlKey || e.metaKey) && e.key === "y") { e.preventDefault(); if (canRedo) redo() }
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [canRedo, canUndo, canUseHistoryRestore, redo, undo])
+  }, [canRedo, canUndo, canUseHistoryRestore, redo, undo, verified])
 
   // 预览历史版本
   const handleSelectHistoryEntry = useCallback((entry: VisitHistoryEntry) => {
@@ -674,6 +675,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           previewChangedKeys={previewChangedKeys}
           previewChangedCells={computedChangedCells}
           locked={!!previewEntry}
+          verified={verified}
           onClosePreview={() => { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}
           toolbarLeading={(
             <>
@@ -710,7 +712,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 >
                   <Clock className="h-3.5 w-3.5 text-[#4e535a]" />
                 </button>
-                {canUseHistoryRestore && <button
+                {canUseHistoryRestore && !verified && <button
                   onClick={undo}
                   disabled={!canUndo || !!previewEntry}
                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
@@ -718,7 +720,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                 >
                   <Undo2 className="h-3.5 w-3.5 text-[#4e535a]" />
                 </button>}
-                {canUseHistoryRestore && <button
+                {canUseHistoryRestore && !verified && <button
                   onClick={redo}
                   disabled={!canRedo || !!previewEntry}
                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-[#f0f0f0] disabled:cursor-not-allowed disabled:opacity-30"
@@ -783,7 +785,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
           {previewEntry && (
             <div className="border-t border-[#f0f1f2] p-3 shrink-0 flex gap-2">
               <Button size="sm" variant="outline" className="flex-1 h-8 text-[12px]" onClick={() => { setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>返回编辑</Button>
-              {canUseHistoryRestore && <Button size="sm" className="flex-1 h-8 text-[12px]" onClick={async () => { await restoreRef.current?.(previewEntry); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>恢复此版本</Button>}
+              {canUseHistoryRestore && !verified && <Button size="sm" className="flex-1 h-8 text-[12px]" onClick={async () => { await restoreRef.current?.(previewEntry); setPreviewEntry(null); setPreviewRows(undefined); setPreviewChangedKeys([]); setHistoryPanelOpen(false) }}>恢复此版本</Button>}
             </div>
           )}
         </div>

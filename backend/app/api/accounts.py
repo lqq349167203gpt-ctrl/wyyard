@@ -61,7 +61,7 @@ async def create_account(
         raise HTTPException(status_code=400, detail="密码最多128位")
     if not any(c.isalpha() for c in data.password) or not any(c.isdigit() for c in data.password):
         raise HTTPException(status_code=400, detail="密码必须包含字母和数字")
-    if manager_role != "超级管理员" and data.role == "超级管理员":
+    if manager_role != "超级管理员" and "超级管理员" in account_service.normalize_roles(data.roles, data.role):
         raise HTTPException(status_code=403, detail="只有超级管理员可以创建超级管理员账号")
     try:
         result = account_service.create_account(data)
@@ -134,22 +134,23 @@ async def login(data: LoginRequest, request: StarletteRequest):
         device_info=ua,
     )
 
-    if result.role == "超级管理员":
+    account_roles = account_service.normalize_roles(result.roles, result.role)
+    if "超级管理员" in account_roles:
         return {
             "success": True,
             "token": token,
             "account": account_data,
             "permissions": ALL_PAGE_KEYS,
-            "edit_permissions": position_edit_permission_service.get_permissions(result.role),
+            "edit_permissions": position_edit_permission_service.get_permissions(account_roles),
         }
 
-    permissions = position_permission_service.get_permissions(result.role)
+    permissions = position_permission_service.get_permissions(account_roles)
     return {
         "success": True,
         "token": token,
         "account": account_data,
         "permissions": permissions,
-        "edit_permissions": position_edit_permission_service.get_permissions(result.role),
+        "edit_permissions": position_edit_permission_service.get_permissions(account_roles),
     }
 
 
@@ -200,9 +201,9 @@ async def update_account(
         raise HTTPException(status_code=400, detail="修改密码请使用专门的密码修改接口")
     target = account_service.get_account(account_id)
     if manager_role != "超级管理员":
-        if target and (target.role == "超级管理员" or target.is_system):
+        if target and (account_service.account_has_role(target, "超级管理员") or target.is_system):
             raise HTTPException(status_code=403, detail="只有超级管理员可以修改超级管理员账号")
-        if data.role == "超级管理员":
+        if "超级管理员" in account_service.normalize_roles(data.roles, data.role or ""):
             raise HTTPException(status_code=403, detail="只有超级管理员可以授予超级管理员角色")
     try:
         result = account_service.update_account(account_id, data)
@@ -217,7 +218,7 @@ async def update_account(
 async def delete_account(account_id: str, manager_role: str = Depends(require_account_manager)):
     # 仅管理员可删除账号
     target = account_service.get_account(account_id)
-    if manager_role != "超级管理员" and target and (target.role == "超级管理员" or target.is_system):
+    if manager_role != "超级管理员" and target and (account_service.account_has_role(target, "超级管理员") or target.is_system):
         raise HTTPException(status_code=403, detail="只有超级管理员可以删除超级管理员账号")
     if not account_service.delete_account(account_id):
         raise HTTPException(status_code=404, detail="账号不存在")
@@ -268,7 +269,7 @@ async def admin_reset_password(
     if not any(c.isalpha() for c in data.new_password) or not any(c.isdigit() for c in data.new_password):
         raise HTTPException(status_code=400, detail="密码必须包含字母和数字")
     target = account_service.get_account(account_id)
-    if manager_role != "超级管理员" and target and (target.role == "超级管理员" or target.is_system):
+    if manager_role != "超级管理员" and target and (account_service.account_has_role(target, "超级管理员") or target.is_system):
         raise HTTPException(status_code=403, detail="只有超级管理员可以重置超级管理员账号密码")
     try:
         result = account_service.admin_reset_password(account_id, data.new_password)

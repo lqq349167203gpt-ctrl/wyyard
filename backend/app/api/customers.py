@@ -32,6 +32,7 @@ from app.services.excel_parser import parse_excel
 from app.services.visit_service import _count_customer_activities, count_customer_visits, get_last_visit_date
 from app.utils.pagination import paginate
 from app.utils.request_context import get_client_ip
+from app.utils.request_roles import get_request_roles
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +263,7 @@ async def list_customers(
         item["customer_tags"] = visible_tags.get(item["id"], [])
 
     # Sort
-    role = getattr(request.state, "user_role", "")
+    role = get_request_roles(request)
     can_view_payment = customer_access_service.can_view_transaction_summary(role)
     if sort_by and sort_by in _SORTABLE_FIELDS and (sort_by != "total_payment" or can_view_payment):
         _sort_customer_items(items, sort_by, sort_order)
@@ -302,7 +303,7 @@ async def create_customer(data: CustomerCreate, request: Request):
     # 新建响应可回显刚刚由当前操作者录入的内容；后续查询仍统一脱敏。
     result = _fill_visit_count(customer)
     result["contact_permissions"] = customer_contact_service.get_role_permissions(
-        getattr(request.state, "user_role", "")
+        get_request_roles(request)
     )
     return result
 
@@ -369,7 +370,7 @@ async def list_disabled_customers(request: Request):
         }
         for c in customers
     ]
-    role = getattr(request.state, "user_role", "")
+    role = get_request_roles(request)
     return [customer_contact_service.protect_customer_data(item, role) for item in items]
 
 
@@ -381,7 +382,7 @@ async def access_customer_contact(customer_id: str, data: ContactAccessRequest, 
     if not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有查看该客户的权限")
 
-    role = getattr(request.state, "user_role", "")
+    role = get_request_roles(request)
     if not customer_contact_service.can_access(role, data.field, data.action):
         action_label = "查看" if data.action == "view" else "复制"
         field_label = "手机号" if data.field == "phone" else "微信号"
@@ -411,7 +412,7 @@ async def get_customer(customer_id: str, request: Request):
         raise HTTPException(status_code=404, detail="客户不存在")
     if not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有查看该客户的权限")
-    role = getattr(request.state, "user_role", "")
+    role = get_request_roles(request)
     result = customer_access_service.protect_sensitive_data(_fill_visit_count(customer), role)
     if not customer_access_service.can_view_transaction_summary(role):
         result["total_payment"] = None
@@ -430,7 +431,7 @@ async def update_customer(customer_id: str, data: CustomerUpdate, request: Reque
         raise HTTPException(status_code=404, detail="客户不存在")
     update_data = data.model_dump(exclude_unset=True)
     _validate_follow_up_status(update_data.get("follow_up_status"))
-    role = getattr(request.state, "user_role", "")
+    role = get_request_roles(request)
     if not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有修改该客户的权限")
     blocked_sensitive_fields = [
@@ -487,7 +488,7 @@ async def restore_customer(customer_id: str, request: Request, _admin: str = Dep
         raise HTTPException(status_code=404, detail="客户不存在或未被停用")
     return customer_contact_service.protect_customer_data(
         _fill_visit_count(customer),
-        getattr(request.state, "user_role", ""),
+        get_request_roles(request),
         include_permissions=True,
     )
 

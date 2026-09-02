@@ -81,6 +81,9 @@ Page({
     readOnly: false,
     viewOnly: false,
     canEditParticipants: true,
+    canEditTeachers: true,
+    dayLocked: false,
+    lockedBy: '',
     createdBy: '',
     _recordId: '',
     _source: '',
@@ -91,8 +94,12 @@ Page({
     const app = getApp()
     const raw = app.globalData._selectedActivity
     const source = app.globalData._selectedActivitySource
+    const dayLocked = app.globalData._selectedActivityDayLocked === true
+    const lockedBy = app.globalData._selectedActivityLockedBy || ''
     app.globalData._selectedActivity = null
     app.globalData._selectedActivitySource = null
+    app.globalData._selectedActivityDayLocked = false
+    app.globalData._selectedActivityLockedBy = ''
     if (!raw || !raw.id || !source) {
       wx.showToast({ title: '数据加载失败', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 1500)
@@ -108,9 +115,12 @@ Page({
     this._originalType = activityType
 
     const initData = {
-      readOnly: !canEditRecord(raw, 'activities'),
+      readOnly: dayLocked || !canEditRecord(raw, 'activities'),
       viewOnly: isAreaViewOnly('activities'),
-      canEditParticipants: canEditRecord(raw, 'activity_participants'),
+      canEditParticipants: !dayLocked && canEditRecord(raw, 'activity_participants'),
+      canEditTeachers: !dayLocked && canEditRecord(raw, 'activity_teachers'),
+      dayLocked,
+      lockedBy,
       createdBy: raw.created_by || '',
       activityType,
       typeLabel,
@@ -485,7 +495,7 @@ Page({
   },
 
   onTeacherPickerOpen() {
-    if (this.data.readOnly) return
+    if (!this.data.canEditTeachers) return
     const { activityType } = this.data
     const position = TEACHER_POSITION[activityType] || ''
     const isSingle = SINGLE_TEACHER_TYPES.includes(activityType)
@@ -525,7 +535,8 @@ Page({
   },
 
   onPickerSelect(e) {
-    if (this.data.readOnly) return
+    if (this.data.pickerMode === 'owner' && this.data.readOnly) return
+    if ((this.data.pickerMode === 'teacher' || this.data.pickerMode === 'achiever') && !this.data.canEditTeachers) return
     const { id, nickname } = e.currentTarget.dataset
     if (this.data.pickerMode === 'owner') {
       this.setData({ ownerId: id, ownerName: nickname, showPicker: false, pickerKeyword: '' })
@@ -557,12 +568,12 @@ Page({
   },
 
   onTeacherClear() {
-    if (this.data.readOnly) return
+    if (!this.data.canEditTeachers) return
     this.setData({ teacherIds: [], teacherNames: [], teacherDisplay: '' })
   },
 
   onAchieverClear() {
-    if (this.data.readOnly) return
+    if (!this.data.canEditTeachers) return
     this.setData({ achieverId: '', achieverName: '' })
   },
 
@@ -571,7 +582,7 @@ Page({
   async onSave() {
     const { activityType } = this.data
 
-    if (this.data.readOnly && !this.data.canEditParticipants) return
+    if (this.data.readOnly && !this.data.canEditParticipants && !this.data.canEditTeachers) return
 
     if (!this.data.readOnly && activityType === 'class' && this.data.courseIndex < 0) {
       wx.showToast({ title: '请选择课程', icon: 'none' })
@@ -588,8 +599,18 @@ Page({
 
     let payload
     if (this.data.readOnly) {
-      // 课程内容仅浏览但有参与人配置权限时，只提交参与人字段。
-      payload = { participant_ids: this.data.participantIds }
+      // 课程内容仅浏览时，只提交单独获权的参与人/老师字段。
+      payload = {}
+      if (this.data.canEditParticipants) payload.participant_ids = this.data.participantIds
+      if (this.data.canEditTeachers) {
+        if (SINGLE_TEACHER_TYPES.includes(activityType)) {
+          payload.achiever_id = this.data.achieverId
+          payload.achiever_name = this.data.achieverName
+          payload.teacher_ids = this.data.achieverId ? [this.data.achieverId] : []
+        } else {
+          payload.teacher_ids = this.data.teacherIds
+        }
+      }
     } else {
       const space = this.data.spaces[this.data.spaceIndex]
       const room = this.data.rooms[this.data.roomIndex]

@@ -36,6 +36,66 @@ def _create_other_account_headers(client):
     return account, position, {"Authorization": f"Bearer {login.json()['token']}"}
 
 
+def test_course_teacher_permission_is_independent_from_course_content(client, created_customer):
+    suffix = uuid.uuid4().hex[:10]
+    date = "2026-09-02"
+    record_response = client.post("/api/class-records", json={
+        "date": date,
+        "course_id": f"teacher-permission-{suffix}",
+        "course_name": "老师权限测试",
+    })
+    assert record_response.status_code == 200, record_response.text
+    record = record_response.json()
+
+    position_response = client.post("/api/positions", json={"name": f"老师配置角色_{suffix}"})
+    assert position_response.status_code == 200
+    position = position_response.json()
+    permission_response = client.put("/api/position-permissions/full", json={
+        "position": position["name"],
+        "pages": ["daily-activities"],
+        "edit_permissions": {
+            "activities": "view",
+            "activity_teachers": "all",
+            "activity_participants": "view",
+        },
+    })
+    assert permission_response.status_code == 200
+
+    password = f"pw{suffix}9"
+    account_response = client.post("/api/accounts", json={
+        "owner": f"老师配置员工_{suffix}",
+        "role": position["name"],
+        "username": f"teacher_editor_{suffix}",
+        "password": password,
+        "enabled": True,
+    })
+    assert account_response.status_code == 200
+    account = account_response.json()
+    login = client.post("/api/accounts/login", json={
+        "username": account["username"],
+        "password": password,
+    })
+    headers = {"Authorization": f"Bearer {login.json()['token']}"}
+
+    try:
+        teacher_update = client.patch(
+            f"/api/class-records/{record['id']}",
+            json={"teacher_ids": [created_customer["id"]]},
+            headers=headers,
+        )
+        assert teacher_update.status_code == 200, teacher_update.text
+        content_update = client.patch(
+            f"/api/class-records/{record['id']}",
+            json={"course_name": "不应允许修改"},
+            headers=headers,
+        )
+        assert content_update.status_code == 403
+    finally:
+        client.delete(f"/api/accounts/{account['id']}")
+        client.delete(f"/api/positions/{position['id']}")
+        client.delete(f"/api/class-records/{record['id']}")
+
+
 def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client, created_customer):
     date = "2026-08-20"
     visit = client.post("/api/visits", json={

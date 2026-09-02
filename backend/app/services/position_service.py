@@ -147,8 +147,10 @@ def update_position(position_id: str, data: PositionUpdate) -> Optional[Position
         rename_pep(old_name, position.name)
         rename_ppp(old_name, position.name)
         for acc in account_service.list_accounts():
-            if acc.role == old_name:
-                account_service.update_account(acc.id, AccountUpdate(role=position.name))
+            roles = account_service.normalize_roles(acc.roles, acc.role)
+            if old_name in roles:
+                updated_roles = [position.name if role == old_name else role for role in roles]
+                account_service.update_account(acc.id, AccountUpdate(roles=updated_roles))
     return position
 
 
@@ -161,7 +163,11 @@ def delete_position(position_id: str) -> bool:
         return False
     # 检查是否有账号引用此角色（通过公共 API，不持有 position_lock）
     from app.services import account_service
-    refs = [a for a in account_service.list_accounts() if a.role == position.name]
+    refs = [
+        account
+        for account in account_service.list_accounts()
+        if position.name in account_service.normalize_roles(account.roles, account.role)
+    ]
     if refs:
         names = ", ".join(a.owner or a.username for a in refs[:5])
         raise ValueError(f"角色「{position.name}」被 {len(refs)} 个账号使用（{names}等），请先修改这些账号的角色")

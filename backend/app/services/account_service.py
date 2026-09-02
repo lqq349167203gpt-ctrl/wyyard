@@ -7,6 +7,7 @@ import bcrypt
 
 from app.models.account import Account, AccountCreate, AccountUpdate, Role, RoleCreate, RoleUpdate
 from app.services.storage import load_data, save_data, save_item
+from app.utils.request_roles import normalize_roles
 
 ACCOUNTS_FILE = "accounts.json"
 ROLES_FILE = "roles.json"
@@ -27,7 +28,14 @@ def _check_password(password: str, hashed: str) -> bool:
 def _load_accounts():
     global _accounts
     data = load_data(ACCOUNTS_FILE)
-    _accounts = {k: Account(**v) for k, v in data.items()}
+    loaded = {}
+    for key, value in data.items():
+        item = dict(value)
+        roles = normalize_roles(item.get("roles"), item.get("role", ""))
+        item["roles"] = roles
+        item["role"] = roles[0] if roles else str(item.get("role", ""))
+        loaded[key] = Account(**item)
+    _accounts = loaded
 
 
 def _save_accounts(account_id: str = ""):
@@ -98,6 +106,11 @@ def create_account(data: AccountCreate) -> Account:
 
         now = datetime.now(timezone.utc)
         account_data = data.model_dump()
+        roles = normalize_roles(account_data.get("roles"), account_data.get("role", ""))
+        if not roles:
+            raise ValueError("至少选择一个角色")
+        account_data["roles"] = roles
+        account_data["role"] = roles[0]
         account_data["password"] = _hash_password(account_data["password"])
         account = Account(id=str(uuid.uuid4())[:12], created_at=now, **account_data)
         _accounts[account.id] = account
@@ -111,6 +124,16 @@ def update_account(account_id: str, data: AccountUpdate) -> Optional[Account]:
         if not account or account.is_deleted:
             return None
         update_data = data.model_dump(exclude_unset=True)
+        if "roles" in update_data:
+            roles = normalize_roles(update_data.get("roles"))
+            if not roles:
+                raise ValueError("至少选择一个角色")
+            update_data["roles"] = roles
+            update_data["role"] = roles[0]
+        elif "role" in update_data:
+            roles = normalize_roles(update_data.get("role"))
+            update_data["roles"] = roles
+            update_data["role"] = roles[0]
         # 唯一性校验（排除自身和已删除）
         if "owner" in update_data:
             for other in _accounts.values():
@@ -167,6 +190,12 @@ def get_by_username(username: str) -> Optional[Account]:
         if account.username == username and not account.is_deleted:
             return account
     return None
+
+
+def account_has_role(account: Account | None, role: str) -> bool:
+    if not account:
+        return False
+    return role in normalize_roles(account.roles, account.role)
 
 
 def change_password(account_id: str, old_password: str, new_password: str) -> bool:

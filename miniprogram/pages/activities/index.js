@@ -1,4 +1,4 @@
-const { activityWithdrawalApi, classRecordApi, spaceApi } = require('../../utils/api')
+const { activityThemeApi, activityWithdrawalApi, classRecordApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
@@ -8,7 +8,7 @@ const SHARED_SCHEDULE_DATE_KEY = 'schedule_selected_date'
 
 function pad(n) { return n < 10 ? '0' + n : '' + n }
 
-function buildCalendar(year, month, selectedDate, calendarCounts) {
+function buildCalendar(year, month, selectedDate, calendarCounts, lockStatuses) {
   const today = formatDate(new Date())
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -43,6 +43,7 @@ function buildCalendar(year, month, selectedDate, calendarCounts) {
       isSelected: date === selectedDate,
       isToday: date === today,
       count: (calendarCounts || {})[date] || 0,
+      isLocked: Boolean((lockStatuses || {})[date]),
     })
   }
   return days
@@ -55,7 +56,7 @@ function parseLocalDate(date) {
   return new Date(parts[0], parts[1] - 1, parts[2])
 }
 
-function buildWeekPages(selectedDate, calendarCounts) {
+function buildWeekPages(selectedDate, calendarCounts, lockStatuses) {
   const selected = parseLocalDate(selectedDate)
   if (!selected) return []
 
@@ -74,6 +75,7 @@ function buildWeekPages(selectedDate, calendarCounts) {
         day: dateValue.getDate(),
         weekday: WEEKDAYS[dateValue.getDay()],
         count: (calendarCounts || {})[date] || 0,
+        isLocked: Boolean((lockStatuses || {})[date]),
         isSelected: index === selectedWeekdayIndex,
       }
     })
@@ -191,6 +193,10 @@ Page({
     participantSheetList: [],
     loading: true,
     isViewOnly: false,
+    isDayLocked: false,
+    lockInfo: {},
+    canManageActivityLock: false,
+    lockSubmitting: false,
   },
 
   async onLoad(options) {
@@ -199,7 +205,13 @@ Page({
       this.setData({ hasPagePermission: false })
       return
     }
-    this.setData({ isViewOnly: isAreaViewOnly('activities') })
+    const app = getApp()
+    const currentUser = app.globalData.currentUser || wx.getStorageSync('currentUser') || {}
+    const editPermissions = app.globalData.editPermissions || wx.getStorageSync('userEditPermissions') || {}
+    this.setData({
+      isViewOnly: isAreaViewOnly('activities'),
+      canManageActivityLock: currentUser.role === '超级管理员' || editPermissions.activity_lock === true,
+    })
     const date = options.date || wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY) || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
     const d = parseLocalDate(date) || new Date()
     wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
@@ -211,7 +223,7 @@ Page({
       currentWeekday: '周' + WEEKDAYS[d.getDay()],
       calYear: d.getFullYear(),
       calMonth: d.getMonth(),
-      weekPages: buildWeekPages(date, {}),
+      weekPages: buildWeekPages(date, {}, {}),
     })
     await this.loadSpaces()
     this.loadData()
@@ -248,7 +260,7 @@ Page({
       const counts = this._calendarCounts || {}
       this.setData({
         calendarExpanded: true,
-        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, this.data.currentDate, counts),
+        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, this.data.currentDate, counts, this._lockStatuses || {}),
       })
     }
   },
@@ -257,26 +269,28 @@ Page({
     this.setData({ calendarExpanded: false })
   },
 
-  onPrevMonth() {
+  async onPrevMonth() {
     let { calYear, calMonth } = this.data
     calMonth--
     if (calMonth < 0) { calMonth = 11; calYear-- }
     const counts = this._calendarCounts || {}
-    this.setData({
-      calYear, calMonth,
-      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
-    })
+    this.setData({ calYear, calMonth })
+    const locks = await this.loadCalendarLocks(calYear, calMonth, this.data.spaceId)
+    if (this.data.calYear !== calYear || this.data.calMonth !== calMonth) return
+    this._lockStatuses = locks
+    this.setData({ calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts, locks) })
   },
 
-  onNextMonth() {
+  async onNextMonth() {
     let { calYear, calMonth } = this.data
     calMonth++
     if (calMonth > 11) { calMonth = 0; calYear++ }
     const counts = this._calendarCounts || {}
-    this.setData({
-      calYear, calMonth,
-      calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts),
-    })
+    this.setData({ calYear, calMonth })
+    const locks = await this.loadCalendarLocks(calYear, calMonth, this.data.spaceId)
+    if (this.data.calYear !== calYear || this.data.calMonth !== calMonth) return
+    this._lockStatuses = locks
+    this.setData({ calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, counts, locks) })
   },
 
   onCalendarDayTap(e) {
@@ -299,8 +313,8 @@ Page({
       calYear: d.getFullYear(),
       calMonth: d.getMonth(),
       calendarExpanded: false,
-      calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts),
-      weekPages: buildWeekPages(date, counts),
+      calendarDays: buildCalendar(d.getFullYear(), d.getMonth(), date, counts, this._lockStatuses || {}),
+      weekPages: buildWeekPages(date, counts, this._lockStatuses || {}),
       weekSwiperCurrent: 1,
       dateSwitching: useSoftTransition,
     }, () => {
@@ -365,6 +379,23 @@ Page({
 
   // ---------- 数据 ----------
 
+  async loadCalendarLocks(year, month, spaceId) {
+    const startDate = `${year}-${pad(month + 1)}-01`
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    const endDate = `${year}-${pad(month + 1)}-${pad(lastDay)}`
+    try {
+      const themes = await activityThemeApi.list(startDate, endDate, spaceId || '')
+      const statuses = {}
+      ;(themes || []).forEach(function(theme) {
+        if (theme.space_id === (spaceId || '') && theme.is_locked) statuses[theme.date] = theme
+      })
+      return statuses
+    } catch (error) {
+      console.error('加载课表核对状态失败:', error)
+      return this._lockStatuses || {}
+    }
+  },
+
   async loadData(spaceId, options = {}) {
     const requestSeq = (this._loadSeq || 0) + 1
     this._loadSeq = requestSeq
@@ -372,8 +403,15 @@ Page({
     if (!options.silent) this.setData({ loading: true })
     try {
       const sid = spaceId !== undefined ? spaceId : this.data.spaceId
-      const dashboard = await classRecordApi.dashboard(requestedDate, sid || undefined)
+      const requestedDay = parseLocalDate(requestedDate) || new Date()
+      const results = await Promise.all([
+        classRecordApi.dashboard(requestedDate, sid || undefined),
+        this.loadCalendarLocks(requestedDay.getFullYear(), requestedDay.getMonth(), sid || ''),
+      ])
+      const dashboard = results[0]
+      const lockStatuses = results[1]
       if (requestSeq !== this._loadSeq || requestedDate !== this.data.currentDate || String(sid || '') !== String(this.data.spaceId || '')) return
+      this._lockStatuses = lockStatuses
       const records = []
       const rawMap = {}
       const visitMap = {}
@@ -580,7 +618,10 @@ Page({
         withdrawalCourseIndex: 0,
         withdrawalParticipants,
         withdrawalParticipantIndex: 0,
-        weekPages: buildWeekPages(requestedDate, dashboard.calendar_counts || {}),
+        weekPages: buildWeekPages(requestedDate, dashboard.calendar_counts || {}, lockStatuses),
+        calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, requestedDate, dashboard.calendar_counts || {}, lockStatuses),
+        isDayLocked: Boolean(lockStatuses[requestedDate]),
+        lockInfo: lockStatuses[requestedDate] || {},
         loading: false,
         dateSwitching: false,
       })
@@ -598,6 +639,8 @@ Page({
     const raw = this._rawMap[`${record.source}_${record.id}`]
     getApp().globalData._selectedActivity = raw || record
     getApp().globalData._selectedActivitySource = record.source
+    getApp().globalData._selectedActivityDayLocked = this.data.isDayLocked
+    getApp().globalData._selectedActivityLockedBy = this.data.lockInfo?.locked_by || ''
     wx.navigateTo({ url: '/pages/activity-detail/index' })
   },
 
@@ -631,6 +674,10 @@ Page({
   },
 
   onWithdrawalOpen() {
+    if (this.data.isDayLocked) {
+      wx.showToast({ title: '当天课表已锁定，请先解锁', icon: 'none' })
+      return
+    }
     if (!this.data.withdrawalCourses.length) {
       wx.showToast({ title: '当日没有可办理的退课记录', icon: 'none' })
       return
@@ -690,6 +737,7 @@ Page({
   },
 
   async onWithdrawalConfirm() {
+    if (this.data.isDayLocked) return
     const course = this.data.withdrawalCourses[this.data.withdrawalCourseIndex]
     const participant = this.data.withdrawalParticipants[this.data.withdrawalParticipantIndex]
     if (!course || !participant || this.data.withdrawing) return
@@ -709,12 +757,41 @@ Page({
   },
 
   onCreateTap() {
+    if (this.data.isDayLocked) {
+      wx.showToast({ title: '当天课表已锁定，请先解锁', icon: 'none' })
+      return
+    }
     const date = this.data.currentDate
     const spaceId = this.data.spaceId
     wx.navigateTo({ url: `/pages/activity-create/index?date=${date}&spaceId=${spaceId}` })
   },
 
   onFabLongPress() {
+    if (this.data.isDayLocked) return
     wx.navigateTo({ url: `/pages/voice-chat/index?mode=activity&date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
+  },
+
+  onLockToggle() {
+    if (!this.data.canManageActivityLock || this.data.lockSubmitting || !this.data.spaceId) return
+    const willUnlock = this.data.isDayLocked
+    wx.showModal({
+      title: willUnlock ? '解锁当天课表？' : '核对无误并锁定？',
+      content: willUnlock
+        ? '解锁后，拥有相应权限的员工可以继续修改当天课程和参与人。'
+        : '锁定后所有账号都不能修改当天课程、参与人、发布状态和退课记录，需要调整时须先解锁。',
+      confirmText: willUnlock ? '确认解锁' : '确认锁定',
+      success: async (result) => {
+        if (!result.confirm) return
+        this.setData({ lockSubmitting: true })
+        try {
+          if (willUnlock) await activityThemeApi.unlock(this.data.currentDate, this.data.spaceId)
+          else await activityThemeApi.lock(this.data.currentDate, this.data.spaceId)
+          wx.showToast({ title: willUnlock ? '已解锁' : '已核对并锁定', icon: 'success' })
+          await this.loadData()
+        } finally {
+          this.setData({ lockSubmitting: false })
+        }
+      },
+    })
   },
 })

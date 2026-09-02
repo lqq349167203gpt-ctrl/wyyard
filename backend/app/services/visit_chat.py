@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from app.config.settings import settings
 from app.models.operation_log import OperationLogCreate
 from app.models.visit import VisitRecordCreate
-from app.services import customer_service, operation_log_service, visit_service
+from app.services import customer_service, operation_log_service, visit_service, visit_verification_service
 from app.services.miniapp_ai_config_service import get_config as get_miniapp_ai_config
 from app.services.visit_ai_config_service import get_config as get_visit_ai_config
 from app.services.voice_parser import _find_customer_from_instruction, render_prompt, search_customer_candidates
@@ -88,6 +88,15 @@ def _find_visit(customer_name: str, date: str, space_id: str = ""):
     return None
 
 
+def _verified_result(date: str, space_id: str) -> str | None:
+    if not visit_verification_service.is_verified(date, space_id):
+        return None
+    return json.dumps(
+        {"ok": False, "reason": "verified", "message": "当天邀约已核对，需先解锁后再操作"},
+        ensure_ascii=False,
+    )
+
+
 # ── 工具定义 ──────────────────────────────────────────────
 
 
@@ -104,6 +113,8 @@ def add_to_visit_list(customer_name: str, visit_date: str = "") -> str:
     if not date:
         return _invalid_date_json(visit_date)
     space_id = ctx["space_id"]
+    if locked := _verified_result(date, space_id):
+        return locked
     print(f"[tool] add_to_visit_list: customer={customer_name}, date={date}, space_id={space_id}")
 
     customer = _find_customer_from_instruction(customer_name)
@@ -141,6 +152,8 @@ def set_arrival(customer_name: str, time: str = "", arrived: bool = True) -> str
     """
     date = _ctx_var.get()["date"]
     space_id = _ctx_var.get()["space_id"]
+    if locked := _verified_result(date, space_id):
+        return locked
 
     if time:
         normalized = normalize_time(time)
@@ -211,6 +224,8 @@ def remove_from_visit_list(customer_name: str) -> str:
     """
     date = _ctx_var.get()["date"]
     space_id = _ctx_var.get()["space_id"]
+    if locked := _verified_result(date, space_id):
+        return locked
 
     customer = _find_customer_from_instruction(customer_name)
     if not customer:
@@ -252,6 +267,8 @@ def record_customer_needs(customer_name: str, needs: str) -> str:
 
     visit = _find_visit(customer["nickname"], date, space_id)
     if not visit:
+        if locked := _verified_result(date, space_id):
+            return locked
         visit = visit_service.create_visit(VisitRecordCreate(
             visit_date=date, visit_time=_now_hm(),
             customer_id=customer["id"],
@@ -333,6 +350,8 @@ def set_referrer_handler(customer_name: str, referrer_handler: str, visit_date: 
     if not date:
         return _invalid_date_json(visit_date)
     space_id = _ctx_var.get()["space_id"]
+    if locked := _verified_result(date, space_id):
+        return locked
 
     customer = _find_customer_from_instruction(customer_name)
     if not customer:
@@ -376,6 +395,8 @@ def set_leader(customer_name: str, is_leader: bool = True) -> str:
     """
     date = _ctx_var.get()["date"]
     space_id = _ctx_var.get()["space_id"]
+    if locked := _verified_result(date, space_id):
+        return locked
 
     customer = _find_customer_from_instruction(customer_name)
     if not customer:
@@ -406,6 +427,8 @@ def set_group_member(member_name: str, leader_name: str) -> str:
     """
     date = _ctx_var.get()["date"]
     space_id = _ctx_var.get()["space_id"]
+    if locked := _verified_result(date, space_id):
+        return locked
 
     member_customer = _find_customer_from_instruction(member_name)
     if not member_customer:

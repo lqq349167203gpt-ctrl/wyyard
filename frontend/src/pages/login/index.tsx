@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { accountApi } from "@/lib/api"
-import { User, Lock, AlertCircle } from "lucide-react"
+import { User, Lock, AlertCircle, Eye, EyeOff } from "lucide-react"
 import { storePagePermissions } from "@/hooks/use-page-permissions"
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const [username, setUsername] = useState(() => localStorage.getItem("rememberedUsername") || "")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [rememberAccount, setRememberAccount] = useState(() => !!localStorage.getItem("rememberedUsername"))
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -46,7 +47,10 @@ export default function LoginPage() {
           customers: "all",
           visits: "own",
           activities: "own",
+          activity_teachers: "own",
           activity_participants: "all",
+          activity_lock: false,
+          visit_lock: false,
           payments: "all",
         }))
         if (rememberAccount) {
@@ -101,13 +105,21 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8f959e] pointer-events-none" />
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
-                  className="h-11 pl-10 rounded-lg border-[#e5e6eb] text-[13px] focus-visible:ring-1 focus-visible:ring-[#5a80ff] focus-visible:border-[#5a80ff]"
+                  className="h-11 pl-10 pr-10 rounded-lg border-[#e5e6eb] text-[13px] focus-visible:ring-1 focus-visible:ring-[#5a80ff] focus-visible:border-[#5a80ff]"
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(value => !value)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8f959e] hover:text-[#4e535a]"
+                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
 
               <label className="flex items-center gap-2 cursor-pointer select-none">

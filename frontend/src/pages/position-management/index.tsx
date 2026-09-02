@@ -88,7 +88,10 @@ const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
   customers: "all",
   visits: "own",
   activities: "own",
+  activity_teachers: "own",
   activity_participants: "all",
+  activity_lock: false,
+  visit_lock: false,
   payments: "all",
   contacts: {
     phone: { view: false, copy: false, edit: false },
@@ -120,7 +123,10 @@ const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
   customers: "all",
   visits: "all",
   activities: "all",
+  activity_teachers: "all",
   activity_participants: "all",
+  activity_lock: true,
+  visit_lock: true,
   payments: "all",
   contacts: {
     phone: { view: true, copy: true, edit: true },
@@ -273,7 +279,7 @@ export default function PositionManagementPage() {
   )
 
   const getPersonCount = (positionName: string) => {
-    return accounts.filter(a => a.role === positionName).length
+    return accounts.filter(a => (a.roles?.length ? a.roles : [a.role]).includes(positionName)).length
   }
 
   const selectPermissionSection = (section: PermissionSection) => {
@@ -335,10 +341,10 @@ export default function PositionManagementPage() {
           setFormEditPermissions(current => ({ ...current, customers: "all" }))
         }
         if (pageKey === "class-records") {
-          setFormEditPermissions(current => ({ ...current, visits: "own" }))
+          setFormEditPermissions(current => ({ ...current, visits: "own", visit_lock: false }))
         }
         if (pageKey === "daily-activities") {
-          setFormEditPermissions(current => ({ ...current, activities: "own", activity_participants: "view" }))
+          setFormEditPermissions(current => ({ ...current, activities: "own", activity_teachers: "view", activity_participants: "view", activity_lock: false }))
         }
         if (pageKey === "payment") {
           setFormEditPermissions(current => ({ ...current, payments: "own" }))
@@ -794,10 +800,10 @@ export default function PositionManagementPage() {
                                     } else {
                                       setFormPermissions(prev => removePagePermissions(prev, group.keys))
                                       if (group.keys.includes("class-records")) {
-                                        setFormEditPermissions(current => ({ ...current, visits: "own" }))
+                                        setFormEditPermissions(current => ({ ...current, visits: "own", visit_lock: false }))
                                       }
                                       if (group.keys.includes("daily-activities")) {
-                                        setFormEditPermissions(current => ({ ...current, activities: "own", activity_participants: "view" }))
+                                        setFormEditPermissions(current => ({ ...current, activities: "own", activity_teachers: "view", activity_participants: "view", activity_lock: false }))
                                       }
                                       if (group.keys.includes("payment")) {
                                         setFormEditPermissions(current => ({ ...current, payments: "own" }))
@@ -936,6 +942,17 @@ export default function PositionManagementPage() {
                             ],
                           },
                           {
+                            key: "activity_teachers" as const,
+                            pageKey: "daily-activities",
+                            label: "课程老师",
+                            description: "单独控制课表中老师的选择与移除，不影响其他课程内容",
+                            options: [
+                              { value: "view" as const, label: "不可配置" },
+                              { value: "own" as const, label: "仅本人课表" },
+                              { value: "all" as const, label: "全部课表" },
+                            ],
+                          },
+                          {
                             key: "activity_participants" as const,
                             pageKey: "daily-activities",
                             label: "课表人员配置",
@@ -990,6 +1007,44 @@ export default function PositionManagementPage() {
                             </div>
                           )
                         })}
+                        <div className="flex min-h-[76px] items-center justify-between gap-6 border-b border-[#f0f0f0] px-4 py-3">
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-medium text-[#2b2f36]">邀约核对与锁定</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">核对后仅保留来访需求、客户信息和跟进点可编辑</div>
+                            {!formPermissions.includes("class-records") && (
+                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“邀约”页面权限</div>
+                            )}
+                          </div>
+                          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[12px] text-[#646a73]">
+                            <input
+                              type="checkbox"
+                              checked={formEditPermissions.visit_lock}
+                              disabled={isSystemRole || !formPermissions.includes("class-records")}
+                              onChange={(event) => setFormEditPermissions(current => ({ ...current, visit_lock: event.target.checked }))}
+                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff] disabled:cursor-default"
+                            />
+                            允许核对与解锁
+                          </label>
+                        </div>
+                        <div className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-medium text-[#2b2f36]">课表核对与锁定</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">核对当天参与人和课程内容；锁定后所有账号都需先解锁才能修改</div>
+                            {!formPermissions.includes("daily-activities") && (
+                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“课表”页面权限</div>
+                            )}
+                          </div>
+                          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[12px] text-[#646a73]">
+                            <input
+                              type="checkbox"
+                              checked={formEditPermissions.activity_lock}
+                              disabled={isSystemRole || !formPermissions.includes("daily-activities")}
+                              onChange={(event) => setFormEditPermissions(current => ({ ...current, activity_lock: event.target.checked }))}
+                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff] disabled:cursor-default"
+                            />
+                            允许核对与解锁
+                          </label>
+                        </div>
                       </div>
                       <p className="mt-2.5 text-[12px] text-[#8f959e]">“仅浏览”会同时由后端拦截写操作；邀约和课表的“仅本人录入”仍按创建人控制受保护内容。</p>
                     </section>

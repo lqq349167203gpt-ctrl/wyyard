@@ -3,7 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 
 from app.models.base import StrictBaseModel
-from app.services import activity_withdrawal_service, customer_access_service
+from app.services import activity_lock_service, activity_withdrawal_service, customer_access_service
 from app.services.customer_service import get_customer
 from app.utils.record_ownership import ensure_record_creator
 
@@ -59,6 +59,7 @@ def withdraw_participant(
     record = activity_withdrawal_service.get_record(record_type, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="活动记录不存在")
+    activity_lock_service.ensure_record_unlocked(record)
     ensure_record_creator(request, record, "活动", "activities")
     customer_access_service.require_new_customer_ids(
         request,
@@ -124,6 +125,7 @@ def restore_participant(
     record = activity_withdrawal_service.get_record(record_type, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="活动记录不存在")
+    activity_lock_service.ensure_record_unlocked(record)
     ensure_record_creator(request, record, "活动", "activities")
     customer_access_service.require_new_customer_ids(
         request,

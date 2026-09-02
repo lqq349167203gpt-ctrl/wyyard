@@ -10,6 +10,7 @@ from langchain_openai import ChatOpenAI
 from app.config.settings import settings
 from app.models.operation_log import OperationLogCreate
 from app.services import (
+    activity_lock_service,
     class_record_service,
     emotional_release_session_service,
     energy_knot_session_service,
@@ -381,6 +382,7 @@ def create_activity(
             space_name = space.name
 
     try:
+        activity_lock_service.ensure_scope_unlocked(date, space_id)
         if activity_type == "class":
             record = class_record_service.create_record(
                 __import__("app.models.class_record", fromlist=["ClassRecordCreate"]).ClassRecordCreate(

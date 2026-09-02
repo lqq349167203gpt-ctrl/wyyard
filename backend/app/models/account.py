@@ -1,11 +1,15 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
 from typing import Optional
+
+from pydantic import Field
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class AccountBase(SafeBaseModel):
     owner: str  # 归属人
-    role: str  # 角色
+    role: str  # 主要角色（兼容旧数据与旧客户端）
+    roles: list[str] = Field(default_factory=list)  # 可同时拥有多个角色
     username: str  # 账号
     password: str  # 密码
     enabled: bool = True  # 是否启用
@@ -18,6 +22,7 @@ class AccountCreate(AccountBase):
 class AccountUpdate(StrictBaseModel):
     owner: Optional[str] = None
     role: Optional[str] = None
+    roles: Optional[list[str]] = None
     username: Optional[str] = None
     password: Optional[str] = None
     enabled: Optional[bool] = None

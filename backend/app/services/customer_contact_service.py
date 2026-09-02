@@ -1,5 +1,6 @@
 """客户联系方式脱敏、授权访问与审计辅助。"""
 
+from collections.abc import Iterable
 from typing import Literal
 
 from app.models.operation_log import OperationLogCreate
@@ -36,15 +37,15 @@ def mask_contact(field: ContactField, value: str) -> str:
     return mask_phone(value) if field == "phone" else mask_wechat(value)
 
 
-def get_role_permissions(role: str) -> dict:
+def get_role_permissions(role: str | Iterable[str]) -> dict:
     return position_edit_permission_service.get_permissions(role)["contacts"]
 
 
-def can_access(role: str, field: ContactField, action: ContactAction) -> bool:
+def can_access(role: str | Iterable[str], field: ContactField, action: ContactAction) -> bool:
     return position_edit_permission_service.has_contact_permission(role, field, action)
 
 
-def protect_customer_data(data: dict, role: str, *, include_permissions: bool = False) -> dict:
+def protect_customer_data(data: dict, role: str | Iterable[str], *, include_permissions: bool = False) -> dict:
     """员工接口统一返回脱敏联系方式；明文只能通过受审计的访问端点获取。"""
     protected = dict(data)
     protected["phone"] = mask_phone(str(protected.get("phone") or ""))

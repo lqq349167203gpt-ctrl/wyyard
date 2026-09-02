@@ -25,13 +25,19 @@
             class="field-input"
             placeholder="请输入密码"
             placeholder-style="color: #b0b5bb;"
-            password="true"
+            password="{{!showPassword}}"
             value="{{password}}"
             data-field="password"
             bindfocus="onFieldFocus"
             bindblur="onFieldBlur"
             bindinput="onPasswordInput"
           />
+          <view class="password-toggle" catchtap="onTogglePasswordVisibility" aria-role="button" aria-label="{{showPassword ? '隐藏密码' : '显示密码'}}">
+            <view class="eye-shape">
+              <view class="eye-pupil"></view>
+            </view>
+            <view class="eye-slash" wx:if="{{!showPassword}}"></view>
+          </view>
         </view>
 
         <view class="save-options">

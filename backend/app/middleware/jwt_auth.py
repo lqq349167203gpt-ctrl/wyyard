@@ -59,6 +59,7 @@ READ_ONLY_AREA_PATHS = {
     "visits": (
         "/api/visits",
         "/api/visit-notes",
+        "/api/visit-verifications",
         "/api/daily-groupings",
         "/api/visit-history",
     ),
@@ -266,6 +267,20 @@ def _is_activity_participant_patch(path: str, method: str) -> bool:
     return False
 
 
+def _is_activity_lock_action(path: str, method: str) -> bool:
+    return method == "POST" and path in {
+        "/api/activity-themes/lock",
+        "/api/activity-themes/unlock",
+    }
+
+
+def _is_visit_lock_action(path: str, method: str) -> bool:
+    return method == "POST" and path in {
+        "/api/visit-verifications/verify",
+        "/api/visit-verifications/unverify",
+    }
+
+
 def _record_page_view(scope, account, source: str):
     if _parse_header(scope, b"x-page-view") != "1":
         return
@@ -315,7 +330,8 @@ class AuthMiddleware:
         # GET 公开端点（活动列表/详情，无需 token）
         if method == "GET":
             for public in PUBLIC_GET_PATHS:
-                if path == public or path.startswith(public + "/"):
+                # 课表主题列表可公开展示；其核对状态详情属于员工内部接口，必须走鉴权。
+                if path == public or (public != "/api/activity-themes" and path.startswith(public + "/")):
                     await self.app(scope, receive, send)
                     return
 
@@ -331,6 +347,7 @@ class AuthMiddleware:
                     state["user_name"] = "系统任务"
                     state["user_owner"] = ""
                     state["user_role"] = "system"
+                    state["user_roles"] = ["system"]
                     state["source"] = "system"
                     await self.app(scope, receive, send)
                     return
@@ -354,6 +371,7 @@ class AuthMiddleware:
                     state["user_name"] = payload.get("username", "")
                     state["user_owner"] = ""
                     state["user_role"] = "customer"
+                    state["user_roles"] = ["customer"]
                     state["customer_id"] = customer_id
                     state["source"] = _parse_client_type(scope) or "miniprogram-client"
                     # 滑动续期：临期时下发新 token（仅更新 exp）
@@ -399,6 +417,7 @@ class AuthMiddleware:
                 state["user_name"] = account.username
                 state["user_owner"] = account.owner or ""
                 state["user_role"] = account.role
+                state["user_roles"] = account.roles or [account.role]
                 state["token_jti"] = token_jti
                 state["source"] = _parse_client_type(scope) or "pc"
                 _record_page_view(scope, account, state["source"])
@@ -407,21 +426,39 @@ class AuthMiddleware:
                 method = scope.get("method", "")
                 if method in ("POST", "PUT", "PATCH", "DELETE"):
                     for admin_path in ADMIN_PATHS:
-                        if (path == admin_path or path.startswith(admin_path + "/")) and account.role != "超级管理员":
+                        if (path == admin_path or path.startswith(admin_path + "/")) and "超级管理员" not in state["user_roles"]:
                             response = _json_response(403, "权限不足")
                             await response(scope, receive, send)
                             return
 
                     read_only_area = _get_read_only_area(path, method)
-                    if read_only_area and account.role != "超级管理员":
+                    if read_only_area and "超级管理员" not in state["user_roles"]:
                         from app.services import position_edit_permission_service
-                        edit_permissions = position_edit_permission_service.get_permissions(account.role)
-                        participant_patch_allowed = (
+                        edit_permissions = position_edit_permission_service.get_permissions(state["user_roles"])
+                        independent_activity_patch_allowed = (
                             read_only_area == "activities"
                             and _is_activity_participant_patch(path, method)
-                            and edit_permissions["activity_participants"] != "view"
+                            and (
+                                edit_permissions["activity_participants"] != "view"
+                                or edit_permissions["activity_teachers"] != "view"
+                            )
                         )
-                        if edit_permissions[read_only_area] == "view" and not participant_patch_allowed:
+                        independent_activity_lock_allowed = (
+                            read_only_area == "activities"
+                            and _is_activity_lock_action(path, method)
+                            and edit_permissions["activity_lock"]
+                        )
+                        independent_visit_lock_allowed = (
+                            read_only_area == "visits"
+                            and _is_visit_lock_action(path, method)
+                            and edit_permissions["visit_lock"]
+                        )
+                        if (
+                            edit_permissions[read_only_area] == "view"
+                            and not independent_activity_patch_allowed
+                            and not independent_activity_lock_allowed
+                            and not independent_visit_lock_allowed
+                        ):
                             label = READ_ONLY_AREA_LABELS[read_only_area]
                             response = _json_response(403, f"当前账号对{label}仅有浏览权限")
                             await response(scope, receive, send)
@@ -451,34 +488,37 @@ class AuthMiddleware:
 def require_role(*roles: str):
     """FastAPI 依赖：要求当前用户具有指定角色之一"""
     def dependency(request: Request):
-        user_role = getattr(request.state, "user_role", "")
-        if user_role not in roles:
+        from app.utils.request_roles import get_request_roles
+        user_roles = get_request_roles(request)
+        if not set(user_roles).intersection(roles):
             from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="权限不足")
-        return user_role
+        return user_roles[0] if user_roles else ""
     return dependency
 
 
 def require_admin(request: Request):
     """FastAPI 依赖：要求超级管理员角色"""
-    user_role = getattr(request.state, "user_role", "")
-    if user_role != "超级管理员":
+    from app.utils.request_roles import get_request_roles
+    user_roles = get_request_roles(request)
+    if "超级管理员" not in user_roles:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="权限不足")
-    return user_role
+    return "超级管理员"
 
 
 def require_page_permission(page_key: str):
     """FastAPI 依赖：要求超级管理员或当前角色拥有指定页面权限。"""
     def dependency(request: Request):
-        user_role = getattr(request.state, "user_role", "")
-        if user_role == "超级管理员":
-            return user_role
+        from app.utils.request_roles import get_request_roles
+        user_roles = get_request_roles(request)
+        if "超级管理员" in user_roles:
+            return "超级管理员"
 
         from app.services import position_permission_service
-        if page_key not in position_permission_service.get_permissions(user_role):
+        if page_key not in position_permission_service.get_permissions(user_roles):
             from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="权限不足")
-        return user_role
+        return user_roles[0] if user_roles else ""
 
     return dependency

@@ -31,6 +31,7 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
 
@@ -71,7 +72,8 @@ def _build_activity_summary(activities: list[dict]) -> list[dict]:
 def get_customer_detail(customer_id: str, request: Request, date: str | None = None):
     """获取单个客户的完整聚合详情"""
     # 客户角色只能查看自己的数据
-    user_role = getattr(request.state, "user_role", "")
+    user_roles = get_request_roles(request)
+    user_role = user_roles[0] if user_roles else ""
     if user_role == "customer":
         state_customer_id = getattr(request.state, "customer_id", "")
         if state_customer_id != customer_id:
@@ -83,7 +85,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     if not is_customer_self and not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有查看该客户的权限")
 
-    permissions = None if is_customer_self else customer_access_service.get_customer_permissions(user_role)
+    permissions = None if is_customer_self else customer_access_service.get_customer_permissions(user_roles)
     can_follow_up = is_customer_self or bool(permissions["detail_tabs"]["follow_up"])
     can_view_activities = is_customer_self or bool(permissions["detail_tabs"]["activities"])
     can_view_followups = is_customer_self or bool(permissions["detail_tabs"]["customer_followups"])
@@ -93,10 +95,10 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
 
     basic = customer.model_dump(mode="json")
     if not is_customer_self:
-        basic = customer_access_service.protect_sensitive_data(basic, user_role)
+        basic = customer_access_service.protect_sensitive_data(basic, user_roles)
         basic = customer_contact_service.protect_customer_data(
             basic,
-            user_role,
+            user_roles,
             include_permissions=True,
         )
         basic["customer_access_permissions"] = permissions

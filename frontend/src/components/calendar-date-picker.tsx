@@ -8,7 +8,12 @@ function formatDateChinese(d: string): string {
   return `${y}年${parseInt(m)}月${parseInt(day)}日`
 }
 
-export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate, onSelectDate }: { detailDate: string; onSelectDate: (date: string) => void }) {
+export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate, onSelectDate, dateStatuses, onMonthChange }: {
+  detailDate: string
+  onSelectDate: (date: string) => void
+  dateStatuses?: Record<string, boolean>
+  onMonthChange?: (month: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const [month, setMonth] = useState(() => detailDate.substring(0, 7))
   const ref = useRef<HTMLDivElement | null>(null)
@@ -16,6 +21,10 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
   useEffect(() => {
     setMonth(detailDate.substring(0, 7))
   }, [detailDate])
+
+  useEffect(() => {
+    if (open) onMonthChange?.(month)
+  }, [month, onMonthChange, open])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -84,7 +93,7 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
               return (
                 <button
                   key={dateStr}
-                  className={`h-7 w-7 flex items-center justify-center rounded text-[12px] leading-none transition-colors ${
+                  className={`relative h-8 w-8 flex items-center justify-center rounded text-[12px] leading-none transition-colors ${
                     isSelected ? "bg-[#3370ff] text-white" : isTodayDate ? "bg-[#f0f5ff] text-[#3370ff]" : "hover:bg-[#f7f8fa] text-[#2b2f36]"
                   }`}
                   onClick={() => {
@@ -93,6 +102,9 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
                   }}
                 >
                   <span className="inline-flex items-center justify-center h-4">{day}</span>
+                  {dateStatuses && (
+                    <span className={`absolute bottom-[3px] h-1 w-1 rounded-full ${isSelected ? "bg-white/80" : dateStatuses[dateStr] ? "bg-[#3370ff]" : "bg-[#c9cdd4]"}`} />
+                  )}
                 </button>
               )
             })}

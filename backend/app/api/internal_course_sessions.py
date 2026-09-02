@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.internal_course_session import InternalCourseSessionCreate
 from app.services import (
     activity_assignment_notification_service,
+    activity_lock_service,
     customer_access_service,
     internal_course_session_service,
 )
@@ -11,6 +12,7 @@ from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
     ensure_activity_participant_access,
+    ensure_activity_teacher_access,
     ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
@@ -52,6 +54,9 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 
 @router.post("")
 def create_session(data: InternalCourseSessionCreate, request: Request, conversion: bool = False):
+    activity_lock_service.ensure_scope_unlocked(data.date, data.space_id)
+    if not conversion:
+        ensure_activity_teacher_access(request, None, data.model_dump(exclude_unset=True))
     if data.participant_ids and not conversion:
         ensure_activity_participant_access(request)
     customer_access_service.require_new_customer_ids(request, data.participant_ids, action="添加")
@@ -73,7 +78,9 @@ def update_session(session_id: str, data: dict, request: Request, conversion: bo
     old_session = internal_course_session_service.get_session(session_id)
     if not old_session:
         raise HTTPException(status_code=404, detail="记录不存在")
+    activity_lock_service.ensure_update_unlocked(old_session, data)
     ensure_activity_update_access(request, data)
+    ensure_activity_teacher_access(request, old_session, data)
     if "participant_ids" in data:
         if list(data.get("participant_ids") or []) != list(old_session.participant_ids):
             ensure_activity_participant_access(request, old_session)
@@ -144,6 +151,7 @@ def update_session(session_id: str, data: dict, request: Request, conversion: bo
 @router.delete("/{session_id}")
 def delete_session(session_id: str, request: Request, conversion: bool = False):
     old_session = internal_course_session_service.get_session(session_id)
+    activity_lock_service.ensure_record_unlocked(old_session)
     ensure_record_creator(request, old_session, "课表内容", "activities")
 
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")

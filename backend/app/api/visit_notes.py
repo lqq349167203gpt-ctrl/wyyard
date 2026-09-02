@@ -7,6 +7,7 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.utils.request_roles import get_request_roles
 
 
 def _require_visit_permission(request: Request) -> str:
@@ -19,7 +20,7 @@ def _require_visit_permission(request: Request) -> str:
         "class-records-activities",
         "class-records-arrival",
     }
-    if not allowed.intersection(position_permission_service.get_permissions(role)):
+    if not allowed.intersection(position_permission_service.get_permissions(get_request_roles(request))):
         raise HTTPException(status_code=403, detail="没有邀约页面权限")
     return role
 

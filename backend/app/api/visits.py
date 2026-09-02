@@ -4,10 +4,11 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.models.visit import VisitRecordCreate
-from app.services import customer_access_service, customer_service, visit_service
+from app.services import customer_access_service, customer_service, visit_service, visit_verification_service
 from app.services.customer_service import get_customer
 from app.utils.pagination import paginate
 from app.utils.record_ownership import ensure_creator_for_changed_fields, ensure_record_creator, stamp_creator
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
@@ -176,7 +177,7 @@ async def list_visits(
         item = _fill_member_type(record, need_map.get(record.id, ""))
         item["visit_notes"] = note_map.get(record.id, [])
         items.append(item)
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     if date and customer_access_service.can_view_transaction_summary(role):
         _fill_daily_amount(items, date)
     if page is not None:
@@ -256,6 +257,8 @@ async def reorder_visits(data: dict, request: Request):
     records = {record.id: record for record in visit_service.list_visits()}
     if any(visit_id not in records for visit_id in ids):
         raise HTTPException(status_code=404, detail="邀约记录不存在")
+    for visit_id in ids:
+        visit_verification_service.ensure_record_unverified(records[visit_id])
     visible_ids = _visible_customer_ids(request)
     if visible_ids is not None and any(
         records[visit_id].customer_id not in visible_ids for visit_id in ids
@@ -376,6 +379,7 @@ async def get_visit(visit_id: str, request: Request):
 @router.post("")
 async def create_visit(data: VisitRecordCreate, request: Request):
     customer_access_service.require_customer_scope(request, data.customer_id, action="邀约")
+    visit_verification_service.ensure_scope_unverified(data.visit_date, data.space_id or "")
     try:
         initial_need = str(data.needs or "").strip()
         create_data = data.model_copy(update={"needs": ""}) if initial_need else data
@@ -408,6 +412,7 @@ async def update_visit(visit_id: str, data: dict, request: Request):
     customer_access_service.require_customer_scope(request, old_record.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != old_record.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="邀约")
+    visit_verification_service.ensure_update_allowed(old_record, data)
     if "needs" in data and (old_record.cancelled or "cancelled" in data):
         raise HTTPException(status_code=400, detail="取消或恢复邀约时不能同时修改来访需求")
     ensure_creator_for_changed_fields(
@@ -492,6 +497,7 @@ async def delete_visit(visit_id: str, request: Request):
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
     customer_access_service.require_customer_scope(request, record.customer_id, action="删除")
+    visit_verification_service.ensure_record_unverified(record)
     ensure_record_creator(request, record, "邀约", "visits")
     if not visit_service.delete_visit(visit_id):
         raise HTTPException(status_code=404, detail="记录不存在")

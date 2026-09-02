@@ -8,7 +8,7 @@ let _silentLoginPromise = null
 let _logoutScheduled = false
 let _lastTrackedPagePath = ''
 const DEVICE_ID_KEY = 'wyyard_device_id'
-const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
+const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, payments: 'all' }
 const SECURITY_AUTH_REASONS = ['disabled', 'password_changed', 'kicked']
 
 function _getDeviceId() {
@@ -438,6 +438,19 @@ const activityWithdrawalApi = {
     }),
 }
 
+const activityThemeApi = {
+  list: (startDate, endDate, spaceId) => {
+    const params = []
+    if (startDate) params.push(`start_date=${encodeURIComponent(startDate)}`)
+    if (endDate) params.push(`end_date=${encodeURIComponent(endDate)}`)
+    if (spaceId) params.push(`space_ids=${encodeURIComponent(spaceId)}`)
+    return request(`/api/activity-themes${params.length ? '?' + params.join('&') : ''}`)
+  },
+  getLockStatus: (date, spaceId) => request(`/api/activity-themes/lock-status?date=${encodeURIComponent(date)}&space_id=${encodeURIComponent(spaceId || '')}`),
+  lock: (date, spaceId) => request('/api/activity-themes/lock', { method: 'POST', data: { date, space_id: spaceId || '' } }),
+  unlock: (date, spaceId) => request('/api/activity-themes/unlock', { method: 'POST', data: { date, space_id: spaceId || '' } }),
+}
+
 // 课程类型 API
 const courseTypeApi = {
   list: () => request('/api/course-types'),
@@ -734,6 +747,7 @@ module.exports = {
   visitNoteApi,
   classRecordApi,
   activityWithdrawalApi,
+  activityThemeApi,
   customerApi,
   customerTagApi,
   followUpStatusApi,

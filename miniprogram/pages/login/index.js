@@ -13,6 +13,7 @@ Page({
     loginMode: 'password', // 'password' | 'dev'
     username: '',
     password: '',
+    showPassword: false,
     focusedField: '',
     saveAccount: false,
     savePassword: false,
@@ -91,6 +92,10 @@ Page({
     this.setData({ password: e.detail.value })
   },
 
+  onTogglePasswordVisibility() {
+    this.setData({ showPassword: !this.data.showPassword })
+  },
+
   // ---------- 账号密码登录 ----------
 
   onPasswordLogin() {
@@ -155,7 +160,7 @@ Page({
     wx.setStorageSync('auth_token', data.token)
     wx.setStorageSync('currentUser', data.account)
     wx.setStorageSync('userPermissions', data.permissions)
-    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' })
+    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, payments: 'all' })
 
     // 开发模式登录不改动用户保存的账号密码
     if (this.data.loginMode === 'password') {
@@ -176,7 +181,7 @@ Page({
       app.globalData.token = data.token
       app.globalData.currentUser = data.account
       app.globalData.permissions = data.permissions || []
-      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_participants: 'all', payments: 'all' }
+      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, payments: 'all' }
       if (app.scheduleUsageTracking) app.scheduleUsageTracking()
       else if (app.startUsageTracking) app.startUsageTracking()
     }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react"
-import { GripVertical, Trash2, Plus, Info } from "lucide-react"
+import { GripVertical, Trash2, Plus, Info, LockKeyhole } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -114,8 +114,6 @@ const ACTIVITY_CREATOR_ONLY_FIELDS = new Set<keyof ActivityRow>([
   "course_id",
   "owner_id",
   "owner_name",
-  "host_ids",
-  "host_names",
   "activity_mode",
   "start_time",
   "end_time",
@@ -126,6 +124,8 @@ const ACTIVITY_CREATOR_ONLY_FIELDS = new Set<keyof ActivityRow>([
   "course_review",
   "billing_description",
 ])
+
+const ACTIVITY_TEACHER_FIELDS = new Set<keyof ActivityRow>(["host_ids", "host_names"])
 
 let nextKey = 1
 
@@ -280,6 +280,7 @@ interface ActivityBatchTableProps {
   onUndoRedoChange?: (canUndo: boolean, canRedo: boolean, undo: () => void, redo: () => void, history: HistoryEntry[]) => void
   onRestoreRef?: (restore: (entry: HistoryEntry) => Promise<void>) => void
   onCaptureRef?: (capture: () => void) => void
+  onFlushRef?: (flush: () => Promise<void>) => void
   onHistoryPushed?: (entry: HistoryEntry) => void
   previewRows?: ActivityRow[]
   previewChangedKeys?: number[]
@@ -294,7 +295,7 @@ interface ActivityBatchTableProps {
 export function ActivityBatchTable({
   date, courses, customers, invitedCustomerIds, teachers, spaces, spaceId,
   records, onReload, onParticipantsSaved, callbacks, getMemberName, memberIdentities,
-  onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed,
+  onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onFlushRef, onHistoryPushed,
   previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview,
   toolbarLeading, toolbarTrailing, toolbarSupplement,
 }: ActivityBatchTableProps) {
@@ -352,18 +353,27 @@ export function ActivityBatchTable({
     if (editPermissions.activity_participants === "view") return false
     return editPermissions.activity_participants === "all" || isOwnRow(row)
   }, [currentUser.role, editPermissions.activity_participants, isOwnRow])
+  const canEditTeachers = useCallback((row: ActivityRow) => {
+    if (currentUser.role === "超级管理员") return true
+    if (editPermissions.activity_teachers === "view") return false
+    return editPermissions.activity_teachers === "all" || isOwnRow(row)
+  }, [currentUser.role, editPermissions.activity_teachers, isOwnRow])
   const canEditField = useCallback((row: ActivityRow, field: keyof ActivityRow) => (
     field === "participant_ids"
       ? canEditParticipants(row)
+      : ACTIVITY_TEACHER_FIELDS.has(field)
+        ? canEditTeachers(row)
       : !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field))
-  ), [canEditParticipants, canEditRow, isViewOnly])
+  ), [canEditParticipants, canEditRow, canEditTeachers, isViewOnly])
   const canEditChanges = useCallback((row: ActivityRow, changes: Partial<ActivityRow>) => (
     Object.keys(changes).every(field => (
       field === "participant_ids"
         ? canEditParticipants(row)
+        : ACTIVITY_TEACHER_FIELDS.has(field as keyof ActivityRow)
+          ? canEditTeachers(row)
         : !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow))
     ))
-  ), [canEditParticipants, canEditRow, isViewOnly])
+  ), [canEditParticipants, canEditRow, canEditTeachers, isViewOnly])
   const invitedOwnerCustomers = useMemo(() => {
     // 邀约名单加载完成前保持为空，避免短暂暴露全部客户作为案主候选。
     if (!invitedCustomerIds) return []
@@ -895,6 +905,20 @@ export function ActivityBatchTable({
     }, 500)
   }, [])
 
+  const flushPendingSaves = useCallback(async () => {
+    const pendingKeys = Object.keys(timersRef.current).map(Number)
+    for (const key of pendingKeys) {
+      clearTimeout(timersRef.current[key])
+      delete timersRef.current[key]
+    }
+    const pendingRows = pendingKeys
+      .map(key => rowsRef.current.find(row => row.key === key))
+      .filter((row): row is ActivityRow => Boolean(row))
+    await Promise.all(pendingRows.map(row => saveRowRef.current(row)))
+  }, [])
+
+  useEffect(() => { onFlushRef?.(flushPendingSaves) }, [flushPendingSaves, onFlushRef])
+
   const FIELD_LABELS: Record<string, string> = {
     name: "名称", start_time: "时间", end_time: "时间",
     activity_mode: "活动方式", description: "简介", course_review: "课程复盘", is_published: "发布",
@@ -1389,7 +1413,7 @@ export function ActivityBatchTable({
           .activity-table-locked input,
           .activity-table-locked select,
           .activity-table-locked textarea,
-          .activity-table-locked button,
+          .activity-table-locked button:not([data-lock-control]),
           .activity-table-locked [role="combobox"],
           .activity-table-locked [data-dropdown] {
             pointer-events: none !important;
@@ -1797,7 +1821,7 @@ export function ActivityBatchTable({
 
                   {/* 老师 */}
                   <td className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "host_names") || isCellChanged(row.key, "host_ids") ? "bg-[#f5eeff] rounded" : ""}`}>
-                    {rowReadOnly ? (
+                    {!canEditTeachers(row) ? (
                       <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${hostDisplayText ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={hostDisplayText}>
                         {hostDisplayText}
                       </span>
@@ -1947,7 +1971,7 @@ export function ActivityBatchTable({
 
                   {/* 操作 */}
                   <td className="sticky right-0 z-20 w-[52px] bg-white px-0 py-0.5 text-center">
-                    {!rowReadOnly && (
+                    {!rowReadOnly ? (
                       <div className="flex h-7 items-center justify-center gap-1">
                         <button
                           onClick={() => handleDelete(row)}
@@ -1957,6 +1981,11 @@ export function ActivityBatchTable({
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                    ) : (
+                      <span className="inline-flex h-7 max-w-full items-center justify-center gap-1 text-[11px] text-[#8f959e]" title={`锁定人：${creatorName}`}>
+                        <LockKeyhole className="h-3 w-3 shrink-0" />
+                        <span className="max-w-[30px] truncate">{creatorName}</span>
+                      </span>
                     )}
                   </td>
                 </tr>

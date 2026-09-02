@@ -10,6 +10,10 @@ class ActivityThemeBase(SafeBaseModel):
     week_theme_detail: str = ""
     day_theme: str = ""
     day_theme_detail: str = ""
+    is_locked: bool = False
+    locked_by_id: str = ""
+    locked_by: str = ""
+    locked_at: datetime | None = None
 
 
 class ActivityThemeCreate(ActivityThemeBase):

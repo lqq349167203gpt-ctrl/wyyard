@@ -30,6 +30,7 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
 
@@ -106,7 +107,7 @@ def _build_dashboard_summary(today: date, request: Request | None = None) -> dic
         else active_customers
     )
     visible_customer_ids = {customer.id for customer in customers}
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     can_view_payment = customer_access_service.can_view_transaction_summary(role)
     new_customers = sum(
         1
@@ -335,7 +336,7 @@ def get_overview(
         else {customer.id for customer in all_customers}
     )
     customers_map = {c.id: c for c in all_customers if c.id in visible_customer_ids}
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     can_view_payment = customer_access_service.can_view_transaction_summary(role)
 
     def _visit_visible(v) -> bool:
@@ -426,7 +427,7 @@ def get_details(
         else {customer.id for customer in all_customers}
     )
     customers_map = {c.id: c for c in all_customers if c.id in visible_customer_ids}
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     transaction_access = customer_access_service.transaction_access(role)
     can_view_payment = transaction_access in {"summary", "detail"}
     can_view_payment_details = transaction_access == "detail"
@@ -647,7 +648,7 @@ def get_products(
     teacher_id: str | None = Query(None, description="疗愈老师客户ID（按成交人筛选）"),
     request: Request = None,
 ):
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     if not customer_access_service.can_view_transaction_summary(role):
         raise HTTPException(status_code=403, detail="没有查看交易数据的权限")
     date_from, date_to = _get_date_range(date_from, date_to)
@@ -975,7 +976,7 @@ def get_product_details(
 ):
     """获取产品数据某天某列的详情"""
 
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     if not customer_access_service.can_view_transaction_summary(role):
         raise HTTPException(status_code=403, detail="没有查看交易数据的权限")
     if type in {"persons", "amount", "count", "purchase"} and customer_access_service.transaction_access(role) != "detail":
@@ -1445,7 +1446,7 @@ def get_member_statistics(
     active_customers = customer_service.list_customers()
     active_nicknames = {customer.nickname for customer in active_customers if customer.nickname}
     all_customers = customer_access_service.filter_customers(request, active_customers) if request else active_customers
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     can_view_payment = customer_access_service.can_view_transaction_summary(role)
     customers = [
         c for c in all_customers
@@ -1880,7 +1881,7 @@ def get_course_statistics(
         if request
         else set(customer_map)
     )
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     transaction_access = customer_access_service.transaction_access(role)
     can_view_payment = transaction_access in {"summary", "detail"}
     can_view_payment_details = transaction_access == "detail"
@@ -2262,7 +2263,7 @@ def get_referral_statistics(
     active_customers = customer_service.list_customers()
     active_nicknames = {customer.nickname for customer in active_customers if customer.nickname}
     all_customers = customer_access_service.filter_customers(request, active_customers) if request else active_customers
-    role = (getattr(request.state, "user_role", "") or "") if request else "超级管理员"
+    role = get_request_roles(request) if request else ["超级管理员"]
     can_view_payment = customer_access_service.can_view_transaction_summary(role)
     actor_id = getattr(getattr(request, "state", None), "user_id", "")
     matched_tag_customer_ids: set[str] | None = None

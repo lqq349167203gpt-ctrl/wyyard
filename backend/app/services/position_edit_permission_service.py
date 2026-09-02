@@ -1,12 +1,14 @@
 """角色的信息编辑范围、客户数据范围与隐私操作权限。"""
 
+from collections.abc import Iterable
 from copy import deepcopy
 from typing import Literal, TypedDict
 
 from app.services.storage import delete_item, load_data, save_item
+from app.utils.request_roles import normalize_roles
 
 FILENAME = "position_edit_permissions.json"
-EditArea = Literal["customers", "visits", "activities", "activity_participants", "payments"]
+EditArea = Literal["customers", "visits", "activities", "activity_teachers", "activity_participants", "payments"]
 EditScope = Literal["view", "own", "all"]
 ContactField = Literal["phone", "wechat"]
 ContactAction = Literal["view", "copy", "edit"]
@@ -59,7 +61,10 @@ class PositionEditPermissions(TypedDict):
     customers: EditScope
     visits: EditScope
     activities: EditScope
+    activity_teachers: EditScope
     activity_participants: EditScope
+    activity_lock: bool
+    visit_lock: bool
     payments: EditScope
     contacts: ContactPermissions
     customer_access: CustomerAccessPermissions
@@ -130,8 +135,11 @@ DEFAULT_PERMISSIONS: PositionEditPermissions = {
     "customers": "all",
     "visits": "own",
     "activities": "own",
+    "activity_teachers": "own",
     # 新权限上线前所有可进入课表/付费页面的角色均可操作全部记录，保持既有行为。
     "activity_participants": "all",
+    "activity_lock": False,
+    "visit_lock": False,
     "payments": "all",
     "contacts": _empty_contact_permissions(),
     "customer_access": _empty_customer_access(),
@@ -140,7 +148,10 @@ SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
     "customers": "all",
     "visits": "all",
     "activities": "all",
+    "activity_teachers": "all",
     "activity_participants": "all",
+    "activity_lock": True,
+    "visit_lock": True,
     "payments": "all",
     "contacts": _full_contact_permissions(),
     "customer_access": _full_customer_access(),
@@ -216,7 +227,11 @@ def _normalize_permissions(value: object) -> PositionEditPermissions:
         "customers": _normalize_customer_edit_scope(raw.get("customers")),
         "visits": _normalize_scope(raw.get("visits")),
         "activities": _normalize_scope(raw.get("activities")),
+        # 上线前老师字段由课表权限控制；缺少新字段时沿用原范围，保持旧角色行为。
+        "activity_teachers": _normalize_scope(raw.get("activity_teachers", raw.get("activities"))),
         "activity_participants": _normalize_scope(raw.get("activity_participants", "all")),
+        "activity_lock": raw.get("activity_lock") is True,
+        "visit_lock": raw.get("visit_lock") is True,
         "payments": _normalize_scope(raw.get("payments", "all")),
         "contacts": _normalize_contacts(raw.get("contacts")),
         # 兼容上线前的已有角色：旧数据没有 customer_access 时保留原来的完整可见能力。
@@ -238,10 +253,50 @@ def _load() -> None:
 _load()
 
 
-def get_permissions(position: str) -> PositionEditPermissions:
-    if position == "超级管理员":
+def _merge_permissions(roles: list[str]) -> PositionEditPermissions:
+    if "超级管理员" in roles:
         return deepcopy(SUPER_ADMIN_PERMISSIONS)
-    return deepcopy(_permissions.get(position, DEFAULT_PERMISSIONS))
+    if not roles:
+        return deepcopy(DEFAULT_PERMISSIONS)
+
+    values = [deepcopy(_permissions.get(role, DEFAULT_PERMISSIONS)) for role in roles]
+    scope_rank = {"view": 0, "own": 1, "all": 2}
+    customer_scope_rank = {"none": 0, "related": 1, "all": 2}
+    transaction_rank = {"none": 0, "summary": 1, "detail": 2}
+    merged = deepcopy(values[0])
+
+    for key in ("customers", "visits", "activities", "activity_teachers", "activity_participants", "payments"):
+        merged[key] = max((value[key] for value in values), key=lambda item: scope_rank[item])
+    merged["activity_lock"] = any(value["activity_lock"] for value in values)
+    merged["visit_lock"] = any(value["visit_lock"] for value in values)
+    for field in ("phone", "wechat"):
+        for action in ("view", "copy", "edit"):
+            merged["contacts"][field][action] = any(value["contacts"][field][action] for value in values)
+    merged["customer_access"]["scope"] = max(
+        (value["customer_access"]["scope"] for value in values),
+        key=lambda item: customer_scope_rank[item],
+    )
+    for relation in ("referrer", "referrer_handler"):
+        merged["customer_access"]["relations"][relation] = any(
+            value["customer_access"]["relations"][relation] for value in values
+        )
+    for field in ("visit_purpose", "trauma_history", "current_block", "work_info", "other_info"):
+        merged["customer_access"]["sensitive_fields"][field] = any(
+            value["customer_access"]["sensitive_fields"][field] for value in values
+        )
+    for tab in ("follow_up", "communication", "activities", "customer_followups", "card_statistics", "offline_courses"):
+        merged["customer_access"]["detail_tabs"][tab] = any(
+            value["customer_access"]["detail_tabs"][tab] for value in values
+        )
+    merged["customer_access"]["transaction_access"] = max(
+        (value["customer_access"]["transaction_access"] for value in values),
+        key=lambda item: transaction_rank[item],
+    )
+    return merged
+
+
+def get_permissions(position: str | Iterable[str]) -> PositionEditPermissions:
+    return _merge_permissions(normalize_roles(position))
 
 
 def get_all() -> dict[str, PositionEditPermissions]:
@@ -262,11 +317,11 @@ def set_permissions(position: str, permissions: object) -> PositionEditPermissio
     return deepcopy(normalized)
 
 
-def has_all_edit(position: str, area: EditArea) -> bool:
+def has_all_edit(position: str | Iterable[str], area: EditArea) -> bool:
     return get_permissions(position)[area] == "all"
 
 
-def has_contact_permission(position: str, field: ContactField, action: ContactAction) -> bool:
+def has_contact_permission(position: str | Iterable[str], field: ContactField, action: ContactAction) -> bool:
     return get_permissions(position)["contacts"][field][action]
 
 

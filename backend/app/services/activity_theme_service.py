@@ -80,3 +80,44 @@ def save_theme(
 
 def get_theme(date: str) -> Optional[ActivityTheme]:
     return _themes.get(date)
+
+
+def get_theme_for_scope(date: str, space_id: str = "") -> Optional[ActivityTheme]:
+    """精确读取日期与空间，避免把旧的无空间记录误当成当前空间锁。"""
+    key = f"{date}:{space_id}" if space_id else date
+    return _themes.get(key)
+
+
+def is_locked(date: str, space_id: str = "") -> bool:
+    theme = get_theme_for_scope(date, space_id)
+    return bool(theme and theme.is_locked)
+
+
+def set_lock(
+    date: str,
+    space_id: str,
+    *,
+    locked: bool,
+    operator_id: str = "",
+    operator: str = "",
+) -> ActivityTheme:
+    """按日期与空间设置核对锁；复用主题记录，避免另建数据表。"""
+    key = f"{date}:{space_id}" if space_id else date
+    existing = _themes.get(key)
+    now = datetime.now()
+    if existing is None:
+        existing = ActivityTheme(
+            id=key,
+            date=date,
+            space_id=space_id,
+            created_at=now,
+            updated_at=now,
+        )
+        _themes[key] = existing
+    existing.is_locked = locked
+    existing.locked_by_id = operator_id if locked else ""
+    existing.locked_by = operator if locked else ""
+    existing.locked_at = now if locked else None
+    existing.updated_at = now
+    _save(key)
+    return existing

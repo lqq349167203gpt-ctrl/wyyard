@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.base import StrictBaseModel
 from app.services import (
     activity_assignment_notification_service,
+    activity_lock_service,
     activity_withdrawal_service,
     class_record_service,
     customer_access_service,
@@ -15,6 +16,7 @@ from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
     ensure_activity_participant_access,
+    ensure_activity_teacher_access,
     ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
@@ -224,6 +226,9 @@ def create_record(data: dict, request: Request, conversion: bool = False):
         record = stamp_creator(ClassRecordCreate(**data), request)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    activity_lock_service.ensure_scope_unlocked(record.date, record.space_id)
+    if not conversion:
+        ensure_activity_teacher_access(request, None, data)
     if record.participant_ids and not conversion:
         ensure_activity_participant_access(request)
     customer_access_service.require_new_customer_ids(
@@ -247,7 +252,9 @@ def update_record(record_id: str, data: dict, request: Request, conversion: bool
     old_record = class_record_service.get_record(record_id)
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    activity_lock_service.ensure_update_unlocked(old_record, data)
     ensure_activity_update_access(request, data)
+    ensure_activity_teacher_access(request, old_record, data)
     if "participant_ids" in data:
         if list(data.get("participant_ids") or []) != list(old_record.participant_ids):
             ensure_activity_participant_access(request, old_record)
@@ -363,6 +370,7 @@ def update_participants(record_id: str, data: ParticipantUpdate, request: Reques
     old_record = class_record_service.get_record(record_id)
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    activity_lock_service.ensure_record_unlocked(old_record)
     if list(data.participant_ids) != list(old_record.participant_ids):
         ensure_activity_participant_access(request, old_record)
     old_ids = set(old_record.participant_ids) if old_record else set()
@@ -433,6 +441,7 @@ def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: 
     record = class_record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="课程记录不存在")
+    activity_lock_service.ensure_record_unlocked(record)
     ensure_record_creator(request, record, "课程", "activities")
     customer_access_service.require_new_customer_ids(
         request,
@@ -541,6 +550,7 @@ def cancel_withdrawal(record_id: str, customer_id: str, request: Request):
     record = class_record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="课程记录不存在")
+    activity_lock_service.ensure_record_unlocked(record)
     ensure_record_creator(request, record, "课程", "activities")
     customer = get_customer(customer_id)
     if not customer:
@@ -582,6 +592,7 @@ def update_groups(record_id: str, data: dict, request: Request):
     old_record = class_record_service.get_record(record_id)
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    activity_lock_service.ensure_record_unlocked(old_record)
     old_ids = set(old_record.participant_ids) if old_record else set()
     old_member_ids = activity_assignment_notification_service.get_member_ids(old_record)
 
@@ -663,6 +674,7 @@ def update_groups(record_id: str, data: dict, request: Request):
 @router.delete("/{record_id}")
 def delete_record(record_id: str, request: Request, conversion: bool = False):
     old_record = class_record_service.get_record(record_id)
+    activity_lock_service.ensure_record_unlocked(old_record)
     ensure_record_creator(request, old_record, "课表内容", "activities")
 
     operator = getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")
