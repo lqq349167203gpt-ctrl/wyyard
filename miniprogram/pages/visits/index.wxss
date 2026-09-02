@@ -61,6 +61,25 @@
   font-size: 24rpx;
 }
 
+.lock-bar {
+  display: flex;
+  align-items: center;
+  min-height: 52rpx;
+  margin-top: 8rpx;
+  padding: 0 6rpx 0 14rpx;
+  border: 1rpx solid #dee0e3;
+  border-radius: 12rpx;
+  background-color: rgba(255, 255, 255, 0.82);
+}
+
+.lock-bar.locked { border-color: #b7d0ff; background-color: #f0f5ff; }
+.lock-status { display: flex; align-items: center; min-width: 0; color: #8f959e; font-size: 22rpx; }
+.lock-bar.locked .lock-status { color: #245bdb; }
+.lock-status-icon { margin-right: 8rpx; font-size: 21rpx; }
+.lock-operator { overflow: hidden; margin-left: 5rpx; color: #8f959e; text-overflow: ellipsis; white-space: nowrap; }
+.lock-action { height: 42rpx; margin: 0 0 0 auto; padding: 0 16rpx; border: 0; border-radius: 8rpx; background-color: transparent; color: #3370ff; font-size: 21rpx; line-height: 42rpx; }
+.lock-action::after { border: 0; }
+
 /* 当前周日期条 */
 .week-swiper {
   width: 100%;
@@ -123,6 +142,8 @@
 .week-count-dot.visible {
   opacity: 1;
 }
+
+.week-count-dot.verified { opacity: 1; background-color: #3370ff; }
 
 .week-day.selected .week-label {
   color: #3370ff;
@@ -232,6 +253,10 @@
   font-weight: 500;
 }
 
+.day-check-status { min-height: 22rpx; margin-top: 2rpx; color: #b0b5bb; font-size: 18rpx; line-height: 22rpx; }
+.day-check-status.verified,
+.day-cell.selected .day-check-status { color: #3370ff; }
+
 .day-dot {
   width: 8rpx;
   height: 8rpx;
@@ -268,7 +293,7 @@
 
 /* 连续名单：与客户首页保持“一组一卡、组内分行” */
 .visit-section {
-  padding-top: 270rpx;
+  padding-top: 330rpx;
 }
 
 .list-heading {
@@ -396,7 +421,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 406rpx 0 0;
+  padding: 466rpx 0 0;
 }
 
 .empty-icon {
@@ -433,7 +458,7 @@
 .loading {
   display: flex;
   justify-content: center;
-  padding: 406rpx 0 0;
+  padding: 466rpx 0 0;
   color: #b0b5bb;
   font-size: 28rpx;
 }

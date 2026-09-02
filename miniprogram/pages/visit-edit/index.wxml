@@ -1,14 +1,14 @@
-<view class="container {{readOnly ? 'read-only' : ''}}" wx:if="{{!loading}}">
+<view class="container {{readOnly || verified ? 'read-only' : ''}}" wx:if="{{!loading}}">
   <view class="record-meta">
     <text>创建人 · {{createdBy || '未记录'}}</text>
-    <text class="readonly-text" wx:if="{{readOnly}}">{{viewOnly ? '当前账号仅可浏览' : '部分信息仅创建人可改'}}</text>
+    <text class="readonly-text" wx:if="{{readOnly || verified}}">{{verified ? '邀约已核对，仅下方三类信息可补充' : (viewOnly ? '当前账号仅可浏览' : '部分信息仅创建人可改')}}</text>
   </view>
   <!-- 是否组长 -->
   <view class="form-card">
     <view class="form-item last compact-row">
       <text class="form-label">是否组长</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{isLeader}}" disabled="{{viewOnly}}" bindchange="onLeaderChange" color="#3370ff" />
+        <switch checked="{{isLeader}}" disabled="{{viewOnly || verified}}" bindchange="onLeaderChange" color="#3370ff" />
       </view>
     </view>
   </view>
@@ -17,14 +17,14 @@
   <view class="form-card">
     <view class="form-item">
       <text class="form-label">日期</text>
-      <picker wx:if="{{!readOnly}}" class="form-picker" mode="date" value="{{visitDate}}" bindchange="onDateChange">
+      <picker wx:if="{{!readOnly && !verified}}" class="form-picker" mode="date" value="{{visitDate}}" bindchange="onDateChange">
         <view class="picker-display">{{visitDate}}</view>
       </picker>
       <text wx:else class="protected-value">{{visitDate || '-'}}</text>
     </view>
     <view class="form-item last">
       <text class="form-label">预计时间</text>
-      <picker wx:if="{{!readOnly}}" class="form-picker" mode="time" value="{{visitTime}}" bindchange="onTimeChange">
+      <picker wx:if="{{!readOnly && !verified}}" class="form-picker" mode="time" value="{{visitTime}}" bindchange="onTimeChange">
         <view class="picker-display">{{visitTime}}</view>
       </picker>
       <text wx:else class="protected-value">{{visitTime || '-'}}</text>
@@ -36,12 +36,12 @@
     <view class="form-item switch-row {{arrived ? '' : 'last'}}">
       <text class="form-label">到店</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
-        <switch checked="{{arrived}}" disabled="{{viewOnly}}" bindchange="onArrivedChange" color="#3370ff" />
+        <switch checked="{{arrived}}" disabled="{{viewOnly || verified}}" bindchange="onArrivedChange" color="#3370ff" />
       </view>
     </view>
     <view class="form-item last" wx:if="{{arrived}}">
       <text class="form-label">到达时间</text>
-      <picker class="form-picker" disabled="{{viewOnly}}" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
+      <picker class="form-picker" disabled="{{viewOnly || verified}}" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
         <view class="picker-display">{{arrivalTime || '选择时间'}}</view>
       </picker>
     </view>
@@ -52,15 +52,15 @@
     <view class="form-item" bindtap="onPickerOpen" data-field="customer">
       <text class="form-label">客户</text>
       <view class="picker-value-wrap">
-        <text class="{{nickname ? '' : 'placeholder'}}">{{nickname || (readOnly ? '-' : '选择用户')}}</text>
-        <text class="picker-clear" wx:if="{{nickname && !readOnly}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="{{nickname ? '' : 'placeholder'}}">{{nickname || (readOnly || verified ? '-' : '选择用户')}}</text>
+        <text class="picker-clear" wx:if="{{nickname && !readOnly && !verified}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="form-item last" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>
       <view class="picker-value-wrap">
-        <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || (readOnly ? '-' : '选择用户')}}</text>
-        <text class="picker-clear" wx:if="{{referrerHandler && !readOnly}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
+        <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || (readOnly || verified ? '-' : '选择用户')}}</text>
+        <text class="picker-clear" wx:if="{{referrerHandler && !readOnly && !verified}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
       </view>
     </view>
   </view>
@@ -95,7 +95,7 @@
 
   <view class="actions">
     <button class="btn-secondary" bindtap="onBack">返    回</button>
-    <button wx:if="{{!viewOnly}}" class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
+    <button wx:if="{{!viewOnly && !verified}}" class="btn-primary submit-btn" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
 </view>
 

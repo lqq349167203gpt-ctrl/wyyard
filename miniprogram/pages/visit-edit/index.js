@@ -1,4 +1,4 @@
-const { visitApi, spaceApi, customerApi } = require('../../utils/api')
+const { visitApi, spaceApi, customerApi, visitVerificationApi } = require('../../utils/api')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 Page({
@@ -9,6 +9,7 @@ Page({
     readOnly: false,
     viewOnly: false,
     customerViewOnly: false,
+    verified: false,
     createdBy: '',
     spaceName: '',
     visitDate: '',
@@ -31,6 +32,7 @@ Page({
 
   onLoad(options) {
     if (!getApp().checkLogin()) return
+    this.setData({ verified: options.verified === '1' })
     if (options.id) {
       this.loadVisit(options.id)
     }
@@ -58,6 +60,13 @@ Page({
   async loadVisit(id) {
     try {
       const visit = await visitApi.get(id)
+      let verified = this.data.verified
+      try {
+        const verification = await visitVerificationApi.getStatus(visit.visit_date || '', visit.space_id || '')
+        verified = Boolean(verification && verification.is_verified)
+      } catch (error) {
+        console.error('加载邀约核对状态失败:', error)
+      }
       let spaceName = ''
       if (visit.space_id) {
         try {
@@ -74,6 +83,7 @@ Page({
         readOnly: !canEditRecord(visit, 'visits'),
         viewOnly: isAreaViewOnly('visits'),
         customerViewOnly: isAreaViewOnly('customers'),
+        verified,
         createdBy: visit.created_by || '',
         spaceName,
         loading: false,
@@ -105,20 +115,22 @@ Page({
   },
 
   onTimeChange(e) {
+    if (this.data.verified) return
     this.setData({ visitTime: e.detail.value })
   },
 
   onDateChange(e) {
+    if (this.data.verified) return
     this.setData({ visitDate: e.detail.value })
   },
 
   onLeaderChange(e) {
-    if (this.data.viewOnly) return
+    if (this.data.viewOnly || this.data.verified) return
     this.setData({ isLeader: e.detail.value })
   },
 
   async onArrivedChange(e) {
-    if (this.data.viewOnly) return
+    if (this.data.viewOnly || this.data.verified) return
     const previousArrived = this.data.arrived
     const previousArrivalTime = this.data.arrivalTime
     const arrived = e.detail.value
@@ -142,7 +154,7 @@ Page({
   },
 
   async onArrivalTimeChange(e) {
-    if (this.data.viewOnly) return
+    if (this.data.viewOnly || this.data.verified) return
     const previousArrivalTime = this.data.arrivalTime
     const arrivalTime = e.detail.value
     this.setData({ arrivalTime })
@@ -160,7 +172,7 @@ Page({
   // 搜索选择弹窗
   onPickerOpen(e) {
     const field = e.currentTarget.dataset.field
-    if (this.data.readOnly && (field === 'customer' || field === 'referrerHandler')) return
+    if (this.data.verified || (this.data.readOnly && (field === 'customer' || field === 'referrerHandler'))) return
     const titleMap = { customer: '客户', referrerHandler: '邀约人' }
     this.setData({
       showPicker: true,
@@ -210,6 +222,10 @@ Page({
   },
 
   async onSubmit() {
+    if (this.data.verified) {
+      wx.navigateBack()
+      return
+    }
     if (!this.data.customerId) {
       wx.showToast({ title: '请选择客户', icon: 'none' })
       return
