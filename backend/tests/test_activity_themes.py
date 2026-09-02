@@ -86,6 +86,11 @@ def test_schedule_lock_blocks_all_schedule_writes_until_unlocked(client):
     assert locked.status_code == 200
     assert locked.json()["is_locked"] is True
     assert locked.json()["locked_by"] == "不闹"
+    lock_logs = client.get(
+        "/api/operation-logs",
+        params={"entity_id": f"{date}:{space_id}", "method": "POST"},
+    ).json()
+    assert any(log["content"] == f"核对并锁定课表：{date}" for log in lock_logs)
 
     update = client.patch(f"/api/class-records/{record_id}", json={"activity_name": "不应保存"})
     assert update.status_code == 423
@@ -97,6 +102,11 @@ def test_schedule_lock_blocks_all_schedule_writes_until_unlocked(client):
     unlocked = client.post("/api/activity-themes/unlock", json={"date": date, "space_id": space_id})
     assert unlocked.status_code == 200
     assert unlocked.json()["is_locked"] is False
+    unlock_logs = client.get(
+        "/api/operation-logs",
+        params={"entity_id": f"{date}:{space_id}", "method": "POST"},
+    ).json()
+    assert any(log["content"] == f"解锁课表：{date}" for log in unlock_logs)
     update = client.patch(f"/api/class-records/{record_id}", json={"activity_name": "解锁后可保存"})
     assert update.status_code == 200
     assert update.json()["activity_name"] == "解锁后可保存"
