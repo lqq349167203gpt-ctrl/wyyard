@@ -52,7 +52,6 @@ from app.api.offline_course_records import router as offline_course_records_rout
 from app.api.offline_courses import router as offline_courses_router
 from app.api.oh_card_readings import router as oh_card_readings_router
 from app.api.operation_logs import router as operation_logs_router
-from app.api.visit_verifications import router as visit_verifications_router
 from app.api.organizations import router as organizations_router
 from app.api.other_projects import router as other_projects_router
 from app.api.payment_exports import router as payment_exports_router
@@ -73,6 +72,7 @@ from app.api.uploads import router as uploads_router
 from app.api.visit_ai_config import router as visit_ai_config_router
 from app.api.visit_history import router as visit_history_router
 from app.api.visit_notes import router as visit_notes_router
+from app.api.visit_verifications import router as visit_verifications_router
 from app.api.visits import router as visits_router
 from app.api.voice import router as voice_router
 from app.api.wechat import router as wechat_router
