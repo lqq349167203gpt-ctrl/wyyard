@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronRight, ChevronLeft } from "lucide-react"
+import { ChevronRight, ChevronLeft, Lock, Unlock } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
 
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -8,12 +8,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { customerApi, visitApi, dailyGroupingApi, spaceApi, type CustomerLight, type Space } from "@/lib/api"
+import { customerApi, visitApi, dailyGroupingApi, spaceApi, visitVerificationApi, type CustomerLight, type Space, type VisitVerification } from "@/lib/api"
 import type { VisitRowSummary } from "@/components/visits/batch-input-table"
 
 import CustomerDetailView from "@/pages/healing-records/components/detail-view"
 import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 const today = new Date().toLocaleDateString("sv-SE")
 
@@ -29,6 +30,7 @@ function getWeekday(d: string): string {
 
 export default function ClassRecordsPage() {
   const navigate = useNavigate()
+  const editPermissions = useEditPermissions()
   const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
   const [spaces, setSpaces] = useState<Space[]>([])
   const [spacesLoaded, setSpacesLoaded] = useState(false)
@@ -55,6 +57,9 @@ export default function ClassRecordsPage() {
   // 共享状态
   const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
+  const [verificationMap, setVerificationMap] = useState<Record<string, VisitVerification>>({})
+  const [verificationSubmitting, setVerificationSubmitting] = useState(false)
+  const [verificationConfirmOpen, setVerificationConfirmOpen] = useState(false)
 
   // 人员分组
   const [groups, setGroups] = useState<{ name: string; leader_id: string; deputy_id: string; member_ids: string[] }[]>([])
@@ -153,11 +158,56 @@ export default function ClassRecordsPage() {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}") } catch { return {} }
   }, [])
   const isSuperAdmin = currentUser?.role === "超级管理员"
+  const canManageVerification = isSuperAdmin || editPermissions.visit_lock
   const hasPerm = (key: string) => isSuperAdmin || userPermissions.includes(key) || userPermissions.includes("class-records")
 
   const handleVisitsDataLoaded = useCallback((visits: VisitRowSummary[]) => {
     setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
   }, [])
+
+  const loadVerificationRange = useCallback((startDate: string, endDate: string) => {
+    if (!selectedSpaceId) return
+    visitVerificationApi.list(startDate, endDate, selectedSpaceId).then((items) => {
+      setVerificationMap((current) => {
+        const next = { ...current }
+        items.forEach((item) => { next[item.date] = item })
+        return next
+      })
+    }).catch(() => {})
+  }, [selectedSpaceId])
+
+  useEffect(() => {
+    if (!selectedSpaceId) { setVerificationMap({}); return }
+    setVerificationMap({})
+    loadVerificationRange(dateRange[0], dateRange[dateRange.length - 1])
+  }, [dateRange, loadVerificationRange, selectedSpaceId])
+
+  const handleCalendarMonthChange = useCallback((month: string) => {
+    const [year, monthNumber] = month.split("-").map(Number)
+    const endDay = new Date(year, monthNumber, 0).getDate()
+    loadVerificationRange(`${month}-01`, `${month}-${String(endDay).padStart(2, "0")}`)
+  }, [loadVerificationRange])
+
+  const currentVerification = verificationMap[detailDate]
+  const isDayVerified = currentVerification?.is_verified === true
+  const verificationStatuses = useMemo(
+    () => Object.fromEntries(Object.entries(verificationMap).map(([date, item]) => [date, item.is_verified])),
+    [verificationMap],
+  )
+
+  const submitVerification = async () => {
+    if (!selectedSpaceId || verificationSubmitting) return
+    setVerificationSubmitting(true)
+    try {
+      const result = isDayVerified
+        ? await visitVerificationApi.unverify(detailDate, selectedSpaceId)
+        : await visitVerificationApi.verify(detailDate, selectedSpaceId)
+      setVerificationMap((current) => ({ ...current, [detailDate]: result }))
+    } finally {
+      setVerificationSubmitting(false)
+      setVerificationConfirmOpen(false)
+    }
+  }
 
   return (
     <div className="px-6 pt-4 pb-6 flex flex-col min-h-0 min-w-0" style={{ height: 'calc(100vh - 48px)' }}>
@@ -167,8 +217,29 @@ export default function ClassRecordsPage() {
       <div className="border-b-[0.5px] border-[#f0f1f2]">
       {/* 选中日期显示 + 操作按钮 */}
       <div className="flex items-center gap-2">
-        <CalendarDatePicker detailDate={detailDate} onSelectDate={(d) => startTransition(() => setDetailDate(d))} />
+        <CalendarDatePicker
+          detailDate={detailDate}
+          onSelectDate={(d) => startTransition(() => setDetailDate(d))}
+          dateStatuses={verificationStatuses}
+          onMonthChange={handleCalendarMonthChange}
+        />
         <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
+        <div className="ml-auto flex items-center gap-2">
+          <span className={`text-[12px] ${isDayVerified ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
+            {isDayVerified ? `已核对${currentVerification?.verified_by ? ` · ${currentVerification.verified_by}` : ""}` : "未核对"}
+          </span>
+          {canManageVerification && (
+            <button
+              type="button"
+              onClick={() => setVerificationConfirmOpen(true)}
+              disabled={!selectedSpaceId || verificationSubmitting}
+              className="inline-flex h-7 items-center gap-1 rounded-[3px] border border-[#d0d3d6] px-2.5 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-40"
+            >
+              {isDayVerified ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+              {isDayVerified ? "解锁" : "核对并锁定"}
+            </button>
+          )}
+        </div>
       </div>
         {/* 日期滚动条 */}
         <div className="flex items-center justify-between gap-1 mt-3 mb-2 h-[52px]">
@@ -193,7 +264,7 @@ export default function ClassRecordsPage() {
                   </span>
                   <span className="text-[14px] font-medium leading-none h-4 flex items-center">{parseInt(d.split("-")[2])}</span>
                   <span className={`text-[9px] leading-none h-3 flex items-center mt-0.5 ${isSelected ? "text-white/80" : dayCount > 0 ? "text-[#b0b5bb]" : "text-transparent"}`}>
-                    {dayCount > 0 ? `${dayCount}人` : " "}
+                    {verificationMap[d]?.is_verified ? "已核对" : dayCount > 0 ? `${dayCount}人` : "未核对"}
                   </span>
                 </button>
               )
@@ -231,6 +302,7 @@ export default function ClassRecordsPage() {
             spaceId={selectedSpaceId}
             onRequireSpaces={spaces.length === 0 ? () => setNoSpacesDialogOpen(true) : undefined}
             groups={groups}
+            verified={isDayVerified}
           />
         </div>
       </div>
@@ -247,6 +319,21 @@ export default function ClassRecordsPage() {
             <AlertDialogAction onClick={() => { setNoSpacesDialogOpen(false); navigate("/courses/spaces") }}>
               前往配置
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={verificationConfirmOpen} onOpenChange={setVerificationConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isDayVerified ? "解锁当天邀约" : "确认当天邀约无误"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isDayVerified ? "解锁后可继续修改当天全部邀约资料。" : "核对后，除来访需求、客户信息和跟进点外，其余资料及操作都会锁定。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={submitVerification}>{isDayVerified ? "确认解锁" : "确认并锁定"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

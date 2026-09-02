@@ -92,6 +92,12 @@ def ensure_scope_unverified(date: str, space_id: str = "") -> None:
         raise HTTPException(status_code=423, detail="该日期当前空间的邀约已核对，需先解锁后再操作")
 
 
+def ensure_date_unverified(date: str) -> None:
+    """邀约分组当前按日期全局保存；任一空间核对后均不再允许调整分组。"""
+    if any(item.date == date and item.is_verified for item in _verifications.values()):
+        raise HTTPException(status_code=423, detail="该日期已有邀约完成核对，需先解锁后再调整分组")
+
+
 def ensure_record_unverified(record) -> None:
     ensure_scope_unverified(record.visit_date, getattr(record, "space_id", "") or "")
 
