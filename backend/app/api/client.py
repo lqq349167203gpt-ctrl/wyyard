@@ -598,6 +598,13 @@ def signup_activity(activity_id: str, request: Request):
         if s.get("customer_id") == customer_id:
             raise HTTPException(status_code=409, detail="已报名该活动")
 
+    activity_date = item["data"].get("date", "")
+    space_id = item["data"].get("space_id", "")
+    if activity_date:
+        from app.services import visit_verification_service
+
+        visit_verification_service.ensure_scope_unverified(activity_date, space_id)
+
     # 创建报名记录
     signup_id = str(uuid.uuid4())
     signup = {
@@ -610,13 +617,9 @@ def signup_activity(activity_id: str, request: Request):
     save_item(SIGNUPS_FILE, signup_id, signup)
 
     # 同步到邀约页面
-    activity_date = item["data"].get("date", "")
-    space_id = item["data"].get("space_id", "")
     if activity_date:
         from app.models.visit import VisitRecordCreate
-        from app.services import visit_service, visit_verification_service
-
-        visit_verification_service.ensure_scope_unverified(activity_date, space_id)
+        from app.services import visit_service
 
         existing = visit_service.list_visits(date=activity_date, customer_id=customer_id)
         if existing:
