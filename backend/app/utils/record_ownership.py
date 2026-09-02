@@ -4,19 +4,10 @@ from typing import Literal
 
 from fastapi import HTTPException, Request
 
-from app.services import position_edit_permission_service
+from app.services import customer_service, position_edit_permission_service
 from app.utils.request_roles import get_request_roles
 
-EditArea = Literal["visits", "activities", "activity_teachers", "activity_participants"]
-
-ACTIVITY_TEACHER_FIELDS = {
-    "teacher_ids",
-    "teacher_names",
-    "host_id",
-    "host_name",
-    "achiever_id",
-    "achiever_name",
-}
+EditArea = Literal["visits", "activities", "activity_participants"]
 
 ACTIVITY_CREATOR_ONLY_FIELDS = {
     "course_id",
@@ -29,6 +20,11 @@ ACTIVITY_CREATOR_ONLY_FIELDS = {
     "end_time",
     "is_public_welfare",
     "membership_deduction_count",
+    "teacher_ids",
+    "host_id",
+    "host_name",
+    "achiever_id",
+    "achiever_name",
     "owner_id",
     "owner_name",
     "description",
@@ -46,6 +42,81 @@ def get_request_actor(request: Request) -> tuple[str, str]:
         or ""
     )
     return actor_id, actor_name
+
+
+def _normalized_name(value: object) -> str:
+    return str(value or "").strip().casefold()
+
+
+def _record_teacher_ids(record) -> set[str]:
+    teacher_ids = {
+        str(customer_id)
+        for customer_id in (getattr(record, "teacher_ids", None) or [])
+        if customer_id
+    }
+    for field in ("host_id", "achiever_id"):
+        customer_id = str(getattr(record, field, "") or "")
+        if customer_id:
+            teacher_ids.add(customer_id)
+    return teacher_ids
+
+
+def is_request_activity_teacher(request: Request, record) -> bool:
+    """当前账号归属人是否为该堂课已配置的老师。"""
+    if record is None:
+        return False
+    _, actor_name = get_request_actor(request)
+    normalized_actor = _normalized_name(actor_name)
+    if not normalized_actor:
+        return False
+
+    actor_customer_ids = {
+        customer.id
+        for customer in customer_service.list_all_customers()
+        if normalized_actor in {
+            _normalized_name(customer.nickname),
+            _normalized_name(customer.name),
+        }
+    }
+    if actor_customer_ids.intersection(_record_teacher_ids(record)):
+        return True
+
+    # 兼容极少数只保留老师姓名、尚未保存 teacher_ids 的旧记录。
+    teacher_names = {
+        _normalized_name(name)
+        for name in (getattr(record, "teacher_names", None) or [])
+        if name
+    }
+    teacher_names.update(
+        _normalized_name(getattr(record, field, ""))
+        for field in ("host_name", "achiever_name")
+    )
+    return normalized_actor in teacher_names
+
+
+def can_request_edit_activity_content(request: Request, record) -> bool:
+    """课表内容可由全部权限、创建人或已配置的授课老师修改。"""
+    roles = get_request_roles(request)
+    permissions = position_edit_permission_service.get_permissions(roles)
+    if "超级管理员" in roles or permissions["activities"] == "all":
+        return True
+
+    if permissions["activities"] != "view":
+        actor_id, actor_name = get_request_actor(request)
+        created_by_id = str(getattr(record, "created_by_id", "") or "")
+        created_by = str(getattr(record, "created_by", "") or "")
+        is_creator = (
+            bool(actor_id and actor_id == created_by_id)
+            if created_by_id
+            else bool(actor_name and created_by and actor_name == created_by)
+        )
+        if is_creator:
+            return True
+
+    return (
+        permissions["activity_teachers"] != "view"
+        and is_request_activity_teacher(request, record)
+    )
 
 
 def stamp_creator(data, request: Request):
@@ -101,6 +172,8 @@ def ensure_creator_for_changed_fields(
         if data.get(field) != getattr(record, field, None)
     }
     if changed_protected_fields:
+        if edit_area == "activities" and can_request_edit_activity_content(request, record):
+            return
         ensure_record_creator(request, record, label, edit_area)
 
 
@@ -116,44 +189,21 @@ def ensure_activity_participant_access(request: Request, record=None) -> None:
         ensure_record_creator(request, record, "课表参与人", "activity_participants")
 
 
-def ensure_activity_update_access(request: Request, data: dict) -> None:
-    """课表仅浏览时，独立放行已配置的人员与老师字段。"""
+def ensure_activity_update_access(request: Request, record, data: dict) -> None:
+    """课表仅浏览时，只放行授课老师的课程内容或独立获权的参与人字段。"""
     roles = get_request_roles(request)
     if "超级管理员" in roles:
         return
     permissions = position_edit_permission_service.get_permissions(roles)
+    if can_request_edit_activity_content(request, record):
+        return
     if permissions["activities"] != "view":
         return
     allowed_fields: set[str] = set()
     if permissions["activity_participants"] != "view":
         allowed_fields.add("participant_ids")
-    if permissions["activity_teachers"] != "view":
-        allowed_fields.update(ACTIVITY_TEACHER_FIELDS)
     if set(data) - allowed_fields:
-        raise HTTPException(status_code=403, detail="当前账号对课表内容仅有浏览权限")
-
-
-def ensure_activity_teacher_access(request: Request, record, data: dict) -> None:
-    """按独立权限校验课表老师字段的配置范围。"""
-    teacher_fields = ACTIVITY_TEACHER_FIELDS.intersection(data)
-    if not teacher_fields:
-        return
-    if record is not None and not any(
-        data.get(field) != getattr(record, field, None)
-        for field in teacher_fields
-    ):
-        return
-    roles = get_request_roles(request)
-    permissions = position_edit_permission_service.get_permissions(roles)
-    scope = permissions["activity_teachers"]
-    if "超级管理员" in roles or scope == "all":
-        return
-    if scope == "view":
-        raise HTTPException(status_code=403, detail="当前账号没有配置课程老师的权限")
-    if record is None:
-        # “仅本人课表”允许在自己正在新建的课表中配置老师。
-        return
-    ensure_record_creator(request, record, "课程老师", "activity_teachers")
+        raise HTTPException(status_code=403, detail="只能修改自己录入或本人授课的课表内容")
 
 
 def stamp_payment_creator(data, request: Request):

@@ -1,7 +1,7 @@
 import json
 import re
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -32,6 +32,7 @@ from app.services import (
     tea_seat_fee_service,
     visit_service,
 )
+from app.utils.cn_datetime import TZ
 
 FIELD_LABELS = {
     "nickname": "昵称",
@@ -48,6 +49,7 @@ FIELD_LABELS = {
     "referral_date": "引流日期",
     "created_at": "创建日期",
     "invitation_dates": "邀约日期",
+    "invitation_created_dates": "邀约创建日期",
     "first_visit_date": "首次到访",
     "last_visit_date": "最近到访",
     "invitation_count": "受邀次数",
@@ -83,7 +85,8 @@ FIELD_GROUPS = {
         "service_teacher", "created_by",
     ],
     "日期信息": [
-        "referral_date", "created_at", "invitation_dates", "first_visit_date", "last_visit_date",
+        "referral_date", "created_at", "invitation_dates", "invitation_created_dates",
+        "first_visit_date", "last_visit_date",
         "last_communication_date", "payment_dates",
     ],
     "邀约行为": [
@@ -101,11 +104,12 @@ FIELD_GROUPS = {
 }
 
 DATE_FIELDS = {
-    "referral_date", "created_at", "invitation_dates", "first_visit_date", "last_visit_date",
+    "referral_date", "created_at", "invitation_dates", "invitation_created_dates",
+    "first_visit_date", "last_visit_date",
     "last_communication_date", "payment_dates", "latest_payment_date",
 }
 
-MULTI_DATE_FIELDS = {"invitation_dates", "payment_dates"}
+MULTI_DATE_FIELDS = {"invitation_dates", "invitation_created_dates", "payment_dates"}
 
 PAYMENT_EVENT_FIELDS = {
     "purchased_projects",
@@ -116,7 +120,7 @@ PAYMENT_EVENT_FIELDS = {
     "payment_dates",
 }
 
-INVITATION_EVENT_FIELDS = {"inviter_names"}
+INVITATION_EVENT_FIELDS = {"inviter_names", "invitation_created_dates"}
 ACTIVITY_EVENT_FIELDS = {"activity_types", "activity_names", "course_teachers"}
 
 LIST_FIELDS = {
@@ -162,6 +166,7 @@ CARD_DIMENSION_LABELS = {
     "referrer": "引流人",
     "referrer_handler": "承接人",
     "service_teacher": "服务老师",
+    "inviter_names": "邀约人",
     "activity_types": "活动类型",
     "purchased_projects": "购买项目",
 }
@@ -204,6 +209,9 @@ def _item_date(item: Any, *fields: str) -> str:
         value = getattr(item, field, None)
         if isinstance(value, str) and value:
             return value[:10]
+        if isinstance(value, datetime):
+            aware_value = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            return aware_value.astimezone(TZ).date().isoformat()
         if value:
             return value.date().isoformat()
     return ""
@@ -349,6 +357,7 @@ def build_customer_dataset(
     visible_tags = customer_tag_service.visible_tags_by_customer(actor_id)
 
     invitation_dates: dict[str, set[str]] = defaultdict(set)
+    invitation_created_dates: dict[str, set[str]] = defaultdict(set)
     visit_dates: dict[str, set[str]] = defaultdict(set)
     invitation_counts: dict[str, int] = defaultdict(int)
     period_invitation_counts: dict[str, int] = defaultdict(int)
@@ -356,6 +365,7 @@ def build_customer_dataset(
     period_visit_dates: dict[str, set[str]] = defaultdict(set)
     period_inviter_names: dict[str, set[str]] = defaultdict(set)
     period_invitation_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    all_invitation_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
     # 直接读取邀约缓存做批量聚合，避免 list_visits() 为每个日期重复构建活动详情。
     for visit in visit_service._visits.values():
         if getattr(visit, "is_deleted", False):
@@ -363,6 +373,18 @@ def build_customer_dataset(
         customer_id = visit.customer_id
         if visit.visit_date:
             invitation_dates[customer_id].add(visit.visit_date)
+        created_date = _item_date(visit, "created_at")
+        if created_date:
+            invitation_created_dates[customer_id].add(created_date)
+        inviter_name = str(visit.referrer_handler or "").strip()
+        invitation_event = {
+            "inviter_names": [inviter_name] if inviter_name else [],
+            "invitation_created_dates": [created_date] if created_date else [],
+            "visit_date": visit.visit_date,
+            "arrived": bool(visit.arrived),
+            "cancelled": bool(visit.cancelled),
+        }
+        all_invitation_events[customer_id].append(invitation_event)
         if not visit.cancelled:
             invitation_counts[customer_id] += 1
         if visit.arrived:
@@ -375,15 +397,9 @@ def build_customer_dataset(
             period_invitation_counts[customer_id] += 1
         if visit.arrived:
             period_visit_dates[customer_id].add(visit.visit_date)
-        inviter_name = str(visit.referrer_handler or "").strip()
         if inviter_name:
             period_inviter_names[customer_id].add(inviter_name)
-        period_invitation_events[customer_id].append({
-            "inviter_names": [inviter_name] if inviter_name else [],
-            "visit_date": visit.visit_date,
-            "arrived": bool(visit.arrived),
-            "cancelled": bool(visit.cancelled),
-        })
+        period_invitation_events[customer_id].append(invitation_event)
 
     activity_map = visit_service._build_all_activities()  # 项目内批量聚合，避免逐客户重复扫描活动表
     teacher_name_by_id = {
@@ -484,6 +500,7 @@ def build_customer_dataset(
             "referral_date": customer.referral_date or "",
             "created_at": created_at,
             "invitation_dates": sorted(invitation_dates.get(customer.id, set())),
+            "invitation_created_dates": sorted(invitation_created_dates.get(customer.id, set())),
             "first_visit_date": dates[0] if dates else "",
             "last_visit_date": dates[-1] if dates else "",
             "invitation_count": invitation_counts.get(customer.id, 0),
@@ -516,6 +533,7 @@ def build_customer_dataset(
             "_payment_orders_by_project_period": dict(period_payment_orders_by_project.get(customer.id, {})),
             "_payment_events_period": period_payment_events.get(customer.id, []),
             "_invitation_events_period": period_invitation_events.get(customer.id, []),
+            "_invitation_events_all": all_invitation_events.get(customer.id, []),
             "_activity_events_period": period_activity_events.get(customer.id, []),
             "created_in_period": _in_range(created_at, date_from, date_to),
             "referred_in_period": _in_range(customer.referral_date or "", date_from, date_to),
@@ -715,17 +733,9 @@ def _scope_invitation_metrics(rows: list[dict[str, Any]], plan: AnalysisPlan) ->
     if not invitation_conditions:
         return rows
 
-    matcher = all if plan.condition_logic == "all" else any
     scoped_rows: list[dict[str, Any]] = []
     for row in rows:
-        events = [
-            event
-            for event in row.get("_invitation_events_period", [])
-            if matcher(
-                _matches(event, condition, plan.date_from, plan.date_to)
-                for condition in invitation_conditions
-            )
-        ]
+        events = _matching_invitation_events(row, plan, invitation_conditions)
         valid_events = [event for event in events if not event.get("cancelled")]
         scoped_row = dict(row)
         scoped_row.update({
@@ -734,6 +744,12 @@ def _scope_invitation_metrics(rows: list[dict[str, Any]], plan: AnalysisPlan) ->
                 for event in events
                 for name in event.get("inviter_names", [])
                 if name
+            }),
+            "invitation_created_dates": sorted({
+                created_date
+                for event in events
+                for created_date in event.get("invitation_created_dates", [])
+                if created_date
             }),
             "invitation_count_period": len(valid_events),
             "cancelled_count_period": sum(1 for event in events if event.get("cancelled")),
@@ -745,6 +761,42 @@ def _scope_invitation_metrics(rows: list[dict[str, Any]], plan: AnalysisPlan) ->
         })
         scoped_rows.append(scoped_row)
     return scoped_rows
+
+
+def _matching_invitation_events(
+    row: dict[str, Any],
+    plan: AnalysisPlan,
+    invitation_conditions: list[AnalysisCondition] | None = None,
+) -> list[dict[str, Any]]:
+    conditions = invitation_conditions or [
+        condition for condition in plan.conditions if condition.field in INVITATION_EVENT_FIELDS
+    ]
+    if not conditions:
+        return []
+    use_all_events = any(condition.field == "invitation_created_dates" for condition in conditions)
+    matcher = all if plan.condition_logic == "all" else any
+    return [
+        event
+        for event in row.get("_invitation_events_all" if use_all_events else "_invitation_events_period", [])
+        if matcher(_matches(event, condition, plan.date_from, plan.date_to) for condition in conditions)
+    ]
+
+
+def _matches_plan_row(row: dict[str, Any], plan: AnalysisPlan) -> bool:
+    invitation_conditions = [
+        condition for condition in plan.conditions if condition.field in INVITATION_EVENT_FIELDS
+    ]
+    ordinary_conditions = [
+        condition for condition in plan.conditions if condition.field not in INVITATION_EVENT_FIELDS
+    ]
+    invitation_matches = bool(_matching_invitation_events(row, plan, invitation_conditions))
+    ordinary_matches = [
+        _matches(row, condition, plan.date_from, plan.date_to)
+        for condition in ordinary_conditions
+    ]
+    if plan.condition_logic == "all":
+        return all(ordinary_matches) and (invitation_matches if invitation_conditions else True)
+    return any(ordinary_matches) or invitation_matches
 
 
 def _scope_activity_metrics(rows: list[dict[str, Any]], plan: AnalysisPlan) -> list[dict[str, Any]]:
@@ -898,12 +950,7 @@ def _execute_single_plan(
 ) -> dict[str, Any]:
     rows = build_customer_dataset(actor_id, plan.date_from, plan.date_to, allowed_customer_ids)
     if plan.conditions:
-        matcher = all if plan.condition_logic == "all" else any
-        rows = [
-            row
-            for row in rows
-            if matcher(_matches(row, condition, plan.date_from, plan.date_to) for condition in plan.conditions)
-        ]
+        rows = [row for row in rows if _matches_plan_row(row, plan)]
     rows = _scope_payment_metrics(rows, plan)
     rows = _scope_invitation_metrics(rows, plan)
     rows = _scope_activity_metrics(rows, plan)
@@ -1082,6 +1129,8 @@ def _add_condition(conditions: list[AnalysisCondition], field: str, operator: st
 
 
 def _date_field_from_query(query: str) -> str:
+    if "邀约创建" in query or "创建邀约" in query:
+        return "invitation_created_dates"
     if "邀约" in query:
         return "invitation_dates"
     if "引流" in query:
@@ -1201,6 +1250,7 @@ def _local_plan(query: str, actor_id: str) -> AnalysisPlan:
         ("traffic_source", ["按流量来源", "按来源"]),
         ("referrer_handler", ["按承接人"]),
         ("referrer", ["按引流人"]),
+        ("inviter_names", ["按邀约人"]),
         ("member_type", ["按会员身份", "按会员类型"]),
         ("service_teacher", ["按服务老师"]),
         ("gender", ["按性别"]),

@@ -20,13 +20,13 @@
     </view>
     <view class="lock-bar {{isDayVerified ? 'locked' : ''}}">
       <view class="lock-status">
-        <view class="lock-status-icon">{{isDayVerified ? '✓' : '○'}}</view>
+        <view class="lock-status-icon"></view>
         <text>{{isDayVerified ? '已核对' : '未核对'}}</text>
         <text class="lock-operator" wx:if="{{isDayVerified && verificationInfo.verified_by}}">· {{verificationInfo.verified_by}}</text>
       </view>
-      <button class="lock-action" wx:if="{{canManageVisitVerification}}" bindtap="onVerificationToggle" loading="{{verificationSubmitting}}" disabled="{{verificationSubmitting || !spaceId}}">
-        {{isDayVerified ? '解锁' : '核对并锁定'}}
-      </button>
+      <view class="lock-action {{verificationSubmitting || !spaceId ? 'disabled' : ''}}" wx:if="{{canManageVisitVerification}}" bindtap="onVerificationToggle">
+        {{verificationSubmitting ? '处理中…' : (isDayVerified ? '解锁' : '核对并锁定')}}
+      </view>
     </view>
     <!-- 三槽位周轮播：滑动完成后无感回中，避免循环克隆长期滑动后出现空白 -->
     <swiper
@@ -74,8 +74,7 @@
           data-date="{{item.date}}"
         >
           <text>{{item.day}}</text>
-          <view class="day-dot" wx:if="{{item.count > 0}}"></view>
-          <view class="day-check-status {{item.isVerified ? 'verified' : ''}}" wx:if="{{item.isCurrent}}">{{item.isVerified ? '已核对' : '未核对'}}</view>
+          <view class="day-dot {{item.isVerified ? 'verified' : ''}}" wx:if="{{item.isCurrent && (item.isVerified || item.count > 0)}}"></view>
         </view>
       </view>
     </view>

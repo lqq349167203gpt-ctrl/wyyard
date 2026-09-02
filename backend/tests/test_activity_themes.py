@@ -70,7 +70,7 @@ def test_schedule_lock_is_scoped_and_preserves_theme(monkeypatch):
     assert unlocked.day_theme == "当天主题"
 
 
-def test_schedule_lock_blocks_all_schedule_writes_until_unlocked(client):
+def test_schedule_lock_blocks_business_writes_but_allows_theme_updates(client):
     date = "2099-07-23"
     space_id = "space-lock-api"
     created = client.post("/api/class-records", json={
@@ -96,8 +96,19 @@ def test_schedule_lock_blocks_all_schedule_writes_until_unlocked(client):
     assert update.status_code == 423
     reorder = client.post("/api/activity-orders", json={"date": date, "space_id": space_id, "order": []})
     assert reorder.status_code == 423
-    theme = client.post("/api/activity-themes", json={"date": date, "space_id": space_id, "day_theme": "不应保存"})
-    assert theme.status_code == 423
+    theme = client.post("/api/activity-themes", json={"date": date, "space_id": space_id, "day_theme": "核对后仍可修改主题"})
+    assert theme.status_code == 200
+    assert theme.json()["day_theme"] == "核对后仍可修改主题"
+    assert theme.json()["is_locked"] is True
+    batch_theme = client.post("/api/activity-themes/batch", json={"themes": [{
+        "date": date,
+        "space_id": space_id,
+        "week_theme": "核对后仍可修改周主题",
+        "day_theme": "核对后仍可批量修改每日主题",
+    }]})
+    assert batch_theme.status_code == 200
+    assert batch_theme.json()[0]["week_theme"] == "核对后仍可修改周主题"
+    assert batch_theme.json()[0]["is_locked"] is True
 
     unlocked = client.post("/api/activity-themes/unlock", json={"date": date, "space_id": space_id})
     assert unlocked.status_code == 200

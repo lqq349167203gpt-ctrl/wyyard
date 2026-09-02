@@ -1,7 +1,7 @@
 const { activityThemeApi, activityWithdrawalApi, classRecordApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
-const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
+const { canEditActivityContent, canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 const SHARED_SCHEDULE_DATE_KEY = 'schedule_selected_date'
@@ -527,7 +527,7 @@ Page({
         r.key = `${r.source}_${r.id}`
         const rawRecord = rawMap[r.key] || {}
         const rosterParticipants = buildParticipantList(rawRecord, r.source, visitMap)
-        r.canEdit = canEditRecord(rawRecord, 'activities')
+        r.canEdit = canEditActivityContent(rawRecord)
         r.createdBy = rawRecord.created_by || ''
         r.displayName = r.name || r.badge
         const typeParts = []

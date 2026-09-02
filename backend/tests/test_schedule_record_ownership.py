@@ -36,16 +36,25 @@ def _create_other_account_headers(client):
     return account, position, {"Authorization": f"Bearer {login.json()['token']}"}
 
 
-def test_course_teacher_permission_is_independent_from_course_content(client, created_customer):
+def test_assigned_course_teacher_can_edit_course_content(client, created_customer):
     suffix = uuid.uuid4().hex[:10]
     date = "2026-09-02"
     record_response = client.post("/api/class-records", json={
         "date": date,
         "course_id": f"teacher-permission-{suffix}",
         "course_name": "老师权限测试",
+        "teacher_ids": [created_customer["id"]],
     })
     assert record_response.status_code == 200, record_response.text
     record = record_response.json()
+
+    other_record_response = client.post("/api/class-records", json={
+        "date": date,
+        "course_id": f"other-teacher-permission-{suffix}",
+        "course_name": "非本人授课测试",
+    })
+    assert other_record_response.status_code == 200, other_record_response.text
+    other_record = other_record_response.json()
 
     position_response = client.post("/api/positions", json={"name": f"老师配置角色_{suffix}"})
     assert position_response.status_code == 200
@@ -55,7 +64,7 @@ def test_course_teacher_permission_is_independent_from_course_content(client, cr
         "pages": ["daily-activities"],
         "edit_permissions": {
             "activities": "view",
-            "activity_teachers": "all",
+            "activity_teachers": "own",
             "activity_participants": "view",
         },
     })
@@ -63,7 +72,7 @@ def test_course_teacher_permission_is_independent_from_course_content(client, cr
 
     password = f"pw{suffix}9"
     account_response = client.post("/api/accounts", json={
-        "owner": f"老师配置员工_{suffix}",
+        "owner": created_customer["nickname"],
         "role": position["name"],
         "username": f"teacher_editor_{suffix}",
         "password": password,
@@ -78,22 +87,61 @@ def test_course_teacher_permission_is_independent_from_course_content(client, cr
     headers = {"Authorization": f"Bearer {login.json()['token']}"}
 
     try:
-        teacher_update = client.patch(
-            f"/api/class-records/{record['id']}",
-            json={"teacher_ids": [created_customer["id"]]},
-            headers=headers,
-        )
-        assert teacher_update.status_code == 200, teacher_update.text
         content_update = client.patch(
             f"/api/class-records/{record['id']}",
+            json={"course_name": "授课老师可以修改"},
+            headers=headers,
+        )
+        assert content_update.status_code == 200, content_update.text
+        assert content_update.json()["course_name"] == "授课老师可以修改"
+
+        unrelated_update = client.patch(
+            f"/api/class-records/{other_record['id']}",
             json={"course_name": "不应允许修改"},
             headers=headers,
         )
-        assert content_update.status_code == 403
+        assert unrelated_update.status_code == 403
+        unrelated_teacher_assignment = client.patch(
+            f"/api/class-records/{other_record['id']}",
+            json={"teacher_ids": [created_customer["id"]]},
+            headers=headers,
+        )
+        assert unrelated_teacher_assignment.status_code == 403
+
+        participant_update = client.patch(
+            f"/api/class-records/{record['id']}",
+            json={"participant_ids": [created_customer["id"]]},
+            headers=headers,
+        )
+        assert participant_update.status_code == 403
+
+        delete_response = client.delete(
+            f"/api/class-records/{record['id']}",
+            headers=headers,
+        )
+        assert delete_response.status_code == 403
+
+        disable_teacher_edit = client.put("/api/position-permissions/full", json={
+            "position": position["name"],
+            "pages": ["daily-activities"],
+            "edit_permissions": {
+                "activities": "view",
+                "activity_teachers": "view",
+                "activity_participants": "view",
+            },
+        })
+        assert disable_teacher_edit.status_code == 200
+        disabled_update = client.patch(
+            f"/api/class-records/{record['id']}",
+            json={"course_name": "关闭权限后不能修改"},
+            headers=headers,
+        )
+        assert disabled_update.status_code == 403
     finally:
         client.delete(f"/api/accounts/{account['id']}")
         client.delete(f"/api/positions/{position['id']}")
         client.delete(f"/api/class-records/{record['id']}")
+        client.delete(f"/api/class-records/{other_record['id']}")
 
 
 def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client, created_customer):
@@ -293,6 +341,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
                 protected_update,
                 {"start_time": "12:00"},
                 {"end_time": "13:00"},
+                {"teacher_ids": [created_customer["id"]]},
             ):
                 forbidden_update = client.patch(
                     f"{path}/{record_id}",

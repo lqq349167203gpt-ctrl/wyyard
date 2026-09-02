@@ -8,7 +8,7 @@ from app.services.storage import delete_item, load_data, save_item
 from app.utils.request_roles import normalize_roles
 
 FILENAME = "position_edit_permissions.json"
-EditArea = Literal["customers", "visits", "activities", "activity_teachers", "activity_participants", "payments"]
+EditArea = Literal["customers", "visits", "activities", "activity_participants", "payments"]
 EditScope = Literal["view", "own", "all"]
 ContactField = Literal["phone", "wechat"]
 ContactAction = Literal["view", "copy", "edit"]
@@ -148,7 +148,7 @@ SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
     "customers": "all",
     "visits": "all",
     "activities": "all",
-    "activity_teachers": "all",
+    "activity_teachers": "own",
     "activity_participants": "all",
     "activity_lock": True,
     "visit_lock": True,
@@ -167,6 +167,11 @@ def _normalize_scope(value: object) -> EditScope:
 def _normalize_customer_edit_scope(value: object) -> EditScope:
     # 客户资料不区分创建人；旧数据缺少此字段时保持可编辑。
     return "view" if value == "view" else "all"
+
+
+def _normalize_teacher_edit_scope(value: object) -> EditScope:
+    # 该字段表示“授课老师能否编辑本人授课课程”；旧值 all 与 own 均迁移为开启。
+    return "view" if value == "view" else "own"
 
 
 def _normalize_contact_actions(value: object) -> ContactActionPermissions:
@@ -227,8 +232,9 @@ def _normalize_permissions(value: object) -> PositionEditPermissions:
         "customers": _normalize_customer_edit_scope(raw.get("customers")),
         "visits": _normalize_scope(raw.get("visits")),
         "activities": _normalize_scope(raw.get("activities")),
-        # 上线前老师字段由课表权限控制；缺少新字段时沿用原范围，保持旧角色行为。
-        "activity_teachers": _normalize_scope(raw.get("activity_teachers", raw.get("activities"))),
+        "activity_teachers": _normalize_teacher_edit_scope(
+            raw.get("activity_teachers", raw.get("activities"))
+        ),
         "activity_participants": _normalize_scope(raw.get("activity_participants", "all")),
         "activity_lock": raw.get("activity_lock") is True,
         "visit_lock": raw.get("visit_lock") is True,

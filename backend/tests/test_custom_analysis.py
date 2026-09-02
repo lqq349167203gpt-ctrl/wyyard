@@ -23,6 +23,8 @@ def _row(customer_id: str, **overrides):
         "referral_date": "2026-08-01",
         "created_at": "2026-08-01",
         "invitation_dates": [],
+        "invitation_created_dates": [],
+        "inviter_names": [],
         "first_visit_date": "",
         "last_visit_date": "",
         "invitation_count": 0,
@@ -43,6 +45,7 @@ def _row(customer_id: str, **overrides):
         "_payment_orders_by_project_period": {},
         "_payment_events_period": [],
         "_invitation_events_period": [],
+        "_invitation_events_all": [],
         "_activity_events_period": [],
     }
     row.update(overrides)
@@ -332,6 +335,66 @@ def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
     assert result["items"][0]["visit_count_period"] == 1
 
 
+def test_invitation_created_date_filters_and_splits_by_inviter(monkeypatch):
+    rows = [
+        _row(
+            "c1",
+            invitation_created_dates=["2026-08-10", "2026-08-11"],
+            _invitation_events_all=[
+                {
+                    "inviter_names": ["潘潘"],
+                    "invitation_created_dates": ["2026-08-10"],
+                    "visit_date": "2026-08-15",
+                    "arrived": False,
+                    "cancelled": False,
+                },
+                {
+                    "inviter_names": ["娟娟"],
+                    "invitation_created_dates": ["2026-08-11"],
+                    "visit_date": "2026-08-20",
+                    "arrived": False,
+                    "cancelled": False,
+                },
+            ],
+        ),
+        _row(
+            "c2",
+            invitation_created_dates=["2026-08-10"],
+            _invitation_events_all=[
+                {
+                    "inviter_names": ["潘潘"],
+                    "invitation_created_dates": ["2026-08-10"],
+                    "visit_date": "2026-09-01",
+                    "arrived": False,
+                    "cancelled": False,
+                },
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[
+            AnalysisCondition(
+                field="invitation_created_dates",
+                operator="between",
+                value=["2026-08-10", "2026-08-10"],
+            ),
+        ],
+        metrics=["invited_customers"],
+        card_metric="invited_customers",
+        card_dimension="inviter_names",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert result["total"] == 2
+    assert {card["title"]: card["count"] for card in result["cards"]} == {
+        "邀约人数": 2,
+        "潘潘": 2,
+    }
+    assert all(item["inviter_names"] == ["潘潘"] for item in result["items"])
+
+
 def test_comparison_groups_use_independent_periods_and_conditions(monkeypatch):
     def dataset(_actor_id, date_from="", date_to="", _allowed_customer_ids=None):
         if date_from == "2026-01-01":
@@ -451,6 +514,16 @@ def test_metadata_endpoint(client):
     assert invitation_date["group"] == "日期信息"
     assert invitation_date["value_type"] == "date"
     assert "between" in invitation_date["operators"]
+    invitation_created_date = next(
+        item for item in metadata["fields"] if item["value"] == "invitation_created_dates"
+    )
+    assert invitation_created_date["label"] == "邀约创建日期"
+    assert invitation_created_date["group"] == "日期信息"
+    assert invitation_created_date["value_type"] == "date"
+    assert any(
+        item["value"] == "inviter_names" and item["label"] == "邀约人"
+        for item in metadata["card_dimensions"]
+    )
     assert not any(item["value"] == "created_customers" for item in metadata["metrics"])
     assert any(item["value"] == "referred_customers" and item["label"] == "新引流客户数" for item in metadata["metrics"])
 

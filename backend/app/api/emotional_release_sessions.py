@@ -12,7 +12,6 @@ from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
     ensure_activity_participant_access,
-    ensure_activity_teacher_access,
     ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
@@ -81,8 +80,6 @@ def list_sessions(
 @router.post("")
 def create_session(data: EmotionalReleaseSessionCreate, request: Request, conversion: bool = False):
     activity_lock_service.ensure_scope_unlocked(data.date, data.space_id)
-    if not conversion:
-        ensure_activity_teacher_access(request, None, data.model_dump(exclude_unset=True))
     if data.participant_ids and not conversion:
         ensure_activity_participant_access(request)
     customer_access_service.require_customer_scope(request, data.owner_id, action="设置为案主")
@@ -109,8 +106,7 @@ def update_session(session_id: str, data: dict, request: Request):
     if not old_session:
         raise HTTPException(status_code=404, detail="记录不存在")
     activity_lock_service.ensure_update_unlocked(old_session, data)
-    ensure_activity_update_access(request, data)
-    ensure_activity_teacher_access(request, old_session, data)
+    ensure_activity_update_access(request, old_session, data)
     if data.get("owner_id") and data["owner_id"] != old_session.owner_id:
         customer_access_service.require_customer_scope(request, data["owner_id"], action="设置为案主")
     if "participant_ids" in data:

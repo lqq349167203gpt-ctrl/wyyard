@@ -123,7 +123,7 @@ const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
   customers: "all",
   visits: "all",
   activities: "all",
-  activity_teachers: "all",
+  activity_teachers: "own",
   activity_participants: "all",
   activity_lock: true,
   visit_lock: true,
@@ -903,7 +903,7 @@ export default function PositionManagementPage() {
                       <div className="mb-3 flex items-end justify-between gap-4">
                         <div>
                           <div className="text-[14px] font-medium text-[#1f2329]">业务操作范围</div>
-                          <div className="mt-1 text-[12px] text-[#8f959e]">分别设置客户资料、邀约和课表能否操作；仅浏览时所有写入入口都会关闭。</div>
+                          <div className="mt-1 text-[12px] text-[#8f959e]">分别设置各业务的操作范围；课表还可额外允许授课老师编辑本人授课的课程。</div>
                         </div>
                         <span className="shrink-0 text-[12px] text-[#8f959e]">页面权限控制入口，操作范围控制写入</span>
                       </div>
@@ -944,12 +944,11 @@ export default function PositionManagementPage() {
                           {
                             key: "activity_teachers" as const,
                             pageKey: "daily-activities",
-                            label: "课程老师",
-                            description: "单独控制课表中老师的选择与移除，不影响其他课程内容",
+                            label: "授课老师编辑",
+                            description: "开启后，该课已选择的老师对应账号可修改课程内容；删除仍仅限创建人",
                             options: [
-                              { value: "view" as const, label: "不可配置" },
-                              { value: "own" as const, label: "仅本人课表" },
-                              { value: "all" as const, label: "全部课表" },
+                              { value: "view" as const, label: "关闭" },
+                              { value: "own" as const, label: "允许" },
                             ],
                           },
                           {
@@ -1029,7 +1028,7 @@ export default function PositionManagementPage() {
                         <div className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
                           <div className="min-w-0">
                             <div className="text-[13px] font-medium text-[#2b2f36]">课表核对与锁定</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">核对当天参与人和课程内容；锁定后所有账号都需先解锁才能修改</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">核对当天课程安排与参与人；周主题和每日主题不受锁定影响</div>
                             {!formPermissions.includes("daily-activities") && (
                               <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“课表”页面权限</div>
                             )}

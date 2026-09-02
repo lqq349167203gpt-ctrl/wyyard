@@ -16,7 +16,6 @@ from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
     ensure_activity_participant_access,
-    ensure_activity_teacher_access,
     ensure_activity_update_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
@@ -227,8 +226,6 @@ def create_record(data: dict, request: Request, conversion: bool = False):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     activity_lock_service.ensure_scope_unlocked(record.date, record.space_id)
-    if not conversion:
-        ensure_activity_teacher_access(request, None, data)
     if record.participant_ids and not conversion:
         ensure_activity_participant_access(request)
     customer_access_service.require_new_customer_ids(
@@ -253,8 +250,7 @@ def update_record(record_id: str, data: dict, request: Request, conversion: bool
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
     activity_lock_service.ensure_update_unlocked(old_record, data)
-    ensure_activity_update_access(request, data)
-    ensure_activity_teacher_access(request, old_record, data)
+    ensure_activity_update_access(request, old_record, data)
     if "participant_ids" in data:
         if list(data.get("participant_ids") or []) != list(old_record.participant_ids):
             ensure_activity_participant_access(request, old_record)

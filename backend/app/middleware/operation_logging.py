@@ -521,7 +521,7 @@ EDIT_PERMISSION_LABELS = {
     "customers": "客户资料操作范围",
     "visits": "邀约编辑范围",
     "activities": "课表编辑范围",
-    "activity_teachers": "课程老师配置范围",
+    "activity_teachers": "授课老师编辑权限",
     "activity_participants": "课表人员配置范围",
     "activity_lock": "课表核对与锁定权限",
     "visit_lock": "邀约核对与锁定权限",
@@ -545,8 +545,12 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
         default_scope = "all" if key in {"customers", "activity_participants", "payments"} else "own"
         old_value = str(old_permissions.get(key, default_scope))
         new_value = str(new_permissions.get(key, default_scope))
-        old_scope = "可编辑" if key == "customers" and old_value == "all" else VALUE_LABELS.get(old_value, VALUE_LABELS[default_scope])
-        new_scope = "可编辑" if key == "customers" and new_value == "all" else VALUE_LABELS.get(new_value, VALUE_LABELS[default_scope])
+        if key == "activity_teachers":
+            old_scope = "关闭" if old_value == "view" else "允许"
+            new_scope = "关闭" if new_value == "view" else "允许"
+        else:
+            old_scope = "可编辑" if key == "customers" and old_value == "all" else VALUE_LABELS.get(old_value, VALUE_LABELS[default_scope])
+            new_scope = "可编辑" if key == "customers" and new_value == "all" else VALUE_LABELS.get(new_value, VALUE_LABELS[default_scope])
         if old_scope != new_scope:
             changes.append(f"{label}({old_scope}→{new_scope})")
     old_contacts = old_permissions.get("contacts") if isinstance(old_permissions.get("contacts"), dict) else {}

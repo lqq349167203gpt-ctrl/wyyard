@@ -57,6 +57,7 @@ export default function ClassRecordsPage() {
   // 共享状态
   const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
+  const [calendarVisitCounts, setCalendarVisitCounts] = useState<Record<string, number>>({})
   const [verificationMap, setVerificationMap] = useState<Record<string, VisitVerification>>({})
   const [verificationSubmitting, setVerificationSubmitting] = useState(false)
   const [verificationConfirmOpen, setVerificationConfirmOpen] = useState(false)
@@ -183,11 +184,31 @@ export default function ClassRecordsPage() {
     loadVerificationRange(dateRange[0], dateRange[dateRange.length - 1])
   }, [dateRange, loadVerificationRange, selectedSpaceId])
 
+  const calendarVisitCountSeqRef = useRef(0)
+  useEffect(() => {
+    calendarVisitCountSeqRef.current += 1
+    setCalendarVisitCounts({})
+  }, [selectedSpaceId])
+
   const handleCalendarMonthChange = useCallback((month: string) => {
     const [year, monthNumber] = month.split("-").map(Number)
     const endDay = new Date(year, monthNumber, 0).getDate()
-    loadVerificationRange(`${month}-01`, `${month}-${String(endDay).padStart(2, "0")}`)
-  }, [loadVerificationRange])
+    const startDate = `${month}-01`
+    const endDate = `${month}-${String(endDay).padStart(2, "0")}`
+    loadVerificationRange(startDate, endDate)
+    const seq = ++calendarVisitCountSeqRef.current
+    if (!selectedSpaceId) {
+      setCalendarVisitCounts({})
+      return
+    }
+    visitApi.counts({ startDate, endDate, spaceId: selectedSpaceId })
+      .then((counts) => {
+        if (seq === calendarVisitCountSeqRef.current) setCalendarVisitCounts(counts)
+      })
+      .catch(() => {
+        if (seq === calendarVisitCountSeqRef.current) setCalendarVisitCounts({})
+      })
+  }, [loadVerificationRange, selectedSpaceId])
 
   const currentVerification = verificationMap[detailDate]
   const isDayVerified = currentVerification?.is_verified === true
@@ -219,29 +240,32 @@ export default function ClassRecordsPage() {
       <div className="border-b-[0.5px] border-[#f0f1f2]">
       {/* 选中日期显示 + 操作按钮 */}
       <div className="flex items-center gap-2">
-        <CalendarDatePicker
-          detailDate={detailDate}
-          onSelectDate={(d) => startTransition(() => setDetailDate(d))}
-          dateStatuses={verificationStatuses}
-          onMonthChange={handleCalendarMonthChange}
-        />
-        <SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} />
-        <div className="ml-auto flex items-center gap-2">
-          <span className={`text-[12px] ${isDayVerified ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
-            {isDayVerified ? `已核对${currentVerification?.verified_by ? ` · ${currentVerification.verified_by}` : ""}` : "未核对"}
-          </span>
-          {canManageVerification && (
-            <button
-              type="button"
-              onClick={() => setVerificationConfirmOpen(true)}
-              disabled={!selectedSpaceId || verificationSubmitting}
-              className="inline-flex h-7 items-center gap-1 rounded-[3px] border border-[#d0d3d6] px-2.5 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-40"
-            >
-              {isDayVerified ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-              {isDayVerified ? "解锁" : "核对并锁定"}
-            </button>
-          )}
+        <div className="flex items-center gap-0 relative">
+          <CalendarDatePicker
+            detailDate={detailDate}
+            onSelectDate={(d) => startTransition(() => setDetailDate(d))}
+            dateStatuses={verificationStatuses}
+            dateCounts={calendarVisitCounts}
+            onMonthChange={handleCalendarMonthChange}
+            verifiedDotColor="green"
+          />
+          <div className="ml-1.5"><SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} /></div>
         </div>
+        <span className={`ml-2 text-[12px] ${isDayVerified ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
+          {isDayVerified ? `已核对${currentVerification?.verified_by ? ` · ${currentVerification.verified_by}` : ""}` : "未核对"}
+        </span>
+        {canManageVerification && (
+          <button
+            type="button"
+            onClick={() => setVerificationConfirmOpen(true)}
+            disabled={!selectedSpaceId || verificationSubmitting}
+            className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] text-[#4e535a] transition-colors hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isDayVerified ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+            {isDayVerified ? "解锁" : "核对并锁定"}
+          </button>
+        )}
+        <div className="flex-1" />
       </div>
         {/* 日期滚动条 */}
         <div className="flex items-center justify-between gap-1 mt-3 mb-2 h-[52px]">
@@ -266,7 +290,7 @@ export default function ClassRecordsPage() {
                   </span>
                   <span className="text-[14px] font-medium leading-none h-4 flex items-center">{parseInt(d.split("-")[2])}</span>
                   <span className={`text-[9px] leading-none h-3 flex items-center mt-0.5 ${isSelected ? "text-white/80" : "text-[#b0b5bb]"}`}>
-                    {verificationMap[d]?.is_verified ? "已核对" : dayCount > 0 ? `${dayCount}人` : "未核对"}
+                    {dayCount > 0 ? `${dayCount}人` : ""}
                   </span>
                 </button>
               )

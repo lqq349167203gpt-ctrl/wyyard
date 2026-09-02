@@ -8,11 +8,13 @@ function formatDateChinese(d: string): string {
   return `${y}年${parseInt(m)}月${parseInt(day)}日`
 }
 
-export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate, onSelectDate, dateStatuses, onMonthChange }: {
+export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate, onSelectDate, dateStatuses, dateCounts, onMonthChange, verifiedDotColor = "blue" }: {
   detailDate: string
   onSelectDate: (date: string) => void
   dateStatuses?: Record<string, boolean>
+  dateCounts?: Record<string, number>
   onMonthChange?: (month: string) => void
+  verifiedDotColor?: "blue" | "green"
 }) {
   const [open, setOpen] = useState(false)
   const [month, setMonth] = useState(() => detailDate.substring(0, 7))
@@ -90,6 +92,8 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
               const dateStr = `${displayMonth}-${String(day).padStart(2, "0")}`
               const isSelected = dateStr === detailDate
               const isTodayDate = dateStr === today
+              const isVerified = dateStatuses?.[dateStr] === true
+              const hasContent = (dateCounts?.[dateStr] || 0) > 0
               return (
                 <button
                   key={dateStr}
@@ -102,8 +106,8 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
                   }}
                 >
                   <span className="inline-flex items-center justify-center h-4">{day}</span>
-                  {dateStatuses && (
-                    <span className={`absolute bottom-[3px] h-1 w-1 rounded-full ${isSelected ? "bg-white/80" : dateStatuses[dateStr] ? "bg-[#3370ff]" : "bg-[#c9cdd4]"}`} />
+                  {(isVerified || hasContent) && (
+                    <span className={`absolute bottom-[3px] h-1 w-1 rounded-full ${isVerified && verifiedDotColor === "green" ? "bg-[#34c724]" : isSelected ? "bg-white/80" : "bg-[#3370ff]"}`} />
                   )}
                 </button>
               )

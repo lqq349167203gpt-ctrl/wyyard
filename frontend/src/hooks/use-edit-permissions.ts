@@ -42,9 +42,7 @@ function normalizeEditPermissions(permissions?: Partial<PositionEditPermissions>
     customers: permissions?.customers === "view" ? "view" : "all",
     visits: ["view", "own", "all"].includes(permissions?.visits || "") ? permissions!.visits! : "own",
     activities: ["view", "own", "all"].includes(permissions?.activities || "") ? permissions!.activities! : "own",
-    activity_teachers: ["view", "own", "all"].includes(permissions?.activity_teachers || "")
-      ? permissions!.activity_teachers!
-      : (["view", "own", "all"].includes(permissions?.activities || "") ? permissions!.activities! : "own"),
+    activity_teachers: permissions?.activity_teachers === "view" ? "view" : "own",
     activity_participants: ["view", "own", "all"].includes(permissions?.activity_participants || "")
       ? permissions!.activity_participants!
       : "all",

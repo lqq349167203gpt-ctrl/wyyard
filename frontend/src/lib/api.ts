@@ -3189,6 +3189,7 @@ export type AnalysisField =
   | "referral_date"
   | "created_at"
   | "invitation_dates"
+  | "invitation_created_dates"
   | "first_visit_date"
   | "last_visit_date"
   | "invitation_count"
@@ -3217,7 +3218,7 @@ export type AnalysisField =
   | "latest_payment_date"
 
 export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty"
-export type AnalysisCardDimension = "none" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "activity_types" | "purchased_projects"
+export type AnalysisCardDimension = "none" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "inviter_names" | "activity_types" | "purchased_projects"
 export type AnalysisMetric = "total_customers" | "created_customers" | "referred_customers" | "invited_customers" | "arrived_customers" | "activity_customers" | "converted_customers" | "payment_orders" | "payment_amount"
 
 export interface AnalysisCondition {

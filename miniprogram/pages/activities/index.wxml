@@ -21,13 +21,13 @@
     </view>
     <view class="lock-bar {{isDayLocked ? 'locked' : ''}}">
       <view class="lock-status">
-        <view class="lock-status-icon">{{isDayLocked ? '✓' : '○'}}</view>
+        <view class="lock-status-icon"></view>
         <text>{{isDayLocked ? '已核对' : '未核对'}}</text>
         <text class="lock-operator" wx:if="{{isDayLocked && lockInfo.locked_by}}">· {{lockInfo.locked_by}}</text>
       </view>
-      <button class="lock-action" wx:if="{{canManageActivityLock}}" bindtap="onLockToggle" loading="{{lockSubmitting}}" disabled="{{lockSubmitting || !spaceId}}">
-        {{isDayLocked ? '解锁' : '核对并锁定'}}
-      </button>
+      <view class="lock-action {{lockSubmitting || !spaceId ? 'disabled' : ''}}" wx:if="{{canManageActivityLock}}" bindtap="onLockToggle">
+        {{lockSubmitting ? '处理中…' : (isDayLocked ? '解锁' : '核对并锁定')}}
+      </view>
     </view>
     <!-- 三槽位周轮播：滑动完成后无感回中，可稳定连续切换前后周 -->
     <swiper
@@ -74,8 +74,7 @@
           data-date="{{item.date}}"
         >
           <text>{{item.day}}</text>
-          <view class="day-check-status {{item.isLocked ? 'verified' : ''}}" wx:if="{{item.isCurrent}}">{{item.isLocked ? '已核对' : '未核对'}}</view>
-          <view class="day-dot" wx:if="{{item.count > 0}}"></view>
+          <view class="day-dot {{item.isLocked ? 'verified' : ''}}" wx:if="{{item.isCurrent && (item.isLocked || item.count > 0)}}"></view>
         </view>
       </view>
     </view>

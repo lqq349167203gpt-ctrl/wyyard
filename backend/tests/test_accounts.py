@@ -188,7 +188,7 @@ class TestLogin:
             result = login.json()
             assert set(result["permissions"]) == {"healing-records", "daily-activities"}
             assert result["edit_permissions"]["activities"] == "own"
-            assert result["edit_permissions"]["activity_teachers"] == "all"
+            assert result["edit_permissions"]["activity_teachers"] == "own"
             assert result["edit_permissions"]["activity_participants"] == "own"
         finally:
             client.delete(f"/api/accounts/{account['id']}")

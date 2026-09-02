@@ -41,6 +41,7 @@ const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   referral_date: "引流日期",
   created_at: "创建日期",
   invitation_dates: "邀约日期",
+  invitation_created_dates: "邀约创建日期",
   inviter_names: "邀约人",
   invitation_count_period: "期间邀约次数",
   visit_count_period: "期间到场次数",

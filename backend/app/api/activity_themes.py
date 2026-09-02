@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.base import StrictBaseModel
-from app.services import activity_lock_service, activity_theme_service, position_edit_permission_service
+from app.services import activity_theme_service, position_edit_permission_service
 from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/activity-themes", tags=["activity-themes"])
@@ -120,7 +120,6 @@ async def unlock_schedule(data: ScheduleLockRequest, request: Request):
 
 @router.post("")
 async def save_theme(data: SaveThemeRequest):
-    activity_lock_service.ensure_scope_unlocked(data.date, data.space_id)
     return activity_theme_service.save_theme(
         data.date,
         data.week_theme,
@@ -133,8 +132,6 @@ async def save_theme(data: SaveThemeRequest):
 
 @router.post("/batch")
 async def batch_save_themes(data: BatchSaveThemeRequest):
-    for theme in data.themes:
-        activity_lock_service.ensure_scope_unlocked(theme.date, theme.space_id)
     results = []
     for t in data.themes:
         results.append(

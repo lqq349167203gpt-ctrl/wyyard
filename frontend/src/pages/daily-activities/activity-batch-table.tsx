@@ -120,12 +120,12 @@ const ACTIVITY_CREATOR_ONLY_FIELDS = new Set<keyof ActivityRow>([
   "is_public_welfare",
   "membership_deduction_count",
   "deduction_count",
+  "host_ids",
+  "host_names",
   "description",
   "course_review",
   "billing_description",
 ])
-
-const ACTIVITY_TEACHER_FIELDS = new Set<keyof ActivityRow>(["host_ids", "host_names"])
 
 let nextKey = 1
 
@@ -345,7 +345,28 @@ export function ActivityBatchTable({
     if (row.created_by_id) return Boolean(currentActorId && row.created_by_id === currentActorId)
     return Boolean(row.created_by && currentActorName && row.created_by === currentActorName)
   }, [currentActorId, currentActorName])
+  const currentActorCustomerIds = useMemo(() => new Set(
+    customers
+      .filter(customer => {
+        const names = [customer.nickname, customer.name]
+          .map(name => String(name || "").trim().toLocaleLowerCase())
+          .filter(Boolean)
+        return names.includes(currentActorName.trim().toLocaleLowerCase())
+      })
+      .map(customer => customer.id),
+  ), [customers, currentActorName])
+  const isAssignedTeacher = useCallback((row: ActivityRow) => {
+    if (row.pendingCreate || !row.record_id) return false
+    if (row.host_ids.some(id => currentActorCustomerIds.has(id))) return true
+    const actorName = currentActorName.trim().toLocaleLowerCase()
+    return Boolean(actorName && row.host_names.some(name => name.trim().toLocaleLowerCase() === actorName))
+  }, [currentActorCustomerIds, currentActorName])
   const canEditRow = useCallback((row: ActivityRow) => (
+    canEditAllActivities
+    || (!isViewOnly && isOwnRow(row))
+    || (editPermissions.activity_teachers !== "view" && isAssignedTeacher(row))
+  ), [canEditAllActivities, editPermissions.activity_teachers, isAssignedTeacher, isOwnRow, isViewOnly])
+  const canDeleteRow = useCallback((row: ActivityRow) => (
     !isViewOnly && (canEditAllActivities || isOwnRow(row))
   ), [canEditAllActivities, isOwnRow, isViewOnly])
   const canEditParticipants = useCallback((row: ActivityRow) => {
@@ -353,27 +374,19 @@ export function ActivityBatchTable({
     if (editPermissions.activity_participants === "view") return false
     return editPermissions.activity_participants === "all" || isOwnRow(row)
   }, [currentUser.role, editPermissions.activity_participants, isOwnRow])
-  const canEditTeachers = useCallback((row: ActivityRow) => {
-    if (currentUser.role === "超级管理员") return true
-    if (editPermissions.activity_teachers === "view") return false
-    return editPermissions.activity_teachers === "all" || isOwnRow(row)
-  }, [currentUser.role, editPermissions.activity_teachers, isOwnRow])
+  const canEditTeachers = canEditRow
   const canEditField = useCallback((row: ActivityRow, field: keyof ActivityRow) => (
     field === "participant_ids"
       ? canEditParticipants(row)
-      : ACTIVITY_TEACHER_FIELDS.has(field)
-        ? canEditTeachers(row)
-      : !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field))
-  ), [canEditParticipants, canEditRow, canEditTeachers, isViewOnly])
+      : canEditRow(row) || (!isViewOnly && !ACTIVITY_CREATOR_ONLY_FIELDS.has(field))
+  ), [canEditParticipants, canEditRow, isViewOnly])
   const canEditChanges = useCallback((row: ActivityRow, changes: Partial<ActivityRow>) => (
     Object.keys(changes).every(field => (
       field === "participant_ids"
         ? canEditParticipants(row)
-        : ACTIVITY_TEACHER_FIELDS.has(field as keyof ActivityRow)
-          ? canEditTeachers(row)
-        : !isViewOnly && (canEditRow(row) || !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow))
+        : canEditRow(row) || (!isViewOnly && !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow))
     ))
-  ), [canEditParticipants, canEditRow, canEditTeachers, isViewOnly])
+  ), [canEditParticipants, canEditRow, isViewOnly])
   const invitedOwnerCustomers = useMemo(() => {
     // 邀约名单加载完成前保持为空，避免短暂暴露全部客户作为案主候选。
     if (!invitedCustomerIds) return []
@@ -429,13 +442,13 @@ export function ActivityBatchTable({
   const deleteRecordFromBackend = useCallback(async (row: ActivityRow, conversion = false) => {
     const id = row.record_id
     if (!id) return
-    if (!canEditRow(row)) throw new Error("只能删除自己创建的课表内容")
+    if (!canDeleteRow(row)) throw new Error("只能删除自己创建的课表内容")
     if (row.record_type === "class") await classRecordApi.delete(id, conversion)
     else if (row.record_type === "gcs") await groupCaseSessionApi.delete(id, conversion)
     else if (row.record_type === "ers") await emotionalReleaseSessionApi.delete(id, conversion)
     else if (row.record_type === "eks") await energyKnotSessionApi.delete(id, conversion)
     else if (row.record_type === "ics") await internalCourseSessionApi.delete(id, conversion)
-  }, [canEditRow])
+  }, [canDeleteRow])
 
   const undo = useCallback(() => {
     if (undoStack.length === 0) return
@@ -999,14 +1012,14 @@ export function ActivityBatchTable({
 
   // 删除按钮
   const handleDelete = useCallback((row: ActivityRow) => {
-    if (!canEditRow(row)) return
+    if (!canDeleteRow(row)) return
     // 不在确认前移除行，等父组件确认后由 loadDateData 同步
     if (row.record_type === "class") callbacks.onDeleteClass(row.record_id)
     else if (row.record_type === "gcs") callbacks.onDeleteGcs(row.record_id)
     else if (row.record_type === "ers") callbacks.onDeleteErs(row.record_id)
     else if (row.record_type === "eks") callbacks.onDeleteEks(row.record_id)
     else if (row.record_type === "ics") callbacks.onDeleteIcs(row.record_id)
-  }, [callbacks, canEditRow])
+  }, [callbacks, canDeleteRow])
 
   // 类型切换 → 先创建新记录，成功后再删除旧记录（防止数据丢失）
   const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {
@@ -1019,6 +1032,8 @@ export function ActivityBatchTable({
     const oldName = row.name || "未命名活动"
     const newTypeName = parsedCourse || TYPE_NAMES[parsedType as ActivityType] || parsedType
     const type = parsedType as ActivityType
+    // 跨活动大类需要创建新记录并删除旧记录，仍只允许创建人或全部权限执行。
+    if (type !== row.record_type && !canDeleteRow(row)) return
     // 同类型且同课程 → 忽略（在 pushHistory 之前检查，避免污染 undo 栈）
     const currentCourse = row.record_type === "ics"
       ? row.ics_course_key?.replace("ics:", "")
@@ -1102,7 +1117,7 @@ export function ActivityBatchTable({
     } finally {
       typeChangeKeysRef.current.delete(rowKey)
     }
-  }, [deleteRecordFromBackend, fetchRemaining, invitedOwnerCustomers, saveRow, pushHistory, canEditRow])
+  }, [deleteRecordFromBackend, fetchRemaining, invitedOwnerCustomers, saveRow, pushHistory, canDeleteRow, canEditRow])
 
   const selectOwner = useCallback((row: ActivityRow, customer: CustomerLight) => {
     const ownerId = customer.id
@@ -1971,7 +1986,7 @@ export function ActivityBatchTable({
 
                   {/* 操作 */}
                   <td className="sticky right-0 z-20 w-[52px] bg-white px-0 py-0.5 text-center">
-                    {!rowReadOnly ? (
+                    {canDeleteRow(row) ? (
                       <div className="flex h-7 items-center justify-center gap-1">
                         <button
                           onClick={() => handleDelete(row)}
@@ -1981,6 +1996,13 @@ export function ActivityBatchTable({
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                    ) : !rowReadOnly ? (
+                      <span
+                        className="inline-flex h-7 items-center justify-center text-[11px] text-[#8f959e]"
+                        title="本人为该课老师，可编辑课程；仅创建人可删除"
+                      >
+                        老师
+                      </span>
                     ) : (
                       <span className="inline-flex h-7 max-w-full items-center justify-center gap-1 text-[11px] text-[#8f959e]" title={`锁定人：${creatorName}`}>
                         <LockKeyhole className="h-3 w-3 shrink-0" />

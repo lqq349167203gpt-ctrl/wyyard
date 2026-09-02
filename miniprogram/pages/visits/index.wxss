@@ -64,21 +64,19 @@
 .lock-bar {
   display: flex;
   align-items: center;
-  min-height: 52rpx;
-  margin-top: 8rpx;
-  padding: 0 6rpx 0 14rpx;
-  border: 1rpx solid #dee0e3;
-  border-radius: 12rpx;
-  background-color: rgba(255, 255, 255, 0.82);
+  min-height: 48rpx;
+  margin-top: 6rpx;
+  padding: 0 2rpx;
 }
 
-.lock-bar.locked { border-color: #b7d0ff; background-color: #f0f5ff; }
+.lock-bar.locked .lock-status { color: #4e535a; }
 .lock-status { display: flex; align-items: center; min-width: 0; color: #8f959e; font-size: 22rpx; }
-.lock-bar.locked .lock-status { color: #245bdb; }
-.lock-status-icon { margin-right: 8rpx; font-size: 21rpx; }
+.lock-status-icon { width: 12rpx; height: 12rpx; margin-right: 10rpx; border-radius: 50%; background-color: #c9cdd4; flex-shrink: 0; }
+.lock-bar.locked .lock-status-icon { background-color: #34c724; }
 .lock-operator { overflow: hidden; margin-left: 5rpx; color: #8f959e; text-overflow: ellipsis; white-space: nowrap; }
-.lock-action { height: 42rpx; margin: 0 0 0 auto; padding: 0 16rpx; border: 0; border-radius: 8rpx; background-color: transparent; color: #3370ff; font-size: 21rpx; line-height: 42rpx; }
-.lock-action::after { border: 0; }
+.lock-action { display: flex; align-items: center; height: 48rpx; margin-left: auto; padding-left: 24rpx; color: #3370ff; font-size: 22rpx; font-weight: 500; }
+.lock-action:active { opacity: 0.55; }
+.lock-action.disabled { color: #b8bec8; pointer-events: none; }
 
 /* 当前周日期条 */
 .week-swiper {
@@ -143,7 +141,7 @@
   opacity: 1;
 }
 
-.week-count-dot.verified { opacity: 1; background-color: #3370ff; }
+.week-count-dot.verified { opacity: 1; background-color: #34c724; }
 
 .week-day.selected .week-label {
   color: #3370ff;
@@ -160,6 +158,10 @@
 
 .week-day.selected .week-count-dot {
   background-color: #3370ff;
+}
+
+.week-day.selected .week-count-dot.verified {
+  background-color: #34c724;
 }
 
 /* 下拉日历 */
@@ -253,10 +255,6 @@
   font-weight: 500;
 }
 
-.day-check-status { min-height: 22rpx; margin-top: 2rpx; color: #b0b5bb; font-size: 18rpx; line-height: 22rpx; }
-.day-check-status.verified,
-.day-cell.selected .day-check-status { color: #3370ff; }
-
 .day-dot {
   width: 8rpx;
   height: 8rpx;
@@ -264,6 +262,8 @@
   background-color: #3370ff;
   margin-top: 4rpx;
 }
+
+.day-dot.verified { background-color: #34c724; }
 
 /* 排序按钮 */
 .edit-toggle {

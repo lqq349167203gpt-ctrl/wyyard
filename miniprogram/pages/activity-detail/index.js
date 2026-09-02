@@ -7,7 +7,7 @@ const {
   BADGE_COLORS, ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
   SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
 } = require('../../utils/activity-constants')
-const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
+const { canEditActivityContent, canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const SOURCE_TO_TYPE = {
   class_record: 'class',
@@ -109,16 +109,17 @@ Page({
     const activityType = SOURCE_TO_TYPE[source]
     const typeLabel = raw.course_type || TYPE_LABELS[activityType] || ''
     const typeColor = BADGE_COLORS[typeLabel] || BADGE_COLORS['沙龙'] || '#3370ff'
+    const canEditContent = canEditActivityContent(raw)
 
     this._recordId = raw.id
     this._source = source
     this._originalType = activityType
 
     const initData = {
-      readOnly: dayLocked || !canEditRecord(raw, 'activities'),
+      readOnly: dayLocked || !canEditContent,
       viewOnly: isAreaViewOnly('activities'),
       canEditParticipants: !dayLocked && canEditRecord(raw, 'activity_participants'),
-      canEditTeachers: !dayLocked && canEditRecord(raw, 'activity_teachers'),
+      canEditTeachers: !dayLocked && canEditContent,
       dayLocked,
       lockedBy,
       createdBy: raw.created_by || '',

@@ -1668,7 +1668,6 @@ export default function DailyActivitiesPage() {
   const [detailDate, setDetailDate] = useState(() => {
     try { return localStorage.getItem("shared-selected-date") || localStorage.getItem("daily-activities-date") || today } catch { return today }
   })
-  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [dateRangeStart, setDateRangeStart] = useState(() => {
     try {
       const stored = localStorage.getItem("shared-selected-date") || localStorage.getItem("daily-activities-date")
@@ -1890,6 +1889,7 @@ export default function DailyActivitiesPage() {
 
   // ===== Theme state =====
   const [themes, setThemes] = useState<ActivityTheme[]>([])
+  const [calendarLockStatuses, setCalendarLockStatuses] = useState<Record<string, boolean>>({})
   const [lockDialogOpen, setLockDialogOpen] = useState(false)
   const [lockSubmitting, setLockSubmitting] = useState(false)
   const [themeEditWeekIndex, setThemeEditWeekIndex] = useState<number | null>(null)
@@ -1941,10 +1941,10 @@ export default function DailyActivitiesPage() {
         ? await activityThemeApi.unlock(detailDate, selectedSpaceId)
         : await activityThemeApi.lock(detailDate, selectedSpaceId)
       setThemes(current => [...current.filter(theme => theme.id !== result.id), result])
+      setCalendarLockStatuses(current => ({ ...current, [detailDate]: result.is_locked }))
       setPreviewEntry(null)
       setHistoryPanelOpen(false)
       setWithdrawalDialogOpen(false)
-      setThemeEditWeekIndex(null)
       setLockDialogOpen(false)
     } catch (error: any) {
       setWarningMsg(error?.message || (isDayLocked ? "解锁失败" : "锁定失败"))
@@ -1993,6 +1993,29 @@ export default function DailyActivitiesPage() {
       .then(data => { if (seq === themeSeqRef.current) setThemes(data) })
       .catch(() => { if (seq === themeSeqRef.current) setThemes([]) })
   }, [themeMonthStart, themeMonthEnd, selectedSpaceId])
+
+  const calendarLockSeqRef = useRef(0)
+  useEffect(() => {
+    calendarLockSeqRef.current += 1
+    setCalendarLockStatuses({})
+  }, [selectedSpaceId])
+
+  const handleCalendarLockMonthChange = useCallback((month: string) => {
+    const seq = ++calendarLockSeqRef.current
+    const [year, monthNumber] = month.split("-").map(Number)
+    const endDay = new Date(year, monthNumber, 0).getDate()
+    const spaceFilter = selectedSpaceId ? [selectedSpaceId] : undefined
+    activityThemeApi.list(`${month}-01`, `${month}-${String(endDay).padStart(2, "0")}`, spaceFilter)
+      .then((items) => {
+        if (seq !== calendarLockSeqRef.current) return
+        const next: Record<string, boolean> = {}
+        items.forEach((item) => { next[item.date] = item.is_locked === true })
+        setCalendarLockStatuses(next)
+      })
+      .catch(() => {
+        if (seq === calendarLockSeqRef.current) setCalendarLockStatuses({})
+      })
+  }, [selectedSpaceId])
 
   const saveTheme = async (date: string, weekTheme: string, dayTheme: string, spaceIds: string[]) => {
     const targetSpaceIds = spaceIds.length > 0 ? spaceIds : (selectedSpaceId ? [selectedSpaceId] : [""])
@@ -2680,56 +2703,19 @@ export default function DailyActivitiesPage() {
         {/* 月份导航 + 空间 */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0 relative">
-            <button onClick={() => { const d = new Date(detailDate); d.setMonth(d.getMonth() - 1); d.setDate(1); setDetailDate(formatDate(d)) }} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
-              <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
-            </button>
-            <button
-              className="text-[16px] font-medium text-[#2b2f36] hover:bg-[#f7f8fa] px-1 rounded transition-colors"
-              onClick={() => setMonthPickerOpen(!monthPickerOpen)}
-            >
-              {new Date(detailDate).getFullYear()}年{new Date(detailDate).getMonth() + 1}月
-            </button>
-            {monthPickerOpen && (
-              <>
-                <div className="fixed inset-0 z-[99]" onClick={() => setMonthPickerOpen(false)} />
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8e8] p-3 z-[100]" style={{ width: "220px" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <button className="p-0.5 rounded hover:bg-[#f7f8fa]" onClick={() => { const d = new Date(detailDate); d.setFullYear(d.getFullYear() - 1); setDetailDate(formatDate(d)) }}>
-                      <ChevronLeft className="h-3.5 w-3.5 text-[#4e535a]" />
-                    </button>
-                    <span className="text-[13px] font-medium text-[#2b2f36]">{new Date(detailDate).getFullYear()}年</span>
-                    <button className="p-0.5 rounded hover:bg-[#f7f8fa]" onClick={() => { const d = new Date(detailDate); d.setFullYear(d.getFullYear() + 1); setDetailDate(formatDate(d)) }}>
-                      <ChevronRight className="h-3.5 w-3.5 text-[#4e535a]" />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1">
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                      const d = new Date(detailDate)
-                      const isSelected = d.getMonth() + 1 === m
-                      return (
-                        <button
-                          key={m}
-                          className={`px-1.5 py-1.5 text-[12px] rounded transition-colors whitespace-nowrap ${isSelected ? "bg-[#3370ff] text-white" : "hover:bg-[#f7f8fa] text-[#2b2f36]"}`}
-                          onClick={() => { const nd = new Date(d.getFullYear(), m - 1, 1); setDetailDate(formatDate(nd)); setMonthPickerOpen(false) }}
-                        >
-                          {m}月
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-            <button onClick={() => { const d = new Date(detailDate); d.setMonth(d.getMonth() + 1); d.setDate(1); setDetailDate(formatDate(d)) }} className="p-1 rounded hover:bg-[#f7f8fa] transition-colors">
-              <ChevronRight className="h-4 w-4 text-[#4e535a]" />
-            </button>
+            <CalendarDatePicker
+              detailDate={detailDate}
+              onSelectDate={setDetailDate}
+              dateStatuses={calendarLockStatuses}
+              dateCounts={calendarCounts}
+              onMonthChange={handleCalendarLockMonthChange}
+              verifiedDotColor="green"
+            />
             <div className="ml-1.5"><SpaceDropdown spaces={spaces} selectedSpaceId={selectedSpaceId} onSelect={handleSpaceSelect} /></div>
           </div>
-          <div className={`ml-2 inline-flex h-7 items-center gap-1.5 rounded-[4px] border px-2 text-[12px] ${isDayLocked ? "border-[#b7d0ff] bg-[#f0f5ff] text-[#245bdb]" : "border-[#dee0e3] bg-white text-[#8f959e]"}`}>
-            <Lock className="h-3.5 w-3.5" />
-            <span>{isDayLocked ? "已核对" : "未核对"}</span>
-            {isDayLocked && currentTheme?.locked_by && <span className="text-[#8f959e]">· {currentTheme.locked_by}</span>}
-          </div>
+          <span className={`ml-2 text-[12px] ${isDayLocked ? "text-[#3370ff]" : "text-[#8f959e]"}`}>
+            {isDayLocked ? `已核对${currentTheme?.locked_by ? ` · ${currentTheme.locked_by}` : ""}` : "未核对"}
+          </span>
           {canManageActivityLock && (
             <button
               type="button"
@@ -2785,7 +2771,7 @@ export default function DailyActivitiesPage() {
                     <td
                       className={`px-2 text-center text-[12px] text-[#2b2f36] overflow-hidden text-ellipsis whitespace-nowrap ${isViewOnly ? "cursor-default" : "cursor-pointer hover:bg-[#f0f5ff]"}`}
                       style={{ height: "38px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
-                      onClick={() => { if (isViewOnly || isDayLocked) return; if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
+                      onClick={() => { if (isViewOnly) return; if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
                     >
                       {weekThemeText}
                     </td>
@@ -2794,7 +2780,6 @@ export default function DailyActivitiesPage() {
                       const isSelected = day.date === detailDate
                       const isToday = day.date === today
                       const dayTheme = day.inMonth ? themeMap.get(day.date)?.day_theme || "" : ""
-                      const dayLocked = day.inMonth && themeMap.get(day.date)?.is_locked === true
                       const hasActivities = (calendarCounts[day.date] || 0) > 0
                       return (
                         <td
@@ -2811,11 +2796,6 @@ export default function DailyActivitiesPage() {
                             }`}>{dayNum}</span>
                             {dayTheme && <span className="min-w-0 truncate">{dayTheme}</span>}
                           </div>
-                          {day.inMonth && (
-                            <div className={`mt-0.5 text-[9px] leading-none ${dayLocked ? "text-[#3370ff]" : "text-[#b0b5bb]"}`}>
-                              {dayLocked ? "已核对" : "未核对"}
-                            </div>
-                          )}
                         </td>
                       )
                     })}
@@ -2950,7 +2930,7 @@ export default function DailyActivitiesPage() {
             <AlertDialogDescription className="text-[13px] leading-6 text-[#646a73]">
               {isDayLocked
                 ? "解锁后，拥有相应操作权限的员工可以继续修改课程内容、参与人、发布状态和退课记录。"
-                : `${formatDateChinese(detailDate)}的课程内容与参与人将被锁定，所有账号都不能再修改；需要调整时须由有权限的人员先解锁。`}
+                : `${formatDateChinese(detailDate)}的课程安排、参与人、发布状态和退课记录将被锁定；周主题和每日主题仍可继续修改。`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
