@@ -28,6 +28,8 @@ interface Row {
   is_leader: boolean
   needs: string
   referrer_handler: string
+  receptionist: string
+  goal: string
   arrived: boolean
   cancelled: boolean
   feedback: string
@@ -38,7 +40,7 @@ interface Row {
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_id: "", created_by_id: "", created_by: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", activities: "" }
+  return { key: nextKey++, visit_id: "", created_by_id: "", created_by: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", receptionist: "", goal: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", activities: "" }
 }
 
 export interface VisitChangedCell {
@@ -123,7 +125,7 @@ const VISIT_CREATOR_ONLY_FIELDS = new Set<keyof Row>([
   "referrer_handler",
 ])
 
-const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 78, 80, 64, 207, 203, 203, 60, 60, 74, 74, 76, 76] as const
+const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 78, 80, 64, 207, 203, 203, 60, 60, 74, 84, 180, 74, 76, 76] as const
 
 export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved, onSavedCountChange, onSavingCountChange, onCustomerClick, onActivityClick, onCreateCustomer, onUndoRedoChange, onRestoreRef, onCaptureRef, onHistoryPushed, previewRows, previewChangedKeys, previewChangedCells, locked, verified = false, onClosePreview, toolbarLeading, toolbarTrailing, onDataLoaded, onRowsChange, onFlushRef }: BatchInputTableProps) {
   const [rows, setRows] = useState<Row[]>(initRows)
@@ -455,6 +457,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           is_leader: v.is_leader || false,
           needs: v.needs || "",
           referrer_handler: v.referrer_handler || "",
+          receptionist: v.receptionist || "",
+          goal: v.goal || "",
           arrived: v.arrived,
           cancelled: v.cancelled,
           feedback: v.feedback || "",
@@ -497,6 +501,10 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
             visit_time: row.visit_time || "",
             referrer_handler: row.referrer_handler,
           } : {}),
+          ...(!isViewOnly && !verified ? {
+            receptionist: row.receptionist,
+            goal: row.goal,
+          } : {}),
         })
         // 更新剩余次数
         if (result?.remaining_count !== undefined) {
@@ -517,6 +525,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           is_leader: row.is_leader,
           needs: row.needs,
           referrer_handler: row.referrer_handler,
+          receptionist: row.receptionist,
+          goal: row.goal,
           arrived: row.arrived,
           arrival_time: row.arrived ? row.visit_time : "",
           space_id: spaceId || undefined,
@@ -547,7 +557,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       }
     }
-  }, [date, spaceId, onSaved, canEditRow, currentActorId, currentActorName])
+  }, [date, spaceId, onSaved, canEditRow, currentActorId, currentActorName, isViewOnly, verified])
 
   // 同步 saveRow 到 ref，供 restoreFromHistory 使用
   useEffect(() => { saveRowRef.current = saveRow }, [saveRow])
@@ -581,7 +591,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   const FIELD_LABELS: Record<string, string> = {
     visit_time: "到店时间", nickname: "昵称", member_type: "会员身份",
-    is_leader: "组长", needs: "来访需求", referrer_handler: "引流处理",
+    is_leader: "组长", needs: "来访需求", referrer_handler: "邀约人",
+    receptionist: "接待人", goal: "目标",
     arrived: "到店状态", feedback: "客户信息", healing_notes: "跟进点",
   }
 
@@ -833,7 +844,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               </button>
             }
           />
-          <TooltipContent>{isViewOnly ? "当前账号可查看邀约，但不能新增、修改、排序、取消或删除" : "昵称、邀约人、时间及删除仅创建人可操作；取消/恢复可由非只读员工协作"}</TooltipContent>
+          <TooltipContent>{isViewOnly ? "当前账号可查看邀约，但不能新增、修改、排序、取消或删除" : "昵称、邀约人、时间及删除仅创建人可操作；接待人、目标和取消/恢复可由非只读员工协作"}</TooltipContent>
         </Tooltip>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <button
@@ -851,7 +862,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       </div>
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div ref={headerScrollRef} className="shrink-0 overflow-hidden">
-          <div className="min-w-[1444px]">
+          <div className="min-w-[1708px]">
             <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
@@ -871,6 +882,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">参与活动</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">今日成交</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">邀约人</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">接待人</th>
+              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">目标</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">所属组长</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">创建人</th>
               <th className="sticky right-0 z-20 bg-[#f7f8fa] px-1.5 py-2 text-center font-normal">操作</th>
@@ -880,7 +893,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           </div>
         </div>
         <div ref={scrollRef} onScroll={handleTableScroll} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-hide">
-          <div className="min-w-[1444px]">
+          <div className="min-w-[1708px]">
             <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
@@ -1047,6 +1060,38 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                         onChange={(v) => updateRow(row.key, "referrer_handler", typeof v === "string" ? v : v[0] || "")}
                         placeholder=""
                         className="h-7 [&]:border-[0.5px]"
+                      />
+                    )}
+                  </td>
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "receptionist") ? "bg-[#f5eeff] rounded" : ""}`}>
+                    {row.cancelled || !canEditField(row, "receptionist") ? (
+                      <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.receptionist ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.receptionist}>
+                        {row.receptionist || "-"}
+                      </span>
+                    ) : (
+                      <CustomerSearchInput rounded="2px"
+                        customers={customers}
+                        value={row.receptionist}
+                        showClear={false}
+                        selectionOnly
+                        onChange={(v) => updateRow(row.key, "receptionist", typeof v === "string" ? v : v[0] || "")}
+                        placeholder=""
+                        className="h-7 [&]:border-[0.5px]"
+                      />
+                    )}
+                  </td>
+                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "goal") ? "bg-[#f5eeff] rounded" : ""}`}>
+                    {row.cancelled || !canEditField(row, "goal") ? (
+                      <span className={`block max-h-[44px] overflow-hidden whitespace-pre-wrap break-words text-[12px] leading-[18px] ${row.goal ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.goal}>
+                        {row.goal || "-"}
+                      </span>
+                    ) : (
+                      <textarea
+                        value={row.goal}
+                        onChange={(event) => updateRow(row.key, "goal", event.target.value)}
+                        rows={1}
+                        placeholder=""
+                        className="block min-h-7 w-full resize-none rounded-[2px] border-[0.5px] border-[#e8eaed] bg-transparent px-2 py-1 text-[12px] leading-[18px] text-[#2b2f36] outline-none focus:border-[#3370ff]"
                       />
                     )}
                   </td>

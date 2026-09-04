@@ -1,6 +1,9 @@
 """课表与邀约记录按字段校验创建人权限。"""
 
 import uuid
+from io import BytesIO
+
+from openpyxl import load_workbook
 
 from app.services import position_edit_permission_service
 
@@ -34,6 +37,84 @@ def _create_other_account_headers(client):
     })
     assert login.status_code == 200
     return account, position, {"Authorization": f"Bearer {login.json()['token']}"}
+
+
+def test_visit_receptionist_and_goal_are_shared_for_non_view_accounts(client, created_customer):
+    visit_response = client.post("/api/visits", json={
+        "visit_date": "2026-09-04",
+        "visit_time": "14:00",
+        "customer_id": created_customer["id"],
+        "receptionist": created_customer["nickname"],
+        "goal": "完成首次需求确认",
+    })
+    assert visit_response.status_code == 200, visit_response.text
+    visit = visit_response.json()
+    assert visit["receptionist"] == created_customer["nickname"]
+    assert visit["goal"] == "完成首次需求确认"
+
+    account, position, other_headers = _create_other_account_headers(client)
+    try:
+        shared_update = client.patch(
+            f"/api/visits/{visit['id']}",
+            json={"receptionist": "", "goal": "由接待人完成方案沟通"},
+            headers=other_headers,
+        )
+        assert shared_update.status_code == 200, shared_update.text
+        assert shared_update.json()["receptionist"] == ""
+        assert shared_update.json()["goal"] == "由接待人完成方案沟通"
+
+        visit_logs = client.get("/api/operation-logs", params={"entity_id": visit["id"]})
+        assert visit_logs.status_code == 200
+        assert any(
+            "目标" in item["content"] and "接待人" in item["content"]
+            for item in visit_logs.json()
+        )
+
+        invalid_receptionist = client.patch(
+            f"/api/visits/{visit['id']}",
+            json={"receptionist": "不存在的接待人昵称"},
+            headers=other_headers,
+        )
+        assert invalid_receptionist.status_code == 400
+
+        set_view_only = client.put("/api/position-permissions/full", json={
+            "position": position["name"],
+            "pages": ["class-records", "daily-activities"],
+            "edit_permissions": {"visits": "view", "activities": "own"},
+        })
+        assert set_view_only.status_code == 200
+        view_only_update = client.patch(
+            f"/api/visits/{visit['id']}",
+            json={"goal": "仅浏览账号不能修改"},
+            headers=other_headers,
+        )
+        assert view_only_update.status_code == 403
+    finally:
+        client.delete(f"/api/accounts/{account['id']}")
+        client.delete(f"/api/positions/{position['id']}")
+        client.delete(f"/api/visits/{visit['id']}")
+
+
+def test_visit_export_marks_leader_row_yellow(client, created_customer):
+    date = "2026-09-05"
+    visit_response = client.post("/api/visits", json={
+        "visit_date": date,
+        "customer_id": created_customer["id"],
+        "is_leader": True,
+    })
+    assert visit_response.status_code == 200, visit_response.text
+    visit = visit_response.json()
+    try:
+        export_response = client.get(f"/api/visits/export?date={date}")
+        assert export_response.status_code == 200, export_response.text
+        sheet = load_workbook(BytesIO(export_response.content)).active
+        leader_row = next(
+            row for row in sheet.iter_rows(min_row=2)
+            if row[1].value == created_customer["nickname"]
+        )
+        assert all(cell.fill.fgColor.rgb == "FFFFF2CC" for cell in leader_row)
+    finally:
+        client.delete(f"/api/visits/{visit['id']}")
 
 
 def test_assigned_course_teacher_can_edit_course_content(client, created_customer):
@@ -289,7 +370,6 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
         assert other_shared_update.json()["healing_notes"].endswith(
             f"{account['owner']}：他人可补充跟进点"
         )
-
         other_private_need = client.patch(
             f"/api/visits/{visit_id}",
             json={"needs": "其他员工自己的来访需求"},

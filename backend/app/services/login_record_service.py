@@ -20,6 +20,7 @@ _recent_page_views: dict[tuple[str, str, str], datetime] = {}
 PAGE_NAMES = {
     # PC 管理端
     "/custom-analysis": "自定义筛选",
+    "/service-teachers": "服务老师",
     "/business-reminders": "提醒",
     "/referral-statistics": "引流统计",
     "/member-statistics": "会员情况",

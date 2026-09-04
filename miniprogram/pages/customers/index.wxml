@@ -165,8 +165,6 @@
   </view>
 
   <!-- 浮动添加按钮 -->
-  <view class="fab" wx:if="{{!isViewOnly}}" bindtap="onAddTap" bindlongpress="onFabLongPress">
-    <text class="fab-icon">+</text>
-  </view>
+  <draggable-fab wx:if="{{!isViewOnly}}" storage-key="customers-fab-position" bindtap="onAddTap" bindlongpress="onFabLongPress" />
   </block>
 </view>

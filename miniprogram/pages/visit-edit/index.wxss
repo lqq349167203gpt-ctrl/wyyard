@@ -54,6 +54,12 @@
   text-align: right;
 }
 
+.goal-input {
+  min-height: 40rpx;
+  padding: 8rpx 0;
+  line-height: 40rpx;
+}
+
 .form-picker {
   flex: 1;
   min-width: 0;

@@ -1,0 +1,46 @@
+.fab-movable-area {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+.fab-movable-view {
+  width: 104rpx;
+  height: 104rpx;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.fab-movable-view.ready {
+  opacity: 1;
+}
+
+.fab-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  background-color: #3370ff;
+  box-shadow: 0 8rpx 24rpx rgba(51, 112, 255, 0.22);
+}
+
+.fab-button:active {
+  transform: scale(0.96);
+}
+
+.fab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -4rpx;
+  color: #ffffff;
+  font-size: 52rpx;
+}

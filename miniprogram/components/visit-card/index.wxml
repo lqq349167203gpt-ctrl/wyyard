@@ -36,6 +36,14 @@
         <text class="needs-label">来访需求</text>
         <text class="needs-content">{{visit.needs}}</text>
       </view>
+      <view class="needs-row" wx:if="{{visit.receptionist}}">
+        <text class="needs-label">接待人</text>
+        <text class="needs-content">{{visit.receptionist}}</text>
+      </view>
+      <view class="needs-row" wx:if="{{visit.goal}}">
+        <text class="needs-label">目标</text>
+        <text class="needs-content goal-content">{{visit.goal}}</text>
+      </view>
       <view class="card-actions">
         <text class="creator-text">创建人 {{visit.created_by || '未记录'}}</text>
         <view class="action-list" wx:if="{{!editMode}}">

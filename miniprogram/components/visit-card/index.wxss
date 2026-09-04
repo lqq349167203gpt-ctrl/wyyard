@@ -170,6 +170,13 @@
   word-break: break-all;
 }
 
+.goal-content {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .arrival-badge {
   flex-shrink: 0;
   min-width: 100rpx;

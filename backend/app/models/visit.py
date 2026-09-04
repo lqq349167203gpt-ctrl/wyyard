@@ -23,6 +23,8 @@ class VisitRecordBase(SafeBaseModel):
     daily_card_usage: int = 0
     needs: str = ""
     referrer_handler: str = ""  # 承接人
+    receptionist: str = ""  # 接待人（必须来自客户资料昵称）
+    goal: str = ""  # 本次邀约目标（多人共享字段）
     space_id: str = ""  # 所属空间
     is_leader: bool = False  # 是否组长
     arrived: bool = False  # 是否到店
@@ -36,7 +38,7 @@ class VisitRecordBase(SafeBaseModel):
     created_by: str = ""  # 创建人显示名称（服务端写入）
 
     @field_validator(
-        "visit_time", "member_type", "needs", "referrer_handler",
+        "visit_time", "member_type", "needs", "referrer_handler", "receptionist", "goal",
         "space_id", "arrival_time", "created_by_id", "created_by",
         "experience", "feedback", "healing_notes",
         mode="before",

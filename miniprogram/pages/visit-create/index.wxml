@@ -46,21 +46,35 @@
         <text class="picker-clear" wx:if="{{customerName}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
-    <view class="form-item">
-      <text class="form-label">来访需求</text>
-      <input class="form-input" placeholder="请输入来访需求" placeholder-class="form-input-placeholder" value="{{needs}}" bindinput="onNeedsInput" />
-    </view>
-    <view class="form-item last" bindtap="onPickerOpen" data-field="referrerHandler">
+    <view class="form-item" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>
       <view class="picker-value-wrap">
         <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || '选择用户'}}</text>
         <text class="picker-clear" wx:if="{{referrerHandler}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
       </view>
     </view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="receptionist">
+      <text class="form-label">接待人</text>
+      <view class="picker-value-wrap">
+        <text class="{{receptionist ? '' : 'placeholder'}}">{{receptionist || '选择用户'}}</text>
+        <text class="picker-clear" wx:if="{{receptionist}}" catchtap="onPickerClear" data-field="receptionist">x</text>
+      </view>
+    </view>
+    <view class="form-item last">
+      <text class="form-label">目标</text>
+      <textarea class="form-input goal-input" auto-height maxlength="5000" placeholder="请输入目标" placeholder-class="form-input-placeholder" value="{{goal}}" bindinput="onGoalInput" />
+    </view>
   </view>
 
   <!-- 记录 -->
   <view class="form-card">
+    <view class="form-item column textarea-row">
+      <text class="form-label" style="margin-bottom: 16rpx;">来访需求</text>
+      <view class="text-preview" bindtap="onOpenEditor" data-field="needs" data-label="来访需求">
+        <text class="text-preview-content {{needs ? '' : 'text-preview-placeholder'}}">{{needs || '点击输入来访需求'}}</text>
+        <text class="text-preview-count">{{needs.length}} 字</text>
+      </view>
+    </view>
     <view class="form-item column textarea-row">
       <text class="form-label" style="margin-bottom: 16rpx;">客户信息</text>
       <view class="text-preview" bindtap="onOpenEditor" data-field="feedback" data-label="客户信息">

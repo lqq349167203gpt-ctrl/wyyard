@@ -18,6 +18,9 @@ Page({
     nickname: '',
     referrerHandler: '',
     referrerHandlerId: '',
+    receptionist: '',
+    receptionistId: '',
+    goal: '',
     isLeader: false,
     arrived: false,
     arrivalTime: '',
@@ -93,6 +96,9 @@ Page({
         nickname: visit.nickname || '',
         referrerHandler: visit.referrer_handler || '',
         referrerHandlerId: visit.referrer_handler_id || '',
+        receptionist: visit.receptionist || '',
+        receptionistId: visit.receptionist_id || '',
+        goal: visit.goal || '',
         isLeader: visit.is_leader || false,
         arrived: visit.arrived || false,
         arrivalTime: visit.arrival_time || '',
@@ -172,8 +178,8 @@ Page({
   // 搜索选择弹窗
   onPickerOpen(e) {
     const field = e.currentTarget.dataset.field
-    if (this.data.verified || (this.data.readOnly && (field === 'customer' || field === 'referrerHandler'))) return
-    const titleMap = { customer: '客户', referrerHandler: '邀约人' }
+    if (this.data.viewOnly || this.data.verified || (this.data.readOnly && (field === 'customer' || field === 'referrerHandler'))) return
+    const titleMap = { customer: '客户', referrerHandler: '邀约人', receptionist: '接待人' }
     this.setData({
       showPicker: true,
       pickerField: field,
@@ -204,6 +210,8 @@ Page({
       this.setData({ customerId: id, nickname: nickname })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: nickname, referrerHandlerId: id })
+    } else if (field === 'receptionist') {
+      this.setData({ receptionist: nickname, receptionistId: id })
     }
     this.setData({ showPicker: false, pickerField: '', pickerKeyword: '' })
   },
@@ -214,7 +222,14 @@ Page({
       this.setData({ customerId: '', nickname: '' })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: '', referrerHandlerId: '' })
+    } else if (field === 'receptionist') {
+      this.setData({ receptionist: '', receptionistId: '' })
     }
+  },
+
+  onGoalInput(e) {
+    if (this.data.viewOnly || this.data.verified) return
+    this.setData({ goal: e.detail.value })
   },
 
   onBack() {
@@ -236,6 +251,8 @@ Page({
         is_leader: this.data.isLeader,
         arrived: this.data.arrived,
         arrival_time: this.data.arrivalTime || null,
+        receptionist: this.data.receptionist,
+        goal: this.data.goal,
         ...(this.data.readOnly ? {} : {
           customer_id: this.data.customerId,
           visit_date: this.data.visitDate,

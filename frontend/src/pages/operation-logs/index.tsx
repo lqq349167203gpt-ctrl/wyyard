@@ -17,6 +17,7 @@ const PAGE_SIZE = 20
 
 const PAGE_LABELS: Record<string, string> = {
   "custom-analysis": "自定义筛选",
+  "service-teacher": "服务老师",
   "healing-records": "客户信息",
   "activity-records": "活动记录",
   "traffic-records": "引流记录",
@@ -120,7 +121,7 @@ const FIELD_CN: Record<string, string> = {
   price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
   sort_order: "排序", is_public_welfare: "公益", category: "分类",
   arrived: "到店", cancelled: "邀约状态", arrival_time: "到店时间", experience: "客户反馈", feedback: "客户信息",
-  needs: "来访需求",
+  needs: "来访需求", receptionist: "接待人", goal: "目标",
   visit_date: "到访日期", visit_time: "预计时间", visit_count: "到店次数",
   referrer: "引流人", referral_date: "引流日期", traffic_source: "流量来源", paid_content: "付费内容",
   basic_info: "基础信息", assessment: "客户评估", tags: "标签", self_tags: "个人标签",

@@ -581,29 +581,6 @@
   font-size: 28rpx;
 }
 
-.fab {
-  position: fixed;
-  right: 32rpx;
-  bottom: 200rpx;
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  background-color: #3370ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 32rpx rgba(51, 112, 255, 0.25);
-}
-
-.fab-icon {
-  font-size: 52rpx;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: -4rpx;
-}
-
 .head-tools {
   display: flex;
   align-items: center;

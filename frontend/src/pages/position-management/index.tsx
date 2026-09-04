@@ -27,6 +27,7 @@ import { AccountsContent } from "@/pages/accounts"
 const ALL_PAGES = [
   // 数据
   { key: "custom-analysis", label: "自定义筛选" },
+  { key: "service-teacher", label: "服务老师" },
   { key: "referral-statistics", label: "引流统计" },
   { key: "member-statistics", label: "会员情况" },
   { key: "course-statistics", label: "课程" },
@@ -72,7 +73,7 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["custom-analysis", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
+  { label: "数据", keys: ["custom-analysis", "service-teacher", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
   { label: "报表", keys: ["financial-overview", "daily-report"] },
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },

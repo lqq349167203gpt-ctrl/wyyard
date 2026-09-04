@@ -56,12 +56,23 @@
         <text class="picker-clear" wx:if="{{nickname && !readOnly && !verified}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
-    <view class="form-item last" bindtap="onPickerOpen" data-field="referrerHandler">
+    <view class="form-item" bindtap="onPickerOpen" data-field="referrerHandler">
       <text class="form-label">邀约人</text>
       <view class="picker-value-wrap">
         <text class="{{referrerHandler ? '' : 'placeholder'}}">{{referrerHandler || (readOnly || verified ? '-' : '选择用户')}}</text>
         <text class="picker-clear" wx:if="{{referrerHandler && !readOnly && !verified}}" catchtap="onPickerClear" data-field="referrerHandler">x</text>
       </view>
+    </view>
+    <view class="form-item" bindtap="onPickerOpen" data-field="receptionist">
+      <text class="form-label">接待人</text>
+      <view class="picker-value-wrap">
+        <text class="{{receptionist ? '' : 'placeholder'}}">{{receptionist || (viewOnly || verified ? '-' : '选择用户')}}</text>
+        <text class="picker-clear" wx:if="{{receptionist && !viewOnly && !verified}}" catchtap="onPickerClear" data-field="receptionist">x</text>
+      </view>
+    </view>
+    <view class="form-item last">
+      <text class="form-label">目标</text>
+      <textarea class="form-input goal-input" auto-height maxlength="5000" disabled="{{viewOnly || verified}}" placeholder="{{viewOnly || verified ? '-' : '请输入目标'}}" placeholder-class="form-input-placeholder" value="{{goal}}" bindinput="onGoalInput" />
     </view>
   </view>
 

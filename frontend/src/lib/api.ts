@@ -441,6 +441,51 @@ export const customerApi = {
   generateTags: (tags: string) => request<{ tags: string }>("/api/customers/generate-tags", { method: "POST", body: JSON.stringify({ tags }) }),
 }
 
+export type ServiceTeacherFollowUpFilter = "inactive_30" | "active_30" | "all"
+
+export interface ServiceTeacherCustomerItem {
+  id: string
+  nickname: string
+  name: string
+  member_type: string
+  follow_up_status: string
+  service_teacher: string
+  last_follow_up_at: string
+  last_follow_up_category: string
+  last_follow_up_by: string
+  is_active_30: boolean
+}
+
+export interface ServiceTeacherCustomerSummary {
+  total: number
+  active_30: number
+  inactive_30: number
+}
+
+export interface ServiceTeacherCustomerResponse extends PaginatedResponse<ServiceTeacherCustomerItem> {
+  teacher: string
+  summary: ServiceTeacherCustomerSummary
+}
+
+export const serviceTeacherCustomerApi = {
+  metadata: () => request<{ current_teacher: string; teachers: string[] }>("/api/service-teacher-customers/metadata"),
+  list: (params: {
+    service_teacher?: string
+    follow_up_filter?: ServiceTeacherFollowUpFilter
+    nickname?: string
+    page: number
+    page_size: number
+  }) => {
+    const query = new URLSearchParams()
+    if (params.service_teacher) query.set("service_teacher", params.service_teacher)
+    if (params.follow_up_filter) query.set("follow_up_filter", params.follow_up_filter)
+    if (params.nickname) query.set("nickname", params.nickname)
+    query.set("page", String(params.page))
+    query.set("page_size", String(params.page_size))
+    return request<ServiceTeacherCustomerResponse>(`/api/service-teacher-customers?${query.toString()}`)
+  },
+}
+
 export const customerTagApi = {
   list: (includeDisabled = false) => request<CustomerTag[]>(`/api/customer-tags${includeDisabled ? "?include_disabled=true" : ""}`),
   create: (data: CustomerTagCreate) => request<CustomerTag>("/api/customer-tags", { method: "POST", body: JSON.stringify(data) }),
@@ -615,6 +660,8 @@ export interface VisitRecord {
   daily_card_usage: number
   needs: string
   referrer_handler: string
+  receptionist: string
+  goal: string
   space_id: string
   is_leader: boolean
   arrived: boolean
@@ -645,6 +692,8 @@ export interface VisitRecordCreate {
   daily_card_usage?: number
   needs?: string
   referrer_handler?: string
+  receptionist?: string
+  goal?: string
   space_id?: string
   is_leader?: boolean
   arrived?: boolean

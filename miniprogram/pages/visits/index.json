@@ -3,7 +3,8 @@
   "navigationBarBackgroundColor": "#f3f7ff",
   "navigationBarTextStyle": "black",
   "usingComponents": {
-    "visit-card": "/components/visit-card/index"
+    "visit-card": "/components/visit-card/index",
+    "draggable-fab": "/components/draggable-fab/index"
   },
   "enablePullDownRefresh": true
 }

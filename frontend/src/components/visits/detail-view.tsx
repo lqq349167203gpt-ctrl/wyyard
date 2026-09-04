@@ -548,12 +548,14 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         "组长情况": role || "-",
         "组长获得的信息": "",
         "邀约人": v.referrer_handler || "",
+        "接待人": v.receptionist || "",
+        "目标": v.goal || "",
       }
     })
     if (!rows.length) return
 
     const headers = Object.keys(rows[0])
-    const colWidths = [10, 12, 10, 10, 12, 40, 10, 30, 10]
+    const colWidths = [10, 12, 10, 10, 12, 40, 10, 30, 10, 10, 40]
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet("邀约到场", { views: [{ showGridLines: false }] })
     ws.columns = headers.map((h, i) => ({ header: h, key: h, width: colWidths[i] }))
@@ -598,6 +600,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     ws.getRow(1).eachCell(cell => {
       cell.font = { bold: true }
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D3D6" } }
+    })
+    rows.forEach((rowData, index) => {
+      if (rowData["组长情况"] !== "组长") return
+      ws.getRow(index + 2).eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF2CC" } }
+      })
     })
 
     const buffer = await wb.xlsx.writeBuffer()

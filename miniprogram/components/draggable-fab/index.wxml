@@ -1,0 +1,15 @@
+<movable-area class="fab-movable-area">
+  <movable-view
+    class="fab-movable-view {{ready ? 'ready' : ''}}"
+    direction="all"
+    x="{{x}}"
+    y="{{y}}"
+    inertia="{{true}}"
+    out-of-bounds="{{false}}"
+    bindchange="onMove"
+  >
+    <view class="fab-button" catchtap="onTap" bindlongpress="onLongPress">
+      <text class="fab-icon">+</text>
+    </view>
+  </movable-view>
+</movable-area>

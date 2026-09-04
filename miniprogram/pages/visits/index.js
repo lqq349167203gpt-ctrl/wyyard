@@ -446,9 +446,14 @@ Page({
   // ---- 排序存储 ----
 
   saveOrder() {
-    if (this.data.isDayVerified) return
+    if (this.data.isDayVerified) return Promise.resolve(false)
     const ids = this.data.visits.map(v => v.id)
-    visitApi.reorder(ids).catch(e => console.error('保存排序失败:', e))
+    return visitApi.reorder(ids)
+      .then(() => true)
+      .catch(e => {
+        console.error('保存排序失败:', e)
+        return false
+      })
   },
 
   // ---- 组长映射 ----
@@ -472,6 +477,31 @@ Page({
   onToggleEditMode() {
     if (this.data.isDayVerified) return
     this.setData({ editMode: !this.data.editMode })
+  },
+
+  onSortByTime() {
+    if (!this.data.editMode || this.data.isViewOnly || this.data.isDayVerified) return
+    const toMinutes = (value) => {
+      const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/)
+      if (!match) return Number.MAX_SAFE_INTEGER
+      return Number(match[1]) * 60 + Number(match[2])
+    }
+    const visits = this.data.visits
+      .map((visit, index) => ({ visit, index }))
+      .sort((left, right) => {
+        if (Boolean(left.visit.cancelled) !== Boolean(right.visit.cancelled)) {
+          return left.visit.cancelled ? 1 : -1
+        }
+        const timeDifference = toMinutes(left.visit.visit_time) - toMinutes(right.visit.visit_time)
+        return timeDifference || left.index - right.index
+      })
+      .map(item => item.visit)
+    const leaderMap = this.buildLeaderMap(visits)
+    this.setData({ visits, leaderMap }, () => {
+      this.saveOrder().then(saved => {
+        wx.showToast({ title: saved ? '已按时间排序' : '排序保存失败', icon: 'none' })
+      })
+    })
   },
 
   onMoveUp(e) {

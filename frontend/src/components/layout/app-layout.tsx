@@ -16,6 +16,7 @@ const PAGE_TITLES: Record<string, string> = {
 
 
   "/custom-analysis": "无忧 - 自定义筛选",
+  "/service-teachers": "无忧 - 服务老师",
   "/visits": "无忧 - 到场人员",
   "/healing-records": "无忧 - 客户信息",
   "/courses/class-records": "无忧 - 人员安排",

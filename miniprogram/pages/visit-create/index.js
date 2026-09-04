@@ -13,6 +13,9 @@ Page({
     healingNotes: '',
     referrerHandler: '',
     referrerHandlerId: '',
+    receptionist: '',
+    receptionistId: '',
+    goal: '',
     spaces: [],
     spaceIndex: 0,
     isLeader: false,
@@ -113,8 +116,8 @@ Page({
     this.setData({ arrivalTime: e.detail.value })
   },
 
-  onNeedsInput(e) {
-    this.setData({ needs: e.detail.value })
+  onGoalInput(e) {
+    this.setData({ goal: e.detail.value })
   },
 
   onOpenEditor(e) {
@@ -133,7 +136,7 @@ Page({
   // 搜索选择弹窗
   onPickerOpen(e) {
     const field = e.currentTarget.dataset.field
-    const titleMap = { customer: '客户', referrerHandler: '邀约人' }
+    const titleMap = { customer: '客户', referrerHandler: '邀约人', receptionist: '接待人' }
     this.setData({
       showPicker: true,
       pickerField: field,
@@ -164,6 +167,8 @@ Page({
       this.setData({ customerId: id, customerName: nickname })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: nickname, referrerHandlerId: id })
+    } else if (field === 'receptionist') {
+      this.setData({ receptionist: nickname, receptionistId: id })
     }
     this.setData({ showPicker: false, pickerField: '', pickerKeyword: '' })
   },
@@ -174,6 +179,8 @@ Page({
       this.setData({ customerId: '', customerName: '' })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: '', referrerHandlerId: '' })
+    } else if (field === 'receptionist') {
+      this.setData({ receptionist: '', receptionistId: '' })
     }
   },
 
@@ -197,6 +204,8 @@ Page({
         needs: this.data.needs,
         referrer_handler: this.data.referrerHandler,
         referrer_handler_id: this.data.referrerHandlerId || '',
+        receptionist: this.data.receptionist,
+        goal: this.data.goal,
         space_id: space?.id || '',
         is_leader: this.data.isLeader,
         arrived: this.data.arrived,

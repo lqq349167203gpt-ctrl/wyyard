@@ -60,6 +60,7 @@ from app.api.positions import router as positions_router
 from app.api.project_deductions import router as project_deductions_router
 from app.api.project_refunds import router as project_refunds_router
 from app.api.reminders import router as reminders_router
+from app.api.service_teacher_customers import router as service_teacher_customers_router
 from app.api.spaces import router as spaces_router
 from app.api.statistics import router as statistics_router
 from app.api.system_helper import router as system_helper_router
@@ -145,6 +146,7 @@ app.include_router(positions_router)
 app.include_router(daily_groupings_router)
 app.include_router(activity_permissions_router)
 app.include_router(reminders_router)
+app.include_router(service_teacher_customers_router)
 app.include_router(business_reminders_router)
 app.include_router(organizations_router)
 app.include_router(activity_themes_router)

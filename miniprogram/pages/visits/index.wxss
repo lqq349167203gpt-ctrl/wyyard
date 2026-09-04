@@ -291,6 +291,23 @@
   color: #ffffff;
 }
 
+.time-sort-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48rpx;
+  padding: 0 20rpx;
+  border-radius: 8rpx;
+  background-color: #eef3ff;
+  flex-shrink: 0;
+}
+
+.time-sort-btn text {
+  color: #3370ff;
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
 /* 连续名单：与客户首页保持“一组一卡、组内分行” */
 .visit-section {
   padding-top: 330rpx;
@@ -375,21 +392,6 @@
   }
 }
 
-/* 浮动按钮 */
-.fab {
-  position: fixed;
-  right: 32rpx;
-  bottom: 200rpx;
-  z-index: 20;
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  background-color: #3370ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .export-btn {
   display: flex;
   align-items: center;
@@ -405,15 +407,6 @@
   font-size: 22rpx;
   color: #4e535a;
   font-weight: 500;
-}
-
-.fab-icon {
-  font-size: 52rpx;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: -4rpx;
 }
 
 /* 空状态 */

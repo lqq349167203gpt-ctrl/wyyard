@@ -72,7 +72,7 @@ async def create_account(
 
 ALL_PAGE_KEYS = [
     # 数据
-    "custom-analysis", "referral-statistics",
+    "custom-analysis", "service-teacher", "referral-statistics",
     "member-statistics", "course-statistics", "product-sales", "statistics", "financial-overview",
     # 报表
     "daily-report",

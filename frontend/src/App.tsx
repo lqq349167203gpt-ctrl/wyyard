@@ -36,6 +36,7 @@ import ChangePasswordPage from "@/pages/change-password"
 import DisabledCustomersPage from "@/pages/disabled-customers"
 import ChatHistoryPage from "@/pages/chat-history"
 import StatisticsPage from "@/pages/statistics"
+import ServiceTeachersPage from "@/pages/service-teachers"
 import ProductSalesPage from "@/pages/product-sales"
 import DailyReportPage from "@/pages/daily-report"
 import MemberStatisticsPage from "@/pages/member-statistics"
@@ -87,6 +88,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/referral-statistics": "referral-statistics",
   "/chat-history": "chat-history",
   "/statistics": "statistics",
+  "/service-teachers": "service-teacher",
   "/product-sales": "product-sales",
   "/member-statistics": "member-statistics",
   "/course-statistics": "course-statistics",
@@ -205,6 +207,7 @@ function App() {
               <Route path="/referral-statistics" element={<ReferralStatisticsPage />} />
               <Route path="/chat-history" element={<ChatHistoryPage />} />
               <Route path="/statistics" element={<StatisticsPage />} />
+              <Route path="/service-teachers" element={<ServiceTeachersPage />} />
               <Route path="/product-sales" element={<ProductSalesPage />} />
               <Route path="/member-statistics" element={<MemberStatisticsPage />} />
               <Route path="/course-statistics" element={<CourseStatisticsPage />} />

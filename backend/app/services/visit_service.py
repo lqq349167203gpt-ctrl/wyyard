@@ -598,6 +598,8 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 # 来访需求由 API 按当前账号单独注入，服务层不再暴露公共字段。
                 "needs": "",
                 "referrer_handler": r.referrer_handler or "",
+                "receptionist": r.receptionist or "",
+                "goal": r.goal or "",
                 "arrived": r.arrived,
                 "arrival_time": r.arrival_time or "",
                 "arrived_count": all_arrived_counts.get(r.customer_id, 0),
@@ -633,6 +635,13 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
         if not handler:
             raise ValueError("邀约人必须选择客户资料中已有的昵称")
         data = data.model_copy(update={"referrer_handler": handler.nickname})
+    if data.receptionist:
+        from app.services import customer_service
+
+        receptionist = customer_service.get_by_nickname(data.receptionist)
+        if not receptionist:
+            raise ValueError("接待人必须选择客户资料中已有的昵称")
+        data = data.model_copy(update={"receptionist": receptionist.nickname})
     _invalidate_counts_cache()
     with _visit_lock:
         # 检查当天是否已到场（customer_id 为空时跳过检查）
@@ -675,6 +684,16 @@ def create_visit(data: VisitRecordCreate) -> VisitRecord:
     return record
 
 
+def list_basic_visits(customer_ids: set[str] | None = None) -> List[VisitRecord]:
+    """返回未删除的邀约基础记录，不计算活动、卡次等列表附加信息。"""
+    return [
+        record
+        for record in _visits.values()
+        if not record.is_deleted
+        and (customer_ids is None or record.customer_id in customer_ids)
+    ]
+
+
 def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
     _invalidate_counts_cache()
     with _visit_lock:
@@ -707,6 +726,16 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
                 if normalized_handler and not handler:
                     raise ValueError("邀约人必须选择客户资料中已有的昵称")
                 data["referrer_handler"] = handler.nickname if handler else ""
+
+        if "receptionist" in data:
+            normalized_receptionist = str(data.get("receptionist") or "").strip()
+            if normalized_receptionist != record.receptionist:
+                from app.services import customer_service
+
+                receptionist = customer_service.get_by_nickname(normalized_receptionist) if normalized_receptionist else None
+                if normalized_receptionist and not receptionist:
+                    raise ValueError("接待人必须选择客户资料中已有的昵称")
+                data["receptionist"] = receptionist.nickname if receptionist else ""
 
         old_arrived = record.arrived
         if requested_cancelled is True:
