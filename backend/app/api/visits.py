@@ -295,11 +295,9 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
             "引流人": v.get("referrer") or "-",
             "客户昵称": v.get("nickname") or "",
             "预计时间": v.get("visit_time") or "",
-            "参与次数": v.get("visit_count") or 0,
             "会员身份": v.get("member_type") or "",
             "来访需求": v.get("needs") or "",
             "组长情况": role or "-",
-            "组长获得的信息": "",
             "邀约人": v.get("referrer_handler") or "",
             "接待人": v.get("receptionist") or "",
             "目标": v.get("goal") or "",
@@ -309,8 +307,8 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
         # 空表也返回有效 xlsx（只有表头）
         rows = []
 
-    headers = ["引流人", "客户昵称", "预计时间", "参与次数", "会员身份", "来访需求", "组长情况", "组长获得的信息", "邀约人", "接待人", "目标"]
-    col_widths = [10, 12, 10, 10, 12, 40, 10, 30, 10, 10, 40]
+    headers = ["引流人", "客户昵称", "预计时间", "会员身份", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
+    col_widths = [10, 12, 10, 12, 40, 10, 10, 10, 20]
 
     wb = Workbook()
     ws = wb.active
@@ -324,7 +322,10 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
     # 写表头
     header_font = Font(bold=True)
     header_fill = PatternFill(start_color="D0D3D6", end_color="D0D3D6", fill_type="solid")
-    leader_fill = PatternFill(start_color="FFFFF2CC", end_color="FFFFF2CC", fill_type="solid")
+    leader_fill = PatternFill(start_color="FFFEFA53", end_color="FFFEFA53", fill_type="solid")
+    leader_emphasis_font = Font(size=13, bold=True)
+    nickname_column = headers.index("客户昵称") + 1
+    leader_status_column = headers.index("组长情况") + 1
     thin_border = Border(
         left=Side(style="thin", color="C0C4CC"),
         right=Side(style="thin", color="C0C4CC"),
@@ -337,16 +338,18 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
         cell.font = header_font
         cell.fill = header_fill
         cell.border = thin_border
-        cell.alignment = Alignment(vertical="center", wrap_text=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     # 写数据行
     for r, row_data in enumerate(rows, 2):
         for c, h in enumerate(headers, 1):
             cell = ws.cell(row=r, column=c, value=row_data[h])
             cell.border = thin_border
-            cell.alignment = Alignment(vertical="center", wrap_text=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             if row_data["组长情况"] == "组长":
                 cell.fill = leader_fill
+                if c in {nickname_column, leader_status_column}:
+                    cell.font = leader_emphasis_font
 
     # 输出到内存
     buf = io.BytesIO()

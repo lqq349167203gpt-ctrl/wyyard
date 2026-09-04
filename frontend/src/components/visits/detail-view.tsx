@@ -542,11 +542,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         "引流人": customerMap.get(v.customer_id)?.referrer || "-",
         "客户昵称": v.nickname,
         "预计时间": v.visit_time || "",
-        "参与次数": v.visit_count || 0,
         "会员身份": v.member_type || "",
         "来访需求": v.needs || "",
         "组长情况": role || "-",
-        "组长获得的信息": "",
         "邀约人": v.referrer_handler || "",
         "接待人": v.receptionist || "",
         "目标": v.goal || "",
@@ -555,11 +553,54 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     if (!rows.length) return
 
     const headers = Object.keys(rows[0])
-    const colWidths = [10, 12, 10, 10, 12, 40, 10, 30, 10, 10, 40]
+    const colWidths = [10, 12, 10, 12, 40, 10, 10, 10, 20]
+
+    // 按预计时间分场次：上午场 <12:00，下午场 12:00~17:59，晚上场 >=18:00
+    const slotIndex = (time: string) => {
+      const h = parseInt((time || "").slice(0, 2))
+      if (isNaN(h)) return 0
+      if (h < 12) return 0
+      if (h < 18) return 1
+      return 2
+    }
+    const slotGroups = [
+      { label: "上午场", rows: [] as typeof rows },
+      { label: "下午场", rows: [] as typeof rows },
+      { label: "晚上场", rows: [] as typeof rows },
+    ]
+    rows.forEach(r => slotGroups[slotIndex(r["预计时间"])].rows.push(r))
+    const visibleSlots = slotGroups.filter(s => s.rows.length > 0)
+
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet("邀约到场", { views: [{ showGridLines: false }] })
     ws.columns = headers.map((h, i) => ({ header: h, key: h, width: colWidths[i] }))
-    rows.forEach(r => ws.addRow(r))
+
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top: { style: "thin", color: { argb: "FFC0C4CC" } },
+      bottom: { style: "thin", color: { argb: "FFC0C4CC" } },
+      left: { style: "thin", color: { argb: "FFC0C4CC" } },
+      right: { style: "thin", color: { argb: "FFC0C4CC" } },
+    }
+
+    const groupRowNumbers: number[] = []
+    const leaderRowNumbers: number[] = []
+
+    // 分场次插入：场次标题行 + 该场次的数据行
+    visibleSlots.forEach(slot => {
+      const groupRow = ws.addRow([slot.label])
+      groupRowNumbers.push(groupRow.number)
+      ws.mergeCells(groupRow.number, 1, groupRow.number, headers.length)
+      const groupCell = groupRow.getCell(1)
+      groupCell.alignment = { horizontal: "center", vertical: "middle" }
+      groupCell.font = { bold: true, size: 12 }
+      groupCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF3FF" } }
+      groupRow.height = 24
+
+      slot.rows.forEach(r => {
+        const row = ws.addRow(r)
+        if (r["组长情况"] === "组长") leaderRowNumbers.push(row.number)
+      })
+    })
 
     // 按内容自动计算行高（估算每行能放的字符数，中文约 2 字符宽度）
     const calcLines = (text: string, wch: number) => {
@@ -570,7 +611,23 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       }
       return lines
     }
+
+    // 表头：加粗 + 灰底 + 居中
+    ws.getRow(1).eachCell(cell => {
+      cell.font = { bold: true }
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D3D6" } }
+      cell.border = thinBorder
+      cell.alignment = { horizontal: "center", vertical: "middle" }
+    })
+
+    // 数据行：细边框 + 水平垂直居中 + 自动换行 + 行高
     ws.eachRow((row) => {
+      if (row.number === 1 || groupRowNumbers.includes(row.number)) return
+      for (let c = 1; c <= headers.length; c++) {
+        const cell = row.getCell(c)
+        cell.border = thinBorder
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }
+      }
       let maxLines = 1
       for (let i = 0; i < headers.length; i++) {
         const v = row.getCell(i + 1).value
@@ -580,32 +637,14 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       row.height = Math.max(30, maxLines * 18)
     })
 
-    // 全表细边框 + 垂直居中 + 自动换行
-    const thinBorder: Partial<ExcelJS.Borders> = {
-      top: { style: "thin", color: { argb: "FFC0C4CC" } },
-      bottom: { style: "thin", color: { argb: "FFC0C4CC" } },
-      left: { style: "thin", color: { argb: "FFC0C4CC" } },
-      right: { style: "thin", color: { argb: "FFC0C4CC" } },
-    }
-    ws.eachRow((row, rowNumber) => {
-      for (let c = 1; c <= headers.length; c++) {
-        const cell = row.getCell(c)
-        cell.border = thinBorder
-        // 参与次数列（第 4 列）数据行内容左对齐
-        const alignLeft = rowNumber > 1 && c === 4
-        cell.alignment = { vertical: "middle", wrapText: true, ...(alignLeft ? { horizontal: "left" as const } : {}) }
-      }
-    })
-    // 表头加粗 + 灰底
-    ws.getRow(1).eachCell(cell => {
-      cell.font = { bold: true }
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D3D6" } }
-    })
-    rows.forEach((rowData, index) => {
-      if (rowData["组长情况"] !== "组长") return
-      ws.getRow(index + 2).eachCell({ includeEmpty: true }, (cell) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF2CC" } }
+    // 组长行：黄底 + 昵称/“组长”加粗加大（与昵称一致）
+    leaderRowNumbers.forEach(rowNum => {
+      const leaderRow = ws.getRow(rowNum)
+      leaderRow.eachCell({ includeEmpty: true }, cell => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEFA53" } }
       })
+      leaderRow.getCell(headers.indexOf("客户昵称") + 1).font = { size: 13, bold: true }
+      leaderRow.getCell(headers.indexOf("组长情况") + 1).font = { size: 13, bold: true }
     })
 
     const buffer = await wb.xlsx.writeBuffer()

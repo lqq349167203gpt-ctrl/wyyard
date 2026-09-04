@@ -112,7 +112,19 @@ def test_visit_export_marks_leader_row_yellow(client, created_customer):
             row for row in sheet.iter_rows(min_row=2)
             if row[1].value == created_customer["nickname"]
         )
-        assert all(cell.fill.fgColor.rgb == "FFFFF2CC" for cell in leader_row)
+        headers = [cell.value for cell in sheet[1]]
+        assert "参与次数" not in headers
+        assert "组长获得的信息" not in headers
+        assert all(cell.fill.fgColor.rgb == "FFFEFA53" for cell in leader_row)
+        nickname_cell = leader_row[headers.index("客户昵称")]
+        assert nickname_cell.font.bold is True
+        assert nickname_cell.font.size == 13
+        leader_status_cell = leader_row[headers.index("组长情况")]
+        assert leader_status_cell.font.bold is True
+        assert leader_status_cell.font.size == 13
+        assert all(cell.alignment.horizontal == "center" for row in sheet.iter_rows() for cell in row)
+        goal_column = sheet.cell(1, headers.index("目标") + 1).column_letter
+        assert sheet.column_dimensions[goal_column].width == 20
     finally:
         client.delete(f"/api/visits/{visit['id']}")
 
