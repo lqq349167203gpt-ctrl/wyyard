@@ -108,7 +108,7 @@
     <!-- 扣卡次数（eks/ics 不显示） -->
     <view class="form-item" wx:if="{{activityType !== 'eks' && activityType !== 'ics'}}">
       <text class="form-label">扣卡次数</text>
-      <input wx:if="{{!readOnly}}" class="form-input" type="number" placeholder="1" placeholder-style="color: #b0b5bb;" value="{{membershipDeductionCount}}" bindinput="onDeductionCountInput" />
+      <input wx:if="{{!readOnly}}" class="form-input" type="number" placeholder="1" placeholder-style="color: #b0b5bb;" value="{{membershipDeductionCount}}" disabled="{{isPublicWelfare}}" bindinput="onDeductionCountInput" />
       <text wx:else class="protected-value">{{membershipDeductionCount}}</text>
     </view>
 

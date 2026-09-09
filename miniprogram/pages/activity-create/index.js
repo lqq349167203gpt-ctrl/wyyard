@@ -270,7 +270,13 @@ Page({
 
   // 公益
   onPublicWelfareChange(e) {
-    this.setData({ isPublicWelfare: e.detail.value })
+    const isPublicWelfare = e.detail.value
+    this.setData({
+      isPublicWelfare,
+      membershipDeductionCount: isPublicWelfare
+        ? 0
+        : Math.max(1, Number(this.data.membershipDeductionCount) || 1),
+    })
   },
 
   // 扣卡次数
@@ -523,7 +529,9 @@ Page({
             course_description: this.data.description,
             teacher_ids: this.data.teacherIds,
             is_public_welfare: this.data.isPublicWelfare,
-            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+            membership_deduction_count: this.data.isPublicWelfare
+              ? 0
+              : Math.max(1, Number(this.data.membershipDeductionCount) || 1),
             is_published: this.data.isPublished,
           }))
           break

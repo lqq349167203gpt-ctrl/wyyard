@@ -59,9 +59,11 @@ class TestClassRecordFull:
             "course_id": "c1",
             "course_name": "公益沙龙",
             "is_public_welfare": True,
+            "membership_deduction_count": 2,
         })
         assert resp.status_code == 200
         assert resp.json()["is_public_welfare"] is True
+        assert resp.json()["membership_deduction_count"] == 0
 
     def test_create_with_teachers(self, client, created_customer):
         """带课程老师"""

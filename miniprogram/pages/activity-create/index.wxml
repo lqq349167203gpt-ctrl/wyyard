@@ -90,7 +90,7 @@
     <!-- 扣卡次数（eks/ics 不显示） -->
     <view class="form-item" wx:if="{{activityType !== 'eks' && activityType !== 'ics'}}">
       <text class="form-label">扣卡次数</text>
-      <input class="form-input" type="number" placeholder="1" placeholder-style="color: #b0b5bb;" value="{{membershipDeductionCount}}" bindinput="onDeductionCountInput" />
+      <input class="form-input" type="number" placeholder="1" placeholder-style="color: #b0b5bb;" value="{{membershipDeductionCount}}" disabled="{{isPublicWelfare}}" bindinput="onDeductionCountInput" />
     </view>
 
     <!-- 老师（多选：class/eks/ics） -->

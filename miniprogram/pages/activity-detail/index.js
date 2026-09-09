@@ -144,7 +144,9 @@ Page({
       achieverId: raw.achiever_id || raw.host_id || (raw.teacher_ids || [])[0] || '',
       achieverName: (raw.teacher_names || [])[0] || raw.achiever_name || raw.host_name || '',
       isPublicWelfare: raw.is_public_welfare || false,
-      membershipDeductionCount: raw.membership_deduction_count != null ? raw.membership_deduction_count : 1,
+      membershipDeductionCount: raw.is_public_welfare
+        ? 0
+        : (raw.membership_deduction_count != null ? raw.membership_deduction_count : 1),
       isPublished: raw.is_published || false,
       participantIds: raw.participant_ids || [],
       withdrawnParticipantIds: raw.withdrawn_participant_ids || [],
@@ -385,7 +387,13 @@ Page({
 
   onPublicWelfareChange(e) {
     if (this.data.readOnly) return
-    this.setData({ isPublicWelfare: e.detail.value })
+    const isPublicWelfare = e.detail.value
+    this.setData({
+      isPublicWelfare,
+      membershipDeductionCount: isPublicWelfare
+        ? 0
+        : Math.max(1, Number(this.data.membershipDeductionCount) || 1),
+    })
   },
 
   onDeductionCountInput(e) {
@@ -640,7 +648,9 @@ Page({
             course_description: this.data.description,
             course_review: this.data.courseReview,
             teacher_ids: this.data.teacherIds,
-            membership_deduction_count: Number(this.data.membershipDeductionCount) || 1,
+            membership_deduction_count: this.data.isPublicWelfare
+              ? 0
+              : Math.max(1, Number(this.data.membershipDeductionCount) || 1),
           })
           break
         }

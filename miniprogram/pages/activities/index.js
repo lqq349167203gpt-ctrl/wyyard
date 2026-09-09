@@ -478,7 +478,7 @@ Page({
             color: BADGE_COLORS[badge] || BADGE_COLORS['沙龙'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
-            deductionCount: r.membership_deduction_count,
+            deductionCount: r.is_public_welfare ? 0 : r.membership_deduction_count,
             participants: r.visible_participant_count != null ? r.visible_participant_count : (r.participant_ids?.length || 0),
             space: r.space_name || '',
             source: 'class_record',
@@ -583,7 +583,8 @@ Page({
         r.typeText = typeParts.join(' · ')
         const metaParts = []
         if (r.teacher) metaParts.push(r.teacher)
-        if (r.deductionCount > 0) metaParts.push(`扣卡 ${r.deductionCount} 次`)
+        if (r.isPublicWelfare) metaParts.push('扣卡 0 次')
+        else if (r.deductionCount > 0) metaParts.push(`扣卡 ${r.deductionCount} 次`)
         r.metaText = metaParts.join(' · ')
         r.rosterCount = rosterParticipants.length
         r.noteTotalCount = Number(rawRecord.participant_note_total_count || 0)

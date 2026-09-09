@@ -12,12 +12,27 @@ _records: Dict[str, ClassRecord] = {}
 _record_lock = threading.Lock()
 
 
+def _normalize_membership_deduction_count(record: ClassRecord) -> ClassRecord:
+    """统一沙龙扣卡规则：公益固定为 0，非公益至少为 1。"""
+    record.membership_deduction_count = (
+        0
+        if record.is_public_welfare
+        else max(1, int(record.membership_deduction_count or 1))
+    )
+    return record
+
+
 def _load():
     global _records
     data = load_data(FILENAME)
     _records = {}
     for k, v in data.items():
-        _records[k] = ClassRecord(**v)
+        record = ClassRecord(**v)
+        stored_count = record.membership_deduction_count
+        _normalize_membership_deduction_count(record)
+        _records[k] = record
+        if record.membership_deduction_count != stored_count:
+            save_item(FILENAME, k, record.model_dump(mode="json"))
 
 
 def _save(item_id: str = ""):
@@ -183,6 +198,7 @@ def create_record(data: ClassRecordCreate, refresh_identities: bool = True) -> C
         updated_at=now,
         **data.model_dump(),
     )
+    _normalize_membership_deduction_count(record)
     _records[record.id] = record
     _save(record.id)
     _deduct_for_record(record)
@@ -223,11 +239,7 @@ def update_record(
                 "deleted_at",
             ):
                 setattr(record, key, value)
-        record.membership_deduction_count = (
-            0
-            if record.is_public_welfare
-            else max(1, int(record.membership_deduction_count or 1))
-        )
+        _normalize_membership_deduction_count(record)
         record.updated_at = datetime.now(timezone.utc)
         _records[record_id] = record
         _save(record_id)
