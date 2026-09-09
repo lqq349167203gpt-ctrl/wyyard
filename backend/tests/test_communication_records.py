@@ -53,6 +53,7 @@ def test_only_creator_can_delete_and_log_keeps_snapshot(client, created_customer
             headers=other_headers,
         )
         other_record = next(item for item in listed.json() if item["id"] == record["id"])
+        assert other_record["customer_name"] == (created_customer.get("name") or "")
         assert other_record["can_edit"] is False
         assert other_record["can_delete"] is False
 

@@ -1,8 +1,5 @@
 from types import SimpleNamespace
 
-import pytest
-from fastapi import HTTPException
-
 from app.utils.payment_validation import ensure_payment_closer_total
 
 
@@ -19,13 +16,11 @@ def test_payment_closer_total_accepts_matching_amounts():
     )
 
 
-def test_payment_closer_total_rejects_mismatch():
-    with pytest.raises(HTTPException, match="必须与费用金额") as exc_info:
-        ensure_payment_closer_total(
-            {"amount": 500, "closers": [{"id": "a", "amount": 300}]},
-            "amount",
-        )
-    assert exc_info.value.status_code == 400
+def test_payment_closer_total_accepts_mismatch_after_fields_are_removed():
+    ensure_payment_closer_total(
+        {"amount": 500, "closers": [{"id": "a", "amount": 300}]},
+        "amount",
+    )
 
 
 def test_payment_closer_total_merges_partial_update_with_existing_record():
@@ -35,16 +30,29 @@ def test_payment_closer_total_merges_partial_update_with_existing_record():
     )
     ensure_payment_closer_total({"notes": "仅修改备注"}, "fee", existing)
 
-    with pytest.raises(HTTPException, match="必须与费用金额"):
-        ensure_payment_closer_total({"fee": 1200}, "fee", existing)
+    ensure_payment_closer_total({"fee": 1200}, "fee", existing)
 
 
-def test_payment_closer_total_is_mandatory_for_pc_and_miniprogram_requests():
+def test_payment_closer_total_is_not_required_for_pc_and_miniprogram_requests():
     payload = {"amount": 500, "closers": [{"id": "a", "amount": 300}]}
     internal_request = SimpleNamespace(headers={})
     ensure_payment_closer_total(payload, "amount", request=internal_request)
 
     for source in ("pc", "miniprogram"):
         request = SimpleNamespace(headers={"x-client-type": source})
-        with pytest.raises(HTTPException, match="必须与费用金额"):
-            ensure_payment_closer_total(payload, "amount", request=request)
+        ensure_payment_closer_total(payload, "amount", request=request)
+
+
+def test_coarse_door_count_card_does_not_require_payment_details():
+    for source in ("pc", "miniprogram"):
+        request = SimpleNamespace(headers={"x-client-type": source})
+        ensure_payment_closer_total(
+            {
+                "card_type": "粗门次卡",
+                "price": 0,
+                "closers": [],
+                "payment_method": None,
+            },
+            "price",
+            request=request,
+        )

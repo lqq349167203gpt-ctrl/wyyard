@@ -3,13 +3,20 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from app.models.activity_participant_note import (
+    ActivityParticipantNoteSource,
+    ActivityParticipantNoteUpsert,
+)
 from app.models.base import StrictBaseModel
 from app.services import (
     activity_assignment_notification_service,
     activity_lock_service,
+    activity_participant_note_service,
     activity_withdrawal_service,
     class_record_service,
     customer_access_service,
+    position_edit_permission_service,
+    position_permission_service,
 )
 from app.services.customer_service import get_customer, list_all_customers
 from app.utils.pagination import paginate
@@ -21,8 +28,21 @@ from app.utils.record_ownership import (
     ensure_record_creator,
     stamp_creator,
 )
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
+
+ACTIVITY_NOTE_CATEGORY_LABELS = {
+    "customer_info": "客户信息",
+    "follow_up": "跟进点",
+}
+ACTIVITY_NOTE_SOURCE_LABELS = {
+    "class_record": "沙龙活动",
+    "group_case": "觉醒游戏",
+    "emotional_release": "情绪释放",
+    "energy_knot": "能量结",
+    "internal_course": "内部课程",
+}
 
 
 def _visible_customer_ids(request: Request | None) -> set[str] | None:
@@ -64,6 +84,98 @@ def _private_visit_need_map(request: Request | None, visit_ids: list[str]) -> di
         creator = note.created_by or "未知"
         result.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
     return {visit_id: "\n".join(lines) for visit_id, lines in result.items()}
+
+
+def _activity_note_context(
+    activity_source: ActivityParticipantNoteSource,
+    session_id: str,
+) -> dict:
+    from app.services import (
+        emotional_release_session_service,
+        energy_knot_session_service,
+        group_case_session_service,
+        internal_course_session_service,
+    )
+
+    getters = {
+        "class_record": class_record_service.get_record,
+        "group_case": group_case_session_service.get_session,
+        "emotional_release": emotional_release_session_service.get_session,
+        "energy_knot": energy_knot_session_service.get_session,
+        "internal_course": internal_course_session_service.get_session,
+    }
+    record = getters[activity_source](session_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="课程记录不存在")
+
+    participant_ids = set(getattr(record, "participant_ids", None) or [])
+    for group in getattr(record, "groups", None) or []:
+        participant_ids.update(
+            value
+            for value in (group.leader_id, group.deputy_id)
+            if value
+        )
+        participant_ids.update(group.member_ids or [])
+    if activity_source in {"group_case", "emotional_release", "energy_knot"}:
+        owner_id = str(getattr(record, "owner_id", "") or "")
+        if owner_id:
+            participant_ids.add(owner_id)
+
+    activity_name = str(
+        getattr(record, "activity_name", "")
+        or getattr(record, "course_name", "")
+        or getattr(record, "name", "")
+        or ACTIVITY_NOTE_SOURCE_LABELS[activity_source]
+    )
+    return {
+        "record": record,
+        "participant_ids": participant_ids,
+        "activity_name": activity_name,
+        "activity_date": str(getattr(record, "date", "") or ""),
+        "start_time": str(getattr(record, "start_time", "") or ""),
+        "end_time": str(getattr(record, "end_time", "") or ""),
+    }
+
+
+def _activity_note_actor(request: Request) -> tuple[str, str]:
+    return (
+        str(getattr(request.state, "user_id", "") or ""),
+        str(
+            getattr(request.state, "user_owner", "")
+            or getattr(request.state, "user_name", "")
+            or ""
+        ),
+    )
+
+
+def _ensure_activity_note_editable(request: Request) -> None:
+    roles = get_request_roles(request)
+    if (
+        "超级管理员" not in roles
+        and "daily-activities" not in position_permission_service.get_permissions(roles)
+    ):
+        raise HTTPException(status_code=403, detail="没有课表页面权限")
+    permissions = position_edit_permission_service.get_permissions(roles)
+    if (
+        "超级管理员" not in roles
+        and permissions["activities"] == "view"
+        and permissions["activity_participants"] == "view"
+    ):
+        raise HTTPException(status_code=403, detail="当前账号只有课表浏览权限")
+
+
+def _activity_note_response(note, request: Request) -> dict:
+    actor_id, actor_name = _activity_note_actor(request)
+    result = note.model_dump(mode="json")
+    can_edit = activity_participant_note_service.can_manage_note(
+        note,
+        actor_id,
+        actor_name,
+    )
+    result["category_label"] = ACTIVITY_NOTE_CATEGORY_LABELS[note.category]
+    result["can_edit"] = can_edit
+    result["can_delete"] = can_edit
+    return result
 
 
 def _fill_names(items: list, visible_ids: set[str] | None = None) -> list:
@@ -216,6 +328,115 @@ def list_unified(
     items.sort(key=sort_key, reverse=True)
 
     return paginate(items, page, page_size)
+
+
+@router.get("/participant-notes/list")
+def list_activity_participant_notes(
+    activity_source: ActivityParticipantNoteSource,
+    session_id: str,
+    request: Request,
+    customer_ids: str = "",
+):
+    roles = get_request_roles(request)
+    if (
+        "超级管理员" not in roles
+        and "daily-activities" not in position_permission_service.get_permissions(roles)
+    ):
+        raise HTTPException(status_code=403, detail="没有课表页面权限")
+    context = _activity_note_context(activity_source, session_id)
+    visible_ids = _visible_customer_ids(request) or set()
+    allowed_ids = context["participant_ids"].intersection(visible_ids)
+    requested_ids = {
+        customer_id.strip()
+        for customer_id in customer_ids.split(",")
+        if customer_id.strip()
+    }
+    if requested_ids:
+        allowed_ids.intersection_update(requested_ids)
+    if not allowed_ids:
+        return []
+    notes = activity_participant_note_service.list_notes(
+        activity_source,
+        session_id,
+        allowed_ids,
+    )
+    return [_activity_note_response(note, request) for note in notes]
+
+
+@router.post("/participant-notes")
+def save_activity_participant_note(
+    data: ActivityParticipantNoteUpsert,
+    request: Request,
+):
+    _ensure_activity_note_editable(request)
+    context = _activity_note_context(data.activity_source, data.session_id)
+    if data.customer_id not in context["participant_ids"]:
+        raise HTTPException(status_code=400, detail="该客户不在本场课程参与名单中")
+    customer = customer_access_service.require_customer_scope(
+        request,
+        data.customer_id,
+        action="记录信息到",
+    )
+    actor_id, actor_name = _activity_note_actor(request)
+    try:
+        note = activity_participant_note_service.upsert_note(
+            activity_source=data.activity_source,
+            session_id=data.session_id,
+            customer_id=data.customer_id,
+            category=data.category,
+            content=data.content,
+            activity_name=context["activity_name"],
+            activity_date=context["activity_date"],
+            start_time=context["start_time"],
+            end_time=context["end_time"],
+            actor_id=actor_id,
+            actor_name=actor_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    result = _activity_note_response(note, request)
+    request.state.operation_log_context = {
+        "content": (
+            f"保存课程参与人{ACTIVITY_NOTE_CATEGORY_LABELS[note.category]}："
+            f"课程：{note.activity_name}｜日期：{note.activity_date}｜"
+            f"客户：{customer.nickname or customer.name or customer.id}｜内容：{note.content}"
+        ),
+        "entity_id": note.id,
+        "after_data": result,
+    }
+    return result
+
+
+@router.delete("/participant-notes/{note_id}")
+def delete_activity_participant_note(note_id: str, request: Request):
+    _ensure_activity_note_editable(request)
+    note = activity_participant_note_service.get_note(note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    _activity_note_context(note.activity_source, note.session_id)
+    customer_access_service.require_customer_scope(
+        request,
+        note.customer_id,
+        action="删除信息于",
+    )
+    actor_id, actor_name = _activity_note_actor(request)
+    if not activity_participant_note_service.can_manage_note(
+        note,
+        actor_id,
+        actor_name,
+    ):
+        raise HTTPException(status_code=403, detail="只能删除自己录入的信息")
+    before = _activity_note_response(note, request)
+    activity_participant_note_service.delete_note(note_id)
+    request.state.operation_log_context = {
+        "content": (
+            f"清空课程参与人{ACTIVITY_NOTE_CATEGORY_LABELS[note.category]}："
+            f"课程：{note.activity_name}｜日期：{note.activity_date}｜内容：{note.content}"
+        ),
+        "entity_id": note.id,
+        "before_data": before,
+    }
+    return {"ok": True}
 
 
 @router.post("")
@@ -883,6 +1104,37 @@ def dashboard(
         owner_id = d.get("owner_id", "")
         if owner_id and owner_id not in visible_ids:
             d["owner_name"] = ""
+
+    activity_note_rows = (
+        ("class_record", cr_dicts),
+        ("group_case", gcs_dicts),
+        ("emotional_release", ers_dicts),
+        ("energy_knot", eks_dicts),
+        ("internal_course", ics_dicts),
+    )
+    for activity_source, activity_rows in activity_note_rows:
+        for activity in activity_rows:
+            withdrawn_ids = set(activity.get("withdrawn_participant_ids", []) or [])
+            active_ids = {
+                participant["id"]
+                for participant in activity.get("participants", [])
+                if participant.get("id") and not participant.get("withdrawn")
+            }
+            owner_id = str(activity.get("owner_id") or "")
+            if (
+                activity_source in {"group_case", "emotional_release", "energy_knot"}
+                and owner_id in visible_ids
+                and owner_id not in withdrawn_ids
+            ):
+                active_ids.add(owner_id)
+            completed_ids = activity_participant_note_service.completed_customer_ids(
+                activity_source,
+                activity["id"],
+            )
+            activity["participant_note_total_count"] = len(active_ids)
+            activity["participant_note_completed_count"] = len(
+                active_ids.intersection(completed_ids)
+            )
 
     visible_visit_ids = list(visible_ids)
     visit_counts = (

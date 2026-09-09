@@ -80,7 +80,7 @@ export default function FollowupRecordsPage() {
                   setSearchCustomerId("")
                 }
               }}
-              placeholder="搜索昵称"
+              placeholder="搜索姓名或昵称"
               filterSelected={false}
               className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
               rounded="7px"

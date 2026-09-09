@@ -127,6 +127,48 @@ def list_visible_notes(
     return list_notes(visit_ids)
 
 
+def get_previous_visit_need(
+    customer_id: str,
+    before_date: str = "",
+    exclude_visit_id: str = "",
+    account_id: str = "",
+    owner_name: str = "",
+    username: str = "",
+) -> tuple[VisitNote, str] | None:
+    """返回当前账号可见的最近一次来访需求及其邀约日期。"""
+    from app.services import visit_service
+
+    visits = [
+        visit
+        for visit in visit_service.list_basic_visits({customer_id})
+        if not visit.cancelled
+        and visit.id != exclude_visit_id
+        and (not before_date or visit.visit_date < before_date)
+    ]
+    visits.sort(
+        key=lambda visit: (visit.visit_date, visit.created_at, visit.id),
+        reverse=True,
+    )
+    for visit in visits:
+        notes = list_visible_notes(
+            [visit.id],
+            account_id=account_id,
+            owner_name=owner_name,
+            username=username,
+        )
+        previous_note = next(
+            (
+                note
+                for note in notes
+                if note.category == "visit_need"
+            ),
+            None,
+        )
+        if previous_note:
+            return previous_note, visit.visit_date
+    return None
+
+
 def get_note(note_id: str) -> VisitNote | None:
     note = _notes.get(note_id)
     return note if note and not note.is_deleted else None

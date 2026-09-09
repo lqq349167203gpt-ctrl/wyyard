@@ -1,6 +1,7 @@
 // API 请求封装
 // 后端地址由 utils/config.js 的 DEV 总开关决定（上线/提审前切为 false 即指向生产）
 const { BASE_URL } = require('./config')
+console.info('[api] 当前数据源:', BASE_URL)
 
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
@@ -308,6 +309,7 @@ async function request(path, options = {}) {
       url: `${BASE_URL}${path}`,
       method: options.method || 'GET',
       data: options.data,
+      responseType: options.responseType,
       timeout: options.timeout || 60000,
       header: Object.assign(
         {
@@ -405,9 +407,28 @@ const visitApi = {
 
 const visitNoteApi = {
   list: (visitId) => request(`/api/visit-notes?visit_id=${encodeURIComponent(visitId)}`),
+  previousVisitNeed: (customerId, beforeDate, excludeVisitId) => {
+    const params = [`customer_id=${encodeURIComponent(customerId)}`]
+    if (beforeDate) params.push(`before_date=${encodeURIComponent(beforeDate)}`)
+    if (excludeVisitId) params.push(`exclude_visit_id=${encodeURIComponent(excludeVisitId)}`)
+    return request(`/api/visit-notes/previous-visit-need?${params.join('&')}`)
+  },
   create: (data) => request('/api/visit-notes', { method: 'POST', data }),
   update: (id, content) => request(`/api/visit-notes/${id}`, { method: 'PATCH', data: { content } }),
   delete: (id) => request(`/api/visit-notes/${id}`, { method: 'DELETE' }),
+}
+
+const activityParticipantNoteApi = {
+  list: (activitySource, sessionId, customerIds = []) => {
+    const params = [
+      `activity_source=${encodeURIComponent(activitySource)}`,
+      `session_id=${encodeURIComponent(sessionId)}`,
+    ]
+    if (customerIds.length) params.push(`customer_ids=${encodeURIComponent(customerIds.join(','))}`)
+    return request(`/api/class-records/participant-notes/list?${params.join('&')}`)
+  },
+  save: (data) => request('/api/class-records/participant-notes', { method: 'POST', data }),
+  delete: (id) => request(`/api/class-records/participant-notes/${id}`, { method: 'DELETE' }),
 }
 
 const visitVerificationApi = {
@@ -692,6 +713,10 @@ const paymentApi = {
     delete: (id) => request(`/api/project-deductions/${id}`, { method: 'DELETE' }),
     availableItems: (customerId, projectType) =>
       request(`/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`),
+    coarseDoorOptions: (customerId) =>
+      request(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}`),
+    createCoarseDoorCourse: (data) =>
+      request('/api/project-deductions/coarse-door-course', { method: 'POST', data }),
   },
 
   // 退费
@@ -749,6 +774,12 @@ const customAnalysisApi = {
     method: 'POST',
     data: { plan, page, page_size: pageSize },
   }),
+  export: (plan) => request('/api/custom-analysis/export', {
+    method: 'POST',
+    data: { plan },
+    responseType: 'arraybuffer',
+    timeout: 120000,
+  }),
   listTemplates: () => request('/api/custom-analysis/templates'),
   createTemplate: (data) => request('/api/custom-analysis/templates', { method: 'POST', data }),
   markTemplateUsed: (id) => request(`/api/custom-analysis/templates/${id}/use`, { method: 'POST' }),
@@ -758,6 +789,7 @@ module.exports = {
   request,
   visitApi,
   visitNoteApi,
+  activityParticipantNoteApi,
   visitVerificationApi,
   classRecordApi,
   activityWithdrawalApi,

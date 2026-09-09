@@ -95,7 +95,11 @@ Page({
     const selected = new Set(this.data.selectedCreators)
     const hasCreatorFilter = selected.size > 0
     const filtered = this.data.records.filter(record => {
-      if (keyword && !(record.customer_nickname || '').toLowerCase().includes(keyword)) return false
+      if (
+        keyword
+        && !(record.customer_nickname || '').toLowerCase().includes(keyword)
+        && !(record.customer_name || '').toLowerCase().includes(keyword)
+      ) return false
       if (hasCreatorFilter && !selected.has((record.creator || '').trim())) return false
       return true
     })

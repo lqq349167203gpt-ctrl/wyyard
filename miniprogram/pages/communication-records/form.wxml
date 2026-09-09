@@ -36,7 +36,7 @@
       <text class="picker-close" bindtap="onPickerClose">关闭</text>
     </view>
     <view class="picker-search">
-      <input class="picker-search-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+      <input class="picker-search-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
     <scroll-view class="picker-list" scroll-y>
       <view

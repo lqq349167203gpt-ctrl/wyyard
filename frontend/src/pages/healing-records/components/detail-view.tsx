@@ -10,9 +10,11 @@ import { uploadApi, customerApi, customerTagApi, followUpStatusApi, healingRecor
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Upload, Copy, Edit, Eye, Inbox, Trash2 } from "lucide-react"
+import { X, Upload, Copy, Edit, Eye, Inbox, Plus, Trash2 } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { UnifiedPaymentContent } from "@/pages/payment/unified-payment"
+import { CoarseDoorCardTab } from "@/pages/payment/coarse-door-card-tab"
 
 interface HealingRec {
   id: string
@@ -111,12 +113,23 @@ export default function DetailView({
   const [activityRoleFilter, setActivityRoleFilter] = useState<string>("全部")
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
   const [followUpStatuses, setFollowUpStatuses] = useState<FollowUpStatusConfig[]>([])
+  const [paymentEntryOpen, setPaymentEntryOpen] = useState(false)
+  const [coarseDoorEntryOpen, setCoarseDoorEntryOpen] = useState(false)
   const loadSeqRef = useRef(0)
   const canEditVisits = useMemo(() => {
     try {
       const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
       const permissions = JSON.parse(localStorage.getItem("userPermissions") || "[]")
       return currentUser?.role === "超级管理员" || permissions.includes("class-records")
+    } catch {
+      return false
+    }
+  }, [])
+  const canCreatePayment = useMemo(() => {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}")
+      const permissions = JSON.parse(localStorage.getItem("userPermissions") || "[]")
+      return currentUser?.role === "超级管理员" || permissions.includes("payment")
     } catch {
       return false
     }
@@ -287,7 +300,7 @@ export default function DetailView({
           value={searchValue}
           onChange={(v) => setSearchValue(v as string)}
           onSelectItem={(customer) => { loadDetail(customer.id) }}
-          placeholder="搜索用户昵称或姓名"
+          placeholder="搜索姓名或昵称"
         />
       </div>
       {detail && (
@@ -332,11 +345,11 @@ export default function DetailView({
   const access = c.customer_access_permissions
   const arrivedRecords = (detail?.visit_records || []).filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
   const firstVisit = arrivedRecords.length > 0 ? arrivedRecords[0].visit_date : ""
-  // 指标：参与活动场数 = 活动日期属于已到店日期集合的场数；消费额 = 未退费交易求和
+  // 指标：参与活动场数 = 活动日期属于已到店日期集合的场数
   const arrivedActivityCount = (detail?.activities || []).filter(a => (
     a.participated === undefined ? arrivedDates.has(a.date) : a.participated
   )).length
-  const totalSpend = c.total_payment ?? (access ? null : (detail?.payment_records || []).filter(g => !g.voided).reduce((sum, g) => sum + g.amount, 0))
+  const transactionCount = c.transaction_count ?? (access ? null : (detail?.payment_records || []).length)
   const workInfo = c.work_status ? `${c.work_status}${c.work_description ? ` · ${c.work_description}` : ""}` : (c.work_description || "")
   const archiveFields: [string, string][] = [
     (!access || access.sensitive_fields.visit_purpose) && ["到访目的", c.tags || ""],
@@ -445,7 +458,7 @@ export default function DetailView({
                 )) : <span className="text-[11px] text-[#a8b1bd]">暂无客户标签</span>}
               </div>
             </div>
-            {/* 指标：累计到店 → 参与活动 → 累计消费（.stat 左对齐，padding 9/12/8） */}
+            {/* 指标：累计到店 → 参与活动 → 交易笔数（.stat 左对齐，padding 9/12/8） */}
             <div className="grid grid-cols-3 gap-2 mt-3">
               <div className="bg-[#212631] rounded-[10px] px-3 pt-[9px] pb-2">
                 <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{c.visit_count}<span className="text-[10.5px] font-semibold"> 次</span></div>
@@ -456,8 +469,8 @@ export default function DetailView({
                 <div className="text-[#a8b1bd] text-[10.5px] mt-px">参与活动</div>
               </div>
               <div className="bg-[#212631] rounded-[10px] px-3 pt-[9px] pb-2">
-                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{totalSpend === null ? "—" : `¥${totalSpend.toLocaleString()}`}</div>
-                <div className="text-[#a8b1bd] text-[10.5px] mt-px">累计消费</div>
+                <div className="text-[#a3c0ff] text-[14px] font-medium leading-[1.25] tabular-nums">{transactionCount === null ? "—" : <>{transactionCount}<span className="text-[10.5px] font-medium"> 笔</span></>}</div>
+                <div className="text-[#a8b1bd] text-[10.5px] mt-px">交易笔数</div>
               </div>
             </div>
             <div className="mt-[11px] pt-[9px] border-t border-dashed border-[#eceef0] space-y-[7px] text-[11.5px] text-[#a8b1bd]">
@@ -597,8 +610,9 @@ export default function DetailView({
           {/* 记录区 */}
           <div className="flex-1 min-h-0 bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-5 pb-2.5 flex flex-col overflow-hidden">
             {/* 标签页按钮：选中态青柠下划线 */}
-            <div className="dv-scroll flex min-w-0 shrink-0 gap-[2px] overflow-x-auto border-b border-[#eef0f1]">
-              {[
+            <div className="flex min-w-0 shrink-0 items-stretch border-b border-[#eef0f1]">
+              <div className="dv-scroll flex min-w-0 flex-1 gap-[2px] overflow-x-auto">
+                {[
                 { key: "healing" as const, label: "跟进点", cnt: (detail?.visit_records || []).length },
                 { key: "communication" as const, label: "沟通记录", cnt: commRecords.length },
                 { key: "activities" as const, label: "活动记录", cnt: (detail?.activities || []).length },
@@ -615,33 +629,46 @@ export default function DetailView({
                 if (tab.key === "purchase") return access.detail_tabs.card_statistics
                 if (tab.key === "offline_course") return access.detail_tabs.offline_courses
                 return access.transaction_access === "detail"
-              }).map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setActiveTab(tab.key as any)
-                    setActivitiesPage(1)
-                    setHealingPage(1)
-                    setPaymentPage(1)
-                    setPurchasePage(1)
-                    setFollowupsPage(1)
-                    setOfflineCoursePage(1)
-                  }}
-                  className={`relative px-3.5 pt-3 pb-2.5 text-[13px] whitespace-nowrap transition-colors ${
-                    activeTab === tab.key
-                      ? "text-[#212631] font-medium"
-                      : "text-[#79838f] font-normal hover:text-[#212631]"
-                  }`}
-                >
-                  {tab.label}
-                  {typeof tab.cnt === "number" && (
-                    <span className="ml-[3px] text-[10.5px] font-medium text-[#a8b1bd] tabular-nums">{tab.cnt}</span>
-                  )}
-                  {activeTab === tab.key && (
-                    <span className="absolute left-3.5 right-3.5 -bottom-px h-[3px] rounded-t-[3px] bg-[#3370ff]" />
-                  )}
-                </button>
-              ))}
+                }).map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setActiveTab(tab.key as any)
+                      setActivitiesPage(1)
+                      setHealingPage(1)
+                      setPaymentPage(1)
+                      setPurchasePage(1)
+                      setFollowupsPage(1)
+                      setOfflineCoursePage(1)
+                    }}
+                    className={`relative px-3.5 pt-3 pb-2.5 text-[13px] whitespace-nowrap transition-colors ${
+                      activeTab === tab.key
+                        ? "text-[#212631] font-medium"
+                        : "text-[#79838f] font-normal hover:text-[#212631]"
+                    }`}
+                  >
+                    {tab.label}
+                    {typeof tab.cnt === "number" && (
+                      <span className="ml-[3px] text-[10.5px] font-medium text-[#a8b1bd] tabular-nums">{tab.cnt}</span>
+                    )}
+                    {activeTab === tab.key && (
+                      <span className="absolute left-3.5 right-3.5 -bottom-px h-[3px] rounded-t-[3px] bg-[#3370ff]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              {activeTab === "payment" && canCreatePayment && (
+                <div className="flex shrink-0 items-center pl-2 pr-1">
+                  <button
+                    type="button"
+                    className="flex h-7 items-center gap-1 rounded-[4px] px-2.5 text-[12px] font-normal text-[#3370ff] transition-colors hover:bg-[#f5f6f7]"
+                    onClick={() => setPaymentEntryOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    新增
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 标签页内容：内部滚动 */}
@@ -811,10 +838,22 @@ export default function DetailView({
             })
             const visibleActivitySummary = activitySummary.filter(item => item.count > 0)
             // 筛选
-            const allTypes = [...new Set(activities.map(a => a.type).filter(Boolean))]
+            const coarseDeductionType = "粗门扣卡"
+            const allTypes = [...new Set([
+              ...activities.map(a => a.type).filter(Boolean),
+              ...(activities.some(a => a.deduction_summary?.startsWith(coarseDeductionType)) ? [coarseDeductionType] : []),
+            ])]
             const allRoles = [...new Set(activities.map(a => a.role).filter(Boolean))]
             const filtered = activities.filter(a => {
-              if (activityTypeFilter !== "全部" && a.type !== activityTypeFilter) return false
+              if (
+                activityTypeFilter === coarseDeductionType
+                && !a.deduction_summary?.startsWith(coarseDeductionType)
+              ) return false
+              if (
+                activityTypeFilter !== "全部"
+                && activityTypeFilter !== coarseDeductionType
+                && a.type !== activityTypeFilter
+              ) return false
               if (activityRoleFilter !== "全部" && a.role !== activityRoleFilter) return false
               return true
             })
@@ -1317,14 +1356,16 @@ export default function DetailView({
             const pageSize = 5
             const totalPages = Math.ceil(paymentRecords.length / pageSize)
             const paginatedRecords = paymentRecords.slice((paymentPage - 1) * pageSize, paymentPage * pageSize)
-            return paymentRecords.length===0 ? <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div> : (
+            return (
               <div>
+                {paymentRecords.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无记录</span></div>
+                ) : (<>
                 <Table className="border-b border-[#f0f0f0]"><TableHeader className="[&_tr]:!h-8">
                   <TableRow className="hover:bg-transparent !h-8">
                   <TableHead className="pl-4 !h-7 text-[12px]">类型</TableHead>
                   <TableHead className="!h-7 text-[12px]">名称</TableHead>
                   <TableHead className="!h-7 text-[12px]">数量</TableHead>
-                  <TableHead className="!h-7 text-[12px]">金额</TableHead>
                   <TableHead className="!h-7 text-[12px]">成交日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">生效日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">到期日期</TableHead>
@@ -1335,7 +1376,10 @@ export default function DetailView({
                     const today = new Date().toLocaleDateString("sv-SE")
                     let status: React.ReactNode = <span className="text-[#d0d3d6]">-</span>
                     let statusClass = ""
-                    if (r.voided) {
+                    if (r.type === "粗门扣卡") {
+                      status = "已抵扣"
+                      statusClass = "text-[#3370ff]"
+                    } else if (r.voided) {
                       status = "已退费"
                       statusClass = "text-[#c4506a]"
                     } else if (r.effective_date && r.effective_date > today) {
@@ -1353,7 +1397,6 @@ export default function DetailView({
                       <TableCell className="pl-4 py-1 text-[12px]">{r.type}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.name || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.quantity}</TableCell>
-                      <TableCell className="py-1 text-[12px]">¥{r.amount.toLocaleString()}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.deal_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.effective_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员卡" ? "不限" : <span className="text-[#d0d3d6]">-</span>)}</TableCell>
@@ -1368,6 +1411,7 @@ export default function DetailView({
                     <PaginationBar currentPage={paymentPage} totalPages={totalPages} totalItems={detail?.payment_records.length ?? 0} startIndex={(paymentPage-1)*pageSize+1} endIndex={Math.min(paymentPage*pageSize, detail?.payment_records.length ?? 0)} onPageChange={setPaymentPage} />
                   </div>
                 )}
+                </>)}
               </div>
             )
           })()}
@@ -1378,6 +1422,31 @@ export default function DetailView({
 
       {/* 弹窗 */}
       {!isViewOnly && <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec} customers={customerList} saving={saving}/>}
+
+      {canCreatePayment && (
+        <UnifiedPaymentContent
+          formOnly
+          externalOpen={paymentEntryOpen}
+          onExternalOpenChange={setPaymentEntryOpen}
+          presetCustomer={{ id: c.id, nickname: c.nickname || c.name }}
+          onSaved={() => loadDetail(c.id)}
+          includeCoarseDoorOption
+          onCoarseDoorSelect={() => setCoarseDoorEntryOpen(true)}
+        />
+      )}
+
+      <Dialog open={coarseDoorEntryOpen} onOpenChange={setCoarseDoorEntryOpen}>
+        <DialogContent className="w-[720px] max-w-[92vw] p-0 gap-0" initialFocus={false}>
+          <CoarseDoorCardTab
+            formOnly
+            presetCustomer={{ id: c.id, nickname: c.nickname || c.name }}
+            onSaved={() => {
+              loadDetail(c.id)
+              setCoarseDoorEntryOpen(false)
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!commDeleteTarget} onOpenChange={(open) => { if (!open) setCommDeleteTarget(null) }}>
         <DialogContent className="w-[380px] max-w-[90vw] p-0 gap-0">

@@ -16,18 +16,19 @@ interface CloserInputProps {
   onChange: (closers: Closer[]) => void
   disabled?: boolean
   defaultAmount?: number
+  showAmounts?: boolean
 }
 
-export function CloserInput({ customers, value, onChange, disabled, defaultAmount }: CloserInputProps) {
+export function CloserInput({ customers, value, onChange, disabled, defaultAmount, showAmounts = true }: CloserInputProps) {
   const [searchValue, setSearchValue] = useState("")
 
   const selectedIds = value.map(c => c.id)
 
   const handleSelect = useCallback((customer: Customer) => {
     if (value.some(c => c.id === customer.id)) return
-    onChange([...value, { id: customer.id, name: customer.nickname, amount: value.length === 0 ? (defaultAmount ?? 0) : 0 }])
+    onChange([...value, { id: customer.id, name: customer.nickname, amount: showAmounts && value.length === 0 ? (defaultAmount ?? 0) : 0 }])
     setSearchValue("")
-  }, [value, onChange, defaultAmount])
+  }, [value, onChange, defaultAmount, showAmounts])
 
   const handleRemove = useCallback((id: string) => {
     onChange(value.filter(c => c.id !== id))
@@ -58,15 +59,17 @@ export function CloserInput({ customers, value, onChange, disabled, defaultAmoun
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#f0f5ff] text-[11px] text-[#3370ff] shrink-0">
                 {closer.name}
               </span>
-              <Input
-                type="number"
-                value={closer.amount || ""}
-                onChange={(e) => handleAmountChange(closer.id, e.target.value)}
-                placeholder="金额"
-                className="h-7 text-[12px] w-24"
-                disabled={disabled}
-              />
-              <span className="text-[11px] text-[#8f959e]">元</span>
+              {showAmounts && <>
+                <Input
+                  type="number"
+                  value={closer.amount || ""}
+                  onChange={(e) => handleAmountChange(closer.id, e.target.value)}
+                  placeholder="金额"
+                  className="h-7 text-[12px] w-24"
+                  disabled={disabled}
+                />
+                <span className="text-[11px] text-[#8f959e]">元</span>
+              </>}
               <button
                 onClick={() => handleRemove(closer.id)}
                 className="text-[#8f959e] hover:text-[#e02020] shrink-0"
@@ -76,7 +79,7 @@ export function CloserInput({ customers, value, onChange, disabled, defaultAmoun
               </button>
             </div>
           ))}
-          {value.length > 0 && (
+          {showAmounts && value.length > 0 && (
             <div className="text-[11px] text-[#8f959e]">
               总金额: <span className="text-[#2b2f36] font-medium">{total}</span> 元
             </div>

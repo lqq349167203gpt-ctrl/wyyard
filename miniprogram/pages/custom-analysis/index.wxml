@@ -7,7 +7,9 @@
         <text class="page-title">自定义筛选</text>
         <text class="page-subtitle">按自己的条件找出客户，查看邀约、到店和成交情况</text>
       </view>
-      <button class="save-button" bindtap="onSaveTemplate">保存模板</button>
+      <view class="header-actions">
+        <button class="save-button" bindtap="onSaveTemplate">保存模板</button>
+      </view>
     </view>
 
     <view class="section-card template-row">
@@ -231,6 +233,15 @@
       <view class="selected-columns">
         <text class="column-tag" wx:for="{{selectedColumns}}" wx:key="value">{{item.label}}</text>
       </view>
+      <view class="display-mode-row">
+        <view class="display-mode-copy">
+          <text class="display-mode-label">列表排列</text>
+          <text class="display-mode-hint">按实际到场展开时，每位客户每天显示一条</text>
+        </view>
+        <picker class="display-mode-picker" mode="selector" range="{{rowDisplayOptions}}" range-key="label" value="{{rowDisplayIndex}}" bindchange="onRowDisplayChange">
+          <view class="picker-value">{{rowDisplayOptions[rowDisplayIndex].label}}<text class="picker-arrow">⌄</text></view>
+        </picker>
+      </view>
     </view>
 
     <view class="query-bar">
@@ -262,7 +273,10 @@
     </view>
 
     <view class="result-area" wx:elif="{{result}}">
-      <view class="result-heading"><text class="result-title">筛选结果</text><text class="result-total">共 {{result.total}} 人</text></view>
+      <view class="result-heading">
+        <view class="result-heading-copy"><text class="result-title">筛选结果</text><text class="result-total">共 {{result.total}} {{result.total_unit || '人'}}</text></view>
+        <button class="result-export-button" disabled="{{exporting}}" bindtap="onExport">{{exporting ? '导出中' : '导出'}}</button>
+      </view>
       <view class="cards-grid">
         <view class="result-card {{item.is_total ? 'total' : ''}}" wx:for="{{metricCards}}" wx:key="key">
           <text class="card-title">{{item.title}}</text>
@@ -281,7 +295,7 @@
       </view>
 
       <view class="customer-list">
-        <view class="customer-row" wx:for="{{resultItems}}" wx:key="id" data-id="{{item.id}}" bindtap="onCustomerTap">
+        <view class="customer-row" wx:for="{{resultItems}}" wx:key="displayKey" data-id="{{item.id}}" bindtap="onCustomerTap">
           <view class="customer-head"><text class="customer-name">{{item.nickname}}</text><text class="customer-arrow">›</text></view>
           <view class="customer-fields">
             <view class="customer-field" wx:for="{{item.fields}}" wx:for-item="field" wx:key="label">

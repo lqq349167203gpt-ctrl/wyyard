@@ -461,7 +461,7 @@ export default function ExpensesPage() {
                   setForm(current => ({ ...current, customer_id: customer?.id || "", customer_nickname: nickname }))
                 }}
                 onSelectItem={customer => setForm(current => ({ ...current, customer_id: customer.id, customer_nickname: customer.nickname }))}
-                placeholder="输入昵称搜索"
+                placeholder="输入姓名或昵称搜索"
                 filterSelected={false}
               />
             </div>}

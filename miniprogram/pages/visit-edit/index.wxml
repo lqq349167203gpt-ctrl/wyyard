@@ -76,7 +76,7 @@
     </view>
   </view>
 
-  <visit-note-section visit-id="{{visit.id}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" read-only="{{viewOnly}}" />
+  <visit-note-section visit-id="{{visit.id}}" customer-id="{{visit.customer_id}}" visit-date="{{visit.visit_date}}" category="visit_need" title="来访需求" private-to-creator="{{true}}" read-only="{{viewOnly}}" />
   <visit-note-section visit-id="{{visit.id}}" category="customer_info" title="客户信息" read-only="{{viewOnly}}" />
   <visit-note-section visit-id="{{visit.id}}" category="follow_up" title="跟进点" read-only="{{viewOnly}}" />
 
@@ -88,7 +88,7 @@
       <text class="picker-close" bindtap="onPickerClose">关闭</text>
     </view>
     <view class="picker-search">
-      <input class="picker-search-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+      <input class="picker-search-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">

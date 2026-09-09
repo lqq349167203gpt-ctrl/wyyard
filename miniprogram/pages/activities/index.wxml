@@ -125,9 +125,10 @@
               </view>
             </view>
           </view>
-          <view class="card-roster-strip">
+          <view class="card-roster-strip" catchtap="onParticipantsOpen" data-record="{{item}}">
             <text class="card-roster-names">{{item.participantRosterText}}</text>
-            <text class="card-roster-entry" catchtap="onParticipantsOpen" data-record="{{item}}">名单 ›</text>
+            <text class="card-roster-progress" wx:if="{{item.noteProgressText}}">{{item.noteProgressText}}</text>
+            <text class="card-roster-entry">名单 ›</text>
           </view>
         </view>
       </view>
@@ -146,7 +147,7 @@
   </view>
 
   <!-- 添加按钮 -->
-  <draggable-fab wx:if="{{!isViewOnly && !isDayLocked}}" storage-key="activities-fab-position" bindtap="onCreateTap" bindlongpress="onFabLongPress" />
+  <draggable-fab wx:if="{{!isViewOnly}}" storage-key="activities-fab-position" bindtap="onCreateTap" bindlongpress="onFabLongPress" />
 
   <view class="withdraw-mask" wx:if="{{showWithdrawal}}" bindtap="onWithdrawalClose"></view>
   <view class="withdraw-sheet" wx:if="{{showWithdrawal}}">
@@ -198,36 +199,113 @@
     <view class="participant-sheet-head">
       <view class="participant-sheet-heading">
         <view class="participant-sheet-title-row">
-          <text class="participant-sheet-title">参与人员</text>
-          <text class="participant-sheet-count">{{participantSheetList.length}}</text>
+          <text class="participant-sheet-title">参与人记录</text>
+          <text class="participant-sheet-count">{{participantSheetCompletedCount}} / {{participantSheetTotalCount}} 已完成</text>
         </view>
         <text class="participant-sheet-subtitle">{{participantSheetMeta || participantSheetTitle}}</text>
       </view>
       <view class="participant-sheet-close" bindtap="onParticipantSheetClose" aria-label="关闭">×</view>
     </view>
+    <view class="participant-sheet-filter">
+      <text class="participant-sheet-filter-hint">客户信息和跟进点均填写后计为完成</text>
+      <view class="participant-sheet-filter-button {{participantSheetOnlyIncomplete ? 'active' : ''}}" bindtap="onParticipantFilterToggle">
+        {{participantSheetOnlyIncomplete ? '查看全部' : '只看未填写'}}
+      </view>
+    </view>
     <scroll-view class="participant-sheet-list" scroll-y>
-      <view class="participant-sheet-empty" wx:if="{{participantSheetList.length === 0}}">暂无参与人员</view>
-      <view class="participant-sheet-item" wx:for="{{participantSheetList}}" wx:key="id" catchtap="onParticipantProfileTap" data-id="{{item.id}}">
-        <view class="participant-sheet-avatar">{{item.avatar}}</view>
-        <view class="participant-sheet-content">
-          <view class="participant-sheet-name-line">
-            <view class="participant-sheet-name-wrap">
-              <text class="participant-sheet-name">{{item.nickname}}</text>
-              <text class="participant-sheet-withdrawn" wx:if="{{item.withdrawn}}">已退课</text>
-              <text class="participant-no-visit" wx:if="{{!item.hasVisitInfo}}">当日无邀约</text>
+      <view class="participant-sheet-loading" wx:if="{{participantSheetLoading}}">正在加载参与人记录…</view>
+      <view class="participant-sheet-empty" wx:elif="{{participantSheetVisibleList.length === 0}}">
+        {{participantSheetOnlyIncomplete && participantSheetList.length > 0 ? '本场参与人均已完成' : '暂无参与人员'}}
+      </view>
+      <view class="participant-sheet-item {{participantSheetExpandedId === item.id ? 'expanded' : ''}}" wx:for="{{participantSheetVisibleList}}" wx:key="id">
+        <view class="participant-sheet-summary" bindtap="onParticipantToggle" data-id="{{item.id}}">
+          <view class="participant-sheet-avatar">{{item.avatar}}</view>
+          <view class="participant-sheet-content">
+            <view class="participant-sheet-name-line">
+              <view class="participant-sheet-name-wrap">
+                <text class="participant-sheet-name">{{item.nickname}}</text>
+                <text class="participant-sheet-withdrawn" wx:if="{{item.withdrawn}}">已退课</text>
+                <text class="participant-no-visit" wx:if="{{!item.hasVisitInfo}}">当日无邀约</text>
+              </view>
             </view>
-            <text class="participant-sheet-link">资料 ›</text>
+            <view class="participant-meta-line" wx:if="{{item.metaItems.length > 0}}">
+              <block wx:for="{{item.metaItems}}" wx:key="*this" wx:for-item="metaItem" wx:for-index="metaIndex">
+                <text class="participant-meta-separator" wx:if="{{metaIndex > 0}}">·</text>
+                <text class="participant-meta-value">{{metaItem}}</text>
+              </block>
+            </view>
+            <view class="participant-needs-row" wx:if="{{item.hasNeeds}}">
+              <text class="participant-needs-label">需求：</text>
+              <text class="participant-needs-value">{{item.needs}}</text>
+            </view>
+            <view class="participant-note-statuses">
+              <text class="participant-note-status {{item.hasCustomerInfo ? 'filled' : ''}}">客户信息 · {{item.hasCustomerInfo ? '已填' : '未填'}}</text>
+              <text class="participant-note-status {{item.hasFollowUp ? 'filled' : ''}}">跟进点 · {{item.hasFollowUp ? '已填' : '未填'}}</text>
+              <view class="participant-item-actions">
+                <text class="participant-action participant-action-outline" catchtap="onParticipantProfileTap" data-id="{{item.id}}">资料</text>
+                <text
+                  class="participant-action {{participantSheetExpandedId === item.id || (item.hasCustomerInfo && item.hasFollowUp) ? 'participant-action-ghost' : 'participant-action-solid'}}"
+                  catchtap="onParticipantToggle"
+                  data-id="{{item.id}}"
+                >{{participantSheetExpandedId === item.id ? '收起' : ((item.hasCustomerInfo && item.hasFollowUp) ? '查看' : '填写')}}</text>
+              </view>
+            </view>
           </view>
-          <view class="participant-meta-line" wx:if="{{item.metaItems.length > 0}}">
-            <block wx:for="{{item.metaItems}}" wx:key="*this" wx:for-item="metaItem" wx:for-index="metaIndex">
-              <text class="participant-meta-separator" wx:if="{{metaIndex > 0}}">·</text>
-              <text class="participant-meta-value">{{metaItem}}</text>
-            </block>
+        </view>
+        <view class="participant-note-editor" wx:if="{{participantSheetExpandedId === item.id && !item.withdrawn}}">
+          <view class="participant-note-field">
+            <view class="participant-note-field-head">
+              <text class="participant-note-field-label">客户信息</text>
+              <text class="participant-note-field-count" wx:if="{{item.customerInfoOtherNotes.length}}">另有 {{item.customerInfoOtherNotes.length}} 人填写</text>
+            </view>
+            <textarea
+              class="participant-note-input"
+              value="{{item.customerInfoValue}}"
+              data-id="{{item.id}}"
+              data-field="customerInfoValue"
+              maxlength="5000"
+              disabled="{{!participantSheetEditable}}"
+              placeholder="记录本次观察到的状态、反馈或变化"
+              placeholder-style="color:#b7bdc6"
+              bindinput="onParticipantNoteInput"
+            />
+            <view class="participant-note-others" wx:if="{{item.customerInfoOtherNotes.length}}">
+              <view class="participant-note-other" wx:for="{{item.customerInfoOtherNotes}}" wx:key="id" wx:for-item="note">
+                <text class="participant-note-other-author">{{note.created_by || '其他同事'}}：</text>
+                <text>{{note.content}}</text>
+              </view>
+            </view>
           </view>
-          <view class="participant-needs-row" wx:if="{{item.hasNeeds}}">
-            <text class="participant-needs-label">需求：</text>
-            <text class="participant-needs-value">{{item.needs}}</text>
+          <view class="participant-note-field">
+            <view class="participant-note-field-head">
+              <text class="participant-note-field-label">跟进点</text>
+              <text class="participant-note-field-count" wx:if="{{item.followUpOtherNotes.length}}">另有 {{item.followUpOtherNotes.length}} 人填写</text>
+            </view>
+            <textarea
+              class="participant-note-input"
+              value="{{item.followUpValue}}"
+              data-id="{{item.id}}"
+              data-field="followUpValue"
+              maxlength="5000"
+              disabled="{{!participantSheetEditable}}"
+              placeholder="记录下一步需要关注或执行的事项"
+              placeholder-style="color:#b7bdc6"
+              bindinput="onParticipantNoteInput"
+            />
+            <view class="participant-note-others" wx:if="{{item.followUpOtherNotes.length}}">
+              <view class="participant-note-other" wx:for="{{item.followUpOtherNotes}}" wx:key="id" wx:for-item="note">
+                <text class="participant-note-other-author">{{note.created_by || '其他同事'}}：</text>
+                <text>{{note.content}}</text>
+              </view>
+            </view>
           </view>
+          <view
+            class="participant-note-save {{participantSheetSavingId ? 'disabled' : ''}}"
+            wx:if="{{participantSheetEditable}}"
+            bindtap="onParticipantSaveNext"
+            data-id="{{item.id}}"
+          >{{participantSheetSavingId === item.id ? '保存中…' : '保存并填写下一位'}}</view>
+          <text class="participant-note-readonly" wx:else>当前账号只有浏览权限</text>
         </view>
       </view>
     </scroll-view>

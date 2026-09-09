@@ -35,7 +35,7 @@ def _actor(request: Request) -> tuple[str, str, str]:
     )
 
 
-def _record_response(record, request: Request) -> dict:
+def _record_response(record, request: Request, customer_name: str | None = None) -> dict:
     account_id, owner_name, username = _actor(request)
     data = record.model_dump(mode="json")
     can_manage = communication_record_service.can_manage_record(
@@ -43,6 +43,10 @@ def _record_response(record, request: Request) -> dict:
     )
     data["can_edit"] = can_manage
     data["can_delete"] = can_manage
+    if customer_name is None:
+        customer = customer_service.get_by_nickname(record.customer_nickname)
+        customer_name = customer.name if customer and customer.name else ""
+    data["customer_name"] = customer_name
     return data
 
 
@@ -62,19 +66,28 @@ def _require_customer_access(request: Request, nickname: str):
 def list_communication_records(request: Request, customer_nickname: str = Query(None)):
     records = communication_record_service.list_records()
     if customer_nickname:
-        _require_customer_access(request, customer_nickname)
+        customer = _require_customer_access(request, customer_nickname)
         records = [r for r in records if r.customer_nickname == customer_nickname]
+        customer_names = {customer.nickname: customer.name or ""}
     else:
         role = get_request_roles(request)
         if not customer_access_service.can_view_detail_tab(role, "communication"):
             raise HTTPException(status_code=403, detail="没有查看沟通记录的权限")
-        visible_names = {
-            customer.nickname
-            for customer in customer_access_service.filter_customers(request, customer_service.list_customers())
+        visible_customers = customer_access_service.filter_customers(
+            request,
+            customer_service.list_customers(),
+        )
+        customer_names = {
+            customer.nickname: customer.name or ""
+            for customer in visible_customers
             if customer.nickname
         }
+        visible_names = set(customer_names)
         records = [record for record in records if record.customer_nickname in visible_names]
-    return [_record_response(record, request) for record in records]
+    return [
+        _record_response(record, request, customer_names.get(record.customer_nickname, ""))
+        for record in records
+    ]
 
 
 @router.post("")

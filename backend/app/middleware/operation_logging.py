@@ -10,6 +10,11 @@ from app.services.operation_log_service import create_log
 from app.utils.request_context import get_client_ip
 
 SECTION_MAP = {
+    "/api/system-helper-config": "AI 配置",
+    "/api/customer-ai-config": "AI 配置",
+    "/api/visit-ai-config": "AI 配置",
+    "/api/activity-ai-config": "AI 配置",
+    "/api/miniapp-ai-config": "AI 配置",
     "/api/tea-guest/consumption-records": "茶客业务 · 消费记录",
     "/api/tea-guest/expenses": "茶客业务 · 支出",
     "/api/custom-analysis": "自定义筛选",
@@ -28,6 +33,7 @@ SECTION_MAP = {
     "/api/customer-tags": "客户标签",
     "/api/follow-up-statuses": "跟进状态配置",
     "/api/activity-permissions": "课表",
+    "/api/activity-registrations": "课表",
     "/api/activity-withdrawals": "课表",
     "/api/activity-orders": "课表",
     "/api/membership-cards": "付费项目",
@@ -65,6 +71,8 @@ SECTION_MAP = {
     "/api/communication-records": "沟通记录",
     "/api/offline-courses": "付费项目",
     "/api/offline-course-records": "落地课程",
+    "/api/tea-seat-fees": "付费项目",
+    "/api/client/activity-followups": "客户回访",
     "/api/client/activities": "邀约",
     "/api/client/notifications": "消息通知",
 }
@@ -188,7 +196,6 @@ PAGE_LABELS: dict[str, str] = {
 SKIP_PATHS = [
     "/api/health",
     "/api/accounts/login",
-    "/api/accounts/roles",
     "/api/member-identities/batch",
     "/api/member-identities/refresh-all",
     "/api/customers/batch",  # 只读批量查询，不需要记录操作日志
@@ -303,6 +310,12 @@ FIELD_NAMES = {
     "provider": "模型供应商", "model": "模型", "api_key": "API密钥", "base_url": "接口地址",
     "system_prompt": "系统提示词", "temperature": "温度", "max_tokens": "最大Token数",
     "project_name": "项目名称",
+    "deduction_date": "扣卡日期", "remaining_after": "扣卡后剩余次数", "reason": "扣卡原因",
+    "source_activity_type": "来源课程类型", "source_activity_id": "来源课程编号",
+    "source_activity_key": "来源课程标识", "source_activity_name": "来源课程",
+    "source_organization_id": "来源组织 ID", "source_organization_name": "来源组织",
+    "source_activity_date": "来源课程日期", "source_space_id": "来源空间编号",
+    "source_space_name": "来源空间",
     "fee": "费用", "refund_amount": "退费金额", "payment_method": "支付方式",
     "diagnosis_duration": "诊断时长", "quantity": "数量",
     "duration_type": "时长类型", "duration_value": "时长值",
@@ -1452,7 +1465,8 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         method = request.method
 
-        if any(path.startswith(p) for p in SKIP_PATHS):
+        # 茶院助手的聊天请求不进入操作日志，但它的配置修改属于系统配置变更，必须保留审计记录。
+        if path != "/api/system-helper-config" and any(path.startswith(p) for p in SKIP_PATHS):
             return await call_next(request)
 
         if not path.startswith("/api/") or method == "OPTIONS":

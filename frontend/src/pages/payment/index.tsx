@@ -11,9 +11,11 @@ import {
 } from "@/components/ui/dialog"
 import { paymentExportApi, type PaymentExportParams, type PaymentExportRangeType } from "@/lib/api"
 import { UnifiedPaymentContent } from "./unified-payment"
+import { CoarseDoorCardTab } from "./coarse-door-card-tab"
 
 const TABS = [
   { key: "membership_card", label: "会员卡" },
+  { key: "coarse_door_card", label: "粗门次卡" },
   { key: "group_case", label: "觉醒游戏" },
   { key: "emotional_release", label: "情绪释放" },
   { key: "oh_card_reading", label: "OH卡诊断" },
@@ -134,7 +136,7 @@ export default function PaymentPage() {
       <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; } .dv-root th, .dv-root td { padding-left: 4px; padding-right: 4px; font-size: 12px; } .dv-root th.pl-4, .dv-root td.pl-4 { padding-left: 16px; } .dv-root th.pr-4, .dv-root td.pr-4 { padding-right: 16px; }`}</style>
 
       <div className="flex items-center rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
-        <div className="flex flex-1 items-center gap-6">
+        <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map(tab => (
             <button
               key={tab.key}
@@ -163,7 +165,9 @@ export default function PaymentPage() {
         </Button>
       </div>
 
-      <UnifiedPaymentContent key={activeTab} embedded filterTypes={[activeTab as any]} />
+      {activeTab === "coarse_door_card"
+        ? <CoarseDoorCardTab />
+        : <UnifiedPaymentContent key={activeTab} embedded filterTypes={[activeTab as any]} />}
 
       <Dialog
         open={exportDialogOpen}

@@ -76,7 +76,10 @@ Page({
     const { allCustomers } = this.data
     const kw = (keyword || '').toLowerCase()
     const filtered = kw
-      ? allCustomers.filter(c => (c.nickname || '').toLowerCase().includes(kw))
+      ? allCustomers.filter(c => (
+        (c.nickname || '').toLowerCase().includes(kw)
+        || (c.name || '').toLowerCase().includes(kw)
+      ))
       : allCustomers
     this.setData({ pickerList: filtered.slice(0, 50) })
   },

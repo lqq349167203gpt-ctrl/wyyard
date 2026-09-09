@@ -1,6 +1,8 @@
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
+from openpyxl import load_workbook
 
 from app.models.custom_analysis import AnalysisComparisonGroup, AnalysisCondition, AnalysisPlan
 from app.services import custom_analysis_service
@@ -36,6 +38,7 @@ def _row(customer_id: str, **overrides):
         "referred_in_period": True,
         "invitation_count_period": 0,
         "visit_count_period": 0,
+        "arrival_count_period": 0,
         "activity_count_period": 0,
         "payment_count_period": 0,
         "payment_amount_period": 0,
@@ -147,6 +150,132 @@ def test_execute_plan_supports_any_logic_and_selected_metrics(monkeypatch):
         "payment_orders": 2,
         "payment_amount": 796,
     }
+
+
+def test_arrival_visits_counts_repeat_arrivals_for_same_customer(monkeypatch):
+    rows = [
+        _row("c1", visit_count_period=2, arrival_count_period=3),
+        _row("c2", visit_count_period=1, arrival_count_period=2),
+        _row("c3"),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        metrics=["arrived_customers", "arrival_visits"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert {card["key"]: card["count"] for card in result["cards"]} == {
+        "arrived_customers": 2,
+        "arrival_visits": 5,
+    }
+
+
+def test_activity_participations_counts_repeat_activities_for_same_customer(monkeypatch):
+    rows = [
+        _row("c1", activity_count_period=3),
+        _row("c2", activity_count_period=2),
+        _row("c3"),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        metrics=["activity_customers", "activity_participations"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert {card["key"]: card["count"] for card in result["cards"]} == {
+        "activity_customers": 2,
+        "activity_participations": 5,
+    }
+
+
+@pytest.mark.parametrize(
+    ("row_display_mode", "count_field", "first_count", "second_count", "expected_total"),
+    [
+        ("arrival_visits", "arrival_count_period", 3, 2, 5),
+        ("activity_participations", "activity_count_period", 2, 1, 3),
+    ],
+)
+def test_execute_plan_can_expand_customer_rows_by_occurrence(
+    monkeypatch,
+    row_display_mode,
+    count_field,
+    first_count,
+    second_count,
+    expected_total,
+):
+    rows = [
+        _row("c1", **{count_field: first_count}),
+        _row("c2", **{count_field: second_count}),
+        _row("c3"),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        metrics=["total_customers"],
+        card_dimension="none",
+        row_display_mode=row_display_mode,
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert result["total"] == expected_total
+    assert result["total_unit"] == "人次"
+    assert [item["id"] for item in result["items"]].count("c1") == first_count
+    assert [item["id"] for item in result["items"]].count("c2") == second_count
+    assert len({item["_display_key"] for item in result["items"]}) == expected_total
+    assert result["cards"][0]["count"] == 3
+
+
+def test_arrival_rows_are_unique_per_customer_day_and_show_one_invitation_date(monkeypatch):
+    rows = [
+        _row(
+            "c1",
+            arrival_count_period=3,
+            invitation_dates=["2026-08-03", "2026-08-06"],
+            _arrival_events_display=[
+                {
+                    "visit_date": "2026-08-03",
+                    "invitation_created_dates": ["2026-08-01"],
+                    "inviter_names": ["小李"],
+                    "arrived": True,
+                    "cancelled": False,
+                },
+                {
+                    "visit_date": "2026-08-03",
+                    "invitation_created_dates": ["2026-08-02"],
+                    "inviter_names": ["小王"],
+                    "arrived": True,
+                    "cancelled": False,
+                },
+                {
+                    "visit_date": "2026-08-06",
+                    "invitation_created_dates": ["2026-08-05"],
+                    "inviter_names": ["小张"],
+                    "arrived": True,
+                    "cancelled": False,
+                },
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        metrics=["total_customers"],
+        card_dimension="none",
+        row_display_mode="arrival_visits",
+        columns=["nickname", "invitation_dates"],
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert result["total"] == 2
+    assert [item["invitation_dates"] for item in result["items"]] == [
+        ["2026-08-03"],
+        ["2026-08-06"],
+    ]
+    assert len({item["_display_key"] for item in result["items"]}) == 2
 
 
 def test_split_comparison_uses_selected_metric(monkeypatch):
@@ -291,7 +420,7 @@ def test_course_teacher_condition_scopes_activity_metrics(monkeypatch):
     monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
     plan = AnalysisPlan(
         conditions=[AnalysisCondition(field="course_teachers", operator="eq", value="奥雅")],
-        metrics=["total_customers", "activity_customers"],
+        metrics=["total_customers", "activity_customers", "activity_participations"],
         card_dimension="none",
     )
 
@@ -300,6 +429,7 @@ def test_course_teacher_condition_scopes_activity_metrics(monkeypatch):
     assert {card["key"]: card["count"] for card in result["cards"]} == {
         "total_customers": 1,
         "activity_customers": 1,
+        "activity_participations": 1,
     }
     assert result["items"][0]["activity_count_period"] == 1
     assert result["items"][0]["activity_names"] == ["课程A"]
@@ -312,6 +442,7 @@ def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
             inviter_names=["奥雅", "耀凯"],
             invitation_count_period=2,
             visit_count_period=2,
+            arrival_count_period=2,
             _invitation_events_period=[
                 {"inviter_names": ["奥雅"], "visit_date": "2026-01-05", "arrived": True, "cancelled": False},
                 {"inviter_names": ["耀凯"], "visit_date": "2026-01-08", "arrived": True, "cancelled": False},
@@ -321,7 +452,7 @@ def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
     monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
     plan = AnalysisPlan(
         conditions=[AnalysisCondition(field="inviter_names", operator="eq", value="奥雅")],
-        metrics=["invited_customers", "arrived_customers"],
+        metrics=["invited_customers", "arrived_customers", "arrival_visits"],
         card_dimension="none",
     )
 
@@ -330,9 +461,11 @@ def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
     assert {card["key"]: card["count"] for card in result["cards"]} == {
         "invited_customers": 1,
         "arrived_customers": 1,
+        "arrival_visits": 1,
     }
     assert result["items"][0]["invitation_count_period"] == 1
     assert result["items"][0]["visit_count_period"] == 1
+    assert result["items"][0]["arrival_count_period"] == 1
 
 
 def test_invitation_created_date_filters_and_splits_by_inviter(monkeypatch):
@@ -514,6 +647,14 @@ def test_metadata_endpoint(client):
     assert invitation_date["group"] == "日期信息"
     assert invitation_date["value_type"] == "date"
     assert "between" in invitation_date["operators"]
+    arrival_visits = next(item for item in metadata["metrics"] if item["value"] == "arrival_visits")
+    assert arrival_visits["label"] == "实际到场人次"
+    assert arrival_visits["unit"] == "人次"
+    activity_participations = next(
+        item for item in metadata["metrics"] if item["value"] == "activity_participations"
+    )
+    assert activity_participations["label"] == "参与活动人次"
+    assert activity_participations["unit"] == "人次"
     invitation_created_date = next(
         item for item in metadata["fields"] if item["value"] == "invitation_created_dates"
     )
@@ -562,6 +703,35 @@ def test_execute_endpoint_returns_matching_customer(client, sample_customer):
             {"字段": "昵称", "规则": "等于", "值": created["nickname"]},
         ]
         assert matching_logs[0]["config"]["结果人数"] == 1
+    finally:
+        client.delete(f"/api/customers/{created['id']}")
+
+
+def test_export_endpoint_uses_current_columns_and_row_display_mode(client, sample_customer):
+    created = client.post("/api/customers", json=sample_customer).json()
+    try:
+        response = client.post("/api/custom-analysis/export", json={
+            "plan": {
+                "title": "客户导出测试",
+                "conditions": [
+                    {"field": "nickname", "operator": "eq", "value": created["nickname"]},
+                ],
+                "card_dimension": "none",
+                "columns": ["nickname", "member_type"],
+                "sort_by": "nickname",
+                "sort_order": "asc",
+                "row_display_mode": "unique_customers",
+            },
+        })
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"].startswith(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        workbook = load_workbook(filename=BytesIO(response.content))
+        worksheet = workbook["筛选结果"]
+        assert [worksheet.cell(row=1, column=index).value for index in range(1, 3)] == ["昵称", "会员身份"]
+        assert worksheet.cell(row=2, column=1).value == created["nickname"]
     finally:
         client.delete(f"/api/customers/{created['id']}")
 

@@ -1,4 +1,4 @@
-const { activityThemeApi, activityWithdrawalApi, classRecordApi, spaceApi } = require('../../utils/api')
+const { activityParticipantNoteApi, activityThemeApi, activityWithdrawalApi, classRecordApi, spaceApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
 const { canEditActivityContent, canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
@@ -157,6 +157,36 @@ function buildParticipantList(raw, source, visitMap) {
   return participants
 }
 
+function decorateParticipantNotes(participants, notes) {
+  const allNotes = Array.isArray(notes) ? notes : []
+  return participants.map(function(participant) {
+    const participantNotes = allNotes.filter(function(note) {
+      return note.customer_id === participant.id
+    })
+    const customerInfoNotes = participantNotes.filter(function(note) {
+      return note.category === 'customer_info'
+    })
+    const followUpNotes = participantNotes.filter(function(note) {
+      return note.category === 'follow_up'
+    })
+    const ownCustomerInfo = customerInfoNotes.find(function(note) { return note.can_edit }) || null
+    const ownFollowUp = followUpNotes.find(function(note) { return note.can_edit }) || null
+    return Object.assign({}, participant, {
+      customerInfoNoteId: ownCustomerInfo ? ownCustomerInfo.id : '',
+      customerInfoValue: ownCustomerInfo ? ownCustomerInfo.content : '',
+      customerInfoOriginal: ownCustomerInfo ? ownCustomerInfo.content : '',
+      customerInfoOtherNotes: customerInfoNotes.filter(function(note) { return !note.can_edit }),
+      followUpNoteId: ownFollowUp ? ownFollowUp.id : '',
+      followUpValue: ownFollowUp ? ownFollowUp.content : '',
+      followUpOriginal: ownFollowUp ? ownFollowUp.content : '',
+      followUpOtherNotes: followUpNotes.filter(function(note) { return !note.can_edit }),
+      hasCustomerInfo: customerInfoNotes.length > 0,
+      hasFollowUp: followUpNotes.length > 0,
+      isComplete: customerInfoNotes.length > 0 && followUpNotes.length > 0,
+    })
+  })
+}
+
 Page({
   data: {
     hasPagePermission: true,
@@ -191,11 +221,20 @@ Page({
     participantSheetTitle: '',
     participantSheetMeta: '',
     participantSheetList: [],
+    participantSheetVisibleList: [],
+    participantSheetCompletedCount: 0,
+    participantSheetTotalCount: 0,
+    participantSheetLoading: false,
+    participantSheetSavingId: '',
+    participantSheetExpandedId: '',
+    participantSheetOnlyIncomplete: false,
+    participantSheetEditable: true,
     loading: true,
     isViewOnly: false,
     isDayLocked: false,
     lockInfo: {},
     canManageActivityLock: false,
+    canEditParticipantNotes: false,
     lockSubmitting: false,
   },
 
@@ -205,13 +244,7 @@ Page({
       this.setData({ hasPagePermission: false })
       return
     }
-    const app = getApp()
-    const currentUser = app.globalData.currentUser || wx.getStorageSync('currentUser') || {}
-    const editPermissions = app.globalData.editPermissions || wx.getStorageSync('userEditPermissions') || {}
-    this.setData({
-      isViewOnly: isAreaViewOnly('activities'),
-      canManageActivityLock: currentUser.role === '超级管理员' || editPermissions.activity_lock === true,
-    })
+    this.refreshActionPermissions()
     const date = options.date || wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY) || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
     const d = parseLocalDate(date) || new Date()
     wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
@@ -231,6 +264,7 @@ Page({
 
   onShow() {
     if (!getApp().checkLogin()) return
+    this.refreshActionPermissions()
     const sharedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY)
     if (sharedDate && this.data.currentDate && sharedDate !== this.data.currentDate && parseLocalDate(sharedDate)) {
       this._selectDate(sharedDate)
@@ -240,6 +274,19 @@ Page({
       this._needRefresh = false
       this.loadData()
     }
+  },
+
+  refreshActionPermissions() {
+    const app = getApp()
+    const currentUser = app.globalData.currentUser || wx.getStorageSync('currentUser') || {}
+    const editPermissions = app.globalData.editPermissions || wx.getStorageSync('userEditPermissions') || {}
+    this.setData({
+      isViewOnly: currentUser.role !== '超级管理员' && editPermissions.activities === 'view',
+      canManageActivityLock: currentUser.role === '超级管理员' || editPermissions.activity_lock === true,
+      canEditParticipantNotes: currentUser.role === '超级管理员'
+        || editPermissions.activities !== 'view'
+        || editPermissions.activity_participants !== 'view',
+    })
   },
 
   onPullDownRefresh() {
@@ -539,6 +586,11 @@ Page({
         if (r.deductionCount > 0) metaParts.push(`扣卡 ${r.deductionCount} 次`)
         r.metaText = metaParts.join(' · ')
         r.rosterCount = rosterParticipants.length
+        r.noteTotalCount = Number(rawRecord.participant_note_total_count || 0)
+        r.noteCompletedCount = Number(rawRecord.participant_note_completed_count || 0)
+        r.noteProgressText = r.noteTotalCount > 0
+          ? `${r.noteCompletedCount}/${r.noteTotalCount} 已填写`
+          : ''
         r.participantRosterText = rosterParticipants.length
           ? `${rosterParticipants.length} 人 · ${rosterParticipants.map(function(item) { return item.nickname }).join('、')}`
           : '0 人'
@@ -644,13 +696,15 @@ Page({
     wx.navigateTo({ url: '/pages/activity-detail/index' })
   },
 
-  onParticipantsOpen(e) {
+  async onParticipantsOpen(e) {
     const record = e.currentTarget.dataset.record
     if (!record || !record.id) return
     const raw = this._rawMap && this._rawMap[`${record.source}_${record.id}`]
     if (!raw) return
 
     const participants = buildParticipantList(raw, record.source, this._visitMap)
+    this._participantSheetRecord = record
+    this._participantSheetParticipants = participants
 
     this.setData({
       showParticipantSheet: true,
@@ -658,12 +712,154 @@ Page({
       participantSheetMeta: [record.displayName || record.name || record.badge || '', (record.time || '').replace('-', '–')]
         .filter(Boolean)
         .join(' · '),
-      participantSheetList: participants,
+      participantSheetList: decorateParticipantNotes(participants, []),
+      participantSheetVisibleList: decorateParticipantNotes(participants, []),
+      participantSheetCompletedCount: 0,
+      participantSheetTotalCount: participants.filter(function(item) { return !item.withdrawn }).length,
+      participantSheetLoading: true,
+      participantSheetSavingId: '',
+      participantSheetExpandedId: '',
+      participantSheetOnlyIncomplete: false,
+      participantSheetEditable: this.data.canEditParticipantNotes,
+    })
+    await this._loadParticipantNotes()
+  },
+
+  async _loadParticipantNotes(expandedId) {
+    const record = this._participantSheetRecord
+    const participants = this._participantSheetParticipants || []
+    if (!record || !record.id) return []
+    const requestKey = `${record.source}_${record.id}`
+    try {
+      const notes = await activityParticipantNoteApi.list(
+        record.source,
+        record.id,
+        participants.map(function(item) { return item.id }),
+      )
+      const currentRecord = this._participantSheetRecord
+      if (!currentRecord || `${currentRecord.source}_${currentRecord.id}` !== requestKey) return []
+      const list = decorateParticipantNotes(participants, notes)
+      this._applyParticipantSheetList(list, {
+        participantSheetLoading: false,
+        participantSheetExpandedId: expandedId === undefined
+          ? this.data.participantSheetExpandedId
+          : expandedId,
+      })
+      return list
+    } catch (error) {
+      this.setData({ participantSheetLoading: false })
+      return []
+    }
+  },
+
+  _applyParticipantSheetList(list, extra = {}) {
+    const activeParticipants = list.filter(function(item) { return !item.withdrawn })
+    const visibleList = this.data.participantSheetOnlyIncomplete
+      ? activeParticipants.filter(function(item) { return !item.isComplete })
+      : list
+    this.setData(Object.assign({
+      participantSheetList: list,
+      participantSheetVisibleList: visibleList,
+      participantSheetCompletedCount: activeParticipants.filter(function(item) { return item.isComplete }).length,
+      participantSheetTotalCount: activeParticipants.length,
+    }, extra))
+  },
+
+  onParticipantFilterToggle() {
+    const participantSheetOnlyIncomplete = !this.data.participantSheetOnlyIncomplete
+    this.setData({ participantSheetOnlyIncomplete }, () => {
+      this._applyParticipantSheetList(this.data.participantSheetList)
     })
   },
 
+  onParticipantToggle(e) {
+    const customerId = e.currentTarget.dataset.id
+    if (!customerId) return
+    this.setData({
+      participantSheetExpandedId: this.data.participantSheetExpandedId === customerId ? '' : customerId,
+    })
+  },
+
+  onParticipantNoteInput(e) {
+    const customerId = e.currentTarget.dataset.id
+    const field = e.currentTarget.dataset.field
+    if (!customerId || !['customerInfoValue', 'followUpValue'].includes(field)) return
+    const list = this.data.participantSheetList.map(function(item) {
+      return item.id === customerId
+        ? Object.assign({}, item, { [field]: e.detail.value })
+        : item
+    })
+    this._applyParticipantSheetList(list)
+  },
+
+  async _saveParticipantNoteCategory(participant, category) {
+    const record = this._participantSheetRecord
+    const isCustomerInfo = category === 'customer_info'
+    const valueField = isCustomerInfo ? 'customerInfoValue' : 'followUpValue'
+    const originalField = isCustomerInfo ? 'customerInfoOriginal' : 'followUpOriginal'
+    const noteIdField = isCustomerInfo ? 'customerInfoNoteId' : 'followUpNoteId'
+    const content = String(participant[valueField] || '').trim()
+    const original = String(participant[originalField] || '').trim()
+    const noteId = participant[noteIdField]
+    if (content === original) return
+    if (!content) {
+      if (noteId) await activityParticipantNoteApi.delete(noteId)
+      return
+    }
+    await activityParticipantNoteApi.save({
+      activity_source: record.source,
+      session_id: record.id,
+      customer_id: participant.id,
+      category,
+      content,
+    })
+  },
+
+  async onParticipantSaveNext(e) {
+    const customerId = e.currentTarget.dataset.id
+    const participant = this.data.participantSheetList.find(function(item) {
+      return item.id === customerId
+    })
+    if (!participant || participant.withdrawn || this.data.participantSheetSavingId) return
+    const hasInput = String(participant.customerInfoValue || '').trim()
+      || String(participant.followUpValue || '').trim()
+      || participant.customerInfoNoteId
+      || participant.followUpNoteId
+    if (!hasInput) {
+      wx.showToast({ title: '请至少填写一项内容', icon: 'none' })
+      return
+    }
+    this.setData({ participantSheetSavingId: customerId })
+    try {
+      await Promise.all([
+        this._saveParticipantNoteCategory(participant, 'customer_info'),
+        this._saveParticipantNoteCategory(participant, 'follow_up'),
+      ])
+      const refreshed = await this._loadParticipantNotes('')
+      const currentIndex = refreshed.findIndex(function(item) { return item.id === customerId })
+      const next = refreshed.slice(currentIndex + 1)
+        .concat(refreshed.slice(0, Math.max(currentIndex, 0)))
+        .find(function(item) { return !item.withdrawn && !item.isComplete })
+      this.setData({
+        participantSheetSavingId: '',
+        participantSheetExpandedId: next ? next.id : '',
+      })
+      wx.showToast({ title: next ? '已保存，继续下一位' : '本场记录已保存', icon: 'success' })
+      this.loadData(undefined, { silent: true })
+    } catch (error) {
+      this.setData({ participantSheetSavingId: '' })
+    }
+  },
+
   onParticipantSheetClose() {
-    this.setData({ showParticipantSheet: false })
+    if (this.data.participantSheetSavingId) return
+    this._participantSheetRecord = null
+    this._participantSheetParticipants = []
+    this.setData({
+      showParticipantSheet: false,
+      participantSheetExpandedId: '',
+      participantSheetOnlyIncomplete: false,
+    })
   },
 
   onParticipantProfileTap(e) {
@@ -767,7 +963,10 @@ Page({
   },
 
   onFabLongPress() {
-    if (this.data.isDayLocked) return
+    if (this.data.isDayLocked) {
+      wx.showToast({ title: '当天课表已锁定，请先解锁', icon: 'none' })
+      return
+    }
     wx.navigateTo({ url: `/pages/voice-chat/index?mode=activity&date=${this.data.currentDate}&spaceId=${this.data.spaceId}` })
   },
 

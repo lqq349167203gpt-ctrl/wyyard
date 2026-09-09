@@ -6,6 +6,7 @@ interface Option {
   value: string
   label: string
   rightLabel?: string  // 右侧标签，用于左对齐名称右对齐价格
+  groupLabel?: string  // 子菜单分组标题，仅在该组第一项上设置
   children?: Option[]  // 子选项，用于级联菜单
 }
 
@@ -353,18 +354,25 @@ export function SelectDropdown({
               {hoveredOption.children.map((child) => {
                 const isSelected = multi && Array.isArray(value) ? value.includes(child.value) : false
                 return (
-                  <button key={child.value}
-                    type="button"
-                    className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
-                    onMouseDown={() => select(child.value)}
-                  >
-                    {multi && !hideCheckbox && (
-                      <span className={`inline-block w-4 h-4 mr-2 rounded border align-middle ${isSelected ? "bg-[#3370ff] border-[#3370ff]" : "border-[#d0d3d6]"}`}>
-                        {isSelected && <span className="text-white text-[10px] leading-4 text-center block">✓</span>}
-                      </span>
+                  <div key={child.value}>
+                    {child.groupLabel && (
+                      <div className="bg-[#f7f8fa] px-2 py-1.5 text-[11px] text-[#8f959e]">
+                        {child.groupLabel}
+                      </div>
                     )}
-                    {child.label}
-                  </button>
+                    <button
+                      type="button"
+                      className={`block w-full text-left truncate hover:bg-[#f7f8fa] ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""}`}
+                      onMouseDown={() => select(child.value)}
+                    >
+                      {multi && !hideCheckbox && (
+                        <span className={`inline-block w-4 h-4 mr-2 rounded border align-middle ${isSelected ? "bg-[#3370ff] border-[#3370ff]" : "border-[#d0d3d6]"}`}>
+                          {isSelected && <span className="text-white text-[10px] leading-4 text-center block">✓</span>}
+                        </span>
+                      )}
+                      {child.label}
+                    </button>
+                  </div>
                 )
               })}
             </div>

@@ -10,7 +10,7 @@
         <view class="search-symbol"></view>
         <input
           class="search-input"
-          placeholder="搜索客户昵称"
+          placeholder="搜索姓名或昵称"
           placeholder-class="placeholder"
           value="{{keyword}}"
           focus="{{true}}"

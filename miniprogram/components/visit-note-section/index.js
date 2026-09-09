@@ -11,6 +11,8 @@ function formatTime(value) {
 Component({
   properties: {
     visitId: { type: String, value: '' },
+    customerId: { type: String, value: '' },
+    visitDate: { type: String, value: '' },
     category: { type: String, value: '' },
     title: { type: String, value: '' },
     privateToCreator: { type: Boolean, value: false },
@@ -25,6 +27,10 @@ Component({
     editorValue: '',
     saving: false,
     loading: false,
+    previousNeed: null,
+    previousOpen: false,
+    previousLoading: false,
+    previousError: '',
   },
 
   observers: {
@@ -77,7 +83,51 @@ Component({
 
     onAdd() {
       if (this.properties.readOnly) return
-      this.setData({ editorOpen: true, editorValue: this.data.myNote ? this.data.myNote.content : '' })
+      this.setData({
+        editorOpen: true,
+        editorValue: this.data.myNote ? this.data.myNote.content : '',
+        previousOpen: false,
+        previousNeed: null,
+        previousError: '',
+      })
+    },
+
+    async onTogglePrevious() {
+      if (this.data.previousOpen) {
+        this.setData({ previousOpen: false })
+        return
+      }
+      this.setData({ previousOpen: true })
+      if (this.data.previousNeed || !this.properties.customerId || this.data.previousLoading) return
+      await this.loadPreviousNeed()
+    },
+
+    async loadPreviousNeed() {
+      if (!this.properties.customerId || this.data.previousLoading) return
+      this.setData({ previousLoading: true, previousError: '' })
+      try {
+        const previousNeed = await visitNoteApi.previousVisitNeed(
+          this.properties.customerId,
+          this.properties.visitDate,
+          this.properties.visitId,
+        )
+        this.setData({ previousNeed, previousError: '' })
+      } catch (error) {
+        this.setData({ previousNeed: null, previousError: error.message || '加载上次需求失败' })
+      } finally {
+        this.setData({ previousLoading: false })
+      }
+    },
+
+    onAppendPrevious() {
+      const previousContent = this.data.previousNeed && this.data.previousNeed.content
+      if (!previousContent) return
+      const current = (this.data.editorValue || '').trim()
+      if (current.includes(previousContent.trim())) {
+        wx.showToast({ title: '已带入', icon: 'none' })
+        return
+      }
+      this.setData({ editorValue: current ? `${current}\n${previousContent}` : previousContent })
     },
 
     onEditorInput(event) {
@@ -86,7 +136,7 @@ Component({
 
     onEditorClose() {
       if (this.data.saving) return
-      this.setData({ editorOpen: false, editorValue: '' })
+      this.setData({ editorOpen: false, editorValue: '', previousOpen: false, previousNeed: null, previousError: '' })
     },
 
     async onSubmit() {

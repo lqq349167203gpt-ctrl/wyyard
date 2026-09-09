@@ -1,6 +1,10 @@
 import asyncio
+import re
+from datetime import datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from app.middleware.jwt_auth import require_page_permission
 from app.models.custom_analysis import (
@@ -47,6 +51,34 @@ def _actor(request: Request) -> tuple[str, str, bool]:
     return actor_id, actor_name, is_super_admin
 
 
+def _allowed_customer_ids_for_plan(request: Request, plan) -> set[str] | None:
+    role = get_request_roles(request)
+    allow_payment_details = customer_access_service.transaction_access(role) == "detail"
+    allow_communication = customer_access_service.can_view_detail_tab(role, "communication")
+    payment_fields = set(custom_analysis_service.FIELD_GROUPS["付费行为"])
+    all_conditions = list(plan.conditions)
+    for group in plan.comparison_groups:
+        all_conditions.extend(group.conditions)
+    plan_fields = {
+        *(condition.field for condition in all_conditions),
+        *plan.columns,
+        plan.sort_by,
+        plan.card_dimension,
+    }
+    payment_metrics = {"converted_customers", "payment_orders", "payment_amount"}
+    if not allow_payment_details and (
+        plan_fields.intersection(payment_fields)
+        or set(plan.metrics).intersection(payment_metrics)
+        or plan.card_metric in payment_metrics
+    ):
+        raise HTTPException(status_code=403, detail="当前角色没有客户交易明细权限，请移除付费相关筛选项")
+    if not allow_communication and plan_fields.intersection(custom_analysis_service.FIELD_GROUPS["沟通行为"]):
+        raise HTTPException(status_code=403, detail="当前角色没有沟通记录查看权限")
+    return customer_access_service.visible_customer_ids(
+        request, customer_service.list_customers()
+    )
+
+
 def _condition_snapshot(condition) -> dict:
     value = "跟随统计周期" if condition.inherit_period else condition.value
     if not condition.inherit_period and condition.operator == "between" and isinstance(value, list):
@@ -79,6 +111,7 @@ def _template_snapshot(template) -> dict:
         "拆分指标": custom_analysis_service.METRIC_LABELS[template.plan.card_metric][0],
         "拆分维度": custom_analysis_service.CARD_DIMENSION_LABELS[template.plan.card_dimension],
         "列表字段": [custom_analysis_service.FIELD_LABELS[field] for field in template.plan.columns],
+        "列表排列": custom_analysis_service.ROW_DISPLAY_MODE_LABELS[template.plan.row_display_mode],
     }
 
 
@@ -127,8 +160,11 @@ def _plan_snapshot(plan, result: dict) -> dict:
         "拆分指标": custom_analysis_service.METRIC_LABELS[plan.card_metric][0],
         "拆分维度": custom_analysis_service.CARD_DIMENSION_LABELS[plan.card_dimension],
         "显示字段": [custom_analysis_service.FIELD_LABELS[item] for item in plan.columns],
+        "列表排列": custom_analysis_service.ROW_DISPLAY_MODE_LABELS[plan.row_display_mode],
         "排序方式": f"{custom_analysis_service.FIELD_LABELS[plan.sort_by]}（{'升序' if plan.sort_order == 'asc' else '降序'}）",
         "结果人数": result_total,
+        "结果数量": result_total,
+        "结果单位": "人" if plan.row_display_mode == "unique_customers" else "人次",
     }
 
 
@@ -230,31 +266,7 @@ async def parse_query(data: AnalysisParseRequest, request: Request):
 @router.post("/execute")
 async def execute_query(data: AnalysisExecuteRequest, request: Request):
     actor_id = getattr(request.state, "user_id", "")
-    role = get_request_roles(request)
-    allow_payment_details = customer_access_service.transaction_access(role) == "detail"
-    allow_communication = customer_access_service.can_view_detail_tab(role, "communication")
-    payment_fields = set(custom_analysis_service.FIELD_GROUPS["付费行为"])
-    all_conditions = list(data.plan.conditions)
-    for group in data.plan.comparison_groups:
-        all_conditions.extend(group.conditions)
-    plan_fields = {
-        *(condition.field for condition in all_conditions),
-        *data.plan.columns,
-        data.plan.sort_by,
-        data.plan.card_dimension,
-    }
-    payment_metrics = {"converted_customers", "payment_orders", "payment_amount"}
-    if not allow_payment_details and (
-        plan_fields.intersection(payment_fields)
-        or set(data.plan.metrics).intersection(payment_metrics)
-        or data.plan.card_metric in payment_metrics
-    ):
-        raise HTTPException(status_code=403, detail="当前角色没有客户交易明细权限，请移除付费相关筛选项")
-    if not allow_communication and plan_fields.intersection(custom_analysis_service.FIELD_GROUPS["沟通行为"]):
-        raise HTTPException(status_code=403, detail="当前角色没有沟通记录查看权限")
-    allowed_customer_ids = customer_access_service.visible_customer_ids(
-        request, customer_service.list_customers()
-    )
+    allowed_customer_ids = _allowed_customer_ids_for_plan(request, data.plan)
     result = await asyncio.to_thread(
         custom_analysis_service.execute_plan,
         data.plan,
@@ -269,14 +281,44 @@ async def execute_query(data: AnalysisExecuteRequest, request: Request):
             f"{group.get('name') or '未命名组'} {int(group.get('total') or 0)}人"
             for group in comparison_groups
         )
+        result_unit = str(result.get("total_unit") or "人")
         request.state.operation_log_context = {
             "content": (
                 f"执行方案对比“{data.plan.title}”：{comparison_summary}"
                 if comparison_groups
-                else f"执行自定义筛选“{data.plan.title}”：筛选出 {result['total']} 人"
+                else f"执行自定义筛选“{data.plan.title}”：筛选出 {result['total']} {result_unit}"
             ),
             "after_data": _plan_snapshot(data.plan, result),
         }
     else:
         request.state.skip_operation_log = True
     return result
+
+
+@router.post("/export")
+async def export_query(data: AnalysisExecuteRequest, request: Request):
+    if data.plan.analysis_mode != "single":
+        raise HTTPException(status_code=400, detail="方案对比暂不支持客户明细导出")
+    actor_id = getattr(request.state, "user_id", "")
+    allowed_customer_ids = _allowed_customer_ids_for_plan(request, data.plan)
+    output, record_count = await asyncio.to_thread(
+        custom_analysis_service.build_analysis_export,
+        data.plan,
+        actor_id,
+        allowed_customer_ids,
+    )
+    if record_count == 0:
+        raise HTTPException(status_code=404, detail="当前筛选条件下暂无可导出的客户")
+
+    safe_title = re.sub(r"[\\/:*?\"<>|]", "-", data.plan.title).strip() or "筛选结果"
+    filename = f"自定义筛选_{safe_title}_{datetime.now().date().isoformat()}.xlsx"
+    request.state.operation_log_context = {
+        "content": f"导出自定义筛选“{data.plan.title}”：共 {record_count} {'人' if data.plan.row_display_mode == 'unique_customers' else '人次'}",
+        "after_data": _plan_snapshot(data.plan, {"total": record_count}),
+    }
+    disposition = f'attachment; filename="custom_analysis.xlsx"; filename*=UTF-8\'\'{quote(filename)}'
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": disposition, "X-Export-Count": str(record_count)},
+    )

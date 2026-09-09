@@ -330,6 +330,7 @@ export interface Customer {
   visit_count: number
   activity_count: number
   total_payment: number | null
+  transaction_count?: number | null
   last_visit_date?: string | null
   core_situation: string
   need_tags: string
@@ -710,6 +711,12 @@ export interface VisitNote extends VisitNoteSummary {
   can_delete: boolean
 }
 
+export interface PreviousVisitNeed {
+  visit_id: string
+  visit_date: string
+  content: string
+}
+
 export interface CustomerSearchResult {
   id: string
   nickname: string
@@ -769,6 +776,12 @@ export const visitApi = {
 export const visitNoteApi = {
   list: (visitId: string) => request<VisitNote[]>(`/api/visit-notes?visit_id=${encodeURIComponent(visitId)}`),
   listByVisits: (visitIds: string[]) => request<VisitNote[]>(`/api/visit-notes?visit_ids=${encodeURIComponent(visitIds.join(","))}`),
+  previousVisitNeed: (customerId: string, beforeDate?: string, excludeVisitId?: string) => {
+    const params = new URLSearchParams({ customer_id: customerId })
+    if (beforeDate) params.set("before_date", beforeDate)
+    if (excludeVisitId) params.set("exclude_visit_id", excludeVisitId)
+    return request<PreviousVisitNeed | null>(`/api/visit-notes/previous-visit-need?${params.toString()}`)
+  },
   create: (data: { visit_id: string; category: VisitNoteCategory; content: string }) =>
     request<VisitNote>("/api/visit-notes", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, content: string) =>
@@ -1788,6 +1801,33 @@ export interface ProjectDeduction {
   created_by: string
   updated_by: string
   created_at: string
+  source_activity_type?: string
+  source_activity_id?: string
+  source_activity_key?: string
+  source_activity_name?: string
+  source_activity_date?: string
+  source_organization_id?: string
+  source_organization_name?: string
+  source_space_id?: string
+  source_space_name?: string
+}
+
+export interface CoarseDoorCourseOption {
+  record_type: string
+  record_id: string
+  name: string
+  course_type: string
+  date: string
+  start_time: string
+  deduction_count: number
+  organization_ids: string[]
+  space_id: string
+  space_name: string
+}
+
+export interface CoarseDoorOptions {
+  organizations: { id: string; name: string }[]
+  courses: CoarseDoorCourseOption[]
 }
 
 export const projectDeductionApi = {
@@ -1810,6 +1850,10 @@ export const projectDeductionApi = {
     ),
   autoDeduct: (data: { nickname: string; project_type: string; count: number; created_by?: string; name_filter?: string }) =>
     request<ProjectDeduction>("/api/project-deductions/auto", { method: "POST", body: JSON.stringify(data) }),
+  getCoarseDoorOptions: (customerId: string) =>
+    request<CoarseDoorOptions>(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}`),
+  createCoarseDoorCourse: (data: { customer_id: string; record_type: string; record_id: string; organization_id: string }) =>
+    request<ProjectDeduction>("/api/project-deductions/coarse-door-course", { method: "POST", body: JSON.stringify(data) }),
 }
 
 export interface ProjectRefund {
@@ -3268,7 +3312,8 @@ export type AnalysisField =
 
 export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty"
 export type AnalysisCardDimension = "none" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "inviter_names" | "activity_types" | "purchased_projects"
-export type AnalysisMetric = "total_customers" | "created_customers" | "referred_customers" | "invited_customers" | "arrived_customers" | "activity_customers" | "converted_customers" | "payment_orders" | "payment_amount"
+export type AnalysisMetric = "total_customers" | "created_customers" | "referred_customers" | "invited_customers" | "arrived_customers" | "arrival_visits" | "activity_customers" | "activity_participations" | "converted_customers" | "payment_orders" | "payment_amount"
+export type AnalysisRowDisplayMode = "unique_customers" | "arrival_visits" | "activity_participations"
 
 export interface AnalysisCondition {
   field: AnalysisField
@@ -3299,6 +3344,7 @@ export interface AnalysisPlan {
   columns: AnalysisField[]
   sort_by: AnalysisField
   sort_order: "asc" | "desc"
+  row_display_mode: AnalysisRowDisplayMode
   analysis_mode: "single" | "comparison"
   comparison_groups: AnalysisComparisonGroup[]
 }
@@ -3322,6 +3368,7 @@ export interface AnalysisResult {
   cards: Array<{ key: string; title: string; count: number; unit: string; format: "number" | "currency"; is_total: boolean }>
   items: Array<Record<string, unknown> & { id: string; nickname: string }>
   total: number
+  total_unit?: "人" | "人次"
   page: number
   page_size: number
   total_pages: number
@@ -3382,7 +3429,10 @@ export interface AnalysisLog {
     拆分方式?: string
     显示字段?: string[]
     排序方式?: string
+    列表排列?: string
     结果人数?: number
+    结果数量?: number
+    结果单位?: string
     对比组?: Array<string | {
       名称: string
       时间范围?: string
@@ -3406,6 +3456,33 @@ export const customAnalysisApi = {
     method: "POST",
     body: JSON.stringify({ plan, page, page_size: pageSize }),
   }),
+  download: async (plan: AnalysisPlan) => {
+    const res = await fetch(`${API_BASE}/api/custom-analysis/export`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ plan }),
+    })
+    applyNewToken(res)
+    if (res.status === 401) {
+      handle401()
+      throw new Error("登录已过期")
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      const detail = data.detail
+      const message = Array.isArray(detail)
+        ? detail.map((item: { msg?: string }) => item.msg || "参数错误").join("；")
+        : (detail || "导出失败，请稍后再试")
+      throw new Error(message)
+    }
+    const disposition = res.headers.get("Content-Disposition") || ""
+    const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    let filename = `自定义筛选_${new Date().toLocaleDateString("sv-SE")}.xlsx`
+    if (encodedFilename) {
+      try { filename = decodeURIComponent(encodedFilename) } catch {}
+    }
+    return { blob: await res.blob(), filename }
+  },
   listTemplates: () => request<AnalysisTemplate[]>("/api/custom-analysis/templates"),
   createTemplate: (data: { name: string; description: string; scope: "private" | "shared"; plan: AnalysisPlan }) => request<AnalysisTemplate>("/api/custom-analysis/templates", {
     method: "POST",
@@ -3515,6 +3592,7 @@ export const statisticsApi = {
 export interface CommunicationRecord {
   id: string
   customer_nickname: string
+  customer_name?: string
   content: string
   creator: string
   creator_id: string

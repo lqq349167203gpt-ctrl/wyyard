@@ -118,6 +118,33 @@ def list_visit_notes(
     return [_response(note, request) for note in notes]
 
 
+@router.get("/previous-visit-need")
+def get_previous_visit_need(
+    request: Request,
+    customer_id: str = Query(..., min_length=1),
+    before_date: str = Query(""),
+    exclude_visit_id: str = Query(""),
+):
+    customer_access_service.require_customer_scope(request, customer_id)
+    account_id, owner_name, username = _actor(request)
+    result = visit_note_service.get_previous_visit_need(
+        customer_id,
+        before_date=before_date,
+        exclude_visit_id=exclude_visit_id,
+        account_id=account_id,
+        owner_name=owner_name,
+        username=username,
+    )
+    if not result:
+        return None
+    note, visit_date = result
+    return {
+        "visit_id": note.visit_id,
+        "visit_date": visit_date,
+        "content": note.content,
+    }
+
+
 @router.post("")
 def create_visit_note(data: VisitNoteCreate, request: Request):
     _require_visit_customer_scope(request, data.visit_id, action="新增信息到")

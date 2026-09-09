@@ -220,6 +220,8 @@ def ensure_payment_record_manager(request: Request, record) -> None:
     scope = position_edit_permission_service.get_permissions(roles)["payments"]
     if "超级管理员" in roles or scope == "all":
         return
+    if scope == "view":
+        raise HTTPException(status_code=403, detail="当前角色只能查看付费记录")
     actor_id, actor_name = get_request_actor(request)
     created_by_id = str(getattr(record, "created_by_id", "") or "")
     created_by = str(getattr(record, "created_by", "") or "")

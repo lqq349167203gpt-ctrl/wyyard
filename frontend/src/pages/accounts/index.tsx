@@ -271,7 +271,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
                   customers={customerList}
                   value={form.owner}
                   onChange={(val) => setForm({ ...form, owner: val as string })}
-                  placeholder="输入昵称搜索..."
+                  placeholder="输入姓名或昵称搜索..."
                   filterSelected={false}
                 />
                 {formErrors.owner && <p className="text-[11px] text-red-500 mt-0.5 -mb-2">{formErrors.owner}</p>}

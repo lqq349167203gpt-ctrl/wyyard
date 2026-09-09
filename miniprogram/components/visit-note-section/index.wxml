@@ -35,7 +35,25 @@
 <view class="editor-panel" wx:if="{{editorOpen && !readOnly}}">
   <view class="editor-header">
     <text class="editor-title">我填写的{{title}}</text>
-    <text class="editor-close" bindtap="onEditorClose">取消</text>
+    <view class="editor-header-actions">
+      <text class="previous-toggle" wx:if="{{category === 'visit_need' && customerId}}" bindtap="onTogglePrevious">{{previousOpen ? '收起上次需求' : '引用上次需求'}}</text>
+      <text class="editor-close" bindtap="onEditorClose">取消</text>
+    </view>
+  </view>
+  <view class="previous-box" wx:if="{{category === 'visit_need' && previousOpen}}">
+    <text class="previous-empty" wx:if="{{previousLoading}}">正在加载上次需求…</text>
+    <view class="previous-error" wx:elif="{{previousError}}" bindtap="loadPreviousNeed">
+      <text>{{previousError}}</text>
+      <text class="previous-retry">点击重试</text>
+    </view>
+    <block wx:elif="{{previousNeed}}">
+      <view class="previous-meta">
+        <text>{{previousNeed.visit_date}} 的来访需求</text>
+        <text class="previous-append" bindtap="onAppendPrevious">带入本次</text>
+      </view>
+      <text class="previous-content">{{previousNeed.content}}</text>
+    </block>
+    <text class="previous-empty" wx:else>暂无可引用的历史需求</text>
   </view>
   <textarea
     class="editor-input"

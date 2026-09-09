@@ -872,7 +872,7 @@ export default function OrganizationsPage() {
                 value={memberName}
                 onChange={(v) => setMemberName(typeof v === "string" ? v : "")}
                 excludeIds={activeOrg?.member_ids || []}
-                placeholder="输入昵称或姓名搜索..."
+                placeholder="输入姓名或昵称搜索..."
               />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">

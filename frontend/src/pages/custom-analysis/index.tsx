@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Save, Trash2, X } from "lucide-react"
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, GripVertical, Plus, Save, Trash2, X } from "lucide-react"
 
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -18,10 +18,15 @@ import {
   type AnalysisOperator,
   type AnalysisPlan,
   type AnalysisResult,
+  type AnalysisRowDisplayMode,
   type AnalysisTemplate,
 } from "@/lib/api"
 
 const VALUELESS_OPERATORS = new Set<AnalysisOperator>(["is_empty", "is_not_empty"])
+const ROW_DISPLAY_OPTIONS: Array<{ value: AnalysisRowDisplayMode; label: string }> = [
+  { value: "unique_customers", label: "每人显示一次" },
+  { value: "arrival_visits", label: "按实际到场人次展开" },
+]
 const NUMBER_FIELDS = new Set<AnalysisField>([
   "age", "invitation_count", "visit_count", "activity_count", "communication_count",
   "total_consumption", "invitation_count_period", "visit_count_period", "cancelled_count_period",
@@ -223,6 +228,7 @@ function defaultPlan(): AnalysisPlan {
     ],
     sort_by: "referral_date",
     sort_order: "desc",
+    row_display_mode: "unique_customers",
     analysis_mode: "single",
     comparison_groups: [],
   }
@@ -267,6 +273,9 @@ function clonePlan(plan: AnalysisPlan): AnalysisPlan {
     })),
     metrics: metrics.length ? metrics : ["total_customers"],
     card_metric: plan.card_metric === "created_customers" ? "total_customers" : plan.card_metric,
+    row_display_mode: plan.row_display_mode === "activity_participations"
+      ? "unique_customers"
+      : plan.row_display_mode ?? "unique_customers",
     columns: [...plan.columns],
   }
 }
@@ -303,6 +312,7 @@ export default function CustomAnalysisPage() {
   const [templates, setTemplates] = useState<AnalysisTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
   const [executing, setExecuting] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [metadataLoading, setMetadataLoading] = useState(true)
   const [error, setError] = useState("")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
@@ -327,6 +337,27 @@ export default function CustomAnalysisPage() {
       setTemplates(await customAnalysisApi.listTemplates())
     } catch {
       setTemplates([])
+    }
+  }
+
+  const exportResult = async () => {
+    if (!result || result.plan.analysis_mode !== "single" || exporting) return
+    setExporting(true)
+    setError("")
+    try {
+      const { blob, filename } = await customAnalysisApi.download(result.plan)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = filename
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "导出失败，请稍后重试")
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -706,6 +737,7 @@ export default function CustomAnalysisPage() {
   const currentPage = result?.page ?? 1
   const totalPages = result?.total_pages ?? 1
   const totalItems = result?.total ?? 0
+  const totalUnit = result?.total_unit ?? (result?.plan.row_display_mode === "unique_customers" ? "人" : "人次")
   const startIndex = totalItems ? (currentPage - 1) * 20 + 1 : 0
   const endIndex = Math.min(currentPage * 20, totalItems)
 
@@ -725,7 +757,7 @@ export default function CustomAnalysisPage() {
   const selectedPeriod = selectedPeriodValue(plan.date_from, plan.date_to)
   const querySummary = plan.analysis_mode === "comparison"
     ? `${plan.comparison_groups.length} 个对比组 · ${plan.metrics.length} 项共用指标`
-    : `${dateSummary} · ${plan.conditions.length} 个条件 · ${plan.metrics.length} 项总数 · ${plan.columns.length} 列`
+    : `${dateSummary} · ${plan.conditions.length} 个条件 · ${plan.metrics.length} 项总数 · ${plan.columns.length} 列 · ${ROW_DISPLAY_OPTIONS.find(item => item.value === plan.row_display_mode)?.label ?? "每人显示一次"}`
   const metricCards = result?.cards.filter(card => !card.key.startsWith("dimension-")) ?? []
   const dimensionCards = result?.cards.filter(card => card.key.startsWith("dimension-")) ?? []
   const dimensionLabel = metadata?.card_dimensions.find(item => item.value === result?.plan.card_dimension)?.label ?? "分组"
@@ -759,6 +791,7 @@ export default function CustomAnalysisPage() {
               clearable
             />
             {canManageSelectedTemplate && <Button variant="outline" size="sm" onClick={updateSelectedTemplate} disabled={savingTemplate} className="h-8 rounded-[4px] border border-[#dee0e3] bg-white px-3 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7]">更新模板</Button>}
+            <Button variant="outline" size="sm" onClick={exportResult} disabled={!result || result.plan.analysis_mode !== "single" || exporting} className="h-8 rounded-[4px] border border-[#dee0e3] bg-white px-3 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7] disabled:text-[#b7bdc6]"><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "导出中" : "导出"}</Button>
             <Button variant="outline" size="sm" onClick={() => {
               if (!validateComparisonGroups(plan)) return
               setTemplateName("")
@@ -927,6 +960,11 @@ export default function CustomAnalysisPage() {
                 setPlan(current => ({ ...current, columns: nextColumns }))
               }} multi triggerLabel="+ 添加" hideChevron className="w-[64px]" buttonClassName="!h-7 !rounded-[4px] !border !border-dashed !border-[#b9cdf8] !bg-white !px-2 !text-[11px] !shadow-none" dropdownWidth={280} menuMaxHeight={300} />
             </div>
+            <div className="mt-2 flex items-center gap-2 text-[12px] text-[#79838f]">
+              <span>列表排列</span>
+              <SelectDropdown value={plan.row_display_mode} options={ROW_DISPLAY_OPTIONS} onChange={value => setPlan(current => ({ ...current, row_display_mode: value as AnalysisRowDisplayMode }))} size="sm" className="w-[180px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" dropdownWidth={180} />
+              <span className="text-[11px] text-[#b7bdc6]">按实际到场展开时，每位客户每天显示一条</span>
+            </div>
           </div>}
         </div>
 
@@ -982,7 +1020,7 @@ export default function CustomAnalysisPage() {
             </div>}
           </div>
           <div className="mx-[22px] mb-4 mt-4 overflow-hidden border-[0.5px] border-[#eceef0] bg-white">
-            <div className="flex items-baseline justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-3.5 py-2.5"><div className="flex min-w-0 items-baseline gap-2"><div className="truncate text-[13px] font-medium text-[#2b2f36]">{result.plan.title === "自助分析结果" ? `${dateSummary} · 符合条件客户` : result.plan.title}</div><span className="shrink-0 text-[12px] text-[#8f959e]">共 {result.total} 人</span></div><span className="shrink-0 text-[12px] text-[#8f959e]">{executing ? "正在更新..." : "修改条件后点击“更新结果”"}</span></div>
+            <div className="flex items-baseline justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-3.5 py-2.5"><div className="flex min-w-0 items-baseline gap-2"><div className="truncate text-[13px] font-medium text-[#2b2f36]">{result.plan.title === "自助分析结果" ? `${dateSummary} · 符合条件客户` : result.plan.title}</div><span className="shrink-0 text-[12px] text-[#8f959e]">共 {result.total} {totalUnit}</span></div><span className="shrink-0 text-[12px] text-[#8f959e]">{executing ? "正在更新..." : "修改条件后点击“更新结果”"}</span></div>
             <div className="overflow-x-auto">
               {result.items.length === 0 ? <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无符合条件的客户</div> : (
                 <Table className="min-w-[900px] table-fixed">
@@ -1005,7 +1043,7 @@ export default function CustomAnalysisPage() {
                   </TableHeader>
                   <TableBody>
                     {result.items.map(item => (
-                      <TableRow key={item.id} className="h-9">
+                      <TableRow key={String(item._display_key ?? item.id)} className="h-9">
                         {columns.map((field, index) => (
                           <TableCell key={field} className={`${index === 0 ? "pl-3.5" : ""} overflow-hidden px-3.5 py-2 text-[12px] text-[#4e535a]`}>
                             {field === "nickname" ? <button type="button" onClick={() => setSelectedCustomerId(item.id)} className="block max-w-full truncate text-left text-[12px] font-medium text-[#2b2f36] hover:underline" title={String(item.nickname || "")}>{item.nickname || <EmptyLine />}</button> : <span className="block truncate" title={Array.isArray(item[field]) ? item[field].join("、") : String(item[field] ?? "")}>{renderValue(field, item[field])}</span>}
@@ -1017,7 +1055,7 @@ export default function CustomAnalysisPage() {
                 </Table>
               )}
             </div>
-            <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} startIndex={startIndex} endIndex={endIndex} unit="人" onPageChange={page => execute(plan, page)} />
+            <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} startIndex={startIndex} endIndex={endIndex} unit={totalUnit} onPageChange={page => execute(plan, page)} />
           </div>
         </div>}
       </section>

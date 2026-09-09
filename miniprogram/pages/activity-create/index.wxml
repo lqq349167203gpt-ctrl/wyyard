@@ -180,16 +180,17 @@
       <block wx:if="{{typePickerStep === 2}}">
         <!-- 沙龙活动：课程列表 -->
         <block wx:if="{{_pendingType === 'class'}}">
-          <view
-            wx:for="{{courses}}"
-            wx:key="name"
-            class="picker-item {{item.name === _pendingCourseName ? 'selected' : ''}}"
-            bindtap="onCourseSelect"
-            data-name="{{item.name}}"
-          >
-            <text class="picker-item-name">{{item.name}}</text>
-            <text class="picker-item-check" wx:if="{{item.name === _pendingCourseName}}">✓</text>
-          </view>
+          <block wx:for="{{courses}}" wx:key="name">
+            <view class="course-organization-title" wx:if="{{item.showOrganizationHeader}}">{{item.organizationName}}</view>
+            <view
+              class="picker-item {{item.name === _pendingCourseName ? 'selected' : ''}}"
+              bindtap="onCourseSelect"
+              data-name="{{item.name}}"
+            >
+              <text class="picker-item-name">{{item.name}}</text>
+              <text class="picker-item-check" wx:if="{{item.name === _pendingCourseName}}">✓</text>
+            </view>
+          </block>
         </block>
         <!-- 内部课程：课程类型列表 -->
         <block wx:if="{{_pendingType === 'ics'}}">

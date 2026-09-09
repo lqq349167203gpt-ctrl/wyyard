@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.services import (
     activity_followup_service,
+    activity_participant_note_service,
     class_record_service,
     customer_access_service,
     customer_contact_service,
@@ -27,6 +28,7 @@ from app.services import (
     offline_course_service,
     oh_card_reading_service,
     other_project_service,
+    project_deduction_service,
     tea_seat_fee_service,
     visit_note_service,
     visit_service,
@@ -122,6 +124,11 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
         if transaction_level != "none"
         else None
     )
+    basic["transaction_count"] = (
+        len(all_payment_records)
+        if transaction_level != "none"
+        else None
+    )
     payment_records = all_payment_records if transaction_level == "detail" else []
     offline_course_records = _build_offline_course_records(customer_id) if can_view_offline else []
     visits = visit_service.list_visits(customer_id=customer_id)
@@ -174,6 +181,10 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
             record.model_dump(mode="json")
             for record in activity_followup_service.list_followups(customer_id)
         ] if can_view_followups else [],
+        "activity_participant_notes": [
+            record.model_dump(mode="json")
+            for record in activity_participant_note_service.list_customer_notes(customer_id)
+        ] if can_follow_up and not is_customer_self else [],
         "healing_records": healing_records,
         "payment_records": payment_records,
         "offline_course_records": offline_course_records,
@@ -636,12 +647,20 @@ def _build_activities(
             v.visit_date for v in visit_service.list_visits(customer_id=customer_id)
             if v.arrived
         }
+    coarse_deduction_counts: dict[str, int] = {}
+    for usage in membership_card_service.list_activity_usage_records(customer_id):
+        if usage.get("benefit_name") != "粗门次卡":
+            continue
+        activity_key = str(usage.get("key") or "").split("#unit=", 1)[0]
+        if activity_key:
+            coarse_deduction_counts[activity_key] = coarse_deduction_counts.get(activity_key, 0) + 1
     activities = []
 
     def deduction_summary(
         *,
         attended: bool,
         membership_count: int = 0,
+        coarse_count: int = 0,
         project_label: str = "",
         withdrawn: bool = False,
     ) -> str:
@@ -649,6 +668,8 @@ def _build_activities(
             return "已退课"
         if not attended:
             return "未参与"
+        if coarse_count > 0:
+            return f"粗门扣卡{coarse_count}次"
         if project_label:
             return project_label
         if membership_count > 0:
@@ -676,7 +697,7 @@ def _build_activities(
             activities.append({
                 "type": "沙龙类型",
                 "date": r.date,
-                "name": r.course_name,
+                "name": r.activity_name or r.course_name,
                 "course_type": r.course_type or "",
                 "role": role,
                 "host": host,
@@ -688,6 +709,7 @@ def _build_activities(
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     membership_count=membership_count,
+                    coarse_count=coarse_deduction_counts.get(f"class:{r.id}", 0),
                     withdrawn=withdrawn,
                 ),
             })
@@ -725,6 +747,7 @@ def _build_activities(
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     membership_count=membership_count,
+                    coarse_count=coarse_deduction_counts.get(f"gcs:{s.id}", 0),
                     project_label="觉醒游戏扣卡1次" if role == "案主" else "",
                     withdrawn=withdrawn,
                 ),
@@ -763,6 +786,7 @@ def _build_activities(
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     membership_count=membership_count,
+                    coarse_count=coarse_deduction_counts.get(f"ers:{s.id}", 0),
                     project_label="情绪释放扣卡1次" if role == "案主" else "",
                     withdrawn=withdrawn,
                 ),
@@ -798,6 +822,7 @@ def _build_activities(
                 "membership_deduction_count": 0,
                 "deduction_summary": deduction_summary(
                     attended=attended,
+                    coarse_count=coarse_deduction_counts.get(f"eks:{s.id}", 0),
                     project_label=f"能量结部位{project_count}个" if role == "案主" else "",
                     withdrawn=withdrawn,
                 ),
@@ -828,7 +853,11 @@ def _build_activities(
                 "participated": attended,
                 "withdrawn": withdrawn,
                 "membership_deduction_count": 0,
-                "deduction_summary": deduction_summary(attended=attended, withdrawn=withdrawn),
+                "deduction_summary": deduction_summary(
+                    attended=attended,
+                    coarse_count=coarse_deduction_counts.get(f"ics:{s.id}", 0),
+                    withdrawn=withdrawn,
+                ),
             })
 
     activity_type_codes = {
@@ -877,6 +906,39 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "created_at": c.effective_date,
             "voided": c.voided,
             "notes": c.notes or "",
+        })
+
+    # 粗门扣卡：这是一次真实交易变动，也需要出现在客户交易记录里。
+    coarse_deductions = project_deduction_service.list_deductions(
+        customer_id=customer_id,
+        project_type="membership-cards",
+    )
+    for deduction in coarse_deductions:
+        if deduction.project_name != project_deduction_service.COARSE_DOOR_CARD_TYPE:
+            continue
+        if date and deduction.deduction_date != date:
+            continue
+        record_name = " · ".join(
+            value
+            for value in (
+                deduction.source_organization_name,
+                deduction.source_activity_name,
+            )
+            if value
+        )
+        records.append({
+            "source_id": deduction.id,
+            "source_created_at": deduction.created_at.isoformat(),
+            "type": "粗门扣卡",
+            "name": record_name or "课程抵扣",
+            "quantity": deduction.count,
+            "amount": 0,
+            "deal_date": deduction.deduction_date or "",
+            "effective_date": deduction.source_activity_date or deduction.deduction_date or "",
+            "expiry_date": "",
+            "closer_name": deduction.created_by or "",
+            "created_at": deduction.created_at.strftime("%Y-%m-%d"),
+            "notes": deduction.reason or "",
         })
 
     # 觉醒游戏
@@ -975,7 +1037,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "deal_date": r.deal_date or "",
             "effective_date": getattr(r, "effective_date", None) or "",
             "expiry_date": getattr(r, "expiry_date", None) or "",
-            "closer_name": r.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in r.closers) if r.closers else (r.closer_name or ""),
             "created_at": r.created_at.strftime("%Y-%m-%d"),
             "notes": r.notes or "",
             "diagnosis_teacher": getattr(r, "diagnosis_teacher", None) or "",
@@ -997,7 +1059,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "deal_date": r.deal_date or "",
             "effective_date": r.effective_date or "",
             "expiry_date": expiry_date,
-            "closer_name": r.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in r.closers) if r.closers else (r.closer_name or ""),
             "created_at": r.created_at.strftime("%Y-%m-%d"),
             "notes": r.notes or "",
         })
@@ -1017,7 +1079,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "deal_date": r.deal_date or "",
             "effective_date": "",
             "expiry_date": "",
-            "closer_name": r.closer_name or "",
+            "closer_name": ", ".join(cl["name"] for cl in r.closers) if r.closers else (r.closer_name or ""),
             "created_at": r.created_at.strftime("%Y-%m-%d"),
             "notes": r.notes or "",
         })

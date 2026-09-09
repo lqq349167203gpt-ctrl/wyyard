@@ -157,6 +157,13 @@
   height: 0;
 }
 
+.course-organization-title {
+  padding: 20rpx 32rpx 10rpx;
+  background-color: #f7f8fa;
+  color: #8f959e;
+  font-size: 24rpx;
+}
+
 .picker-item {
   display: flex;
   align-items: center;

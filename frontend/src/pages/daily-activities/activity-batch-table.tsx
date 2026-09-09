@@ -7,8 +7,8 @@ import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
 import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
-  courseTypeApi, activityOrderApi,
-  type CustomerLight, type Space, type MemberIdentity, type CourseType,
+  courseTypeApi, organizationApi, activityOrderApi,
+  type CustomerLight, type Space, type MemberIdentity, type CourseType, type Organization,
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -140,7 +140,7 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
 
   if (type === "class") {
     hostIds = data.teacher_ids || []
-    name = courses.find(c => c.id === data.course_id)?.name || data.course_name || ""
+    name = data.activity_name || courses.find(c => c.id === data.course_id)?.name || data.course_name || ""
     classCourseType = data.course_type || ""
   } else if (type === "gcs" || type === "ers") {
     ownerId = data.owner_id || ""
@@ -319,6 +319,7 @@ export function ActivityBatchTable({
   const fetchedRemainingRef = useRef<Set<string>>(new Set())
   const prevOwnerRef = useRef<Record<number, string>>({})
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
+  const [organizations, setOrganizations] = useState<Organization[]>([])
   const [editingDescriptionKey, setEditingDescriptionKey] = useState<number | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState("")
   const [editingReviewKey, setEditingReviewKey] = useState<number | null>(null)
@@ -594,11 +595,32 @@ export function ActivityBatchTable({
   // 加载活动类型（沙龙子类型）
   useEffect(() => {
     courseTypeApi.list().then(setCourseTypes).catch(() => {})
+    organizationApi.list().then(setOrganizations).catch(() => {})
   }, [])
 
   // 动态构建类型选项
   const typeOptions = useMemo(() => {
-    const classChildren = courseTypes.filter(t => t.category !== "other").map(t => ({ value: `class:${t.name}`, label: t.name }))
+    const salonTypes = courseTypes.filter(type => type.category !== "other")
+    const organizationNames = new Map(organizations.map(organization => [organization.id, organization.name]))
+    const organizationOrder = [...organizations.map(organization => organization.id), ""]
+    const classChildren = organizationOrder.flatMap(organizationId => {
+      const group = salonTypes.filter(type => type.organization_id === organizationId)
+      return group.map((type, index) => ({
+        value: `class:${type.name}`,
+        label: type.name,
+        groupLabel: index === 0 ? (organizationNames.get(organizationId) || "未配置组织") : undefined,
+      }))
+    })
+    const unknownOrganizationTypes = salonTypes.filter(type => (
+      type.organization_id && !organizationNames.has(type.organization_id)
+    ))
+    unknownOrganizationTypes.forEach((type, index) => {
+      classChildren.push({
+        value: `class:${type.name}`,
+        label: type.name,
+        groupLabel: index === 0 ? "未配置组织" : undefined,
+      })
+    })
     return [
       { value: "class", label: "沙龙活动", children: classChildren },
       { value: "gcs", label: "觉醒游戏" },
@@ -608,7 +630,7 @@ export function ActivityBatchTable({
       { value: "ics:商业框架陪跑", label: "商业框架陪跑" },
       { value: "ics:落地赋能班", label: "落地赋能班" },
     ]
-  }, [courseTypes])
+  }, [courseTypes, organizations])
 
   // 报告保存状态
   useEffect(() => {
@@ -726,7 +748,8 @@ export function ActivityBatchTable({
         if (type === "class") {
           const course = courses.find(c => c.id === row.course_id)
           createData.course_id = row.course_id || ""
-          createData.course_name = course?.name || row.name || ""
+          createData.course_name = course?.name || row.class_course_type || ""
+          createData.activity_name = row.name !== row.class_course_type ? row.name : ""
           createData.course_type = row.class_course_type || ""
           createData.course_description = row.description || ""
           createData.teacher_ids = row.host_ids
@@ -797,7 +820,8 @@ export function ActivityBatchTable({
           await classRecordApi.update(id, participantOnly ? participantUpdate : {
             ...common,
             course_id: row.course_id,
-            course_name: course?.name || row.name,
+            course_name: course?.name || row.class_course_type || "",
+            activity_name: row.name !== row.class_course_type ? row.name : "",
             course_type: row.class_course_type || "",
             course_description: row.description,
             teacher_ids: row.host_ids,

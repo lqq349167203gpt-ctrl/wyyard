@@ -11,7 +11,7 @@
   <view class="search-box" wx:if="{{!value}}">
     <input
       class="search-input"
-      placeholder="搜索客户昵称"
+      placeholder="搜索姓名或昵称"
       value="{{keyword}}"
       bindinput="onInput"
       bindfocus="onFocus"

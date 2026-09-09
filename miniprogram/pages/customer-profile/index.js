@@ -1,9 +1,11 @@
-const { customerApi, customerTagApi, communicationRecordApi } = require('../../utils/api')
+const { customerApi, customerTagApi, communicationRecordApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 
-function formatMoney(value) {
-  return '¥' + String(Math.round(value || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
+const DETAIL_PAYMENT_PROJECT_TYPES = [
+  PAYMENT_PROJECT_TYPES[0],
+  { key: 'coarse_door_card', label: '粗门次卡' },
+  ...PAYMENT_PROJECT_TYPES.slice(1),
+]
 
 const ACTIVITY_SUMMARY_TYPES = [
   { key: 'class', label: '沙龙活动' },
@@ -112,8 +114,8 @@ Page({
     loadError: '',
     healerText: '',
     firstVisit: '',
-    totalPayment: 0,
-    totalPaymentText: '¥0',
+    transactionCount: 0,
+    transactionCountText: '0',
     genderAgeText: '',
     workText: '',
     activities: [],
@@ -122,6 +124,7 @@ Page({
     commContent: '',
     commSaving: false,
     healingRecords: [],
+    courseParticipantNotes: [],
     arrivedCount: 0,
     cancelledCount: 0,
     absentCount: 0,
@@ -140,11 +143,19 @@ Page({
       { key: 'payment', label: '交易', count: 0 },
     ],
     isViewOnly: false,
+    canCreatePayment: false,
+    paymentEntryVisible: false,
+    paymentEntryTypes: DETAIL_PAYMENT_PROJECT_TYPES,
+    paymentEntryTypeIndex: 0,
+    paymentFormVisible: true,
   },
 
   onLoad(options) {
     if (!getApp().checkLogin()) return
-    this.setData({ isViewOnly: isAreaViewOnly('customers') })
+    this.setData({
+      isViewOnly: isAreaViewOnly('customers'),
+      canCreatePayment: getApp().checkPagePermission('payment'),
+    })
     if (options.id) {
       this.setData({ customerId: options.id })
       this.loadData(options.id)
@@ -192,9 +203,9 @@ Page({
       const workText = [c.work_status, c.work_description].filter(Boolean).join(' · ')
 
       const customerAccessPermissions = c.customer_access_permissions || null
-      const totalPayment = c.total_payment == null
+      const transactionCount = c.transaction_count == null
         ? null
-        : Number(c.total_payment || 0)
+        : Number(c.transaction_count || 0)
       // 活动记录
       const activities = (detail.activities || []).map(function(a) {
         return Object.assign({}, a, {
@@ -215,6 +226,12 @@ Page({
       const arrivedCount = visitRecords.filter(v => v.arrived).length
       const cancelledCount = visitRecords.filter(v => v.cancelled).length
       const absentCount = visitRecords.length - arrivedCount - cancelledCount
+      const courseParticipantNotes = (detail.activity_participant_notes || []).map(function(note) {
+        return Object.assign({}, note, {
+          categoryText: note.category === 'customer_info' ? '客户信息' : '跟进点',
+          timeText: [note.start_time, note.end_time].filter(Boolean).join('–'),
+        })
+      })
 
       // 卡次统计：扁平化，每张卡/项目一行
       const purchaseSummary = buildPurchaseSummary(detail.purchase_summary || [])
@@ -240,13 +257,14 @@ Page({
         heroTag: (customerTags[0] && customerTags[0].name) || '',
         healerText,
         firstVisit,
-        totalPayment,
-        totalPaymentText: totalPayment == null ? '—' : formatMoney(totalPayment),
+        transactionCount,
+        transactionCountText: transactionCount == null ? '—' : String(transactionCount),
         genderAgeText,
         workText,
         activities,
         activitySummary,
         healingRecords,
+        courseParticipantNotes,
         arrivedCount,
         cancelledCount,
         absentCount,
@@ -273,10 +291,10 @@ Page({
   },
 
   updateTabCounts() {
-    const { healingRecords, commRecords, activities, activityFollowups, purchaseSummary, offlineCourseRecords, paymentRecords, customerAccessPermissions } = this.data
+    const { healingRecords, courseParticipantNotes, commRecords, activities, activityFollowups, purchaseSummary, offlineCourseRecords, paymentRecords, customerAccessPermissions } = this.data
     const access = customerAccessPermissions
     const tabs = [
-      (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进', count: healingRecords.length },
+      (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进', count: healingRecords.length + courseParticipantNotes.length },
       (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: commRecords.length },
       (!access || access.detail_tabs.activities) && { key: 'activities', label: '活动', count: activities.length },
       (!access || access.detail_tabs.customer_followups) && { key: 'followups', label: '回访', count: activityFollowups.length },
@@ -332,6 +350,36 @@ Page({
       })
     })
   },
+
+  onPaymentEntryOpen() {
+    if (!this.data.canCreatePayment || !this.data.customer) return
+    this.setData({ paymentEntryVisible: true, paymentEntryTypeIndex: 0 })
+  },
+
+  onPaymentEntryClose() {
+    this.setData({ paymentEntryVisible: false })
+  },
+
+  onPaymentEntryTypeChange(e) {
+    const index = Number(e.detail.value) || 0
+    const selectedType = this.data.paymentEntryTypes[index]
+    if (selectedType && selectedType.key === 'coarse_door_card') {
+      const customerId = this.data.customerId
+      this.setData({ paymentEntryVisible: false, paymentEntryTypeIndex: 0 })
+      wx.navigateTo({ url: `/pages/payment/index?type=coarse_door_card&customerId=${encodeURIComponent(customerId)}` })
+      return
+    }
+    this.setData({ paymentFormVisible: false }, () => {
+      this.setData({ paymentEntryTypeIndex: index, paymentFormVisible: true })
+    })
+  },
+
+  onPaymentEntrySuccess() {
+    this.setData({ paymentEntryVisible: false })
+    if (this.data.customerId) this.loadData(this.data.customerId)
+  },
+
+  stopPropagation() {},
 
   onEditTap() {
     wx.navigateTo({ url: `/pages/customer-form/index?id=${this.data.customerId}` })

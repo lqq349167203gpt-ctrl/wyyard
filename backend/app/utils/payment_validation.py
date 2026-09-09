@@ -30,7 +30,7 @@ def _money(value, label: str) -> Decimal:
 
 
 def ensure_payment_closer_total(data, amount_field: str, existing=None, request=None) -> None:
-    """校验 PC/管理端小程序的成交人金额，PATCH 时按旧记录补全未提交字段。"""
+    """保留金额格式校验；新录入流程已取消成交人金额合计校验。"""
     if request is not None:
         source = str(request.headers.get("x-client-type", "") or "").lower()
         if source not in {"pc", "miniprogram"}:
@@ -39,19 +39,4 @@ def ensure_payment_closer_total(data, amount_field: str, existing=None, request=
     incoming = _as_dict(data)
     current = _as_dict(existing)
     fee = _money(incoming.get(amount_field, current.get(amount_field, 0)), "费用金额")
-    closers = incoming.get("closers", current.get("closers", []))
-    if not isinstance(closers, list):
-        raise HTTPException(status_code=400, detail="成交人金额明细格式不正确")
-
-    total = Decimal("0")
-    for closer in closers:
-        if not isinstance(closer, dict):
-            raise HTTPException(status_code=400, detail="成交人金额明细格式不正确")
-        total += _money(closer.get("amount", 0), "成交人金额")
-    total = total.quantize(CENT, rounding=ROUND_HALF_UP)
-
-    if total != fee:
-        raise HTTPException(
-            status_code=400,
-            detail=f"成交人金额合计 ¥{total:.2f} 必须与费用金额 ¥{fee:.2f} 一致",
-        )
+    _ = fee

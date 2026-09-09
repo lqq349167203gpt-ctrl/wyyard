@@ -134,6 +134,16 @@ export function CustomerSearchInput({
     ? (Array.isArray(value) ? value : [])
     : (typeof value === "string" && value ? [value] : [])
 
+  const findExactCustomer = (query: string) => {
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) return undefined
+    const matches = customers.filter(customer => (
+      customer.nickname.toLowerCase() === normalized
+      || (customer.name || "").toLowerCase() === normalized
+    ))
+    return matches.length === 1 ? matches[0] : undefined
+  }
+
   const filtered = useMemo(() => {
     if (!search) return []
     const q = search.toLowerCase()
@@ -288,7 +298,7 @@ export function CustomerSearchInput({
             onBlur={() => {
               setTimeout(() => {
                 if (selectionOnly) {
-                  const exactMatch = customers.find((customer) => customer.nickname === search.trim())
+                  const exactMatch = findExactCustomer(search)
                   if (exactMatch) onChange(exactMatch.nickname)
                   setSearch("")
                   setOpen(false)
@@ -304,7 +314,7 @@ export function CustomerSearchInput({
                 e.preventDefault()
                 e.stopPropagation()
                 if (selectionOnly) {
-                  const exactMatch = customers.find((customer) => customer.nickname === search.trim())
+                  const exactMatch = findExactCustomer(search)
                   if (exactMatch) selectItem(exactMatch)
                   else {
                     setSearch("")
@@ -375,7 +385,11 @@ export function CustomerSearchInput({
       {open && !disabled && !compactMulti && search && createPortal(
         <div ref={dropdownRef} onPointerDown={(e) => e.stopPropagation()}>
           {(filtered.length > 0 || onNoResultsClick) && (() => {
-            const exactMatch = filtered.some(c => c.nickname.toLowerCase() === search.trim().toLowerCase())
+            const normalizedSearch = search.trim().toLowerCase()
+            const exactMatch = filtered.some(c => (
+              c.nickname.toLowerCase() === normalizedSearch
+              || (c.name || "").toLowerCase() === normalizedSearch
+            ))
             const showCreate = onNoResultsClick && !exactMatch
             if (filtered.length === 0 && !showCreate) return null
             return (

@@ -196,11 +196,28 @@ function getApi(type: ProjectTypeKey) {
 interface UnifiedPaymentContentProps {
   embedded?: boolean
   filterTypes?: ProjectTypeKey[]
+  formOnly?: boolean
+  externalOpen?: boolean
+  onExternalOpenChange?: (open: boolean) => void
+  presetCustomer?: { id: string; nickname: string } | null
+  onSaved?: () => void
+  includeCoarseDoorOption?: boolean
+  onCoarseDoorSelect?: () => void
 }
 
 /* ========== 组件 ========== */
 
-export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentContentProps) {
+export function UnifiedPaymentContent({
+  embedded,
+  filterTypes,
+  formOnly = false,
+  externalOpen = false,
+  onExternalOpenChange,
+  presetCustomer,
+  onSaved,
+  includeCoarseDoorOption = false,
+  onCoarseDoorSelect,
+}: UnifiedPaymentContentProps) {
   const enterToNext = useEnterToNext()
   const navigate = useNavigate()
   const editPermissions = useEditPermissions()
@@ -213,9 +230,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   const canManagePayment = useCallback((item: UnifiedItem) => (
     currentUser.role === "超级管理员"
     || editPermissions.payments === "all"
-    || (item.created_by_id
+    || (editPermissions.payments === "own" && (item.created_by_id
       ? Boolean(currentActorId && item.created_by_id === currentActorId)
-      : Boolean(item.created_by && currentActorName && item.created_by === currentActorName))
+      : Boolean(item.created_by && currentActorName && item.created_by === currentActorName)))
   ), [currentActorId, currentActorName, currentUser.role, editPermissions.payments])
 
   // 筛选
@@ -255,6 +272,8 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   const [formTotalCount, setFormTotalCount] = useState("")
   const [formUnlimited, setFormUnlimited] = useState(false)
   const [formPrice, setFormPrice] = useState("")
+  // 新业务规则：不再录入成交金额和支付方式；成交人保留为可选多选。
+  const hidePaymentDetails = true
 
   // 觉醒/情绪/能量表单
   const [formPurchaseCount, setFormPurchaseCount] = useState("")
@@ -309,7 +328,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   // 客户
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customersReady, setCustomersReady] = useState(false)
-  const { organizations, hasAnyOrganization } = useOrganizations()
+  const { organizations, hasAnyOrganization, loading: organizationsLoading } = useOrganizations()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
   const [noAssignmentDialogOpen, setNoAssignmentDialogOpen] = useState(false)
 
@@ -402,6 +421,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     setFormCardType(type)
     const config = MEMBERSHIP_CARD_TYPES[type]
     setFormPrice(String(config.price))
+    setFormClosers([])
+    setFormPaymentMethod("")
+    setCloserError(false)
     if (config.defaultCount) {
       setFormRemainingCount(String(config.defaultCount))
       setFormTotalCount(String(config.defaultCount))
@@ -458,6 +480,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     setEditingItem(null)
     setFormType(activeType === "all" ? (filterTypes ? filterTypes[0] : "membership_card") : activeType)
     resetForm()
+    if (presetCustomer) {
+      setFormCustomerId(presetCustomer.id)
+      setFormNickname(presetCustomer.nickname)
+    }
     setDialogOpen(true)
   }
 
@@ -557,6 +583,14 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     setFormOtherRemainingCount("")
     setFormOtherUnlimited(false)
   }
+
+  useEffect(() => {
+    if (!formOnly || organizationsLoading) return
+    if (externalOpen && !dialogOpen) handleOpenCreate()
+    if (!externalOpen && dialogOpen && !confirmOpen) setDialogOpen(false)
+    // 外部开关只在用户点击“新增”或关闭弹窗时变化，避免表单输入触发重置。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalOpen, formOnly, organizationsLoading])
 
   // 打开编辑弹窗
   const handleOpenEdit = (item: UnifiedItem) => {
@@ -662,10 +696,11 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   // 保存
   const handleSave = () => {
     if (!formCustomerId) return
-    if (formClosers.length === 0) { setCloserError(true); return }
     setCloserError(false)
-    const amt = getFormAmount()
-    if (Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - amt) > 0.01) return
+    if (!hidePaymentDetails) {
+      const amt = getFormAmount()
+      if (Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - amt) > 0.01) return
+    }
     if (formType === "membership_card" && !formCardType) return
     if (formType === "internal_course" && !formCourseType) return
     if (formType === "tea_seat_fee" && !parseInt(formTeaQuantity)) return
@@ -676,7 +711,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   const buildPayload = () => {
     const closer_id = formClosers[0]?.id || null
     const closer_name = formClosers[0]?.name || null
-    const closers = formClosers
+    const closers = formClosers.map(closer => ({ ...closer, amount: 0 }))
     const organization_id = formOrganizationId || null
     const deal_date = formDealDate || null
     let createdBy = ""
@@ -687,11 +722,11 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
         const config = MEMBERSHIP_CARD_TYPES[formCardType]
         const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname, card_type: formCardType,
-          price: formPrice ? parseFloat(formPrice) : config.price,
+          price: 0,
           effective_date: formEffectiveDate, duration_type: formDurationType,
           duration_value: formDurationValue ? parseInt(formDurationValue) : null,
           closer_id, closer_name, closers, organization_id, deal_date,
-          payment_method: formPaymentMethod || null,
+          payment_method: hidePaymentDetails ? null : formPaymentMethod || null,
           created_by: createdBy,
           notes: formNotes || "",
         }
@@ -717,9 +752,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
           diagnosis_teacher: formDiagnosisTeacher || "",
           diagnosis_duration: formDiagnosisDuration || 1,
           ...(editingItem ? {} : { created_by: createdBy }),
-          amount: parseFloat(formOhAmount) || 0,
+          amount: 0,
           closer_id, closer_name, closers, organization_id, deal_date,
-          payment_method: formPaymentMethod || null,
+          payment_method: null,
           notes: formNotes || "",
         }
       case "group_case":
@@ -741,9 +776,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
           customer_id: formCustomerId, nickname: formNickname,
           purchase_count: parseInt(formPurchaseCount) || 0,
           ...(editingItem ? {} : { created_by: createdBy }),
-          amount: parseFloat(formAmount) || 0,
+          amount: 0,
           closer_id, closer_name, closers, organization_id, deal_date,
-          payment_method: formPaymentMethod || null,
+          payment_method: null,
           effective_date: formProjectEffectiveDate || null,
           expiry_date,
           notes: formNotes || "",
@@ -772,10 +807,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
         }
         return {
           customer_id: formCustomerId, nickname: formNickname,
-          course_type: formCourseType, price: formCourseAmount,
+          course_type: formCourseType, price: 0,
           effective_date: formEffectiveDate, expiry_date,
           closer_id, closer_name, closers, organization_id, deal_date,
-          payment_method: formPaymentMethod || null,
+          payment_method: null,
           ...(!editingItem && { created_by: createdBy }),
           notes: formNotes || "",
         }
@@ -784,9 +819,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
         return {
           customer_id: formCustomerId, nickname: formNickname,
           quantity: parseInt(formTeaQuantity) || 1,
-          amount: parseFloat(formTeaAmount) || 68,
+          amount: 0,
           closer_id, closer_name, closers, organization_id, deal_date,
-          payment_method: formPaymentMethod || null,
+          payment_method: null,
           ...(editingItem ? {} : { created_by: createdBy }),
           notes: formNotes || "",
         }
@@ -804,9 +839,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
           effective_date: formOfflineEffectiveDate || null,
           validity_value: val || 1,
           validity_unit: "month",
-          amount: parseFloat(formOfflineAmount) || 0,
+          amount: 0,
           closer_id, closer_name, closers, organization_id, deal_date,
-          payment_method: formPaymentMethod || null,
+          payment_method: null,
           ...(editingItem ? {} : { created_by: createdBy }),
           notes: formNotes || "",
         }
@@ -814,12 +849,12 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       case "other": {
         const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname,
-          category: formCategory || null, project_name: formProjectName, fee: parseFloat(formFee) || 0,
+          category: formCategory || null, project_name: formProjectName, fee: 0,
           effective_date: formOtherEffectiveDate,
           duration_type: formOtherDurationType,
           duration_value: formOtherDurationValue ? parseInt(formOtherDurationValue) : null,
           closer_id, closer_name, closers, organization_id, deal_date,
-          payment_method: formPaymentMethod || null,
+          payment_method: null,
           ...(!editingItem && { created_by: createdBy }),
           notes: formNotes || "",
         }
@@ -841,7 +876,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       }
       setConfirmOpen(false)
       setDialogOpen(false)
+      onExternalOpenChange?.(false)
       refresh()
+      onSaved?.()
     } catch (error: any) {
       console.error("保存失败:", error)
       alert(error?.message || error?.detail || "保存失败")
@@ -869,72 +906,54 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "会员卡类型", key: "card_type", width: 12, example: "体验会员" },
-      { header: "金额", key: "price", width: 10, example: "398" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     group_case: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "购买场次", key: "purchase_count", width: 10, example: "5" },
-      { header: "金额", key: "amount", width: 10, example: "799" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     emotional_release: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "购买场次", key: "purchase_count", width: 10, example: "3" },
-      { header: "金额", key: "amount", width: 10, example: "500" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     oh_card_reading: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "诊断时长（半小时为单位）", key: "diagnosis_duration", width: 16, example: "2（=1小时）" },
-      { header: "金额", key: "amount", width: 10, example: "298" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
       { header: "备注", key: "notes", width: 18, example: "" },
     ],
     energy_knot: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "购买部位", key: "purchase_count", width: 10, example: "3" },
-      { header: "金额", key: "amount", width: 10, example: "500" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     internal_course: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "课程类型", key: "course_type", width: 24, example: "疗愈师课程：自爱力构建" },
-      { header: "金额", key: "price", width: 10, example: "20000" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     tea_seat_fee: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "数量", key: "quantity", width: 10, example: "1" },
-      { header: "金额", key: "amount", width: 10, example: "68" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     offline_course: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
       { header: "有效期（月）", key: "validity_value", width: 10, example: "1" },
-      { header: "金额", key: "amount", width: 10, example: "500" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
     ],
     other: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "项目名称", key: "project_name", width: 18, example: "定制服务" },
-      { header: "金额", key: "fee", width: 10, example: "1000" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
       { header: "有效期单位", key: "duration_type", width: 10, example: "月" },
       { header: "有效期时长", key: "duration_value", width: 10, example: "6" },
       { header: "次数（不填则无限次数）", key: "remaining_count", width: 16, example: "" },
-      { header: "成交人昵称（多个成交人请去页面内录入）", key: "closer_name", width: 22, example: "李四" },
       { header: "所属组织", key: "organization", width: 12, example: "" },
     ],
   }
@@ -1026,18 +1045,21 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     const amountStr = get("金额")
     const closerNickname = get("成交人昵称（多个成交人请去页面内录入）") || get("成交人昵称")
     const orgName = get("所属组织")
+    const cardType = type === "membership_card" ? get("会员卡类型") : ""
+    const omitPaymentDetails = true
 
     if (!dealDate) errors.push("成交日期为空")
     else if (!/^\d{4}-\d{2}-\d{2}$/.test(dealDate)) errors.push("日期格式错误（需YYYY-MM-DD）")
     if (!nickname) errors.push("用户昵称为空")
     const customer = customerMap.get(nickname)
     if (nickname && !customer) errors.push(`用户"${nickname}"不存在`)
-    const amount = parseFloat(amountStr)
-    if (!amountStr) errors.push("金额为空")
-    else if (isNaN(amount) || amount < 0) errors.push("金额格式错误")
+    const amount = omitPaymentDetails ? 0 : parseFloat(amountStr)
+    if (!omitPaymentDetails) {
+      if (!amountStr) errors.push("金额为空")
+      else if (isNaN(amount) || amount < 0) errors.push("金额格式错误")
+    }
 
     if (type === "membership_card") {
-      const cardType = get("会员卡类型")
       if (!cardType) errors.push("会员卡类型为空")
       else if (!MEMBERSHIP_CARD_TYPES[cardType]) errors.push(`会员卡类型"${cardType}"无效`)
     }
@@ -1047,7 +1069,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       else if (!COURSE_TYPES[courseType]) errors.push(`课程类型"${courseType}"无效`)
     }
     if (type === "other" && !get("项目名称")) errors.push("项目名称为空")
-    if (!closerNickname) errors.push("成交人为空")
+    if (!omitPaymentDetails && !closerNickname) errors.push("成交人为空")
 
     let closerId: string | null = null
     let closerName: string | null = null
@@ -1072,7 +1094,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
 
     const base = {
       customer_id: customer!.id, nickname: customer!.nickname,
-      closer_id: closerId, closer_name: closerName, closers: closerId ? [{ id: closerId, name: closerName!, amount }] : [],
+      closer_id: omitPaymentDetails ? null : closerId,
+      closer_name: omitPaymentDetails ? null : closerName,
+      closers: omitPaymentDetails ? [] : (closerId ? [{ id: closerId, name: closerName!, amount }] : []),
       organization_id: orgId, deal_date: dealDate,
     }
     const durUnit = get("有效期单位")
@@ -1084,7 +1108,6 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     let dupKey: string
     switch (type) {
       case "membership_card": {
-        const cardType = get("会员卡类型")
         const mcConfig = MEMBERSHIP_CARD_TYPES[cardType]
         let mcDurType: string | null = null
         let mcDurValue: number | null = null
@@ -1315,7 +1338,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     if (formType === "membership_card") {
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "会员卡", value: formCardType || "-" })
-      rows.push({ label: "费用金额", value: `¥${parseFloat(formPrice || "0").toLocaleString()}` })
+      if (!hidePaymentDetails) {
+        rows.push({ label: "费用金额", value: `¥${parseFloat(formPrice || "0").toLocaleString()}` })
+      }
       const dv = parseInt(formDurationValue)
       const dt = formDurationType === "day" ? "day" : "month"
       if (!isNaN(dv) && dv > 0) {
@@ -1337,10 +1362,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     } else if (formType === "internal_course") {
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "课程类型", value: formCourseType || "-" })
-      rows.push({ label: "付费金额", value: `¥${(formCourseAmount || 0).toLocaleString()}` })
+      if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${(formCourseAmount || 0).toLocaleString()}` })
     } else if (formType === "other") {
       rows.push({ label: "项目名称", value: [formCategory, formProjectName].filter(Boolean).join(" / ") || "-" })
-      rows.push({ label: "费用", value: `¥${parseFloat(formFee || "0").toLocaleString()}` })
+      if (!hidePaymentDetails) rows.push({ label: "费用", value: `¥${parseFloat(formFee || "0").toLocaleString()}` })
       rows.push({ label: "生效日期", value: formOtherEffectiveDate || "-" })
       if (formOtherDurationValue || formOtherRemainingCount || formOtherUnlimited) {
         let v = ""
@@ -1352,22 +1377,19 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
     } else if (formType === "oh_card_reading") {
       rows.push({ label: "诊断老师", value: formDiagnosisTeacher || "-" })
       rows.push({ label: "诊断时长", value: `${formDiagnosisDuration * 0.5}小时` })
-      rows.push({ label: "付费金额", value: `¥${parseFloat(formOhAmount || "0").toLocaleString()}` })
-      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+      if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formOhAmount || "0").toLocaleString()}` })
     } else if (formType === "tea_seat_fee") {
       rows.push({ label: "数量", value: `${formTeaQuantity || "1"} 位` })
-      rows.push({ label: "付费金额", value: `¥${parseFloat(formTeaAmount || "0").toLocaleString()}` })
-      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+      if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formTeaAmount || "0").toLocaleString()}` })
     } else if (formType === "offline_course") {
       rows.push({ label: "生效日期", value: formOfflineEffectiveDate || "-" })
       rows.push({ label: "有效期", value: `${formOfflineValidityValue || "1"} 个月` })
-      rows.push({ label: "付费金额", value: `¥${parseFloat(formOfflineAmount || "0").toLocaleString()}` })
-      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+      if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formOfflineAmount || "0").toLocaleString()}` })
     } else if (formType === "group_case" || formType === "emotional_release" || formType === "energy_knot") {
       const countLabel = formType === "energy_knot" ? "部位数" : "购买场次"
       const countUnit = formType === "energy_knot" ? "个" : "次"
       rows.push({ label: countLabel, value: `${formPurchaseCount || "0"} ${countUnit}` })
-      rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
+      if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
       rows.push({ label: "生效日期", value: formProjectEffectiveDate || "-" })
       if (formProjectValidityValue && formProjectValidityUnit) {
         const val = parseInt(formProjectValidityValue)
@@ -1390,13 +1412,15 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
       }
     } else {
       rows.push({ label: formType === "energy_knot" ? "部位数" : "购买场次", value: `${formPurchaseCount || "0"} ${formType === "energy_knot" ? "个" : "次"}` })
-      rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
+      if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
     }
     rows.push({ label: "所属组织", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
-    rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : "-" })
-    rows.push({ label: "成交人合计", value: `¥${formClosers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0).toLocaleString()}` })
-    if (!["oh_card_reading", "tea_seat_fee", "offline_course"].includes(formType)) {
-      rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+    rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => c.name).join("、") : "-" })
+    if (!hidePaymentDetails) {
+      rows.push({ label: "成交人合计", value: `¥${formClosers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0).toLocaleString()}` })
+      if (!["oh_card_reading", "tea_seat_fee", "offline_course"].includes(formType)) {
+        rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
+      }
     }
     rows.push({ label: "备注", value: formNotes || "-" })
     return rows
@@ -1405,7 +1429,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
   return (
     <>
       {/* 搜索栏 + 表格 卡片 */}
-      <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
+      {!formOnly && <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
         {/* 搜索栏 */}
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
           <div className="w-[172px]">
@@ -1598,10 +1622,13 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
             />
           </>
         )}
-      </div>
+      </div>}
 
       {/* ========== 新增/编辑弹窗 ========== */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => {
+        setDialogOpen(open)
+        if (!open) onExternalOpenChange?.(false)
+      }}>
         <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{dialogTitle}</DialogTitle>
@@ -1629,12 +1656,25 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目类型</span>
                 <SelectDropdown
                   value={formType}
-                  options={(filterTypes || (Object.keys(PROJECT_TYPES) as ProjectTypeKey[])).map(key => ({
-                    value: key,
-                    label: PROJECT_TYPES[key].label,
-                  }))}
+                  options={(() => {
+                    const options: { value: string; label: string }[] = (filterTypes || (Object.keys(PROJECT_TYPES) as ProjectTypeKey[])).map(key => ({
+                      value: key,
+                      label: PROJECT_TYPES[key].label,
+                    }))
+                    if (includeCoarseDoorOption) options.splice(1, 0, { value: "coarse_door_card", label: "粗门次卡" })
+                    return options
+                  })()}
                   placeholder="请选择项目类型"
-                  onChange={(v) => { setFormType(v as ProjectTypeKey); resetTypeFields() }}
+                  onChange={(v) => {
+                    if (v === "coarse_door_card") {
+                      setDialogOpen(false)
+                      onExternalOpenChange?.(false)
+                      onCoarseDoorSelect?.()
+                      return
+                    }
+                    setFormType(v as ProjectTypeKey)
+                    resetTypeFields()
+                  }}
                 />
               </div>
             )}
@@ -1645,7 +1685,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">会员卡</span>
                 <SelectDropdown
                   value={formCardType}
-                  options={Object.entries(MEMBERSHIP_CARD_TYPES).map(([type, config]) => ({ value: type, label: type, rightLabel: `¥${config.price.toLocaleString()}` }))}
+                  options={Object.keys(MEMBERSHIP_CARD_TYPES).map(type => ({ value: type, label: type }))}
                   placeholder="请选择会员卡"
                   onChange={(v) => handleSelectCardType(v)}
                 />
@@ -1661,7 +1701,6 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                   options={Object.entries(COURSE_TYPES).map(([type, config]) => ({
                     value: type,
                     label: `${type.split("：")[0]}（${config.duration}）`,
-                    rightLabel: `¥${config.price.toLocaleString()}`,
                   }))}
                   placeholder="请选择课程"
                   onChange={(v) => { setFormCourseType(v); setFormCourseAmount(COURSE_TYPES[v]?.price || 0) }}
@@ -1681,9 +1720,9 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                     if (!name) { setFormNickname(""); setFormCustomerId("") }
                   }}
                   onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
-                  disabled={!!editingItem}
-                  showClear={!editingItem}
-                  placeholder="搜索昵称"
+                  disabled={!!editingItem || !!presetCustomer}
+                  showClear={!editingItem && !presetCustomer}
+                  placeholder="搜索姓名或昵称"
                 />
               </div>
             )}
@@ -1767,7 +1806,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
             )}
 
             {/* 会员卡费用金额（统一放在时长/次数之后） */}
-            {formType === "membership_card" && formCardType && (
+            {formType === "membership_card" && formCardType && !hidePaymentDetails && (
               <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">费用金额</span>
                 <Input type="text" inputMode="decimal" value={formPrice} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={MEMBERSHIP_CARD_TYPES[formCardType] ? `${MEMBERSHIP_CARD_TYPES[formCardType].price}` : ""} className="h-8 text-xs" />
@@ -1779,10 +1818,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">{formType === "energy_knot" ? "部位数" : "购买场次"}</span>
                   <Input type="number" value={formPurchaseCount} onChange={(e) => setFormPurchaseCount(e.target.value)} placeholder="0" min="0" className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} placeholder="0" min="0" step="0.01" className="h-8 text-xs" />
-                </div>
+                </div>}
               </>
             )}
 
@@ -1813,10 +1852,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                     onChange={(v) => setFormDiagnosisDuration(parseInt(v) || 1)}
                   />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formOhAmount} onChange={(e) => setFormOhAmount(e.target.value)} placeholder="298" min="0" step="0.01" className="h-8 text-xs" />
-                </div>
+                </div>}
               </>
             )}
 
@@ -1827,10 +1866,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">数量</span>
                   <Input type="number" value={formTeaQuantity} onChange={(e) => setFormTeaQuantity(e.target.value)} placeholder="1" min="1" step="1" className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formTeaAmount} onChange={(e) => setFormTeaAmount(e.target.value)} placeholder="68" min="0" step="0.01" className="h-8 text-xs" />
-                </div>
+                </div>}
               </>
             )}
 
@@ -1848,10 +1887,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                     <span className="text-[12px] text-[#4e535a]">个月</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formOfflineAmount} onChange={(e) => setFormOfflineAmount(e.target.value)} placeholder="输入金额" min="0" step="0.01" className="h-8 text-xs" />
-                </div>
+                </div>}
               </>
             )}
 
@@ -1862,10 +1901,10 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formEffectiveDate} onChange={(e) => setFormEffectiveDate(e.target.value)} className="h-8 text-xs" />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formCourseAmount || ""} onChange={(e) => setFormCourseAmount(Number(e.target.value) || 0)} placeholder="输入金额" className="h-8 text-xs" />
-                </div>
+                </div>}
               </>
             )}
 
@@ -1887,13 +1926,13 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                     }}
                     onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
                     disabled={!!editingItem}
-                    placeholder="搜索昵称"
+                    placeholder="搜索姓名或昵称"
                   />
                 </div>
-                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">费用</span>
                   <Input type="number" value={formFee} onChange={(e) => setFormFee(e.target.value)} placeholder="0" className="h-8 text-xs" min="0" step="0.01" />
-                </div>
+                </div>}
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formOtherEffectiveDate} onChange={(e) => setFormOtherEffectiveDate(e.target.value)} className="h-8 text-xs" />
@@ -1923,18 +1962,18 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
 
             {/* ===== 公共字段：成交人 ===== */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest mt-2">成交人</span>
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest mt-2">成交人<br /><span className="text-[10px] text-[#8f959e]">可选</span></span>
               <div>
-                <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={getFormAmount()} />
-                {closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}
-                {formClosers.length > 0 && Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - getFormAmount()) > 0.01 && (
+                <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={getFormAmount()} showAmounts={!hidePaymentDetails} />
+                {!hidePaymentDetails && closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}
+                {!hidePaymentDetails && formClosers.length > 0 && Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - getFormAmount()) > 0.01 && (
                   <span className="text-[11px] text-[#f54a45] mt-0.5 block">成交人总金额与付费金额不一致</span>
                 )}
               </div>
             </div>
 
             {/* ===== 公共字段：支付方式 ===== */}
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+            {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">支付方式</span>
               <SelectDropdown
                 value={formPaymentMethod}
@@ -1946,7 +1985,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
                 placeholder="请选择"
                 onChange={setFormPaymentMethod}
               />
-            </div>
+            </div>}
 
             {/* ===== 公共字段：备注 ===== */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -1971,7 +2010,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
             <DialogTitle className="text-base">{editingItem ? "确认编辑" : "确认新增"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
-            <p className="text-[12px] text-[#8f959e]">成交人金额合计需与费用金额一致</p>
+            {!hidePaymentDetails && <p className="text-[12px] text-[#8f959e]">成交人金额合计需与费用金额一致</p>}
             {confirmContent.map((row, i) => (
               <div key={i} className="grid grid-cols-[70px_1fr] items-center gap-2">
                 <span className="text-[12px] text-[#8f959e] font-light text-right tracking-widest">{row.label}</span>
@@ -2045,7 +2084,7 @@ export function UnifiedPaymentContent({ embedded, filterTypes }: UnifiedPaymentC
           <AlertDialogHeader>
             <AlertDialogTitle>发现重复数据</AlertDialogTitle>
             <AlertDialogDescription>
-              有 <span className="text-[#f5a623] font-medium">{pendingImport?.duplicates.length}</span> 条记录与系统中已有数据重复（相同用户、类型、日期、金额），
+              有 <span className="text-[#f5a623] font-medium">{pendingImport?.duplicates.length}</span> 条记录与系统中已有数据重复（相同用户、类型和日期），
               正常数据 <span className="text-[#34c724] font-medium">{pendingImport?.rows.length}</span> 条。是否仍然导入重复数据？
             </AlertDialogDescription>
           </AlertDialogHeader>

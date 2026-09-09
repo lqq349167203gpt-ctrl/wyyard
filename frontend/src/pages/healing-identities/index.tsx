@@ -262,7 +262,7 @@ export default function HealingIdentitiesPage() {
                 multi
                 filterSelected
                 excludeIds={members.map(m => m.id)}
-                placeholder="输入昵称或姓名搜索..."
+                placeholder="输入姓名或昵称搜索..."
               />
             </div>
 

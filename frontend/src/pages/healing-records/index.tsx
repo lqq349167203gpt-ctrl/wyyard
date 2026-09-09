@@ -209,7 +209,7 @@ export default function HealingRecordsPage() {
               customers={customers}
               value={searchNickname}
               onChange={(v) => { setSearchNickname(typeof v === "string" ? v : "") }}
-              placeholder="搜索用户昵称或姓名"
+              placeholder="搜索姓名或昵称"
               filterSelected={false}
               className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
               rounded="7px"

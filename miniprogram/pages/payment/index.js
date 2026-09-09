@@ -1,6 +1,11 @@
-const { paymentApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
+const { customerApi, paymentApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
+const { canEditRecord } = require('../../utils/record-ownership')
 
-const TABS = PAYMENT_PROJECT_TYPES
+const TABS = [
+  PAYMENT_PROJECT_TYPES[0],
+  { key: 'coarse_door_card', label: '粗门次卡', special: true },
+  ...PAYMENT_PROJECT_TYPES.slice(1),
+]
 
 const now = new Date()
 const TODAY = [
@@ -207,6 +212,19 @@ Page({
     exportDateFrom: CURRENT_MONTH + '-01',
     exportDateTo: TODAY,
     exportRangeSummary: CURRENT_MONTH + '-01 至 ' + getMonthEnd(CURRENT_MONTH),
+    isCoarseDoorTab: false,
+    coarseCustomers: [],
+    coarseCustomerKeyword: '',
+    coarseCustomerResults: [],
+    coarseCustomerSearchOpen: false,
+    coarseCustomerIndex: -1,
+    coarseOrganizations: [],
+    coarseOrganizationIndex: -1,
+    coarseCourses: [],
+    coarseCourseIndex: -1,
+    coarseRecords: [],
+    coarseSubmitting: false,
+    coarseDeletingId: '',
   },
 
   onLoad(options = {}) {
@@ -216,6 +234,7 @@ Page({
       return
     }
     const requestedType = options.type || ''
+    this._presetCoarseCustomerId = options.customerId || ''
     const requestedIndex = TABS.findIndex(tab => tab.key === requestedType)
     const activeTab = requestedIndex >= 0 ? requestedIndex : 0
     const searchMode = options.search === '1'
@@ -227,6 +246,7 @@ Page({
       hasSearched: !searchMode,
       subtypeLabel: subtypeConfig ? subtypeConfig.label : '',
       subtypeField: subtypeConfig ? subtypeConfig.field : '',
+      isCoarseDoorTab: TABS[activeTab].key === 'coarse_door_card',
     }, () => this.loadItems())
     if (searchMode) wx.setNavigationBarTitle({ title: '搜索付费项目' })
   },
@@ -263,6 +283,7 @@ Page({
       subtypeLabel: subtypeConfig ? subtypeConfig.label : '',
       subtypeField: subtypeConfig ? subtypeConfig.field : '',
       subtypeList: [],
+      isCoarseDoorTab: TABS[index].key === 'coarse_door_card',
     }, () => {
       this.updateFilterCount()
       this.loadItems()
@@ -276,9 +297,14 @@ Page({
 
     try {
       const type = TABS[this.data.activeTab].key
+      if (type === 'coarse_door_card') {
+        await this.loadCoarseDoorData()
+        if (requestVersion === this._loadRequestVersion) this.setData({ loading: false })
+        return
+      }
       const api = paymentApi.getByType(type)
       // 获取当前类型的完整可见记录，搜索和筛选均在前端完成，避免只筛到第一页。
-      const res = await api.list()
+      const [res] = await Promise.all([api.list(), this.loadCustomerSearchIndex()])
       if (requestVersion !== this._loadRequestVersion) return
       const raw = res.items || res.data || res || []
       const sourceItems = decorateItems(Array.isArray(raw) ? raw : [], type)
@@ -289,6 +315,240 @@ Page({
       console.error('加载付费项目失败:', e)
       this.setData({ loading: false })
     }
+  },
+
+  async loadCustomerSearchIndex() {
+    if (this._customerSearchReady) return
+    if (!this._customerSearchPromise) {
+      this._customerSearchPromise = customerApi.light(1000)
+        .then(customers => {
+          const nameById = {}
+          const nameByNickname = {}
+          ;(Array.isArray(customers) ? customers : []).forEach(customer => {
+            const name = String(customer.name || '').trim().toLowerCase()
+            if (customer.id) nameById[customer.id] = name
+            if (customer.nickname) nameByNickname[customer.nickname] = name
+          })
+          this._customerNameById = nameById
+          this._customerNameByNickname = nameByNickname
+        })
+        .catch(() => {
+          this._customerNameById = {}
+          this._customerNameByNickname = {}
+        })
+        .finally(() => {
+          this._customerSearchReady = true
+          this._customerSearchPromise = null
+        })
+    }
+    await this._customerSearchPromise
+  },
+
+  matchesCustomerKeyword(item, keyword) {
+    if (!keyword) return true
+    const nickname = String(item.nickname || '').toLowerCase()
+    const name = (this._customerNameById || {})[item.customer_id]
+      || (this._customerNameByNickname || {})[item.nickname]
+      || ''
+    return nickname.includes(keyword) || name.includes(keyword)
+  },
+
+  async loadCoarseDoorData() {
+    const [customers, records] = await Promise.all([
+      customerApi.light(1000),
+      paymentApi.deductions.list({ project_type: 'membership-cards', card_type: '粗门次卡' }),
+    ])
+    const coarseCustomers = Array.isArray(customers) ? customers : []
+    this.setData({
+      coarseCustomers,
+      coarseCustomerResults: this.filterCoarseCustomers(coarseCustomers, this.data.coarseCustomerKeyword),
+      coarseRecords: (Array.isArray(records) ? records : (records.items || [])).map(record => Object.assign({}, record, {
+        _canDelete: canEditRecord(record, 'payments'),
+      })),
+    }, () => {
+      if (!this._presetCoarseCustomerId) return
+      const customerId = this._presetCoarseCustomerId
+      this._presetCoarseCustomerId = ''
+      this.onCoarseCustomerSelect({ currentTarget: { dataset: { id: customerId } } })
+    })
+  },
+
+  filterCoarseCustomers(customers, keyword) {
+    const normalizedKeyword = String(keyword || '').trim().toLowerCase()
+    return customers
+      .filter(customer => (
+        !normalizedKeyword
+        || String(customer.nickname || '').toLowerCase().includes(normalizedKeyword)
+        || String(customer.name || '').toLowerCase().includes(normalizedKeyword)
+      ))
+  },
+
+  onCoarseCustomerPickerOpen() {
+    this.setData({
+      coarseCustomerSearchOpen: true,
+      coarseCustomerKeyword: '',
+      coarseCustomerResults: this.data.coarseCustomers,
+    })
+  },
+
+  onCoarseCustomerPickerClose() {
+    this.setData({
+      coarseCustomerSearchOpen: false,
+      coarseCustomerKeyword: '',
+      coarseCustomerResults: [],
+    })
+  },
+
+  onCoarseCustomerSearch(e) {
+    const keyword = e.detail.value || ''
+    this.setData({
+      coarseCustomerKeyword: keyword,
+      coarseCustomerResults: this.filterCoarseCustomers(this.data.coarseCustomers, keyword),
+    })
+  },
+
+  onCoarseCustomerClear() {
+    this._coarseAllCourses = []
+    this.setData({
+      coarseCustomerKeyword: '',
+      coarseCustomerResults: [],
+      coarseCustomerSearchOpen: false,
+      coarseCustomerIndex: -1,
+      coarseOrganizations: [],
+      coarseOrganizationIndex: -1,
+      coarseCourses: [],
+      coarseCourseIndex: -1,
+    })
+  },
+
+  async onCoarseCustomerSelect(e) {
+    const customerId = e.currentTarget.dataset.id
+    const index = this.data.coarseCustomers.findIndex(customer => customer.id === customerId)
+    const customer = this.data.coarseCustomers[index]
+    if (!customer) return
+    this.setData({
+      coarseCustomerKeyword: '',
+      coarseCustomerResults: [],
+      coarseCustomerSearchOpen: false,
+      coarseCustomerIndex: index,
+      coarseOrganizations: [],
+      coarseOrganizationIndex: -1,
+      coarseCourses: [],
+      coarseCourseIndex: -1,
+    })
+    wx.showLoading({ title: '加载课程' })
+    try {
+      const result = await paymentApi.deductions.coarseDoorOptions(customer.id)
+      const organizations = result.organizations || []
+      const courses = (result.courses || []).map(item => Object.assign({}, item, {
+        _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
+      }))
+      this._coarseAllCourses = courses
+      this.setData({
+        coarseOrganizations: organizations,
+        coarseOrganizationIndex: organizations.length === 1 ? 0 : -1,
+        coarseCourses: organizations.length === 1
+          ? courses.filter(item => (item.organization_ids || []).includes(organizations[0].id))
+          : [],
+      })
+    } catch (error) {
+      wx.showToast({ title: (error && error.message) || '课程加载失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
+  onCoarseOrganizationChange(e) {
+    const index = Number(e.detail.value)
+    const organization = this.data.coarseOrganizations[index]
+    this.setData({
+      coarseOrganizationIndex: index,
+      coarseCourses: organization
+        ? (this._coarseAllCourses || []).filter(item => (item.organization_ids || []).includes(organization.id))
+        : [],
+      coarseCourseIndex: -1,
+    })
+  },
+
+  onCoarseCourseChange(e) {
+    this.setData({ coarseCourseIndex: Number(e.detail.value) })
+  },
+
+  async onCoarseSubmit() {
+    const customer = this.data.coarseCustomers[this.data.coarseCustomerIndex]
+    const course = this.data.coarseCourses[this.data.coarseCourseIndex]
+    if (!customer || !course || this.data.coarseSubmitting) return
+    this.setData({ coarseSubmitting: true })
+    try {
+      await paymentApi.deductions.createCoarseDoorCourse({
+        customer_id: customer.id,
+        record_type: course.record_type,
+        record_id: course.record_id,
+        organization_id: this.data.coarseOrganizations[this.data.coarseOrganizationIndex].id,
+      })
+      wx.showToast({ title: '抵扣成功', icon: 'success' })
+      const result = await paymentApi.deductions.coarseDoorOptions(customer.id)
+      const organizations = result.organizations || []
+      this._coarseAllCourses = (result.courses || []).map(item => Object.assign({}, item, {
+        _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
+      }))
+      this.setData({
+        coarseOrganizations: organizations,
+        coarseOrganizationIndex: -1,
+        coarseCourses: [],
+        coarseCourseIndex: -1,
+      })
+      await this.loadCoarseDoorData()
+    } catch (error) {
+      wx.showToast({ title: (error && error.message) || '抵扣失败', icon: 'none' })
+    } finally {
+      this.setData({ coarseSubmitting: false })
+    }
+  },
+
+  onCoarseDeleteTap(e) {
+    const deductionId = e.currentTarget.dataset.id
+    const record = this.data.coarseRecords.find(item => item.id === deductionId)
+    if (!record || !canEditRecord(record, 'payments') || this.data.coarseDeletingId) return
+    const courseName = record.source_activity_name || '所选课程'
+    wx.showModal({
+      title: '确认删除抵扣记录？',
+      content: `删除后，${record.nickname}的“${courseName}”将重新按原规则扣除会员卡${record.count}次；没有可用会员卡时会恢复为欠卡。`,
+      confirmText: '删除',
+      confirmColor: '#c4506a',
+      success: async (result) => {
+        if (!result.confirm) return
+        this.setData({ coarseDeletingId: deductionId })
+        try {
+          const selectedCustomer = this.data.coarseCustomers[this.data.coarseCustomerIndex]
+          await paymentApi.deductions.delete(deductionId)
+          await this.loadCoarseDoorData()
+          if (selectedCustomer && selectedCustomer.id === record.customer_id) {
+            const refreshedIndex = this.data.coarseCustomers.findIndex(item => item.id === selectedCustomer.id)
+            const options = await paymentApi.deductions.coarseDoorOptions(selectedCustomer.id)
+            const organizations = options.organizations || []
+            const courses = (options.courses || []).map(item => Object.assign({}, item, {
+              _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
+            }))
+            this._coarseAllCourses = courses
+            this.setData({
+              coarseCustomerIndex: refreshedIndex,
+              coarseOrganizations: organizations,
+              coarseOrganizationIndex: organizations.length === 1 ? 0 : -1,
+              coarseCourses: organizations.length === 1
+                ? courses.filter(item => (item.organization_ids || []).includes(organizations[0].id))
+                : [],
+              coarseCourseIndex: -1,
+            })
+          }
+          wx.showToast({ title: '已删除', icon: 'success' })
+        } catch (error) {
+          wx.showToast({ title: (error && error.message) || '删除失败', icon: 'none' })
+        } finally {
+          this.setData({ coarseDeletingId: '' })
+        }
+      },
+    })
   },
 
   updateFilterOptions(onComplete) {
@@ -346,7 +606,7 @@ Page({
       return
     }
     const items = (this._sourceItems || []).filter(item => {
-      if (keyword && !String(item.nickname || '').toLowerCase().includes(keyword)) return false
+      if (!this.matchesCustomerKeyword(item, keyword)) return false
       if (selectedCreators.size && !selectedCreators.has(String(item.created_by || '').trim())) return false
       if (subtypeField && selectedSubtypes.size && !selectedSubtypes.has(String(item[subtypeField] || '').trim())) return false
       return true
@@ -372,7 +632,7 @@ Page({
 
   onSearchTap() {
     const tab = TABS[this.data.activeTab]
-    if (!tab) return
+    if (!tab || tab.key === 'coarse_door_card') return
     wx.navigateTo({ url: `/pages/payment/index?search=1&type=${encodeURIComponent(tab.key)}` })
   },
 
@@ -433,7 +693,7 @@ Page({
 
   onAddTap() {
     const tab = TABS[this.data.activeTab]
-    if (!tab) {
+    if (!tab || tab.key === 'coarse_door_card') {
       wx.showToast({ title: '未找到项目类型', icon: 'none' })
       return
     }

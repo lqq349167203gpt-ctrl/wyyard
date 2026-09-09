@@ -123,6 +123,7 @@ Component({
     isEdit: { type: Boolean, value: false },
     editData: { type: Object, value: null },
     hideBtn: { type: Boolean, value: false },
+    presetCustomer: { type: Object, value: null },
   },
 
   data: {
@@ -135,6 +136,7 @@ Component({
     closers: [],
     closerTotal: 0,
     closerIdMap: {},
+    hidePaymentDetails: true,
     formData: {},
     cardTypes: CARD_TYPES,
     cardTypeIndex: -1,
@@ -165,11 +167,28 @@ Component({
     'type': function(type) {
       this._applyTypeDefaults(type)
     },
+    'presetCustomer': function(customer) {
+      if (customer && customer.id) {
+        this.setData({
+          selectedCustomer: { id: customer.id, nickname: customer.nickname || '' },
+          'formData.customer_id': customer.id,
+        })
+      }
+    },
   },
 
   lifetimes: {
     attached() {
       this._applyTypeDefaults(this.data.type)
+      if (this.data.presetCustomer && this.data.presetCustomer.id) {
+        this.setData({
+          selectedCustomer: {
+            id: this.data.presetCustomer.id,
+            nickname: this.data.presetCustomer.nickname || '',
+          },
+          'formData.customer_id': this.data.presetCustomer.id,
+        })
+      }
       this._loadCustomers()
       this._loadOrganizations()
     },
@@ -212,6 +231,7 @@ Component({
 
     _buildConfirmRows() {
       const { type, formData, selectedCustomer, closers, organizations, orgIndex } = this.data
+      const hidePaymentDetails = true
       const rows = [
         { label: '成交日期', value: formData.deal_date || '-' },
         { label: '用户', value: selectedCustomer ? selectedCustomer.nickname : '-' },
@@ -248,18 +268,20 @@ Component({
       const validity = getValidityDetails(type, formData)
       rows.push({ label: '有效期', value: validity.label })
       rows.push({ label: '结束日期', value: validity.expiryDate })
-      rows.push(amountRow)
+      if (!hidePaymentDetails) rows.push(amountRow)
       const organization = organizations[orgIndex]
       rows.push({ label: '所属组织', value: organization ? organization.name : '-' })
-      rows.push({ label: '成交人', value: closers.map(c => `${c.nickname} ¥${formatMoney(c.amount)}`).join('、') || '-' })
-      rows.push({ label: '成交人合计', value: '¥' + formatMoney(closers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0)) })
-      rows.push({ label: '支付方式', value: formData.payment_method || '-' })
+      rows.push({ label: '成交人', value: closers.map(c => c.nickname).join('、') || '-' })
+      if (!hidePaymentDetails) {
+        rows.push({ label: '成交人合计', value: '¥' + formatMoney(closers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0)) })
+        rows.push({ label: '支付方式', value: formData.payment_method || '-' })
+      }
       rows.push({ label: '备注', value: formData.notes || '-' })
       return rows
     },
 
     _loadCustomers() {
-      customerApi.light(200).then(res => {
+      customerApi.light(1000).then(res => {
         const customers = res || []
         this.setData({ allCustomers: customers })
         this._filterDiagnosisTeachers(customers)
@@ -310,6 +332,7 @@ Component({
         quantity: d.quantity ?? '1',
       }
       const type = this.data.type
+      const hidePaymentDetails = true
       if (type === 'membership_card' && d.card_type) {
         const idx = CARD_TYPES.findIndex(c => c.key === d.card_type)
         if (idx >= 0) {
@@ -381,11 +404,13 @@ Component({
         closers,
         closerTotal,
         closerIdMap,
+        hidePaymentDetails,
       })
     },
 
     onPickerOpen(e) {
       const field = e.currentTarget.dataset.field
+      if (field === 'customer' && this.data.presetCustomer && this.data.presetCustomer.id) return
       this.setData({
         showPicker: true,
         pickerTitle: field === 'customer' ? '用户' : '选择成交人',
@@ -410,7 +435,10 @@ Component({
       }
       const q = keyword.toLowerCase()
       this.setData({
-        pickerList: this.data.allCustomers.filter(c => c.nickname && c.nickname.toLowerCase().includes(q)),
+        pickerList: this.data.allCustomers.filter(c => (
+          (c.nickname || '').toLowerCase().includes(q)
+          || (c.name || '').toLowerCase().includes(q)
+        )),
       })
     },
 
@@ -427,7 +455,9 @@ Component({
           wx.showToast({ title: '已选择该成交人', icon: 'none' })
           return
         }
-        const defaultAmount = closers.length === 0 ? this._getFeeAmount() : 0
+        const defaultAmount = this.data.hidePaymentDetails
+          ? 0
+          : (closers.length === 0 ? this._getFeeAmount() : 0)
         const newClosers = closers.concat([{ id, nickname, amount: defaultAmount }])
         const closerIdMap = {}
         newClosers.forEach(c => { closerIdMap[c.id] = true })
@@ -445,7 +475,10 @@ Component({
       let list = this.data.allCustomers
       if (keyword) {
         const q = keyword.toLowerCase()
-        list = list.filter(c => c.nickname && c.nickname.toLowerCase().includes(q))
+        list = list.filter(c => (
+          (c.nickname || '').toLowerCase().includes(q)
+          || (c.name || '').toLowerCase().includes(q)
+        ))
       }
       this.setData({ pickerKeyword: keyword, pickerList: list })
     },
@@ -453,6 +486,7 @@ Component({
     onPickerClear(e) {
       const field = e.currentTarget.dataset.field
       if (field === 'customer') {
+        if (this.data.presetCustomer && this.data.presetCustomer.id) return
         this.setData({ selectedCustomer: null, 'formData.customer_id': '' })
       }
     },
@@ -499,14 +533,20 @@ Component({
     onCardTypeChange(e) {
       const idx = parseInt(e.detail.value)
       const ct = CARD_TYPES[idx]
+      const hidePaymentDetails = true
       this.setData({
         cardTypeIndex: idx,
+        hidePaymentDetails,
         'formData.card_type': ct.key,
         'formData.price': ct.price,
         'formData.remaining_count': ct.count === null ? '' : ct.count,
         'formData.total_count': ct.count === null ? '' : ct.count,
         'formData.duration_type': ct.duration_type,
         'formData.duration_value': ct.duration_value,
+        ...(hidePaymentDetails ? {
+          paymentMethodIndex: -1,
+          'formData.payment_method': '',
+        } : {}),
       })
       const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === ct.duration_type)
       if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx })
@@ -561,6 +601,7 @@ Component({
 
     _buildPayload() {
       const { formData, selectedCustomer, closers, type, isEdit } = this.data
+      const hidePaymentDetails = true
       const payload = Object.assign({}, formData)
       payload.customer_id = selectedCustomer.id
       payload.nickname = selectedCustomer.nickname
@@ -569,7 +610,11 @@ Component({
       if (closers.length > 0) {
         payload.closer_id = closers[0].id || null
         payload.closer_name = closers[0].nickname || ''
-        payload.closers = closers.map(c => ({ id: c.id || '', name: c.nickname || '', amount: c.amount || 0 }))
+        payload.closers = closers.map(c => ({ id: c.id || '', name: c.nickname || '', amount: 0 }))
+      } else {
+        payload.closer_id = null
+        payload.closer_name = null
+        payload.closers = []
       }
       // session 类型: 从 effective_date + duration 计算 expiry_date
       const isSession = type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'
@@ -619,17 +664,28 @@ Component({
           delete payload[k]
         }
       })
+      if (hidePaymentDetails) {
+        if (type === 'membership_card' || type === 'internal_course') payload.price = 0
+        else if (type === 'other') payload.fee = 0
+        else payload.amount = 0
+        payload.payment_method = null
+      }
+      // 成交人独立于金额配置；保留空值，确保编辑时也能清空原成交人。
+      payload.closer_id = closers[0] ? (closers[0].id || null) : null
+      payload.closer_name = closers[0] ? (closers[0].nickname || '') : null
+      payload.closers = closers.map(c => ({ id: c.id || '', name: c.nickname || '', amount: 0 }))
       return payload
     },
 
     onSubmit() {
       if (this._submitting) return
       const { selectedCustomer, closers, type, cardTypeIndex, courseTypeIndex, isEdit, formData } = this.data
+      const hidePaymentDetails = true
       if (!selectedCustomer) {
         wx.showToast({ title: '请选择用户', icon: 'none' })
         return
       }
-      if (closers.length === 0) {
+      if (!hidePaymentDetails && closers.length === 0) {
         wx.showToast({ title: '请选择成交人', icon: 'none' })
         return
       }
@@ -648,7 +704,7 @@ Component({
       }
       const fee = this._getFeeAmount()
       const closerTotal = closers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0)
-      if (Math.abs(closerTotal - fee) > 0.01) {
+      if (!hidePaymentDetails && Math.abs(closerTotal - fee) > 0.01) {
         wx.showToast({ title: '成交人总金额必须与费用金额一致', icon: 'none' })
         return
       }

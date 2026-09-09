@@ -1,4 +1,4 @@
-<page-meta page-style="{{showFilterPanel ? 'overflow:hidden;height:100vh;' : ''}}" />
+<page-meta page-style="{{showFilterPanel || coarseCustomerSearchOpen ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
   <!-- 无权限 -->
   <view class="no-permission" wx:if="{{!hasPagePermission}}">
@@ -26,12 +26,12 @@
     </view>
 
     <!-- 搜索与筛选 -->
-    <view class="search-bar">
+    <view class="search-bar" wx:if="{{!isCoarseDoorTab}}">
       <view class="search-input-wrap" wx:if="{{searchMode}}">
         <view class="search-symbol"></view>
         <input
           class="search-input"
-          placeholder="搜索客户昵称"
+          placeholder="搜索姓名或昵称"
           placeholder-class="placeholder"
           value="{{keyword}}"
           focus="{{true}}"
@@ -43,7 +43,7 @@
       </view>
       <view class="search-input-wrap search-entry" wx:else bindtap="onSearchTap" hover-class="search-entry-active" hover-stay-time="80">
         <view class="search-symbol"></view>
-        <text class="search-entry-text">搜索客户昵称</text>
+        <text class="search-entry-text">搜索姓名或昵称</text>
       </view>
       <view class="filter-btn {{showFilterPanel ? 'active' : ''}}" bindtap="onToggleFilterPanel">
         <text>筛选</text>
@@ -51,6 +51,70 @@
         <view class="filter-toggle-arrow {{showFilterPanel ? 'open' : ''}}"></view>
       </view>
     </view>
+  </view>
+
+  <view class="coarse-door" wx:if="{{isCoarseDoorTab}}">
+    <view class="coarse-card">
+      <view class="coarse-title">用粗门次卡抵扣课程</view>
+      <view class="coarse-desc">仅显示已参与且扣卡次数大于 0 的课程；抵扣后返还原会员卡的对应次数</view>
+      <view class="coarse-field" bindtap="onCoarseCustomerPickerOpen">
+        <text class="coarse-label">用户昵称</text>
+        <view class="coarse-customer-value">
+          <text class="coarse-picker {{coarseCustomerIndex < 0 ? 'placeholder' : ''}}">{{coarseCustomerIndex >= 0 ? coarseCustomers[coarseCustomerIndex].nickname : '选择客户'}}</text>
+          <text class="coarse-customer-clear" wx:if="{{coarseCustomerIndex >= 0}}" catchtap="onCoarseCustomerClear">×</text>
+        </view>
+      </view>
+      <view class="coarse-field">
+        <text class="coarse-label">所属组织</text>
+        <picker mode="selector" range="{{coarseOrganizations}}" range-key="name" value="{{coarseOrganizationIndex}}" bindchange="onCoarseOrganizationChange" disabled="{{coarseCustomerIndex < 0}}">
+          <view class="coarse-picker {{coarseOrganizationIndex < 0 ? 'placeholder' : ''}}">
+            {{coarseOrganizationIndex >= 0 ? coarseOrganizations[coarseOrganizationIndex].name : '选择组织'}}
+          </view>
+        </picker>
+      </view>
+      <view class="coarse-field">
+        <text class="coarse-label">所扣课程</text>
+        <picker mode="selector" range="{{coarseCourses}}" range-key="_label" value="{{coarseCourseIndex}}" bindchange="onCoarseCourseChange" disabled="{{coarseOrganizationIndex < 0}}">
+          <view class="coarse-picker {{coarseCourseIndex < 0 ? 'placeholder' : ''}}">
+            {{coarseCourseIndex >= 0 ? coarseCourses[coarseCourseIndex]._label : '选择尚未扣除的课程'}}
+          </view>
+        </picker>
+      </view>
+      <button class="coarse-submit" bindtap="onCoarseSubmit" disabled="{{coarseCourseIndex < 0 || coarseSubmitting}}" loading="{{coarseSubmitting}}">{{coarseSubmitting ? '抵扣中' : (coarseCourseIndex >= 0 ? '抵扣 ' + coarseCourses[coarseCourseIndex].deduction_count + ' 次' : '确认抵扣')}}</button>
+    </view>
+    <view class="coarse-list-title">抵扣记录</view>
+    <view class="coarse-record" wx:for="{{coarseRecords}}" wx:key="id">
+      <view class="coarse-record-main">
+        <text class="coarse-record-name">{{item.nickname}}</text>
+        <view class="coarse-record-actions">
+          <text class="coarse-record-count">-{{item.count}}次</text>
+          <text class="coarse-record-delete {{coarseDeletingId === item.id ? 'disabled' : ''}}" wx:if="{{item._canDelete}}" catchtap="onCoarseDeleteTap" data-id="{{item.id}}">{{coarseDeletingId === item.id ? '删除中' : '删除'}}</text>
+        </view>
+      </view>
+      <text class="coarse-record-course">{{item.source_activity_name || item.reason}}</text>
+      <text class="coarse-record-meta">{{item.source_activity_date || item.deduction_date}}<text wx:if="{{item.source_organization_name}}"> · {{item.source_organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
+    </view>
+    <view class="empty" wx:if="{{!loading && coarseRecords.length === 0}}"><text class="empty-text">暂无粗门次卡抵扣记录</text></view>
+  </view>
+
+  <!-- 用户选择：与新增付费项目保持一致，点击字段后在弹层内搜索昵称 -->
+  <view class="coarse-picker-mask" wx:if="{{coarseCustomerSearchOpen}}" bindtap="onCoarseCustomerPickerClose"></view>
+  <view class="coarse-picker-popup" wx:if="{{coarseCustomerSearchOpen}}">
+    <view class="coarse-picker-head">
+      <text class="coarse-picker-title">选择用户</text>
+      <text class="coarse-picker-close" bindtap="onCoarseCustomerPickerClose">关闭</text>
+    </view>
+    <view class="coarse-picker-search">
+      <input class="coarse-picker-input" placeholder="搜索姓名或昵称" value="{{coarseCustomerKeyword}}" bindinput="onCoarseCustomerSearch" focus="{{coarseCustomerSearchOpen}}" />
+    </view>
+    <scroll-view class="coarse-picker-list" scroll-y>
+      <view class="coarse-picker-item" wx:for="{{coarseCustomerResults}}" wx:key="id" bindtap="onCoarseCustomerSelect" data-id="{{item.id}}">
+        <text>{{item.nickname}}</text>
+      </view>
+      <view class="coarse-picker-empty" wx:if="{{coarseCustomerResults.length === 0}}">
+        <text>无匹配用户</text>
+      </view>
+    </scroll-view>
   </view>
 
   <view class="dropdown-panel" wx:if="{{showFilterPanel}}">
@@ -99,19 +163,19 @@
     </view>
   </view>
 
-  <view class="search-welcome" wx:if="{{searchMode && !hasSearched && !loading}}">
+  <view class="search-welcome" wx:if="{{!isCoarseDoorTab && searchMode && !hasSearched && !loading}}">
     <view class="search-welcome-icon"><view class="search-symbol large"></view></view>
     <text class="search-welcome-title">搜索付费记录</text>
     <text class="search-welcome-hint">输入客户昵称，或点击右侧按创建人和项目类型筛选</text>
   </view>
 
-  <view class="search-result-summary" wx:if="{{searchMode && hasSearched && !loading}}">
+  <view class="search-result-summary" wx:if="{{!isCoarseDoorTab && searchMode && hasSearched && !loading}}">
     <text class="search-result-title">搜索结果</text>
     <text class="search-result-count">共 {{total}} 条</text>
   </view>
 
   <!-- 列表 -->
-  <view class="list" wx:if="{{items.length > 0}}">
+  <view class="list" wx:if="{{!isCoarseDoorTab && items.length > 0}}">
     <view class="card" wx:for="{{items}}" wx:key="id" bindtap="onItemTap" data-item="{{item}}">
       <view class="card-main">
         <view class="card-row1">
@@ -138,7 +202,7 @@
   </view>
 
   <!-- 空状态 -->
-  <view class="empty" wx:if="{{!loading && hasSearched && items.length === 0}}">
+  <view class="empty" wx:if="{{!isCoarseDoorTab && !loading && hasSearched && items.length === 0}}">
     <text class="empty-text">{{searchMode ? '没有找到匹配的付费记录' : (keyword || filterCount > 0 ? '没有符合条件的记录' : '暂无数据')}}</text>
     <text class="empty-hint" wx:if="{{searchMode}}">试试更短的昵称或调整筛选条件</text>
   </view>
@@ -149,7 +213,7 @@
   </view>
 
   <!-- 新增按钮 -->
-  <draggable-fab wx:if="{{!searchMode}}" storage-key="payment-fab-position" bindtap="onAddTap" />
+  <draggable-fab wx:if="{{!searchMode && !isCoarseDoorTab}}" storage-key="payment-fab-position" bindtap="onAddTap" />
 
   <view class="export-mask" wx:if="{{exportDialogVisible}}" catchtap="onExportDialogClose">
     <view class="export-panel" catchtap="stopPropagation">

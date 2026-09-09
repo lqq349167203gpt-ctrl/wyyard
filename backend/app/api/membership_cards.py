@@ -60,6 +60,14 @@ def get_card(card_id: str, request: Request):
 def create_card(data: MembershipCardCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
+    if data.card_type == "粗门次卡":
+        data = data.model_copy(update={
+            "price": 0,
+            "closer_id": None,
+            "closer_name": None,
+            "closers": [],
+            "payment_method": None,
+        })
     ensure_payment_closer_total(data, "price", request=request)
     return membership_card_service.create_card(stamp_payment_creator(data, request))
 
@@ -75,6 +83,14 @@ def update_card(card_id: str, data: dict, request: Request):
     ensure_payment_record_manager(request, old_card)
     data.pop("created_by", None)
     data.pop("created_by_id", None)
+    if data.get("card_type", old_card.card_type) == "粗门次卡":
+        data.update({
+            "price": 0,
+            "closer_id": None,
+            "closer_name": None,
+            "closers": [],
+            "payment_method": None,
+        })
     customer_access_service.require_customer_scope(request, old_card.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != old_card.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")

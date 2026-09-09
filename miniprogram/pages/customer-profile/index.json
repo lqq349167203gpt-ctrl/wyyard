@@ -2,5 +2,7 @@
   "navigationBarTitleText": "客户详情",
   "navigationBarBackgroundColor": "#f3f7ff",
   "navigationBarTextStyle": "black",
-  "usingComponents": {}
+  "usingComponents": {
+    "payment-form": "/components/payment-form/index"
+  }
 }

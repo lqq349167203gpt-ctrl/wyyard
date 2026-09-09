@@ -9,6 +9,10 @@ Page({
     customerId: '',
     customerName: '',
     needs: '',
+    previousNeed: null,
+    previousNeedOpen: false,
+    previousNeedLoading: false,
+    previousNeedError: '',
     feedback: '',
     healingNotes: '',
     referrerHandler: '',
@@ -88,7 +92,7 @@ Page({
   },
 
   onDateChange(e) {
-    this.setData({ date: e.detail.value })
+    this.setData({ date: e.detail.value, previousNeed: null, previousNeedOpen: false, previousNeedError: '' })
   },
 
   onTimeChange(e) {
@@ -164,7 +168,7 @@ Page({
     const { id, nickname } = e.currentTarget.dataset
     const field = this.data.pickerField
     if (field === 'customer') {
-      this.setData({ customerId: id, customerName: nickname })
+      this.setData({ customerId: id, customerName: nickname, previousNeed: null, previousNeedOpen: false, previousNeedError: '' })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: nickname, referrerHandlerId: id })
     } else if (field === 'receptionist') {
@@ -176,12 +180,46 @@ Page({
   onPickerClear(e) {
     const field = e.currentTarget.dataset.field
     if (field === 'customer') {
-      this.setData({ customerId: '', customerName: '' })
+      this.setData({ customerId: '', customerName: '', previousNeed: null, previousNeedOpen: false, previousNeedError: '' })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: '', referrerHandlerId: '' })
     } else if (field === 'receptionist') {
       this.setData({ receptionist: '', receptionistId: '' })
     }
+  },
+
+  async onTogglePreviousNeed() {
+    if (this.data.previousNeedOpen) {
+      this.setData({ previousNeedOpen: false })
+      return
+    }
+    this.setData({ previousNeedOpen: true })
+    if (this.data.previousNeed || !this.data.customerId || this.data.previousNeedLoading) return
+    await this.loadPreviousNeed()
+  },
+
+  async loadPreviousNeed() {
+    if (!this.data.customerId || this.data.previousNeedLoading) return
+    this.setData({ previousNeedLoading: true, previousNeedError: '' })
+    try {
+      const previousNeed = await visitNoteApi.previousVisitNeed(this.data.customerId, this.data.date)
+      this.setData({ previousNeed, previousNeedError: '' })
+    } catch (error) {
+      this.setData({ previousNeed: null, previousNeedError: error.message || '加载上次需求失败' })
+    } finally {
+      this.setData({ previousNeedLoading: false })
+    }
+  },
+
+  onAppendPreviousNeed() {
+    const previousContent = this.data.previousNeed && this.data.previousNeed.content
+    if (!previousContent) return
+    const current = (this.data.needs || '').trim()
+    if (current.includes(previousContent.trim())) {
+      wx.showToast({ title: '已带入', icon: 'none' })
+      return
+    }
+    this.setData({ needs: current ? `${current}\n${previousContent}` : previousContent })
   },
 
   onBack() {

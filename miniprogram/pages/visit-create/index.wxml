@@ -69,7 +69,25 @@
   <!-- 记录 -->
   <view class="form-card">
     <view class="form-item column textarea-row">
-      <text class="form-label" style="margin-bottom: 16rpx;">来访需求</text>
+      <view class="need-heading">
+        <text class="form-label">来访需求</text>
+        <text class="previous-need-toggle" wx:if="{{customerId}}" bindtap="onTogglePreviousNeed">{{previousNeedOpen ? '收起上次需求' : '引用上次需求'}}</text>
+      </view>
+      <view class="previous-need-box" wx:if="{{previousNeedOpen}}">
+        <text class="previous-need-empty" wx:if="{{previousNeedLoading}}">正在加载上次需求…</text>
+        <view class="previous-need-error" wx:elif="{{previousNeedError}}" bindtap="loadPreviousNeed">
+          <text>{{previousNeedError}}</text>
+          <text class="previous-need-retry">点击重试</text>
+        </view>
+        <block wx:elif="{{previousNeed}}">
+          <view class="previous-need-meta">
+            <text>{{previousNeed.visit_date}} 的来访需求</text>
+            <text class="previous-need-append" bindtap="onAppendPreviousNeed">带入本次</text>
+          </view>
+          <text class="previous-need-content">{{previousNeed.content}}</text>
+        </block>
+        <text class="previous-need-empty" wx:else>暂无可引用的历史需求</text>
+      </view>
       <view class="text-preview" bindtap="onOpenEditor" data-field="needs" data-label="来访需求">
         <text class="text-preview-content {{needs ? '' : 'text-preview-placeholder'}}">{{needs || '点击输入来访需求'}}</text>
         <text class="text-preview-count">{{needs.length}} 字</text>
@@ -99,7 +117,7 @@
       <text class="picker-close" bindtap="onPickerClose">关闭</text>
     </view>
     <view class="picker-search">
-      <input class="picker-search-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+      <input class="picker-search-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">

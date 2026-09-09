@@ -107,7 +107,7 @@ export default function PositionsPage() {
                 onChange={(v) => setSelectedNicknames(v as string[])}
                 multi
                 excludeIds={courseTeachers.map(t => t.id)}
-                placeholder="输入昵称或姓名搜索..."
+                placeholder="输入姓名或昵称搜索..."
               />
             </div>
 

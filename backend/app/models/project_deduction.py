@@ -1,7 +1,9 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
-from pydantic import Field
 from datetime import datetime
 from typing import Optional
+
+from pydantic import Field
+
+from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class ProjectDeductionBase(SafeBaseModel):
@@ -16,6 +18,15 @@ class ProjectDeductionBase(SafeBaseModel):
     reason: str = ""
     created_by: str = ""
     updated_by: str = ""
+    source_activity_type: str = ""
+    source_activity_id: str = ""
+    source_activity_key: str = ""
+    source_activity_name: str = ""
+    source_activity_date: str = ""
+    source_organization_id: str = ""
+    source_organization_name: str = ""
+    source_space_id: str = ""
+    source_space_name: str = ""
 
 
 class ProjectDeductionCreate(StrictBaseModel):
@@ -25,6 +36,16 @@ class ProjectDeductionCreate(StrictBaseModel):
     count: int = Field(default=1, ge=1)
     reason: str = Field(min_length=1, max_length=200)
     created_by: str = ""
+    deduction_date: str = ""
+    source_activity_type: str = ""
+    source_activity_id: str = ""
+    source_activity_key: str = ""
+    source_activity_name: str = ""
+    source_activity_date: str = ""
+    source_organization_id: str = ""
+    source_organization_name: str = ""
+    source_space_id: str = ""
+    source_space_name: str = ""
 
 
 class ProjectDeduction(ProjectDeductionBase):

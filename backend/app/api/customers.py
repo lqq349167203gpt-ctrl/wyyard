@@ -212,7 +212,13 @@ async def list_customers(
 
     # Apply filters
     if nickname:
-        items = [c for c in items if nickname.lower() in (c.get("nickname", "") or "").lower()]
+        keyword = nickname.lower()
+        items = [
+            customer
+            for customer in items
+            if keyword in (customer.get("nickname", "") or "").lower()
+            or keyword in (customer.get("name", "") or "").lower()
+        ]
     if member_type:
         items = [c for c in items if c.get("member_type") == member_type]
     if referrer:

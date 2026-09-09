@@ -47,7 +47,14 @@ def _migrate_deductions(raw):
         migrated = []
         for it in items:
             activity_key = it.get("key") if isinstance(it, dict) else it
-            if isinstance(activity_key, str) and activity_key.startswith(("ics:", "eks:")):
+            keep_coarse_assignment = (
+                isinstance(it, dict) and it.get("benefit_name") == "粗门次卡"
+            )
+            if (
+                isinstance(activity_key, str)
+                and activity_key.startswith(("ics:", "eks:"))
+                and not keep_coarse_assignment
+            ):
                 continue
             if isinstance(it, dict):
                 migrated.append({
@@ -384,7 +391,7 @@ def get_card_effective_remaining(card_id: str) -> Optional[int]:
 def get_activity_deduction_count(activity) -> int:
     """获取单个参与者在该场活动中需要扣除的会员卡次数。"""
     try:
-        return max(1, int(getattr(activity, "membership_deduction_count", 1)))
+        return max(0, int(getattr(activity, "membership_deduction_count", 1)))
     except (TypeError, ValueError):
         return 1
 
@@ -728,7 +735,11 @@ def delete_card(card_id: str) -> bool:
 
 def _select_membership_benefit(customer_id: str, usage_date: str) -> Optional[tuple]:
     """按活动日期选择可用会员卡权益；没有可用会员卡时返回 None。"""
-    active_cards = _active_cards(customer_id, usage_date)
+    # 粗门次卡只能在付费项目的专属入口中按具体课程人工扣除，不能进入课表自动扣卡池。
+    active_cards = [
+        card for card in _active_cards(customer_id, usage_date)
+        if card.card_type != "粗门次卡"
+    ]
     unlimited_cards = [card for card in active_cards if card.remaining_count is None]
     if unlimited_cards:
         unlimited_cards.sort(
@@ -835,6 +846,95 @@ def _get_card_activity_deductions_count(card_id: str) -> int:
         for item in _deductions.get(card.customer_id, [])
         if isinstance(item, dict) and item.get("card_id") == card_id
     )
+
+
+def assign_activity_to_coarse_offset(
+    customer_id: str,
+    record_type: str,
+    record_id: str,
+    count: int,
+) -> list[str]:
+    """将课程扣卡单位改记为粗门次卡抵扣，返还原会员卡次数或清除对应欠卡。"""
+    activity_prefix = f"{record_type}:{record_id}"
+    count = max(0, int(count or 0))
+    if count <= 0:
+        raise ValueError("扣卡次数为0的课程不能使用粗门次卡抵扣")
+
+    with _deduct_lock:
+        expected_keys = [
+            _activity_unit_key(activity_prefix, unit_index)
+            for unit_index in range(1, count + 1)
+        ]
+        records = _deductions.setdefault(customer_id, [])
+        debt_keys = _debt_activities.get(customer_id, [])
+        record_by_key = {
+            str(item.get("key")): item
+            for item in records
+            if isinstance(item, dict) and item.get("key")
+        }
+        if any(
+            record_by_key.get(key, {}).get("benefit_name") == "粗门次卡"
+            for key in expected_keys
+        ):
+            raise ValueError("该课程已经使用粗门次卡抵扣")
+
+        for activity_key in expected_keys:
+            candidate = record_by_key.get(activity_key)
+            if candidate:
+                candidate.update({
+                    "card_id": None,
+                    "benefit_type": "coarse_door_offset",
+                    "benefit_id": activity_prefix,
+                    "benefit_name": "粗门次卡",
+                    "remaining_after": None,
+                    "deducted_at": datetime.now(timezone.utc).isoformat(),
+                })
+            else:
+                record = {
+                    "key": activity_key,
+                    "card_id": None,
+                    "benefit_type": "coarse_door_offset",
+                    "benefit_id": activity_prefix,
+                    "benefit_name": "粗门次卡",
+                    "remaining_after": None,
+                    "deducted_at": datetime.now(timezone.utc).isoformat(),
+                }
+                records.append(record)
+
+        remaining_debts = [key for key in debt_keys if str(key) not in set(expected_keys)]
+        if remaining_debts:
+            _debt_activities[customer_id] = remaining_debts
+            _debts[customer_id] = len(remaining_debts)
+        else:
+            _debt_activities.pop(customer_id, None)
+            _debts.pop(customer_id, None)
+        _save_customer_usages({customer_id})
+        return expected_keys
+
+
+def release_coarse_card_assignment(customer_id: str, activity_keys: str | list[str]) -> None:
+    """撤销粗门次卡课程归属，并按原有规则逐次恢复普通卡或欠卡。"""
+    keys = [activity_keys] if isinstance(activity_keys, str) else list(activity_keys)
+    key_set = set(keys)
+    with _deduct_lock:
+        records = _deductions.get(customer_id, [])
+        kept = [
+            item for item in records
+            if not (
+                isinstance(item, dict)
+                and item.get("key") in key_set
+                and item.get("benefit_name") == "粗门次卡"
+            )
+        ]
+        if len(kept) == len(records):
+            return
+        if kept:
+            _deductions[customer_id] = kept
+        else:
+            _deductions.pop(customer_id, None)
+        for activity_key in keys:
+            _do_deduct(customer_id, activity_key)
+        _save_customer_usages({customer_id})
 
 
 def _set_record_benefit(record: dict, benefit: tuple) -> None:

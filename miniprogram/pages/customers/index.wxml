@@ -9,7 +9,7 @@
   <view class="search-bar">
     <view class="search-input-wrap search-entry" bindtap="onSearchTap" hover-class="search-entry-active" hover-stay-time="80">
       <view class="search-symbol"></view>
-      <text class="search-entry-text">搜索客户昵称</text>
+      <text class="search-entry-text">搜索姓名或昵称</text>
     </view>
     <view class="filter-btn {{showFilterPanel ? 'active' : ''}}" bindtap="onToggleFilterPanel">
       <text>筛选</text>

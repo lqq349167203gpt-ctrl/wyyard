@@ -158,6 +158,65 @@
   font-size: 28rpx;
 }
 
+.editor-header-actions,
+.previous-meta {
+  display: flex;
+  align-items: center;
+}
+
+.editor-header-actions {
+  gap: 28rpx;
+}
+
+.previous-toggle,
+.previous-append {
+  color: #3370ff;
+  font-size: 24rpx;
+}
+
+.previous-box {
+  margin: 24rpx 28rpx 0;
+  padding: 16rpx 20rpx;
+  border: 1rpx solid #dce5f8;
+  border-radius: 8rpx;
+  background: #f7f9fc;
+}
+
+.previous-meta {
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+  color: #8f959e;
+  font-size: 22rpx;
+}
+
+.previous-content {
+  display: block;
+  color: #4e535a;
+  font-size: 26rpx;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.previous-empty {
+  color: #8f959e;
+  font-size: 24rpx;
+}
+
+.previous-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  color: #c4506a;
+  font-size: 24rpx;
+}
+
+.previous-retry {
+  flex-shrink: 0;
+  color: #3370ff;
+}
+
 .editor-input {
   box-sizing: border-box;
   width: calc(100% - 56rpx);

@@ -2,10 +2,12 @@ import { useMemo, useRef, useState } from "react"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { visitNoteApi, type VisitNote, type VisitNoteCategory } from "@/lib/api"
+import { visitNoteApi, type PreviousVisitNeed, type VisitNote, type VisitNoteCategory } from "@/lib/api"
 
 interface VisitNoteCellProps {
   visitId: string
+  customerId?: string
+  visitDate?: string
   nickname: string
   title: string
   category: VisitNoteCategory
@@ -42,12 +44,15 @@ function authorName(note: VisitNote): string {
   return name && name !== "历史记录" ? name : "未知"
 }
 
-export function VisitNoteCell({ visitId, nickname, title, category, notes, disabled, expanded = false, privateToCreator = false, onNotesChange }: VisitNoteCellProps) {
+export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickname, title, category, notes, disabled, expanded = false, privateToCreator = false, onNotesChange }: VisitNoteCellProps) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState("")
   const [savedValue, setSavedValue] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [previousNeed, setPreviousNeed] = useState<PreviousVisitNeed | null>(null)
+  const [previousLoading, setPreviousLoading] = useState(false)
+  const [showPrevious, setShowPrevious] = useState(false)
   const savingRef = useRef(false)
 
   const categoryNotes = useMemo(() => {
@@ -79,15 +84,50 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
     const initialValue = myNote?.content || ""
     setDraft(initialValue)
     setSavedValue(initialValue)
+    setShowPrevious(false)
+    setPreviousNeed(null)
     try {
-      const latestNotes = await refreshNotes()
+      const [latestNotes, previous] = await Promise.all([
+        refreshNotes(),
+        category === "visit_need" && customerId
+          ? visitNoteApi.previousVisitNeed(customerId, visitDate, visitId)
+          : Promise.resolve(null),
+      ])
       const latestMine = latestNotes.find((note) => note.category === category && note.can_edit)
       const nextValue = latestMine?.content || ""
       setDraft(nextValue)
       setSavedValue(nextValue)
+      setPreviousNeed(previous)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "加载失败")
     }
+  }
+
+  const togglePrevious = async () => {
+    if (showPrevious) {
+      setShowPrevious(false)
+      return
+    }
+    setShowPrevious(true)
+    if (previousNeed || !customerId || previousLoading) return
+    setPreviousLoading(true)
+    try {
+      setPreviousNeed(await visitNoteApi.previousVisitNeed(customerId, visitDate, visitId))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "加载上次需求失败")
+    } finally {
+      setPreviousLoading(false)
+    }
+  }
+
+  const appendPrevious = () => {
+    if (!previousNeed?.content) return
+    setDraft((current) => {
+      const normalized = current.trim()
+      if (!normalized) return previousNeed.content
+      if (normalized.includes(previousNeed.content.trim())) return current
+      return `${normalized}\n${previousNeed.content}`
+    })
   }
 
   const persistDraft = async () => {
@@ -207,7 +247,33 @@ export function VisitNoteCell({ visitId, nickname, title, category, notes, disab
                   </>
                 )}
               </span>
+              {category === "visit_need" && customerId && (
+                <button
+                  type="button"
+                  className="ml-auto text-[11px] text-[#3370ff] hover:text-[#245bdb]"
+                  onClick={() => void togglePrevious()}
+                >
+                  {showPrevious ? "收起上次需求" : "引用上次需求"}
+                </button>
+              )}
             </div>
+            {category === "visit_need" && showPrevious && (
+              <div className="mb-3 rounded-[4px] border-[0.5px] border-[#dce5f8] bg-[#f7f9fc] px-2.5 py-2">
+                {previousLoading ? (
+                  <div className="text-[11px] text-[#8f959e]">正在加载上次需求…</div>
+                ) : previousNeed ? (
+                  <>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-[#8f959e]">{previousNeed.visit_date} 的来访需求</span>
+                      <button type="button" className="shrink-0 text-[11px] text-[#3370ff] hover:text-[#245bdb]" onClick={appendPrevious}>带入本次</button>
+                    </div>
+                    <div className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{previousNeed.content}</div>
+                  </>
+                ) : (
+                  <div className="text-[11px] text-[#8f959e]">暂无可引用的历史需求</div>
+                )}
+              </div>
+            )}
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}

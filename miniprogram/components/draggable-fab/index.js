@@ -1,6 +1,7 @@
 const FAB_SIZE_RPX = 104
 const DEFAULT_RIGHT_RPX = 32
 const DEFAULT_BOTTOM_RPX = 200
+const EDGE_INSET_RPX = 24
 
 Component({
   properties: {
@@ -22,6 +23,13 @@ Component({
     },
     detached() {
       if (this._saveTimer) clearTimeout(this._saveTimer)
+    },
+  },
+
+  pageLifetimes: {
+    show() {
+      // tab 页面通常不会销毁；每次重新显示时都重新校正，避免旧坐标落到可视区外。
+      this._restorePosition()
     },
   },
 
@@ -48,11 +56,12 @@ Component({
 
     _clampPosition(position) {
       const bounds = this._bounds()
-      const maxX = Math.max(0, bounds.width - bounds.size)
-      const maxY = Math.max(0, bounds.height - bounds.size)
+      const edgeInset = EDGE_INSET_RPX * (bounds.width / 750)
+      const maxX = Math.max(edgeInset, bounds.width - bounds.size - edgeInset)
+      const maxY = Math.max(edgeInset, bounds.height - bounds.size - edgeInset)
       return {
-        x: Math.max(0, Math.min(maxX, Number(position.x) || 0)),
-        y: Math.max(0, Math.min(maxY, Number(position.y) || 0)),
+        x: Math.max(edgeInset, Math.min(maxX, Number(position.x) || 0)),
+        y: Math.max(edgeInset, Math.min(maxY, Number(position.y) || 0)),
       }
     },
 

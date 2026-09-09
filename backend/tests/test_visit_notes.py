@@ -216,6 +216,60 @@ def test_visit_note_create_upserts_same_creator(client, created_customer):
         client.delete(f"/api/visits/{visit['id']}")
 
 
+def test_previous_visit_need_returns_latest_visible_need_before_current_visit(
+    client, created_customer
+):
+    older = _create_visit(
+        client,
+        created_customer["id"],
+        visit_date="2026-08-20",
+        needs="较早的睡眠需求",
+    )
+    previous = _create_visit(
+        client,
+        created_customer["id"],
+        visit_date="2026-08-22",
+        needs="上一次的情绪疏导需求",
+    )
+    current = _create_visit(
+        client,
+        created_customer["id"],
+        visit_date="2026-08-24",
+    )
+    account, other_headers = _create_other_headers(client)
+    try:
+        response = client.get(
+            "/api/visit-notes/previous-visit-need",
+            params={
+                "customer_id": created_customer["id"],
+                "before_date": current["visit_date"],
+                "exclude_visit_id": current["id"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "visit_id": previous["id"],
+            "visit_date": "2026-08-22",
+            "content": "上一次的情绪疏导需求",
+        }
+        other_response = client.get(
+            "/api/visit-notes/previous-visit-need",
+            params={
+                "customer_id": created_customer["id"],
+                "before_date": current["visit_date"],
+                "exclude_visit_id": current["id"],
+            },
+            headers=other_headers,
+        )
+        assert other_response.status_code == 200, other_response.text
+        assert other_response.json()["content"] == "上一次的情绪疏导需求"
+    finally:
+        client.delete(f"/api/visits/{current['id']}")
+        client.delete(f"/api/visits/{previous['id']}")
+        client.delete(f"/api/visits/{older['id']}")
+        client.delete(f"/api/accounts/{account['id']}")
+
+
 def test_visit_need_is_private_to_each_account(client, created_customer):
     visit = _create_visit(client, created_customer["id"], needs="创建人的私有需求")
     account, other_headers = _create_other_headers(client)

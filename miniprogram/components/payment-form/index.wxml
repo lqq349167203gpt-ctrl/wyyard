@@ -20,7 +20,7 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
@@ -45,11 +45,11 @@
         </picker>
       </view>
     </view>
-    <view class="pf-row">
+    <view class="pf-row {{hidePaymentDetails ? 'pf-row-last' : ''}}">
       <text class="pf-label">卡内次数（次）</text>
       <input class="pf-input" type="number" placeholder="留空为不限次" placeholder-class="pf-placeholder" value="{{formData.remaining_count}}" bindinput="onFieldInput" data-field="remaining_count" />
     </view>
-    <view class="pf-row pf-row-last">
+    <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">费用金额（元）</text>
       <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.price}}" bindinput="onFieldInput" data-field="price" />
     </view>
@@ -61,7 +61,7 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
@@ -84,7 +84,7 @@
         </picker>
       </view>
     </view>
-    <view class="pf-row pf-row-last">
+    <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">付费金额（元）</text>
       <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.amount}}" bindinput="onFieldInput" data-field="amount" />
     </view>
@@ -96,7 +96,7 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
@@ -111,7 +111,7 @@
         <view class="pf-value">{{diagnosisDurations[diagnosisDurationIndex].label}}</view>
       </picker>
     </view>
-    <view class="pf-row pf-row-last">
+    <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">付费金额（元）</text>
       <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.amount}}" bindinput="onFieldInput" data-field="amount" />
     </view>
@@ -123,14 +123,14 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
       <text class="pf-label">数量</text>
       <input class="pf-input" type="number" placeholder="1" placeholder-class="pf-placeholder" value="{{formData.quantity}}" bindinput="onFieldInput" data-field="quantity" />
     </view>
-    <view class="pf-row pf-row-last">
+    <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">付费金额（元）</text>
       <input class="pf-input" type="digit" placeholder="68" placeholder-class="pf-placeholder" value="{{formData.amount}}" bindinput="onFieldInput" data-field="amount" />
     </view>
@@ -142,7 +142,7 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
@@ -158,7 +158,7 @@
         <text class="pf-suffix">个月</text>
       </view>
     </view>
-    <view class="pf-row pf-row-last">
+    <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">付费金额（元）</text>
       <input class="pf-input" type="digit" placeholder="输入金额" placeholder-class="pf-placeholder" value="{{formData.amount}}" bindinput="onFieldInput" data-field="amount" />
     </view>
@@ -170,7 +170,7 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
@@ -185,7 +185,7 @@
         <view class="pf-value {{formData.effective_date ? '' : 'pf-placeholder'}}">{{formData.effective_date || '选择日期'}}</view>
       </picker>
     </view>
-    <view class="pf-row pf-row-last">
+    <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">付费金额（元）</text>
       <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.price}}" bindinput="onFieldInput" data-field="price" />
     </view>
@@ -197,14 +197,14 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
       <text class="pf-label">项目名称</text>
       <input class="pf-input" placeholder="项目名称" placeholder-class="pf-placeholder" value="{{formData.project_name}}" bindinput="onFieldInput" data-field="project_name" />
     </view>
-    <view class="pf-row">
+    <view class="pf-row" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">费用（元）</text>
       <input class="pf-input" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{formData.fee}}" bindinput="onFieldInput" data-field="fee" />
     </view>
@@ -233,21 +233,19 @@
   <!-- 成交人 -->
   <view class="pf-card">
     <view class="pf-row" bindtap="onPickerOpen" data-field="closer">
-      <text class="pf-label">成交人</text>
+      <text class="pf-label">成交人（可选）</text>
       <view class="pf-value-wrap">
         <text class="{{closers.length > 0 ? '' : 'pf-placeholder'}}">{{closers.length > 0 ? '已选' + closers.length + '人' : '选择成交人'}}</text>
       </view>
     </view>
     <view class="pf-closer-item" wx:for="{{closers}}" wx:key="id">
       <text class="pf-closer-tag">{{item.nickname}}</text>
-      <input class="pf-closer-amount" type="digit" placeholder="金额" placeholder-class="pf-placeholder" value="{{item.amount}}" bindinput="onCloserAmountInput" data-id="{{item.id}}" />
-      <text class="pf-closer-unit">元</text>
       <text class="pf-closer-del" bindtap="onRemoveCloser" data-id="{{item.id}}">x</text>
     </view>
-    <view class="pf-closer-total" wx:if="{{closers.length > 0}}">
+    <view class="pf-closer-total" wx:if="{{!hidePaymentDetails && closers.length > 0}}">
       <text>总金额: {{closerTotal}} 元</text>
     </view>
-    <view class="pf-row">
+    <view class="pf-row" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">支付方式</text>
       <picker class="pf-picker" mode="selector" range="{{paymentMethods}}" range-key="label" value="{{paymentMethodIndex}}" bindchange="onPaymentMethodChange">
         <view class="pf-value {{paymentMethodIndex >= 0 ? '' : 'pf-placeholder'}}">{{paymentMethodIndex >= 0 ? paymentMethods[paymentMethodIndex].label : '请选择'}}</view>
@@ -267,7 +265,7 @@
       <text class="pf-popup-close" bindtap="onPickerClose">关闭</text>
     </view>
     <view class="pf-popup-search">
-      <input class="pf-popup-input" placeholder="搜索昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
+      <input class="pf-popup-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
     <scroll-view class="pf-popup-list" scroll-y>
       <view class="pf-popup-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
@@ -285,7 +283,7 @@
     <view class="pf-confirm-panel" catchtap="stopPropagation">
       <view class="pf-confirm-header">
         <text class="pf-confirm-title">{{isEdit ? '确认编辑' : '确认新增'}}</text>
-        <text class="pf-confirm-rule">成交人金额合计需与费用金额一致</text>
+        <text class="pf-confirm-rule" wx:if="{{!hidePaymentDetails}}">成交人金额合计需与费用金额一致</text>
       </view>
       <scroll-view class="pf-confirm-body" scroll-y>
         <view class="pf-confirm-row" wx:for="{{confirmRows}}" wx:key="label">

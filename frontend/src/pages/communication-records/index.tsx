@@ -78,7 +78,11 @@ export default function CommunicationRecordsPage() {
   // 筛选后的记录
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
-      if (searchNickname && !r.customer_nickname.includes(searchNickname)) return false
+      if (
+        searchNickname
+        && !r.customer_nickname.includes(searchNickname)
+        && !(nicknameToName[r.customer_nickname] || "").includes(searchNickname)
+      ) return false
       if (searchIdentity) {
         const identity = nicknameToIdentity[r.customer_nickname] || ""
         if (identity !== searchIdentity) return false
@@ -86,7 +90,7 @@ export default function CommunicationRecordsPage() {
       if (searchCreator && r.creator !== searchCreator) return false
       return true
     })
-  }, [records, searchNickname, searchIdentity, searchCreator, nicknameToIdentity])
+  }, [records, searchNickname, searchIdentity, searchCreator, nicknameToIdentity, nicknameToName])
 
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredRecords, { pageSize: 10 })
 
@@ -163,7 +167,7 @@ export default function CommunicationRecordsPage() {
               customers={customers}
               value={searchNickname}
               onChange={(v) => { setSearchNickname(typeof v === "string" ? v : "") }}
-              placeholder="搜索昵称"
+              placeholder="搜索姓名或昵称"
               filterSelected={false}
               className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
               rounded="7px"
@@ -287,7 +291,7 @@ export default function CommunicationRecordsPage() {
                 customers={customers}
                 value={form.customer_nickname}
                 onChange={(v) => setForm({ ...form, customer_nickname: typeof v === "string" ? v : "" })}
-                placeholder="搜索昵称"
+                placeholder="搜索姓名或昵称"
                 filterSelected={false}
               />
             </div>
@@ -326,7 +330,7 @@ export default function CommunicationRecordsPage() {
                 customers={customers}
                 value={editForm.customer_nickname}
                 onChange={(v) => setEditForm({ ...editForm, customer_nickname: typeof v === "string" ? v : "" })}
-                placeholder="搜索昵称"
+                placeholder="搜索姓名或昵称"
                 filterSelected={false}
               />
             </div>

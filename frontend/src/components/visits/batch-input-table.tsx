@@ -997,6 +997,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <VisitNoteCell
                       visitId={row.visit_id}
+                      customerId={row.customer_id}
+                      visitDate={date}
                       nickname={row.nickname}
                       title="来访需求"
                       category="visit_need"

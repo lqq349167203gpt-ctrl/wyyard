@@ -85,6 +85,7 @@ function defaultPlan() {
     columns: ['nickname', 'member_type', 'follow_up_status', 'referrer', 'visit_count_period', 'payment_amount_period'],
     sort_by: 'referral_date',
     sort_order: 'desc',
+    row_display_mode: 'unique_customers',
     analysis_mode: 'single',
     comparison_groups: [],
   }, monthRange())
@@ -93,6 +94,8 @@ function defaultPlan() {
 function clonePlan(plan) {
   const next = JSON.parse(JSON.stringify(plan || defaultPlan()))
   next.analysis_mode = next.analysis_mode || 'single'
+  next.row_display_mode = next.row_display_mode || 'unique_customers'
+  if (next.row_display_mode === 'activity_participations') next.row_display_mode = 'unique_customers'
   next.comparison_groups = next.comparison_groups || []
   next.comparison_groups.forEach(group => {
     if (!group.id) group.id = comparisonGroupId()
@@ -135,6 +138,7 @@ Page({
   data: {
     loading: true,
     querying: false,
+    exporting: false,
     metadata: null,
     plan: defaultPlan(),
     fieldOptions: [],
@@ -145,6 +149,11 @@ Page({
     dimensionMetricIndex: 0,
     dimensionOptions: [],
     dimensionIndex: 0,
+    rowDisplayOptions: [
+      { value: 'unique_customers', label: '每人显示一次' },
+      { value: 'arrival_visits', label: '按实际到场人次展开' },
+    ],
+    rowDisplayIndex: 0,
     periodRange: [periodYears.map(year => `${year}年`), periodParts],
     periodValue: [Math.max(0, periodYears.indexOf(currentYear)), new Date().getMonth() + 1],
     periodLabel: '',
@@ -260,6 +269,7 @@ Page({
     const dimensionMetricIndex = Math.max(0, dimensionMetricOptions.findIndex(item => item.value === cardMetric))
     const dimensionOptions = metadata.card_dimensions || []
     const dimensionIndex = Math.max(0, dimensionOptions.findIndex(item => item.value === plan.card_dimension))
+    const rowDisplayIndex = Math.max(0, this.data.rowDisplayOptions.findIndex(item => item.value === plan.row_display_mode))
     const selectedColumns = plan.columns.map(value => {
       const field = metadata.fields.find(item => item.value === value)
       return { value, label: field ? field.label : value }
@@ -275,6 +285,7 @@ Page({
       dimensionMetricIndex,
       dimensionOptions,
       dimensionIndex,
+      rowDisplayIndex,
       selectedColumns,
       columnOptions,
       periodValue: selectedPeriod.value,
@@ -531,6 +542,12 @@ Page({
     this.syncPlanView(plan)
   },
 
+  onRowDisplayChange(e) {
+    const plan = clonePlan(this.data.plan)
+    plan.row_display_mode = this.data.rowDisplayOptions[Number(e.detail.value)].value
+    this.syncPlanView(plan)
+  },
+
   onOpenColumns() {
     this.setData({ showColumnPicker: true })
   },
@@ -660,6 +677,7 @@ Page({
       this.data.metadata.fields.forEach(field => { fieldMap[field.value] = field.label })
       const resultItems = (result.items || []).map(item => ({
         id: item.id,
+        displayKey: item._display_key || item.id,
         nickname: item.nickname || '未命名',
         fields: result.plan.columns.filter(field => field !== 'nickname').map(field => ({ label: fieldMap[field] || field, value: displayValue(field, item[field]) })),
       }))
@@ -705,5 +723,41 @@ Page({
 
   onCustomerTap(e) {
     wx.navigateTo({ url: `/pages/customer-profile/index?id=${e.currentTarget.dataset.id}` })
+  },
+
+  async onExport() {
+    const result = this.data.result
+    if (!result || result.plan.analysis_mode !== 'single' || this.data.exporting) return
+    this.setData({ exporting: true })
+    wx.showLoading({ title: '正在导出...' })
+    try {
+      const fileData = await customAnalysisApi.export(result.plan)
+      const title = String(result.plan.title || '筛选结果').replace(/[\\/:*?"<>|]/g, '-')
+      const filePath = `${wx.env.USER_DATA_PATH}/自定义筛选_${title}_${Date.now()}.xlsx`
+      await new Promise((resolve, reject) => {
+        wx.getFileSystemManager().writeFile({
+          filePath,
+          data: fileData,
+          encoding: 'binary',
+          success: resolve,
+          fail: reject,
+        })
+      })
+      wx.hideLoading()
+      await new Promise((resolve, reject) => {
+        wx.openDocument({
+          filePath,
+          fileType: 'xlsx',
+          showMenu: true,
+          success: resolve,
+          fail: reject,
+        })
+      })
+    } catch (error) {
+      wx.hideLoading()
+      wx.showToast({ title: (error && error.message) || '导出失败', icon: 'none' })
+    } finally {
+      this.setData({ exporting: false })
+    }
   },
 })

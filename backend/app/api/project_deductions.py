@@ -4,8 +4,59 @@ from app.models.base import StrictBaseModel
 from app.models.project_deduction import ProjectDeductionCreate
 from app.services import customer_access_service, customer_service, project_deduction_service
 from app.utils.pagination import paginate
+from app.utils.record_ownership import ensure_payment_record_manager, get_request_actor
 
 router = APIRouter(prefix="/api/project-deductions", tags=["project-deductions"])
+
+
+class CoarseDoorCourseDeductionCreate(StrictBaseModel):
+    customer_id: str
+    record_type: str
+    record_id: str
+    organization_id: str
+
+
+@router.get("/coarse-door-options")
+def get_coarse_door_options(customer_id: str, request: Request):
+    customer_access_service.require_transaction_access(request, detail=True)
+    customer_access_service.require_customer_scope(request, customer_id)
+    return project_deduction_service.get_coarse_door_options(customer_id)
+
+
+@router.post("/coarse-door-course")
+def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Request):
+    customer_access_service.require_transaction_access(request, detail=True)
+    customer_access_service.require_customer_scope(request, data.customer_id, action="销卡")
+    _, actor_name = get_request_actor(request)
+    try:
+        deduction = project_deduction_service.create_coarse_door_course_deduction(
+            data.customer_id,
+            data.record_type,
+            data.record_id,
+            data.organization_id,
+            actor_name,
+        )
+        result = deduction.model_dump(mode="json")
+        course_summary = " · ".join(
+            value
+            for value in (
+                deduction.source_activity_date,
+                deduction.source_organization_name,
+                deduction.source_activity_name,
+            )
+            if value
+        )
+        request.state.operation_log_context = {
+            "content": (
+                f"{deduction.nickname} · 粗门次卡抵扣："
+                f"{course_summary or '所选课程'} · 抵扣{deduction.count}次，原会员卡返还{deduction.count}次"
+            ),
+            "entity_id": deduction.id,
+            "after_data": result,
+        }
+        return result
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.get("")
@@ -45,6 +96,7 @@ def update_deduction(deduction_id: str, data: DeductionUpdate, request: Request)
     )
     if not existing:
         raise HTTPException(status_code=404, detail="销卡记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     try:
         return project_deduction_service.update_deduction(
@@ -66,6 +118,7 @@ def delete_deduction(deduction_id: str, request: Request):
     )
     if not existing:
         raise HTTPException(status_code=404, detail="销卡记录不存在")
+    ensure_payment_record_manager(request, existing)
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     try:
         project_deduction_service.delete_deduction(deduction_id)

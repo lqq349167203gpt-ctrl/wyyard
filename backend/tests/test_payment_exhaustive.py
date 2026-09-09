@@ -1,5 +1,4 @@
 """付费项目穷举测试 — 5种付费类型，逐字段、逐业务规则"""
-import pytest
 import uuid
 
 
@@ -11,6 +10,34 @@ def _u():
 
 class TestMembershipCardCreate:
     """会员卡创建"""
+
+    def test_create_coarse_door_count_card_clears_payment_details(self, client, created_customer):
+        """粗门次卡不记录成交金额、成交人和支付方式。"""
+        resp = client.post(
+            "/api/membership-cards",
+            headers={"x-client-type": "pc"},
+            json={
+                "customer_id": created_customer["id"],
+                "nickname": created_customer["nickname"],
+                "card_type": "粗门次卡",
+                "price": 999,
+                "effective_date": "2026-05-01",
+                "duration_type": "month",
+                "duration_value": 1,
+                "remaining_count": 1,
+                "closer_id": "closer-001",
+                "closer_name": "销售A",
+                "closers": [{"id": "closer-001", "name": "销售A", "amount": 999}],
+                "payment_method": "微信",
+            },
+        )
+        assert resp.status_code == 200
+        card = resp.json()
+        assert card["price"] == 0
+        assert card["closer_id"] is None
+        assert card["closer_name"] is None
+        assert card["closers"] == []
+        assert card["payment_method"] is None
 
     def test_create_experience_card(self, client, created_customer):
         """体验会员"""

@@ -319,6 +319,23 @@ class TestCustomerList:
         resp = client.get("/api/customers")
         assert any(c["id"] == cid for c in resp.json())
 
+    def test_list_search_matches_name_and_nickname(self, client):
+        """客户搜索关键字同时匹配姓名和昵称。"""
+        suffix = _u()
+        created = client.post(
+            "/api/customers",
+            json={"nickname": f"昵称检索_{suffix}", "name": f"姓名检索_{suffix}"},
+        ).json()
+        try:
+            by_name = client.get("/api/customers", params={"nickname": f"姓名检索_{suffix}"})
+            by_nickname = client.get("/api/customers", params={"nickname": f"昵称检索_{suffix}"})
+            assert by_name.status_code == 200
+            assert by_nickname.status_code == 200
+            assert [item["id"] for item in by_name.json()] == [created["id"]]
+            assert [item["id"] for item in by_nickname.json()] == [created["id"]]
+        finally:
+            client.delete(f'/api/customers/{created["id"]}')
+
     def test_list_has_visit_count(self, client):
         """列表中的客户包含到店次数"""
         resp = client.get("/api/customers")
@@ -356,6 +373,7 @@ class TestCustomerDetail:
         assert resp.status_code == 200
         data = resp.json()
         assert "customer" in data
+        assert "transaction_count" in data["customer"]
         assert "visit_records" in data
         assert "healing_records" in data
         assert "payment_records" in data
@@ -403,7 +421,9 @@ class TestCustomerDetail:
             "effective_date": "2026-05-01",
         })
         resp = client.get(f"/api/customer-detail/{cid}")
-        assert len(resp.json()["purchase_summary"]) >= 1
+        detail = resp.json()
+        assert len(detail["purchase_summary"]) >= 1
+        assert detail["customer"]["transaction_count"] >= 1
 
     def test_detail_nonexistent(self, client):
         resp = client.get("/api/customer-detail/nonexistent")

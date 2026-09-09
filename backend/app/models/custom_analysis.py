@@ -84,10 +84,18 @@ AnalysisMetric = Literal[
     "referred_customers",
     "invited_customers",
     "arrived_customers",
+    "arrival_visits",
     "activity_customers",
+    "activity_participations",
     "converted_customers",
     "payment_orders",
     "payment_amount",
+]
+
+RowDisplayMode = Literal[
+    "unique_customers",
+    "arrival_visits",
+    "activity_participations",
 ]
 
 INHERITABLE_DATE_FIELDS = {
@@ -161,7 +169,7 @@ class AnalysisPlan(StrictBaseModel):
     condition_logic: Literal["all", "any"] = "all"
     date_from: str = ""
     date_to: str = ""
-    metrics: list[AnalysisMetric] = Field(default_factory=lambda: ["total_customers"], min_length=1, max_length=9)
+    metrics: list[AnalysisMetric] = Field(default_factory=lambda: ["total_customers"], min_length=1, max_length=11)
     card_metric: AnalysisMetric = "total_customers"
     card_dimension: CardDimension = "follow_up_status"
     columns: list[AnalysisField] = Field(
@@ -180,6 +188,7 @@ class AnalysisPlan(StrictBaseModel):
     )
     sort_by: AnalysisField = "referral_date"
     sort_order: Literal["asc", "desc"] = "desc"
+    row_display_mode: RowDisplayMode = "unique_customers"
     analysis_mode: Literal["single", "comparison"] = "single"
     comparison_groups: list[AnalysisComparisonGroup] = Field(default_factory=list, max_length=4)
 

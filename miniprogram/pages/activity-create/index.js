@@ -1,5 +1,5 @@
 const {
-  classRecordApi, courseTypeApi, spaceApi, customerApi, visitApi,
+  classRecordApi, courseTypeApi, spaceApi, organizationApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
 } = require('../../utils/api')
@@ -106,8 +106,35 @@ Page({
 
   async loadCourses() {
     try {
-      const types = await courseTypeApi.list()
-      const courses = types.filter(t => t.category !== 'other').map(t => ({ id: t.name, name: t.name }))
+      const [types, organizations] = await Promise.all([
+        courseTypeApi.list(),
+        // 组织名称只用于分组提示；即使组织接口临时失败，也不能阻断课程类型选择。
+        organizationApi.list().catch(() => []),
+      ])
+      const organizationNames = {}
+      ;(organizations || []).forEach(organization => {
+        organizationNames[organization.id] = organization.name
+      })
+      const sourceCourses = types.filter(t => t.category !== 'other').map(t => ({
+        id: t.name,
+        name: t.name,
+        organizationId: t.organization_id || '',
+        organizationName: organizationNames[t.organization_id] || '未配置组织',
+      }))
+      const groupOrder = (organizations || []).map(organization => organization.id).concat([''])
+      const courses = []
+      groupOrder.forEach(organizationId => {
+        sourceCourses
+          .filter(course => course.organizationId === organizationId)
+          .forEach((course, index) => courses.push(Object.assign({}, course, {
+            showOrganizationHeader: index === 0,
+          })))
+      })
+      sourceCourses
+        .filter(course => course.organizationId && !organizationNames[course.organizationId])
+        .forEach((course, index) => courses.push(Object.assign({}, course, {
+          showOrganizationHeader: index === 0,
+        })))
       const defaultIndex = courses.findIndex(c => c.name === '读书会')
       const courseIndex = defaultIndex >= 0 ? defaultIndex : -1
 
