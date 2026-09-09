@@ -25,6 +25,7 @@ def create_record(
 ) -> CommunicationRecord:
     record = CommunicationRecord(
         id=str(uuid.uuid4())[:12],
+        customer_id=data.customer_id,
         customer_nickname=data.customer_nickname,
         content=data.content,
         creator=creator,
@@ -37,11 +38,30 @@ def create_record(
 
 
 def list_records() -> List[CommunicationRecord]:
-    return sorted(_records.values(), key=lambda x: x.created_at, reverse=True)
+    return sorted((_current_customer_record(r) for r in _records.values()), key=lambda x: x.created_at, reverse=True)
+
+
+def _current_customer_record(record: CommunicationRecord) -> CommunicationRecord:
+    from app.services import customer_service
+
+    customer = customer_service.get_customer(record.customer_id) if record.customer_id else None
+    if customer:
+        return record.model_copy(update={"customer_nickname": customer.nickname})
+    return record
+
+
+def bind_legacy_customer(customer_id: str, nickname: str) -> None:
+    """改名前固定已有昵称记录的归属，不猜测已经改名的历史记录。"""
+    for record_id, record in list(_records.items()):
+        if not record.customer_id and record.customer_nickname == nickname:
+            updated = record.model_copy(update={"customer_id": customer_id})
+            save_item(FILENAME, record_id, updated.model_dump(mode="json"))
+            _records[record_id] = updated
 
 
 def get_record(record_id: str) -> Optional[CommunicationRecord]:
-    return _records.get(record_id)
+    record = _records.get(record_id)
+    return _current_customer_record(record) if record else None
 
 
 def can_manage_record(
@@ -61,7 +81,11 @@ def update_record(record_id: str, data: CommunicationRecordCreate) -> Optional[C
     record = _records.get(record_id)
     if not record:
         return None
-    updated = record.model_copy(update={"customer_nickname": data.customer_nickname, "content": data.content})
+    updated = record.model_copy(update={
+        "customer_id": data.customer_id,
+        "customer_nickname": data.customer_nickname,
+        "content": data.content,
+    })
     _records[record_id] = updated
     save_item(FILENAME, record_id, updated.model_dump(mode="json"))
     return updated

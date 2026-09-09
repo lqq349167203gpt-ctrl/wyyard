@@ -123,8 +123,13 @@ def list_visible_notes(
     owner_name: str = "",
     username: str = "",
 ) -> list[VisitNote]:
-    """所有协作内容（含来访需求）共享可见。"""
-    return list_notes(visit_ids)
+    """来访需求共享可见，但必须具备角色的跟进点查看权限。"""
+    from app.services import account_service, customer_access_service
+
+    account = account_service.get_account(account_id) if account_id else None
+    roles = (account.roles or [account.role]) if account else []
+    can_view_need = customer_access_service.can_view_detail_tab(roles, "follow_up")
+    return [note for note in list_notes(visit_ids) if note.category != "visit_need" or can_view_need]
 
 
 def get_previous_visit_need(

@@ -40,10 +40,10 @@ def test_dashboard_summary_uses_calendar_month_and_recent_contacts(monkeypatch):
     monkeypatch.setattr(statistics.visit_service, "get_arrived_customer_ids", arrived_ids)
 
     payments = [
-        SimpleNamespace(deal_date="2026-07-05", amount=398, voided=False),
-        SimpleNamespace(deal_date="2026-07-08", price=1000, voided=False),
-        SimpleNamespace(deal_date="2026-07-09", fee=500, voided=True),
-        SimpleNamespace(deal_date="2026-06-30", amount=200, voided=False),
+        SimpleNamespace(customer_id="c1", deal_date="2026-07-05", amount=398, voided=False),
+        SimpleNamespace(customer_id="c2", deal_date="2026-07-08", price=1000, voided=False),
+        SimpleNamespace(customer_id="c1", deal_date="2026-07-09", fee=500, voided=True),
+        SimpleNamespace(customer_id="c1", deal_date="2026-06-30", amount=200, voided=False),
     ]
     monkeypatch.setattr(statistics, "_payment_record_groups", lambda: [payments])
 

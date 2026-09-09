@@ -32,6 +32,12 @@ router = APIRouter(
 async def get_metadata(request: Request):
     actor_id = getattr(request.state, "user_id", "")
     role = get_request_roles(request)
+    sensitive_permissions = customer_access_service.get_customer_permissions(role)["sensitive_fields"]
+    allowed_sensitive_fields = {
+        field_name
+        for field_name, allowed in sensitive_permissions.items()
+        if allowed
+    }
     allowed_customer_ids = customer_access_service.visible_customer_ids(
         request, customer_service.list_customers()
     )
@@ -41,6 +47,7 @@ async def get_metadata(request: Request):
         allowed_customer_ids,
         customer_access_service.transaction_access(role) == "detail",
         customer_access_service.can_view_detail_tab(role, "communication"),
+        allowed_sensitive_fields,
     )
 
 
@@ -53,6 +60,7 @@ def _actor(request: Request) -> tuple[str, str, bool]:
 
 def _allowed_customer_ids_for_plan(request: Request, plan) -> set[str] | None:
     role = get_request_roles(request)
+    sensitive_permissions = customer_access_service.get_customer_permissions(role)["sensitive_fields"]
     allow_payment_details = customer_access_service.transaction_access(role) == "detail"
     allow_communication = customer_access_service.can_view_detail_tab(role, "communication")
     payment_fields = set(custom_analysis_service.FIELD_GROUPS["付费行为"])
@@ -74,9 +82,27 @@ def _allowed_customer_ids_for_plan(request: Request, plan) -> set[str] | None:
         raise HTTPException(status_code=403, detail="当前角色没有客户交易明细权限，请移除付费相关筛选项")
     if not allow_communication and plan_fields.intersection(custom_analysis_service.FIELD_GROUPS["沟通行为"]):
         raise HTTPException(status_code=403, detail="当前角色没有沟通记录查看权限")
+    for field_name in plan_fields.intersection(custom_analysis_service.SENSITIVE_COLUMN_FIELDS):
+        permission_key = custom_analysis_service.SENSITIVE_COLUMN_FIELDS[field_name]
+        if not sensitive_permissions.get(permission_key, False):
+            label = custom_analysis_service.FIELD_LABELS[field_name]
+            raise HTTPException(status_code=403, detail=f"当前角色没有{label}查看权限，请移除该显示列")
     return customer_access_service.visible_customer_ids(
         request, customer_service.list_customers()
     )
+
+
+def _remove_forbidden_sensitive_values(request: Request, result: dict) -> None:
+    role = get_request_roles(request)
+    sensitive_permissions = customer_access_service.get_customer_permissions(role)["sensitive_fields"]
+    forbidden_fields = {
+        field_name
+        for field_name, permission_key in custom_analysis_service.SENSITIVE_COLUMN_FIELDS.items()
+        if not sensitive_permissions.get(permission_key, False)
+    }
+    for item in result.get("items", []):
+        for field_name in forbidden_fields:
+            item.pop(field_name, None)
 
 
 def _condition_snapshot(condition) -> dict:
@@ -275,6 +301,7 @@ async def execute_query(data: AnalysisExecuteRequest, request: Request):
         data.page_size,
         allowed_customer_ids,
     )
+    _remove_forbidden_sensitive_values(request, result)
     if data.page == 1:
         comparison_groups = result.get("comparison_groups", [])
         comparison_summary = "、".join(

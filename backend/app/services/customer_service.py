@@ -136,6 +136,10 @@ def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer
                 if new_phone and c.phone == new_phone:
                     raise ValueError("手机号已存在")
 
+        if "nickname" in update_data and update_data["nickname"] != customer.nickname:
+            from app.services import communication_record_service
+
+            communication_record_service.bind_legacy_customer(customer_id, customer.nickname)
         for key, value in update_data.items():
             setattr(customer, key, value)
         customer.updated_at = datetime.now(timezone.utc)

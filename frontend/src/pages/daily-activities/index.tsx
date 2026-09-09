@@ -1557,6 +1557,13 @@ const WeekThemeDialog = memo(({ open, weekIndex, weekDays, themeMap, spaces, def
   )
 })
 
+function themeTableText(...values: Array<string | undefined>) {
+  return values
+    .map(value => (value || "").replace(/\s+/g, " ").trim())
+    .filter((value, index, items) => value && items.indexOf(value) === index)
+    .join(" · ")
+}
+
 // ===== HistoryDayGroup 三级手风琴组件 =====
 type HourGroup = { hour: string; entries: HistoryEntry[] }
 type DayGroup = { date: string; label: string; hours: HourGroup[] }
@@ -2763,14 +2770,17 @@ export default function DailyActivitiesPage() {
             </thead>
             <tbody>
               {themeWeeks.map((week, wi) => {
-                const firstTheme = week.days.map(day => themeMap.get(day.date)).find(theme => theme?.week_theme)
-                const weekThemeText = firstTheme?.week_theme || ""
+                const firstTheme = week.days
+                  .map(day => themeMap.get(day.date))
+                  .find(theme => theme?.week_theme || theme?.week_theme_detail)
+                const weekThemeText = themeTableText(firstTheme?.week_theme, firstTheme?.week_theme_detail)
                 const isLastWeek = wi === themeWeeks.length - 1
                 return (
                   <tr key={`week-${wi}`}>
                     <td
-                      className={`px-2 text-center text-[12px] text-[#2b2f36] overflow-hidden text-ellipsis whitespace-nowrap ${isViewOnly ? "cursor-default" : "cursor-pointer hover:bg-[#f0f5ff]"}`}
-                      style={{ height: "38px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
+                      className={`px-2 text-center text-[10px] text-[#2b2f36] overflow-hidden text-ellipsis whitespace-nowrap ${isViewOnly ? "cursor-default" : "cursor-pointer hover:bg-[#f0f5ff]"}`}
+                      style={{ height: "26px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
+                      title={weekThemeText || undefined}
                       onClick={() => { if (isViewOnly) return; if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
                     >
                       {weekThemeText}
@@ -2779,22 +2789,24 @@ export default function DailyActivitiesPage() {
                       const dayNum = day.date.split("-")[2].replace(/^0/, "")
                       const isSelected = day.date === detailDate
                       const isToday = day.date === today
-                      const dayTheme = day.inMonth ? themeMap.get(day.date)?.day_theme || "" : ""
+                      const dayTheme = day.inMonth ? themeMap.get(day.date) : undefined
+                      const dayThemeText = themeTableText(dayTheme?.day_theme, dayTheme?.day_theme_detail)
                       const hasActivities = (calendarCounts[day.date] || 0) > 0
                       return (
                         <td
                           key={day.date}
-                          className={`cursor-pointer overflow-hidden px-1 text-center text-[12px] transition-colors ${
+                          className={`cursor-pointer overflow-hidden px-1 text-center text-[10px] transition-colors ${
                             !day.inMonth ? "bg-[#fdfdfd] text-[#b0b5bb]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36]"
                           }`}
-                          style={{ height: "38px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
+                          style={{ height: "26px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
+                          title={dayThemeText || undefined}
                           onClick={() => day.inMonth && setDetailDate(day.date)}
                         >
                           <div className="flex min-w-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap">
                             <span className={`shrink-0 text-[10px] ${
                               !day.inMonth ? "text-[#b0b5bb]" : isToday ? "text-[#3370ff]" : hasActivities ? "text-[#2b2f36]" : "text-[#8f959e]"
                             }`}>{dayNum}</span>
-                            {dayTheme && <span className="min-w-0 truncate">{dayTheme}</span>}
+                            {dayThemeText && <span className="min-w-0 truncate">{dayThemeText}</span>}
                           </div>
                         </td>
                       )

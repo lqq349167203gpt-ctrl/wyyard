@@ -10,7 +10,7 @@ import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { EmptyValue } from "@/components/empty-value"
 
-const SORT_FIELDS = ["member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "referral_date"] as const
+const SORT_FIELDS = ["member_type", "visit_count", "activity_count", "transaction_count", "last_visit_date", "referral_date"] as const
 type SortField = typeof SORT_FIELDS[number]
 
 /** 列排序箭头 */
@@ -119,8 +119,8 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                   </span>
                 </TableHead>
                 <TableHead style={{ width: "8%" }}>
-                  <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("total_payment")}>
-                    消费<SortArrow field="total_payment" sortField={sortField} sortOrder={sortOrder} />
+                  <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("transaction_count")}>
+                    交易笔数<SortArrow field="transaction_count" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
                 <TableHead style={{ width: "9%" }}>
@@ -186,7 +186,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                   {c.activity_count ? `${c.activity_count} 场` : <EmptyValue />}
                 </TableCell>
                 <TableCell className="tabular-nums text-[#2b2f36]">
-                  {c.total_payment === null ? <span className="text-[#c9cdd4]">—</span> : `¥${c.total_payment.toLocaleString()}`}
+                  {c.transaction_count ? `${c.transaction_count.toLocaleString()} 笔` : <EmptyValue />}
                 </TableCell>
                 <TableCell className="text-[11px] text-[#8f959e] tabular-nums">
                   {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString("zh-CN") : <EmptyValue />}

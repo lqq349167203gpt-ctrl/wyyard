@@ -19,6 +19,8 @@ def _analysis_log_type(log) -> str:
     path = log.path.rstrip("/")
     if path == "/api/custom-analysis/execute" and log.method == "POST":
         return "analysis_executed"
+    if path == "/api/custom-analysis/export" and log.method == "POST":
+        return "analysis_exported"
     if path == "/api/custom-analysis/templates" and log.method == "POST":
         return "template_created"
     if path.startswith("/api/custom-analysis/templates/"):
@@ -33,7 +35,7 @@ def _analysis_log_type(log) -> str:
 def list_analysis_logs(
     operator: Optional[str] = None,
     source: Optional[str] = Query(None, pattern="^(pc|miniprogram)?$"),
-    record_type: Optional[str] = Query(None, pattern="^(analysis|template)?$"),
+    record_type: Optional[str] = Query(None, pattern="^(analysis|export|template)?$"),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     page: int = Query(1, ge=1),
@@ -48,6 +50,8 @@ def list_analysis_logs(
     filtered = all_logs
     if record_type == "analysis":
         filtered = [(log, log_type) for log, log_type in filtered if log_type == "analysis_executed"]
+    elif record_type == "export":
+        filtered = [(log, log_type) for log, log_type in filtered if log_type == "analysis_exported"]
     elif record_type == "template":
         filtered = [(log, log_type) for log, log_type in filtered if log_type.startswith("template_")]
     if operator:

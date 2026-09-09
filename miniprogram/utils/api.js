@@ -767,6 +767,45 @@ const expenseApi = {
   delete: (id) => request(`/api/expenses/${id}`, { method: 'DELETE' }),
 }
 
+// 服务老师
+const serviceTeacherApi = {
+  metadata: () => request('/api/service-teacher-customers/metadata'),
+  list: (params = {}) => {
+    const qs = Object.entries(params)
+      .filter(([_, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    return request(`/api/service-teacher-customers${qs ? '?' + qs : ''}`)
+  },
+  courses: (params = {}) => {
+    const qs = Object.entries(params)
+      .filter(([_, value]) => value !== undefined && value !== null && value !== '' && value !== 'all')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    return request(`/api/statistics/courses${qs ? '?' + qs : ''}`)
+  },
+  exportFollowUps: (params = {}) => {
+    const qs = Object.entries(params)
+      .filter(([_, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    return request(`/api/service-teacher-customers/export-follow-ups${qs ? '?' + qs : ''}`, {
+      responseType: 'arraybuffer',
+      timeout: 120000,
+    })
+  },
+  exportCourses: (params = {}) => {
+    const qs = Object.entries(params)
+      .filter(([_, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    return request(`/api/service-teacher-customers/export-courses${qs ? '?' + qs : ''}`, {
+      responseType: 'arraybuffer',
+      timeout: 120000,
+    })
+  },
+}
+
 // 自定义筛选
 const customAnalysisApi = {
   metadata: () => request('/api/custom-analysis/metadata'),
@@ -813,5 +852,6 @@ module.exports = {
   paymentApi,
   communicationRecordApi,
   expenseApi,
+  serviceTeacherApi,
   customAnalysisApi,
 }

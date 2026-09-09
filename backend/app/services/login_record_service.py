@@ -80,6 +80,7 @@ PAGE_NAMES = {
     "/pages/text-editor/index": "文本编辑",
     "/pages/me/index": "我的",
     "/pages/custom-analysis/index": "自定义筛选",
+    "/pages/service-teachers/index": "服务老师",
 }
 
 
@@ -588,7 +589,7 @@ def list_activity(
                 continue
             if end and record.created_at > end:
                 continue
-            content = "登录系统" if record.event_type == "login" else f"访问{record.page_name}"
+            content = record.content or ("登录系统" if record.event_type == "login" else f"访问{record.page_name}")
             if keyword and keyword.lower() not in f"{record.owner} {record.username} {record.page_name} {content}".lower():
                 continue
             items.append({

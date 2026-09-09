@@ -771,29 +771,11 @@
 }
 
 .coarse-door { padding: 20rpx 24rpx 120rpx; }
-.coarse-card { padding: 26rpx 24rpx; border-radius: 20rpx; background: #fff; }
-.coarse-title { color: #1f2329; font-size: 28rpx; font-weight: 500; }
-.coarse-desc { margin-top: 8rpx; color: #8f959e; font-size: 22rpx; line-height: 34rpx; }
-.coarse-field { display: grid; grid-template-columns: 150rpx minmax(0, 1fr); align-items: center; min-height: 82rpx; border-bottom: 1rpx solid #f0f0f0; }
-.coarse-label { color: #4e535a; font-size: 24rpx; }
-.coarse-picker { overflow: hidden; color: #2b2f36; font-size: 24rpx; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.coarse-picker.placeholder { color: #a8adb4; }
-.coarse-customer-value { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
-.coarse-customer-clear { margin-left: 8rpx; padding: 8rpx 0 8rpx 16rpx; color: #b0b5bb; font-size: 30rpx; line-height: 1; }
-.coarse-picker-mask { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 100; background: rgba(0, 0, 0, 0.5); }
-.coarse-picker-popup { position: fixed; top: 96rpx; right: 0; bottom: 0; left: 0; z-index: 101; display: flex; flex-direction: column; overflow: hidden; border-radius: 0 0 24rpx 24rpx; background: #fff; }
-.coarse-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 28rpx 32rpx; border-bottom: 1rpx solid #f0f1f2; }
-.coarse-picker-title { color: #1f2329; font-size: 30rpx; font-weight: 500; }
-.coarse-picker-close { padding: 8rpx; color: #8f959e; font-size: 28rpx; }
-.coarse-picker-search { padding: 16rpx 32rpx; }
-.coarse-picker-input { height: 72rpx; padding: 0 28rpx; border-radius: 12rpx; background: #f2f3f5; color: #1f2329; font-size: 28rpx; box-sizing: border-box; }
-.coarse-picker-list { flex: 1; height: 0; }
-.coarse-picker-item { display: flex; align-items: center; padding: 28rpx 32rpx; border-bottom: 1rpx solid #f5f6f7; color: #1f2329; font-size: 30rpx; }
-.coarse-picker-item:active { background: #f7f8fa; }
-.coarse-picker-empty { display: flex; justify-content: center; padding: 80rpx 0; color: #b0b5bb; font-size: 28rpx; }
-.coarse-submit { display: flex; align-items: center; justify-content: center; height: 68rpx; margin-top: 24rpx; border-radius: 12rpx; background: #212631; color: #fff; font-size: 25rpx; font-weight: 400; line-height: 1; }
-.coarse-submit[disabled] { background: #d9dce1; color: #fff; }
-.coarse-list-title { padding: 30rpx 4rpx 14rpx; color: #646a73; font-size: 23rpx; }
+.coarse-toolbar { display: flex; align-items: center; justify-content: space-between; height: 64rpx; padding: 0 8rpx 0 4rpx; }
+.coarse-toolbar-caption { color: #8f959e; font-size: 22rpx; }
+.coarse-toolbar-button { display: flex; align-items: center; justify-content: center; gap: 4rpx; height: 52rpx; padding: 0 16rpx; border-radius: 8rpx; color: #3370ff; font-size: 24rpx; }
+.coarse-toolbar-button:active { background: #f2f5fa; }
+.coarse-toolbar-plus { font-size: 28rpx; line-height: 1; }
 .coarse-record { margin-bottom: 12rpx; padding: 22rpx 24rpx; border-radius: 18rpx; background: #fff; }
 .coarse-record-main { display: flex; align-items: center; justify-content: space-between; }
 .coarse-record-name { color: #1f2329; font-size: 27rpx; }
@@ -803,3 +785,10 @@
 .coarse-record-delete.disabled { color: #b9bdc3; }
 .coarse-record-course { display: block; margin-top: 12rpx; overflow: hidden; color: #2b2f36; font-size: 24rpx; text-overflow: ellipsis; white-space: nowrap; }
 .coarse-record-meta { display: block; margin-top: 8rpx; color: #8f959e; font-size: 22rpx; }
+
+.payment-entry-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; background: rgba(20, 24, 32, .36); }
+.payment-entry-panel { display: flex; width: 100%; max-height: 88vh; flex-direction: column; overflow: hidden; border-radius: 28rpx 28rpx 0 0; background: #f7f8fa; }
+.payment-entry-head { display: flex; align-items: center; justify-content: space-between; padding: 28rpx 30rpx 22rpx; border-bottom: 1rpx solid #eef0f2; background: #fff; }
+.payment-entry-title { color: #1f2329; font-size: 30rpx; font-weight: 500; }
+.payment-entry-close { color: #646a73; font-size: 25rpx; }
+.payment-entry-body { min-height: 0; flex: 1; padding-top: 4rpx; box-sizing: border-box; }

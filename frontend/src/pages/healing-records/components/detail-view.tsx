@@ -14,7 +14,6 @@ import { X, Upload, Copy, Edit, Eye, Inbox, Plus, Trash2 } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { UnifiedPaymentContent } from "@/pages/payment/unified-payment"
-import { CoarseDoorCardTab } from "@/pages/payment/coarse-door-card-tab"
 
 interface HealingRec {
   id: string
@@ -114,7 +113,6 @@ export default function DetailView({
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
   const [followUpStatuses, setFollowUpStatuses] = useState<FollowUpStatusConfig[]>([])
   const [paymentEntryOpen, setPaymentEntryOpen] = useState(false)
-  const [coarseDoorEntryOpen, setCoarseDoorEntryOpen] = useState(false)
   const loadSeqRef = useRef(0)
   const canEditVisits = useMemo(() => {
     try {
@@ -151,6 +149,9 @@ export default function DetailView({
     setRevealedContacts({ phone: false, wechat: false })
     setCopiedContact(null)
     setCommRecords([])
+    setCommContent("")
+    setCommPage(1)
+    setCommDeleteTarget(null)
     setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1); setFollowupsPage(1); setOfflineCoursePage(1)
     try {
       const data = await customerDetailApi.get(cid)
@@ -176,7 +177,11 @@ export default function DetailView({
       ].filter(Boolean) as (typeof activeTab)[]
       setActiveTab(current => availableTabs.includes(current) ? current : (availableTabs[0] || "healing"))
       if (nickname && communicationAllowed) {
-        communicationRecordApi.list(nickname).then(setCommRecords).catch(() => setCommRecords([]))
+        communicationRecordApi.list(nickname).then(records => {
+          if (seq === loadSeqRef.current) setCommRecords(records)
+        }).catch(() => {
+          if (seq === loadSeqRef.current) setCommRecords([])
+        })
       } else {
         setCommRecords([])
       }
@@ -199,7 +204,10 @@ export default function DetailView({
     }
   }, [])
 
-  useEffect(() => { if (selectedCustomerId) loadDetail(selectedCustomerId) }, [selectedCustomerId, loadDetail])
+  useEffect(() => {
+    if (selectedCustomerId) loadDetail(selectedCustomerId)
+    return () => { loadSeqRef.current += 1 }
+  }, [selectedCustomerId, loadDetail])
 
   const onClear = () => { setDetail(null); setSearchValue(""); onClearSelection() }
 
@@ -232,25 +240,29 @@ export default function DetailView({
     navigate("/courses/class-records")
   }
 
-  const reloadCommunicationRecords = async () => {
+  const reloadCommunicationRecords = async (seq = loadSeqRef.current) => {
+    if (seq !== loadSeqRef.current) return
     const nickname = detail?.customer.nickname
     if (!nickname) {
       setCommRecords([])
       return
     }
-    setCommRecords(await communicationRecordApi.list(nickname))
+    const records = await communicationRecordApi.list(nickname)
+    if (seq === loadSeqRef.current) setCommRecords(records)
   }
 
   const saveCommunicationRecord = async () => {
     const nickname = detail?.customer.nickname
     const content = commContent.trim()
     if (!nickname || !content || commSaving) return
+    const seq = loadSeqRef.current
     setCommSaving(true)
     try {
       await communicationRecordApi.create({ customer_nickname: nickname, content })
+      if (seq !== loadSeqRef.current) return
       setCommContent("")
       setCommPage(1)
-      await reloadCommunicationRecords()
+      await reloadCommunicationRecords(seq)
     } catch (e) {
       alert("保存失败：" + (e instanceof Error ? e.message : "未知错误"))
     } finally {
@@ -260,12 +272,14 @@ export default function DetailView({
 
   const deleteCommunicationRecord = async () => {
     if (!commDeleteTarget || commDeleting) return
+    const seq = loadSeqRef.current
     setCommDeleting(true)
     try {
       await communicationRecordApi.delete(commDeleteTarget.id)
+      if (seq !== loadSeqRef.current) return
       setCommDeleteTarget(null)
       setCommPage(1)
-      await reloadCommunicationRecords()
+      await reloadCommunicationRecords(seq)
     } catch (e) {
       alert("删除失败：" + (e instanceof Error ? e.message : "未知错误"))
     } finally {
@@ -1370,13 +1384,14 @@ export default function DetailView({
                   <TableHead className="!h-7 text-[12px]">生效日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">到期日期</TableHead>
                   <TableHead className="!h-7 text-[12px]">状态</TableHead>
-                  <TableHead className="!h-7 text-[12px]">成交人</TableHead>
+                  <TableHead className="!h-7 text-[12px]">成交人 / 录入人</TableHead>
                 </TableRow></TableHeader><TableBody>
                   {paginatedRecords.map((r,i)=>{
                     const today = new Date().toLocaleDateString("sv-SE")
+                    const isCoarseDoorDeduction = r.type === "粗门扣卡"
                     let status: React.ReactNode = <span className="text-[#d0d3d6]">-</span>
                     let statusClass = ""
-                    if (r.type === "粗门扣卡") {
+                    if (isCoarseDoorDeduction) {
                       status = "已抵扣"
                       statusClass = "text-[#3370ff]"
                     } else if (r.voided) {
@@ -1393,15 +1408,50 @@ export default function DetailView({
                       statusClass = "text-[#3370ff]"
                     }
                     return (
-                    <TableRow key={i} className="!h-9">
-                      <TableCell className="pl-4 py-1 text-[12px]">{r.type}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.name || <span className="text-[#d0d3d6]">-</span>}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.quantity}</TableCell>
+                    <TableRow key={i} className={isCoarseDoorDeduction ? "!h-12" : "!h-9"}>
+                      <TableCell className="pl-4 py-1 text-[12px]">
+                        {isCoarseDoorDeduction ? (
+                          <div className="flex items-center gap-2">
+                            <span className="h-5 w-[2px] shrink-0 rounded-[1px] bg-[#3370ff]" />
+                            <div className="leading-[1.35]">
+                              <div className="font-medium text-[#2b2f36]">粗门次卡</div>
+                              <div className="text-[11px] text-[#8f959e]">课程抵扣</div>
+                            </div>
+                          </div>
+                        ) : r.type}
+                      </TableCell>
+                      <TableCell className="py-1 text-[12px]">
+                        {isCoarseDoorDeduction ? (
+                          <div className="min-w-0 leading-[1.4]">
+                            <div className="max-w-[180px] truncate font-medium text-[#2b2f36]" title={r.activity_name || r.name}>
+                              {r.activity_name || r.name || "课程抵扣"}
+                            </div>
+                            <div className="mt-0.5 flex max-w-[260px] flex-wrap gap-x-2 text-[11px] text-[#8f959e]">
+                              <span className="truncate" title={r.settlement_organization_name || ""}>
+                                所属组织：{r.settlement_organization_name || "-"}
+                              </span>
+                              <span className="truncate" title={r.course_organization_name || ""}>
+                                课程所属：{r.course_organization_name || "-"}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (r.name || <span className="text-[#d0d3d6]">-</span>)}
+                      </TableCell>
+                      <TableCell className={`py-1 text-[12px] ${isCoarseDoorDeduction ? "font-medium text-[#3370ff]" : ""}`}>
+                        {isCoarseDoorDeduction ? `扣 ${r.quantity} 次` : r.quantity}
+                      </TableCell>
                       <TableCell className="py-1 text-[12px]">{r.deal_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.effective_date || <span className="text-[#d0d3d6]">-</span>}</TableCell>
                       <TableCell className="py-1 text-[12px]">{r.expiry_date || (r.type === "会员卡" ? "不限" : <span className="text-[#d0d3d6]">-</span>)}</TableCell>
                       <TableCell className={`py-1 text-[12px] ${statusClass}`}>{status}</TableCell>
-                      <TableCell className="py-1 text-[12px]">{r.closer_name || <span className="text-[#d0d3d6]">-</span>}</TableCell>
+                      <TableCell className="py-1 text-[12px]">
+                        {isCoarseDoorDeduction ? (
+                          <div className="leading-[1.4]">
+                            <div>{r.closer_name || <span className="text-[#d0d3d6]">-</span>}</div>
+                            {r.created_by && <div className="text-[11px] text-[#8f959e]">录入：{r.created_by}</div>}
+                          </div>
+                        ) : (r.closer_name || <span className="text-[#d0d3d6]">-</span>)}
+                      </TableCell>
                     </TableRow>
                     )
                   })}
@@ -1431,22 +1481,8 @@ export default function DetailView({
           presetCustomer={{ id: c.id, nickname: c.nickname || c.name }}
           onSaved={() => loadDetail(c.id)}
           includeCoarseDoorOption
-          onCoarseDoorSelect={() => setCoarseDoorEntryOpen(true)}
         />
       )}
-
-      <Dialog open={coarseDoorEntryOpen} onOpenChange={setCoarseDoorEntryOpen}>
-        <DialogContent className="w-[720px] max-w-[92vw] p-0 gap-0" initialFocus={false}>
-          <CoarseDoorCardTab
-            formOnly
-            presetCustomer={{ id: c.id, nickname: c.nickname || c.name }}
-            onSaved={() => {
-              loadDetail(c.id)
-              setCoarseDoorEntryOpen(false)
-            }}
-          />
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!commDeleteTarget} onOpenChange={(open) => { if (!open) setCommDeleteTarget(null) }}>
         <DialogContent className="w-[380px] max-w-[90vw] p-0 gap-0">

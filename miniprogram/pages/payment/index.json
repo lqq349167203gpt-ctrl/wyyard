@@ -3,6 +3,7 @@
   "navigationBarBackgroundColor": "#f3f7ff",
   "backgroundColor": "#f7f8fa",
   "usingComponents": {
-    "draggable-fab": "/components/draggable-fab/index"
+    "draggable-fab": "/components/draggable-fab/index",
+    "payment-form": "/components/payment-form/index"
   }
 }

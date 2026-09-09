@@ -19,6 +19,11 @@
       <text class="menu-label">自定义筛选</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onServiceTeacherTap" wx:if="{{canServiceTeacher}}">
+      <image class="menu-icon" src="{{icons.serviceTeacher}}" mode="aspectFit" />
+      <text class="menu-label">服务老师</text>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
 
   <view class="menu-card">

@@ -50,6 +50,12 @@
   text-align: right;
 }
 
+.pf-value-wrap-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pf-placeholder {
   color: #b0b5bb;
 }

@@ -439,6 +439,16 @@ def delete_activity_participant_note(note_id: str, request: Request):
     return {"ok": True}
 
 
+def _participant_scope_ids(participant_ids, groups) -> set[str]:
+    """组长和组员同样属于参与人；兼容旧数据字段，但不新增界面角色。"""
+    ids = set(participant_ids or [])
+    for group in groups or []:
+        item = group if isinstance(group, dict) else group.model_dump()
+        ids.update(item.get("member_ids") or [])
+        ids.update(filter(None, (item.get("leader_id"), item.get("deputy_id"))))
+    return ids
+
+
 @router.post("")
 def create_record(data: dict, request: Request, conversion: bool = False):
     from app.models.class_record import ClassRecordCreate
@@ -447,11 +457,12 @@ def create_record(data: dict, request: Request, conversion: bool = False):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     activity_lock_service.ensure_scope_unlocked(record.date, record.space_id)
-    if record.participant_ids and not conversion:
+    participant_ids = _participant_scope_ids(record.participant_ids, getattr(record, "groups", []))
+    if participant_ids:
         ensure_activity_participant_access(request)
     customer_access_service.require_new_customer_ids(
         request,
-        record.participant_ids,
+        participant_ids,
         action="添加",
     )
     created = class_record_service.create_record(record, refresh_identities=not conversion)
@@ -472,13 +483,18 @@ def update_record(record_id: str, data: dict, request: Request, conversion: bool
         raise HTTPException(status_code=404, detail="记录不存在")
     activity_lock_service.ensure_update_unlocked(old_record, data)
     ensure_activity_update_access(request, old_record, data)
-    if "participant_ids" in data:
-        if list(data.get("participant_ids") or []) != list(old_record.participant_ids):
+    if "participant_ids" in data or "groups" in data:
+        old_participants = _participant_scope_ids(old_record.participant_ids, old_record.groups)
+        new_participants = _participant_scope_ids(
+            data.get("participant_ids", old_record.participant_ids), data.get("groups", old_record.groups),
+        )
+        groups_changed = "groups" in data and data["groups"] != [g.model_dump() for g in old_record.groups]
+        if new_participants != old_participants or groups_changed:
             ensure_activity_participant_access(request, old_record)
         customer_access_service.require_new_customer_ids(
             request,
-            data.get("participant_ids") or [],
-            existing_ids=old_record.participant_ids,
+            new_participants,
+            existing_ids=old_participants,
             action="添加",
         )
     ensure_creator_for_changed_fields(

@@ -275,7 +275,7 @@
     <view class="result-area" wx:elif="{{result}}">
       <view class="result-heading">
         <view class="result-heading-copy"><text class="result-title">筛选结果</text><text class="result-total">共 {{result.total}} {{result.total_unit || '人'}}</text></view>
-        <button class="result-export-button" disabled="{{exporting}}" bindtap="onExport">{{exporting ? '导出中' : '导出'}}</button>
+        <view class="result-export-button {{exporting ? 'disabled' : ''}}" bindtap="onExport">{{exporting ? '导出中' : '导出'}}</view>
       </view>
       <view class="cards-grid">
         <view class="result-card {{item.is_total ? 'total' : ''}}" wx:for="{{metricCards}}" wx:key="key">
@@ -295,7 +295,11 @@
       </view>
 
       <view class="customer-list">
-        <view class="customer-row" wx:for="{{resultItems}}" wx:key="displayKey" data-id="{{item.id}}" bindtap="onCustomerTap">
+        <view class="customer-list-head" wx:if="{{resultItems.length > 0}}">
+          <text class="customer-list-title">客户名单</text>
+          <view class="content-toggle-button" bindtap="onToggleContent">{{contentExpanded ? '缩略' : '展开'}}</view>
+        </view>
+        <view class="customer-row {{contentExpanded ? 'expanded' : ''}}" wx:for="{{resultItems}}" wx:key="displayKey" data-id="{{item.id}}" bindtap="onCustomerTap">
           <view class="customer-head"><text class="customer-name">{{item.nickname}}</text><text class="customer-arrow">›</text></view>
           <view class="customer-fields">
             <view class="customer-field" wx:for="{{item.fields}}" wx:for-item="field" wx:key="label">
@@ -318,11 +322,14 @@
   <view class="column-sheet" wx:if="{{showColumnPicker}}">
     <view class="sheet-head"><text class="sheet-title">选择显示内容</text><text class="sheet-done" bindtap="onCloseColumns">完成</text></view>
     <scroll-view class="sheet-list" scroll-y>
-      <view class="sheet-item" wx:for="{{columnOptions}}" wx:key="value" data-value="{{item.value}}" bindtap="onColumnToggle">
-        <text class="sheet-item-name">{{item.label}}</text>
-        <text class="sheet-item-note" wx:if="{{item.locked}}">固定显示</text>
-        <view class="sheet-check {{item.selected ? 'selected' : ''}}">{{item.selected ? '✓' : ''}}</view>
-      </view>
+      <block wx:for="{{columnOptions}}" wx:key="value">
+        <view class="sheet-group-title" wx:if="{{item.showGroupHeading}}">{{item.groupLabel}}</view>
+        <view class="sheet-item" data-value="{{item.value}}" bindtap="onColumnToggle">
+          <text class="sheet-item-name">{{item.label}}</text>
+          <text class="sheet-item-note" wx:if="{{item.locked}}">固定显示</text>
+          <view class="sheet-check {{item.selected ? 'selected' : ''}}">{{item.selected ? '✓' : ''}}</view>
+        </view>
+      </block>
     </scroll-view>
   </view>
 

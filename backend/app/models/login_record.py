@@ -16,4 +16,5 @@ class LoginRecord(SafeBaseModel):
     device_info: str = ""
     page_path: str = ""
     page_name: str = ""
+    content: str = ""
     created_at: datetime

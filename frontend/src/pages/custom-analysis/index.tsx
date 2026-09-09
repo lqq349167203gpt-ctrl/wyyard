@@ -32,6 +32,7 @@ const NUMBER_FIELDS = new Set<AnalysisField>([
   "total_consumption", "invitation_count_period", "visit_count_period", "cancelled_count_period",
   "activity_count_period", "payment_count_period", "payment_amount_period",
 ])
+const CUSTOM_ANALYSIS_DRAFT_PREFIX = "custom-analysis:last-state:v1"
 
 const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   nickname: "昵称",
@@ -57,6 +58,11 @@ const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   payment_amount_period: "期间成交金额",
   payment_dates: "成交日期",
   course_teachers: "课程老师",
+  visit_purpose: "到访目的",
+  trauma_history: "创伤经历",
+  current_block: "当下卡点",
+  work_info: "工作情况",
+  other_info: "其他信息",
 }
 
 function monthRange() {
@@ -254,8 +260,12 @@ function createComparisonGroup(name: string, source?: AnalysisPlan["comparison_g
 
 const EmptyLine = () => <span className="inline-block h-[2px] w-[8px] rounded-full bg-[#e5e8eb] align-middle" />
 
-function clonePlan(plan: AnalysisPlan): AnalysisPlan {
+function clonePlan(plan: AnalysisPlan, allowedColumns?: Set<AnalysisField>): AnalysisPlan {
   const metrics = plan.metrics.filter(metric => metric !== "created_customers")
+  const columns = allowedColumns
+    ? plan.columns.filter(field => allowedColumns.has(field))
+    : [...plan.columns]
+  if (!columns.includes("nickname")) columns.unshift("nickname")
   return {
     ...plan,
     conditions: plan.conditions.map(condition => ({
@@ -276,7 +286,7 @@ function clonePlan(plan: AnalysisPlan): AnalysisPlan {
     row_display_mode: plan.row_display_mode === "activity_participations"
       ? "unique_customers"
       : plan.row_display_mode ?? "unique_customers",
-    columns: [...plan.columns],
+    columns: columns.slice(0, 10),
   }
 }
 
@@ -323,14 +333,20 @@ export default function CustomAnalysisPage() {
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateToDelete, setTemplateToDelete] = useState<AnalysisTemplate | null>(null)
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null)
+  const [contentExpanded, setContentExpanded] = useState(false)
+  const [draftReady, setDraftReady] = useState(false)
 
   const currentUser = useMemo(() => {
     try {
-      return JSON.parse(localStorage.getItem("currentUser") || "{}") as { id?: string; role?: string }
+      return JSON.parse(localStorage.getItem("currentUser") || "{}") as { id?: string; username?: string; owner?: string; role?: string }
     } catch {
       return {}
     }
   }, [])
+  const draftStorageKey = useMemo(
+    () => `${CUSTOM_ANALYSIS_DRAFT_PREFIX}:${currentUser.id || currentUser.username || currentUser.owner || "current"}`,
+    [currentUser.id, currentUser.owner, currentUser.username],
+  )
 
   const refreshTemplates = async () => {
     try {
@@ -364,16 +380,47 @@ export default function CustomAnalysisPage() {
   useEffect(() => {
     Promise.all([customAnalysisApi.metadata(), customAnalysisApi.listTemplates()])
       .then(([nextMetadata, nextTemplates]) => {
+        const nextAllowedColumns = new Set(
+          (nextMetadata.column_fields ?? nextMetadata.fields).map(field => field.value),
+        )
+        let savedDraft: { plan?: AnalysisPlan; contentExpanded?: boolean } | null = null
+        try {
+          savedDraft = JSON.parse(localStorage.getItem(draftStorageKey) || "null")
+        } catch {
+          savedDraft = null
+        }
         setMetadata(nextMetadata)
         setTemplates(nextTemplates)
+        setPlan(current => {
+          try {
+            return clonePlan(savedDraft?.plan ?? current, nextAllowedColumns)
+          } catch {
+            return clonePlan(current, nextAllowedColumns)
+          }
+        })
+        setContentExpanded(Boolean(savedDraft?.contentExpanded))
       })
       .catch(requestError => setError(requestError instanceof Error ? requestError.message : "分析配置加载失败"))
-      .finally(() => setMetadataLoading(false))
-  }, [])
+      .finally(() => {
+        setMetadataLoading(false)
+        setDraftReady(true)
+      })
+  }, [draftStorageKey])
+
+  useEffect(() => {
+    if (!draftReady) return
+    try {
+      localStorage.setItem(draftStorageKey, JSON.stringify({ plan, contentExpanded }))
+    } catch {
+      // 浏览器禁用本地存储时不影响筛选功能本身。
+    }
+  }, [contentExpanded, draftReady, draftStorageKey, plan])
 
   const fieldLabels = useMemo(() => ({
     ...FALLBACK_FIELD_LABELS,
-    ...(metadata ? Object.fromEntries(metadata.fields.map(item => [item.value, item.label])) : {}),
+    ...(metadata ? Object.fromEntries(
+      [...metadata.fields, ...(metadata.column_fields ?? [])].map(item => [item.value, item.label]),
+    ) : {}),
   }) as Record<AnalysisField, string>, [metadata])
   const operatorLabels = useMemo(() => Object.fromEntries((metadata?.operators ?? []).map(item => [item.value, item.label])) as Partial<Record<AnalysisOperator, string>>, [metadata])
   const fieldByName = useMemo(() => new Map((metadata?.fields ?? []).map(field => [field.value, field])), [metadata])
@@ -386,7 +433,10 @@ export default function CustomAnalysisPage() {
     }
     return [...groups.entries()].map(([group, children]) => ({ value: `group-${group}`, label: group, children }))
   }, [metadata])
-  const columnOptions = useMemo(() => (metadata?.fields ?? []).map(field => ({ value: field.value, label: field.label })), [metadata])
+  const allowedColumnFields = useMemo(() => new Set(
+    (metadata?.column_fields ?? metadata?.fields ?? []).map(field => field.value),
+  ), [metadata])
+  const columnOptions = useMemo(() => (metadata?.column_fields ?? metadata?.fields ?? []).map(field => ({ value: field.value, label: field.label })), [metadata])
   const periodOptions = useMemo(() => {
     const currentYear = new Date().getFullYear()
     return Array.from({ length: 10 }, (_, index) => currentYear + 1 - index).flatMap(year => [
@@ -494,7 +544,7 @@ export default function CustomAnalysisPage() {
     try {
       const data = await customAnalysisApi.execute(nextPlan, page, 20)
       setResult(data)
-      setPlan(clonePlan(data.plan))
+      setPlan(clonePlan(data.plan, allowedColumnFields))
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "查询失败，请稍后重试")
     } finally {
@@ -551,7 +601,7 @@ export default function CustomAnalysisPage() {
     setSelectedTemplateId(templateId)
     const template = templates.find(item => item.id === templateId)
     if (!template) return
-    setPlan(clonePlan(template.plan))
+    setPlan(clonePlan(template.plan, allowedColumnFields))
     setResult(null)
     setError("")
     customAnalysisApi.markTemplateUsed(templateId).then(refreshTemplates).catch(() => {})
@@ -791,7 +841,6 @@ export default function CustomAnalysisPage() {
               clearable
             />
             {canManageSelectedTemplate && <Button variant="outline" size="sm" onClick={updateSelectedTemplate} disabled={savingTemplate} className="h-8 rounded-[4px] border border-[#dee0e3] bg-white px-3 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7]">更新模板</Button>}
-            <Button variant="outline" size="sm" onClick={exportResult} disabled={!result || result.plan.analysis_mode !== "single" || exporting} className="h-8 rounded-[4px] border border-[#dee0e3] bg-white px-3 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7] disabled:text-[#b7bdc6]"><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "导出中" : "导出"}</Button>
             <Button variant="outline" size="sm" onClick={() => {
               if (!validateComparisonGroups(plan)) return
               setTemplateName("")
@@ -1020,7 +1069,14 @@ export default function CustomAnalysisPage() {
             </div>}
           </div>
           <div className="mx-[22px] mb-4 mt-4 overflow-hidden border-[0.5px] border-[#eceef0] bg-white">
-            <div className="flex items-baseline justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-3.5 py-2.5"><div className="flex min-w-0 items-baseline gap-2"><div className="truncate text-[13px] font-medium text-[#2b2f36]">{result.plan.title === "自助分析结果" ? `${dateSummary} · 符合条件客户` : result.plan.title}</div><span className="shrink-0 text-[12px] text-[#8f959e]">共 {result.total} {totalUnit}</span></div><span className="shrink-0 text-[12px] text-[#8f959e]">{executing ? "正在更新..." : "修改条件后点击“更新结果”"}</span></div>
+            <div className="flex items-center justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-3.5 py-2.5">
+              <div className="flex min-w-0 items-baseline gap-2"><div className="truncate text-[13px] font-medium text-[#2b2f36]">{result.plan.title === "自助分析结果" ? `${dateSummary} · 符合条件客户` : result.plan.title}</div><span className="shrink-0 text-[12px] text-[#8f959e]">共 {result.total} {totalUnit}</span></div>
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="text-[12px] text-[#8f959e]">{executing ? "正在更新..." : "修改条件后点击“更新结果”"}</span>
+                <Button variant="outline" size="sm" onClick={exportResult} disabled={exporting} className="h-7 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7] disabled:text-[#b7bdc6]"><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "导出中" : "导出"}</Button>
+                <button type="button" onClick={() => setContentExpanded(current => !current)} aria-pressed={contentExpanded} className="h-7 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]">{contentExpanded ? "缩略" : "展开"}</button>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               {result.items.length === 0 ? <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无符合条件的客户</div> : (
                 <Table className="min-w-[900px] table-fixed">
@@ -1043,10 +1099,10 @@ export default function CustomAnalysisPage() {
                   </TableHeader>
                   <TableBody>
                     {result.items.map(item => (
-                      <TableRow key={String(item._display_key ?? item.id)} className="h-9">
+                      <TableRow key={String(item._display_key ?? item.id)} className={contentExpanded ? "h-auto" : "h-9"}>
                         {columns.map((field, index) => (
-                          <TableCell key={field} className={`${index === 0 ? "pl-3.5" : ""} overflow-hidden px-3.5 py-2 text-[12px] text-[#4e535a]`}>
-                            {field === "nickname" ? <button type="button" onClick={() => setSelectedCustomerId(item.id)} className="block max-w-full truncate text-left text-[12px] font-medium text-[#2b2f36] hover:underline" title={String(item.nickname || "")}>{item.nickname || <EmptyLine />}</button> : <span className="block truncate" title={Array.isArray(item[field]) ? item[field].join("、") : String(item[field] ?? "")}>{renderValue(field, item[field])}</span>}
+                          <TableCell key={field} className={`${index === 0 ? "pl-3.5" : ""} overflow-hidden px-3.5 py-2 text-[12px] text-[#4e535a] ${contentExpanded ? "h-auto align-top whitespace-normal" : ""}`}>
+                            {field === "nickname" ? <button type="button" onClick={() => setSelectedCustomerId(item.id)} className={`block max-w-full text-left text-[12px] font-medium text-[#2b2f36] hover:underline ${contentExpanded ? "whitespace-pre-wrap break-words" : "truncate"}`} title={String(item.nickname || "")}>{item.nickname || <EmptyLine />}</button> : <span className={`block ${contentExpanded ? "whitespace-pre-wrap break-words" : "truncate"}`} title={Array.isArray(item[field]) ? item[field].join("、") : String(item[field] ?? "")}>{renderValue(field, item[field])}</span>}
                           </TableCell>
                         ))}
                       </TableRow>

@@ -437,8 +437,14 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
             deduction_date=data.deduction_date or datetime.now().strftime("%Y-%m-%d"),
             remaining_after=remaining_after,
             reason=reason,
+            notes=data.notes,
             created_by=data.created_by,
             updated_by=data.created_by,
+            closer_id=data.closer_id,
+            closer_name=data.closer_name,
+            closers=data.closers,
+            organization_id=data.organization_id,
+            organization_name=data.organization_name,
             source_activity_type=data.source_activity_type,
             source_activity_id=data.source_activity_id,
             source_activity_key=data.source_activity_key,
@@ -599,12 +605,22 @@ def get_coarse_door_options(customer_id: str) -> dict:
         for organization_id in course["organization_ids"]
         if organization_id in organization_map
     }
-    organizations = [
+    course_organizations = [
         {"id": organization_id, "name": organization_map[organization_id]}
         for organization_id in visible_organization_ids
     ]
+    settlement_organizations = [
+        {"id": organization.id, "name": organization.name}
+        for organization in organization_service.list_organizations()
+    ]
     return {
-        "organizations": sorted(organizations, key=lambda item: item["name"]),
+        # organizations 保留给旧版小程序，语义与 course_organizations 相同。
+        "organizations": sorted(course_organizations, key=lambda item: item["name"]),
+        "course_organizations": sorted(course_organizations, key=lambda item: item["name"]),
+        "settlement_organizations": sorted(
+            settlement_organizations,
+            key=lambda item: item["name"],
+        ),
         "courses": [course for course in courses if course["organization_ids"]],
     }
 
@@ -613,7 +629,11 @@ def create_coarse_door_course_deduction(
     customer_id: str,
     record_type: str,
     record_id: str,
-    organization_id: str,
+    course_organization_id: str,
+    settlement_organization_id: str,
+    deal_date: str,
+    closers: list[dict],
+    notes: str,
     created_by: str,
 ) -> ProjectDeduction:
     with _deduct_lock:
@@ -626,16 +646,23 @@ def create_coarse_door_course_deduction(
         )
         if not option:
             raise ValueError("该课程不可抵扣，可能未到场、扣卡次数为0、已退课或已经抵扣")
-        if organization_id not in option["organization_ids"]:
-            raise ValueError("所选课程不属于该组织，请重新选择")
+        if course_organization_id not in option["organization_ids"]:
+            raise ValueError("所选课程不属于该课程所属，请重新选择")
         from app.services import organization_service
 
-        organization = next(
-            (item for item in organization_service.list_organizations() if item.id == organization_id),
+        organizations = organization_service.list_organizations()
+        course_organization = next(
+            (item for item in organizations if item.id == course_organization_id),
             None,
         )
-        if not organization:
-            raise ValueError("所选组织不存在，请重新选择")
+        if not course_organization:
+            raise ValueError("所选课程所属不存在，请重新选择")
+        settlement_organization = next(
+            (item for item in organizations if item.id == settlement_organization_id),
+            None,
+        )
+        if not settlement_organization:
+            raise ValueError("所选所属组织不存在，请重新选择")
         deduction_count = option["deduction_count"]
         from app.services import membership_card_service
 
@@ -650,6 +677,16 @@ def create_coarse_door_course_deduction(
             membership_card_service.release_coarse_card_assignment(customer_id, activity_keys)
             raise ValueError("客户不存在")
         now = datetime.now(timezone.utc)
+        valid_closers = [
+            {
+                "id": str(item.get("id") or ""),
+                "name": str(item.get("name") or "").strip(),
+                "amount": 0,
+            }
+            for item in closers
+            if str(item.get("name") or "").strip()
+        ]
+        primary_closer = valid_closers[0] if valid_closers else {}
         deduction = ProjectDeduction(
             id=str(uuid.uuid4())[:12],
             customer_id=customer_id,
@@ -659,17 +696,23 @@ def create_coarse_door_course_deduction(
             project_name=COARSE_DOOR_CARD_TYPE,
             count=deduction_count,
             reason=f'粗门次卡抵扣：{option["date"]} {option["name"]}，返还原会员卡{deduction_count}次',
+            notes=notes.strip(),
             created_by=created_by,
             updated_by=created_by,
-            deduction_date=option["date"],
+            closer_id=primary_closer.get("id", ""),
+            closer_name=primary_closer.get("name", ""),
+            closers=valid_closers,
+            organization_id=settlement_organization.id,
+            organization_name=settlement_organization.name,
+            deduction_date=deal_date or option["date"],
             remaining_after=None,
             source_activity_type=option["record_type"],
             source_activity_id=option["record_id"],
             source_activity_key=",".join(activity_keys),
             source_activity_name=option["name"],
             source_activity_date=option["date"],
-            source_organization_id=organization.id,
-            source_organization_name=organization.name,
+            source_organization_id=course_organization.id,
+            source_organization_name=course_organization.name,
             source_space_id=option["space_id"],
             source_space_name=option["space_name"],
             created_at=now,

@@ -1,0 +1,144 @@
+<view class="page">
+  <view class="top-card">
+    <view class="tabs">
+      <view class="tab {{activeTab === 'courses' ? 'active' : ''}}" data-tab="courses" bindtap="onTabTap">课程记录</view>
+      <view class="tab {{activeTab === 'follow-ups' ? 'active' : ''}}" data-tab="follow-ups" bindtap="onTabTap">跟进记录</view>
+    </view>
+
+    <view class="filter-row">
+      <text class="filter-label">服务老师</text>
+      <picker class="filter-picker" mode="selector" range="{{teachers}}" range-key="name" value="{{teacherIndex}}" bindchange="onTeacherChange">
+        <view class="picker-value">{{teacherName || '请选择'}}<text class="picker-arrow">⌄</text></view>
+      </picker>
+    </view>
+
+    <block wx:if="{{activeTab === 'courses'}}">
+      <view class="filter-row">
+        <text class="filter-label">课程类型</text>
+        <picker class="filter-picker" mode="selector" range="{{courseTypes}}" range-key="label" value="{{courseTypeIndex}}" bindchange="onCourseTypeChange">
+          <view class="picker-value">{{courseTypes[courseTypeIndex].label}}<text class="picker-arrow">⌄</text></view>
+        </picker>
+      </view>
+      <view class="filter-row align-start">
+        <text class="filter-label">快捷时间</text>
+        <view class="course-presets">
+          <view
+            class="course-preset {{courseRangePreset === item.value ? 'active' : ''}}"
+            wx:for="{{courseRangePresets}}"
+            wx:key="value"
+            data-value="{{item.value}}"
+            bindtap="onCourseRangePresetTap"
+          >{{item.label}}</view>
+        </view>
+      </view>
+      <view class="filter-row align-start">
+        <text class="filter-label">时间</text>
+        <view class="date-range">
+          <picker class="date-picker" mode="date" value="{{courseDateFrom}}" end="{{courseDateTo}}" bindchange="onDateFromChange">
+            <view class="date-value {{courseDateFrom ? '' : 'placeholder'}}">{{courseDateFrom || '选择日期'}}</view>
+          </picker>
+          <text class="date-separator">至</text>
+          <picker class="date-picker" mode="date" value="{{courseDateTo}}" start="{{courseDateFrom}}" bindchange="onDateToChange">
+            <view class="date-value {{courseDateTo ? '' : 'placeholder'}}">{{courseDateTo || '选择日期'}}</view>
+          </picker>
+        </view>
+      </view>
+    </block>
+
+    <block wx:else>
+      <view class="filter-row">
+        <text class="filter-label">包含</text>
+        <view class="definition-group">
+          <view class="definition-option {{includeCustomerInfo ? 'active' : ''}}" data-definition="customer_info" bindtap="onDefinitionTap">
+            <view class="check-box">{{includeCustomerInfo ? '✓' : ''}}</view><text>客户信息</text>
+          </view>
+          <view class="definition-option {{includeFollowUp ? 'active' : ''}}" data-definition="follow_up" bindtap="onDefinitionTap">
+            <view class="check-box">{{includeFollowUp ? '✓' : ''}}</view><text>跟进点</text>
+          </view>
+        </view>
+      </view>
+      <view class="filter-row">
+        <text class="filter-label">范围</text>
+        <view class="days-field">
+          <input class="days-input" type="number" value="{{followUpDays}}" bindblur="onFollowUpDaysChange" bindconfirm="onFollowUpDaysChange" />
+          <text class="days-unit">天</text>
+        </view>
+        <picker class="filter-picker follow-filter-picker" mode="selector" range="{{followUpFilters}}" range-key="label" value="{{followUpFilterIndex}}" bindchange="onFollowUpFilterChange">
+          <view class="picker-value">{{followUpFilters[followUpFilterIndex].label}}<text class="picker-arrow">⌄</text></view>
+        </picker>
+      </view>
+    </block>
+  </view>
+
+  <view class="summary-card" wx:if="{{summaryCards.length}}">
+    <view class="summary-item" wx:for="{{summaryCards}}" wx:key="label">
+      <text class="summary-label">{{item.label}}</text>
+      <view><text class="summary-value">{{item.value}}</text><text class="summary-unit">{{item.unit}}</text></view>
+    </view>
+  </view>
+
+  <view class="records-card">
+    <view class="records-head">
+      <text class="records-title">{{activeTab === 'courses' ? '课程列表' : '客户列表'}}</text>
+      <view class="records-actions">
+        <button class="outline-button" loading="{{exporting}}" disabled="{{exporting}}" bindtap="onExport">导出</button>
+        <button class="outline-button" wx:if="{{activeTab === 'follow-ups'}}" bindtap="onToggleContent">{{contentExpanded ? '缩略' : '展开'}}</button>
+      </view>
+    </view>
+
+    <view class="loading" wx:if="{{loading}}">加载中...</view>
+    <view class="empty" wx:elif="{{activeTab === 'courses' && courseRecords.length === 0}}">暂无课程记录</view>
+    <view class="empty" wx:elif="{{activeTab === 'follow-ups' && followUpRecords.length === 0}}">暂无客户记录</view>
+
+    <block wx:elif="{{activeTab === 'courses'}}">
+      <view class="course-record" wx:for="{{courseRecords}}" wx:key="id">
+        <view class="record-primary">
+          <text class="course-name">{{item.name || '—'}}</text>
+          <text class="course-type">{{item.activity_type_label || '—'}}</text>
+        </view>
+        <view class="record-meta"><text>{{item.date}}</text><text>{{item.timeText}}</text><text>{{item.class_hours}}课时</text></view>
+        <view class="teacher-line"><text class="detail-label">老师/成就君</text><text class="detail-value">{{item.teacherText}}</text></view>
+        <view class="participant-summary"><text>参与 {{item.participant_count}}人</text><text>新人 {{item.new_count}}人</text><text>老人 {{item.old_count}}人</text></view>
+        <view class="name-line">
+          <text class="detail-label">新人名单</text>
+          <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+          <text class="empty-dash" wx:else>—</text>
+        </view>
+        <view class="name-line">
+          <text class="detail-label">老人名单</text>
+          <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+          <text class="empty-dash" wx:else>—</text>
+        </view>
+      </view>
+    </block>
+
+    <block wx:else>
+      <view class="follow-record" wx:for="{{followUpRecords}}" wx:key="id" data-id="{{item.id}}" bindtap="onCustomerTap">
+        <view class="record-primary">
+          <text class="customer-name">{{item.displayName}}</text>
+          <text class="distance {{item.isActive ? '' : 'overdue'}}">{{item.distanceText}}</text>
+        </view>
+        <view class="record-meta"><text>{{item.member_type || '—'}}</text><text>{{item.follow_up_status || '未配置'}}</text><text>{{item.lastAtText || '暂无录入'}}</text></view>
+        <view class="note-block">
+          <text class="note-title">最近客户信息</text>
+          <view class="note-entry" wx:if="{{item.latest_customer_info_content}}">
+            <text class="note-author">{{item.latest_customer_info_by || '未知'}}</text>
+            <text class="note-content {{contentExpanded ? 'expanded' : ''}}">{{item.latest_customer_info_content}}</text>
+          </view>
+          <text class="empty-dash" wx:else>—</text>
+          <text class="note-time" wx:if="{{item.customerInfoAtText}}">{{item.customerInfoAtText}}</text>
+        </view>
+        <view class="note-block">
+          <text class="note-title">最近跟进点</text>
+          <view class="note-entry" wx:if="{{item.latest_follow_up_content}}">
+            <text class="note-author">{{item.latest_follow_up_by || '未知'}}</text>
+            <text class="note-content {{contentExpanded ? 'expanded' : ''}}">{{item.latest_follow_up_content}}</text>
+          </view>
+          <text class="empty-dash" wx:else>—</text>
+          <text class="note-time" wx:if="{{item.followUpAtText}}">{{item.followUpAtText}}</text>
+        </view>
+      </view>
+      <view class="load-more" wx:if="{{followUpHasMore}}">继续上拉加载</view>
+    </block>
+  </view>
+</view>

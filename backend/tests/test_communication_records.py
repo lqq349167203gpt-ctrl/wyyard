@@ -3,6 +3,38 @@
 import uuid
 
 
+def test_customer_rename_preserves_communication_identity(client, created_customer):
+    old_name = created_customer["nickname"]
+    response = client.post("/api/communication-records", json={
+        "customer_nickname": old_name, "content": "改名后仍属于原客户",
+    })
+    assert response.status_code == 200
+    record = response.json()
+    assert record["customer_id"] == created_customer["id"]
+    new_name = f"改名_{uuid.uuid4().hex[:10]}"
+    assert client.patch(f"/api/customers/{created_customer['id']}", json={"nickname": new_name}).status_code == 200
+    records = client.get("/api/communication-records", params={"customer_nickname": new_name}).json()
+    assert any(item["id"] == record["id"] and item["customer_nickname"] == new_name for item in records)
+    replacement = client.post("/api/customers", json={"nickname": old_name}).json()
+    assert replacement["id"] != created_customer["id"]
+    assert client.get("/api/communication-records", params={"customer_nickname": old_name}).json() == []
+    assert client.delete(f"/api/communication-records/{record['id']}").status_code == 200
+
+
+def test_legacy_communication_is_bound_before_rename(client, created_customer):
+    from app.models.communication_record import CommunicationRecordCreate
+    from app.services import communication_record_service
+
+    record = communication_record_service.create_record(CommunicationRecordCreate(
+        customer_nickname=created_customer["nickname"], content="旧版记录",
+    ))
+    new_name = f"旧客户改名_{uuid.uuid4().hex[:8]}"
+    assert client.patch(f"/api/customers/{created_customer['id']}", json={"nickname": new_name}).status_code == 200
+    updated = communication_record_service.get_record(record.id)
+    assert updated.customer_id == created_customer["id"]
+    assert updated.customer_nickname == new_name
+
+
 def test_only_creator_can_delete_and_log_keeps_snapshot(client, created_customer):
     content = f"测试沟通内容_{uuid.uuid4().hex[:8]}"
     created = client.post("/api/communication-records", json={

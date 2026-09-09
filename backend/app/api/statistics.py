@@ -1836,6 +1836,7 @@ def _course_teacher_hours_in_range(date_from: str, date_to: str) -> dict[str, in
 def get_course_statistics(
     date_from: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
+    all_dates: bool = Query(False, description="是否查询全部课程日期"),
     granularity: str = Query("day", description="时间单位: day/week/month"),
     organization_id: str | None = Query(None, description="所属组织 ID"),
     activity_type: str | None = Query(None, description="活动类型编码"),
@@ -1844,7 +1845,27 @@ def get_course_statistics(
     request: Request = None,
 ):
     """获取课程数、课时数及参与人数统计。"""
-    date_from, date_to = _get_date_range(date_from, date_to)
+    all_dates = all_dates if isinstance(all_dates, bool) else False
+    if all_dates:
+        activities_by_type = {
+            type_key: list(loader())
+            for type_key, _label, loader in COURSE_ACTIVITY_TYPES
+        }
+        activity_dates = [
+            activity.date
+            for activities in activities_by_type.values()
+            for activity in activities
+            if getattr(activity, "date", "")
+        ]
+        today = datetime.now().strftime("%Y-%m-%d")
+        date_from = min(activity_dates, default=today)
+        date_to = max(activity_dates, default=today)
+    else:
+        date_from, date_to = _get_date_range(date_from, date_to)
+        activities_by_type = {
+            type_key: list(loader(start_date=date_from, end_date=date_to))
+            for type_key, _label, loader in COURSE_ACTIVITY_TYPES
+        }
     if granularity not in {"day", "week", "month"}:
         granularity = "day"
     organization_filter = (_normalize_query_str(organization_id) or "").strip()
@@ -1904,11 +1925,6 @@ def get_course_statistics(
         for key, _label, _loader in COURSE_ACTIVITY_TYPES
         if not activity_type or activity_type == "all" or key == activity_type
     }
-    activities_by_type = {
-        type_key: list(loader(start_date=date_from, end_date=date_to))
-        for type_key, _label, loader in COURSE_ACTIVITY_TYPES
-    }
-
     def _matches_organization(type_key: str, activity) -> bool:
         activity_organization_ids = _course_activity_organization_ids(
             type_key,
@@ -2192,6 +2208,13 @@ def get_course_statistics(
     )
     for transaction_teacher_id, amount in teacher_transaction_amounts.items():
         teacher_statistics[transaction_teacher_id]["transaction_amount"] = round(amount, 2)
+
+    if request and "service-teachers" in request.headers.get("x-page-path", ""):
+        from app.api.service_teacher_customers import record_service_teacher_action
+        selected_teacher = customer_map.get(teacher_id)
+        teacher_name = getattr(selected_teacher, "nickname", "") or getattr(selected_teacher, "name", "") or "全部"
+        type_name = next((label for key, label, _ in COURSE_ACTIVITY_TYPES if key == activity_type), "全部课程")
+        record_service_teacher_action(request, f"查询课程记录：老师 {teacher_name}；课程类型 {type_name}；{date_from} 至 {date_to}；共{len(course_rows)}场")
 
     return {
         "date_from": date_from,

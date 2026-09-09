@@ -213,18 +213,10 @@ Page({
     exportDateTo: TODAY,
     exportRangeSummary: CURRENT_MONTH + '-01 至 ' + getMonthEnd(CURRENT_MONTH),
     isCoarseDoorTab: false,
-    coarseCustomers: [],
-    coarseCustomerKeyword: '',
-    coarseCustomerResults: [],
-    coarseCustomerSearchOpen: false,
-    coarseCustomerIndex: -1,
-    coarseOrganizations: [],
-    coarseOrganizationIndex: -1,
-    coarseCourses: [],
-    coarseCourseIndex: -1,
     coarseRecords: [],
-    coarseSubmitting: false,
     coarseDeletingId: '',
+    coarseEntryVisible: false,
+    coarseEntryPickerOpen: false,
   },
 
   onLoad(options = {}) {
@@ -234,7 +226,6 @@ Page({
       return
     }
     const requestedType = options.type || ''
-    this._presetCoarseCustomerId = options.customerId || ''
     const requestedIndex = TABS.findIndex(tab => tab.key === requestedType)
     const activeTab = requestedIndex >= 0 ? requestedIndex : 0
     const searchMode = options.search === '1'
@@ -284,6 +275,8 @@ Page({
       subtypeField: subtypeConfig ? subtypeConfig.field : '',
       subtypeList: [],
       isCoarseDoorTab: TABS[index].key === 'coarse_door_card',
+      coarseEntryVisible: false,
+      coarseEntryPickerOpen: false,
     }, () => {
       this.updateFilterCount()
       this.loadItems()
@@ -354,156 +347,33 @@ Page({
   },
 
   async loadCoarseDoorData() {
-    const [customers, records] = await Promise.all([
-      customerApi.light(1000),
-      paymentApi.deductions.list({ project_type: 'membership-cards', card_type: '粗门次卡' }),
-    ])
-    const coarseCustomers = Array.isArray(customers) ? customers : []
+    const records = await paymentApi.deductions.list({ project_type: 'membership-cards', card_type: '粗门次卡' })
     this.setData({
-      coarseCustomers,
-      coarseCustomerResults: this.filterCoarseCustomers(coarseCustomers, this.data.coarseCustomerKeyword),
-      coarseRecords: (Array.isArray(records) ? records : (records.items || [])).map(record => Object.assign({}, record, {
-        _canDelete: canEditRecord(record, 'payments'),
-      })),
-    }, () => {
-      if (!this._presetCoarseCustomerId) return
-      const customerId = this._presetCoarseCustomerId
-      this._presetCoarseCustomerId = ''
-      this.onCoarseCustomerSelect({ currentTarget: { dataset: { id: customerId } } })
+      coarseRecords: (Array.isArray(records) ? records : (records.items || []))
+        .map(record => Object.assign({}, record, { _canDelete: canEditRecord(record, 'payments') }))
+        .sort((a, b) => (
+          String(b.deduction_date || b.created_at || '').localeCompare(String(a.deduction_date || a.created_at || ''))
+          || String(b.created_at || '').localeCompare(String(a.created_at || ''))
+        )),
     })
   },
 
-  filterCoarseCustomers(customers, keyword) {
-    const normalizedKeyword = String(keyword || '').trim().toLowerCase()
-    return customers
-      .filter(customer => (
-        !normalizedKeyword
-        || String(customer.nickname || '').toLowerCase().includes(normalizedKeyword)
-        || String(customer.name || '').toLowerCase().includes(normalizedKeyword)
-      ))
+  onCoarseEntryOpen() {
+    this.setData({ coarseEntryVisible: true, coarseEntryPickerOpen: false })
   },
 
-  onCoarseCustomerPickerOpen() {
-    this.setData({
-      coarseCustomerSearchOpen: true,
-      coarseCustomerKeyword: '',
-      coarseCustomerResults: this.data.coarseCustomers,
-    })
+  onCoarseEntryClose() {
+    if (this.data.coarseEntryPickerOpen) return
+    this.setData({ coarseEntryVisible: false, coarseEntryPickerOpen: false })
   },
 
-  onCoarseCustomerPickerClose() {
-    this.setData({
-      coarseCustomerSearchOpen: false,
-      coarseCustomerKeyword: '',
-      coarseCustomerResults: [],
-    })
+  onCoarseEntryPickerState(e) {
+    this.setData({ coarseEntryPickerOpen: Boolean(e.detail && e.detail.open) })
   },
 
-  onCoarseCustomerSearch(e) {
-    const keyword = e.detail.value || ''
-    this.setData({
-      coarseCustomerKeyword: keyword,
-      coarseCustomerResults: this.filterCoarseCustomers(this.data.coarseCustomers, keyword),
-    })
-  },
-
-  onCoarseCustomerClear() {
-    this._coarseAllCourses = []
-    this.setData({
-      coarseCustomerKeyword: '',
-      coarseCustomerResults: [],
-      coarseCustomerSearchOpen: false,
-      coarseCustomerIndex: -1,
-      coarseOrganizations: [],
-      coarseOrganizationIndex: -1,
-      coarseCourses: [],
-      coarseCourseIndex: -1,
-    })
-  },
-
-  async onCoarseCustomerSelect(e) {
-    const customerId = e.currentTarget.dataset.id
-    const index = this.data.coarseCustomers.findIndex(customer => customer.id === customerId)
-    const customer = this.data.coarseCustomers[index]
-    if (!customer) return
-    this.setData({
-      coarseCustomerKeyword: '',
-      coarseCustomerResults: [],
-      coarseCustomerSearchOpen: false,
-      coarseCustomerIndex: index,
-      coarseOrganizations: [],
-      coarseOrganizationIndex: -1,
-      coarseCourses: [],
-      coarseCourseIndex: -1,
-    })
-    wx.showLoading({ title: '加载课程' })
-    try {
-      const result = await paymentApi.deductions.coarseDoorOptions(customer.id)
-      const organizations = result.organizations || []
-      const courses = (result.courses || []).map(item => Object.assign({}, item, {
-        _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
-      }))
-      this._coarseAllCourses = courses
-      this.setData({
-        coarseOrganizations: organizations,
-        coarseOrganizationIndex: organizations.length === 1 ? 0 : -1,
-        coarseCourses: organizations.length === 1
-          ? courses.filter(item => (item.organization_ids || []).includes(organizations[0].id))
-          : [],
-      })
-    } catch (error) {
-      wx.showToast({ title: (error && error.message) || '课程加载失败', icon: 'none' })
-    } finally {
-      wx.hideLoading()
-    }
-  },
-
-  onCoarseOrganizationChange(e) {
-    const index = Number(e.detail.value)
-    const organization = this.data.coarseOrganizations[index]
-    this.setData({
-      coarseOrganizationIndex: index,
-      coarseCourses: organization
-        ? (this._coarseAllCourses || []).filter(item => (item.organization_ids || []).includes(organization.id))
-        : [],
-      coarseCourseIndex: -1,
-    })
-  },
-
-  onCoarseCourseChange(e) {
-    this.setData({ coarseCourseIndex: Number(e.detail.value) })
-  },
-
-  async onCoarseSubmit() {
-    const customer = this.data.coarseCustomers[this.data.coarseCustomerIndex]
-    const course = this.data.coarseCourses[this.data.coarseCourseIndex]
-    if (!customer || !course || this.data.coarseSubmitting) return
-    this.setData({ coarseSubmitting: true })
-    try {
-      await paymentApi.deductions.createCoarseDoorCourse({
-        customer_id: customer.id,
-        record_type: course.record_type,
-        record_id: course.record_id,
-        organization_id: this.data.coarseOrganizations[this.data.coarseOrganizationIndex].id,
-      })
-      wx.showToast({ title: '抵扣成功', icon: 'success' })
-      const result = await paymentApi.deductions.coarseDoorOptions(customer.id)
-      const organizations = result.organizations || []
-      this._coarseAllCourses = (result.courses || []).map(item => Object.assign({}, item, {
-        _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
-      }))
-      this.setData({
-        coarseOrganizations: organizations,
-        coarseOrganizationIndex: -1,
-        coarseCourses: [],
-        coarseCourseIndex: -1,
-      })
-      await this.loadCoarseDoorData()
-    } catch (error) {
-      wx.showToast({ title: (error && error.message) || '抵扣失败', icon: 'none' })
-    } finally {
-      this.setData({ coarseSubmitting: false })
-    }
+  onCoarseEntrySuccess() {
+    this.setData({ coarseEntryVisible: false, coarseEntryPickerOpen: false })
+    this.loadCoarseDoorData()
   },
 
   onCoarseDeleteTap(e) {
@@ -520,27 +390,8 @@ Page({
         if (!result.confirm) return
         this.setData({ coarseDeletingId: deductionId })
         try {
-          const selectedCustomer = this.data.coarseCustomers[this.data.coarseCustomerIndex]
           await paymentApi.deductions.delete(deductionId)
           await this.loadCoarseDoorData()
-          if (selectedCustomer && selectedCustomer.id === record.customer_id) {
-            const refreshedIndex = this.data.coarseCustomers.findIndex(item => item.id === selectedCustomer.id)
-            const options = await paymentApi.deductions.coarseDoorOptions(selectedCustomer.id)
-            const organizations = options.organizations || []
-            const courses = (options.courses || []).map(item => Object.assign({}, item, {
-              _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
-            }))
-            this._coarseAllCourses = courses
-            this.setData({
-              coarseCustomerIndex: refreshedIndex,
-              coarseOrganizations: organizations,
-              coarseOrganizationIndex: organizations.length === 1 ? 0 : -1,
-              coarseCourses: organizations.length === 1
-                ? courses.filter(item => (item.organization_ids || []).includes(organizations[0].id))
-                : [],
-              coarseCourseIndex: -1,
-            })
-          }
           wx.showToast({ title: '已删除', icon: 'success' })
         } catch (error) {
           wx.showToast({ title: (error && error.message) || '删除失败', icon: 'none' })

@@ -156,6 +156,11 @@ Component({
     allCustomers: [],
     organizations: [],
     orgIndex: 0,
+    coarseCourseOrganizations: [],
+    coarseCourseOrganizationIndex: -1,
+    coarseCourses: [],
+    coarseCourseIndex: -1,
+    coarseOptionsLoading: false,
   },
 
   observers: {
@@ -231,6 +236,21 @@ Component({
 
     _buildConfirmRows() {
       const { type, formData, selectedCustomer, closers, organizations, orgIndex } = this.data
+      if (type === 'coarse_door_card') {
+        const settlementOrganization = organizations[orgIndex]
+        const courseOrganization = this.data.coarseCourseOrganizations[this.data.coarseCourseOrganizationIndex]
+        const course = this.data.coarseCourses[this.data.coarseCourseIndex]
+        return [
+          { label: '成交日期', value: formData.deal_date || '-' },
+          { label: '用户', value: selectedCustomer ? selectedCustomer.nickname : '-' },
+          { label: '课程所属', value: courseOrganization ? courseOrganization.name : '-' },
+          { label: '所扣课程', value: course ? course._label : '-' },
+          { label: '抵扣次数', value: course ? `${course.deduction_count}次` : '-' },
+          { label: '所属组织', value: settlementOrganization ? settlementOrganization.name : '-' },
+          { label: '成交人', value: closers.map(c => c.nickname).join('、') || '-' },
+          { label: '备注', value: formData.notes || '-' },
+        ]
+      }
       const hidePaymentDetails = true
       const rows = [
         { label: '成交日期', value: formData.deal_date || '-' },
@@ -306,6 +326,42 @@ Component({
           'formData.organization_id': this.data.formData.organization_id || defaultOrgId,
         })
       }).catch(() => {})
+      if (this.data.type === 'coarse_door_card') {
+        const customer = this.data.presetCustomer || this.data.selectedCustomer
+        if (customer && customer.id) this._loadCoarseDoorOptions(customer.id)
+      }
+    },
+
+    _loadCoarseDoorOptions(customerId) {
+      if (!customerId || this._coarseOptionsCustomerId === customerId) return
+      this._coarseOptionsCustomerId = customerId
+      this.setData({
+        coarseOptionsLoading: true,
+        coarseCourseOrganizations: [],
+        coarseCourseOrganizationIndex: -1,
+        coarseCourses: [],
+        coarseCourseIndex: -1,
+      })
+      paymentApi.deductions.coarseDoorOptions(customerId).then(result => {
+        const courseOrganizations = result.course_organizations || result.organizations || []
+        const courses = (result.courses || []).map(item => Object.assign({}, item, {
+          _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
+        }))
+        const courseOrgIndex = courseOrganizations.length === 1 ? 0 : -1
+        this._coarseAllCourses = courses
+        this.setData({
+          coarseCourseOrganizations: courseOrganizations,
+          coarseCourseOrganizationIndex: courseOrgIndex,
+          coarseCourses: courseOrgIndex === 0
+            ? courses.filter(item => (item.organization_ids || []).includes(courseOrganizations[0].id))
+            : [],
+          coarseOptionsLoading: false,
+        })
+      }).catch(error => {
+        this._coarseOptionsCustomerId = ''
+        this.setData({ coarseOptionsLoading: false })
+        wx.showToast({ title: (error && error.message) || '课程加载失败', icon: 'none' })
+      })
     },
 
     _populateEditData(d) {
@@ -448,6 +504,7 @@ Component({
       if (field === 'customer') {
         this.setData({ selectedCustomer: { id, nickname }, 'formData.customer_id': id })
         this.onPickerClose()
+        if (this.data.type === 'coarse_door_card') this._loadCoarseDoorOptions(id)
       } else {
         // 成交人：添加到数组，不关闭弹窗
         const closers = this.data.closers
@@ -487,7 +544,16 @@ Component({
       const field = e.currentTarget.dataset.field
       if (field === 'customer') {
         if (this.data.presetCustomer && this.data.presetCustomer.id) return
-        this.setData({ selectedCustomer: null, 'formData.customer_id': '' })
+        this._coarseOptionsCustomerId = ''
+        this._coarseAllCourses = []
+        this.setData({
+          selectedCustomer: null,
+          'formData.customer_id': '',
+          coarseCourseOrganizations: [],
+          coarseCourseOrganizationIndex: -1,
+          coarseCourses: [],
+          coarseCourseIndex: -1,
+        })
       }
     },
 
@@ -528,6 +594,22 @@ Component({
         orgIndex: idx,
         'formData.organization_id': this.data.organizations[idx].id,
       })
+    },
+
+    onCoarseCourseOrganizationChange(e) {
+      const idx = parseInt(e.detail.value)
+      const organization = this.data.coarseCourseOrganizations[idx]
+      this.setData({
+        coarseCourseOrganizationIndex: idx,
+        coarseCourses: organization
+          ? (this._coarseAllCourses || []).filter(item => (item.organization_ids || []).includes(organization.id))
+          : [],
+        coarseCourseIndex: -1,
+      })
+    },
+
+    onCoarseCourseChange(e) {
+      this.setData({ coarseCourseIndex: parseInt(e.detail.value) })
     },
 
     onCardTypeChange(e) {
@@ -674,6 +756,14 @@ Component({
       payload.closer_id = closers[0] ? (closers[0].id || null) : null
       payload.closer_name = closers[0] ? (closers[0].nickname || '') : null
       payload.closers = closers.map(c => ({ id: c.id || '', name: c.nickname || '', amount: 0 }))
+      if (isEdit && hidePaymentDetails) {
+        ;['price', 'amount', 'fee', 'payment_method'].forEach(key => delete payload[key])
+        const previous = (this.data.editData && this.data.editData.closers) || []
+        payload.closers = payload.closers.map(closer => {
+          const old = previous.find(item => closer.id ? item.id === closer.id : item.name === closer.name)
+          return Object.assign({}, closer, { amount: old ? old.amount : 0 })
+        })
+      }
       return payload
     },
 
@@ -683,6 +773,23 @@ Component({
       const hidePaymentDetails = true
       if (!selectedCustomer) {
         wx.showToast({ title: '请选择用户', icon: 'none' })
+        return
+      }
+      if (type === 'coarse_door_card') {
+        if (this.data.orgIndex < 0) {
+          wx.showToast({ title: '请选择所属组织', icon: 'none' })
+          return
+        }
+        if (this.data.coarseCourseOrganizationIndex < 0) {
+          wx.showToast({ title: '请选择课程所属', icon: 'none' })
+          return
+        }
+        if (this.data.coarseCourseIndex < 0) {
+          wx.showToast({ title: '请选择所扣课程', icon: 'none' })
+          return
+        }
+        this.setData({ confirmVisible: true, confirmRows: this._buildConfirmRows() })
+        this.triggerEvent('pickerstate', { open: true })
         return
       }
       if (!hidePaymentDetails && closers.length === 0) {
@@ -730,13 +837,30 @@ Component({
     _doSubmit() {
       if (this._submitting) return
       const { type, isEdit } = this.data
-      const payload = this._buildPayload()
       this._submitting = true
       this.setData({ submitting: true })
-      const api = paymentApi.getByType(type)
-      const action = isEdit ? api.update(this.data.editData.id, payload) : api.create(payload)
+      let action
+      if (type === 'coarse_door_card') {
+        const course = this.data.coarseCourses[this.data.coarseCourseIndex]
+        const settlementOrganization = this.data.organizations[this.data.orgIndex]
+        const courseOrganization = this.data.coarseCourseOrganizations[this.data.coarseCourseOrganizationIndex]
+        action = paymentApi.deductions.createCoarseDoorCourse({
+          customer_id: this.data.selectedCustomer.id,
+          record_type: course.record_type,
+          record_id: course.record_id,
+          course_organization_id: courseOrganization.id,
+          settlement_organization_id: settlementOrganization.id,
+          deal_date: this.data.formData.deal_date,
+          closers: this.data.closers.map(closer => ({ id: closer.id || '', name: closer.nickname || '', amount: 0 })),
+          notes: this.data.formData.notes || '',
+        })
+      } else {
+        const payload = this._buildPayload()
+        const api = paymentApi.getByType(type)
+        action = isEdit ? api.update(this.data.editData.id, payload) : api.create(payload)
+      }
       action.then(() => {
-        wx.showToast({ title: isEdit ? '已保存' : '已新增' })
+        wx.showToast({ title: type === 'coarse_door_card' ? '抵扣成功' : (isEdit ? '已保存' : '已新增') })
         this.triggerEvent('success')
       }).catch(err => {
         wx.showToast({ title: err.message || '操作失败', icon: 'none' })

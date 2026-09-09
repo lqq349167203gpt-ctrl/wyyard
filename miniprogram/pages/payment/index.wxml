@@ -1,4 +1,4 @@
-<page-meta page-style="{{showFilterPanel || coarseCustomerSearchOpen ? 'overflow:hidden;height:100vh;' : ''}}" />
+<page-meta page-style="{{showFilterPanel || coarseEntryVisible || coarseEntryPickerOpen ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
   <!-- 无权限 -->
   <view class="no-permission" wx:if="{{!hasPagePermission}}">
@@ -54,35 +54,13 @@
   </view>
 
   <view class="coarse-door" wx:if="{{isCoarseDoorTab}}">
-    <view class="coarse-card">
-      <view class="coarse-title">用粗门次卡抵扣课程</view>
-      <view class="coarse-desc">仅显示已参与且扣卡次数大于 0 的课程；抵扣后返还原会员卡的对应次数</view>
-      <view class="coarse-field" bindtap="onCoarseCustomerPickerOpen">
-        <text class="coarse-label">用户昵称</text>
-        <view class="coarse-customer-value">
-          <text class="coarse-picker {{coarseCustomerIndex < 0 ? 'placeholder' : ''}}">{{coarseCustomerIndex >= 0 ? coarseCustomers[coarseCustomerIndex].nickname : '选择客户'}}</text>
-          <text class="coarse-customer-clear" wx:if="{{coarseCustomerIndex >= 0}}" catchtap="onCoarseCustomerClear">×</text>
-        </view>
+    <view class="coarse-toolbar">
+      <text class="coarse-toolbar-caption">抵扣记录</text>
+      <view class="coarse-toolbar-button" bindtap="onCoarseEntryOpen">
+        <text class="coarse-toolbar-plus">＋</text>
+        <text>新增</text>
       </view>
-      <view class="coarse-field">
-        <text class="coarse-label">所属组织</text>
-        <picker mode="selector" range="{{coarseOrganizations}}" range-key="name" value="{{coarseOrganizationIndex}}" bindchange="onCoarseOrganizationChange" disabled="{{coarseCustomerIndex < 0}}">
-          <view class="coarse-picker {{coarseOrganizationIndex < 0 ? 'placeholder' : ''}}">
-            {{coarseOrganizationIndex >= 0 ? coarseOrganizations[coarseOrganizationIndex].name : '选择组织'}}
-          </view>
-        </picker>
-      </view>
-      <view class="coarse-field">
-        <text class="coarse-label">所扣课程</text>
-        <picker mode="selector" range="{{coarseCourses}}" range-key="_label" value="{{coarseCourseIndex}}" bindchange="onCoarseCourseChange" disabled="{{coarseOrganizationIndex < 0}}">
-          <view class="coarse-picker {{coarseCourseIndex < 0 ? 'placeholder' : ''}}">
-            {{coarseCourseIndex >= 0 ? coarseCourses[coarseCourseIndex]._label : '选择尚未扣除的课程'}}
-          </view>
-        </picker>
-      </view>
-      <button class="coarse-submit" bindtap="onCoarseSubmit" disabled="{{coarseCourseIndex < 0 || coarseSubmitting}}" loading="{{coarseSubmitting}}">{{coarseSubmitting ? '抵扣中' : (coarseCourseIndex >= 0 ? '抵扣 ' + coarseCourses[coarseCourseIndex].deduction_count + ' 次' : '确认抵扣')}}</button>
     </view>
-    <view class="coarse-list-title">抵扣记录</view>
     <view class="coarse-record" wx:for="{{coarseRecords}}" wx:key="id">
       <view class="coarse-record-main">
         <text class="coarse-record-name">{{item.nickname}}</text>
@@ -92,29 +70,25 @@
         </view>
       </view>
       <text class="coarse-record-course">{{item.source_activity_name || item.reason}}</text>
-      <text class="coarse-record-meta">{{item.source_activity_date || item.deduction_date}}<text wx:if="{{item.source_organization_name}}"> · {{item.source_organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
+      <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}<text wx:if="{{item.source_activity_date}}"> · 课程日期：{{item.source_activity_date}}</text><text wx:if="{{item.organization_name}}"> · 所属组织：{{item.organization_name}}</text><text wx:if="{{item.source_organization_name}}"> · 课程所属：{{item.source_organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
     </view>
     <view class="empty" wx:if="{{!loading && coarseRecords.length === 0}}"><text class="empty-text">暂无粗门次卡抵扣记录</text></view>
   </view>
 
-  <!-- 用户选择：与新增付费项目保持一致，点击字段后在弹层内搜索昵称 -->
-  <view class="coarse-picker-mask" wx:if="{{coarseCustomerSearchOpen}}" bindtap="onCoarseCustomerPickerClose"></view>
-  <view class="coarse-picker-popup" wx:if="{{coarseCustomerSearchOpen}}">
-    <view class="coarse-picker-head">
-      <text class="coarse-picker-title">选择用户</text>
-      <text class="coarse-picker-close" bindtap="onCoarseCustomerPickerClose">关闭</text>
-    </view>
-    <view class="coarse-picker-search">
-      <input class="coarse-picker-input" placeholder="搜索姓名或昵称" value="{{coarseCustomerKeyword}}" bindinput="onCoarseCustomerSearch" focus="{{coarseCustomerSearchOpen}}" />
-    </view>
-    <scroll-view class="coarse-picker-list" scroll-y>
-      <view class="coarse-picker-item" wx:for="{{coarseCustomerResults}}" wx:key="id" bindtap="onCoarseCustomerSelect" data-id="{{item.id}}">
-        <text>{{item.nickname}}</text>
+  <view class="payment-entry-mask" wx:if="{{coarseEntryVisible}}" bindtap="onCoarseEntryClose">
+    <view class="payment-entry-panel" catchtap="stopPropagation">
+      <view class="payment-entry-head">
+        <text class="payment-entry-title">新增粗门次卡</text>
+        <text class="payment-entry-close" bindtap="onCoarseEntryClose">关闭</text>
       </view>
-      <view class="coarse-picker-empty" wx:if="{{coarseCustomerResults.length === 0}}">
-        <text>无匹配用户</text>
-      </view>
-    </scroll-view>
+      <scroll-view class="payment-entry-body" scroll-y>
+        <payment-form
+          type="coarse_door_card"
+          bind:success="onCoarseEntrySuccess"
+          bind:pickerstate="onCoarseEntryPickerState"
+        />
+      </scroll-view>
+    </view>
   </view>
 
   <view class="dropdown-panel" wx:if="{{showFilterPanel}}">

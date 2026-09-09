@@ -8,6 +8,15 @@ def _u():
     return uuid.uuid4().hex[:12]
 
 
+def _participants(client, count):
+    ids = []
+    for _ in range(count):
+        response = client.post("/api/customers", json={"nickname": f"参与者_{_u()}"})
+        assert response.status_code == 200
+        ids.append(response.json()["id"])
+    return ids
+
+
 @pytest.fixture
 def bypass_owner_invitation_validation(monkeypatch):
     """这些穷举用例只验证场次字段；邀约规则由专项规则测试覆盖。"""
@@ -350,7 +359,7 @@ class TestGroupCaseSessionFull:
             "date": "2026-08-05",
             "owner_id": created_customer["id"],
             "owner_name": created_customer["nickname"],
-            "participant_ids": ["p1", "p2", "p3"],
+            "participant_ids": _participants(client, 3),
         })
         assert resp.status_code == 200
         assert len(resp.json()["participant_ids"]) == 3
@@ -383,7 +392,7 @@ class TestGroupCaseSessionFull:
             "owner_id": created_customer["id"],
             "owner_name": created_customer["nickname"],
             "description": "完整场次",
-            "participant_ids": ["p1"],
+            "participant_ids": _participants(client, 1),
             "achiever_id": "a1",
             "achiever_name": "成就君",
             "host_id": "h1",
@@ -410,7 +419,7 @@ class TestGroupCaseSessionFull:
             "owner_name": created_customer["nickname"],
         })
         sid = resp.json()["id"]
-        resp = client.patch(f"/api/group-case-sessions/{sid}", json={"participant_ids": ["new1", "new2"]})
+        resp = client.patch(f"/api/group-case-sessions/{sid}", json={"participant_ids": _participants(client, 2)})
         assert resp.status_code == 200
 
     def test_update_nonexistent(self, client):
@@ -496,7 +505,7 @@ class TestEmotionalReleaseSessionFull:
             "date": "2026-08-05",
             "owner_id": created_customer["id"],
             "owner_name": created_customer["nickname"],
-            "participant_ids": ["p1", "p2"],
+            "participant_ids": _participants(client, 2),
         })
         assert resp.status_code == 200
 
@@ -633,7 +642,7 @@ class TestEnergyKnotSessionFull:
             "date": "2026-08-04",
             "owner_id": created_customer["id"],
             "owner_name": created_customer["nickname"],
-            "participant_ids": ["p1", "p2", "p3"],
+            "participant_ids": _participants(client, 3),
         })
         assert resp.status_code == 200
 
@@ -824,7 +833,7 @@ class TestInternalCourseSessionFull:
             "date": "2026-08-05",
             "course_type": "疗愈师课程",
             "course_name": "参与测试",
-            "participant_ids": ["p1", "p2"],
+            "participant_ids": _participants(client, 2),
         })
         assert resp.status_code == 200
 
@@ -850,7 +859,7 @@ class TestInternalCourseSessionFull:
             "course_description": "完整描述",
             "host_ids": ["h1"],
             "host_names": ["老师"],
-            "participant_ids": ["p1", "p2"],
+            "participant_ids": _participants(client, 2),
             "space_id": "s1",
             "room_id": "r1",
         })
@@ -884,7 +893,7 @@ class TestInternalCourseSessionFull:
             "course_name": "参与更新",
         })
         sid = resp.json()["id"]
-        resp = client.patch(f"/api/internal-course-sessions/{sid}", json={"participant_ids": ["new1"]})
+        resp = client.patch(f"/api/internal-course-sessions/{sid}", json={"participant_ids": _participants(client, 1)})
         assert resp.status_code == 200
 
     def test_update_nonexistent(self, client):

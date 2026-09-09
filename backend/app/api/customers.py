@@ -22,8 +22,10 @@ from app.services import (
     internal_course_service,
     member_identity_service,
     membership_card_service,
+    offline_course_service,
     oh_card_reading_service,
     other_project_service,
+    project_deduction_service,
     project_refund_service,
     tea_seat_fee_service,
 )
@@ -90,11 +92,33 @@ def _fill_total_payment(customer_id: str) -> float:
     return max(total, 0)
 
 
+def _build_transaction_counts() -> dict[str, int]:
+    """与客户详情交易记录一致：每条交易记一笔，包含零金额及粗门抵扣记录。"""
+    from collections import Counter
+
+    counts = Counter()
+    for records in (
+        membership_card_service.list_cards(), group_case_service.list_cases(),
+        emotional_release_service.list_releases(), energy_knot_service.list_knots(),
+        internal_course_service.list_courses(), oh_card_reading_service.list_readings(),
+        offline_course_service.list_courses(), tea_seat_fee_service.list_fees(),
+        other_project_service.list_projects(),
+    ):
+        counts.update(record.customer_id for record in records)
+    counts.update(
+        record.customer_id
+        for record in project_deduction_service.list_deductions(project_type="membership-cards")
+        if record.project_name == project_deduction_service.COARSE_DOOR_CARD_TYPE
+    )
+    return dict(counts)
+
+
 def _build_enriched_items(customers) -> list[dict]:
     """批量构建客户列表，一次性扫描所有项目，避免 N*7 次全表扫描"""
     from collections import defaultdict
 
     payment_map: dict[str, float] = defaultdict(float)
+    transaction_counts = _build_transaction_counts()
 
     # 会员卡（作废卡仍计入消费总额，退费由 refund 记录扣除）
     for c in membership_card_service.list_cards():
@@ -142,6 +166,7 @@ def _build_enriched_items(customers) -> list[dict]:
         data["visit_count"] = count_customer_visits(c.id)
         data["activity_count"] = _count_customer_activities(c.id)
         data["total_payment"] = max(payment_map.get(c.id, 0), 0)
+        data["transaction_count"] = transaction_counts.get(c.id, 0)
         data["last_visit_date"] = get_last_visit_date(c.id)
         data["card_remaining"] = remaining_map.get(c.id)
         items.append(data)
@@ -157,8 +182,8 @@ def _fill_visit_count(customer):
     return data
 
 
-_SORTABLE_FIELDS = {"member_type", "visit_count", "activity_count", "total_payment", "last_visit_date", "created_at", "referral_date"}
-_NUMERIC_SORT_FIELDS = {"visit_count", "activity_count", "total_payment"}
+_SORTABLE_FIELDS = {"member_type", "visit_count", "activity_count", "total_payment", "transaction_count", "last_visit_date", "created_at", "referral_date"}
+_NUMERIC_SORT_FIELDS = {"visit_count", "activity_count", "total_payment", "transaction_count"}
 
 
 def _sort_customer_items(items: list[dict], sort_by: str, sort_order: str | None) -> None:
@@ -271,7 +296,7 @@ async def list_customers(
     # Sort
     role = get_request_roles(request)
     can_view_payment = customer_access_service.can_view_transaction_summary(role)
-    if sort_by and sort_by in _SORTABLE_FIELDS and (sort_by != "total_payment" or can_view_payment):
+    if sort_by and sort_by in _SORTABLE_FIELDS and (sort_by not in {"total_payment", "transaction_count"} or can_view_payment):
         _sort_customer_items(items, sort_by, sort_order)
     else:
         items.sort(key=lambda c: c.get("created_at", ""), reverse=True)
@@ -281,6 +306,7 @@ async def list_customers(
         protected = customer_access_service.protect_sensitive_data(item, role)
         if not can_view_payment:
             protected["total_payment"] = None
+            protected["transaction_count"] = None
         protected_items.append(customer_contact_service.protect_customer_data(protected, role))
     items = protected_items
 

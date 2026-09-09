@@ -648,12 +648,25 @@ def _build_activities(
             if v.arrived
         }
     coarse_deduction_counts: dict[str, int] = {}
+    usage_labels: dict[str, dict[str, int]] = {}
     for usage in membership_card_service.list_activity_usage_records(customer_id):
+        activity_key = str(usage.get("key") or "").split("#unit=", 1)[0]
+        label = "会员卡扣卡"
+        if usage.get("benefit_name") == "粗门次卡":
+            label = "粗门扣卡"
+        elif usage.get("benefit_type") == "internal_course":
+            label = "内部课程权益使用"
+        counts = usage_labels.setdefault(activity_key, {})
+        counts[label] = counts.get(label, 0) + 1
         if usage.get("benefit_name") != "粗门次卡":
             continue
         activity_key = str(usage.get("key") or "").split("#unit=", 1)[0]
         if activity_key:
             coarse_deduction_counts[activity_key] = coarse_deduction_counts.get(activity_key, 0) + 1
+    for usage in membership_card_service.list_debt_activity_usage_records(customer_id):
+        activity_key = str(usage.get("key") or "").split("#unit=", 1)[0]
+        counts = usage_labels.setdefault(activity_key, {})
+        counts["预支扣卡"] = counts.get("预支扣卡", 0) + 1
     activities = []
 
     def deduction_summary(
@@ -663,11 +676,18 @@ def _build_activities(
         coarse_count: int = 0,
         project_label: str = "",
         withdrawn: bool = False,
+        activity_key: str = "",
     ) -> str:
         if withdrawn:
             return "已退课"
         if not attended:
             return "未参与"
+        if activity_key:
+            counts = usage_labels.get(activity_key, {})
+            labels = [f"{label}{count}次" for label, count in counts.items() if count > 0]
+            if project_label:
+                labels.insert(0, project_label)
+            return "、".join(labels) if labels else "已参与"
         if coarse_count > 0:
             return f"粗门扣卡{coarse_count}次"
         if project_label:
@@ -684,7 +704,6 @@ def _build_activities(
             teacher_names.append(t.nickname or t.name if t else tid)
         host = ", ".join(teacher_names)
         registered_participants = class_record_service._get_registered_participant_ids(r)
-        chargeable = class_record_service._get_group_member_ids(r)
         withdrawn = customer_id in set(r.withdrawn_participant_ids or [])
         role = _resolve_activity_role(
             customer_id,
@@ -693,7 +712,7 @@ def _build_activities(
         )
         if role:
             attended = r.date in arrived_dates and not withdrawn
-            membership_count = r.membership_deduction_count if attended and customer_id in chargeable else 0
+            membership_count = usage_labels.get(f"class:{r.id}", {}).get("会员卡扣卡", 0) if attended else 0
             activities.append({
                 "type": "沙龙类型",
                 "date": r.date,
@@ -710,6 +729,7 @@ def _build_activities(
                     attended=attended,
                     membership_count=membership_count,
                     coarse_count=coarse_deduction_counts.get(f"class:{r.id}", 0),
+                    activity_key=f"class:{r.id}",
                     withdrawn=withdrawn,
                 ),
             })
@@ -731,8 +751,7 @@ def _build_activities(
         if role:
             withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
             attended = s.date in arrived_dates and not withdrawn
-            chargeable = group_case_session_service._get_chargeable_ids(s)
-            membership_count = s.membership_deduction_count if attended and customer_id in chargeable else 0
+            membership_count = usage_labels.get(f"gcs:{s.id}", {}).get("会员卡扣卡", 0) if attended else 0
             activities.append({
                 "type": "觉醒游戏",
                 "date": s.date,
@@ -748,6 +767,7 @@ def _build_activities(
                     attended=attended,
                     membership_count=membership_count,
                     coarse_count=coarse_deduction_counts.get(f"gcs:{s.id}", 0),
+                    activity_key=f"gcs:{s.id}",
                     project_label="觉醒游戏扣卡1次" if role == "案主" else "",
                     withdrawn=withdrawn,
                 ),
@@ -770,8 +790,7 @@ def _build_activities(
         if role:
             withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
             attended = s.date in arrived_dates and not withdrawn
-            chargeable = emotional_release_session_service._get_chargeable_ids(s)
-            membership_count = s.membership_deduction_count if attended and customer_id in chargeable else 0
+            membership_count = usage_labels.get(f"ers:{s.id}", {}).get("会员卡扣卡", 0) if attended else 0
             activities.append({
                 "type": "情绪释放",
                 "date": s.date,
@@ -787,6 +806,7 @@ def _build_activities(
                     attended=attended,
                     membership_count=membership_count,
                     coarse_count=coarse_deduction_counts.get(f"ers:{s.id}", 0),
+                    activity_key=f"ers:{s.id}",
                     project_label="情绪释放扣卡1次" if role == "案主" else "",
                     withdrawn=withdrawn,
                 ),
@@ -931,14 +951,22 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_created_at": deduction.created_at.isoformat(),
             "type": "粗门扣卡",
             "name": record_name or "课程抵扣",
+            "activity_name": deduction.source_activity_name or "",
+            "course_organization_name": deduction.source_organization_name or "",
+            "settlement_organization_name": deduction.organization_name or "",
             "quantity": deduction.count,
             "amount": 0,
             "deal_date": deduction.deduction_date or "",
             "effective_date": deduction.source_activity_date or deduction.deduction_date or "",
             "expiry_date": "",
-            "closer_name": deduction.created_by or "",
+            "closer_name": (
+                ", ".join(item.get("name", "") for item in deduction.closers if item.get("name"))
+                if deduction.closers
+                else (deduction.closer_name or "")
+            ),
+            "created_by": deduction.created_by or "",
             "created_at": deduction.created_at.strftime("%Y-%m-%d"),
-            "notes": deduction.reason or "",
+            "notes": deduction.notes or deduction.reason or "",
         })
 
     # 觉醒游戏

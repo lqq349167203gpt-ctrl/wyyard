@@ -29,6 +29,7 @@ import { useOrganizations } from "@/hooks/use-organizations"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { CoarseDoorCardTab } from "@/pages/payment/coarse-door-card-tab"
 
 /* ========== 常量 ========== */
 
@@ -202,7 +203,6 @@ interface UnifiedPaymentContentProps {
   presetCustomer?: { id: string; nickname: string } | null
   onSaved?: () => void
   includeCoarseDoorOption?: boolean
-  onCoarseDoorSelect?: () => void
 }
 
 /* ========== 组件 ========== */
@@ -216,7 +216,6 @@ export function UnifiedPaymentContent({
   presetCustomer,
   onSaved,
   includeCoarseDoorOption = false,
-  onCoarseDoorSelect,
 }: UnifiedPaymentContentProps) {
   const enterToNext = useEnterToNext()
   const navigate = useNavigate()
@@ -249,6 +248,7 @@ export function UnifiedPaymentContent({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<UnifiedItem | null>(null)
   const [formType, setFormType] = useState<ProjectTypeKey>("membership_card")
+  const [coarseDoorSelected, setCoarseDoorSelected] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<UnifiedItem | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -478,6 +478,7 @@ export function UnifiedPaymentContent({
     if (!hasAnyOrganization) { setNoOrgDialogOpen(true); return }
     if (organizations.length === 0) { setNoAssignmentDialogOpen(true); return }
     setEditingItem(null)
+    setCoarseDoorSelected(false)
     setFormType(activeType === "all" ? (filterTypes ? filterTypes[0] : "membership_card") : activeType)
     resetForm()
     if (presetCustomer) {
@@ -489,10 +490,11 @@ export function UnifiedPaymentContent({
 
   // 弹窗标题
   const dialogTitle = useMemo(() => {
+    if (coarseDoorSelected) return "新增 - 粗门次卡"
     const typeName = PROJECT_TYPES[formType]?.label || ""
     if (editingItem) return `编辑 - ${typeName}`
     return `新增 - ${typeName}`
-  }, [formType, editingItem])
+  }, [coarseDoorSelected, formType, editingItem])
 
   const resetTypeFields = () => {
     // 会员卡
@@ -596,6 +598,7 @@ export function UnifiedPaymentContent({
   const handleOpenEdit = (item: UnifiedItem) => {
     if (!canManagePayment(item)) return
     setEditingItem(item)
+    setCoarseDoorSelected(false)
     setFormType(item.type)
     setFormCustomerId(item.customer_id)
     setFormNickname(item.nickname)
@@ -870,6 +873,15 @@ export function UnifiedPaymentContent({
       const api = getApi(formType)
       const data = buildPayload()
       if (editingItem) {
+        // 隐藏的支付字段不代表清空：编辑旧记录时保留原始财务信息。
+        for (const key of ["price", "amount", "fee", "payment_method"]) delete data[key]
+        if (Array.isArray(data.closers)) {
+          data.closers = data.closers.map((closer: { id: string; name: string; amount: number }) => ({
+            ...closer,
+            amount: (editingItem.closers || []).find((old: { id: string; name: string }) =>
+              closer.id ? old.id === closer.id : old.name === closer.name)?.amount ?? 0,
+          }))
+        }
         await api.update(editingItem.id, data)
       } else {
         await api.create(data)
@@ -1627,12 +1639,64 @@ export function UnifiedPaymentContent({
       {/* ========== 新增/编辑弹窗 ========== */}
       <Dialog open={dialogOpen} onOpenChange={(open) => {
         setDialogOpen(open)
-        if (!open) onExternalOpenChange?.(false)
+        if (!open) {
+          setCoarseDoorSelected(false)
+          onExternalOpenChange?.(false)
+        }
       }}>
         <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-base">{dialogTitle}</DialogTitle>
           </DialogHeader>
+          {/* 项目类型固定在弹窗顶部，与管理端小程序的录入顺序一致 */}
+          {!editingItem && !(filterTypes && filterTypes.length === 1) && (
+            <div className="border-b border-[#ebedf0] px-6 py-4">
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">项目类型</span>
+                <SelectDropdown
+                  value={coarseDoorSelected ? "coarse_door_card" : formType}
+                  options={(() => {
+                    const options: { value: string; label: string }[] = (filterTypes || (Object.keys(PROJECT_TYPES) as ProjectTypeKey[])).map(key => ({
+                      value: key,
+                      label: PROJECT_TYPES[key].label,
+                    }))
+                    if (includeCoarseDoorOption) options.splice(1, 0, { value: "coarse_door_card", label: "粗门次卡" })
+                    return options
+                  })()}
+                  placeholder="请选择项目类型"
+                  onChange={(v) => {
+                    if (v === "coarse_door_card") {
+                      setCoarseDoorSelected(true)
+                      return
+                    }
+                    setCoarseDoorSelected(false)
+                    setFormType(v as ProjectTypeKey)
+                    resetTypeFields()
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {coarseDoorSelected ? (
+            <div className="max-h-[calc(65vh+120px)] overflow-y-auto">
+              <CoarseDoorCardTab
+                formOnly
+                showHeader={false}
+                presetCustomer={presetCustomer}
+                onCancel={() => {
+                  setDialogOpen(false)
+                  setCoarseDoorSelected(false)
+                  onExternalOpenChange?.(false)
+                }}
+                onSaved={() => {
+                  setDialogOpen(false)
+                  setCoarseDoorSelected(false)
+                  onExternalOpenChange?.(false)
+                  onSaved?.()
+                }}
+              />
+            </div>
+          ) : (
           <div className="px-6 py-5 space-y-4 max-h-[calc(65vh+120px)] overflow-y-auto" {...enterToNext}>
             {/* 成交日期 + 所属组织（顶部） */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -1649,35 +1713,6 @@ export function UnifiedPaymentContent({
               />
             </div>
             <div className="border-b border-[#ebedf0] ml-[19px] -mt-[2px]" style={{ borderBottomWidth: "0.5px" }} />
-
-            {/* 项目类型选择（新增时，单一类型时不显示） */}
-            {!editingItem && !(filterTypes && filterTypes.length === 1) && (
-              <div className="grid grid-cols-[70px_1fr] items-center gap-2 -mt-[2px]">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">项目类型</span>
-                <SelectDropdown
-                  value={formType}
-                  options={(() => {
-                    const options: { value: string; label: string }[] = (filterTypes || (Object.keys(PROJECT_TYPES) as ProjectTypeKey[])).map(key => ({
-                      value: key,
-                      label: PROJECT_TYPES[key].label,
-                    }))
-                    if (includeCoarseDoorOption) options.splice(1, 0, { value: "coarse_door_card", label: "粗门次卡" })
-                    return options
-                  })()}
-                  placeholder="请选择项目类型"
-                  onChange={(v) => {
-                    if (v === "coarse_door_card") {
-                      setDialogOpen(false)
-                      onExternalOpenChange?.(false)
-                      onCoarseDoorSelect?.()
-                      return
-                    }
-                    setFormType(v as ProjectTypeKey)
-                    resetTypeFields()
-                  }}
-                />
-              </div>
-            )}
 
             {/* 会员卡类型 */}
             {formType === "membership_card" && (
@@ -1962,7 +1997,7 @@ export function UnifiedPaymentContent({
 
             {/* ===== 公共字段：成交人 ===== */}
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest mt-2">成交人<br /><span className="text-[10px] text-[#8f959e]">可选</span></span>
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest mt-2">成交人</span>
               <div>
                 <CloserInput customers={customers} value={formClosers} onChange={(v) => { setFormClosers(v); if (v.length > 0) setCloserError(false) }} defaultAmount={getFormAmount()} showAmounts={!hidePaymentDetails} />
                 {!hidePaymentDetails && closerError && <span className="text-[11px] text-[#f54a45] mt-0.5 block">请选择成交人</span>}
@@ -2000,6 +2035,7 @@ export function UnifiedPaymentContent({
               </Button>
             </div>
           </div>
+          )}
         </DialogContent>
       </Dialog>
 

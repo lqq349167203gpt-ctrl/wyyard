@@ -68,6 +68,7 @@ const PAGE_LABELS: Record<string, string> = {
 }
 
 const METHOD_LABELS: Record<string, string> = {
+  EXPORT: "导出",
   POST: "新增",
   PUT: "更新",
   PATCH: "更新",
@@ -207,6 +208,7 @@ const COUNT_FIELDS = new Set(["count", "total_count", "remaining_count", "purcha
 const DATE_TIME_FIELDS = new Set(["created_at", "updated_at", "deleted_at", "voided_at", "arrival_time"])
 
 const API_PATH_LABELS: Array<[string, string]> = [
+  ["/api/custom-analysis", "自定义筛选"],
   ["/api/activity-withdrawals", "退课"],
   ["/api/activity-orders", "课表"],
   ["/api/project-refunds", "退费记录"],
@@ -227,7 +229,7 @@ const API_PATH_LABELS: Array<[string, string]> = [
 ]
 
 const SECTION_OPTIONS = [
-  "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
+  "自定义筛选", "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
   "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
@@ -811,7 +813,7 @@ export default function OperationLogsPage() {
           <label className="text-[12px] text-[#8f959e]">操作类型</label>
           <SelectDropdown
             value={methodFilter}
-            options={[{value: "", label: "全部"}, {value: "POST", label: "新增"}, {value: "UPDATE", label: "更新"}, {value: "DELETE", label: "删除"}, {value: "VIEW", label: "查看"}, {value: "COPY", label: "复制"}]}
+            options={[{value: "", label: "全部"}, {value: "POST", label: "新增"}, {value: "UPDATE", label: "更新"}, {value: "DELETE", label: "删除"}, {value: "VIEW", label: "查看"}, {value: "COPY", label: "复制"}, {value: "EXPORT", label: "导出"}]}
             placeholder="全部"
             onChange={(v) => handleFilterChange("method", v)}
             className="w-28"

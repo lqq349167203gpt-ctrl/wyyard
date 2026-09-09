@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from openpyxl import load_workbook
 
+from app.api import custom_analysis as custom_analysis_api
 from app.models.custom_analysis import AnalysisComparisonGroup, AnalysisCondition, AnalysisPlan
 from app.services import custom_analysis_service
 
@@ -44,6 +45,11 @@ def _row(customer_id: str, **overrides):
         "payment_amount_period": 0,
         "payment_dates": [],
         "course_teachers": [],
+        "visit_purpose": "",
+        "trauma_history": "",
+        "current_block": "",
+        "work_info": "",
+        "other_info": "",
         "_payment_amounts_by_project_period": {},
         "_payment_orders_by_project_period": {},
         "_payment_events_period": [],
@@ -667,6 +673,82 @@ def test_metadata_endpoint(client):
     )
     assert not any(item["value"] == "created_customers" for item in metadata["metrics"])
     assert any(item["value"] == "referred_customers" and item["label"] == "新引流客户数" for item in metadata["metrics"])
+    assert {
+        "visit_purpose",
+        "trauma_history",
+        "current_block",
+        "work_info",
+        "other_info",
+    }.issubset({item["value"] for item in metadata["column_fields"]})
+    assert not any(item["value"] == "visit_purpose" for item in metadata["fields"])
+
+
+def test_metadata_only_returns_permitted_sensitive_column_options(client, monkeypatch):
+    permissions = {
+        "scope": "all",
+        "relations": {"referrer": True, "referrer_handler": True},
+        "sensitive_fields": {
+            "visit_purpose": True,
+            "trauma_history": False,
+            "current_block": False,
+            "work_info": True,
+            "other_info": False,
+        },
+        "detail_tabs": {"communication": True},
+        "transaction_access": "detail",
+    }
+    monkeypatch.setattr(
+        custom_analysis_api.customer_access_service,
+        "get_customer_permissions",
+        lambda _role: permissions,
+    )
+
+    response = client.get("/api/custom-analysis/metadata")
+
+    assert response.status_code == 200
+    sensitive_options = {
+        item["value"]
+        for item in response.json()["column_fields"]
+        if item["value"] in custom_analysis_service.SENSITIVE_COLUMN_FIELDS
+    }
+    assert sensitive_options == {"visit_purpose", "work_info"}
+
+
+def test_execute_rejects_sensitive_column_without_permission(client, monkeypatch):
+    permissions = {
+        "scope": "all",
+        "relations": {"referrer": True, "referrer_handler": True},
+        "sensitive_fields": {
+            "visit_purpose": True,
+            "trauma_history": False,
+            "current_block": True,
+            "work_info": True,
+            "other_info": True,
+        },
+        "detail_tabs": {"communication": True},
+        "transaction_access": "detail",
+    }
+    monkeypatch.setattr(
+        custom_analysis_api.customer_access_service,
+        "get_customer_permissions",
+        lambda _role: permissions,
+    )
+
+    response = client.post("/api/custom-analysis/execute", json={
+        "plan": {
+            "title": "越权字段测试",
+            "conditions": [],
+            "card_dimension": "none",
+            "columns": ["nickname", "trauma_history"],
+            "sort_by": "nickname",
+            "sort_order": "asc",
+        },
+        "page": 1,
+        "page_size": 20,
+    })
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "当前角色没有创伤经历查看权限，请移除该显示列"
 
 
 def test_execute_endpoint_returns_matching_customer(client, sample_customer):
@@ -732,8 +814,71 @@ def test_export_endpoint_uses_current_columns_and_row_display_mode(client, sampl
         worksheet = workbook["筛选结果"]
         assert [worksheet.cell(row=1, column=index).value for index in range(1, 3)] == ["昵称", "会员身份"]
         assert worksheet.cell(row=2, column=1).value == created["nickname"]
+
+        logs_response = client.get("/api/analysis-logs?record_type=export")
+        assert logs_response.status_code == 200
+        matching_logs = [
+            item for item in logs_response.json()["items"]
+            if item["log_type"] == "analysis_exported"
+            and item["config"].get("标题") == "客户导出测试"
+        ]
+        assert matching_logs
+        assert matching_logs[0]["config"]["结果人数"] == 1
     finally:
         client.delete(f"/api/customers/{created['id']}")
+
+
+def test_export_contains_selected_sensitive_customer_columns(monkeypatch):
+    monkeypatch.setattr(
+        custom_analysis_service,
+        "build_customer_dataset",
+        lambda *_args: [
+            _row(
+                "c1",
+                nickname="小安",
+                visit_purpose="改善睡眠",
+                trauma_history="童年经历",
+                current_block="关系压力",
+                work_info="在职 · 产品经理",
+                other_info="偏好晚间联系，沟通时请完整记录客户反馈，并保留后续跟进安排和需要重点关注的信息。",
+            ),
+        ],
+    )
+    plan = AnalysisPlan(
+        columns=[
+            "nickname",
+            "visit_purpose",
+            "trauma_history",
+            "current_block",
+            "work_info",
+            "other_info",
+        ],
+        card_dimension="none",
+        sort_by="nickname",
+    )
+
+    output, record_count = custom_analysis_service.build_analysis_export(plan, "actor")
+
+    assert record_count == 1
+    worksheet = load_workbook(filename=output)["筛选结果"]
+    assert [worksheet.cell(row=1, column=index).value for index in range(1, 7)] == [
+        "昵称",
+        "到访目的",
+        "创伤经历",
+        "当下卡点",
+        "工作情况",
+        "其他信息",
+    ]
+    assert [worksheet.cell(row=2, column=index).value for index in range(1, 7)] == [
+        "小安",
+        "改善睡眠",
+        "童年经历",
+        "关系压力",
+        "在职 · 产品经理",
+        "偏好晚间联系，沟通时请完整记录客户反馈，并保留后续跟进安排和需要重点关注的信息。",
+    ]
+    assert all(worksheet.cell(row=2, column=index).alignment.wrap_text for index in range(1, 7))
+    assert worksheet.row_dimensions[2].height > 22
 
 
 def test_comparison_execute_log_keeps_each_group_conditions_and_result(client, sample_customer):

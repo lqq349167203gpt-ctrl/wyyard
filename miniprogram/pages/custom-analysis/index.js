@@ -1,6 +1,17 @@
 const { customAnalysisApi } = require('../../utils/api')
 
 const VALUELESS_OPERATORS = ['is_empty', 'is_not_empty']
+const CUSTOM_ANALYSIS_DRAFT_PREFIX = 'custom-analysis:last-state:v1'
+
+function draftStorageKey() {
+  try {
+    const app = getApp()
+    const user = (app.globalData && app.globalData.currentUser) || wx.getStorageSync('currentUser') || {}
+    return `${CUSTOM_ANALYSIS_DRAFT_PREFIX}:${user.id || user.username || user.owner || 'current'}`
+  } catch (e) {
+    return `${CUSTOM_ANALYSIS_DRAFT_PREFIX}:current`
+  }
+}
 
 function pad(value) {
   return String(value).padStart(2, '0')
@@ -139,6 +150,7 @@ Page({
     loading: true,
     querying: false,
     exporting: false,
+    contentExpanded: false,
     metadata: null,
     plan: defaultPlan(),
     fieldOptions: [],
@@ -185,6 +197,8 @@ Page({
       return
     }
     if (getApp().trackUsagePage) getApp().trackUsagePage('/pages/custom-analysis/index')
+    this._draftStorageKey = draftStorageKey()
+    this._draftReady = false
     await this.loadBaseData()
   },
 
@@ -199,16 +213,54 @@ Page({
       const values = await Promise.all([customAnalysisApi.metadata(), customAnalysisApi.listTemplates()])
       const metadata = values[0]
       const templates = values[1] || []
+      let restoredPlan = this.data.plan
+      let contentExpanded = this.data.contentExpanded
+      if (!this._draftReady) {
+        const savedDraft = this.readDraft()
+        if (savedDraft) {
+          contentExpanded = !!savedDraft.contentExpanded
+          try {
+            restoredPlan = clonePlan(savedDraft.plan || restoredPlan)
+          } catch (e) {
+            restoredPlan = this.data.plan
+          }
+        }
+      }
       this.setData({
         metadata,
         fieldOptions: metadata.fields || [],
         templateOptions: [{ id: '', name: '选择已保存模板' }].concat(templates),
         templateIndex: 0,
+        contentExpanded,
         loading: false,
+      }, () => {
+        this._draftReady = true
+        this.syncPlanView(restoredPlan)
       })
-      this.syncPlanView(this.data.plan)
     } catch (e) {
       this.setData({ loading: false })
+    }
+  },
+
+  readDraft() {
+    if (!this._draftStorageKey) return null
+    try {
+      const savedDraft = wx.getStorageSync(this._draftStorageKey)
+      return savedDraft && typeof savedDraft === 'object' ? savedDraft : null
+    } catch (e) {
+      return null
+    }
+  },
+
+  saveDraft() {
+    if (!this._draftReady || !this._draftStorageKey) return
+    try {
+      wx.setStorageSync(this._draftStorageKey, {
+        plan: clonePlan(this.data.plan),
+        contentExpanded: !!this.data.contentExpanded,
+      })
+    } catch (e) {
+      // 本地存储不可用时，不影响筛选功能本身。
     }
   },
 
@@ -250,6 +302,11 @@ Page({
     const metadata = this.data.metadata
     if (!metadata) return
     const plan = clonePlan(inputPlan)
+    const columnFields = metadata.column_fields || metadata.fields || []
+    const allowedColumnValues = new Set(columnFields.map(item => item.value))
+    plan.columns = (plan.columns || []).filter(value => allowedColumnValues.has(value))
+    if (!plan.columns.includes('nickname')) plan.columns.unshift('nickname')
+    plan.columns = plan.columns.slice(0, 10)
     const conditionRows = this.buildConditionRows(plan.conditions, plan)
     const comparisonGroupRows = (plan.comparison_groups || []).map((group, index) => {
       const selectedPeriod = periodSelection(group)
@@ -271,10 +328,18 @@ Page({
     const dimensionIndex = Math.max(0, dimensionOptions.findIndex(item => item.value === plan.card_dimension))
     const rowDisplayIndex = Math.max(0, this.data.rowDisplayOptions.findIndex(item => item.value === plan.row_display_mode))
     const selectedColumns = plan.columns.map(value => {
-      const field = metadata.fields.find(item => item.value === value)
+      const field = columnFields.find(item => item.value === value)
       return { value, label: field ? field.label : value }
     })
-    const columnOptions = metadata.fields.map(item => Object.assign({}, item, { selected: plan.columns.includes(item.value), locked: item.value === 'nickname' }))
+    const orderedColumnFields = columnFields
+      .filter(item => item.group === '客户详情')
+      .concat(columnFields.filter(item => item.group !== '客户详情'))
+    const columnOptions = orderedColumnFields.map((item, index) => Object.assign({}, item, {
+      selected: plan.columns.includes(item.value),
+      locked: item.value === 'nickname',
+      showGroupHeading: index === 0 || orderedColumnFields[index - 1].group !== item.group,
+      groupLabel: item.group === '客户详情' ? '客户详情（按权限显示）' : item.group,
+    }))
     const selectedPeriod = periodSelection(plan)
     this.setData({
       plan,
@@ -290,7 +355,7 @@ Page({
       columnOptions,
       periodValue: selectedPeriod.value,
       periodLabel: selectedPeriod.label,
-    })
+    }, () => this.saveDraft())
   },
 
   onTemplateChange(e) {
@@ -674,7 +739,8 @@ Page({
       }))
       const result = await customAnalysisApi.execute(queryPlan, page, 20)
       const fieldMap = {}
-      this.data.metadata.fields.forEach(field => { fieldMap[field.value] = field.label })
+      const columnFields = this.data.metadata.column_fields || this.data.metadata.fields || []
+      columnFields.forEach(field => { fieldMap[field.value] = field.label })
       const resultItems = (result.items || []).map(item => ({
         id: item.id,
         displayKey: item._display_key || item.id,
@@ -719,6 +785,10 @@ Page({
 
   onNextPage() {
     if (this.data.result && this.data.result.page < this.data.result.total_pages) this.execute(this.data.result.page + 1)
+  },
+
+  onToggleContent() {
+    this.setData({ contentExpanded: !this.data.contentExpanded }, () => this.saveDraft())
   },
 
   onCustomerTap(e) {

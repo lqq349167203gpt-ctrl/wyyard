@@ -58,7 +58,12 @@ def test_coarse_door_card_deducts_each_course_once_without_precreated_card(clien
     from app.services import membership_card_service
 
     course_date = "2026-09-01"
+    deal_date = "2026-09-05"
     organization, course = _create_organization_course(client, "粗门体验课")
+    settlement_organization = client.post(
+        "/api/organizations",
+        json={"name": f"粗门结算组织_{uuid.uuid4().hex[:8]}", "member_ids": []},
+    ).json()
     visit_response = client.post(
         "/api/visits",
         json={
@@ -95,6 +100,11 @@ def test_coarse_door_card_deducts_each_course_once_without_precreated_card(clien
     assert options_response.status_code == 200
     options = options_response.json()
     assert options["organizations"] == [{"id": organization["id"], "name": organization["name"]}]
+    assert options["course_organizations"] == options["organizations"]
+    assert {
+        "id": settlement_organization["id"],
+        "name": settlement_organization["name"],
+    } in options["settlement_organizations"]
     assert any(item["record_id"] == activity_id for item in options["courses"])
 
     deduction_response = client.post(
@@ -103,16 +113,29 @@ def test_coarse_door_card_deducts_each_course_once_without_precreated_card(clien
             "customer_id": created_customer["id"],
             "record_type": "class",
             "record_id": activity_id,
-            "organization_id": organization["id"],
+            "course_organization_id": organization["id"],
+            "settlement_organization_id": settlement_organization["id"],
+            "deal_date": deal_date,
+            "closers": [
+                {"id": "closer-a", "name": "成交人甲", "amount": 0},
+                {"id": "closer-b", "name": "成交人乙", "amount": 0},
+            ],
+            "notes": "粗门抵扣备注",
         },
     )
     assert deduction_response.status_code == 200
     deduction = deduction_response.json()
     assert deduction["project_id"] == f"coarse:class:{activity_id}"
     assert deduction["source_activity_id"] == activity_id
-    assert deduction["deduction_date"] == course_date
+    assert deduction["deduction_date"] == deal_date
+    assert deduction["source_activity_date"] == course_date
+    assert deduction["closer_name"] == "成交人甲"
+    assert [item["name"] for item in deduction["closers"]] == ["成交人甲", "成交人乙"]
+    assert deduction["notes"] == "粗门抵扣备注"
     assert deduction["source_organization_id"] == organization["id"]
     assert deduction["source_organization_name"] == organization["name"]
+    assert deduction["organization_id"] == settlement_organization["id"]
+    assert deduction["organization_name"] == settlement_organization["name"]
     assert deduction["source_space_id"] == "space-test"
     assert deduction["source_space_name"] == "测试空间"
     assert membership_card_service.get_debt(created_customer["id"]) == 0
@@ -128,8 +151,13 @@ def test_coarse_door_card_deducts_each_course_once_without_precreated_card(clien
     )
     assert transaction_row["type"] == "粗门扣卡"
     assert transaction_row["name"] == f"{organization['name']} · 粗门体验课"
+    assert transaction_row["activity_name"] == "粗门体验课"
+    assert transaction_row["course_organization_name"] == organization["name"]
+    assert transaction_row["settlement_organization_name"] == settlement_organization["name"]
     assert transaction_row["quantity"] == 1
-    assert transaction_row["deal_date"] == course_date
+    assert transaction_row["deal_date"] == deal_date
+    assert transaction_row["effective_date"] == course_date
+    assert transaction_row["closer_name"] == "成交人甲, 成交人乙"
 
     duplicate_response = client.post(
         "/api/project-deductions/coarse-door-course",
@@ -137,7 +165,11 @@ def test_coarse_door_card_deducts_each_course_once_without_precreated_card(clien
             "customer_id": created_customer["id"],
             "record_type": "class",
             "record_id": activity_id,
-            "organization_id": organization["id"],
+            "course_organization_id": organization["id"],
+            "settlement_organization_id": settlement_organization["id"],
+            "deal_date": deal_date,
+            "closers": [],
+            "notes": "",
         },
     )
     assert duplicate_response.status_code == 400
@@ -159,6 +191,7 @@ def test_coarse_door_card_deducts_each_course_once_without_precreated_card(clien
     client.delete(f"/api/visits/{visit_id}")
     client.delete(f'/api/courses/{course["id"]}')
     client.delete(f'/api/organizations/{organization["id"]}')
+    client.delete(f'/api/organizations/{settlement_organization["id"]}')
 
 
 def test_coarse_door_card_returns_all_original_card_deductions(client, created_customer):

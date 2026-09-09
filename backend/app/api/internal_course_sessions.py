@@ -54,7 +54,7 @@ def list_sessions(date: str = "", page: int | None = Query(None, ge=1), page_siz
 @router.post("")
 def create_session(data: InternalCourseSessionCreate, request: Request, conversion: bool = False):
     activity_lock_service.ensure_scope_unlocked(data.date, data.space_id)
-    if data.participant_ids and not conversion:
+    if data.participant_ids:
         ensure_activity_participant_access(request)
     customer_access_service.require_new_customer_ids(request, data.participant_ids, action="添加")
     session = internal_course_session_service.create_session(

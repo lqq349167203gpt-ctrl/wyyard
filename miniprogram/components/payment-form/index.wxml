@@ -14,6 +14,29 @@
     </view>
   </view>
 
+  <!-- 粗门次卡抵扣：在当前付费弹窗内完成 -->
+  <view class="pf-card" wx:if="{{type === 'coarse_door_card'}}">
+    <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
+      <text class="pf-label">用户</text>
+      <view class="pf-value-wrap">
+        <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+      </view>
+    </view>
+    <view class="pf-row">
+      <text class="pf-label">课程所属</text>
+      <picker class="pf-picker" mode="selector" range="{{coarseCourseOrganizations}}" range-key="name" value="{{coarseCourseOrganizationIndex}}" bindchange="onCoarseCourseOrganizationChange" disabled="{{coarseOptionsLoading || coarseCourseOrganizations.length === 0}}">
+        <view class="pf-value {{coarseCourseOrganizationIndex < 0 ? 'pf-placeholder' : ''}}">{{coarseOptionsLoading ? '加载中...' : (coarseCourseOrganizationIndex >= 0 ? coarseCourseOrganizations[coarseCourseOrganizationIndex].name : (coarseCourseOrganizations.length ? '请选择课程所属' : '暂无可选课程所属'))}}</view>
+      </picker>
+    </view>
+    <view class="pf-row pf-row-last">
+      <text class="pf-label">所扣课程</text>
+      <picker class="pf-picker" mode="selector" range="{{coarseCourses}}" range-key="_label" value="{{coarseCourseIndex}}" bindchange="onCoarseCourseChange" disabled="{{coarseCourseOrganizationIndex < 0 || coarseCourses.length === 0}}">
+        <view class="pf-value pf-value-wrap-text {{coarseCourseIndex < 0 ? 'pf-placeholder' : ''}}">{{coarseCourseIndex >= 0 ? coarseCourses[coarseCourseIndex]._label : (coarseCourseOrganizationIndex < 0 ? '请先选择课程所属' : (coarseCourses.length ? '请选择' : '暂无可抵扣课程'))}}</view>
+      </picker>
+    </view>
+  </view>
+
   <!-- 会员卡 -->
   <view class="pf-card" wx:if="{{type === 'membership_card'}}">
     <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
@@ -233,9 +256,9 @@
   <!-- 成交人 -->
   <view class="pf-card">
     <view class="pf-row" bindtap="onPickerOpen" data-field="closer">
-      <text class="pf-label">成交人（可选）</text>
+      <text class="pf-label">成交人</text>
       <view class="pf-value-wrap">
-        <text class="{{closers.length > 0 ? '' : 'pf-placeholder'}}">{{closers.length > 0 ? '已选' + closers.length + '人' : '选择成交人'}}</text>
+        <text class="{{closers.length > 0 ? '' : 'pf-placeholder'}}">{{closers.length > 0 ? '已选' + closers.length + '人' : '选择成交人（可选）'}}</text>
       </view>
     </view>
     <view class="pf-closer-item" wx:for="{{closers}}" wx:key="id">
@@ -282,7 +305,7 @@
   <view class="pf-confirm-mask" wx:if="{{confirmVisible}}" catchtap="onConfirmClose">
     <view class="pf-confirm-panel" catchtap="stopPropagation">
       <view class="pf-confirm-header">
-        <text class="pf-confirm-title">{{isEdit ? '确认编辑' : '确认新增'}}</text>
+        <text class="pf-confirm-title">{{type === 'coarse_door_card' ? '确认抵扣' : (isEdit ? '确认编辑' : '确认新增')}}</text>
         <text class="pf-confirm-rule" wx:if="{{!hidePaymentDetails}}">成交人金额合计需与费用金额一致</text>
       </view>
       <scroll-view class="pf-confirm-body" scroll-y>
@@ -300,7 +323,7 @@
 
   <view class="pf-btns" wx:if="{{!hideBtn}}">
     <button class="pf-submit" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting}}">
-      {{isEdit ? '保    存' : '添    加'}}
+      {{type === 'coarse_door_card' ? '确认抵扣' : (isEdit ? '保    存' : '添    加')}}
     </button>
   </view>
 </view>

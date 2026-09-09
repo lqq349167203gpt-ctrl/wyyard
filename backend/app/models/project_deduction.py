@@ -16,8 +16,14 @@ class ProjectDeductionBase(SafeBaseModel):
     deduction_date: str  # YYYY-MM-DD
     remaining_after: Optional[int] = None
     reason: str = ""
+    notes: str = ""
     created_by: str = ""
     updated_by: str = ""
+    closer_id: str = ""
+    closer_name: str = ""
+    closers: list[dict] = []
+    organization_id: str = ""
+    organization_name: str = ""
     source_activity_type: str = ""
     source_activity_id: str = ""
     source_activity_key: str = ""
@@ -35,8 +41,14 @@ class ProjectDeductionCreate(StrictBaseModel):
     project_id: str
     count: int = Field(default=1, ge=1)
     reason: str = Field(min_length=1, max_length=200)
+    notes: str = ""
     created_by: str = ""
     deduction_date: str = ""
+    closer_id: str = ""
+    closer_name: str = ""
+    closers: list[dict] = []
+    organization_id: str = ""
+    organization_name: str = ""
     source_activity_type: str = ""
     source_activity_id: str = ""
     source_activity_key: str = ""

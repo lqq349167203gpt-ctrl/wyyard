@@ -442,7 +442,8 @@ export const customerApi = {
   generateTags: (tags: string) => request<{ tags: string }>("/api/customers/generate-tags", { method: "POST", body: JSON.stringify({ tags }) }),
 }
 
-export type ServiceTeacherFollowUpFilter = "inactive_30" | "active_30" | "all"
+export type ServiceTeacherFollowUpFilter = "inactive" | "active" | "all"
+export type ServiceTeacherFollowUpDefinition = "none" | "customer_info" | "follow_up" | "both"
 
 export interface ServiceTeacherCustomerItem {
   id: string
@@ -454,25 +455,44 @@ export interface ServiceTeacherCustomerItem {
   last_follow_up_at: string
   last_follow_up_category: string
   last_follow_up_by: string
+  latest_customer_info_content: string
+  latest_customer_info_by: string
+  latest_customer_info_at: string
+  latest_follow_up_content: string
+  latest_follow_up_by: string
+  latest_follow_up_at: string
+  is_active: boolean
   is_active_30: boolean
 }
 
 export interface ServiceTeacherCustomerSummary {
   total: number
+  active: number
+  inactive: number
   active_30: number
   inactive_30: number
 }
 
 export interface ServiceTeacherCustomerResponse extends PaginatedResponse<ServiceTeacherCustomerItem> {
   teacher: string
+  follow_up_days: number
   summary: ServiceTeacherCustomerSummary
 }
 
 export const serviceTeacherCustomerApi = {
-  metadata: () => request<{ current_teacher: string; teachers: string[] }>("/api/service-teacher-customers/metadata"),
+  recordExport: (content: string) => request('/api/service-teacher-customers/export-audit', {
+    method: 'POST', body: JSON.stringify({ content }),
+  }),
+  metadata: () => request<{
+    current_teacher: string
+    teachers: string[]
+    teacher_options: Array<{ name: string; customer_id: string }>
+  }>("/api/service-teacher-customers/metadata"),
   list: (params: {
     service_teacher?: string
     follow_up_filter?: ServiceTeacherFollowUpFilter
+    follow_up_definition?: ServiceTeacherFollowUpDefinition
+    follow_up_days?: number
     nickname?: string
     page: number
     page_size: number
@@ -480,6 +500,7 @@ export const serviceTeacherCustomerApi = {
     const query = new URLSearchParams()
     if (params.service_teacher) query.set("service_teacher", params.service_teacher)
     if (params.follow_up_filter) query.set("follow_up_filter", params.follow_up_filter)
+    if (params.follow_up_definition) query.set("follow_up_definition", params.follow_up_definition)
     if (params.nickname) query.set("nickname", params.nickname)
     query.set("page", String(params.page))
     query.set("page_size", String(params.page_size))
@@ -1798,8 +1819,14 @@ export interface ProjectDeduction {
   deduction_date: string
   remaining_after: number | null
   reason: string
+  notes?: string
   created_by: string
   updated_by: string
+  closer_id?: string
+  closer_name?: string
+  closers?: Array<{ id: string; name: string; amount: number }>
+  organization_id?: string
+  organization_name?: string
   created_at: string
   source_activity_type?: string
   source_activity_id?: string
@@ -1827,6 +1854,8 @@ export interface CoarseDoorCourseOption {
 
 export interface CoarseDoorOptions {
   organizations: { id: string; name: string }[]
+  course_organizations: { id: string; name: string }[]
+  settlement_organizations: { id: string; name: string }[]
   courses: CoarseDoorCourseOption[]
 }
 
@@ -1852,7 +1881,16 @@ export const projectDeductionApi = {
     request<ProjectDeduction>("/api/project-deductions/auto", { method: "POST", body: JSON.stringify(data) }),
   getCoarseDoorOptions: (customerId: string) =>
     request<CoarseDoorOptions>(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}`),
-  createCoarseDoorCourse: (data: { customer_id: string; record_type: string; record_id: string; organization_id: string }) =>
+  createCoarseDoorCourse: (data: {
+    customer_id: string
+    record_type: string
+    record_id: string
+    course_organization_id: string
+    settlement_organization_id: string
+    deal_date: string
+    closers: Array<{ id: string; name: string; amount: number }>
+    notes: string
+  }) =>
     request<ProjectDeduction>("/api/project-deductions/coarse-door-course", { method: "POST", body: JSON.stringify(data) }),
 }
 
@@ -2408,6 +2446,10 @@ export interface ActivityFollowup {
 export interface PaymentRecord {
   type: string
   name: string
+  activity_name?: string
+  course_organization_name?: string
+  settlement_organization_name?: string
+  created_by?: string
   quantity: number | string
   amount: number
   deal_date: string
@@ -3309,6 +3351,11 @@ export type AnalysisField =
   | "payment_amount_period"
   | "payment_dates"
   | "latest_payment_date"
+  | "visit_purpose"
+  | "trauma_history"
+  | "current_block"
+  | "work_info"
+  | "other_info"
 
 export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty"
 export type AnalysisCardDimension = "none" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "inviter_names" | "activity_types" | "purchased_projects"
@@ -3357,6 +3404,11 @@ export interface AnalysisMetadata {
     value_type: "text" | "number" | "date" | "select" | "multi_select"
     operators: AnalysisOperator[]
     options: string[]
+  }>
+  column_fields?: Array<{
+    value: AnalysisField
+    label: string
+    group: string
   }>
   operators: Array<{ value: AnalysisOperator; label: string }>
   card_dimensions: Array<{ value: AnalysisCardDimension; label: string }>
@@ -3411,7 +3463,7 @@ export interface AnalysisLog {
   source: "pc" | "miniprogram"
   ip: string
   content: string
-  log_type: "analysis_executed" | "template_created" | "template_updated" | "template_deleted"
+  log_type: "analysis_executed" | "analysis_exported" | "template_created" | "template_updated" | "template_deleted"
   config: {
     模板名称?: string
     模板简介?: string
@@ -3500,7 +3552,7 @@ export const analysisLogApi = {
   list: (params: {
     operator?: string
     source?: "pc" | "miniprogram"
-    record_type?: "analysis" | "template"
+    record_type?: "analysis" | "export" | "template"
     date_from?: string
     date_to?: string
     page?: number
@@ -3562,10 +3614,11 @@ export const statisticsApi = {
     if (params.time_by) searchParams.set("time_by", params.time_by)
     return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
   },
-  courses: (params: { date_from?: string; date_to?: string; granularity?: string; organization_id?: string; activity_type?: string; course_subtype?: string; teacher_id?: string }) => {
+  courses: (params: { date_from?: string; date_to?: string; all_dates?: boolean; granularity?: string; organization_id?: string; activity_type?: string; course_subtype?: string; teacher_id?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)
     if (params.date_to) searchParams.set("date_to", params.date_to)
+    if (params.all_dates) searchParams.set("all_dates", "true")
     if (params.granularity) searchParams.set("granularity", params.granularity)
     if (params.organization_id) searchParams.set("organization_id", params.organization_id)
     if (params.activity_type && params.activity_type !== "all") searchParams.set("activity_type", params.activity_type)

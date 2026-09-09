@@ -360,7 +360,12 @@
           <view class="rec-head">
             <text class="rec-name">{{item.type}}</text>
           </view>
-          <view class="rec-sub" wx:if="{{item.name || item.quantity || item.closer_name}}">
+          <view class="rec-sub" wx:if="{{item.type === '粗门扣卡'}}">
+            <text>{{item.activity_name || item.name || '课程抵扣'}}</text>
+            <text class="sep">·</text>
+            <text>扣{{item.quantity}}次</text>
+          </view>
+          <view class="rec-sub" wx:elif="{{item.name || item.quantity || item.closer_name}}">
             <text wx:if="{{item.name}}">{{item.name}}</text>
             <text class="sep" wx:if="{{item.name && item.quantity}}">·</text>
             <text wx:if="{{item.quantity}}">x{{item.quantity}}</text>
@@ -369,6 +374,9 @@
           </view>
           <view class="rec-sub" wx:if="{{item.type === '粗门扣卡'}}">
             <text>抵扣日期 {{item.deal_date || item.effective_date || '-'}}</text>
+            <text wx:if="{{item.settlement_organization_name}}"> · 所属组织：{{item.settlement_organization_name}}</text>
+            <text wx:if="{{item.course_organization_name}}"> · 课程所属：{{item.course_organization_name}}</text>
+            <text wx:if="{{item.closer_name}}"> · {{item.closer_name}}录入</text>
           </view>
           <view class="rec-sub" wx:elif="{{item.effective_date || item.expiry_date}}">
             <text>{{item.effective_date || '-'}} ~ {{item.expiry_date || '不限'}}</text>
@@ -389,11 +397,17 @@
       <text class="payment-entry-close" bindtap="onPaymentEntryClose">关闭</text>
     </view>
     <view class="payment-entry-type">
-      <text class="payment-entry-label">项目类型</text>
-      <picker mode="selector" range="{{paymentEntryTypes}}" range-key="label" value="{{paymentEntryTypeIndex}}" bindchange="onPaymentEntryTypeChange">
+      <view class="payment-entry-type-leading">
+        <view class="payment-entry-type-icon"><view></view><view></view></view>
+        <view class="payment-entry-type-copy">
+          <text class="payment-entry-label">项目类型</text>
+          <text class="payment-entry-hint">选择需要新增的记录</text>
+        </view>
+      </view>
+      <picker class="payment-entry-type-picker" mode="selector" range="{{paymentEntryTypes}}" range-key="label" value="{{paymentEntryTypeIndex}}" bindchange="onPaymentEntryTypeChange">
         <view class="payment-entry-picker">
-          <text>{{paymentEntryTypes[paymentEntryTypeIndex].label}}</text>
-          <text class="payment-entry-arrow">⌄</text>
+          <text class="payment-entry-picker-value">{{paymentEntryTypes[paymentEntryTypeIndex].label}}</text>
+          <view class="payment-entry-arrow"></view>
         </view>
       </picker>
     </view>

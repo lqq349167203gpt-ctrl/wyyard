@@ -4,6 +4,7 @@ from .base import SafeBaseModel
 
 
 class CommunicationRecordBase(SafeBaseModel):
+    customer_id: str = ""  # 稳定客户关联；旧记录兼容昵称
     customer_nickname: str  # 用户昵称
     content: str  # 沟通记录内容
 

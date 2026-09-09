@@ -13,7 +13,13 @@ class CoarseDoorCourseDeductionCreate(StrictBaseModel):
     customer_id: str
     record_type: str
     record_id: str
-    organization_id: str
+    # organization_id 兼容旧版客户端，旧版仍按课程组织处理并作为结算组织。
+    organization_id: str = ""
+    course_organization_id: str = ""
+    settlement_organization_id: str = ""
+    deal_date: str = ""
+    closers: list[dict] = []
+    notes: str = ""
 
 
 @router.get("/coarse-door-options")
@@ -28,12 +34,18 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="销卡")
     _, actor_name = get_request_actor(request)
+    course_organization_id = data.course_organization_id or data.organization_id
+    settlement_organization_id = data.settlement_organization_id or course_organization_id
     try:
         deduction = project_deduction_service.create_coarse_door_course_deduction(
             data.customer_id,
             data.record_type,
             data.record_id,
-            data.organization_id,
+            course_organization_id,
+            settlement_organization_id,
+            data.deal_date,
+            data.closers,
+            data.notes,
             actor_name,
         )
         result = deduction.model_dump(mode="json")
@@ -49,7 +61,9 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
         request.state.operation_log_context = {
             "content": (
                 f"{deduction.nickname} · 粗门次卡抵扣："
-                f"{course_summary or '所选课程'} · 抵扣{deduction.count}次，原会员卡返还{deduction.count}次"
+                f"成交日期{deduction.deduction_date} · {course_summary or '所选课程'} · "
+                f"所属组织{deduction.organization_name or '-'} · "
+                f"抵扣{deduction.count}次，原会员卡返还{deduction.count}次"
             ),
             "entity_id": deduction.id,
             "after_data": result,
@@ -66,6 +80,11 @@ def list_deductions(request: Request, customer_id: str | None = Query(None), nic
     items = customer_access_service.filter_record_dicts(request, items)
     if card_type:
         items = [i for i in items if i.get("project_name") == card_type]
+    if card_type == project_deduction_service.COARSE_DOOR_CARD_TYPE:
+        items.sort(
+            key=lambda item: (item.get("deduction_date") or "", item.get("created_at") or ""),
+            reverse=True,
+        )
     if page is not None:
         return paginate(items, page, page_size or 10)
     return items

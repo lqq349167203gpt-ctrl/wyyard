@@ -15,6 +15,7 @@ const SOURCE_LABELS: Record<string, string> = {
 }
 const LOG_TYPE_LABELS: Record<AnalysisLog["log_type"], string> = {
   analysis_executed: "执行筛选",
+  analysis_exported: "导出表格",
   template_created: "保存模板",
   template_updated: "更新模板",
   template_deleted: "删除模板",
@@ -37,7 +38,7 @@ function conditionSummary(log: AnalysisLog) {
 }
 
 function isTemplateLog(log: AnalysisLog) {
-  return log.log_type !== "analysis_executed"
+  return log.log_type.startsWith("template_")
 }
 
 interface ComparisonGroupLog {
@@ -128,7 +129,7 @@ function ComparisonLogDetail({ log }: { log: AnalysisLog }) {
 export default function AnalysisLogsPage() {
   const [operator, setOperator] = useState("")
   const [source, setSource] = useState<"" | "pc" | "miniprogram">("")
-  const [recordType, setRecordType] = useState<"" | "analysis" | "template">("")
+  const [recordType, setRecordType] = useState<"" | "analysis" | "export" | "template">("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [operators, setOperators] = useState<string[]>([])
@@ -140,7 +141,7 @@ export default function AnalysisLogsPage() {
     const response = await analysisLogApi.list({
       operator: filters.operator || undefined,
       source: (filters.source || undefined) as "pc" | "miniprogram" | undefined,
-      record_type: (filters.recordType || undefined) as "analysis" | "template" | undefined,
+      record_type: (filters.recordType || undefined) as "analysis" | "export" | "template" | undefined,
       date_from: filters.dateFrom || undefined,
       date_to: filters.dateTo || undefined,
       page,
@@ -165,7 +166,7 @@ export default function AnalysisLogsPage() {
     filtersRef.current = { ...filtersRef.current, [key]: value }
     if (key === "operator") setOperator(value)
     if (key === "source") setSource(value as "" | "pc" | "miniprogram")
-    if (key === "recordType") setRecordType(value as "" | "analysis" | "template")
+    if (key === "recordType") setRecordType(value as "" | "analysis" | "export" | "template")
     if (key === "dateFrom") setDateFrom(value)
     if (key === "dateTo") setDateTo(value)
     goToPage(1)
@@ -185,7 +186,7 @@ export default function AnalysisLogsPage() {
     <div className="space-y-4 px-6 pb-6 pt-12">
       <div>
         <h1 className="text-lg font-medium text-[#1f2329]">分析日志</h1>
-        <p className="mt-1.5 text-[12px] text-[#8f959e]">查看每位使用者执行过的筛选，以及保存、更新或删除过的模板</p>
+        <p className="mt-1.5 text-[12px] text-[#8f959e]">查看每位使用者执行或导出过的筛选，以及保存、更新或删除过的模板</p>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -199,7 +200,7 @@ export default function AnalysisLogsPage() {
         </div>
         <div className="space-y-1">
           <div className="text-[12px] text-[#8f959e]">记录类型</div>
-          <SelectDropdown value={recordType} options={[{ value: "", label: "全部" }, { value: "analysis", label: "执行筛选" }, { value: "template", label: "模板记录" }]} onChange={value => updateFilter("recordType", value)} className="w-36" />
+          <SelectDropdown value={recordType} options={[{ value: "", label: "全部" }, { value: "analysis", label: "执行筛选" }, { value: "export", label: "导出表格" }, { value: "template", label: "模板记录" }]} onChange={value => updateFilter("recordType", value)} className="w-36" />
         </div>
         <div className="space-y-1">
           <div className="text-[12px] text-[#8f959e]">查询日期</div>

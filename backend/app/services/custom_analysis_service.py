@@ -1,6 +1,8 @@
 import io
 import json
+import math
 import re
+import unicodedata
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -80,6 +82,19 @@ FIELD_LABELS = {
     "payment_amount_period": "期间成交金额",
     "payment_dates": "成交日期",
     "latest_payment_date": "最近成交日期",
+    "visit_purpose": "到访目的",
+    "trauma_history": "创伤经历",
+    "current_block": "当下卡点",
+    "work_info": "工作情况",
+    "other_info": "其他信息",
+}
+
+SENSITIVE_COLUMN_FIELDS = {
+    "visit_purpose": "visit_purpose",
+    "trauma_history": "trauma_history",
+    "current_block": "current_block",
+    "work_info": "work_info",
+    "other_info": "other_info",
 }
 
 FIELD_GROUPS = {
@@ -545,6 +560,15 @@ def build_customer_dataset(
             "payment_amount_period": round(period_payment_amounts.get(customer.id, 0), 2),
             "payment_dates": sorted(all_payment_dates.get(customer.id, set())),
             "latest_payment_date": latest_payment_dates.get(customer.id, ""),
+            "visit_purpose": customer.tags or "",
+            "trauma_history": customer.basic_info or "",
+            "current_block": customer.assessment or customer.core_situation or "",
+            "work_info": " · ".join(
+                item
+                for item in [customer.work_status or "", customer.work_description or ""]
+                if item
+            ),
+            "other_info": customer.other_info or "",
             "_payment_amounts_by_project_period": {
                 project: round(amount, 2)
                 for project, amount in period_payment_amounts_by_project.get(customer.id, {}).items()
@@ -1191,12 +1215,53 @@ def build_analysis_export(
             cell = worksheet.cell(row=row_index, column=column_index, value=value)
             cell.border = thin_border
             cell.alignment = Alignment(vertical="center", wrap_text=True)
-        worksheet.row_dimensions[row_index].height = 22
 
     for column_index, field in enumerate(plan.columns, 1):
-        values = [FIELD_LABELS[field], *(str(row.get(field) or "") for row in rows[:200])]
-        width = min(max(max((len(value) for value in values), default=8) + 2, 12), 32)
+        values = [
+            str(worksheet.cell(row=row_index, column=column_index).value or "")
+            for row_index in range(1, min(len(rows) + 1, 201) + 1)
+        ]
+        width = min(
+            max(
+                max(
+                    (
+                        sum(
+                            2 if unicodedata.east_asian_width(character) in {"W", "F", "A"} else 1
+                            for character in value
+                        )
+                        for value in values
+                    ),
+                    default=8,
+                )
+                + 2,
+                12,
+            ),
+            32,
+        )
         worksheet.column_dimensions[get_column_letter(column_index)].width = width
+
+    for row_index in range(2, len(rows) + 2):
+        wrapped_lines = 1
+        for column_index in range(1, len(plan.columns) + 1):
+            cell = worksheet.cell(row=row_index, column=column_index)
+            text = str(cell.value or "").replace("\r\n", "\n").replace("\r", "\n")
+            column_width = worksheet.column_dimensions[get_column_letter(column_index)].width or 12
+            available_width = max(int(column_width) - 2, 1)
+            cell_lines = sum(
+                max(
+                    1,
+                    math.ceil(
+                        sum(
+                            2 if unicodedata.east_asian_width(character) in {"W", "F", "A"} else 1
+                            for character in line
+                        )
+                        / available_width
+                    ),
+                )
+                for line in text.split("\n")
+            )
+            wrapped_lines = max(wrapped_lines, cell_lines)
+        worksheet.row_dimensions[row_index].height = max(22, wrapped_lines * 18)
 
     output = io.BytesIO()
     workbook.save(output)
@@ -1477,6 +1542,7 @@ def metadata(
     allowed_customer_ids: set[str] | None = None,
     allow_payment_details: bool = True,
     allow_communication: bool = True,
+    allowed_sensitive_fields: set[str] | None = None,
 ) -> dict[str, Any]:
     rows = build_customer_dataset(actor_id, allowed_customer_ids=allowed_customer_ids)
     fields = []
@@ -1515,8 +1581,22 @@ def metadata(
                 "operators": operators,
                 "options": options[:500],
             })
+    column_fields = [
+        {"value": field["value"], "label": field["label"], "group": field["group"]}
+        for field in fields
+    ]
+    column_fields.extend(
+        {
+            "value": field_name,
+            "label": FIELD_LABELS[field_name],
+            "group": "客户详情",
+        }
+        for field_name, permission_key in SENSITIVE_COLUMN_FIELDS.items()
+        if allowed_sensitive_fields is None or permission_key in allowed_sensitive_fields
+    )
     return {
         "fields": fields,
+        "column_fields": column_fields,
         "operators": [{"value": value, "label": label} for value, label in OPERATOR_LABELS.items()],
         "card_dimensions": [
             {"value": value, "label": label}

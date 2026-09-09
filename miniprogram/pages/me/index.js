@@ -5,6 +5,7 @@ const MENU_ICONS = {
   dailyReport: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgNWgtMmEyIDIgMCAwIDAgLTIgMnYxMmEyIDIgMCAwIDAgMiAyaDEwYTIgMiAwIDAgMCAyIC0ydi0xMmEyIDIgMCAwIDAgLTIgLTJoLTIiLz48cGF0aCBkPSJNOSA1YTIgMiAwIDAgMSAyIC0yaDJhMiAyIDAgMCAxIDIgMmEyIDIgMCAwIDEgLTIgMmgtMmEyIDIgMCAwIDEgLTIgLTIiLz48cGF0aCBkPSJNOSAxMmg2Ii8+PHBhdGggZD0iTTkgMTZoNiIvPjwvc3ZnPg==',
   customerTags: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTMgOHY0LjE3MmEyIDIgMCAwIDAgLjU4NiAxLjQxNGw1LjcxIDUuNzFhMi40MSAyLjQxIDAgMCAwIDMuNDA4IDBsMy41OTIgLTMuNTkyYTIuNDEgMi40MSAwIDAgMCAwIC0zLjQwOGwtNS43MSAtNS43MWEyIDIgMCAwIDAgLTEuNDE0IC0uNTg2aC00LjE3MmEyIDIgMCAwIDAgLTIgMiIvPjxwYXRoIGQ9Ik0xOCAxOWwxLjU5MiAtMS41OTJhNC44MiA0LjgyIDAgMCAwIDAgLTYuODE2bC00LjU5MiAtNC41OTIiLz48cGF0aCBkPSJNNyAxMGgtLjAxIi8+PC9zdmc+',
   customAnalysis: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTMgM3YxOGgxOCIvPjxwYXRoIGQ9Ik03IDlhMiAyIDAgMSAwIDQgMGEyIDIgMCAxIDAgLTQgMCIvPjxwYXRoIGQ9Ik0xNyA3YTIgMiAwIDEgMCA0IDBhMiAyIDAgMSAwIC00IDAiLz48cGF0aCBkPSJNMTIgMTVhMiAyIDAgMSAwIDQgMGEyIDIgMCAxIDAgLTQgMCIvPjxwYXRoIGQ9Ik0xMC4xNiAxMC42MmwyLjM0IDIuODgiLz48cGF0aCBkPSJNMTUuMDg4IDEzLjMyOGwyLjgzNyAtNC41ODYiLz48L3N2Zz4=',
+  serviceTeacher: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iOSIgY3k9IjciIHI9IjQiLz48cGF0aCBkPSJNMyAyMXYtMmE2IDYgMCAwIDEgMTIgMHYyIi8+PHBhdGggZD0ibTE4IDggMSAyIDIgMS0yIDEtMSAyLTEtMi0yLTEgMi0xeiIvPjwvc3ZnPg==',
 }
 
 Page({
@@ -18,6 +19,7 @@ Page({
     canDailyReport: false,
     canCustomerTags: false,
     canCustomAnalysis: false,
+    canServiceTeacher: false,
   },
 
   async onShow() {
@@ -39,6 +41,7 @@ Page({
       canDailyReport: app.checkPagePermission('daily-report'),
       canCustomerTags: app.checkPagePermission('customer-tags'),
       canCustomAnalysis: app.checkPagePermission('custom-analysis'),
+      canServiceTeacher: app.checkPagePermission('service-teacher'),
     })
   },
 
@@ -64,6 +67,10 @@ Page({
 
   onCustomAnalysisTap() {
     wx.navigateTo({ url: '/pages/custom-analysis/index' })
+  },
+
+  onServiceTeacherTap() {
+    wx.navigateTo({ url: '/pages/service-teachers/index' })
   },
 
   onLogout() {

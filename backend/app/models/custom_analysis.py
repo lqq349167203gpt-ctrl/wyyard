@@ -47,6 +47,11 @@ AnalysisField = Literal[
     "payment_amount_period",
     "payment_dates",
     "latest_payment_date",
+    "visit_purpose",
+    "trauma_history",
+    "current_block",
+    "work_info",
+    "other_info",
 ]
 
 AnalysisOperator = Literal[

@@ -362,13 +362,6 @@ Page({
 
   onPaymentEntryTypeChange(e) {
     const index = Number(e.detail.value) || 0
-    const selectedType = this.data.paymentEntryTypes[index]
-    if (selectedType && selectedType.key === 'coarse_door_card') {
-      const customerId = this.data.customerId
-      this.setData({ paymentEntryVisible: false, paymentEntryTypeIndex: 0 })
-      wx.navigateTo({ url: `/pages/payment/index?type=coarse_door_card&customerId=${encodeURIComponent(customerId)}` })
-      return
-    }
     this.setData({ paymentFormVisible: false }, () => {
       this.setData({ paymentEntryTypeIndex: index, paymentFormVisible: true })
     })

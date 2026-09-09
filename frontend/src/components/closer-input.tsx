@@ -48,7 +48,7 @@ export function CloserInput({ customers, value, onChange, disabled, defaultAmoun
         value={searchValue}
         onChange={(v) => setSearchValue(typeof v === "string" ? v : "")}
         onSelectItem={handleSelect}
-        placeholder="搜索成交人"
+        placeholder="搜索成交人（可选）"
         excludeIds={selectedIds}
         disabled={disabled}
       />
