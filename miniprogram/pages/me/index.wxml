@@ -29,6 +29,11 @@
       <text class="menu-label">课程记录</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onPrincipalTap" wx:if="{{canPrincipal}}">
+      <image class="menu-icon" src="{{icons.dailyReport}}" mode="aspectFit" />
+      <text class="menu-label">主理人</text>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
 
   <view class="menu-card">
@@ -54,11 +59,6 @@
     <view class="menu-item" bindtap="onPaymentTap" wx:if="{{canPayment}}">
       <image class="menu-icon" src="{{icons.payment}}" mode="aspectFit" />
       <text class="menu-label">付费项目</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onExpensesTap" wx:if="{{canExpenses}}">
-      <image class="menu-icon" src="{{icons.expenses}}" mode="aspectFit" />
-      <text class="menu-label">支出</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>

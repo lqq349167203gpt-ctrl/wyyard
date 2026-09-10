@@ -650,11 +650,11 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                   <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
                     <TableHead className="h-9 w-[92px] px-3 pl-4 text-[11px] font-normal">上课日期</TableHead>
                     <TableHead className="h-9 w-[105px] px-3 text-[11px] font-normal">上课时间</TableHead>
-                    <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">课程</TableHead>
-                    <TableHead className="h-9 w-[90px] px-3 text-[11px] font-normal">课程类型</TableHead>
+                    <TableHead className="h-9 w-[200px] px-3 text-[11px] font-normal">课程</TableHead>
+                    <TableHead className="h-9 w-[80px] px-3 text-[11px] font-normal">课程类型</TableHead>
                     <TableHead className="h-9 w-[56px] px-3 text-right text-[11px] font-normal">课时</TableHead>
-                    <TableHead className="h-9 w-[130px] px-3 text-[11px] font-normal">老师/成就君</TableHead>
-                    {showCourseOwner && <TableHead className="h-9 w-[100px] px-3 text-[11px] font-normal">案主</TableHead>}
+                    <TableHead className="h-9 w-[90px] px-3 text-[11px] font-normal">老师/成就君</TableHead>
+                    {showCourseOwner && <TableHead className="h-9 w-[60px] px-3 text-[11px] font-normal">案主</TableHead>}
                     {showCourseBodyParts && <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">部位数</TableHead>}
                     <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">参与人数</TableHead>
                     <TableHead className="h-9 px-3 text-[11px] font-normal">新人名单</TableHead>
@@ -679,7 +679,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                       </TableCell>
                       <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.activity_type_label || <EmptyDash />}</TableCell>
                       <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.class_hours}</TableCell>
-                      <TableCell className="h-11 max-w-[130px] truncate px-3 py-0 text-[12px] text-[#4e535a]" title={course.teachers.join("、") || undefined}>
+                      <TableCell className="h-11 max-w-[90px] truncate px-3 py-0 text-[12px] text-[#4e535a]" title={course.teachers.join("、") || undefined}>
                         {course.teachers.join("、") || <EmptyDash />}
                       </TableCell>
                       {showCourseOwner && <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.owner_name || <EmptyDash />}</TableCell>}

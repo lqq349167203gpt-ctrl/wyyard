@@ -1,4 +1,4 @@
-const { visitApi, classRecordApi, customerApi, memberIdentityApi, paymentApi, spaceApi } = require('../../utils/api')
+const { visitApi, classRecordApi, customerApi, memberIdentityApi, paymentApi, spaceApi, organizationApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -176,10 +176,11 @@ Page({
 
   async _loadStatic() {
     try {
-      const [customers, memberIdentities, paymentData] = await Promise.all([
+      const [customers, memberIdentities, paymentData, organizations] = await Promise.all([
         customerApi.list(),
         memberIdentityApi.list(),
         this._loadPaymentData(),
+        organizationApi.list(),
       ])
       const customerMap = {}
       for (const c of customers) customerMap[c.id] = c
@@ -187,13 +188,14 @@ Page({
       this._customerMap = customerMap
       this._memberIdentities = memberIdentities || []
       this._paymentData = paymentData
+      this._organizations = organizations || []
     } catch (e) {
       console.error('加载静态数据失败:', e)
     }
   },
 
   async _loadPaymentData() {
-    const [cards, groups, emotions, ohs, energies, courses, others, deductions] = await Promise.all([
+    const [cards, groups, emotions, ohs, energies, courses, others, deductions, teaFees, offlineCourses] = await Promise.all([
       paymentApi.membershipCards.list().catch(() => []),
       paymentApi.groupCases.list().catch(() => []),
       paymentApi.emotionalReleases.list().catch(() => []),
@@ -202,8 +204,10 @@ Page({
       paymentApi.internalCourses.list().catch(() => []),
       paymentApi.otherProjects.list().catch(() => []),
       paymentApi.deductions.list().catch(() => []),
+      paymentApi.teaSeatFees.list().catch(() => []),
+      paymentApi.offlineCourses.list().catch(() => []),
     ])
-    return { cards, groups, emotions, ohs, energies, courses, others, deductions }
+    return { cards, groups, emotions, ohs, energies, courses, others, deductions, teaFees, offlineCourses }
   },
 
   // ---------- 空间 ----------
@@ -370,8 +374,8 @@ Page({
         identityText: v.member_type || '',
         hasIdentity: !!v.member_type,
         arrived: !!v.arrived,
-        amountText: (v.daily_amount || 0) > 0 ? '¥' + formatMoney(v.daily_amount) : '-',
-        hasAmount: (v.daily_amount || 0) > 0,
+        amountText: this._buildPaymentRecords(v.customer_id, date).length + '笔',
+        hasAmount: this._buildPaymentRecords(v.customer_id, date).length > 0,
         invitedCount: v.invitation_count || 0,
         cancelledCount: v.cancelled_count || 0,
         arrivedCount: v.arrived_count || 0,
@@ -526,6 +530,10 @@ Page({
           itemName = item.course_type || ''
           amount = item.price || 0
           break
+        case 'tea_seat_fee':
+          itemType = '茶位费'; purchaseCount = item.quantity; break
+        case 'offline_course':
+          itemType = '线下落地课程'; itemName = item.course_name || ''; break
         case 'other':
           itemType = '其他项目'
           itemName = item.project_name || item.category || ''
@@ -551,6 +559,7 @@ Page({
           : '',
         closer_name: closerNames,
         payment_method: item.payment_method || '',
+        organization_name: ((this._organizations || []).find(org => org.id === item.organization_id) || {}).name || '',
         amount,
         amountText: '¥' + formatMoney(amount),
       })
@@ -562,6 +571,8 @@ Page({
     for (const i of payment.energies || []) addItem(i, 'energy_knot')
     for (const i of payment.courses || []) addItem(i, 'internal_course')
     for (const i of payment.others || []) addItem(i, 'other')
+    for (const i of payment.teaFees || []) addItem(i, 'tea_seat_fee')
+    for (const i of payment.offlineCourses || []) addItem(i, 'offline_course')
 
     const total = rows.reduce((s, r) => s + (r.amount || 0), 0)
     const methodMap = {}
@@ -788,7 +799,7 @@ Page({
       ],
       payment: [
         { text: '项目类型', cls: 'p-c1' }, { text: '项目名称', cls: 'p-c2' }, { text: '购买场次', cls: 'p-c3' },
-        { text: '金额', cls: 'p-c4' }, { text: '成交人', cls: 'p-c5' }, { text: '备注', cls: 'p-c6' },
+        { text: '成交归属', cls: 'p-c4' }, { text: '成交人', cls: 'p-c5' }, { text: '备注', cls: 'p-c6' },
       ],
     }
     // 表头在弹窗打开时就固定渲染，不依赖数据加载
@@ -876,6 +887,10 @@ Page({
           c1 = '能量结'; c2 = '能量结'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
         case 'internal_course':
           c1 = '内部课程'; c2 = item.course_type || ''; quantity = 1; amount = item.price || 0; break
+        case 'tea_seat_fee':
+          c1 = '茶位费'; quantity = item.quantity; break
+        case 'offline_course':
+          c1 = '线下落地课程'; c2 = item.course_name || ''; break
         case 'other':
           c1 = '其他项目'; c2 = item.project_name || item.category || ''; quantity = item.remaining_count != null ? item.remaining_count : '不限'; amount = item.fee || 0; break
       }
@@ -884,7 +899,7 @@ Page({
         c1,
         c2,
         c3: quantity == null ? '' : (quantity === '不限' ? '不限' : quantity + '次'),
-        c4: amount > 0 ? '¥' + formatMoney(amount) : '',
+        c4: ((this._organizations || []).find(org => org.id === item.organization_id) || {}).name || '-',
         c5: closer,
         c6: item.notes || '',
       })
@@ -896,6 +911,8 @@ Page({
     for (const i of payment.energies || []) add(i, 'energy_knot')
     for (const i of payment.courses || []) add(i, 'internal_course')
     for (const i of payment.others || []) add(i, 'other')
+    for (const i of payment.teaFees || []) add(i, 'tea_seat_fee')
+    for (const i of payment.offlineCourses || []) add(i, 'offline_course')
     return records
   },
 

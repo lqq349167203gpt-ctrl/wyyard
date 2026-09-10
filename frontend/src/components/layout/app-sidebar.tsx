@@ -22,9 +22,7 @@ import {
   IconSchool,
   IconBook,
   IconAlertTriangle,
-  IconReceipt,
   IconTags,
-  IconChartPie,
   IconLogin,
   IconChartDots,
 } from "@tabler/icons-react"
@@ -54,6 +52,7 @@ const businessItems = [
   { title: "自定义筛选", icon: IconChartDots, path: "/custom-analysis", permission: "custom-analysis" },
   { title: "服务老师", icon: IconSparkles, path: "/service-teachers", permission: "service-teacher" },
   { title: "课程记录", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
+  { title: "主理人", icon: IconSchool, path: "/principal", permission: "principal" },
   { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "referral-statistics" },
   { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "member-statistics" },
   { title: "产品销售", icon: IconBasket, path: "/product-sales", permission: "product-sales" },
@@ -61,12 +60,7 @@ const businessItems = [
 ]
 
 const reportItems = [
-  { title: "财务数据", icon: IconChartPie, path: "/financial-overview", permission: "financial-overview" },
   { title: "每日报表", icon: IconClipboardText, path: "/daily-report", permission: "daily-report" },
-]
-
-const expenseItems = [
-  { title: "支出项", path: "/expenses", permission: "expenses", icon: IconReceipt },
 ]
 
 const courseItems = [
@@ -285,7 +279,6 @@ export function AppSidebar() {
         <FixedGroup label="业务" items={courseItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="沟通" items={communicationItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="付费" permissions={permissions} isSuperAdmin={isSuperAdmin} items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡/退课", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }, { title: "欠卡记录", path: "/debt-records", permission: "debt-records", icon: IconAlertTriangle }]} />
-        <FixedGroup label="支出" items={expenseItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />

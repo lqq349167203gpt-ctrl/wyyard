@@ -42,11 +42,10 @@ const PAGE_TITLES: Record<string, string> = {
   "/analysis-logs": "无忧 - 分析日志",
   "/referral-statistics": "无忧 - 引流统计",
   "/course-statistics": "无忧 - 课程记录",
+  "/principal": "无忧 - 主理人",
   "/communication-records": "无忧 - 沟通记录",
   "/followup-records": "无忧 - 回访记录",
   "/chat-history": "无忧 - 沟通记录",
-  "/financial-overview": "无忧 - 财务数据",
-  "/expenses": "无忧 - 支出项",
 }
 
 export function AppLayout() {

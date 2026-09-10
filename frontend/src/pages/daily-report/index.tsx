@@ -6,6 +6,7 @@ import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { useOrganizations } from "@/hooks/use-organizations"
+import { teaSeatFeeApi, offlineCourseApi } from "@/lib/api"
 
 const today = new Date().toLocaleDateString("sv-SE")
 
@@ -129,8 +130,12 @@ export default function DailyReportPage() {
     setDetailLoading(true)
     setDetailExpanded(new Set())
     setDetailOverflow(new Set())
+    if (type === "payment") {
+      setDetailLoading(false)
+      return
+    }
     try {
-      const data = await customerDetailApi.get(customerId, type === "activity_today" || type === "payment" ? detailDate : undefined)
+      const data = await customerDetailApi.get(customerId, type === "activity_today" ? detailDate : undefined)
       setDetailData(data)
     } catch {
       setDetailData(null)
@@ -350,7 +355,9 @@ export default function DailyReportPage() {
       groupCaseSessionApi.list(detailDate).catch(() => []),
       emotionalReleaseSessionApi.list(detailDate).catch(() => []),
       energyKnotSessionApi.list(detailDate).catch(() => []),
-    ]).then(([cards, groups, emotions, ohs, energies, courses, others, deductions, todayVisits, gcsSessions, ersSessions, eksSessions]) => {
+      teaSeatFeeApi.list().catch(() => []),
+      offlineCourseApi.list().catch(() => []),
+    ]).then(([cards, groups, emotions, ohs, energies, courses, others, deductions, todayVisits, gcsSessions, ersSessions, eksSessions, teaFees, offlineCourses]) => {
       // 人工销卡：按 (customer_id, project_type, project_id) 分组，所有项目类型
       const manualDeductionMap = new Map<string, { customer_id: string; nickname: string; project_type: string; project_id: string; project_name: string; count: number; remaining_after: number | null }>()
       for (const d of deductions as any[]) {
@@ -475,6 +482,14 @@ export default function DailyReportPage() {
             amount = item.fee || 0
             purchaseCount = item.total_count ?? null
             break
+          case "tea_seat_fee":
+            itemType = "茶位费"
+            purchaseCount = item.quantity ?? null
+            break
+          case "offline_course":
+            itemType = "线下落地课程"
+            itemName = item.course_name || ""
+            break
         }
         const closerNames = (item.closers || []).map((c: any) => c.name).filter(Boolean).join("、")
           || item.closer_name || ""
@@ -502,6 +517,8 @@ export default function DailyReportPage() {
       for (const item of energies as any[]) addItem(item, "energy_knot")
       for (const item of courses as any[]) addItem(item, "internal_course")
       for (const item of others as any[]) addItem(item, "other")
+      for (const item of teaFees as any[]) addItem(item, "tea_seat_fee")
+      for (const item of offlineCourses as any[]) addItem(item, "offline_course")
       setFinanceRows(rows)
 
       // 构建当日销卡数据
@@ -894,10 +911,10 @@ export default function DailyReportPage() {
           </DialogHeader>
           {detailLoading ? (
             <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">加载中...</div>
-          ) : !detailData ? (
+          ) : !detailData && detailType !== "payment" ? (
             <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无数据</div>
           ) : detailType === "visit" ? (() => {
-            const records = (detailData.visit_records || []).filter(v => v.arrived).sort((a, b) => (b.visit_date || "").localeCompare(a.visit_date || ""))
+            const records = (detailData?.visit_records || []).filter(v => v.arrived).sort((a, b) => (b.visit_date || "").localeCompare(a.visit_date || ""))
             return records.length === 0 ? (
               <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无到店记录</div>
             ) : (
@@ -927,7 +944,7 @@ export default function DailyReportPage() {
               </>
             )
           })() : detailType === "invited" ? (() => {
-            const records = (detailData.visit_records || []).sort((a, b) => (b.visit_date || "").localeCompare(a.visit_date || ""))
+            const records = (detailData?.visit_records || []).sort((a, b) => (b.visit_date || "").localeCompare(a.visit_date || ""))
             return records.length === 0 ? (
               <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无受邀记录</div>
             ) : (
@@ -957,7 +974,7 @@ export default function DailyReportPage() {
               </>
             )
           })() : detailType === "cancelled" ? (() => {
-            const records = (detailData.visit_records || []).filter(v => v.cancelled).sort((a, b) => (b.visit_date || "").localeCompare(a.visit_date || ""))
+            const records = (detailData?.visit_records || []).filter(v => v.cancelled).sort((a, b) => (b.visit_date || "").localeCompare(a.visit_date || ""))
             return records.length === 0 ? (
               <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无取消记录</div>
             ) : (
@@ -1026,7 +1043,7 @@ export default function DailyReportPage() {
               </>
             )
           })() : (() => {
-            const records = (detailData.activities || [])
+            const records = (detailData?.activities || [])
               .filter(a => detailType === "activity_today" ? a.date === detailDate : true)
               .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
             return records.length === 0 ? (

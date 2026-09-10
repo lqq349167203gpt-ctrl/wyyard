@@ -58,6 +58,7 @@ class CustomerAccessPermissions(TypedDict):
 
 
 class PositionEditPermissions(TypedDict):
+    principal_scope: Literal["own", "all"]
     customers: EditScope
     visits: EditScope
     activities: EditScope
@@ -131,6 +132,7 @@ def _full_customer_access() -> CustomerAccessPermissions:
 
 
 DEFAULT_PERMISSIONS: PositionEditPermissions = {
+    "principal_scope": "own",
     # 兼容已有角色：客户资料在新增“仅浏览”权限前默认可编辑。
     "customers": "all",
     "visits": "own",
@@ -145,6 +147,7 @@ DEFAULT_PERMISSIONS: PositionEditPermissions = {
     "customer_access": _empty_customer_access(),
 }
 SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
+    "principal_scope": "all",
     "customers": "all",
     "visits": "all",
     "activities": "all",
@@ -229,6 +232,7 @@ def _normalize_customer_access(value: object, *, legacy_default: bool = False) -
 def _normalize_permissions(value: object) -> PositionEditPermissions:
     raw = value if isinstance(value, dict) else {}
     return {
+        "principal_scope": "all" if raw.get("principal_scope") == "all" else "own",
         "customers": _normalize_customer_edit_scope(raw.get("customers")),
         "visits": _normalize_scope(raw.get("visits")),
         "activities": _normalize_scope(raw.get("activities")),
@@ -270,6 +274,7 @@ def _merge_permissions(roles: list[str]) -> PositionEditPermissions:
     customer_scope_rank = {"none": 0, "related": 1, "all": 2}
     transaction_rank = {"none": 0, "summary": 1, "detail": 2}
     merged = deepcopy(values[0])
+    merged["principal_scope"] = "all" if any(value.get("principal_scope") == "all" for value in values) else "own"
 
     for key in ("customers", "visits", "activities", "activity_teachers", "activity_participants", "payments"):
         merged[key] = max((value[key] for value in values), key=lambda item: scope_rank[item])

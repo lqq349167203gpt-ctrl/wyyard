@@ -10,6 +10,7 @@ from app.services.operation_log_service import create_log
 from app.utils.request_context import get_client_ip
 
 SECTION_MAP = {
+    "/api/principal": "主理人",
     "/api/system-helper-config": "AI 配置",
     "/api/customer-ai-config": "AI 配置",
     "/api/visit-ai-config": "AI 配置",
@@ -61,7 +62,6 @@ SECTION_MAP = {
 
     "/api/project-deductions": "付费项目",
     "/api/project-refunds": "付费项目",
-    "/api/expenses": "支出项",
     "/api/reminders": "提醒配置",
     "/api/business-reminders": "提醒",
     "/api/activity-themes": "课表",
@@ -119,8 +119,6 @@ GETTER_MAP = {
     "/api/communication-records": ("沟通记录", "communication_record_service", "get_record"),
     "/api/offline-courses": ("付费项目", "offline_course_service", "get_course"),
     "/api/offline-course-records": ("落地课程", "offline_course_record_service", "get_record"),
-    "/api/expenses/types": ("支出项", "expense_service", "get_expense_type"),
-    "/api/expenses": ("支出项", "expense_service", "get_expense"),
 }
 
 PAGE_LABELS: dict[str, str] = {
@@ -143,6 +141,7 @@ PAGE_LABELS: dict[str, str] = {
     "referral-statistics": "引流统计",
     "member-statistics": "会员情况",
     "course-statistics": "课程记录",
+    "principal": "主理人",
     "product-sales": "产品销售",
     "statistics": "服务数据",
     "daily-report": "每日报表",

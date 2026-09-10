@@ -1,4 +1,58 @@
 const API_BASE = ""
+
+export interface ConversionAction {
+  kind: "attendance" | "purchase" | "coarse_usage"
+  product: string
+  subtype: string
+  occurrence: "first" | "any" | "repeat"
+}
+export interface ConversionRule {
+  name: string
+  source: ConversionAction
+  targets: ConversionAction[]
+  target_mode: "any" | "all"
+  window_days: number
+  same_organization: boolean
+}
+export interface PrincipalQuery {
+  organization_id: string
+  date_from: string | null
+  date_to: string | null
+  tab: "overview" | "courses" | "orders" | "conversion"
+  product: string
+  order_filter: "" | "first" | "repeat" | "cross"
+  status: "" | "converted" | "unconverted" | "observing"
+  rule: ConversionRule
+}
+export interface PrincipalOption { key: string; label: string; subtypes: string[] }
+export interface PrincipalMetadata {
+  organizations: { id: string; name: string }[]
+  products: PrincipalOption[]
+  activity_types: PrincipalOption[]
+  scope: "own" | "all"
+  transaction_access: "none" | "summary" | "detail"
+}
+export interface PrincipalRow { id: string; details: string[]; [key: string]: string | number | string[] }
+export interface PrincipalResult extends PaginatedResponse<PrincipalRow> {
+  summary: Record<string, string | number>
+  columns: { key: string; label: string }[]
+  notice: string
+}
+export interface SavedConversionRule { id: string; rule: ConversionRule; updated_at: string }
+export const principalApi = {
+  metadata: () => request<PrincipalMetadata>("/api/principal/metadata"),
+  query: (query: PrincipalQuery, page: number, page_size: number) => request<PrincipalResult>("/api/principal/query", { method: "POST", body: JSON.stringify({ ...query, page, page_size }) }),
+  rules: () => request<SavedConversionRule[]>("/api/principal/rules"),
+  saveRule: (rule: ConversionRule, id?: string) => request<SavedConversionRule>(`/api/principal/rules${id ? "/" + id : ""}`, { method: id ? "PATCH" : "POST", body: JSON.stringify(rule) }),
+  deleteRule: (id: string) => request<{ success: boolean }>(`/api/principal/rules/${id}`, { method: "DELETE" }),
+  download: async (query: PrincipalQuery) => {
+    const res = await fetch(`${API_BASE}/api/principal/export`, { method: "POST", headers: getAuthHeaders(), body: JSON.stringify(query) })
+    applyNewToken(res)
+    if (res.status === 401) handle401()
+    if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.detail || "导出失败") }
+    return res.blob()
+  },
+}
 let lastTrackedPagePath = ""
 const DEVICE_ID_KEY = "wyyardDeviceId"
 
@@ -1968,66 +2022,6 @@ export const paymentExportApi = {
   },
 }
 
-export interface Expense {
-  id: string
-  expense_time: string
-  cost_category: "" | "management" | "operation"
-  expense_type: string
-  purchase_content: string
-  amount: number
-  customer_id: string
-  customer_nickname: string
-  platform: string
-  notes: string
-  created_by: string
-  updated_by: string
-  created_at: string
-  updated_at: string
-}
-
-export interface ExpenseInput {
-  cost_category: "management" | "operation"
-  expense_type: string
-  expense_time: string
-  purchase_content: string
-  amount: number
-  customer_id: string
-  customer_nickname: string
-  platform: string
-  notes: string
-}
-
-export const expenseApi = {
-  listPaginated: (page: number, pageSize: number, params?: { date_from?: string; date_to?: string; cost_category?: string }) => {
-    const searchParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (params?.date_from) searchParams.set("date_from", params.date_from)
-    if (params?.date_to) searchParams.set("date_to", params.date_to)
-    if (params?.cost_category) searchParams.set("cost_category", params.cost_category)
-    return request<PaginatedResponse<Expense>>(`/api/expenses?${searchParams.toString()}`)
-  },
-  create: (data: ExpenseInput) =>
-    request<Expense>("/api/expenses", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: ExpenseInput) =>
-    request<Expense>(`/api/expenses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    request<{ message: string }>(`/api/expenses/${id}`, { method: "DELETE" }),
-  listTypes: (costCategory = "") => request<ExpenseType[]>(`/api/expenses/types/list${costCategory ? `?cost_category=${costCategory}` : ""}`),
-  createType: (data: { cost_category: "management" | "operation"; name: string; requires_customer: boolean; requires_platform: boolean }) =>
-    request<ExpenseType>("/api/expenses/types", { method: "POST", body: JSON.stringify(data) }),
-  updateType: (id: string, data: { requires_customer: boolean; requires_platform: boolean }) =>
-    request<ExpenseType>(`/api/expenses/types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteType: (id: string) => request<{ message: string }>(`/api/expenses/types/${id}`, { method: "DELETE" }),
-}
-
-export interface ExpenseType {
-  id: string
-  cost_category: "management" | "operation"
-  name: string
-  requires_customer: boolean
-  requires_platform: boolean
-  created_at: string
-}
-
 export type TeaGuestPaymentMethod = "美团" | "支付宝" | "微信" | "抖音"
 
 export interface TeaGuestConsumptionRecord {
@@ -2139,73 +2133,6 @@ export const teaGuestExpenseApi = {
     request<TeaGuestExpenseType>(`/api/tea-guest/expenses/types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteType: (id: string) =>
     request<{ message: string }>(`/api/tea-guest/expenses/types/${id}`, { method: "DELETE" }),
-}
-
-export interface FinancialBreakdown {
-  name: string
-  revenue: number
-  revenue_share: number
-  deal_count: number
-  customer_count: number
-  closers: string[]
-}
-
-export interface FinancialOrderDetail {
-  id: string
-  deal_date: string
-  nickname: string
-  type: string
-  name: string
-  quantity: string
-  amount: number
-  closers: { name: string; amount: number }[]
-  notes: string
-}
-
-export type FinancialCompositionKind = "expense" | "refund"
-
-export interface FinancialCompositionDetail {
-  id: string
-  kind: FinancialCompositionKind
-  date: string
-  primary: string
-  secondary: string
-  content: string
-  customer_nickname: string
-  amount: number
-  paid_amount?: number
-  platform: string
-  notes: string
-  operator: string
-}
-
-export interface FinancialOverview {
-  date_from: string
-  date_to: string
-  total_revenue: number
-  management_cost: number
-  operation_cost: number
-  total_expense: number
-  refund_total: number
-  group_class_revenue: number
-  custom_course_revenue: number
-  group_class_breakdown: FinancialBreakdown[]
-  custom_course_breakdown: FinancialBreakdown[]
-}
-
-export const financialApi = {
-  overview: (dateFrom: string, dateTo: string) => {
-    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo })
-    return request<FinancialOverview>(`/api/financial/overview?${params.toString()}`)
-  },
-  revenueDetails: (dateFrom: string, dateTo: string, category: "group" | "custom", name: string) => {
-    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, category, name })
-    return request<{ data: FinancialOrderDetail[] }>(`/api/financial/revenue-details?${params.toString()}`)
-  },
-  compositionDetails: (dateFrom: string, dateTo: string, kind: FinancialCompositionKind) => {
-    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, kind })
-    return request<{ data: FinancialCompositionDetail[] }>(`/api/financial/composition-details?${params.toString()}`)
-  },
 }
 
 // Space
@@ -2757,6 +2684,7 @@ export interface CustomerAccessPermissions {
   transaction_access: TransactionAccess
 }
 export interface PositionEditPermissions {
+  principal_scope?: "own" | "all"
   customers: "view" | "all"
   visits: PositionEditScope
   activities: PositionEditScope
@@ -3035,6 +2963,7 @@ export const consumptionRecordsApi = {
     return request<PaginatedResponse<DeductionRecord>>(`/api/consumption-records/deductions?${searchParams.toString()}`)
   },
   getDailyTotals: (date: string) => request<Record<string, number>>(`/api/consumption-records/daily-totals?date=${date}`),
+  getDailyCounts: (date: string) => request<Record<string, number>>(`/api/consumption-records/daily-counts?date=${date}`),
 }
 
 export interface ChangedCell {

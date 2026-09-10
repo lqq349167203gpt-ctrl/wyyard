@@ -1,0 +1,42 @@
+<view class="page">
+  <view class="panel filters">
+    <view class="toolbar"><picker range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrg"><view class="control">{{organizations[orgIndex].name}} ▾</view></picker><button class="small" disabled="{{busy || loading || error}}" bindtap="exportData">导出表格</button></view>
+    <view class="toolbar"><picker mode="date" value="{{query.date_from}}" data-field="date_from" bindchange="onDate"><view class="control">{{query.date_from || '开始日期'}}</view></picker><text>~</text><picker mode="date" value="{{query.date_to}}" data-field="date_to" bindchange="onDate"><view class="control">{{query.date_to || '结束日期'}}</view></picker><text class="link" bindtap="clearDates">全部</text></view>
+    <picker wx:if="{{query.tab === 'overview' || query.tab === 'orders'}}" range="{{productOptions}}" range-key="label" value="{{productIndex}}" bindchange="onProduct"><view class="control">{{productOptions[productIndex].label}} ▾</view></picker>
+    <view class="muted">{{metadata.scope === 'all' ? '全部组织权限' : '仅本人所属组织'}} · 客户及交易权限同时生效</view>
+  </view>
+  <view class="tabs"><view wx:for="{{tabs}}" wx:key="key" class="tab {{query.tab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onTab">{{item.label}}</view></view>
+  <view wx:if="{{query.tab === 'conversion'}}" class="panel">
+    <view class="toolbar"><picker range="{{ruleOptions}}" value="{{ruleIndex}}" bindchange="onRule"><view class="control">{{ruleOptions[ruleIndex]}} ▾</view></picker><button class="small" bindtap="openEditor">配置规则</button></view>
+    <view class="toolbar"><picker range="{{statusOptions}}" value="{{statusIndex}}" bindchange="onStatus"><view class="control">{{statusOptions[statusIndex]}} ▾</view></picker><text wx:if="{{ruleId}}" class="link" bindtap="removeRule">删除规则</text></view>
+    <view class="muted">{{query.rule.name}} · {{query.rule.window_days}} 天内 · {{query.rule.same_organization ? '同一组织' : '跨可见组织'}} · {{query.rule.target_mode === 'all' ? '满足全部目标' : '满足任意目标'}}</view>
+    <view class="muted">按人数去重；目标可发生在筛选结束日期之后。</view>
+  </view>
+  <picker wx:if="{{query.tab === 'orders'}}" range="{{orderOptions}}" value="{{orderIndex}}" bindchange="onOrder"><view class="control order-filter">{{orderOptions[orderIndex]}} ▾</view></picker>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{metadata &amp;&amp; !metadata.organizations.length}}" class="muted empty">暂无可查看组织，请检查账号归属人和组织成员配置。同名归属人需先消除歧义。</view>
+  <view class="stats"><view wx:for="{{summary}}" wx:key="label" class="stat"><view class="muted">{{item.label}}</view><view class="number">{{item.value}}</view></view></view>
+  <view class="muted count">共 {{total}} 条</view>
+  <view wx:for="{{list}}" wx:key="id" class="panel record" data-index="{{index}}" bindtap="showDetails">
+    <view wx:for="{{item.cells}}" wx:for-item="cell" wx:key="label" class="field"><text class="muted">{{cell.label}}</text><text class="value">{{cell.value}}</text></view>
+    <view class="link detail-link">查看关联明细 ›</view>
+  </view>
+  <view wx:if="{{loading}}" class="empty muted">加载中…</view><view wx:elif="{{!list.length &amp;&amp; !error}}" class="empty muted">暂无符合条件的数据</view>
+  <view class="muted notice">{{notice}}</view>
+  <view wx:if="{{editing}}" class="mask" bindtap="closeEditor"><view class="sheet" catchtap="noop"><view class="sheet-title">配置转化规则<text class="link" bindtap="closeEditor">关闭</text></view><scroll-view scroll-y class="editor-scroll">
+    <input class="control" placeholder="规则名称" value="{{draft.name}}" data-field="name" bindinput="onRuleField" />
+    <view wx:for="{{actionEditors}}" wx:key="index" class="action">
+      <view class="toolbar"><text>{{item.title}}</text><text wx:if="{{item.index > 0 &amp;&amp; draft.targets.length > 1}}" class="link" data-index="{{item.index}}" bindtap="removeTarget">移除</text></view>
+      <picker range="{{kindLabels}}" value="{{item.kindIndex}}" data-index="{{item.index}}" data-field="kind" bindchange="onAction"><view class="control">{{kindLabels[item.kindIndex]}} ▾</view></picker>
+      <picker wx:if="{{item.products.length > 1}}" range="{{item.products}}" range-key="label" value="{{item.productIndex}}" data-index="{{item.index}}" data-field="product" bindchange="onAction"><view class="control">{{item.products[item.productIndex].label}} ▾</view></picker>
+      <picker wx:if="{{item.subtypes.length > 1}}" range="{{item.subtypeLabels}}" value="{{item.subtypeIndex}}" data-index="{{item.index}}" data-field="subtype" bindchange="onAction"><view class="control">{{item.subtypeLabels[item.subtypeIndex]}} ▾</view></picker>
+      <picker range="{{occurrenceLabels}}" value="{{item.occurrenceIndex}}" data-index="{{item.index}}" data-field="occurrence" bindchange="onAction"><view class="control">{{occurrenceLabels[item.occurrenceIndex]}} ▾</view></picker>
+    </view>
+    <button class="small add" disabled="{{draft.targets.length >= 8}}" bindtap="addTarget">增加目标</button>
+    <picker range="{{modeLabels}}" value="{{draft.target_mode === 'all' ? 1 : 0}}" bindchange="onMode"><view class="control">{{draft.target_mode === 'all' ? '满足全部目标' : '满足任意目标'}} ▾</view></picker>
+    <view class="field"><text>观察天数</text><input class="control days" type="number" value="{{draft.window_days}}" data-field="window_days" bindinput="onRuleField" /></view>
+    <view class="field"><text>限同一组织</text><switch checked="{{draft.same_organization}}" data-field="same_organization" bindchange="onRuleField" color="#3370ff" /></view>
+    <view class="muted">0 表示当天；会员卡按具体卡种识别，不按成交金额。“再次”指所选产品范围的非首次日。跨组织不超出账号权限。</view>
+  </scroll-view><view class="footer"><button class="small" disabled="{{busy}}" data-mode="once" bindtap="applyRule">仅本次</button><button wx:if="{{ruleId}}" class="small" disabled="{{busy}}" data-mode="new" bindtap="applyRule">另存为</button><button class="small primary" disabled="{{busy}}" data-mode="save" bindtap="applyRule">保存并计算</button></view></view></view>
+  <view wx:if="{{detail}}" class="mask" bindtap="closeDetails"><view class="sheet" catchtap="noop"><view class="sheet-title">关联明细<text class="link" bindtap="closeDetails">关闭</text></view><scroll-view scroll-y class="editor-scroll"><view wx:for="{{detail.details}}" wx:key="index" class="evidence">{{item}}</view><view wx:if="{{!detail.details.length}}" class="empty muted">暂无关联明细</view></scroll-view></view></view>
+</view>

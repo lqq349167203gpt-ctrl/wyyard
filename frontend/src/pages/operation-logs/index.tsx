@@ -31,6 +31,7 @@ const PAGE_LABELS: Record<string, string> = {
   "referral-statistics": "引流统计",
   "member-statistics": "会员情况",
   "course-statistics": "课程记录",
+  "principal": "主理人",
   "product-sales": "产品销售",
   "statistics": "服务数据",
   "daily-report": "每日报表",
@@ -229,6 +230,7 @@ const API_PATH_LABELS: Array<[string, string]> = [
 ]
 
 const SECTION_OPTIONS = [
+  "主理人",
   "课程记录", "服务老师",
   "自定义筛选", "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
   "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",

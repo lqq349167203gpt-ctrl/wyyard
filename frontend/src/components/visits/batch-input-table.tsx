@@ -415,9 +415,9 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     membershipCardApi.list().then(cards => { cardsRef.current = cards }).catch(() => {})
   }, [])
 
-  // 加载当日成交总额
+  // 加载当日有效交易笔数（包括零金额订单）
   useEffect(() => {
-    consumptionRecordsApi.getDailyTotals(date).then(setDailyTotals).catch(() => {})
+    consumptionRecordsApi.getDailyCounts(date).then(setDailyTotals).catch(() => {})
   }, [date])
 
   // 加载当日已有记录（仅首次，日期或空间变化时重新加载）
@@ -1044,7 +1044,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   </td>
                   <td className="px-1.5 py-1.5 text-left">
                     <span className="text-[12px] text-[#8f959e]">
-                      {row.customer_id && dailyTotals[row.customer_id] ? `¥${dailyTotals[row.customer_id].toLocaleString()}` : ""}
+                      {row.customer_id && dailyTotals[row.customer_id] ? `${dailyTotals[row.customer_id]}笔` : ""}
                     </span>
                   </td>
                   <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "referrer_handler") ? "bg-[#f5eeff] rounded" : ""}`}>

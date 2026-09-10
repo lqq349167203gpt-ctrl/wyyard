@@ -21,8 +21,6 @@ import DailyActivitiesPage from "@/pages/daily-activities"
 import PaymentPage from "@/pages/payment"
 import PaymentDeductionsPage from "@/pages/payment-deductions"
 import PaymentRefundsPage from "@/pages/payment-refunds"
-import ExpensesPage from "@/pages/expenses"
-import FinancialOverviewPage from "@/pages/financial-overview"
 import MemberIdentitiesPage from "@/pages/member-identities"
 import HealingRecordsPage from "@/pages/healing-records"
 import CustomerFormPage from "@/pages/healing-records/customer-form"
@@ -41,6 +39,7 @@ import ProductSalesPage from "@/pages/product-sales"
 import DailyReportPage from "@/pages/daily-report"
 import MemberStatisticsPage from "@/pages/member-statistics"
 import CourseStatisticsPage from "@/pages/course-statistics"
+import PrincipalPage from "@/pages/principal"
 import ReferralStatisticsPage from "@/pages/referral-statistics"
 import CommunicationRecordsPage from "@/pages/communication-records"
 import FollowupRecordsPage from "@/pages/followup-records"
@@ -68,8 +67,6 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/payment": "payment",
   "/payment-deductions": "payment-deductions",
   "/payment-refunds": "payment-refunds",
-  "/expenses": "expenses",
-  "/financial-overview": "financial-overview",
   "/agents": "agents",
 
 
@@ -92,6 +89,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/product-sales": "product-sales",
   "/member-statistics": "member-statistics",
   "/course-statistics": "course-statistics",
+  "/principal": "principal",
   "/communication-records": "communication-records",
   "/followup-records": "followup-records",
   "/offline-course-records": "offline-course-records",
@@ -180,8 +178,6 @@ function App() {
               <Route path="/payment" element={<PaymentPage />} />
               <Route path="/payment-deductions" element={<PaymentDeductionsPage />} />
               <Route path="/payment-refunds" element={<PaymentRefundsPage />} />
-              <Route path="/expenses" element={<ExpensesPage />} />
-              <Route path="/financial-overview" element={<FinancialOverviewPage />} />
               <Route path="/other-projects" element={<Navigate to="/payment" replace />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id/chat" element={<ChatPage />} />
@@ -211,6 +207,7 @@ function App() {
               <Route path="/product-sales" element={<ProductSalesPage />} />
               <Route path="/member-statistics" element={<MemberStatisticsPage />} />
               <Route path="/course-statistics" element={<CourseStatisticsPage />} />
+              <Route path="/principal" element={<PrincipalPage />} />
               <Route path="/communication-records" element={<CommunicationRecordsPage />} />
               <Route path="/followup-records" element={<FollowupRecordsPage />} />
               <Route path="/offline-course-records" element={<OfflineCourseRecordsPage />} />

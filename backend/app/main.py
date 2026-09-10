@@ -35,7 +35,6 @@ from app.api.emotional_release_sessions import router as emotional_release_sessi
 from app.api.emotional_releases import router as emotional_releases_router
 from app.api.energy_knot_sessions import router as energy_knot_sessions_router
 from app.api.energy_knots import router as energy_knots_router
-from app.api.expenses import router as expenses_router
 from app.api.financial import router as financial_router
 from app.api.follow_up_statuses import router as follow_up_statuses_router
 from app.api.followup_records import router as followup_records_router
@@ -61,6 +60,7 @@ from app.api.project_deductions import router as project_deductions_router
 from app.api.project_refunds import router as project_refunds_router
 from app.api.reminders import router as reminders_router
 from app.api.service_teacher_customers import router as service_teacher_customers_router
+from app.api.principal import router as principal_router
 from app.api.spaces import router as spaces_router
 from app.api.statistics import router as statistics_router
 from app.api.system_helper import router as system_helper_router
@@ -147,6 +147,7 @@ app.include_router(daily_groupings_router)
 app.include_router(activity_permissions_router)
 app.include_router(reminders_router)
 app.include_router(service_teacher_customers_router)
+app.include_router(principal_router)
 app.include_router(business_reminders_router)
 app.include_router(organizations_router)
 app.include_router(activity_themes_router)
@@ -155,7 +156,6 @@ app.include_router(activity_orders_router)
 app.include_router(project_deductions_router)
 app.include_router(project_refunds_router)
 app.include_router(payment_exports_router)
-app.include_router(expenses_router)
 app.include_router(tea_guest_consumptions_router)
 app.include_router(tea_guest_expenses_router)
 app.include_router(financial_router)

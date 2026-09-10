@@ -18,6 +18,8 @@ _page_view_lock = threading.Lock()
 _recent_page_views: dict[tuple[str, str, str], datetime] = {}
 
 PAGE_NAMES = {
+    "/principal": "主理人",
+    "/pages/principal/index": "主理人",
     # PC 管理端
     "/custom-analysis": "自定义筛选",
     "/service-teachers": "服务老师",

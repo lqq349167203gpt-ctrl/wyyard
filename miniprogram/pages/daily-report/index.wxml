@@ -138,17 +138,13 @@
   <view class="r-body" wx:if="{{activeTab === 'finance'}}">
     <block wx:if="{{!loading}}">
       <view class="fin-summary">
-        <text class="label">今日合计</text>
-        <text class="total">{{financeTotal}}</text>
-        <view class="by-method">
-          <text wx:for="{{byMethod}}" wx:key="method" wx:for-item="m">{{m.method}} {{m.amountText}}</text>
-        </view>
+        <text class="label">交易笔数</text>
+        <text class="total">{{financeRows.length}}笔</text>
       </view>
       <view class="f-card" wx:for="{{financeRows}}" wx:key="id">
         <view class="f-l1">
           <text class="f-name">{{item.nickname}}</text>
           <text class="f-type">{{item.item_type}}</text>
-          <text class="f-amount">{{item.amountText}}</text>
         </view>
         <view class="f-l2">
           <text wx:if="{{item.item_name}}">{{item.item_name}}</text>
@@ -161,8 +157,8 @@
             <text class="val">{{item.closer_name || ''}}<text class="dash" wx:if="{{!item.closer_name}}">-</text></text>
           </view>
           <view class="fi">
-            <text class="lbl">付费方式：</text>
-            <text class="val">{{item.payment_method || ''}}<text class="dash" wx:if="{{!item.payment_method}}">-</text></text>
+            <text class="lbl">成交归属：</text>
+            <text class="val">{{item.organization_name || '—'}}</text>
           </view>
           <view class="fi">
             <text class="lbl">引流：</text>

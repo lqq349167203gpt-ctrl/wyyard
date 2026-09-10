@@ -31,9 +31,9 @@ const ALL_PAGES = [
   { key: "referral-statistics", label: "引流统计" },
   { key: "member-statistics", label: "会员情况" },
   { key: "course-statistics", label: "课程记录" },
+  { key: "principal", label: "主理人" },
   { key: "product-sales", label: "产品销售" },
   { key: "statistics", label: "服务数据" },
-  { key: "financial-overview", label: "财务数据" },
   // 报表
   { key: "daily-report", label: "每日报表" },
   // 业务
@@ -48,7 +48,6 @@ const ALL_PAGES = [
   { key: "payment", label: "付费项目" },
   { key: "payment-deductions", label: "销卡/退课" },
   { key: "payment-refunds", label: "退费" },
-  { key: "expenses", label: "支出项" },
   { key: "debt-records", label: "欠卡记录" },
   // 信息配置
   { key: "member-identities", label: "会员身份" },
@@ -73,12 +72,11 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["custom-analysis", "service-teacher", "referral-statistics", "member-statistics", "course-statistics", "product-sales", "statistics"] },
-  { label: "报表", keys: ["financial-overview", "daily-report"] },
+  { label: "数据", keys: ["custom-analysis", "service-teacher", "referral-statistics", "member-statistics", "course-statistics", "principal", "product-sales", "statistics"] },
+  { label: "报表", keys: ["daily-report"] },
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },
   { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds", "debt-records"] },
-  { label: "支出", keys: ["expenses"] },
   { label: "信息配置", keys: ["member-identities", "customer-tags", "healing-identities", "organizations", "spaces"] },
   { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
   { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs", "login-records", "analysis-logs"] },
@@ -86,6 +84,7 @@ const PERMISSION_GROUPS = [
 ]
 
 const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
+  principal_scope: "own",
   customers: "all",
   visits: "own",
   activities: "own",
@@ -121,6 +120,7 @@ const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
 }
 
 const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
+  principal_scope: "all",
   customers: "all",
   visits: "all",
   activities: "all",
@@ -846,6 +846,18 @@ export default function PositionManagementPage() {
 
                 {permissionSection === "edit" && (
                   <div className="max-w-[860px] space-y-7">
+                    <section className="space-y-3">
+                      <div className="text-[14px] font-medium">主理人组织查看范围</div>
+                      <p className="text-[12px] text-[#8f959e]">需先开启主理人页面权限；仅查看自己指账号归属人所属的组织，客户与交易查看权限仍生效。</p>
+                      <div className="flex gap-6 text-[13px]">
+                        {(["own", "all"] as const).map(value => <label key={value} className="flex items-center gap-2">
+                          <input type="radio" name="principal-scope" checked={(formEditPermissions.principal_scope || "own") === value}
+                            disabled={isSystemRole || !formPermissions.includes("principal")}
+                            onChange={() => setFormEditPermissions(previous => ({ ...previous, principal_scope: value }))} />
+                          {value === "own" ? "仅查看自己" : "查看所有"}
+                        </label>)}
+                      </div>
+                    </section>
                     <section>
                       <div className="mb-3">
                         <div className="text-[14px] font-medium text-[#1f2329]">客户资料可见范围</div>

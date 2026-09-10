@@ -62,6 +62,7 @@ class CustomerAccessPermissionUpdate(StrictBaseModel):
 
 
 class EditPermissionUpdate(StrictBaseModel):
+    principal_scope: Literal["own", "all"] = "own"
     customers: Literal["view", "all"] = "all"
     visits: Literal["view", "own", "all"] = "own"
     activities: Literal["view", "own", "all"] = "own"

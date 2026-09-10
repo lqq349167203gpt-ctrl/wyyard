@@ -1,9 +1,7 @@
-from datetime import date
-
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.financial import CommissionCreate, StaffBenefitCreate
-from app.services import financial_record_service, financial_service
+from app.services import financial_record_service
 from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/financial", tags=["financial"])
@@ -20,44 +18,6 @@ def _set_log_context(request: Request, *, entity_id: str, before_data=None, afte
     if after_data is not None:
         context["after_data"] = after_data.model_dump(mode="json")
     request.state.operation_log_context = context
-
-
-@router.get("/overview")
-def get_overview(
-    date_from: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-    date_to: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-):
-    try:
-        start_date = date.fromisoformat(date_from)
-        end_date = date.fromisoformat(date_to)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail="日期格式不正确") from error
-    if start_date > end_date:
-        raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
-    return financial_service.get_overview(date_from, date_to)
-
-
-@router.get("/revenue-details")
-def list_revenue_details(
-    date_from: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-    date_to: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-    category: str = Query(pattern=r"^(group|custom)$"),
-    name: str = Query(min_length=1, max_length=200),
-):
-    if date_from > date_to:
-        raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
-    return {"data": financial_service.list_revenue_details(date_from, date_to, category, name)}
-
-
-@router.get("/composition-details")
-def list_composition_details(
-    date_from: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-    date_to: str = Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
-    kind: str = Query(pattern=r"^(expense|refund)$"),
-):
-    if date_from > date_to:
-        raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
-    return {"data": financial_service.list_composition_details(date_from, date_to, kind)}
 
 
 @router.get("/commissions")

@@ -751,22 +751,6 @@ const communicationRecordApi = {
   delete: (id) => request(`/api/communication-records/${id}`, { method: 'DELETE' }),
 }
 
-// 支出记录
-const expenseApi = {
-  list: (params = {}) => {
-    const qs = Object.entries(params)
-      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
-      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-      .join('&')
-    return request(`/api/expenses${qs ? '?' + qs : ''}`)
-  },
-  get: (id) => request(`/api/expenses/${id}`),
-  listTypes: (costCategory) => request(`/api/expenses/types/list${costCategory ? `?cost_category=${encodeURIComponent(costCategory)}` : ''}`),
-  create: (data) => request('/api/expenses', { method: 'POST', data }),
-  update: (id, data) => request(`/api/expenses/${id}`, { method: 'PUT', data }),
-  delete: (id) => request(`/api/expenses/${id}`, { method: 'DELETE' }),
-}
-
 // 服务老师
 const serviceTeacherApi = {
   metadata: (courses = false) => request(`/api/service-teacher-customers/${courses ? 'course-metadata' : 'metadata'}`),
@@ -825,6 +809,14 @@ const customAnalysisApi = {
 }
 
 module.exports = {
+  principalApi: {
+    metadata: () => request('/api/principal/metadata'),
+    rules: () => request('/api/principal/rules'),
+    query: (data) => request('/api/principal/query', { method: 'POST', data }),
+    saveRule: (data, id) => request('/api/principal/rules' + (id ? '/' + id : ''), { method: id ? 'PATCH' : 'POST', data }),
+    deleteRule: (id) => request('/api/principal/rules/' + id, { method: 'DELETE' }),
+    export: (data) => request('/api/principal/export', { method: 'POST', data, responseType: 'arraybuffer', timeout: 120000 }),
+  },
   request,
   visitApi,
   visitNoteApi,
@@ -851,7 +843,6 @@ module.exports = {
   internalCourseSessionApi,
   paymentApi,
   communicationRecordApi,
-  expenseApi,
   serviceTeacherApi,
   customAnalysisApi,
 }
